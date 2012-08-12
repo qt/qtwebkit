@@ -28,6 +28,7 @@
 
 #include "Attr.h"
 #include "CSSStyleSheet.h"
+#include "MemoryInstrumentation.h"
 #include "StyledElement.h"
 
 namespace WebCore {
@@ -217,20 +218,20 @@ void ElementAttributeData::destroyInlineStyle(StyledElement* element) const
     m_inlineStyleDecl = 0;
 }
 
-void ElementAttributeData::addAttribute(const Attribute& attribute, Element* element, EInUpdateStyleAttribute inUpdateStyleAttribute)
+void ElementAttributeData::addAttribute(const Attribute& attribute, Element* element, SynchronizationOfLazyAttribute inSynchronizationOfLazyAttribute)
 {
     ASSERT(isMutable());
 
-    if (element && inUpdateStyleAttribute == NotInUpdateStyleAttribute)
+    if (element && inSynchronizationOfLazyAttribute == NotInSynchronizationOfLazyAttribute)
         element->willModifyAttribute(attribute.name(), nullAtom, attribute.value());
 
     m_mutableAttributeVector->append(attribute);
 
-    if (element && inUpdateStyleAttribute == NotInUpdateStyleAttribute)
+    if (element && inSynchronizationOfLazyAttribute == NotInSynchronizationOfLazyAttribute)
         element->didAddAttribute(attribute);
 }
 
-void ElementAttributeData::removeAttribute(size_t index, Element* element, EInUpdateStyleAttribute inUpdateStyleAttribute)
+void ElementAttributeData::removeAttribute(size_t index, Element* element, SynchronizationOfLazyAttribute inSynchronizationOfLazyAttribute)
 {
     ASSERT(isMutable());
     ASSERT(index < length());
@@ -238,7 +239,7 @@ void ElementAttributeData::removeAttribute(size_t index, Element* element, EInUp
     Attribute& attribute = m_mutableAttributeVector->at(index);
     QualifiedName name = attribute.name();
 
-    if (element && inUpdateStyleAttribute == NotInUpdateStyleAttribute)
+    if (element && inSynchronizationOfLazyAttribute == NotInSynchronizationOfLazyAttribute)
         element->willRemoveAttribute(name, attribute.value());
 
     if (RefPtr<Attr> attr = attrIfExists(element, name))
@@ -246,7 +247,7 @@ void ElementAttributeData::removeAttribute(size_t index, Element* element, EInUp
 
     m_mutableAttributeVector->remove(index);
 
-    if (element && inUpdateStyleAttribute == NotInUpdateStyleAttribute)
+    if (element && inSynchronizationOfLazyAttribute == NotInSynchronizationOfLazyAttribute)
         element->didRemoveAttribute(name);
 }
 
@@ -281,6 +282,19 @@ void ElementAttributeData::detachAttrObjectsFromElement(Element* element) const
 
     // The loop above should have cleaned out this element's Attr map.
     ASSERT(!element->hasAttrList());
+}
+
+void ElementAttributeData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::DOM);
+    info.addInstrumentedMember(m_inlineStyleDecl);
+    info.addInstrumentedMember(m_attributeStyle);
+    info.addMember(m_classNames);
+    info.addMember(m_idForStyleResolution);
+    if (m_isMutable)
+        info.addVectorPtr(m_mutableAttributeVector);
+    else
+        info.addRawBuffer(m_attributes, m_arraySize * sizeof(Attribute));
 }
 
 size_t ElementAttributeData::getAttributeItemIndexSlowCase(const AtomicString& name, bool shouldIgnoreAttributeCase) const

@@ -142,12 +142,20 @@ class Port(object):
         self._test_configuration = None
         self._reftest_list = {}
         self._results_directory = None
+        self._root_was_set = hasattr(options, 'root') and options.root
+
+    def additional_drt_flag(self):
+        return []
 
     def default_pixel_tests(self):
         # FIXME: Disable until they are run by default on build.webkit.org.
         return False
 
     def default_timeout_ms(self):
+        if self.get_option('webkit_test_runner'):
+            # Add some more time to WebKitTestRunner because it needs to syncronise the state
+            # with the web process and we want to detect if there is a problem with that in the driver.
+            return 50 * 1000
         return 35 * 1000
 
     def wdiff_available(self):
@@ -207,7 +215,7 @@ class Port(object):
         """This routine is used to ensure that the build is up to date
         and all the needed binaries are present."""
         # If we're using a pre-built copy of WebKit (--root), we assume it also includes a build of DRT.
-        if not self.get_option('root') and self.get_option('build') and not self._build_driver():
+        if not self._root_was_set and self.get_option('build') and not self._build_driver():
             return False
         if not self._check_driver():
             return False
@@ -311,7 +319,7 @@ class Port(object):
         return expected_audio != actual_audio
 
     def diff_image(self, expected_contents, actual_contents, tolerance=None):
-        """Compare two images and return a tuple of an image diff, and a percentage difference (0-100).
+        """Compare two images and return a tuple of an image diff, a percentage difference (0-100), and an error string.
 
         |tolerance| should be a percentage value (0.0 - 100.0).
         If it is omitted, the port default tolerance value is used.
@@ -319,13 +327,14 @@ class Port(object):
         If an error occurs (like ImageDiff isn't found, or crashes, we log an error and return True (for a diff).
         """
         if not actual_contents and not expected_contents:
-            return (None, 0)
+            return (None, 0, None)
         if not actual_contents or not expected_contents:
-            return (True, 0)
+            return (True, 0, None)
         if not self._image_differ:
             self._image_differ = image_diff.ImageDiffer(self)
         self.set_option_default('tolerance', 0.1)
-        tolerance = tolerance or self.get_option('tolerance')
+        if tolerance is None:
+            tolerance = self.get_option('tolerance')
         return self._image_differ.diff_image(expected_contents, actual_contents, tolerance)
 
     def diff_text(self, expected_text, actual_text, expected_filename, actual_filename):
@@ -559,7 +568,7 @@ class Port(object):
             expanded_paths.append(path)
             if self.test_isdir(path) and not path.startswith('platform'):
                 for platform_dir in all_platform_dirs:
-                    if fs.isdir(fs.join(platform_dir, path)):
+                    if fs.isdir(fs.join(platform_dir, path)) and platform_dir in self.baseline_search_path():
                         expanded_paths.append(self.relative_test_filename(fs.join(platform_dir, path)))
 
         return expanded_paths
@@ -786,6 +795,9 @@ class Port(object):
             option_val = self.get_option('results_directory') or self.default_results_directory()
             self._results_directory = self._filesystem.abspath(option_val)
         return self._results_directory
+
+    def perf_results_directory(self):
+        return self._build_path()
 
     def default_results_directory(self):
         """Absolute path to the default place to store the test results."""
@@ -1151,11 +1163,13 @@ class Port(object):
         if not root_directory:
             build_directory = self.get_option('build_directory')
             if build_directory:
-                root_directory = self._filesystem.join(self.get_option('configuration'))
+                root_directory = self._filesystem.join(build_directory, self.get_option('configuration'))
             else:
                 root_directory = self._config.build_directory(self.get_option('configuration'))
             # Set --root so that we can pass this to subprocesses and avoid making the
             # slow call to config.build_directory() N times in each worker.
+            # FIXME: This is like @memoized, but more annoying and fragile; there should be another
+            # way to propagate values without mutating the options list.
             self.set_option_default('root', root_directory)
         return self._filesystem.join(self._filesystem.abspath(root_directory), *comps)
 
@@ -1277,21 +1291,9 @@ class Port(object):
                 return suite.args
         return []
 
-    def supports_switching_pixel_tests_per_test(self):
-        if self.get_option('webkit_test_runner'):
-            return True
-        return self._supports_switching_pixel_tests_per_test()
-
-    def _supports_switching_pixel_tests_per_test(self):
-        # FIXME: all ports should support it.
-        return False
-
     def should_run_as_pixel_test(self, test_input):
         if not self._options.pixel_tests:
             return False
-        if not self.supports_switching_pixel_tests_per_test():
-            # Cannot do more filtering without this.
-            return True
         if self._options.pixel_test_directories:
             return any(test_input.test_name.startswith(directory) for directory in self._options.pixel_test_directories)
         return self._should_run_as_pixel_test(test_input)

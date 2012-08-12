@@ -57,7 +57,7 @@ class Widget;
     
 class AccessibilityRenderObject : public AccessibilityNodeObject {
 protected:
-    AccessibilityRenderObject(RenderObject*);
+    explicit AccessibilityRenderObject(RenderObject*);
 public:
     static PassRefPtr<AccessibilityRenderObject> create(RenderObject*);
     virtual ~AccessibilityRenderObject();
@@ -256,6 +256,8 @@ public:
     virtual String nameForMSAA() const;
     virtual String descriptionForMSAA() const;
     virtual AccessibilityRole roleValueForMSAA() const;
+
+    virtual String passwordFieldValue() const;
 
 protected:
     RenderObject* m_renderer;

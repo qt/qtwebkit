@@ -31,24 +31,23 @@
 #include "config.h"
 #include "V8Utilities.h"
 
-#include <wtf/ArrayBuffer.h>
+#include "BindingState.h"
 #include "Document.h"
 #include "ExceptionCode.h"
 #include "Frame.h"
+#include "GenericBinding.h"
 #include "MessagePort.h"
 #include "ScriptExecutionContext.h"
 #include "ScriptState.h"
 #include "V8ArrayBuffer.h"
 #include "V8Binding.h"
-#include "V8BindingState.h"
 #include "V8MessagePort.h"
 #include "V8Proxy.h"
 #include "WorkerContext.h"
 #include "WorkerContextExecutionProxy.h"
-
-#include <wtf/Assertions.h>
-
 #include <v8.h>
+#include <wtf/ArrayBuffer.h>
+#include <wtf/Assertions.h>
 
 namespace WebCore {
 
@@ -64,7 +63,7 @@ V8AuxiliaryContext::~V8AuxiliaryContext()
 
 v8::Persistent<v8::Context>& V8AuxiliaryContext::auxiliaryContext()
 {
-    v8::Persistent<v8::Context>& context = V8BindingPerIsolateData::current()->auxiliaryContext();
+    v8::Persistent<v8::Context>& context = V8PerIsolateData::current()->auxiliaryContext();
     if (context.IsEmpty())
         context = v8::Context::New();
     return context;
@@ -84,7 +83,7 @@ void createHiddenDependency(v8::Handle<v8::Object> object, v8::Local<v8::Value> 
     cacheArray->Set(v8Integer(cacheArray->Length()), value);
 }
 
-bool extractTransferables(v8::Local<v8::Value> value, MessagePortArray& ports, ArrayBufferArray& arrayBuffers)
+bool extractTransferables(v8::Local<v8::Value> value, MessagePortArray& ports, ArrayBufferArray& arrayBuffers, v8::Isolate* isolate)
 {
     if (isUndefinedOrNull(value)) {
         ports.resize(0);
@@ -108,7 +107,7 @@ bool extractTransferables(v8::Local<v8::Value> value, MessagePortArray& ports, A
         v8::Local<v8::Value> transferrable = transferrables->Get(i);
         // Validation of non-null objects, per HTML5 spec 10.3.3.
         if (isUndefinedOrNull(transferrable)) {
-            throwError(DATA_CLONE_ERR);
+            V8Proxy::setDOMException(DATA_CLONE_ERR, isolate);
             return false;
         }
         // Validation of Objects implementing an interface, per WebIDL spec 4.1.15.
@@ -124,10 +123,10 @@ bool extractTransferables(v8::Local<v8::Value> value, MessagePortArray& ports, A
     return true;
 }
 
-bool getMessagePortArray(v8::Local<v8::Value> value, MessagePortArray& ports)
+bool getMessagePortArray(v8::Local<v8::Value> value, MessagePortArray& ports, v8::Isolate* isolate)
 {
     ArrayBufferArray arrayBuffers;
-    bool result = extractTransferables(value, ports, arrayBuffers);
+    bool result = extractTransferables(value, ports, arrayBuffers, isolate);
     if (!result)
         return false;
     if (arrayBuffers.size() > 0) {
@@ -171,12 +170,12 @@ void transferHiddenDependency(v8::Handle<v8::Object> object,
 
 Frame* callingOrEnteredFrame()
 {
-    return V8BindingState::Only()->activeFrame();
+    return activeFrame(BindingState::instance());
 }
 
 KURL completeURL(const String& relativeURL)
 {
-    return completeURL(V8BindingState::Only(), relativeURL);
+    return completeURL(BindingState::instance(), relativeURL);
 }
 
 ScriptExecutionContext* getScriptExecutionContext()
@@ -186,15 +185,15 @@ ScriptExecutionContext* getScriptExecutionContext()
         return controller->workerContext();
 #endif
 
-    if (Frame* frame = V8Proxy::retrieveFrameForCurrentContext())
+    if (Frame* frame = currentFrame(BindingState::instance()))
         return frame->document()->scriptExecutionContext();
 
     return 0;
 }
 
-void throwTypeMismatchException(v8::Isolate* isolate)
+void setTypeMismatchException(v8::Isolate* isolate)
 {
-    V8Proxy::throwError(V8Proxy::GeneralError, "TYPE_MISMATCH_ERR: DOM Exception 17", isolate);
+    V8Proxy::setDOMException(TYPE_MISMATCH_ERR, isolate);
 }
 
 } // namespace WebCore

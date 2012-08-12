@@ -110,7 +110,6 @@ HEADERS += \
     PassTraits.h \
     Platform.h \
     PossiblyNull.h \
-    qt/UtilsQt.h \
     RandomNumber.h \
     RandomNumberSeed.h \
     RedBlackTree.h \
@@ -190,6 +189,7 @@ SOURCES += \
     dtoa/fixed-dtoa.cc \
     dtoa/strtod.cc \
     FastMalloc.cpp \
+    GregorianDateTime.cpp \
     gobject/GOwnPtr.cpp \
     gobject/GRefPtr.cpp \
     HashTable.cpp \

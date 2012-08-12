@@ -37,7 +37,6 @@
 #include "ExceptionCode.h"
 #include "ScheduledAction.h"
 #include "V8Binding.h"
-#include "V8BindingMacros.h"
 #include "V8Proxy.h"
 #include "V8Utilities.h"
 #include "V8WorkerContextEventListener.h"
@@ -107,7 +106,7 @@ v8::Handle<v8::Value> V8WorkerContext::importScriptsCallback(const v8::Arguments
     workerContext->importScripts(urls, ec);
 
     if (ec)
-        return throwError(ec, args.GetIsolate());
+        return V8Proxy::setDOMException(ec, args.GetIsolate());
 
     return v8::Undefined();
 }

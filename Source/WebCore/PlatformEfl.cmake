@@ -14,12 +14,10 @@ LIST(APPEND WebCore_INCLUDE_DIRECTORIES
   "${WEBCORE_DIR}/platform/text/efl"
   "${WEBCORE_DIR}/plugins/efl"
   "${WEBKIT_DIR}/efl/WebCoreSupport"
-  "${WEBKIT_DIR}/efl/ewk"
 )
 
 LIST(APPEND WebCore_SOURCES
   accessibility/efl/AccessibilityObjectEfl.cpp
-  bindings/js/ScriptControllerEfl.cpp
   page/efl/DragControllerEfl.cpp
   page/efl/EventHandlerEfl.cpp
   platform/Cursor.cpp
@@ -47,8 +45,6 @@ LIST(APPEND WebCore_SOURCES
   platform/efl/PlatformKeyboardEventEfl.cpp
   platform/efl/PlatformMouseEventEfl.cpp
   platform/efl/PlatformScreenEfl.cpp
-  platform/efl/PlatformTouchEventEfl.cpp
-  platform/efl/PlatformTouchPointEfl.cpp
   platform/efl/PlatformWheelEventEfl.cpp
   platform/efl/PopupMenuEfl.cpp
   platform/efl/RefPtrEfl.cpp

@@ -52,6 +52,7 @@
 #include "RenderVideo.h"
 #include "RenderView.h"
 #include "ScrollingCoordinator.h"
+#include "Settings.h"
 #include "StyleResolver.h"
 #include "TiledBacking.h"
 
@@ -121,8 +122,11 @@ RenderLayerBacking::RenderLayerBacking(RenderLayer* layer)
     if (m_usingTiledCacheLayer) {
         if (Page* page = renderer()->frame()->page()) {
             if (TiledBacking* tiledBacking = m_graphicsLayer->tiledBacking()) {
+                Frame* frame = renderer()->frame();
+
                 tiledBacking->setIsInWindow(page->isOnscreen());
-                tiledBacking->setCanHaveScrollbars(renderer()->frame()->view()->canHaveScrollbars());
+                tiledBacking->setCanHaveScrollbars(frame->view()->canHaveScrollbars());
+                tiledBacking->setScrollingPerformanceLoggingEnabled(frame->settings() && frame->settings()->scrollingPerformanceLoggingEnabled());
             }
         }
     }
@@ -895,16 +899,23 @@ bool RenderLayerBacking::paintsChildren() const
     return false;
 }
 
+static bool isCompositedPlugin(RenderObject* renderer)
+{
+    return renderer->isEmbeddedObject() && toRenderEmbeddedObject(renderer)->allowsAcceleratedCompositing();
+}
+
 // A "simple container layer" is a RenderLayer which has no visible content to render.
 // It may have no children, or all its children may be themselves composited.
 // This is a useful optimization, because it allows us to avoid allocating backing store.
 bool RenderLayerBacking::isSimpleContainerCompositingLayer() const
 {
     RenderObject* renderObject = renderer();
-    if (renderObject->isReplaced() ||       // replaced objects are not containers
-        renderObject->hasMask())            // masks require special treatment
+    if (renderObject->hasMask()) // masks require special treatment
         return false;
 
+    if (renderObject->isReplaced() && !isCompositedPlugin(renderObject))
+            return false;
+    
     if (paintsBoxDecorations() || paintsChildren())
         return false;
     
@@ -1618,6 +1629,20 @@ double RenderLayerBacking::backingStoreMemoryEstimate() const
     
     return backingMemory;
 }
+
+#if PLATFORM(BLACKBERRY)
+bool RenderLayerBacking::contentsVisible(const GraphicsLayer*, const IntRect& localContentRect) const
+{
+    Frame* frame = renderer()->frame();
+    FrameView* view = frame ? frame->view() : 0;
+    if (!view)
+        return false;
+
+    IntRect visibleContentRect(view->visibleContentRect());
+    FloatQuad absoluteContentQuad = renderer()->localToAbsoluteQuad(FloatRect(localContentRect));
+    return absoluteContentQuad.enclosingBoundingBox().intersects(visibleContentRect);
+}
+#endif
 
 } // namespace WebCore
 

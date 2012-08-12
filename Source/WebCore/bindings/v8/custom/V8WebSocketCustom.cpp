@@ -38,6 +38,7 @@
 #include "Frame.h"
 #include "Settings.h"
 #include "V8ArrayBuffer.h"
+#include "V8ArrayBufferView.h"
 #include "V8Binding.h"
 #include "V8Blob.h"
 #include "V8Proxy.h"
@@ -105,11 +106,12 @@ v8::Handle<v8::Value> V8WebSocket::constructorCallback(const v8::Arguments& args
         }
     }
     if (ec)
-        return throwError(ec, args.GetIsolate());
+        return V8Proxy::setDOMException(ec, args.GetIsolate());
 
-    V8DOMWrapper::setDOMWrapper(args.Holder(), &info, webSocket.get());
-    V8DOMWrapper::setJSWrapperForActiveDOMObject(webSocket.release(), v8::Persistent<v8::Object>::New(args.Holder()));
-    return args.Holder();
+    v8::Handle<v8::Object> wrapper = args.Holder();
+    V8DOMWrapper::setDOMWrapper(wrapper, &info, webSocket.get());
+    V8DOMWrapper::setJSWrapperForActiveDOMObject(webSocket.release(), wrapper);
+    return wrapper;
 }
 
 v8::Handle<v8::Value> V8WebSocket::sendCallback(const v8::Arguments& args)
@@ -127,6 +129,10 @@ v8::Handle<v8::Value> V8WebSocket::sendCallback(const v8::Arguments& args)
         ArrayBuffer* arrayBuffer = V8ArrayBuffer::toNative(v8::Handle<v8::Object>::Cast(message));
         ASSERT(arrayBuffer);
         result = webSocket->send(arrayBuffer, ec);
+    } else if (V8ArrayBufferView::HasInstance(message)) {
+        ArrayBufferView* arrayBufferView = V8ArrayBufferView::toNative(v8::Handle<v8::Object>::Cast(message));
+        ASSERT(arrayBufferView);
+        result = webSocket->send(arrayBufferView, ec);
     } else if (V8Blob::HasInstance(message)) {
         Blob* blob = V8Blob::toNative(v8::Handle<v8::Object>::Cast(message));
         ASSERT(blob);
@@ -139,41 +145,9 @@ v8::Handle<v8::Value> V8WebSocket::sendCallback(const v8::Arguments& args)
         result = webSocket->send(toWebCoreString(stringMessage), ec);
     }
     if (ec)
-        return throwError(ec, args.GetIsolate());
+        return V8Proxy::setDOMException(ec, args.GetIsolate());
 
     return v8Boolean(result, args.GetIsolate());
-}
-
-v8::Handle<v8::Value> V8WebSocket::closeCallback(const v8::Arguments& args)
-{
-    // FIXME: We should implement [Clamp] for IDL binding code generator, and
-    // remove this custom method.
-    WebSocket* webSocket = toNative(args.Holder());
-    int argumentCount = args.Length();
-    int code = WebSocketChannel::CloseEventCodeNotSpecified;
-    String reason = "";
-    if (argumentCount >= 1) {
-        double x = args[0]->NumberValue();
-        double maxValue = static_cast<double>(std::numeric_limits<uint16_t>::max());
-        double minValue = static_cast<double>(std::numeric_limits<uint16_t>::min());
-        if (isnan(x))
-            x = 0.0;
-        else
-            x = clampTo(x, minValue, maxValue);
-        code = clampToInteger(x);
-        if (argumentCount >= 2) {
-            v8::TryCatch tryCatch;
-            v8::Handle<v8::String> reasonValue = args[1]->ToString();
-            if (tryCatch.HasCaught())
-                return throwError(tryCatch.Exception(), args.GetIsolate());
-            reason = toWebCoreString(reasonValue);
-        }
-    }
-    ExceptionCode ec = 0;
-    webSocket->close(code, reason, ec);
-    if (ec)
-        return throwError(ec, args.GetIsolate());
-    return v8::Undefined();
 }
 
 }  // namespace WebCore

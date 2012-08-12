@@ -169,6 +169,8 @@
 #include "XPathResult.h"
 #include "markup.h"
 #include "painting/GraphicsContextBuilder.h"
+#include "platform/WebFloatPoint.h"
+#include "platform/WebFloatRect.h"
 #include "platform/WebPoint.h"
 #include "platform/WebRect.h"
 #include "platform/WebSerializedScriptValue.h"
@@ -586,6 +588,16 @@ WebFrame* WebFrame::fromFrameOwnerElement(const WebElement& element)
 WebString WebFrameImpl::name() const
 {
     return m_frame->tree()->uniqueName();
+}
+
+WebString WebFrameImpl::uniqueName() const
+{
+    return m_frame->tree()->uniqueName();
+}
+
+WebString WebFrameImpl::assignedName() const
+{
+    return m_frame->tree()->name();
 }
 
 void WebFrameImpl::setName(const WebString& name)
@@ -1446,11 +1458,22 @@ bool WebFrameImpl::selectWordAroundCaret()
 
 void WebFrameImpl::selectRange(const WebPoint& start, const WebPoint& end)
 {
-    VisibleSelection selection(visiblePositionForWindowPoint(start),
-                               visiblePositionForWindowPoint(end));
+    VisiblePosition startPosition = visiblePositionForWindowPoint(start);
+    VisiblePosition endPosition = visiblePositionForWindowPoint(end);
 
-    if (frame()->selection()->shouldChangeSelection(selection))
-        frame()->selection()->setSelection(selection, CharacterGranularity);
+    // To correctly handle editable boundaries, we adjust the selection by setting its extent
+    // while keeping its base fixed. For a touch-based UI, this means that moving the selection
+    // handles behaves like a drag-select with the mouse, which is what we want here. If both
+    // endpoints changed, we need to set the extent twice.
+    // FIXME: the WebFrame::SelectRange API should explicitly state which endpoint is moving.
+    VisibleSelection newSelection = frame()->selection()->selection();
+    if (startPosition != newSelection.visibleStart())
+        newSelection = VisibleSelection(newSelection.visibleEnd(), startPosition);
+    if (endPosition != newSelection.visibleEnd())
+        newSelection = VisibleSelection(newSelection.visibleStart(), endPosition);
+
+    if (frame()->selection()->shouldChangeSelection(newSelection))
+        frame()->selection()->setSelection(newSelection, CharacterGranularity);
 }
 
 void WebFrameImpl::selectRange(const WebRange& webRange)
@@ -1472,13 +1495,9 @@ VisiblePosition WebFrameImpl::visiblePositionForWindowPoint(const WebPoint& poin
 
     frame()->document()->renderView()->layer()->hitTest(request, result);
 
-    // Matching the logic in MouseEventWithHitTestResults::targetNode()
-    Node* node = result.innerNode();
+    Node* node = EventHandler::targetNode(result);
     if (!node)
         return VisiblePosition();
-    Element* element = node->parentElement();
-    if (!node->inDocument() && element && element->inDocument())
-        node = element;
 
     return node->renderer()->positionForPoint(result.localPoint());
 }
@@ -1938,6 +1957,29 @@ void WebFrameImpl::dispatchMessageEventWithOriginCheck(const WebSecurityOrigin& 
     m_frame->domWindow()->dispatchMessageEventWithOriginCheck(intendedTargetOrigin.get(), event, 0);
 }
 
+int WebFrameImpl::findMatchMarkersVersion() const
+{
+    // FIXME: Implement this as part of https://bugs.webkit.org/show_bug.cgi?id=93111.
+    return 0;
+}
+
+WebFloatRect WebFrameImpl::activeFindMatchRect()
+{
+    // FIXME: Implement this as part of https://bugs.webkit.org/show_bug.cgi?id=93111.
+    return WebFloatRect();
+}
+
+void WebFrameImpl::findMatchRects(WebVector<WebFloatRect>& outputRects)
+{
+    // FIXME: Implement this as part of https://bugs.webkit.org/show_bug.cgi?id=93111.
+}
+
+int WebFrameImpl::selectNearestFindMatch(const WebFloatPoint& point, WebRect* selectionRect)
+{
+    // FIXME: Implement this as part of https://bugs.webkit.org/show_bug.cgi?id=93111.
+    return 0;
+}
+
 void WebFrameImpl::deliverIntent(const WebIntent& intent, WebMessagePortChannelArray* ports, WebDeliveredIntentClient* intentClient)
 {
 #if ENABLE(WEB_INTENTS)
@@ -1999,21 +2041,6 @@ WebString WebFrameImpl::renderTreeAsText(RenderAsTextControls toShow) const
 WebString WebFrameImpl::markerTextForListItem(const WebElement& webElement) const
 {
     return WebCore::markerTextForListItem(const_cast<Element*>(webElement.constUnwrap<Element>()));
-}
-
-int WebFrameImpl::pageNumberForElementById(const WebString& id,
-                                           float pageWidthInPixels,
-                                           float pageHeightInPixels) const
-{
-    if (!m_frame)
-        return -1;
-
-    Element* element = m_frame->document()->getElementById(id);
-    if (!element)
-        return -1;
-
-    FloatSize pageSize(pageWidthInPixels, pageHeightInPixels);
-    return PrintContext::pageNumberForElement(element, pageSize);
 }
 
 void WebFrameImpl::printPagesWithBoundaries(WebCanvas* canvas, const WebSize& pageSizeInPixels)
@@ -2141,6 +2168,9 @@ PassRefPtr<Frame> WebFrameImpl::createChildFrame(
     // script in the page.
     if (!childFrame->tree()->parent())
         return 0;
+
+    if (m_client)
+        m_client->didCreateFrame(this, webframe.get());
 
     return childFrame.release();
 }

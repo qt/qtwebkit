@@ -116,6 +116,7 @@
 #include "JSEvent.cpp"
 #include "JSEventException.cpp"
 #include "JSEventSource.cpp"
+#include "JSEventTarget.cpp"
 #include "JSFile.cpp"
 #include "JSFileCallback.cpp"
 #include "JSFileEntry.cpp"
@@ -237,6 +238,9 @@
 #include "JSMediaError.cpp"
 #include "JSMediaList.cpp"
 #include "JSMediaQueryList.cpp"
+#if ENABLE(MEDIA_SOURCE)
+#include "JSMediaSource.cpp"
+#endif
 #include "JSMemoryInfo.cpp"
 #include "JSMessageChannel.cpp"
 #include "JSMessageEvent.cpp"

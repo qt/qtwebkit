@@ -96,6 +96,19 @@
             'sources': [
                 '<@(test_runner_files)',
             ],
+            'conditions': [
+                ['toolkit_uses_gtk == 1', {
+                    'defines': [
+                        'WTF_USE_GTK=1',
+                    ],
+                    'dependencies': [
+                        '<(chromium_src_dir)/build/linux/system.gyp:gtk',
+                    ],
+                    'include_dirs': [
+                        '<(source_dir)/WebKit/chromium/public/gtk',
+                    ],
+                }],
+            ],
         },
         {
             'target_name': 'DumpRenderTree',
@@ -120,6 +133,7 @@
             'include_dirs': [
                 '<(chromium_src_dir)',
                 '<(source_dir)/WebKit/chromium/public',
+                '<(tools_dir)/DumpRenderTree',
                 '<(DEPTH)',
             ],
             'defines': [
@@ -212,6 +226,7 @@
                         '<(tools_dir)/DumpRenderTree/fonts/WebKitWeightWatcher700.ttf',
                         '<(tools_dir)/DumpRenderTree/fonts/WebKitWeightWatcher800.ttf',
                         '<(tools_dir)/DumpRenderTree/fonts/WebKitWeightWatcher900.ttf',
+                        '<(SHARED_INTERMEDIATE_DIR)/webkit/missingImage.png',
                         '<(SHARED_INTERMEDIATE_DIR)/webkit/textAreaResizeCorner.png',
                     ],
                 },{ # OS!="mac"
@@ -474,8 +489,18 @@
                         '--output',
                         '<(PRODUCT_DIR)/DumpRenderTree_apk',
                         '--ant-args',
+                        '-DANDROID_SDK=<(android_sdk)',
+                        '--ant-args',
+                        '-DANDROID_SDK_ROOT=<(android_sdk_root)',
+                        '--ant-args',
+                        '-DANDROID_SDK_TOOLS=<(android_sdk_tools)',
+                        '--ant-args',
+                        '-DANDROID_SDK_VERSION=<(android_sdk_version)',
+                        '--ant-args',
+                        '-DANDROID_TOOLCHAIN=<(android_toolchain)',
+                        '--ant-args',
                         '-DPRODUCT_DIR=<(ant_build_out)',
-                        '--ant-compile',
+                        '--sdk-build=<(sdk_build)',
                         '--app_abi',
                         '<(android_app_abi)',
                     ],

@@ -52,7 +52,7 @@ namespace WebCore {
     class EventTarget;
     class Frame;
     class Node;
-    class V8BindingPerContextData;
+    class V8PerContextData;
     class V8Proxy;
     class WorkerContext;
     class XPathResolver;
@@ -104,10 +104,12 @@ namespace WebCore {
         static v8::Local<v8::Function> constructorForType(WrapperTypeInfo*, WorkerContext*);
 #endif
 
-        template<typename T> static void setJSWrapperForDOMObject(PassRefPtr<T>, v8::Persistent<v8::Object>, v8::Isolate* = 0);
-        template<typename T> static void setJSWrapperForActiveDOMObject(PassRefPtr<T>, v8::Persistent<v8::Object>, v8::Isolate* = 0);
-        static void setJSWrapperForDOMNode(PassRefPtr<Node>, v8::Persistent<v8::Object>, v8::Isolate* = 0);
-        static void setJSWrapperForActiveDOMNode(PassRefPtr<Node>, v8::Persistent<v8::Object>, v8::Isolate* = 0);
+        template<typename T>
+        static v8::Persistent<v8::Object> setJSWrapperForDOMObject(PassRefPtr<T>, v8::Handle<v8::Object>, v8::Isolate* = 0);
+        template<typename T>
+        static v8::Persistent<v8::Object> setJSWrapperForActiveDOMObject(PassRefPtr<T>, v8::Handle<v8::Object>, v8::Isolate* = 0);
+        static v8::Persistent<v8::Object> setJSWrapperForDOMNode(PassRefPtr<Node>, v8::Handle<v8::Object>, v8::Isolate* = 0);
+        static v8::Persistent<v8::Object> setJSWrapperForActiveDOMNode(PassRefPtr<Node>, v8::Handle<v8::Object>, v8::Isolate* = 0);
 
         static bool isValidDOMObject(v8::Handle<v8::Value>);
 
@@ -146,26 +148,30 @@ namespace WebCore {
             return domNodeMap.get(node);
         }
     private:
-        static V8BindingPerContextData* perContextData(V8Proxy*);
+        static V8PerContextData* perContextData(V8Proxy*);
 #if ENABLE(WORKERS)
-        static V8BindingPerContextData* perContextData(WorkerContext*);
+        static V8PerContextData* perContextData(WorkerContext*);
 #endif
     };
 
     template<typename T>
-    void V8DOMWrapper::setJSWrapperForDOMObject(PassRefPtr<T> object, v8::Persistent<v8::Object> wrapper, v8::Isolate* isolate)
+    v8::Persistent<v8::Object> V8DOMWrapper::setJSWrapperForDOMObject(PassRefPtr<T> object, v8::Handle<v8::Object> wrapper, v8::Isolate* isolate)
     {
-        ASSERT(maybeDOMWrapper(wrapper));
-        ASSERT(!domWrapperType(wrapper)->toActiveDOMObjectFunction);
-        getDOMObjectMap(isolate).set(object.leakRef(), wrapper);
+        v8::Persistent<v8::Object> wrapperHandle = v8::Persistent<v8::Object>::New(wrapper);
+        ASSERT(maybeDOMWrapper(wrapperHandle));
+        ASSERT(!domWrapperType(wrapperHandle)->toActiveDOMObjectFunction);
+        getDOMObjectMap(isolate).set(object.leakRef(), wrapperHandle);
+        return wrapperHandle;
     }
 
     template<typename T>
-    void V8DOMWrapper::setJSWrapperForActiveDOMObject(PassRefPtr<T> object, v8::Persistent<v8::Object> wrapper, v8::Isolate* isolate)
+    v8::Persistent<v8::Object> V8DOMWrapper::setJSWrapperForActiveDOMObject(PassRefPtr<T> object, v8::Handle<v8::Object> wrapper, v8::Isolate* isolate)
     {
-        ASSERT(maybeDOMWrapper(wrapper));
-        ASSERT(domWrapperType(wrapper)->toActiveDOMObjectFunction);
-        getActiveDOMObjectMap(isolate).set(object.leakRef(), wrapper);
+        v8::Persistent<v8::Object> wrapperHandle = v8::Persistent<v8::Object>::New(wrapper);
+        ASSERT(maybeDOMWrapper(wrapperHandle));
+        ASSERT(domWrapperType(wrapperHandle)->toActiveDOMObjectFunction);
+        getActiveDOMObjectMap(isolate).set(object.leakRef(), wrapperHandle);
+        return wrapperHandle;
     }
 }
 

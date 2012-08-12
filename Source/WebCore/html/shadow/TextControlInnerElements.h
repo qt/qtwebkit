@@ -66,6 +66,7 @@ public:
     static PassRefPtr<SearchFieldResultsButtonElement> create(Document*);
 
     virtual void defaultEventHandler(Event*);
+    virtual bool willRespondToMouseClickEvents() OVERRIDE;
 
 private:
     SearchFieldResultsButtonElement(Document*);
@@ -78,6 +79,7 @@ public:
     static PassRefPtr<SearchFieldCancelButtonElement> create(Document*);
 
     virtual void defaultEventHandler(Event*);
+    virtual bool willRespondToMouseClickEvents() OVERRIDE;
 
 private:
     SearchFieldCancelButtonElement(Document*);
@@ -113,6 +115,9 @@ public:
 
     void step(int amount);
     
+    virtual bool willRespondToMouseMoveEvents() OVERRIDE;
+    virtual bool willRespondToMouseClickEvents() OVERRIDE;
+
 private:
     SpinButtonElement(Document*, StepActionHandler&);
 
@@ -120,7 +125,8 @@ private:
     virtual void detach();
     virtual bool isSpinButtonElement() const { return true; }
     virtual bool isEnabledFormControl() const { return shadowHost()->isEnabledFormControl(); }
-    virtual bool isReadOnlyFormControl() const { return shadowHost()->isReadOnlyFormControl(); }
+    virtual bool shouldMatchReadOnlySelector() const OVERRIDE;
+    virtual bool shouldMatchReadWriteSelector() const OVERRIDE;
     virtual void defaultEventHandler(Event*);
     void doStepAction(int);
     void startRepeatingTimer();
@@ -153,6 +159,7 @@ public:
 
     virtual void detach();
     virtual void defaultEventHandler(Event*);
+    virtual bool willRespondToMouseClickEvents();
     virtual bool isInputFieldSpeechButtonElement() const { return true; }
     SpeechInputState state() const { return m_state; }
     void startSpeechInput();

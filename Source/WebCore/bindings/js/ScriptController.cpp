@@ -21,6 +21,7 @@
 #include "config.h"
 #include "ScriptController.h"
 
+#include "ContentSecurityPolicy.h"
 #include "Event.h"
 #include "EventNames.h"
 #include "Frame.h"
@@ -34,6 +35,7 @@
 #include "NP_jsobject.h"
 #include "Page.h"
 #include "PageGroup.h"
+#include "PluginView.h"
 #include "ScriptSourceCode.h"
 #include "ScriptValue.h"
 #include "ScriptableDocumentParser.h"
@@ -215,6 +217,9 @@ JSDOMWindowShell* ScriptController::initScript(DOMWrapperWorld* world)
 
     windowShell->window()->updateDocument();
 
+    if (m_frame->document())
+        windowShell->window()->setEvalEnabled(m_frame->document()->contentSecurityPolicy()->allowEval(0, ContentSecurityPolicy::SuppressReport));   
+
     if (Page* page = m_frame->page()) {
         attachDebugger(windowShell, page->debugger());
         windowShell->window()->setProfileGroup(page->group().identifier());
@@ -237,13 +242,16 @@ void ScriptController::enableEval()
 {
     JSDOMWindowShell* windowShell = existingWindowShell(mainThreadNormalWorld());
     if (!windowShell)
-        return; // Eval is enabled by default.
+        return;
     windowShell->window()->setEvalEnabled(true);
 }
 
 void ScriptController::disableEval()
 {
-    windowShell(mainThreadNormalWorld())->window()->setEvalEnabled(false);
+    JSDOMWindowShell* windowShell = existingWindowShell(mainThreadNormalWorld());
+    if (!windowShell)
+        return;
+    windowShell->window()->setEvalEnabled(false);
 }
 
 bool ScriptController::processingUserGesture()
@@ -380,6 +388,16 @@ NPObject* ScriptController::createScriptObjectForPluginElement(HTMLPlugInElement
     return _NPN_CreateScriptObject(0, object, bindingRootObject());
 }
 
+#endif
+
+#if !PLATFORM(MAC) && !PLATFORM(QT)
+PassRefPtr<JSC::Bindings::Instance> ScriptController::createScriptInstanceForWidget(Widget* widget)
+{
+    if (!widget->isPluginView())
+        return 0;
+
+    return static_cast<PluginView*>(widget)->bindingInstance();
+}
 #endif
 
 JSObject* ScriptController::jsObjectForPluginElement(HTMLPlugInElement* plugin)

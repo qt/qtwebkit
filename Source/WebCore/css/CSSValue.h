@@ -29,6 +29,7 @@
 
 namespace WebCore {
 
+class MemoryObjectInfo;
 class StyleSheetContents;
     
 // FIXME: The current CSSValue and subclasses should be turned into internal types (StyleValue).
@@ -91,6 +92,7 @@ public:
 #if ENABLE(CSS_FILTERS)
     bool isWebKitCSSFilterValue() const { return m_classType == WebKitCSSFilterClass; }
 #if ENABLE(CSS_SHADERS)
+    bool isWebKitCSSMixFunctionValue() const { return m_classType == WebKitCSSMixFunctionValueClass; }
     bool isWebKitCSSShaderValue() const { return m_classType == WebKitCSSShaderClass; }
 #endif
 #endif // ENABLE(CSS_FILTERS)
@@ -117,9 +119,13 @@ public:
 
     void addSubresourceStyleURLs(ListHashSet<KURL>&, const StyleSheetContents*) const;
 
+    bool hasFailedOrCanceledSubresources() const;
+
+    void reportMemoryUsage(MemoryObjectInfo*) const;
+
 protected:
 
-    static const size_t ClassTypeBits = 5;
+    static const size_t ClassTypeBits = 6;
     enum ClassType {
         PrimitiveClass,
 
@@ -173,6 +179,9 @@ protected:
 #endif
 #if ENABLE(CSS_FILTERS)
         WebKitCSSFilterClass,
+#if ENABLE(CSS_SHADERS)
+        WebKitCSSMixFunctionValueClass,
+#endif
 #endif
         WebKitCSSTransformClass,
         // Do not append non-list class types here.

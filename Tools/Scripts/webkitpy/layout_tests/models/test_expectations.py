@@ -96,23 +96,6 @@ def suffixes_for_expectations(expectations):
     return set(suffixes)
 
 
-# FIXME: This method is no longer used here in this module. Remove remaining callsite in manager.py and this method.
-def strip_comments(line):
-    """Strips comments from a line and return None if the line is empty
-    or else the contents of line with leading and trailing spaces removed
-    and all other whitespace collapsed"""
-
-    commentIndex = line.find('//')
-    if commentIndex is -1:
-        commentIndex = len(line)
-
-    line = re.sub(r'\s+', ' ', line[:commentIndex].strip())
-    if line == '':
-        return None
-    else:
-        return line
-
-
 class ParseError(Exception):
     def __init__(self, warnings):
         super(ParseError, self).__init__()
@@ -232,6 +215,10 @@ class TestExpectationParser(object):
         expectation_line = TestExpectationLine()
         expectation_line.original_string = test_name
         expectation_line.modifiers = [TestExpectationParser.DUMMY_BUG_MODIFIER, TestExpectationParser.SKIP_MODIFIER]
+        # FIXME: It's not clear what the expectations for a skipped test should be; the expectations
+        # might be different for different entries in a Skipped file, or from the command line, or from
+        # only running parts of the tests. It's also not clear if it matters much.
+        expectation_line.modifiers.append(TestExpectationParser.WONTFIX_MODIFIER)
         expectation_line.name = test_name
         # FIXME: we should pass in a more descriptive string here.
         expectation_line.filename = '<Skipped file>'
@@ -703,18 +690,16 @@ class TestExpectations(object):
                     'crash': CRASH,
                     'missing': MISSING}
 
-    EXPECTATION_DESCRIPTIONS = {SKIP: ('skipped', 'skipped'),
-                                PASS: ('pass', 'passes'),
-                                TEXT: ('text diff mismatch',
-                                       'text diff mismatch'),
-                                IMAGE: ('image mismatch', 'image mismatch'),
-                                IMAGE_PLUS_TEXT: ('image and text mismatch',
-                                                  'image and text mismatch'),
-                                AUDIO: ('audio mismatch', 'audio mismatch'),
-                                CRASH: ('crash', 'crashes'),
-                                TIMEOUT: ('test timed out', 'tests timed out'),
-                                MISSING: ('no expected result found',
-                                          'no expected results found')}
+    # (aggregated by category, pass/fail/skip, type)
+    EXPECTATION_DESCRIPTIONS = {SKIP: ('skipped', 'skipped', ''),
+                                PASS: ('passes', 'passed', ''),
+                                TEXT: ('text failures', 'failed', ' (text diff)'),
+                                IMAGE: ('image-only failures', 'failed', ' (image diff)'),
+                                IMAGE_PLUS_TEXT: ('both image and text failures', 'failed', ' (both image and text diffs'),
+                                AUDIO: ('audio failures', 'failed', ' (audio diff)'),
+                                CRASH: ('crashes', 'crashed', ''),
+                                TIMEOUT: ('timeouts', 'timed out', ''),
+                                MISSING: ('no expected results found', 'no expected result found', '')}
 
     EXPECTATION_ORDER = (PASS, CRASH, TIMEOUT, MISSING, IMAGE_PLUS_TEXT, TEXT, IMAGE, AUDIO, SKIP)
 
@@ -759,7 +744,7 @@ class TestExpectations(object):
                 self._expectations += expectations
 
         # FIXME: move ignore_tests into port.skipped_layout_tests()
-        self._add_skipped_tests(port.skipped_layout_tests(tests).union(set(port.get_option('ignore_tests', []))))
+        self.add_skipped_tests(port.skipped_layout_tests(tests).union(set(port.get_option('ignore_tests', []))))
 
         self._has_warnings = False
         self._report_warnings()
@@ -867,10 +852,13 @@ class TestExpectations(object):
 
         return TestExpectationSerializer.list_to_string(self._expectations, self._parser._test_configuration_converter, modified_expectations)
 
-    def remove_rebaselined_tests(self, except_these_tests):
-        """Returns a copy of the expectations with the tests removed."""
+    def remove_rebaselined_tests(self, except_these_tests, filename):
+        """Returns a copy of the expectations in the file with the tests removed."""
         def without_rebaseline_modifier(expectation):
-            return not (not expectation.is_invalid() and expectation.name in except_these_tests and "rebaseline" in expectation.modifiers)
+            return not (not expectation.is_invalid() and
+                        expectation.name in except_these_tests and
+                        "rebaseline" in expectation.modifiers and
+                        filename == expectation.filename)
 
         return TestExpectationSerializer.list_to_string(filter(without_rebaseline_modifier, self._expectations))
 
@@ -882,7 +870,7 @@ class TestExpectations(object):
             if self._is_lint_mode or self._test_config in expectation_line.matching_configurations:
                 self._model.add_expectation_line(expectation_line)
 
-    def _add_skipped_tests(self, tests_to_skip):
+    def add_skipped_tests(self, tests_to_skip):
         if not tests_to_skip:
             return
         for test in self._expectations:

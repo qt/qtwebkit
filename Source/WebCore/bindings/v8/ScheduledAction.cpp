@@ -32,6 +32,7 @@
 #include "ScheduledAction.h"
 
 #include "Document.h"
+#include "Frame.h"
 #include "ScriptExecutionContext.h"
 #include "ScriptSourceCode.h"
 
@@ -99,11 +100,9 @@ void ScheduledAction::execute(ScriptExecutionContext* context)
         Frame* frame = static_cast<Document*>(context)->frame();
         if (!frame)
             return;
-        ScriptController* scriptController = frame->script();
-        if (!scriptController->canExecuteScripts(AboutToExecuteScript))
+        if (!frame->script()->canExecuteScripts(AboutToExecuteScript))
             return;
-        V8Proxy* proxy = V8Proxy::retrieve(frame);
-        execute(proxy);
+        execute(frame->script()->proxy());
     }
 #if ENABLE(WORKERS)
     else {
@@ -123,7 +122,7 @@ void ScheduledAction::execute(V8Proxy* proxy)
         return; // JS may not be enabled.
 
 #if PLATFORM(CHROMIUM)
-    TRACE_EVENT("ScheduledAction::execute", this, 0);
+    TRACE_EVENT0("v8", "ScheduledAction::execute");
 #endif
 
     v8::Context::Scope scope(v8Context);

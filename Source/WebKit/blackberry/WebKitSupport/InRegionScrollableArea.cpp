@@ -20,9 +20,11 @@
 #include "InRegionScrollableArea.h"
 
 #include "Frame.h"
-#include "NotImplemented.h"
+#include "LayerCompositingThread.h"
+#include "LayerWebKitThread.h"
 #include "RenderBox.h"
 #include "RenderLayer.h"
+#include "RenderLayerBacking.h"
 #include "RenderObject.h"
 #include "RenderView.h"
 #include "WebPage_p.h"
@@ -69,6 +71,8 @@ InRegionScrollableArea::InRegionScrollableArea(WebPagePrivate* webPage, RenderLa
         m_scrollsVertically = view->contentsHeight() > view->visibleHeight();
 
         m_overscrollLimitFactor = 0.0; // FIXME eventually support overscroll
+        m_cachedCompositedScrollableLayer = 0; // FIXME: Needs composited layer for inner frames.
+
     } else { // RenderBox-based elements case (scrollable boxes (div's, p's, textarea's, etc)).
 
         RenderBox* box = m_layer->renderBox();
@@ -83,7 +87,13 @@ InRegionScrollableArea::InRegionScrollableArea(WebPagePrivate* webPage, RenderLa
         m_scrollsHorizontally = box->scrollWidth() != box->clientWidth() && box->scrollsOverflowX();
         m_scrollsVertically = box->scrollHeight() != box->clientHeight() && box->scrollsOverflowY();
 
-        m_overscrollLimitFactor = 0.0; // FIXME eventually support overscroll
+        if (m_layer->usesCompositedScrolling()) {
+            m_supportsCompositedScrolling = true;
+            ASSERT(m_layer->backing()->hasScrollingLayer());
+            m_cachedCompositedScrollableLayer = reinterpret_cast<unsigned>(m_layer->backing()->scrollingLayer()->platformLayer()->layerCompositingThread());
+        }
+
+        m_overscrollLimitFactor = 0.0;
     }
 }
 
@@ -104,6 +114,6 @@ RenderLayer* InRegionScrollableArea::layer() const
     ASSERT(!m_isNull);
     return m_layer;
 }
-}
 
+}
 }

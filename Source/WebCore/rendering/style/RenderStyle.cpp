@@ -28,6 +28,7 @@
 #include "CSSPropertyNames.h"
 #include "CSSWrapShapes.h"
 #include "FontSelector.h"
+#include "MemoryInstrumentation.h"
 #include "QuotesData.h"
 #include "RenderArena.h"
 #include "RenderObject.h"
@@ -444,7 +445,7 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
         }
 #endif
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
         // If regions change, trigger a relayout to re-calc regions.
         if (rareNonInheritedData->m_dashboardRegions != other->rareNonInheritedData->m_dashboardRegions)
             return StyleDifferenceLayout;
@@ -579,6 +580,9 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
         return StyleDifferenceLayout;
     }
 
+    if (!QuotesData::equals(rareInheritedData->quotes.get(), other->rareInheritedData->quotes.get()))
+        return StyleDifferenceLayout;
+
 #if ENABLE(SVG)
     // SVGRenderStyle::diff() might have returned StyleDifferenceRepaint, eg. if fill changes.
     // If eg. the font-size changed at the same time, we're not allowed to return StyleDifferenceRepaint,
@@ -700,7 +704,7 @@ void RenderStyle::setCursorList(PassRefPtr<CursorList> other)
 
 void RenderStyle::setQuotes(PassRefPtr<QuotesData> q)
 {
-    if (QuotesData::equal(rareInheritedData->quotes.get(), q.get()))
+    if (QuotesData::equals(rareInheritedData->quotes.get(), q.get()))
         return;
     rareInheritedData.access()->quotes = q;
 }
@@ -1049,7 +1053,7 @@ const AtomicString& RenderStyle::textEmphasisMarkString() const
     return nullAtom;
 }
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
 const Vector<StyleDashboardRegion>& RenderStyle::initialDashboardRegions()
 {
     DEFINE_STATIC_LOCAL(Vector<StyleDashboardRegion>, emptyList, ());
@@ -1484,6 +1488,26 @@ LayoutBoxExtent RenderStyle::imageOutsets(const NinePieceImage& image) const
                            NinePieceImage::computeOutset(image.outset().right(), borderRightWidth()),
                            NinePieceImage::computeOutset(image.outset().bottom(), borderBottomWidth()),
                            NinePieceImage::computeOutset(image.outset().left(), borderLeftWidth()));
+}
+
+void RenderStyle::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    info.addMember(m_box);
+    info.addMember(visual);
+    // FIXME: m_background contains RefPtr<StyleImage> that might need to be instrumented.
+    info.addMember(m_background);
+    // FIXME: surrond contains some fields e.g. BorderData that might need to be instrumented.
+    info.addMember(surround);
+    info.addInstrumentedMember(rareNonInheritedData);
+    info.addInstrumentedMember(rareInheritedData);
+    // FIXME: inherited contains StyleImage and Font fields that might need to be instrumented.
+    info.addMember(inherited);
+    if (m_cachedPseudoStyles)
+        info.addVectorPtr(m_cachedPseudoStyles.get());
+#if ENABLE(SVG)
+    info.addMember(m_svgStyle);
+#endif
 }
 
 } // namespace WebCore

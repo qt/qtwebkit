@@ -26,7 +26,6 @@ webcore_cppflags += \
 	-I$(srcdir)/Source/WebCore/bindings \
 	-I$(srcdir)/Source/WebCore/bindings/generic \
 	-I$(srcdir)/Source/WebCore/bindings/js \
-	-I$(srcdir)/Source/WebCore/bindings/js/specialization \
 	-I$(srcdir)/Source/WebCore/bridge \
 	-I$(srcdir)/Source/WebCore/bridge/c \
 	-I$(srcdir)/Source/WebCore/bridge/jni/jsc \
@@ -750,6 +749,14 @@ webcore_cppflags += -DENABLE_LINK_PREFETCH=1
 endif  # END ENABLE_LINK_PREFETCH
 
 # ---
+# Widget region support
+# ---
+if ENABLE_WIDGET_REGION
+FEATURE_DEFINES += ENABLE_WIDGET_REGION=1
+webcore_cppflags += -DENABLE_WIDGET_REGION=1
+endif  # END ENABLE_WIDGET_REGION
+
+# ---
 # Spell check support
 # ---
 if ENABLE_SPELLCHECK
@@ -1053,6 +1060,7 @@ libWebCoreGtk_la_CPPFLAGS = \
 	$(HILDON_CPPFLAGS) \
 	$(COVERAGE_CFLAGS) \
 	$(ENCHANT_CFLAGS) \
+	$(FARSTREAM_CFLAGS) \
 	$(GAIL_CFLAGS) \
 	$(GEOCLUE_CFLAGS) \
 	$(GLIB_CFLAGS) \

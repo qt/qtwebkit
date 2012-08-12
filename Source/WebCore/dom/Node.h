@@ -29,7 +29,6 @@
 #include "EventTarget.h"
 #include "KURLHash.h"
 #include "LayoutTypes.h"
-#include "MemoryInstrumentation.h"
 #include "MutationObserver.h"
 #include "RenderStyleConstants.h"
 #include "ScriptWrappable.h"
@@ -66,6 +65,7 @@ class Frame;
 class HTMLInputElement;
 class IntRect;
 class KeyboardEvent;
+class MemoryObjectInfo;
 class NSResolver;
 class NamedNodeMap;
 class NameNodeList;
@@ -87,6 +87,10 @@ class RenderStyle;
 class ShadowRoot;
 class TagNodeList;
 class TreeScope;
+
+#if ENABLE(GESTURE_EVENTS)
+class PlatformGestureEvent;
+#endif
 
 #if ENABLE(MICRODATA)
 class HTMLPropertiesCollection;
@@ -218,6 +222,7 @@ public:
     virtual bool isAttributeNode() const { return false; }
     virtual bool isCharacterDataNode() const { return false; }
     virtual bool isFrameOwnerElement() const { return false; }
+    virtual bool isPluginElement() const { return false; }
     bool isDocumentNode() const;
     bool isShadowRoot() const { return getFlag(IsShadowRootFlag); }
     bool inNamedFlow() const { return getFlag(InNamedFlowFlag); }
@@ -573,6 +578,9 @@ public:
     PassRefPtr<NodeList> getElementsByClassName(const String& classNames);
     PassRefPtr<RadioNodeList> radioNodeList(const AtomicString&);
 
+    virtual bool willRespondToMouseMoveEvents();
+    virtual bool willRespondToMouseClickEvents();
+
     PassRefPtr<Element> querySelector(const AtomicString& selectors, ExceptionCode&);
     PassRefPtr<NodeList> querySelectorAll(const AtomicString& selectors, ExceptionCode&);
 
@@ -599,8 +607,6 @@ public:
 
     virtual void handleLocalEvents(Event*);
 
-    void dispatchRegionLayoutUpdateEvent();
-
     void dispatchSubtreeModifiedEvent();
     bool dispatchDOMActivateEvent(int detail, PassRefPtr<Event> underlyingEvent);
     void dispatchFocusInEvent(const AtomicString& eventType, PassRefPtr<Node> oldFocusedNode);
@@ -609,6 +615,9 @@ public:
     bool dispatchKeyEvent(const PlatformKeyboardEvent&);
     bool dispatchWheelEvent(const PlatformWheelEvent&);
     bool dispatchMouseEvent(const PlatformMouseEvent&, const AtomicString& eventType, int clickCount = 0, Node* relatedTarget = 0);
+#if ENABLE(GESTURE_EVENTS)
+    bool dispatchGestureEvent(const PlatformGestureEvent&);
+#endif
     void dispatchSimulatedClick(PassRefPtr<Event> underlyingEvent, bool sendMouseEvents = false, bool showPressedLook = true);
     bool dispatchBeforeLoadEvent(const String& sourceURL);
 

@@ -1,3 +1,215 @@
+2012-08-10  Alice Cheng  <alice_cheng@apple.com>
+
+        Part 1 of: Extend -webkit-user-select with a new value "all"
+        <rdar://problem/10161404>
+        https://bugs.webkit.org/show_bug.cgi?id=93562
+
+        Reviewed by Dan Bernstein.
+
+        Modify the enum to resolve ambiguous reference
+
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_class_init): Modify the ambiguous enum
+        (webkit_web_view_select_all): Modify the ambiguous enum
+
+2012-08-10  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [GTK] Broken implementation of AtkText and AtkEditableText for password fields
+        https://bugs.webkit.org/show_bug.cgi?id=93621
+
+        Reviewed by Chris Fleizach.
+
+        Update unit test to ensure that password input fields behave
+        as expected when inserting and removing characters in them.
+
+        * tests/testatk.c:
+        (testWebkitAtkTextChangedNotifications): Updated unit test to
+        cover the special case of password input fields.
+
+2012-08-09  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Handle SSL errors for SOUP
+        https://bugs.webkit.org/show_bug.cgi?id=90267
+
+        Reviewed by Martin Robinson.
+
+        Ignore SSL errors by default for compatibility.
+
+        * webkit/webkitglobals.cpp:
+        (webkitInit):
+
+2012-08-07  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix GTK+ build with GTK2 after r120918.
+
+        * tests/testwebview.c:
+
+2012-08-06  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and configure.ac for 1.9.6 release
+
+        * NEWS: Added release notes for 1.9.6.
+
+2012-08-06  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL] [GTK] Register Protocol Handler Client is never deleted
+        https://bugs.webkit.org/show_bug.cgi?id=92745
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Added usage of OwnPtr to manage register protocol handler client pointer.
+
+        * WebCoreSupport/RegisterProtocolHandlerClientGtk.cpp:
+        (WebKit::RegisterProtocolHandlerClient::create): Factory function returning smart pointer.
+        (WebKit):
+        * WebCoreSupport/RegisterProtocolHandlerClientGtk.h:
+        (RegisterProtocolHandlerClient):
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_init):
+        * webkit/webkitwebviewprivate.h:
+
+2012-08-03  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [GTK] Add a new and reusable enchant-based spellchecker in WebCore
+        https://bugs.webkit.org/show_bug.cgi?id=90269
+
+        Reviewed by Martin Robinson.
+
+        Remove enchant specific code from WebKitSpellCheckerEnchant and
+        implement it relying in the new TextCheckerEnchant class in WebCore.
+
+        * webkit/webkitspellcheckerenchant.cpp:
+        (_WebKitSpellCheckerEnchantPrivate):
+        (webkit_spell_checker_enchant_finalize):
+        (webkit_spell_checker_enchant_class_init):
+        (webkit_spell_checker_enchant_init):
+        (checkSpellingOfString):
+        (getGuessesForWord):
+        (updateSpellCheckingLanguages):
+        (learnWord):
+        (ignoreWord):
+
+2012-08-02  Claudio Saavedra  <csaavedra@igalia.com>
+
+        [GTK] Add WebKitNetworkResponse::suggested-filename property
+        https://bugs.webkit.org/show_bug.cgi?id=92878
+
+        Reviewed by Carlos Garcia Campos.
+
+        Webcore has API the suggested filename for a response, add
+        a property and getter for it in WebKitNetworkResponse.
+
+        * docs/webkitgtk-sections.txt: Add the symbols
+        * webkit/webkitnetworkresponse.cpp:
+        (_WebKitNetworkResponsePrivate): Add suggested_filename.
+        (webkit_network_response_finalize): Free it on finalize
+        (webkit_network_response_get_property): Add the getter call.
+        (webkit_network_response_class_init): Install the property.
+        (webkit_network_response_get_suggested_filename): New getter.
+        * webkit/webkitnetworkresponse.h: Add the declaration to header
+        file.
+
+2012-07-31  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r124207.
+        http://trac.webkit.org/changeset/124207
+        https://bugs.webkit.org/show_bug.cgi?id=92773
+
+        Patch causes crashes on the 64-bit debug builder (and other
+        builders likely) (Requested by zdobersek on #webkit).
+
+        * webkit/webkitspellcheckerenchant.cpp:
+        (_WebKitSpellCheckerEnchantPrivate):
+        (createEnchantBrokerIfNeeded):
+        (freeSpellCheckingLanguage):
+        (webkit_spell_checker_enchant_finalize):
+        (webkit_spell_checker_enchant_class_init):
+        (webkit_spell_checker_enchant_init):
+        (wordEndIsAContractionApostrophe):
+        (checkSpellingOfString):
+        (getGuessesForWord):
+        (getAvailableDictionariesCallback):
+        (updateSpellCheckingLanguages):
+        (learnWord):
+        (ignoreWord):
+
+2012-07-31  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [GTK] Add a new and reusable enchant-based spellchecker in WebCore
+        https://bugs.webkit.org/show_bug.cgi?id=90269
+
+        Reviewed by Martin Robinson.
+
+        Remove enchant specific code from WebKitSpellCheckerEnchant and
+        implement it relying in the new TextCheckerEnchant class in WebCore.
+
+        * webkit/webkitspellcheckerenchant.cpp:
+        (_WebKitSpellCheckerEnchantPrivate):
+        (webkit_spell_checker_enchant_finalize):
+        (webkit_spell_checker_enchant_class_init):
+        (webkit_spell_checker_enchant_init):
+        (checkSpellingOfString):
+        (getGuessesForWord):
+        (updateSpellCheckingLanguages):
+        (learnWord):
+        (ignoreWord):
+
+2012-07-30  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] New lines automatically and repeatedly added to list items in Etherpad
+        https://bugs.webkit.org/show_bug.cgi?id=89971
+
+        Reviewed by Ryosuke Niwa.
+
+        Disable the deletion UI by default. This UI, which was enabled as a side-effect
+        of the addition of the private editing API, seems to expose a bug in Etherpad
+        which causes the continuous insertion of bullet points.
+
+        * WebCoreSupport/EditorClientGtk.cpp:
+        (WebKit::EditorClient::shouldShowDeleteInterface): Disable the deletion UI by default.
+
+2012-07-30  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r123966 and r123967.
+        http://trac.webkit.org/changeset/123966
+        http://trac.webkit.org/changeset/123967
+        https://bugs.webkit.org/show_bug.cgi?id=92656
+
+        This patch is causing assertion failures on the debug bot
+        (also rolling out a dependent patch) (Requested by mrobinson
+        on #webkit).
+
+        * webkit/webkitspellcheckerenchant.cpp:
+        (_WebKitSpellCheckerEnchantPrivate):
+        (createEnchantBrokerIfNeeded):
+        (freeSpellCheckingLanguage):
+        (webkit_spell_checker_enchant_finalize):
+        (webkit_spell_checker_enchant_class_init):
+        (webkit_spell_checker_enchant_init):
+        (wordEndIsAContractionApostrophe):
+        (checkSpellingOfString):
+        (getGuessesForWord):
+        (getAvailableDictionariesCallback):
+        (updateSpellCheckingLanguages):
+        (learnWord):
+        (ignoreWord):
+
+2012-07-30  Claudio Saavedra  <csaavedra@igalia.com>
+
+        [Gtk] Add WK1 API for snapshot retrieval
+        https://bugs.webkit.org/show_bug.cgi?id=92261
+
+        Reviewed by Martin Robinson.
+
+        Add API to WebKitWebView to retrieve a snapshot of its
+        visible contents as a cairo_surface_t.
+
+        * docs/webkitgtk-sections.txt: Add new symbols.
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_get_snapshot): New
+        method to paint a webview snapshot.
+        * webkit/webkitwebview.h: Ditto.
+
 2012-07-28  Mario Sanchez Prada  <msanchez@igalia.com>
 
         [GTK] Add a new and reusable enchant-based spellchecker in WebCore

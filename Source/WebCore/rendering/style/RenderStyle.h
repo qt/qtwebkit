@@ -78,7 +78,7 @@
 #include "StyleFilterData.h"
 #endif
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
 #include "StyleDashboardRegion.h"
 #endif
 
@@ -105,6 +105,7 @@ class BorderData;
 class CounterContent;
 class CursorList;
 class IntRect;
+class MemoryObjectInfo;
 class Pair;
 class ShadowData;
 class StyleImage;
@@ -798,7 +799,7 @@ public:
     EBoxOrient boxOrient() const { return static_cast<EBoxOrient>(rareNonInheritedData->m_deprecatedFlexibleBox->orient); }
     EBoxPack boxPack() const { return static_cast<EBoxPack>(rareNonInheritedData->m_deprecatedFlexibleBox->pack); }
 
-    float order() const { return rareNonInheritedData->m_order; }
+    int order() const { return rareNonInheritedData->m_order; }
     float flexGrow() const { return rareNonInheritedData->m_flexibleBox->m_flexGrow; }
     float flexShrink() const { return rareNonInheritedData->m_flexibleBox->m_flexShrink; }
     Length flexBasis() const { return rareNonInheritedData->m_flexibleBox->m_flexBasis; }
@@ -1011,7 +1012,7 @@ public:
     void setMinHeight(Length v) { SET_VAR(m_box, m_minHeight, v) }
     void setMaxHeight(Length v) { SET_VAR(m_box, m_maxHeight, v) }
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
     Vector<StyleDashboardRegion> dashboardRegions() const { return rareNonInheritedData->m_dashboardRegions; }
     void setDashboardRegions(Vector<StyleDashboardRegion> regions) { SET_VAR(rareNonInheritedData, m_dashboardRegions, regions); }
 
@@ -1268,7 +1269,7 @@ public:
     void setFlexGrow(float f) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexGrow, f); }
     void setFlexShrink(float f) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexShrink, f); }
     void setFlexBasis(Length length) { SET_VAR(rareNonInheritedData.access()->m_flexibleBox, m_flexBasis, length); }
-    void setOrder(float o) { SET_VAR(rareNonInheritedData, m_order, o); }
+    void setOrder(int o) { SET_VAR(rareNonInheritedData, m_order, o); }
     void setAlignContent(EAlignContent p) { SET_VAR(rareNonInheritedData, m_alignContent, p); }
     void setAlignItems(EAlignItems a) { SET_VAR(rareNonInheritedData, m_alignItems, a); }
     void setAlignSelf(EAlignItems a) { SET_VAR(rareNonInheritedData, m_alignSelf, a); }
@@ -1483,22 +1484,9 @@ public:
 
     StyleDifference diff(const RenderStyle*, unsigned& changedContextSensitiveProperties) const;
 
-    bool isDisplayReplacedType() const
-    {
-        return display() == INLINE_BLOCK || display() == INLINE_BOX || display() == INLINE_TABLE || display() == INLINE_GRID;
-    }
-
-    bool isDisplayInlineType() const
-    {
-        return display() == INLINE || isDisplayReplacedType();
-    }
-
-    bool isOriginalDisplayInlineType() const
-    {
-        return originalDisplay() == INLINE || originalDisplay() == INLINE_BLOCK
-            || originalDisplay() == INLINE_BOX || originalDisplay() == INLINE_TABLE || originalDisplay() == INLINE_GRID;
-    }
-
+    bool isDisplayReplacedType() const { return isDisplayReplacedType(display()); }
+    bool isDisplayInlineType() const { return isDisplayInlineType(display()); }
+    bool isOriginalDisplayInlineType() const { return isDisplayInlineType(originalDisplay()); }
     bool isDisplayRegionType() const
     {
         return display() == BLOCK || display() == INLINE_BLOCK
@@ -1541,6 +1529,8 @@ public:
 
     void setHasExplicitlyInheritedProperties() { m_bitfields.setExplicitInheritance(true); }
     bool hasExplicitlyInheritedProperties() const { return m_bitfields.explicitInheritance(); }
+
+    void reportMemoryUsage(MemoryObjectInfo*) const;
     
     // Initial values for all the properties
     static EBorderCollapse initialBorderCollapse() { return BSEPARATE; }
@@ -1610,7 +1600,7 @@ public:
     static float initialFlexGrow() { return 0; }
     static float initialFlexShrink() { return 1; }
     static Length initialFlexBasis() { return Length(Auto); }
-    static float initialOrder() { return 0; }
+    static int initialOrder() { return 0; }
     static EAlignContent initialAlignContent() { return AlignContentStretch; }
     static EAlignItems initialAlignItems() { return AlignStretch; }
     static EAlignItems initialAlignSelf() { return AlignAuto; }
@@ -1715,7 +1705,7 @@ public:
 #if ENABLE(OVERFLOW_SCROLLING)
     static bool initialUseTouchOverflowScrolling() { return false; }
 #endif
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
     static const Vector<StyleDashboardRegion>& initialDashboardRegions();
     static const Vector<StyleDashboardRegion>& noneDashboardRegions();
 #endif
@@ -1746,6 +1736,20 @@ private:
     void getShadowBlockDirectionExtent(const ShadowData* shadow, LayoutUnit& logicalTop, LayoutUnit& logicalBottom) const
     {
         return isHorizontalWritingMode() ? getShadowVerticalExtent(shadow, logicalTop, logicalBottom) : getShadowHorizontalExtent(shadow, logicalTop, logicalBottom);
+    }
+
+    bool isDisplayReplacedType(EDisplay display) const
+    {
+        return display == INLINE_BLOCK || display == INLINE_BOX
+#if ENABLE(CSS3_FLEXBOX)
+            || display == INLINE_FLEX
+#endif
+            || display == INLINE_TABLE || display == INLINE_GRID;
+    }
+
+    bool isDisplayInlineType(EDisplay display) const
+    {
+        return display == INLINE || isDisplayReplacedType(display);
     }
 
     // Color accessors are all private to make sure callers use visitedDependentColor instead to access them.

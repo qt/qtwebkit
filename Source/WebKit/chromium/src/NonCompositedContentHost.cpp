@@ -30,10 +30,9 @@
 #include "FloatPoint.h"
 #include "FloatRect.h"
 #include "GraphicsLayer.h"
-#include "LayerChromium.h"
 #include "PlatformContextSkia.h"
 #include "WebViewImpl.h"
-#include "cc/CCLayerTreeHost.h"
+#include <public/WebContentLayer.h>
 #include <public/WebFloatPoint.h>
 
 namespace WebKit {
@@ -49,10 +48,11 @@ NonCompositedContentHost::NonCompositedContentHost(WebViewImpl* webView)
     m_graphicsLayer->setName("non-composited content");
 #endif
     m_graphicsLayer->setDrawsContent(true);
-    m_graphicsLayer->platformLayer()->setIsNonCompositedContent(true);
-    m_graphicsLayer->platformLayer()->setOpaque(true);
+    WebContentLayer layer = m_graphicsLayer->platformLayer()->to<WebContentLayer>();
+    layer.setUseLCDText(true);
+    layer.setOpaque(true);
 #if !OS(ANDROID)
-    m_graphicsLayer->platformLayer()->setDrawCheckerboardForMissingTiles(true);
+    layer.setDrawCheckerboardForMissingTiles(true);
 #endif
 }
 
@@ -77,11 +77,10 @@ void NonCompositedContentHost::setScrollLayer(WebCore::GraphicsLayer* layer)
 
     if (!layer) {
         m_graphicsLayer->removeFromParent();
-        m_graphicsLayer->platformLayer()->setLayerTreeHost(0);
         return;
     }
 
-    if (WebScrollableLayer(layer->platformLayer()) == scrollLayer())
+    if (*layer->platformLayer() == scrollLayer())
         return;
 
     layer->addChildAtIndex(m_graphicsLayer.get(), 0);
@@ -152,7 +151,7 @@ WebScrollableLayer NonCompositedContentHost::scrollLayer()
 {
     if (!m_graphicsLayer->parent())
         return WebScrollableLayer();
-    return WebScrollableLayer(m_graphicsLayer->parent()->platformLayer());
+    return m_graphicsLayer->parent()->platformLayer()->to<WebScrollableLayer>();
 }
 
 void NonCompositedContentHost::invalidateRect(const WebCore::IntRect& rect)
@@ -169,9 +168,7 @@ void NonCompositedContentHost::notifyAnimationStarted(const WebCore::GraphicsLay
 
 void NonCompositedContentHost::notifySyncRequired(const WebCore::GraphicsLayer*)
 {
-    WebCore::CCLayerTreeHost* layerTreeHost = m_graphicsLayer->platformLayer()->layerTreeHost();
-    if (layerTreeHost)
-        layerTreeHost->setNeedsCommit();
+    m_webView->scheduleCompositingLayerSync();
 }
 
 void NonCompositedContentHost::paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext& context, WebCore::GraphicsLayerPaintingPhase, const WebCore::IntRect& clipRect)

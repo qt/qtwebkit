@@ -1,3 +1,92 @@
+2012-08-09  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Handle SSL errors for SOUP
+        https://bugs.webkit.org/show_bug.cgi?id=90267
+
+        Reviewed by Martin Robinson.
+
+        Ignore SSL errors by default for compatibility.
+
+        * ewk/ewk_main.cpp:
+        (_ewk_init_body):
+
+2012-08-07  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Remove PlatformTouchEventEfl and PlatformTouchPointEfl
+        https://bugs.webkit.org/show_bug.cgi?id=93270
+
+        Reviewed by Eric Seidel.
+
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_feed_touch_event):
+        * ewk/ewk_touch_event.cpp: Added.
+        (WebKitPlatformTouchPoint):
+        (WebKitPlatformTouchPoint::WebKitPlatformTouchPoint):
+        Added to initialize members of PlatformTouchPoint.
+        (WebKitPlatformTouchEvent):
+        (WebKitPlatformTouchEvent::WebKitPlatformTouchEvent):
+        Added to initialize members of PlatformTouchEvent.
+        (EWKPrivate):
+        (EWKPrivate::platformTouchEvent):
+        Converted Ewk_Touch_Event to PlatformTouchEvent.
+        * ewk/ewk_touch_event_private.h: 
+        (EWKPrivate):
+
+2012-08-07  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        CUSTOM_SCHEME_HANDLER flag should depend on REGISTER_PROTOCOL_HANDLER
+        https://bugs.webkit.org/show_bug.cgi?id=93081
+
+        Reviewed by Adam Barth.
+
+        CUSTOM_SCHEME_HANDLER #if guards are enclosed in the REGISTER_PROTOCOL_HANDLER guards.
+
+        * WebCoreSupport/RegisterProtocolHandlerClientEfl.cpp:
+        (WebCore::RegisterProtocolHandlerClientEfl::registerProtocolHandler):
+        * WebCoreSupport/RegisterProtocolHandlerClientEfl.h:
+        * ewk/ewk_custom_handler.cpp:
+        (ewk_custom_handler_register_protocol_handler):
+        * ewk/ewk_custom_handler_private.h:
+        * ewk/ewk_view.cpp:
+        (_ewk_view_priv_new):
+
+2012-08-06  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL] [GTK] Register Protocol Handler Client is never deleted
+        https://bugs.webkit.org/show_bug.cgi?id=92745
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Added usage of OwnPtr to manage register protocol handler client pointer.
+
+        * WebCoreSupport/RegisterProtocolHandlerClientEfl.cpp:
+        (WebCore::RegisterProtocolHandlerClientEfl::create): Factory function returning smart pointer.
+        (WebCore):
+        * WebCoreSupport/RegisterProtocolHandlerClientEfl.h:
+        (RegisterProtocolHandlerClientEfl):
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (_ewk_view_priv_new):
+
+2012-08-01  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL][Regression] Build break with NETSCAPE_PLUGIN_API after r123604
+        https://bugs.webkit.org/show_bug.cgi?id=92937
+
+        Unreviewed build fix.
+
+        r123604 replaced strdup to eina_stringshare, but related codes are not
+        changed properly.
+        This patch changes remained code to use eina_stringshare.
+
+        * ewk/ewk_js.cpp:
+        (ewk_js_variant_to_npvariant):
+        (ewk_js_property_free):
+        (ewk_js_npvariant_to_variant):
+        (ewk_js_variant_free):
+        (ewk_js_variant_array_free):
+        * ewk/ewk_js.h:
+
 2012-07-29  YoungTaeck Song  <youngtaeck.song@samsung.com>
 
         [WK2][EFL] TILED_BACKING_STORE support on Efl WebKit2

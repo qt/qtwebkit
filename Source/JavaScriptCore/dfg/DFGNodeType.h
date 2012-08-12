@@ -113,12 +113,14 @@ namespace JSC { namespace DFG {
     /* opcodes use VarArgs beause they may have up to 4 children. */\
     macro(GetByVal, NodeResultJS | NodeMustGenerate | NodeMightClobber) \
     macro(PutByVal, NodeMustGenerate | NodeHasVarArgs | NodeMightClobber) \
+    macro(PutByValSafe, NodeMustGenerate | NodeHasVarArgs | NodeMightClobber) \
     macro(PutByValAlias, NodeMustGenerate | NodeHasVarArgs | NodeMightClobber) \
     macro(GetById, NodeResultJS | NodeMustGenerate | NodeClobbersWorld) \
     macro(GetByIdFlush, NodeResultJS | NodeMustGenerate | NodeClobbersWorld) \
     macro(PutById, NodeMustGenerate | NodeClobbersWorld) \
     macro(PutByIdDirect, NodeMustGenerate | NodeClobbersWorld) \
     macro(CheckStructure, NodeMustGenerate) \
+    macro(ForwardCheckStructure, NodeMustGenerate) \
     /* Transition watchpoints are a contract between the party setting the watchpoint */\
     /* and the runtime system, where the party promises that the child object once had */\
     /* the structure being watched, and the runtime system in turn promises that the */\

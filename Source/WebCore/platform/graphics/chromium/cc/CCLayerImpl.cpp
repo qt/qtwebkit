@@ -36,6 +36,7 @@
 #include "cc/CCMathUtil.h"
 #include "cc/CCProxy.h"
 #include "cc/CCQuadSink.h"
+#include "cc/CCScrollbarAnimationController.h"
 #include <wtf/text/WTFString.h>
 
 using WebKit::WebTransformationMatrix;
@@ -63,7 +64,7 @@ CCLayerImpl::CCLayerImpl(int id)
     , m_preserves3D(false)
     , m_useParentBackfaceVisibility(false)
     , m_drawCheckerboardForMissingTiles(false)
-    , m_isNonCompositedContent(false)
+    , m_useLCDText(false)
     , m_drawsContent(false)
     , m_forceRenderSurface(false)
     , m_isContainerForFixedPositionLayers(false)
@@ -145,7 +146,7 @@ bool CCLayerImpl::descendantDrawsContent()
 
 PassOwnPtr<CCSharedQuadState> CCLayerImpl::createSharedQuadState(int id) const
 {
-    return CCSharedQuadState::create(id, m_drawTransform, m_visibleContentRect, m_scissorRect, m_drawOpacity, m_opaque);
+    return CCSharedQuadState::create(id, m_drawTransform, m_visibleContentRect, m_drawableContentRect, m_drawOpacity, m_opaque);
 }
 
 void CCLayerImpl::willDraw(CCResourceProvider*)
@@ -182,11 +183,17 @@ CCResourceProvider::ResourceId CCLayerImpl::contentsResourceId() const
 
 void CCLayerImpl::scrollBy(const FloatSize& scroll)
 {
-    FloatSize newDelta = m_scrollDelta + scroll;
     IntSize minDelta = -toSize(m_scrollPosition);
     IntSize maxDelta = m_maxScrollPosition - toSize(m_scrollPosition);
     // Clamp newDelta so that position + delta stays within scroll bounds.
-    m_scrollDelta = newDelta.expandedTo(minDelta).shrunkTo(maxDelta);
+    FloatSize newDelta = (m_scrollDelta + scroll).expandedTo(minDelta).shrunkTo(maxDelta);
+
+    if (m_scrollDelta == newDelta)
+        return;
+
+    m_scrollDelta = newDelta;
+    if (m_scrollbarAnimationController)
+        m_scrollbarAnimationController->updateScrollOffset(this);
     noteLayerPropertyChangedForSubtree();
 }
 
@@ -597,6 +604,41 @@ Region CCLayerImpl::visibleContentOpaqueRegion() const
 
 void CCLayerImpl::didLoseContext()
 {
+}
+
+void CCLayerImpl::setMaxScrollPosition(const IntSize& maxScrollPosition)
+{
+    m_maxScrollPosition = maxScrollPosition;
+
+    if (!m_scrollbarAnimationController)
+        return;
+    m_scrollbarAnimationController->updateScrollOffset(this);
+}
+
+CCScrollbarLayerImpl* CCLayerImpl::horizontalScrollbarLayer() const
+{
+    return m_scrollbarAnimationController ? m_scrollbarAnimationController->horizontalScrollbarLayer() : 0;
+}
+
+void CCLayerImpl::setHorizontalScrollbarLayer(CCScrollbarLayerImpl* scrollbarLayer)
+{
+    if (!m_scrollbarAnimationController)
+        m_scrollbarAnimationController = CCScrollbarAnimationController::create(this);
+    m_scrollbarAnimationController->setHorizontalScrollbarLayer(scrollbarLayer);
+    m_scrollbarAnimationController->updateScrollOffset(this);
+}
+
+CCScrollbarLayerImpl* CCLayerImpl::verticalScrollbarLayer() const
+{
+    return m_scrollbarAnimationController ? m_scrollbarAnimationController->verticalScrollbarLayer() : 0;
+}
+
+void CCLayerImpl::setVerticalScrollbarLayer(CCScrollbarLayerImpl* scrollbarLayer)
+{
+    if (!m_scrollbarAnimationController)
+        m_scrollbarAnimationController = CCScrollbarAnimationController::create(this);
+    m_scrollbarAnimationController->setVerticalScrollbarLayer(scrollbarLayer);
+    m_scrollbarAnimationController->updateScrollOffset(this);
 }
 
 }

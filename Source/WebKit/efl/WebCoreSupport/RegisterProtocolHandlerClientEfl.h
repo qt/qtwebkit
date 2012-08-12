@@ -28,18 +28,18 @@
 #ifndef RegisterProtocolHandlerClientEfl_h
 #define RegisterProtocolHandlerClientEfl_h
 
-#if ENABLE(REGISTER_PROTOCOL_HANDLER) || ENABLE(CUSTOM_SCHEME_HANDLER)
+#if ENABLE(REGISTER_PROTOCOL_HANDLER)
 #include "RegisterProtocolHandlerClient.h"
+
+#include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
 class RegisterProtocolHandlerClientEfl : public WebCore::RegisterProtocolHandlerClient {
 public:
-    explicit RegisterProtocolHandlerClientEfl(Evas_Object* view);
-    ~RegisterProtocolHandlerClientEfl() { }
+    static PassOwnPtr<RegisterProtocolHandlerClientEfl> create(Evas_Object* view);
 
-#if ENABLE(REGISTER_PROTOCOL_HANDLER)
+    ~RegisterProtocolHandlerClientEfl() { }
     virtual void registerProtocolHandler(const String& scheme, const String& baseURL, const String& url, const String& title);
-#endif
 
 #if ENABLE(CUSTOM_SCHEME_HANDLER)
     virtual CustomHandlersState isProtocolHandlerRegistered(const String& scheme, const String& baseURL, const String& url);
@@ -48,6 +48,8 @@ public:
 
 private:
     Evas_Object* m_view;
+
+    RegisterProtocolHandlerClientEfl(Evas_Object* view);
 };
 }
 

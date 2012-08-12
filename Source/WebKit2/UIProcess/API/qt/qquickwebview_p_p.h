@@ -69,10 +69,7 @@ public:
 
     virtual void initialize(WKContextRef contextRef = 0, WKPageGroupRef pageGroupRef = 0);
 
-    virtual void onComponentComplete() { }
-
-    virtual void enableMouseEvents() { }
-    virtual void disableMouseEvents() { }
+    virtual void onComponentComplete();
 
     virtual void provisionalLoadDidStart(const WTF::String& url);
     virtual void didReceiveServerRedirectForProvisionalLoad(const WTF::String& url);
@@ -83,6 +80,7 @@ public:
     virtual void backForwardListDidChange();
     virtual void loadDidSucceed();
     virtual void loadDidFail(const WebKit::QtWebError& error);
+    virtual void handleMouseEvent(QMouseEvent*);
 
     virtual void didChangeViewportProperties(const WebCore::ViewportAttributes& attr) { }
 
@@ -124,8 +122,6 @@ public:
     QPointF contentPos() const;
     void setContentPos(const QPointF&);
 
-    void setDialogActive(bool active) { m_dialogActive = active; }
-
     void updateIcon();
 
     // PageClient.
@@ -142,8 +138,8 @@ protected:
     class FlickableAxisLocker {
         QQuickFlickable::FlickableDirection m_allowedDirection;
 
-        QElapsedTimer m_time;
-        QPointF m_initialScreenPosition;
+        ulong m_time;
+        QPointF m_initialPosition;
         QPointF m_lockReferencePosition;
         int m_sampleCount;
 
@@ -174,6 +170,7 @@ protected:
     QScopedPointer<QQuickWebPage> pageView;
     QQuickWebView* q_ptr;
 
+    QScopedPointer<WebKit::QtViewportHandler> m_viewportHandler;
     FlickableAxisLocker axisLocker;
 
     QQmlComponent* alertDialog;
@@ -192,7 +189,6 @@ protected:
     bool m_useDefaultContentItemSize;
     bool m_navigatorQtObjectEnabled;
     bool m_renderToOffscreenBuffer;
-    bool m_dialogActive;
     bool m_allowAnyHTTPSCertificateForLocalHost;
     WTF::String m_iconUrl;
     int m_loadProgress;
@@ -206,8 +202,6 @@ public:
     virtual void initialize(WKContextRef contextRef = 0, WKPageGroupRef pageGroupRef = 0);
 
     virtual void updateViewportSize();
-    virtual void enableMouseEvents();
-    virtual void disableMouseEvents();
 
     qreal zoomFactor() const;
     void setZoomFactor(qreal);
@@ -228,9 +222,7 @@ public:
 
     virtual void pageDidRequestScroll(const QPoint& pos);
     virtual void didChangeContentsSize(const QSize& newSize);
-
-private:
-    QScopedPointer<WebKit::QtViewportHandler> m_viewportHandler;
+    virtual void handleMouseEvent(QMouseEvent*);
 };
 
 #endif // qquickwebview_p_p_h

@@ -51,9 +51,7 @@
 #include "DOMWindow.h"
 #include "DateComponents.h"
 #include "DeviceMotionController.h"
-#include "DeviceMotionEvent.h"
 #include "DeviceOrientationController.h"
-#include "DeviceOrientationEvent.h"
 #include "DocumentEventQueue.h"
 #include "DocumentFragment.h"
 #include "DocumentLoader.h"
@@ -454,7 +452,7 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     , m_hasXMLDeclaration(0)
     , m_savedRenderer(0)
     , m_designMode(inherit)
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
     , m_hasDashboardRegions(false)
     , m_dashboardRegionsDirty(false)
 #endif
@@ -2045,6 +2043,7 @@ void Document::setIsViewSource(bool isViewSource)
         return;
 
     setSecurityOrigin(SecurityOrigin::createUnique());
+    didUpdateSecurityOrigin();
 }
 
 void Document::combineCSSFeatureFlags()
@@ -3714,7 +3713,7 @@ void Document::activeChainNodeDetached(Node* node)
         m_activeNode = m_activeNode->parentNode();
 }
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
 const Vector<DashboardRegionValue>& Document::dashboardRegions() const
 {
     return m_dashboardRegions;
@@ -4148,8 +4147,6 @@ void Document::addListenerTypeIfNeeded(const AtomicString& eventType)
 #endif
     else if (eventType == eventNames().scrollEvent)
         addListenerType(SCROLL_LISTENER);
-    else if (eventType == eventNames().webkitRegionLayoutUpdateEvent)
-        addListenerType(REGIONLAYOUTUPDATE_LISTENER);
 }
 
 CSSStyleDeclaration* Document::getOverrideStyle(Element*, const String&)
@@ -5018,6 +5015,8 @@ void Document::initSecurityContext()
                 securityOrigin()->enforceFilePathSeparation();
             }
         }
+        if (settings->thirdPartyStorageBlockingEnabled())
+            securityOrigin()->blockThirdPartyStorage();
     }
 
     Document* parentDocument = ownerElement() ? ownerElement()->document() : 0;
@@ -5063,8 +5062,9 @@ void Document::initSecurityContext()
 
 void Document::initContentSecurityPolicy()
 {
-    if (!m_frame->tree()->parent() || !shouldInheritSecurityOriginFromOwner(m_url))
+    if (!m_frame->tree()->parent() || (!shouldInheritSecurityOriginFromOwner(m_url) && !isPluginDocument()))
         return;
+
     contentSecurityPolicy()->copyStateFrom(m_frame->tree()->parent()->document()->contentSecurityPolicy());
 }
 
@@ -5615,7 +5615,7 @@ void Document::webkitWillEnterFullScreenForElement(Element* element)
     }
 
     if (m_fullScreenElement != documentElement())
-        RenderFullScreen::wrapRenderer(renderer, this);
+        RenderFullScreen::wrapRenderer(renderer, renderer ? renderer->parent() : 0, this);
 
     m_fullScreenElement->setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(true);
     
@@ -5829,8 +5829,13 @@ void Document::addDocumentToFullScreenChangeEventQueue(Document* doc)
 #if ENABLE(POINTER_LOCK)
 void Document::webkitExitPointerLock()
 {
-    if (page())
-        page()->pointerLockController()->requestPointerUnlock();
+    if (!page())
+        return;
+    if (Element* target = page()->pointerLockController()->element()) {
+        if (target->document() != this)
+            return;
+    }
+    page()->pointerLockController()->requestPointerUnlock();
 }
 
 Element* Document::webkitPointerLockElement() const
@@ -6016,7 +6021,7 @@ DocumentLoader* Document::loader() const
 PassRefPtr<NodeList> Document::getItems(const String& typeNames)
 {
     // Since documet.getItem() is allowed for microdata, typeNames will be null string.
-    // In this case we need to create an unique string identifier to map such request in the cache.
+    // In this case we need to create an empty string identifier to map such request in the cache.
     String localTypeNames = typeNames.isNull() ? MicroDataItemList::undefinedItemType() : typeNames;
 
     return ensureRareData()->ensureNodeLists()->addCacheWithName<MicroDataItemList>(this, DynamicNodeList::MicroDataItemListType, localTypeNames);
@@ -6087,26 +6092,36 @@ void Document::setContextFeatures(PassRefPtr<ContextFeatures> features)
 
 void Document::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo<Document> info(memoryObjectInfo, this, MemoryInstrumentation::DOM);
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::DOM);
     info.addInstrumentedMember(m_styleResolver);
-    info.visitBaseClass<ContainerNode>(this);
+    ContainerNode::reportMemoryUsage(memoryObjectInfo);
     info.addVector(m_customFonts);
-    info.addString(m_documentURI);
-    info.addString(m_baseTarget);
+    info.addMember(m_url);
+    info.addMember(m_baseURL);
+    info.addMember(m_baseURLOverride);
+    info.addMember(m_baseElementURL);
+    info.addMember(m_cookieURL);
+    info.addMember(m_firstPartyForCookies);
+    info.addMember(m_documentURI);
+    info.addMember(m_baseTarget);
+    info.addInstrumentedMember(m_frame);
+    info.addInstrumentedMember(m_cachedResourceLoader);
+    info.addInstrumentedMember(m_elemSheet);
+    info.addInstrumentedMember(m_pageUserSheet);
     if (m_pageGroupUserSheets)
-        info.addVector(*m_pageGroupUserSheets.get());
+        info.addInstrumentedVectorPtr(m_pageGroupUserSheets);
     if (m_userSheets)
-        info.addVector(*m_userSheets.get());
+        info.addInstrumentedVectorPtr(m_userSheets);
     info.addHashSet(m_nodeIterators);
     info.addHashSet(m_ranges);
     info.addListHashSet(m_styleSheetCandidateNodes);
-    info.addString(m_preferredStylesheetSet);
-    info.addString(m_selectedStylesheetSet);
-    info.addString(m_title.string());
-    info.addString(m_rawTitle.string());
-    info.addString(m_xmlEncoding);
-    info.addString(m_xmlVersion);
-    info.addString(m_contentLanguage);
+    info.addMember(m_preferredStylesheetSet);
+    info.addMember(m_selectedStylesheetSet);
+    info.addMember(m_title.string());
+    info.addMember(m_rawTitle.string());
+    info.addMember(m_xmlEncoding);
+    info.addMember(m_xmlVersion);
+    info.addMember(m_contentLanguage);
     info.addHashMap(m_documentNamedItemCollections);
     info.addHashMap(m_windowNamedItemCollections);
 #if ENABLE(DASHBOARD_SUPPORT)
@@ -6118,6 +6133,7 @@ void Document::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addHashSet(m_mediaVolumeCallbackElements);
     info.addHashSet(m_privateBrowsingStateChangedElements);
     info.addHashMap(m_elementsByAccessKey);
+    info.addInstrumentedMember(m_eventQueue);
     info.addHashSet(m_mediaCanStartListeners);
     info.addVector(m_pendingTasks);
 }

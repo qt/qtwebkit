@@ -31,16 +31,6 @@
 #ifndef WebViewImpl_h
 #define WebViewImpl_h
 
-#include "WebNavigationPolicy.h"
-#include "platform/WebLayer.h"
-#include "platform/WebLayerTreeView.h"
-#include "platform/WebLayerTreeViewClient.h"
-#include "platform/WebPoint.h"
-#include "platform/WebRect.h"
-#include "platform/WebSize.h"
-#include "platform/WebString.h"
-#include "WebView.h"
-
 #include "ChromeClientImpl.h"
 #include "ContextMenuClientImpl.h"
 #include "DragClientImpl.h"
@@ -56,7 +46,18 @@
 #include "PageWidgetDelegate.h"
 #include "PlatformGestureCurveTarget.h"
 #include "UserMediaClientImpl.h"
+#include "WebInputEvent.h"
+#include "WebNavigationPolicy.h"
+#include "WebView.h"
 #include "WebViewBenchmarkSupportImpl.h"
+#include <public/WebFloatQuad.h>
+#include <public/WebLayer.h>
+#include <public/WebLayerTreeView.h>
+#include <public/WebLayerTreeViewClient.h>
+#include <public/WebPoint.h>
+#include <public/WebRect.h>
+#include <public/WebSize.h>
+#include <public/WebString.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/RefCounted.h>
 
@@ -301,13 +302,20 @@ public:
     virtual void transferActiveWheelFlingAnimation(const WebActiveWheelFlingParameters&);
     virtual WebViewBenchmarkSupport* benchmarkSupport();
 
+    virtual WebVector<WebFloatQuad> getTouchHighlightQuads(const WebPoint&,
+                                                           int padding,
+                                                           WebTouchCandidatesInfo& outTouchInfo,
+                                                           WebColor& outTapHighlightColor);
+
     // WebLayerTreeViewClient
     virtual void willBeginFrame();
     virtual void didBeginFrame();
     virtual void updateAnimations(double monotonicFrameBeginTime);
     virtual void applyScrollAndScale(const WebSize&, float);
-    virtual WebGraphicsContext3D* createContext3D();
-    virtual void didRebindGraphicsContext(bool);
+    virtual WebGraphicsContext3D* createContext3D() OVERRIDE;
+    virtual void didRebindGraphicsContext(bool success) OVERRIDE;
+    virtual WebCompositorOutputSurface* createOutputSurface() OVERRIDE;
+    virtual void didRecreateOutputSurface(bool success) OVERRIDE;
     virtual void willCommit();
     virtual void didCommit();
     virtual void didCommitAndDrawFrame();
@@ -382,6 +390,8 @@ public:
     // Event related methods:
     void mouseContextMenu(const WebMouseEvent&);
     void mouseDoubleClick(const WebMouseEvent&);
+
+    bool detectContentIntentOnTouch(const WebPoint&, WebInputEvent::Type);
     void startPageScaleAnimation(const WebCore::IntPoint& targetPosition, bool useAnchor, float newScale, double durationInSeconds);
 
     void numberOfWheelEventHandlersChanged(unsigned);
@@ -528,8 +538,6 @@ public:
 #endif
 
     virtual WebGraphicsContext3D* sharedGraphicsContext3D();
-
-    PassOwnPtr<WebGraphicsContext3D> createCompositorGraphicsContext3D();
 
     virtual void setVisibilityState(WebPageVisibilityState, bool);
 
@@ -824,10 +832,6 @@ private:
     OwnPtr<SpeechRecognitionClientProxy> m_speechRecognitionClient;
 #endif
 
-    // If we attempt to fetch the on-screen GraphicsContext3D before
-    // the compositor has been turned on, we need to instantiate it
-    // early. This member holds on to the GC3D in this case.
-    OwnPtr<WebGraphicsContext3D> m_temporaryOnscreenGraphicsContext3D;
     OwnPtr<DeviceOrientationClientProxy> m_deviceOrientationClientProxy;
     OwnPtr<GeolocationClientProxy> m_geolocationClientProxy;
 #if ENABLE(BATTERY_STATUS)

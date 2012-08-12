@@ -25,8 +25,6 @@
 #ifndef CCLayerTreeHost_h
 #define CCLayerTreeHost_h
 
-#include "GraphicsContext3D.h"
-#include "GraphicsTypes3D.h"
 #include "IntRect.h"
 #include "RateLimiter.h"
 #include "SkColor.h"
@@ -47,13 +45,14 @@
 
 namespace WebCore {
 
-class CCGraphicsContext;
+class CCFontAtlas;
 class CCLayerChromium;
 class CCLayerTreeHostImpl;
 class CCLayerTreeHostImplClient;
-class CCTextureUpdater;
-class Region;
 class CCPrioritizedTextureManager;
+class CCTextureUpdateQueue;
+class HeadsUpDisplayLayerChromium;
+class Region;
 struct CCScrollAndScaleSet;
 
 class CCLayerTreeHostClient {
@@ -64,8 +63,8 @@ public:
     virtual void updateAnimations(double frameBeginTime) = 0;
     virtual void layout() = 0;
     virtual void applyScrollAndScale(const IntSize& scrollDelta, float pageScale) = 0;
-    virtual PassOwnPtr<WebKit::WebGraphicsContext3D> createContext3D() = 0;
-    virtual void didRecreateContext(bool success) = 0;
+    virtual PassOwnPtr<WebKit::WebCompositorOutputSurface> createOutputSurface() = 0;
+    virtual void didRecreateOutputSurface(bool success) = 0;
     virtual void willCommit() = 0;
     virtual void didCommit() = 0;
     virtual void didCommitAndDrawFrame() = 0;
@@ -81,7 +80,6 @@ protected:
 struct CCLayerTreeSettings {
     CCLayerTreeSettings()
             : acceleratePainting(false)
-            , forceSoftwareCompositing(false)
             , showFPSCounter(false)
             , showPlatformLayerTree(false)
             , showPaintRects(false)
@@ -90,6 +88,7 @@ struct CCLayerTreeSettings {
             , showScreenSpaceRects(false)
             , showReplicaScreenSpaceRects(false)
             , showOccludingRects(false)
+            , renderVSyncEnabled(true)
             , refreshRate(0)
             , maxPartialTextureUpdates(std::numeric_limits<size_t>::max())
             , defaultTileSize(IntSize(256, 256))
@@ -98,7 +97,6 @@ struct CCLayerTreeSettings {
     { }
 
     bool acceleratePainting;
-    bool forceSoftwareCompositing;
     bool showFPSCounter;
     bool showPlatformLayerTree;
     bool showPaintRects;
@@ -107,6 +105,7 @@ struct CCLayerTreeSettings {
     bool showScreenSpaceRects;
     bool showReplicaScreenSpaceRects;
     bool showOccludingRects;
+    bool renderVSyncEnabled;
     double refreshRate;
     size_t maxPartialTextureUpdates;
     IntSize defaultTileSize;
@@ -123,12 +122,9 @@ struct LayerRendererCapabilities {
         : bestTextureFormat(0)
         , contextHasCachedFrontBuffer(false)
         , usingPartialSwap(false)
-        , usingMapSub(false)
         , usingAcceleratedPainting(false)
         , usingSetVisibility(false)
         , usingSwapCompleteCallback(false)
-        , usingTextureUsageHint(false)
-        , usingTextureStorageExtension(false)
         , usingGpuMemoryManager(false)
         , usingDiscardFramebuffer(false)
         , usingEglImage(false)
@@ -137,12 +133,9 @@ struct LayerRendererCapabilities {
     GC3Denum bestTextureFormat;
     bool contextHasCachedFrontBuffer;
     bool usingPartialSwap;
-    bool usingMapSub;
     bool usingAcceleratedPainting;
     bool usingSetVisibility;
     bool usingSwapCompleteCallback;
-    bool usingTextureUsageHint;
-    bool usingTextureStorageExtension;
     bool usingGpuMemoryManager;
     bool usingDiscardFramebuffer;
     bool usingEglImage;
@@ -188,7 +181,7 @@ public:
     virtual void acquireLayerTextures();
     // Returns false if we should abort this frame due to initialization failure.
     bool initializeLayerRendererIfNeeded();
-    void updateLayers(CCTextureUpdater&, size_t contentsMemoryLimitBytes);
+    void updateLayers(CCTextureUpdateQueue&, size_t contentsMemoryLimitBytes);
 
     CCLayerTreeHostClient* client() { return m_client; }
 
@@ -229,10 +222,9 @@ public:
 
     const CCLayerTreeSettings& settings() const { return m_settings; }
 
-    void setViewportSize(const IntSize&);
+    void setViewportSize(const IntSize& layoutViewportSize, const IntSize& deviceViewportSize);
 
-    const IntSize& viewportSize() const { return m_viewportSize; }
-    // Gives the viewport size in device/content space.
+    const IntSize& layoutViewportSize() const { return m_layoutViewportSize; }
     const IntSize& deviceViewportSize() const { return m_deviceViewportSize; }
 
     void setPageScaleFactorAndLimits(float pageScaleFactor, float minPageScaleFactor, float maxPageScaleFactor);
@@ -269,6 +261,8 @@ public:
     void setDeviceScaleFactor(float);
     float deviceScaleFactor() const { return m_deviceScaleFactor; }
 
+    void setFontAtlas(PassOwnPtr<CCFontAtlas>);
+
 protected:
     CCLayerTreeHost(CCLayerTreeHostClient*, const CCLayerTreeSettings&);
     bool initialize();
@@ -279,11 +273,11 @@ private:
 
     void initializeLayerRenderer();
 
-    void update(LayerChromium*, CCTextureUpdater&, const CCOcclusionTracker*);
-    bool paintLayerContents(const LayerList&, CCTextureUpdater&);
-    bool paintMasksForRenderSurface(LayerChromium*, CCTextureUpdater&);
+    void update(LayerChromium*, CCTextureUpdateQueue&, const CCOcclusionTracker*);
+    bool paintLayerContents(const LayerList&, CCTextureUpdateQueue&);
+    bool paintMasksForRenderSurface(LayerChromium*, CCTextureUpdateQueue&);
 
-    void updateLayers(LayerChromium*, CCTextureUpdater&);
+    void updateLayers(LayerChromium*, CCTextureUpdateQueue&);
 
     void prioritizeTextures(const LayerList&, CCOverdrawMetrics&); 
     void setPrioritiesForSurfaces(size_t surfaceMemoryBytes);
@@ -311,13 +305,15 @@ private:
     int m_numFailedRecreateAttempts;
 
     RefPtr<LayerChromium> m_rootLayer;
-    RefPtr<LayerChromium> m_hudLayer;
+    RefPtr<HeadsUpDisplayLayerChromium> m_hudLayer;
+    OwnPtr<CCFontAtlas> m_fontAtlas;
+
     OwnPtr<CCPrioritizedTextureManager> m_contentsTextureManager;
     OwnPtr<CCPrioritizedTexture> m_surfaceMemoryPlaceholder;
 
     CCLayerTreeSettings m_settings;
 
-    IntSize m_viewportSize;
+    IntSize m_layoutViewportSize;
     IntSize m_deviceViewportSize;
     float m_deviceScaleFactor;
 
@@ -335,6 +331,7 @@ private:
 
     TextureList m_deleteTextureAfterCommitList;
     size_t m_partialTextureUpdateRequests;
+
     static bool s_needsFilterContext;
 };
 

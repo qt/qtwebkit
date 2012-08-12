@@ -28,7 +28,6 @@
 
 #include "V8ArrayBufferViewCustom.h"
 #include "V8Binding.h"
-#include "V8BindingMacros.h"
 #include "V8DataView.h"
 #include "V8Proxy.h"
 
@@ -48,9 +47,10 @@ v8::Handle<v8::Value> V8DataView::constructorCallback(const v8::Arguments& args)
         // see constructWebGLArray -- we don't seem to be able to distingish between
         // 'new DataView()' and the call used to construct the cached DataView object.
         RefPtr<DataView> dataView = DataView::create(0);
-        V8DOMWrapper::setDOMWrapper(args.Holder(), &info, dataView.get());
-        V8DOMWrapper::setJSWrapperForDOMObject(dataView.release(), v8::Persistent<v8::Object>::New(args.Holder()));
-        return args.Holder();
+        v8::Handle<v8::Object> wrapper = args.Holder();
+        V8DOMWrapper::setDOMWrapper(wrapper, &info, dataView.get());
+        V8DOMWrapper::setJSWrapperForDOMObject(dataView.release(), wrapper);
+        return wrapper;
     }
     if (args[0]->IsNull() || !V8ArrayBuffer::HasInstance(args[0]))
         return V8Proxy::throwTypeError(0, args.GetIsolate());
@@ -107,7 +107,7 @@ v8::Handle<v8::Value> V8DataView::setInt8Callback(const v8::Arguments& args)
     imp->setInt8(byteOffset, static_cast<int8_t>(value), ec);
     if (UNLIKELY(ec))
         return V8Proxy::setDOMException(ec, args.GetIsolate());
-    return v8::Handle<v8::Value>();
+    return v8Undefined();
 }
 
 v8::Handle<v8::Value> V8DataView::setUint8Callback(const v8::Arguments& args)
@@ -123,7 +123,7 @@ v8::Handle<v8::Value> V8DataView::setUint8Callback(const v8::Arguments& args)
     imp->setUint8(byteOffset, static_cast<uint8_t>(value), ec);
     if (UNLIKELY(ec))
         return V8Proxy::setDOMException(ec, args.GetIsolate());
-    return v8::Handle<v8::Value>();
+    return v8Undefined();
 }
 
 } // namespace WebCore

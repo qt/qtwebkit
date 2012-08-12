@@ -60,7 +60,7 @@ namespace WebCore {
 
     ScriptExecutionContext* getScriptExecutionContext();
 
-    void throwTypeMismatchException(v8::Isolate*);
+    void setTypeMismatchException(v8::Isolate*);
 
     enum CallbackAllowedValueFlag {
         CallbackAllowUndefined = 1,
@@ -85,8 +85,8 @@ namespace WebCore {
     // Also validates the elements per sections 4.1.13 and 4.1.15 of the WebIDL spec and section 8.3.3 
     // of the HTML5 spec and generates exceptions as appropriate.
     // Returns true if the array was filled, or false if the passed value was not of an appropriate type.
-    bool extractTransferables(v8::Local<v8::Value>, MessagePortArray&, ArrayBufferArray&); 
-    bool getMessagePortArray(v8::Local<v8::Value>, MessagePortArray&);
+    bool extractTransferables(v8::Local<v8::Value>, MessagePortArray&, ArrayBufferArray&, v8::Isolate*); 
+    bool getMessagePortArray(v8::Local<v8::Value>, MessagePortArray&, v8::Isolate*);
 
     // 'FunctionOnly' is assumed for the created callback.
     template <typename V8CallbackType>
@@ -102,7 +102,7 @@ namespace WebCore {
 
         if (!value->IsFunction()) {
             succeeded = false;
-            throwTypeMismatchException(isolate);
+            setTypeMismatchException(isolate);
             return 0;
         }
 

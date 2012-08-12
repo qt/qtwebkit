@@ -48,6 +48,7 @@
 #include <getopt.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <wtf/Assertions.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
@@ -64,7 +65,7 @@ extern Ewk_History_Item* prevTestBFItem;
 RefPtr<LayoutTestController> gLayoutTestController;
 volatile bool done = false;
 
-static int dumpPixels = false;
+static bool dumpPixelsForCurrentTest;
 static int dumpTree = true;
 static int printSeparators = true;
 static int useX11Window = false;
@@ -192,7 +193,6 @@ static bool parseCommandLineOptions(int argc, char** argv)
 {
     static const option options[] = {
         {"notree", no_argument, &dumpTree, false},
-        {"pixel-tests", no_argument, &dumpPixels, true},
         {"tree", no_argument, &dumpTree, true},
         {"gui", no_argument, &useX11Window, true},
         {0, 0, 0, 0}
@@ -208,32 +208,6 @@ static bool parseCommandLineOptions(int argc, char** argv)
     }
 
     return true;
-}
-
-static String getFinalTestURL(const String& testURL)
-{
-    const size_t hashSeparatorPos = testURL.find("'");
-    if (hashSeparatorPos != notFound)
-        return getFinalTestURL(testURL.left(hashSeparatorPos));
-
-    // Convert the path into a full file URL if it does not look
-    // like an HTTP/S URL (doesn't start with http:// or https://).
-    if (!testURL.startsWith("http://") && !testURL.startsWith("https://")) {
-        char* cFilePath = ecore_file_realpath(testURL.utf8().data());
-        const String filePath = String::fromUTF8(cFilePath);
-        free(cFilePath);
-
-        if (ecore_file_exists(filePath.utf8().data()))
-            return String("file://") + filePath;
-    }
-
-    return testURL;
-}
-
-static String getExpectedPixelHash(const String& testURL)
-{
-    const size_t hashSeparatorPos = testURL.find("'");
-    return (hashSeparatorPos != notFound) ? testURL.substring(hashSeparatorPos + 1) : String();
 }
 
 static inline bool isGlobalHistoryTest(const String& cTestPathOrURL)
@@ -267,13 +241,31 @@ static void createLayoutTestController(const String& testURL, const String& expe
     }
 }
 
-static void runTest(const char* cTestPathOrURL)
+static String getFinalTestURL(const String& testURL)
 {
-    const String testPathOrURL = String::fromUTF8(cTestPathOrURL);
-    ASSERT(!testPathOrURL.isEmpty());
+    if (!testURL.startsWith("http://") && !testURL.startsWith("https://")) {
+        char* cFilePath = ecore_file_realpath(testURL.utf8().data());
+        const String filePath = String::fromUTF8(cFilePath);
+        free(cFilePath);
 
+        if (ecore_file_exists(filePath.utf8().data()))
+            return String("file://") + filePath;
+    }
+
+    return testURL;
+}
+
+static void runTest(const char* inputLine)
+{
+    TestCommand command = parseInputLine(inputLine);
+    const String testPathOrURL(command.pathOrURL.c_str());
+    ASSERT(!testPathOrURL.isEmpty());
+    dumpPixelsForCurrentTest = command.shouldDumpPixels;
+    const String expectedPixelHash(command.expectedPixelHash.c_str());
+
+    // Convert the path into a full file URL if it does not look
+    // like an HTTP/S URL (doesn't start with http:// or https://).
     const String testURL = getFinalTestURL(testPathOrURL);
-    const String expectedPixelHash = getExpectedPixelHash(testPathOrURL);
 
     browser->resetDefaultsToConsistentValues();
     createLayoutTestController(testURL, expectedPixelHash);
@@ -351,7 +343,7 @@ static bool shouldDumpFrameScrollPosition()
 
 static bool shouldDumpPixelsAndCompareWithExpected()
 {
-    return dumpPixels && gLayoutTestController->generatePixelResults() && !gLayoutTestController->dumpDOMAsWebArchive() && !gLayoutTestController->dumpSourceAsWebArchive();
+    return dumpPixelsForCurrentTest && gLayoutTestController->generatePixelResults() && !gLayoutTestController->dumpDOMAsWebArchive() && !gLayoutTestController->dumpSourceAsWebArchive();
 }
 
 static bool shouldDumpBackForwardList()
@@ -450,6 +442,8 @@ int main(int argc, char** argv)
     if (!initEfl())
         return EXIT_FAILURE;
 
+    WTFInstallReportBacktraceOnCrashHook();
+
     OwnPtr<Ecore_Evas> ecoreEvas = adoptPtr(initEcoreEvas());
     browser = DumpRenderTreeChrome::create(ecore_evas_get(ecoreEvas.get()));
     addFontsToEnvironment();
@@ -458,7 +452,7 @@ int main(int argc, char** argv)
         printSeparators = true;
         runTestingServerLoop();
     } else {
-        printSeparators = (optind < argc - 1 || (dumpPixels && dumpTree));
+        printSeparators = (optind < argc - 1 || (dumpPixelsForCurrentTest && dumpTree));
         for (int i = optind; i != argc; ++i)
             runTest(argv[i]);
     }

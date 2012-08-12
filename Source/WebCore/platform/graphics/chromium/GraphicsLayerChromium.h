@@ -36,8 +36,8 @@
 #include "GraphicsContext.h"
 #include "GraphicsLayer.h"
 #include "OpaqueRectTrackingContentLayerDelegate.h"
-#include "cc/CCLayerAnimationDelegate.h"
 
+#include <public/WebAnimationDelegate.h>
 #include <public/WebContentLayer.h>
 #include <public/WebLayer.h>
 #include <wtf/HashMap.h>
@@ -48,7 +48,7 @@ class LayerChromium;
 class LinkHighlight;
 class Path;
 
-class GraphicsLayerChromium : public GraphicsLayer, public GraphicsContextPainter, public CCLayerAnimationDelegate {
+class GraphicsLayerChromium : public GraphicsLayer, public GraphicsContextPainter, public WebKit::WebAnimationDelegate {
 public:
     GraphicsLayerChromium(GraphicsLayerClient*);
     virtual ~GraphicsLayerChromium();
@@ -121,9 +121,9 @@ public:
     // GraphicsContextPainter implementation.
     virtual void paint(GraphicsContext&, const IntRect& clip) OVERRIDE;
 
-    // CCLayerAnimationDelegate implementation.
-    virtual void notifyAnimationStarted(double startTime);
-    virtual void notifyAnimationFinished(double finishTime);
+    // WebAnimationDelegate implementation.
+    virtual void notifyAnimationStarted(double startTime) OVERRIDE;
+    virtual void notifyAnimationFinished(double finishTime) OVERRIDE;
 
     // Exposed for tests.
     WebKit::WebLayer contentsLayer() const { return m_contentsLayer; }
@@ -131,9 +131,7 @@ public:
 private:
     virtual void willBeDestroyed();
 
-    WebKit::WebLayer primaryLayer() const  { return m_transformLayer.isNull() ? m_layer : m_transformLayer; }
-    WebKit::WebLayer hostLayerForChildren() const;
-    WebKit::WebLayer layerForParent() const;
+    WebKit::WebLayer primaryLayer() const;
 
     void updateNames();
     void updateChildList();
@@ -152,7 +150,7 @@ private:
     void updateContentsRect();
     void updateContentsScale();
 
-    void setupContentsLayer(LayerChromium*);
+    void setupContentsLayer(WebKit::WebLayer);
     float contentsScale() const;
 
     int mapAnimationNameToId(const String& animationName);

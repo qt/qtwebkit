@@ -131,6 +131,30 @@ void InjectedBundle::overrideBoolPreferenceForTestRunner(WebPageGroupProxy* page
 
     // FIXME: Need an explicit way to set "WebKitTabToLinksPreferenceKey" directly in WebPage.
 
+    if (preference == "WebKit2AsynchronousPluginInitializationEnabled") {
+        WebPreferencesStore::overrideBoolValueForKey(WebPreferencesKey::asynchronousPluginInitializationEnabledKey(), enabled);
+        for (HashSet<Page*>::iterator i = pages.begin(); i != pages.end(); ++i) {
+            WebPage* webPage = static_cast<WebFrameLoaderClient*>((*i)->mainFrame()->loader()->client())->webFrame()->page();
+            webPage->setAsynchronousPluginInitializationEnabled(enabled);
+        }
+    }
+
+    if (preference == "WebKit2AsynchronousPluginInitializationEnabledForAllPlugins") {
+        WebPreferencesStore::overrideBoolValueForKey(WebPreferencesKey::asynchronousPluginInitializationEnabledForAllPluginsKey(), enabled);
+        for (HashSet<Page*>::iterator i = pages.begin(); i != pages.end(); ++i) {
+            WebPage* webPage = static_cast<WebFrameLoaderClient*>((*i)->mainFrame()->loader()->client())->webFrame()->page();
+            webPage->setAsynchronousPluginInitializationEnabledForAllPlugins(enabled);
+        }
+    }
+
+    if (preference == "WebKit2ArtificialPluginInitializationDelayEnabled") {
+        WebPreferencesStore::overrideBoolValueForKey(WebPreferencesKey::artificialPluginInitializationDelayEnabledKey(), enabled);
+        for (HashSet<Page*>::iterator i = pages.begin(); i != pages.end(); ++i) {
+            WebPage* webPage = static_cast<WebFrameLoaderClient*>((*i)->mainFrame()->loader()->client())->webFrame()->page();
+            webPage->setArtificialPluginInitializationDelayEnabled(enabled);
+        }
+    }
+
     // Map the names used in LayoutTests with the names used in WebCore::Settings and WebPreferencesStore.
 #define FOR_EACH_OVERRIDE_BOOL_PREFERENCE(macro) \
     macro(WebKitAcceleratedCompositingEnabled, AcceleratedCompositingEnabled, acceleratedCompositingEnabled) \
@@ -477,6 +501,13 @@ void InjectedBundle::setPageVisibilityState(WebPage* page, int state, bool isIni
 #if ENABLE(PAGE_VISIBILITY_API)
     page->corePage()->setVisibilityState(static_cast<PageVisibilityState>(state), isInitialState);
 #endif
+}
+
+void InjectedBundle::setUserStyleSheetLocation(WebPageGroupProxy* pageGroup, const String& location)
+{
+    const HashSet<Page*>& pages = PageGroup::pageGroup(pageGroup->identifier())->pages();
+    for (HashSet<Page*>::iterator iter = pages.begin(); iter != pages.end(); ++iter)
+        (*iter)->settings()->setUserStyleSheetLocation(KURL(KURL(), location));
 }
 
 } // namespace WebKit

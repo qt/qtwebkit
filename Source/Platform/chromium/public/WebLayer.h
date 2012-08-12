@@ -26,14 +26,18 @@
 #ifndef WebLayer_h
 #define WebLayer_h
 
+#include "WebAnimation.h"
 #include "WebColor.h"
 #include "WebCommon.h"
 #include "WebPrivatePtr.h"
+#include "WebString.h"
+#include "WebVector.h"
 
 class SkMatrix44;
 namespace WebCore { class LayerChromium; }
 
 namespace WebKit {
+class WebAnimationDelegate;
 class WebFilterOperations;
 class WebTransformationMatrix;
 struct WebFloatPoint;
@@ -71,6 +75,7 @@ public:
     WEBKIT_EXPORT void addChild(const WebLayer&);
     WEBKIT_EXPORT void insertChild(const WebLayer&, size_t index);
     WEBKIT_EXPORT void replaceChild(const WebLayer& reference, const WebLayer& newLayer);
+    WEBKIT_EXPORT void setChildren(const WebVector<WebLayer>&);
     WEBKIT_EXPORT void removeFromParent();
     WEBKIT_EXPORT void removeAllChildren();
 
@@ -88,6 +93,8 @@ public:
 
     WEBKIT_EXPORT void setMaskLayer(const WebLayer&);
     WEBKIT_EXPORT WebLayer maskLayer() const;
+
+    WEBKIT_EXPORT void setReplicaLayer(const WebLayer&);
 
     WEBKIT_EXPORT void setOpacity(float);
     WEBKIT_EXPORT float opacity() const;
@@ -136,6 +143,33 @@ public:
 
     WEBKIT_EXPORT void setDebugBorderColor(const WebColor&);
     WEBKIT_EXPORT void setDebugBorderWidth(float);
+    WEBKIT_EXPORT void setDebugName(WebString);
+
+    // An animation delegate is notified when animations are started and
+    // stopped. The WebLayer does not take ownership of the delegate, and it is
+    // the responsibility of the client to reset the layer's delegate before
+    // deleting the delegate.
+    WEBKIT_EXPORT void setAnimationDelegate(WebAnimationDelegate*);
+
+    // Returns false if the animation cannot be added.
+    WEBKIT_EXPORT bool addAnimation(const WebAnimation&);
+
+    // Removes all animations with the given id.
+    WEBKIT_EXPORT void removeAnimation(int animationId);
+
+    // Removes all animations with the given id targeting the given property.
+    WEBKIT_EXPORT void removeAnimation(int animationId, WebAnimation::TargetProperty);
+
+    // Pauses all animations with the given id.
+    WEBKIT_EXPORT void pauseAnimation(int animationId, double timeOffset);
+
+    // The following functions suspend and resume all animations. The given time
+    // is assumed to use the same time base as monotonicallyIncreasingTime().
+    WEBKIT_EXPORT void suspendAnimations(double monotonicTime);
+    WEBKIT_EXPORT void resumeAnimations(double monotonicTime);
+
+    // Transfers all animations running on the current layer.
+    WEBKIT_EXPORT void transferAnimationsTo(WebLayer*);
 
     // DEPRECATED.
     // This requests that this layer's compositor-managed textures always be reserved
@@ -145,6 +179,10 @@ public:
     // Forces this layer to use a render surface. There is no benefit in doing
     // so, but this is to facilitate benchmarks and tests.
     WEBKIT_EXPORT void setForceRenderSurface(bool);
+
+    // Drops this layer's render surface, if it has one. Used to break cycles in some
+    // cases - if you aren't sure, you don't need to call this.
+    WEBKIT_EXPORT void clearRenderSurface();
 
     template<typename T> T to()
     {

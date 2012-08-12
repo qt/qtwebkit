@@ -32,6 +32,7 @@
 #include "ExceptionCode.h"
 #include "HTMLNames.h"
 #include "MediaList.h"
+#include "MemoryInstrumentation.h"
 #include "Node.h"
 #include "SVGNames.h"
 #include "SecurityOrigin.h"
@@ -52,6 +53,12 @@ private:
     virtual CSSRule* item(unsigned index) const { return m_styleSheet->item(index); }
     
     virtual CSSStyleSheet* styleSheet() const { return m_styleSheet; }
+
+    virtual void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const OVERRIDE
+    {
+        MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+        info.addInstrumentedMember(m_styleSheet);
+    }
     
     CSSStyleSheet* m_styleSheet;
 };
@@ -166,6 +173,18 @@ void CSSStyleSheet::reattachChildRuleCSSOMWrappers()
             continue;
         m_childRuleCSSOMWrappers[i]->reattach(m_contents->ruleAt(i));
     }
+}
+
+void CSSStyleSheet::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    info.addInstrumentedMember(m_contents);
+    info.addMember(m_title);
+    info.addInstrumentedMember(m_mediaQueries);
+    info.addInstrumentedMember(m_ownerNode);
+    info.addInstrumentedMember(m_ownerRule);
+    info.addInstrumentedMember(m_mediaCSSOMWrapper);
+    info.addInstrumentedVector(m_childRuleCSSOMWrappers);
 }
 
 void CSSStyleSheet::setDisabled(bool disabled)

@@ -165,6 +165,11 @@ void SearchFieldResultsButtonElement::defaultEventHandler(Event* event)
         HTMLDivElement::defaultEventHandler(event);
 }
 
+bool SearchFieldResultsButtonElement::willRespondToMouseClickEvents()
+{
+    return true;
+}
+
 // ----------------------------
 
 inline SearchFieldCancelButtonElement::SearchFieldCancelButtonElement(Document* document)
@@ -198,7 +203,7 @@ void SearchFieldCancelButtonElement::defaultEventHandler(Event* event)
 {
     // If the element is visible, on mouseup, clear the value, and set selection
     RefPtr<HTMLInputElement> input(static_cast<HTMLInputElement*>(shadowHost()));
-    if (input->disabled() || input->isReadOnlyFormControl()) {
+    if (input->disabled() || input->readOnly()) {
         if (!event->defaultHandled())
             HTMLDivElement::defaultEventHandler(event);
         return;
@@ -232,6 +237,15 @@ void SearchFieldCancelButtonElement::defaultEventHandler(Event* event)
 
     if (!event->defaultHandled())
         HTMLDivElement::defaultEventHandler(event);
+}
+
+bool SearchFieldCancelButtonElement::willRespondToMouseClickEvents()
+{
+    const HTMLInputElement* input = static_cast<HTMLInputElement*>(shadowHost());
+    if (!input->disabled() && !input->readOnly())
+        return true;
+
+    return HTMLDivElement::willRespondToMouseClickEvents();
 }
 
 // ----------------------------
@@ -279,7 +293,7 @@ void SpinButtonElement::defaultEventHandler(Event* event)
     }
 
     RefPtr<HTMLInputElement> input(static_cast<HTMLInputElement*>(shadowHost()));
-    if (input->disabled() || input->isReadOnlyFormControl()) {
+    if (input->disabled() || input->readOnly()) {
         if (!event->defaultHandled())
             HTMLDivElement::defaultEventHandler(event);
         return;
@@ -328,6 +342,24 @@ void SpinButtonElement::defaultEventHandler(Event* event)
         HTMLDivElement::defaultEventHandler(event);
 }
 
+bool SpinButtonElement::willRespondToMouseMoveEvents()
+{
+    const HTMLInputElement* input = static_cast<HTMLInputElement*>(shadowHost());
+    if (renderBox() && !input->disabled() && !input->readOnly())
+        return true;
+
+    return HTMLDivElement::willRespondToMouseMoveEvents();
+}
+
+bool SpinButtonElement::willRespondToMouseClickEvents()
+{
+    const HTMLInputElement* input = static_cast<HTMLInputElement*>(shadowHost());
+    if (renderBox() && !input->disabled() && !input->readOnly())
+        return true;
+
+    return HTMLDivElement::willRespondToMouseClickEvents();
+}
+
 void SpinButtonElement::doStepAction(int amount)
 {
     if (!m_stepActionHandler)
@@ -350,6 +382,16 @@ void SpinButtonElement::releaseCapture()
     }
 }
 
+bool SpinButtonElement::shouldMatchReadOnlySelector() const
+{
+    return shadowHost()->shouldMatchReadOnlySelector();
+}
+
+bool SpinButtonElement::shouldMatchReadWriteSelector() const
+{
+    return shadowHost()->shouldMatchReadWriteSelector();
+}
+
 void SpinButtonElement::startRepeatingTimer()
 {
     m_pressStartingState = m_upDownState;
@@ -365,7 +407,7 @@ void SpinButtonElement::stopRepeatingTimer()
 void SpinButtonElement::step(int amount)
 {
     HTMLInputElement* input = static_cast<HTMLInputElement*>(shadowHost());
-    if (input->disabled() || input->isReadOnlyFormControl())
+    if (input->disabled() || input->readOnly())
         return;
     // On Mac OS, NSStepper updates the value for the button under the mouse
     // cursor regardless of the button pressed at the beginning. So the
@@ -431,7 +473,7 @@ void InputFieldSpeechButtonElement::defaultEventHandler(Event* event)
     // here, we take a temporary reference.
     RefPtr<HTMLInputElement> input(static_cast<HTMLInputElement*>(shadowHost()));
 
-    if (input->disabled() || input->isReadOnlyFormControl()) {
+    if (input->disabled() || input->readOnly()) {
         if (!event->defaultHandled())
             HTMLDivElement::defaultEventHandler(event);
         return;
@@ -479,6 +521,15 @@ void InputFieldSpeechButtonElement::defaultEventHandler(Event* event)
         HTMLDivElement::defaultEventHandler(event);
 }
 
+bool InputFieldSpeechButtonElement::willRespondToMouseClickEvents()
+{
+    const HTMLInputElement* input = static_cast<HTMLInputElement*>(shadowHost());
+    if (!input->disabled() && !input->readOnly())
+        return true;
+
+    return HTMLDivElement::willRespondToMouseClickEvents();
+}
+
 void InputFieldSpeechButtonElement::setState(SpeechInputState state)
 {
     if (m_state != state) {
@@ -510,7 +561,7 @@ void InputFieldSpeechButtonElement::setRecognitionResult(int, const SpeechInputR
     // remove the input element from DOM. To make sure it remains valid until we finish our work
     // here, we take a temporary reference.
     RefPtr<HTMLInputElement> input(static_cast<HTMLInputElement*>(shadowHost()));
-    if (input->disabled() || input->isReadOnlyFormControl())
+    if (input->disabled() || input->readOnly())
         return;
 
     RefPtr<InputFieldSpeechButtonElement> holdRefButton(this);

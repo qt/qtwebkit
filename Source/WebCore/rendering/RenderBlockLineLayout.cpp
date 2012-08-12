@@ -75,8 +75,13 @@ public:
         ASSERT(block);
         updateAvailableWidth();
     }
+#if ENABLE(SUBPIXEL_LAYOUT)
+    bool fitsOnLine() const { return currentWidth() <= m_availableWidth + LayoutUnit::epsilon(); }
+    bool fitsOnLine(float extra) const { return currentWidth() + extra <= m_availableWidth + LayoutUnit::epsilon(); }
+#else
     bool fitsOnLine() const { return currentWidth() <= m_availableWidth; }
     bool fitsOnLine(float extra) const { return currentWidth() + extra <= m_availableWidth; }
+#endif
     float currentWidth() const { return m_committedWidth + m_uncommittedWidth; }
 
     // FIXME: We should eventually replace these three functions by ones that work on a higher abstraction.
@@ -768,8 +773,11 @@ void RenderBlock::computeInlineDirectionPositionsForLine(RootInlineBox* lineBox,
     ETextAlign textAlign = textAlignmentForLine(!reachedEnd && !lineBox->endsWithBreak());
     
     LayoutUnit lineLogicalHeight = logicalHeightForLine(this);
-    float logicalLeft = pixelSnappedLogicalLeftOffsetForLine(logicalHeight(), lineInfo.isFirstLine(), lineLogicalHeight);
-    float availableLogicalWidth = pixelSnappedLogicalRightOffsetForLine(logicalHeight(), lineInfo.isFirstLine(), lineLogicalHeight) - logicalLeft;
+    // CSS 2.1: "'Text-indent' only affects a line if it is the first formatted line of an element. For example, the first line of an anonymous block 
+    // box is only affected if it is the first child of its parent element."
+    bool firstLine = lineInfo.isFirstLine() && !(isAnonymousBlock() && parent()->firstChild() != this);
+    float logicalLeft = pixelSnappedLogicalLeftOffsetForLine(logicalHeight(), firstLine, lineLogicalHeight);
+    float availableLogicalWidth = pixelSnappedLogicalRightOffsetForLine(logicalHeight(), firstLine, lineLogicalHeight) - logicalLeft;
 
     bool needsWordSpacing = false;
     float totalLogicalWidth = lineBox->getFlowSpacingLogicalWidth();

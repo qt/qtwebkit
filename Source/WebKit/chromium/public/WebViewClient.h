@@ -53,6 +53,7 @@ class WebAccessibilityObject;
 class WebBatteryStatusClient;
 class WebColorChooser;
 class WebColorChooserClient;
+class WebCompositorOutputSurface;
 class WebDeviceOrientationClient;
 class WebDragData;
 class WebElement;
@@ -118,9 +119,11 @@ public:
     // Create a session storage namespace object associated with this WebView.
     virtual WebStorageNamespace* createSessionStorageNamespace(unsigned quota) { return 0; }
 
-    // Creates a graphics context that renders to the client's WebView.
+    // DEPRECATED: Creates a graphics context that renders to the client's WebView.
     virtual WebGraphicsContext3D* createGraphicsContext3D(const WebGraphicsContext3D::Attributes&) { return 0; }
 
+    // Creates the output surface that renders to the client's WebView.
+    virtual WebCompositorOutputSurface* createOutputSurface() { return 0; }
 
     // Misc ----------------------------------------------------------------
 
@@ -373,7 +376,18 @@ public:
     // around a hit test result. The embedder should use platform-specific
     // content detectors (e.g., from the Android intent system) to analyze the
     // region around the hit test result.
-    virtual WebContentDetectionResult detectContentAround(const WebHitTestResult&) { return WebContentDetectionResult(); }
+    virtual WebContentDetectionResult detectContentIntentAround(const WebHitTestResult&) { return WebContentDetectionResult(); }
+
+    // Schedules a new content intent with the provided url.
+    virtual void scheduleContentIntent(const WebURL&) { }
+
+    // Cancels any previously scheduled content intents that have not yet launched.
+    virtual void cancelScheduledContentIntents() { }
+
+    // Draggable regions ----------------------------------------------------
+
+    // Informs the browser that the draggable regions have been updated.
+    virtual void draggableRegionsChanged() { }
 
 protected:
     ~WebViewClient() { }

@@ -62,7 +62,7 @@ RenderView::RenderView(Node* node, FrameView* view)
     , m_pageLogicalHeightChanged(false)
     , m_layoutState(0)
     , m_layoutStateDisableCount(0)
-    , m_renderQuoteCount(0)
+    , m_renderQuoteHead(0)
     , m_renderCounterCount(0)
 {
     // Clear our anonymous bit, set because RenderObject assumes
@@ -165,20 +165,20 @@ void RenderView::layout()
     setNeedsLayout(false);
 }
 
-void RenderView::mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool fixed, bool useTransforms, TransformState& transformState, ApplyContainerFlipOrNot, bool* wasFixed) const
+void RenderView::mapLocalToContainer(RenderBoxModelObject* repaintContainer, TransformState& transformState, MapLocalToContainerFlags mode, bool* wasFixed) const
 {
     // If a container was specified, and was not 0 or the RenderView,
     // then we should have found it by now.
     ASSERT_ARG(repaintContainer, !repaintContainer || repaintContainer == this);
-    ASSERT_UNUSED(wasFixed, !wasFixed || *wasFixed == fixed);
+    ASSERT_UNUSED(wasFixed, !wasFixed || *wasFixed == (mode & IsFixed));
 
-    if (!repaintContainer && useTransforms && shouldUseTransformFromContainer(0)) {
+    if (!repaintContainer && mode & UseTransforms && shouldUseTransformFromContainer(0)) {
         TransformationMatrix t;
         getTransformFromContainer(0, LayoutSize(), t);
         transformState.applyTransform(t);
     }
     
-    if (fixed && m_frameView)
+    if (mode & IsFixed && m_frameView)
         transformState.move(m_frameView->scrollOffsetForFixedPosition());
 }
 
@@ -961,12 +961,12 @@ void RenderView::setFixedPositionedObjectsNeedLayout()
 {
     ASSERT(m_frameView);
 
-    PositionedObjectsListHashSet* positionedObjects = this->positionedObjects();
+    ListHashSet<RenderBox*>* positionedObjects = this->positionedObjects();
     if (!positionedObjects)
         return;
 
-    PositionedObjectsListHashSet::const_iterator end = positionedObjects->end();
-    for (PositionedObjectsListHashSet::const_iterator it = positionedObjects->begin(); it != end; ++it) {
+    ListHashSet<RenderBox*>::const_iterator end = positionedObjects->end();
+    for (ListHashSet<RenderBox*>::const_iterator it = positionedObjects->begin(); it != end; ++it) {
         RenderBox* currBox = *it;
         currBox->setNeedsLayout(true);
     }

@@ -29,6 +29,7 @@
 #include "CSSValueKeywords.h"
 #include "GraphicsContext.h"
 #include "HTMLInputElement.h"
+#include "InputType.h"
 #include "NotImplemented.h"
 #include "Page.h"
 #include "PaintInfo.h"
@@ -326,6 +327,9 @@ bool RenderThemeEfl::paintThemePart(RenderObject* object, FormType type, const P
     // Currently, only sliders needs this message; if other widget ever needs special
     // treatment, move them to special functions.
     if (type == SliderVertical || type == SliderHorizontal) {
+        if (!object->isSlider())
+            return true; // probably have -webkit-appearance: slider..
+
         RenderSlider* renderSlider = toRenderSlider(object);
         HTMLInputElement* input = renderSlider->node()->toInputElement();
         Edje_Message_Float_Set* msg;
@@ -744,8 +748,15 @@ LayoutUnit RenderThemeEfl::baselinePosition(const RenderObject* object) const
 bool RenderThemeEfl::paintSliderTrack(RenderObject* object, const PaintInfo& info, const IntRect& rect)
 {
     if (object->style()->appearance() == SliderHorizontalPart)
-        return paintThemePart(object, SliderHorizontal, info, rect);
-    return paintThemePart(object, SliderVertical, info, rect);
+        paintThemePart(object, SliderHorizontal, info, rect);
+    else
+        paintThemePart(object, SliderVertical, info, rect);
+
+#if ENABLE(DATALIST_ELEMENT)
+    paintSliderTicks(object, info, rect);
+#endif
+
+    return false;
 }
 
 void RenderThemeEfl::adjustSliderTrackStyle(StyleResolver* styleResolver, RenderStyle* style, Element* element) const
@@ -789,16 +800,26 @@ void RenderThemeEfl::adjustSliderThumbSize(RenderStyle* style, Element*) const
 #if ENABLE(DATALIST_ELEMENT)
 IntSize RenderThemeEfl::sliderTickSize() const
 {
-    // FIXME: We need to set this to the size of one tick mark.
-    return IntSize(0, 0);
+    return IntSize(1, 6);
 }
 
 int RenderThemeEfl::sliderTickOffsetFromTrackCenter() const
 {
-    // FIXME: We need to set this to the position of the tick marks.
-    return 0;
+    static const int sliderTickOffset = -12;
+
+    return sliderTickOffset;
 }
 #endif
+
+bool RenderThemeEfl::supportsDataListUI(const AtomicString& type) const
+{
+#if ENABLE(DATALIST_ELEMENT)
+    // FIXME: We need to support other types.
+    return type == InputTypeNames::range();
+#else
+    return false;
+#endif
+}
 
 bool RenderThemeEfl::paintSliderThumb(RenderObject* object, const PaintInfo& info, const IntRect& rect)
 {
@@ -1052,6 +1073,9 @@ double RenderThemeEfl::animationDurationForProgressBar(RenderProgress*) const
 
 bool RenderThemeEfl::paintProgressBar(RenderObject* object, const PaintInfo& info, const IntRect& rect)
 {
+    if (!object->isProgress())
+        return true;
+
     return paintThemePart(object, ProgressBar, info, rect);
 }
 #endif

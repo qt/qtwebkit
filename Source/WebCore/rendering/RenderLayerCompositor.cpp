@@ -494,11 +494,10 @@ bool RenderLayerCompositor::updateBacking(RenderLayer* layer, CompositingChangeR
 
             layer->ensureBacking();
 
-            // The RenderLayer's needs to update repaint rects here, because the target
-            // repaintContainer may have changed after becoming a composited layer.
-            // https://bugs.webkit.org/show_bug.cgi?id=80641
+            // This layer and all of its descendants have cached repaints rects that are relative to
+            // the repaint container, so change when compositing changes; we need to update them here.
             if (layer->parent())
-                layer->computeRepaintRects();
+                layer->computeRepaintRectsIncludingDescendants();
 
             layerChanged = true;
         }
@@ -518,9 +517,9 @@ bool RenderLayerCompositor::updateBacking(RenderLayer* layer, CompositingChangeR
             layer->clearBacking();
             layerChanged = true;
 
-            // The layer's cached repaints rects are relative to the repaint container, so change when
-            // compositing changes; we need to update them here.
-            layer->computeRepaintRects();
+            // This layer and all of its descendants have cached repaints rects that are relative to
+            // the repaint container, so change when compositing changes; we need to update them here.
+            layer->computeRepaintRectsIncludingDescendants();
 
             // If we need to repaint, do so now that we've removed the backing
             if (shouldRepaint == CompositingChangeRepaintNow)

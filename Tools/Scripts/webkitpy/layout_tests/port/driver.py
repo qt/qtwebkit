@@ -166,8 +166,7 @@ class Driver(object):
 
         crash_log = None
         if self.has_crashed():
-            self.error_from_test, crash_log = self._port._get_crash_log(self._crashed_process_name,
-                self._crashed_pid, text, self.error_from_test, newer_than=start_time)
+            self.error_from_test, crash_log = self._get_crash_log(text, self.error_from_test, newer_than=start_time)
 
             # If we don't find a crash log use a placeholder error message instead.
             if not crash_log:
@@ -187,6 +186,9 @@ class Driver(object):
             timeout=timeout, error=self.error_from_test,
             crashed_process_name=self._crashed_process_name,
             crashed_pid=self._crashed_pid, crash_log=crash_log)
+
+    def _get_crash_log(self, stdout, stderr, newer_than):
+        return self._port._get_crash_log(self._crashed_process_name, self._crashed_pid, stdout, stderr, newer_than)
 
     # FIXME: Seems this could just be inlined into callers.
     @classmethod
@@ -292,9 +294,8 @@ class Driver(object):
         # FIXME: We need to pass --timeout=SECONDS to WebKitTestRunner for WebKit2.
 
         cmd.extend(self._port.get_option('additional_drt_flag', []))
+        cmd.extend(self._port.additional_drt_flag())
 
-        if pixel_tests and not self._port.supports_switching_pixel_tests_per_test():
-            cmd.append('--pixel-tests')
         cmd.extend(per_test_args)
 
         cmd.append('-')
@@ -319,6 +320,8 @@ class Driver(object):
             _log.debug('WebProcess crash, pid = %s, error_line = %s' % (str(pid), error_line))
             if error_line.startswith("#PROCESS UNRESPONSIVE - WebProcess"):
                 self._subprocess_was_unresponsive = True
+                # We want to show this since it's not a regular crash and probably we don't have a crash log.
+                self.error_from_test += error_line
             return True
         return self.has_crashed()
 
@@ -335,11 +338,9 @@ class Driver(object):
 
         assert not driver_input.image_hash or driver_input.should_run_pixel_test
 
+        # ' is the separator between arguments.
         if driver_input.should_run_pixel_test:
-            if self._port.supports_switching_pixel_tests_per_test():
-                # We did not start the driver with --pixel-tests, instead we specify it per test.
-                # "'" is the separator of command fields.
-                command += "'" + '--pixel-test'
+            command += "'--pixel-test"
         if driver_input.image_hash:
             command += "'" + driver_input.image_hash
         return command + "\n"
@@ -439,7 +440,7 @@ class ContentBlock(object):
         self.decoded_content = None
 
     def decode_content(self):
-        if self.encoding == 'base64':
+        if self.encoding == 'base64' and self.content is not None:
             self.decoded_content = base64.b64decode(self.content)
         else:
             self.decoded_content = self.content

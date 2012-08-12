@@ -20,6 +20,7 @@
 #define WebPage_h
 
 #include "BlackBerryGlobal.h"
+#include "JavaScriptVariant.h"
 #include "WebString.h"
 
 #include <BlackBerryPlatformGuardedPointer.h>
@@ -63,6 +64,7 @@ namespace WebKit {
 class BackingStore;
 class BackingStoreClient;
 class BackingStorePrivate;
+class InRegionScroller;
 class RenderQueue;
 class WebOverlay;
 class WebPageClient;
@@ -105,7 +107,7 @@ public:
     // Takes a UTF16 encoded script that is used explicitly by the pattern matching code
     bool executeJavaScriptInIsolatedWorld(const std::wstring& script, JavaScriptDataType& returnType, WebString& returnValue);
 
-    bool executeJavaScriptFunction(const std::vector<std::string> &script, const std::vector<std::string> &args, JavaScriptDataType& returnType, WebString& returnValue);
+    void executeJavaScriptFunction(const std::vector<std::string> &function, const std::vector<JavaScriptVariant> &args, JavaScriptVariant& returnValue);
 
     void initializeIconDataBase();
 
@@ -117,6 +119,8 @@ public:
     void prepareToDestroy();
 
     void enableCrossSiteXHR();
+    void addOriginAccessWhitelistEntry(const char* sourceOrigin, const char* destinationOrigin, bool allowDestinationSubdomains);
+    void removeOriginAccessWhitelistEntry(const char* sourceOrigin, const char* destinationOrigin, bool allowDestinationSubdomains);
 
     void reload();
     void reloadFromCache();
@@ -176,6 +180,8 @@ public:
     void setScrollOriginPoint(const Platform::IntPoint&);
 
     BackingStore* backingStore() const;
+
+    InRegionScroller* inRegionScroller() const;
 
     bool zoomToFit();
     bool zoomToOneOne();
@@ -299,7 +305,7 @@ public:
     void goToBackForwardEntry(BackForwardId);
 
     int backForwardListLength() const;
-    void getBackForwardList(SharedArray<BackForwardEntry>& result, unsigned& resultLength) const;
+    void getBackForwardList(SharedArray<BackForwardEntry>& result) const;
     void releaseBackForwardEntry(BackForwardId) const;
     void clearBackForwardList(bool keepCurrentPage) const;
 

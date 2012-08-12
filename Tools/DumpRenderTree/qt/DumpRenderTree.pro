@@ -13,18 +13,19 @@ WEBKIT += wtf webcore
 !v8: WEBKIT += javascriptcore
 
 INCLUDEPATH += \
+    $$PWD/ \
     $$PWD/.. \
     $${ROOT_WEBKIT_DIR}/Source/WebKit/qt/WebCoreSupport \
     $${ROOT_WEBKIT_DIR}/Source/WTF
 
-QT = core gui network testlib webkit
+QT = core gui network testlib webkit widgets printsupport
 macx: QT += xml
-haveQt(5): QT += widgets printsupport
 
 contains(DEFINES, HAVE_FONTCONFIG=1): PKGCONFIG += fontconfig
 
 HEADERS += \
     $$PWD/../WorkQueue.h \
+    $$PWD/../DumpRenderTree.h \
     DumpRenderTreeQt.h \
     EventSenderQt.h \
     TextInputControllerQt.h \
@@ -36,6 +37,7 @@ HEADERS += \
 
 SOURCES += \
     $$PWD/../WorkQueue.cpp \
+    $$PWD/../DumpRenderTreeCommon.cpp \
     DumpRenderTreeQt.cpp \
     EventSenderQt.cpp \
     TextInputControllerQt.cpp \

@@ -64,8 +64,12 @@ public:
 #endif
 
     void addSubresourceStyleURLs(ListHashSet<KURL>&, const StyleSheetContents*) const;
+
+    bool hasFailedOrCanceledSubresources() const;
     
     PassRefPtr<CSSValueList> cloneForCSSOM() const;
+
+    void reportDescendantMemoryUsage(MemoryObjectInfo*) const;
 
 protected:
     CSSValueList(ClassType, ValueListSeparator);

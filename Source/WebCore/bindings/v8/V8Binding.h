@@ -33,15 +33,20 @@
 
 #include "BindingSecurity.h"
 #include "DOMDataStore.h"
+#include "Document.h"
 #include "PlatformString.h"
+#include "V8BindingHelpers.h"
 #include "V8BindingMacros.h"
+#include "V8DOMConfiguration.h"
 #include "V8DOMWrapper.h"
 #include "V8GCController.h"
 #include "V8HiddenPropertyName.h"
+#include "V8PerIsolateData.h"
+#include "V8Proxy.h"
+#include "V8ValueCache.h"
 #include <wtf/MathExtras.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/text/AtomicString.h>
-
 #include <v8.h>
 
 namespace WebCore {
@@ -51,80 +56,6 @@ namespace WebCore {
     class EventTarget;
     class ExternalStringVisitor;
     class MemoryObjectInfo;
-
-    // FIXME: Remove V8Binding.
-    class V8Binding {
-    };
-    typedef BindingSecurity<V8Binding> V8BindingSecurity;
-
-    class StringCache {
-    public:
-        StringCache() { }
-
-        v8::Local<v8::String> v8ExternalString(StringImpl* stringImpl, v8::Isolate* isolate)
-        {
-            if (m_lastStringImpl.get() == stringImpl) {
-                ASSERT(!m_lastV8String.IsNearDeath());
-                ASSERT(!m_lastV8String.IsEmpty());
-                return v8::Local<v8::String>::New(m_lastV8String);
-            }
-
-            return v8ExternalStringSlow(stringImpl, isolate);
-        }
-
-        void clearOnGC() 
-        {
-            m_lastStringImpl = 0;
-            m_lastV8String.Clear();
-        }
-
-        void remove(StringImpl*);
-
-        void reportMemoryUsage(MemoryObjectInfo*) const;
-
-    private:
-        v8::Local<v8::String> v8ExternalStringSlow(StringImpl*, v8::Isolate*);
-
-        HashMap<StringImpl*, v8::String*> m_stringCache;
-        v8::Persistent<v8::String> m_lastV8String;
-        // Note: RefPtr is a must as we cache by StringImpl* equality, not identity
-        // hence lastStringImpl might be not a key of the cache (in sense of identity)
-        // and hence it's not refed on addition.
-        RefPtr<StringImpl> m_lastStringImpl;
-    };
-
-    const int numberOfCachedSmallIntegers = 64;
-
-    class IntegerCache {
-    public:
-        IntegerCache() : m_initialized(false) { };
-        ~IntegerCache();
-
-        v8::Handle<v8::Integer> v8Integer(int value)
-        {
-            if (!m_initialized)
-                createSmallIntegers();
-            if (0 <= value && value < numberOfCachedSmallIntegers)
-                return m_smallIntegers[value];
-            return v8::Integer::New(value);
-        }
-
-        v8::Handle<v8::Integer> v8UnsignedInteger(unsigned value)
-        {
-            if (!m_initialized)
-                createSmallIntegers();
-            if (value < static_cast<unsigned>(numberOfCachedSmallIntegers))
-                return m_smallIntegers[value];
-            return v8::Integer::NewFromUnsigned(value);
-        }
-
-    private:
-        void createSmallIntegers();
-
-        v8::Persistent<v8::Integer> m_smallIntegers[numberOfCachedSmallIntegers];
-        bool m_initialized;
-    };
-
     class ScriptGCEventListener;
 
     class GCEventData {
@@ -139,125 +70,12 @@ namespace WebCore {
         }
         GCEventListeners& listeners() { return m_listeners; }
 
+        // FIXME: Make these members private.
         double startTime;
         size_t usedHeapSize;
 
     private:
         GCEventListeners m_listeners;
-    };
-
-    class ConstructorMode;
-
-#ifndef NDEBUG
-    typedef HashMap<v8::Value*, GlobalHandleInfo*> GlobalHandleMap;
-#endif
-
-    class V8BindingPerIsolateData {
-    public:
-        static V8BindingPerIsolateData* create(v8::Isolate*);
-        static void ensureInitialized(v8::Isolate*);
-        static V8BindingPerIsolateData* current(v8::Isolate* isolate = 0)
-        {
-            if (UNLIKELY(!isolate))
-                isolate = v8::Isolate::GetCurrent();
-            ASSERT(isolate->GetData());
-            return static_cast<V8BindingPerIsolateData*>(isolate->GetData()); 
-        }
-        static void dispose(v8::Isolate*);
-
-        typedef HashMap<WrapperTypeInfo*, v8::Persistent<v8::FunctionTemplate> > TemplateMap;
-
-        TemplateMap& rawTemplateMap() { return m_rawTemplates; }
-        TemplateMap& templateMap() { return m_templates; }
-        v8::Persistent<v8::String>& toStringName() { return m_toStringName; }
-        v8::Persistent<v8::FunctionTemplate>& toStringTemplate() { return m_toStringTemplate; }
-
-        v8::Persistent<v8::FunctionTemplate>& lazyEventListenerToStringTemplate()
-        {
-            return m_lazyEventListenerToStringTemplate;
-        }
-
-        StringCache* stringCache() { return &m_stringCache; }
-        IntegerCache* integerCache() { return &m_integerCache; }
-
-#if ENABLE(INSPECTOR)
-        void visitExternalStrings(ExternalStringVisitor*);
-#endif
-        DOMDataList& allStores() { return m_domDataList; }
-
-        V8HiddenPropertyName* hiddenPropertyName() { return &m_hiddenPropertyName; }
-        v8::Persistent<v8::Context>& auxiliaryContext() { return m_auxiliaryContext; }
-
-        void registerDOMDataStore(DOMDataStore* domDataStore) 
-        {
-            m_domDataList.append(domDataStore);
-        }
-
-        void unregisterDOMDataStore(DOMDataStore* domDataStore)
-        {
-            ASSERT(m_domDataList.find(domDataStore));
-            m_domDataList.remove(m_domDataList.find(domDataStore));
-        }
-
-
-        DOMDataStore* domDataStore() { return m_domDataStore; }
-        // DOMDataStore is owned outside V8BindingPerIsolateData.
-        void setDOMDataStore(DOMDataStore* store) { m_domDataStore = store; }
-
-        int recursionLevel() const { return m_recursionLevel; }
-        int incrementRecursionLevel() { return ++m_recursionLevel; }
-        int decrementRecursionLevel() { return --m_recursionLevel; }
-
-#ifndef NDEBUG
-        GlobalHandleMap& globalHandleMap() { return m_globalHandleMap; }
-
-        int internalScriptRecursionLevel() const { return m_internalScriptRecursionLevel; }
-        int incrementInternalScriptRecursionLevel() { return ++m_internalScriptRecursionLevel; }
-        int decrementInternalScriptRecursionLevel() { return --m_internalScriptRecursionLevel; }
-#endif
-
-        GCEventData& gcEventData() { return m_gcEventData; }
-
-        void reportMemoryUsage(MemoryObjectInfo*) const;
-
-        // Gives the system a hint that we should send a low memory
-        // notification upon the next close or navigation event,
-        // because some expensive objects have been allocated that we
-        // want to take every opportunity to collect.
-        void setLowMemoryNotificationHint() { m_lowMemoryNotificationHint = true; }
-        void clearLowMemoryNotificationHint() { m_lowMemoryNotificationHint = false; }
-        bool isLowMemoryNotificationHint() const { return m_lowMemoryNotificationHint; }
-
-    private:
-        explicit V8BindingPerIsolateData(v8::Isolate*);
-        ~V8BindingPerIsolateData();
-
-        TemplateMap m_rawTemplates;
-        TemplateMap m_templates;
-        v8::Persistent<v8::String> m_toStringName;
-        v8::Persistent<v8::FunctionTemplate> m_toStringTemplate;
-        v8::Persistent<v8::FunctionTemplate> m_lazyEventListenerToStringTemplate;
-        StringCache m_stringCache;
-        IntegerCache m_integerCache;
-
-        DOMDataList m_domDataList;
-        DOMDataStore* m_domDataStore;
-
-        V8HiddenPropertyName m_hiddenPropertyName;
-        v8::Persistent<v8::Context> m_auxiliaryContext;
-
-        bool m_constructorMode;
-        friend class ConstructorMode;
-
-        int m_recursionLevel;
-
-#ifndef NDEBUG
-        GlobalHandleMap m_globalHandleMap;
-        int m_internalScriptRecursionLevel;
-#endif
-        GCEventData m_gcEventData;
-
-        bool m_lowMemoryNotificationHint;
     };
 
     class ConstructorMode {
@@ -269,31 +87,22 @@ namespace WebCore {
 
         ConstructorMode()
         {
-            V8BindingPerIsolateData* data = V8BindingPerIsolateData::current();
+            V8PerIsolateData* data = V8PerIsolateData::current();
             m_previous = data->m_constructorMode;
             data->m_constructorMode = WrapExistingObject;
         }
 
         ~ConstructorMode()
         {
-            V8BindingPerIsolateData* data = V8BindingPerIsolateData::current();
+            V8PerIsolateData* data = V8PerIsolateData::current();
             data->m_constructorMode = m_previous;
         }
 
-        static bool current() { return V8BindingPerIsolateData::current()->m_constructorMode; }
+        static bool current() { return V8PerIsolateData::current()->m_constructorMode; }
 
     private:
         bool m_previous;
     };
-
-
-    enum ExternalMode {
-        Externalize,
-        DoNotExternalize
-    };
-
-    template <typename StringType>
-    StringType v8StringToWebCoreString(v8::Handle<v8::String> v8String, ExternalMode external);
 
     // Since v8::Null(isolate) crashes if we pass a null isolate,
     // we need to use v8NullWithCheck(isolate) if an isolate can be null.
@@ -304,23 +113,21 @@ namespace WebCore {
         return isolate ? v8::Null(isolate) : v8::Null();
     }
 
+    enum ExternalMode {
+        Externalize,
+        DoNotExternalize
+    };
+
+    template <typename StringType>
+    StringType v8StringToWebCoreString(v8::Handle<v8::String>, ExternalMode);
+
     // Convert v8 types to a WTF::String. If the V8 string is not already
     // an external string then it is transformed into an external string at this
     // point to avoid repeated conversions.
-    inline String v8StringToWebCoreString(v8::Handle<v8::String> v8String)
-    {
-        return v8StringToWebCoreString<String>(v8String, Externalize);
-    }
-    String v8NonStringValueToWebCoreString(v8::Handle<v8::Value>);
-    String v8ValueToWebCoreString(v8::Handle<v8::Value> value);
+    String v8ValueToWebCoreString(v8::Handle<v8::Value>);
 
-    // Convert v8 types to a WTF::AtomicString.
-    inline AtomicString v8StringToAtomicWebCoreString(v8::Handle<v8::String> v8String)
-    {
-        return v8StringToWebCoreString<AtomicString>(v8String, Externalize);
-    }
-    AtomicString v8NonStringValueToAtomicWebCoreString(v8::Handle<v8::Value>);
-    AtomicString v8ValueToAtomicWebCoreString(v8::Handle<v8::Value> value);
+    // Convert a V8 value to a WTF::AtomicString.
+    AtomicString v8ValueToAtomicWebCoreString(v8::Handle<v8::Value>);
 
     // Return a V8 external string that shares the underlying buffer with the given
     // WebCore string. The reference counting mechanism is used to keep the
@@ -331,7 +138,7 @@ namespace WebCore {
         if (!stringImpl)
             return isolate ? v8::String::Empty(isolate) : v8::String::Empty();
 
-        V8BindingPerIsolateData* data = V8BindingPerIsolateData::current(isolate);
+        V8PerIsolateData* data = V8PerIsolateData::current(isolate);
         return data->stringCache()->v8ExternalString(stringImpl, isolate);
     }
 
@@ -343,14 +150,19 @@ namespace WebCore {
 
     inline v8::Handle<v8::Integer> v8Integer(int value, v8::Isolate* isolate = 0)
     {
-        V8BindingPerIsolateData* data = V8BindingPerIsolateData::current(isolate);
+        V8PerIsolateData* data = V8PerIsolateData::current(isolate);
         return data->integerCache()->v8Integer(value);
     }
 
     inline v8::Handle<v8::Integer> v8UnsignedInteger(unsigned value, v8::Isolate* isolate = 0)
     {
-        V8BindingPerIsolateData* data = V8BindingPerIsolateData::current(isolate);
+        V8PerIsolateData* data = V8PerIsolateData::current(isolate);
         return data->integerCache()->v8UnsignedInteger(value);
+    }
+
+    inline v8::Handle<v8::Value> v8Undefined()
+    {
+        return v8::Handle<v8::Value>();
     }
 
     template <class T>
@@ -456,7 +268,7 @@ namespace WebCore {
     {
         if (!value->IsObject()) {
             V8Proxy::throwTypeError();
-            return v8::Local<v8::Value>();
+            return v8Undefined();
         }
 
         v8::Local<v8::Value> v8Value(v8::Local<v8::Value>::New(value));
@@ -466,7 +278,7 @@ namespace WebCore {
 
         if (lengthValue->IsUndefined() || lengthValue->IsNull()) {
             V8Proxy::throwTypeError();
-            return v8::Local<v8::Value>();
+            return v8Undefined();
         }
 
         EXCEPTION_BLOCK(uint32_t, sequenceLength, lengthValue->Int32Value());
@@ -612,18 +424,6 @@ namespace WebCore {
 
     v8::Persistent<v8::FunctionTemplate> createRawTemplate();
 
-    struct BatchedAttribute;
-    struct BatchedCallback;
-
-    v8::Local<v8::Signature> configureTemplate(v8::Persistent<v8::FunctionTemplate>,
-                                               const char* interfaceName,
-                                               v8::Persistent<v8::FunctionTemplate> parentClass,
-                                               int fieldCount,
-                                               const BatchedAttribute*,
-                                               size_t attributeCount,
-                                               const BatchedCallback*,
-                                               size_t callbackCount);
-
     v8::Persistent<v8::String> getToStringName();
     v8::Persistent<v8::FunctionTemplate> getToStringTemplate();
 
@@ -726,11 +526,6 @@ namespace WebCore {
 
         return V8ParameterBase::prepareBase();
     }
-
-    enum ParameterDefaultPolicy {
-        DefaultIsUndefined,
-        DefaultIsNullString
-    };
 
 } // namespace WebCore
 

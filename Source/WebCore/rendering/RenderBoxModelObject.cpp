@@ -2526,6 +2526,8 @@ void RenderBoxModelObject::paintBoxShadow(const PaintInfo& info, const LayoutRec
                     context->fillRect(fillRect.rect(), Color::black, s->colorSpace());
                 else {
                     fillRect.expandRadii(shadowSpread);
+                    if (!fillRect.isRenderable())
+                        fillRect.adjustRadii();
                     context->fillRoundedRect(fillRect, Color::black, s->colorSpace());
                 }
             } else {
@@ -2749,9 +2751,8 @@ void RenderBoxModelObject::mapAbsoluteToLocalPoint(bool fixed, bool useTransform
 
 void RenderBoxModelObject::moveChildTo(RenderBoxModelObject* toBoxModelObject, RenderObject* child, RenderObject* beforeChild, bool fullRemoveInsert)
 {
-    // FIXME: We need a performant way to handle clearing positioned objects from our list that are
-    // in |child|'s subtree so we could just clear them here. Because of this, we assume that callers
-    // have cleared their positioned objects list for child moves (!fullRemoveInsert) to avoid any badness.
+    // We assume that callers have cleared their positioned objects list for child moves (!fullRemoveInsert) so the
+    // positioned renderer maps don't become stale. It would be too slow to do the map lookup on each call.
     ASSERT(!fullRemoveInsert || !isRenderBlock() || !toRenderBlock(this)->hasPositionedObjects());
 
     ASSERT(this == child->parent());

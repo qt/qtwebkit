@@ -104,6 +104,15 @@ void CalendarPickerElement::defaultEventHandler(Event* event)
         HTMLDivElement::defaultEventHandler(event);
 }
 
+bool CalendarPickerElement::willRespondToMouseClickEvents()
+{
+    const HTMLInputElement* input = hostInput();
+    if (renderer() && !input->readOnly() && !input->disabled())
+        return true;
+
+    return HTMLDivElement::willRespondToMouseClickEvents();
+}
+
 void CalendarPickerElement::openPopup()
 {
     if (m_popup)
@@ -139,7 +148,7 @@ void CalendarPickerElement::detach()
 
 IntSize CalendarPickerElement::contentSize()
 {
-    return IntSize(100, 100);
+    return IntSize(0, 0);
 }
 
 void CalendarPickerElement::writeDocument(DocumentWriter& writer)

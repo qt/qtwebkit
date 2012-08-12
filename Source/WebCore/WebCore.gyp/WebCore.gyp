@@ -46,6 +46,10 @@
     # binary and increasing the speed of gdb.
     'enable_svg%': 1,
 
+    # If set to 1, links against the cc library from the chromium repository
+    # instead of the compositor implementation files in platform/graphics/chromium
+    'use_libcc_for_compositor%': 0,
+
     'enable_wexit_time_destructors': 1,
 
     'use_harfbuzz_ng%': 0,
@@ -76,7 +80,6 @@
       '../bindings/generic',
       '../bindings/v8',
       '../bindings/v8/custom',
-      '../bindings/v8/specialization',
       '../bridge',
       '../bridge/jni',
       '../bridge/jni/v8',
@@ -1267,7 +1270,7 @@
           # In generated bindings code: 'switch contains default but no case'.
           'msvs_disabled_warnings': [ 4065 ],
         }],
-        ['OS=="linux" and "WTF_USE_WEBAUDIO_IPP=1" in feature_defines', {
+        ['OS in ("linux", "android") and "WTF_USE_WEBAUDIO_IPP=1" in feature_defines', {
           'cflags': [
             '<!@(pkg-config --cflags-only-I ipp)',
           ],
@@ -1470,7 +1473,7 @@
             'include_dirs++': ['../dom'],
           },
         }],
-        ['OS=="linux" and "WTF_USE_WEBAUDIO_IPP=1" in feature_defines', {
+        ['OS in ("linux", "android") and "WTF_USE_WEBAUDIO_IPP=1" in feature_defines', {
           'direct_dependent_settings': {
             'cflags': [
               '<!@(pkg-config --cflags-only-I ipp)',
@@ -1721,10 +1724,16 @@
 
             ['include', 'WebKit/mac/WebCoreSupport/WebSystemInterface\\.mm$'],
 
-            # We use LocalizedDateMac.cpp with LocaleMac.mm instead of LocalizedDateICU.cpp.
+            # We use LocalizedDateMac.cpp and LocalizedNumberMac.mm with
+            # LocaleMac.mm instead of LocalizedDateICU.cpp in order to apply
+            # system locales.
+            ['exclude', 'platform/text/LocaleICU\\.cpp$'],
+            ['exclude', 'platform/text/LocaleICU\\.h$'],
             ['exclude', 'platform/text/LocalizedDateICU\\.cpp$'],
+            ['exclude', 'platform/text/LocalizedNumberICU\\.cpp$'],
             ['include', 'platform/text/mac/LocaleMac\\.mm$'],
             ['include', 'platform/text/mac/LocalizedDateMac\\.cpp$'],
+            ['include', 'platform/text/mac/LocalizedNumberMac\\.mm$'],
 
             # The Mac uses platform/mac/KillRingMac.mm instead of the dummy
             # implementation.
@@ -1795,10 +1804,14 @@
             # SystemInfo.cpp is useful and we don't want to copy it.
             ['include', 'platform/win/SystemInfo\\.cpp$'],
 
+            ['exclude', 'platform/text/LocaleICU\\.cpp$'],
+            ['exclude', 'platform/text/LocaleICU\\.h$'],
             ['exclude', 'platform/text/LocalizedDateICU\.cpp$'],
+            ['exclude', 'platform/text/LocalizedNumberICU\.cpp$'],
             ['include', 'platform/text/LocalizedDateWin\.cpp$'],
             ['include', 'platform/text/LocaleWin\.cpp$'],
             ['include', 'platform/text/LocaleWin\.h$'],
+            ['include', 'platform/text/win/LocalizedNumberWin\\.cpp$'],
           ],
         },{ # OS!="win"
           'sources/': [
@@ -2074,7 +2087,6 @@
         'webcore_dom',
         'webcore_html',
         'webcore_platform',
-        'webcore_chromium_compositor',
         'webcore_remaining',
         'webcore_rendering',
         # Exported.
@@ -2131,11 +2143,29 @@
             ],
           },
         }],
+        # Use IPP static libraries for x86 Android.
+        ['OS=="android" and "WTF_USE_WEBAUDIO_IPP=1" in feature_defines', {
+          'link_settings': {
+            'libraries': [
+               '<!@(pkg-config --libs ipp|sed s/-L//)/libipps_l.a',
+               '<!@(pkg-config --libs ipp|sed s/-L//)/libippcore_l.a',
+            ]
+          },
+        }],
         ['enable_svg!=0', {
           'dependencies': [
             'webcore_svg',
           ],
         }],
+        ['use_libcc_for_compositor==1', {
+          'dependencies': [
+            '<(chromium_src_dir)/cc/cc.gyp:cc'
+          ],
+        }, { # use_libcc_for_compositor==0
+          'dependencies': [
+            'webcore_chromium_compositor'
+          ],
+        }]
       ],
     },
     {

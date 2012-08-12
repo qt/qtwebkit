@@ -273,6 +273,16 @@ void GraphicsLayerTextureMapper::setDrawsContent(bool value)
 
 /* \reimp (GraphicsLayer.h)
 */
+void GraphicsLayerTextureMapper::setContentsVisible(bool value)
+{
+    if (value == contentsAreVisible())
+        return;
+    notifyChange(TextureMapperLayer::ContentsVisibleChange);
+    GraphicsLayer::setContentsVisible(value);
+}
+
+/* \reimp (GraphicsLayer.h)
+*/
 void GraphicsLayerTextureMapper::setContentsOpaque(bool value)
 {
     if (value == contentsOpaque())
@@ -368,7 +378,7 @@ bool GraphicsLayerTextureMapper::addAnimation(const KeyframeValueList& valueList
     if (valueList.property() == AnimatedPropertyWebkitTransform)
         listsMatch = validateTransformOperations(valueList, hasBigRotation) >= 0;
 
-    m_animations.add(keyframesName, GraphicsLayerAnimation(valueList, boxSize, anim, timeOffset, listsMatch));
+    m_animations.add(GraphicsLayerAnimation(keyframesName, valueList, boxSize, anim, timeOffset, listsMatch));
     notifyChange(TextureMapperLayer::AnimationChange);
     m_animationStartedTimer.startOneShot(0);
     return true;

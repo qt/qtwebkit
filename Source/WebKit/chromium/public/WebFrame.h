@@ -75,6 +75,8 @@ class WebURLRequest;
 class WebView;
 struct WebConsoleMessage;
 struct WebFindOptions;
+struct WebFloatPoint;
+struct WebFloatRect;
 struct WebPoint;
 struct WebPrintParams;
 struct WebRect;
@@ -132,6 +134,16 @@ public:
 
     // The name of this frame.
     virtual WebString name() const = 0;
+
+    // The unique name of this frame.
+    //
+    // This is temporarily identical to the above name() function. Once this
+    // change makes it over to the Chromium tree, I will change all callers to
+    // use this function and will subsequently move assignedName() to name().
+    virtual WebString uniqueName() const = 0;
+
+    // The name of this frame. If no name is given, empty string is returned.
+    virtual WebString assignedName() const = 0;
 
     // Sets the name of this frame. For child frames (frames that are not a
     // top-most frame) the actual name may have a suffix appended to make the
@@ -575,6 +587,30 @@ public:
     // of matches found during the scoping effort.
     virtual void resetMatchCount() = 0;
 
+    // Returns a counter that is incremented when the find-in-page markers are
+    // changed on any frame. Switching the active marker doesn't change the
+    // current version. Should be called only on the main frame.
+    virtual int findMatchMarkersVersion() const = 0;
+
+    // Returns the bounding box of the active find-in-page match marker or an
+    // empty rect if no such marker exists. The rect is returned in find-in-page
+    // coordinates whatever frame the active marker is.
+    // Should be called only on the main frame.
+    virtual WebFloatRect activeFindMatchRect() = 0;
+
+    // Swaps the contents of the provided vector with the bounding boxes of the
+    // find-in-page match markers from all frames. The bounding boxes are returned
+    // in find-in-page coordinates. This method should be called only on the main frame.
+    virtual void findMatchRects(WebVector<WebFloatRect>&) = 0;
+
+    // Selects the find-in-page match in the appropriate frame closest to the
+    // provided point in find-in-page coordinates. Returns the ordinal of such
+    // match or -1 if none could be found. If not null, selectionRect is set to
+    // the bounding box of the selected match in window coordinates.
+    // This method should be called only on the main frame.
+    virtual int selectNearestFindMatch(const WebFloatPoint&,
+                                       WebRect* selectionRect) = 0;
+
     // OrientationChange event ---------------------------------------------
 
     // Orientation is the interface orientation in degrees.
@@ -629,12 +665,6 @@ public:
 
     // Calls markerTextForListItem() defined in WebCore/rendering/RenderTreeAsText.h.
     virtual WebString markerTextForListItem(const WebElement&) const = 0;
-
-    // Returns the number of page where the specified element will be put.
-    // This method is used to support layout tests.
-    virtual int pageNumberForElementById(const WebString& id,
-                                         float pageWidthInPixels,
-                                         float pageHeightInPixels) const = 0;
 
     // Prints all of the pages into the canvas, with page boundaries drawn as
     // one pixel wide blue lines. This method exists to support layout tests.

@@ -362,8 +362,7 @@ void InputHandler::focusedNodeChanged()
     Node* node = frame->document()->focusedNode();
 
     if (isActiveTextEdit() && m_currentFocusElement == node) {
-        if (!processingChange())
-            notifyClientOfKeyboardVisibilityChange(true);
+        notifyClientOfKeyboardVisibilityChange(true);
         return;
     }
 
@@ -577,7 +576,7 @@ int32_t InputHandler::convertTransactionIdToSequenceId(int32_t transactionId)
 
 void InputHandler::spellCheckingRequestProcessed(int32_t transactionId, spannable_string_t* spannableString)
 {
-    if (!spannableString) {
+    if (!spannableString || !isActiveTextEdit()) {
         spellCheckingRequestCancelled(transactionId, false /* isSequenceId */);
         return;
     }
@@ -625,6 +624,9 @@ void InputHandler::spellCheckingRequestProcessed(int32_t transactionId, spannabl
 
 void InputHandler::spellCheckingRequestCancelled(int32_t id, bool isSequenceId)
 {
+    if (!isActiveTextEdit())
+        return;
+
     int32_t sequenceId = isSequenceId ? id : convertTransactionIdToSequenceId(id);
     SpellChecker* sp = getSpellChecker();
     if (!sp) {
@@ -636,6 +638,9 @@ void InputHandler::spellCheckingRequestCancelled(int32_t id, bool isSequenceId)
 
 SpellChecker* InputHandler::getSpellChecker()
 {
+    ASSERT(m_currentFocusElement);
+    ASSERT(m_currentFocusElement->document());
+
     if (Frame* frame = m_currentFocusElement->document()->frame())
         if (Editor* editor = frame->editor())
             return editor->spellChecker();
@@ -659,7 +664,6 @@ void InputHandler::setElementUnfocused(bool refocusOccuring)
             notifyClientOfKeyboardVisibilityChange(false);
 
         m_webPage->m_client->inputFocusLost();
-        m_webPage->m_selectionHandler->selectionPositionChanged();
 
         // If the frame selection isn't focused, focus it.
         if (!m_currentFocusElement->document()->frame()->selection()->isFocused())
@@ -1028,6 +1032,11 @@ void InputHandler::notifyClientOfKeyboardVisibilityChange(bool visible)
     // If we aren't ready for input, keyboard changes should be ignored.
     if (!isInputModeEnabled() && visible)
         return;
+
+    if (processingChange()) {
+        ASSERT(visible);
+        return;
+    }
 
     if (!m_delayKeyboardVisibilityChange) {
         m_webPage->showVirtualKeyboard(visible);

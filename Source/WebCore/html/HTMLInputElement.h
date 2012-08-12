@@ -72,6 +72,10 @@ public:
     bool getAllowedValueStep(Decimal*) const;
     StepRange createStepRange(AnyStepHandling) const;
 
+#if ENABLE(DATALIST_ELEMENT)
+    Decimal findClosestTickMarkValue(const Decimal&);
+#endif
+
     // Implementations of HTMLInputElement::stepUp() and stepDown().
     void stepUp(int, ExceptionCode&);
     void stepDown(int, ExceptionCode&);
@@ -231,6 +235,8 @@ public:
 
     void addSearchResult();
     void onSearch();
+
+    virtual bool willRespondToMouseClickEvents() OVERRIDE;
 
 #if ENABLE(DATALIST_ELEMENT)
     HTMLElement* list() const;
@@ -399,6 +405,12 @@ private:
     OwnPtr<ListAttributeTargetObserver> m_listAttributeTargetObserver;
 #endif
 };
+
+inline bool isHTMLInputElement(Node* node)
+{
+    ASSERT(node);
+    return node->hasTagName(HTMLNames::inputTag);
+}
 
 } //namespace
 #endif

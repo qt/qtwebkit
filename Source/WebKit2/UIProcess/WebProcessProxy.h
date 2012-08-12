@@ -29,9 +29,7 @@
 #include "PlatformProcessIdentifier.h"
 #include "PluginInfoStore.h"
 #include "ProcessLauncher.h"
-#include "ProcessModel.h"
 #include "ResponsivenessTimer.h"
-#include "ThreadLauncher.h"
 #include "WebConnectionToWebProcess.h"
 #include "WebPageProxy.h"
 #include "WebProcessProxyMessages.h"
@@ -57,7 +55,7 @@ class WebContext;
 class WebPageGroup;
 struct WebNavigationDataStore;
 
-class WebProcessProxy : public RefCounted<WebProcessProxy>, CoreIPC::Connection::Client, ResponsivenessTimer::Client, ProcessLauncher::Client, ThreadLauncher::Client, CoreIPC::Connection::QueueClient {
+class WebProcessProxy : public RefCounted<WebProcessProxy>, CoreIPC::Connection::Client, ResponsivenessTimer::Client, ProcessLauncher::Client,  CoreIPC::Connection::QueueClient {
 public:
     typedef HashMap<uint64_t, RefPtr<WebFrameProxy> > WebFrameProxyMap;
     typedef HashMap<uint64_t, RefPtr<WebBackForwardListItem> > WebBackForwardListItemMap;
@@ -119,7 +117,7 @@ public:
 private:
     explicit WebProcessProxy(PassRefPtr<WebContext>);
 
-    // Initializes the process or thread launcher which will begin launching the process.
+    // Initializes the process launcher which will begin launching the process.
     void connect();
 
     // Called when the web process has crashed or we know that it will terminate soon.
@@ -165,10 +163,13 @@ private:
     // ProcessLauncher::Client
     virtual void didFinishLaunching(ProcessLauncher*, CoreIPC::Connection::Identifier);
 
-    // ThreadLauncher::Client
-    virtual void didFinishLaunching(ThreadLauncher*, CoreIPC::Connection::Identifier);
-
     void didFinishLaunching(CoreIPC::Connection::Identifier);
+
+    // History client
+    void didNavigateWithNavigationData(uint64_t pageID, const WebNavigationDataStore&, uint64_t frameID);
+    void didPerformClientRedirect(uint64_t pageID, const String& sourceURLString, const String& destinationURLString, uint64_t frameID);
+    void didPerformServerRedirect(uint64_t pageID, const String& sourceURLString, const String& destinationURLString, uint64_t frameID);
+    void didUpdateHistoryTitle(uint64_t pageID, const String& title, const String& url, uint64_t frameID);
 
     // Implemented in generated WebProcessProxyMessageReceiver.cpp
     void didReceiveWebProcessProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
@@ -183,7 +184,6 @@ private:
 
     Vector<std::pair<CoreIPC::Connection::OutgoingMessage, unsigned> > m_pendingMessages;
     RefPtr<ProcessLauncher> m_processLauncher;
-    RefPtr<ThreadLauncher> m_threadLauncher;
 
     RefPtr<WebContext> m_context;
 

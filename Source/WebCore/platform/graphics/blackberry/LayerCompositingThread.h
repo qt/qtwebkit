@@ -35,9 +35,11 @@
 
 #if USE(ACCELERATED_COMPOSITING)
 
+#include "FilterOperations.h"
 #include "FloatQuad.h"
 #include "LayerAnimation.h"
 #include "LayerData.h"
+#include "LayerFilterRenderer.h"
 #include "LayerRendererSurface.h"
 #include "LayerTiler.h"
 
@@ -81,6 +83,10 @@ public:
     float opacity() const { return m_opacity; }
     void setOpacity(float) { m_opacity = opacity; m_opacitySet = true; }
 
+    bool isBoundsOriginSet() const { return m_boundsOriginSet; }
+    FloatPoint boundsOrigin() const { return m_boundsOrigin; }
+    void setBoundsOrigin(const FloatPoint& origin) { m_boundsOrigin = origin; m_boundsOriginSet = true; }
+
     const Vector<RefPtr<LayerAnimation> >& animations() const { return m_animations; }
     void addAnimation(PassRefPtr<LayerAnimation> animation) { m_animations.append(animation); }
     void removeAnimation(const String& name);
@@ -93,6 +99,7 @@ private:
         , m_boundsSet(false)
         , m_transformSet(false)
         , m_opacitySet(false)
+        , m_boundsOriginSet(false)
     {
     }
 
@@ -101,6 +108,8 @@ private:
     IntSize m_bounds;
     TransformationMatrix m_transform;
     float m_opacity;
+    FloatPoint m_boundsOrigin;
+
     Vector<RefPtr<LayerAnimation> > m_animations;
 
     unsigned m_positionSet : 1;
@@ -108,7 +117,10 @@ private:
     unsigned m_boundsSet : 1;
     unsigned m_transformSet : 1;
     unsigned m_opacitySet : 1;
+    unsigned m_boundsOriginSet : 1;
 };
+
+class LayerFilterRendererAction;
 
 class LayerCompositingThread : public ThreadSafeRefCounted<LayerCompositingThread>, public LayerData, public BlackBerry::Platform::GuardedPointerBase {
 public:
@@ -128,6 +140,7 @@ public:
     // These functions can also be used to update animated properties in LayerAnimation.
     void setPosition(const FloatPoint& position) { m_position = position; }
     void setAnchorPoint(const FloatPoint& anchorPoint) { m_anchorPoint = anchorPoint; }
+    void setBoundsOrigin(const FloatPoint& boundsOrigin) { m_boundsOrigin = boundsOrigin; }
     void setBounds(const IntSize& bounds) { m_bounds = bounds; }
     void setSizeIsScaleInvariant(bool invariant) { m_sizeIsScaleInvariant = invariant; }
     void setTransform(const TransformationMatrix& matrix) { m_transform = matrix; }
@@ -207,6 +220,14 @@ public:
     LayerOverride* override();
     void clearOverride();
 
+#if ENABLE(CSS_FILTERS)
+    bool filterOperationsChanged() const { return m_filterOperationsChanged; }
+    void setFilterOperationsChanged(bool changed) { m_filterOperationsChanged = changed; }
+
+    Vector<RefPtr<LayerFilterRendererAction> > filterActions() const { return m_filterActions; }
+    void setFilterActions(const Vector<RefPtr<LayerFilterRendererAction> >& actions) { m_filterActions = actions; }
+#endif
+
 protected:
     virtual ~LayerCompositingThread();
 
@@ -251,6 +272,11 @@ private:
 
     OwnPtr<LayerOverride> m_override;
     LayerCompositingThreadClient* m_client;
+
+#if ENABLE(CSS_FILTERS)
+    bool m_filterOperationsChanged;
+    Vector<RefPtr<LayerFilterRendererAction> > m_filterActions;
+#endif
 };
 
 } // namespace WebCore

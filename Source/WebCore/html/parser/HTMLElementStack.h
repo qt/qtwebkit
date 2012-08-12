@@ -98,9 +98,8 @@ public:
         return m_top->stackItem().get();
     }
 
-    Element* oneBelowTop() const;
+    HTMLStackItem* oneBelowTop() const;
     ElementRecord* topRecord() const;
-    Element* bottom() const;
     ElementRecord* find(Element*) const;
     ElementRecord* topmost(const AtomicString& tagName) const;
 

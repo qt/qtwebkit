@@ -146,6 +146,11 @@ void RenderListBox::updateFromElement()
     }
 }
 
+bool RenderListBox::canBeReplacedWithInlineRunIn() const
+{
+    return false;
+}
+
 void RenderListBox::selectionChanged()
 {
     repaint();
@@ -378,7 +383,9 @@ void RenderListBox::paintItemForeground(PaintInfo& paintInfo, const LayoutPoint&
 {
     FontCachePurgePreventer fontCachePurgePreventer;
 
-    const Vector<HTMLElement*>& listItems = toHTMLSelectElement(node())->listItems();
+    HTMLSelectElement* selectElement = toHTMLSelectElement(node());
+
+    const Vector<HTMLElement*>& listItems = selectElement->listItems();
     HTMLElement* element = listItems[listIndex];
 
     RenderStyle* itemStyle = element->renderStyle();
@@ -401,7 +408,7 @@ void RenderListBox::paintItemForeground(PaintInfo& paintInfo, const LayoutPoint&
         if (frame()->selection()->isFocusedAndActive() && document()->focusedNode() == node())
             textColor = theme()->activeListBoxSelectionForegroundColor();
         // Honor the foreground color for disabled items
-        else if (!element->disabled())
+        else if (!element->disabled() && !selectElement->disabled())
             textColor = theme()->inactiveListBoxSelectionForegroundColor();
     }
 
@@ -618,6 +625,11 @@ int RenderListBox::scrollPosition(Scrollbar*) const
 void RenderListBox::setScrollOffset(const IntPoint& offset)
 {
     scrollTo(offset.y());
+}
+
+IntPoint RenderListBox::scrollPosition() const
+{
+    return IntPoint(0, m_indexOffset);
 }
 
 void RenderListBox::scrollTo(int newOffset)
@@ -864,7 +876,7 @@ void RenderListBox::setHasVerticalScrollbar(bool hasScrollbar)
     if (m_vBar)
         m_vBar->styleChanged();
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
     // Force an update since we know the scrollbars have changed things.
     if (document()->hasDashboardRegions())
         document()->setDashboardRegionsDirty(true);

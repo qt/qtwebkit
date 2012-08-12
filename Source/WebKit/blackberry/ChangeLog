@@ -1,3 +1,820 @@
+2012-08-10  Benjamin C Meyer  <bmeyer@rim.com>
+
+        Introduce JavaScriptVariant object.
+        https://bugs.webkit.org/show_bug.cgi?id=93644
+
+        The JavaScriptVariant can be used for functions that return results from
+        JavaScript such as executeJavaScript or functions that take arguments
+        to pass a variable to JavaScript and they want to make sure the type
+        is correct.
+
+        Convert executeJavaScriptFunction() to use this data type as the
+        example, other functions will be converted in the future.
+
+        PR 14929
+
+        Internally reviewed by Joe Mason
+        Reviewed by Adam Treat
+
+        * Api/JavaScriptVariant.cpp: Added.
+        (WebKit):
+        (BlackBerry::WebKit::JSValueRefToBlackBerryJavaScriptVariant):
+        (BlackBerry::WebKit::BlackBerryJavaScriptVariantToJSValueRef):
+        (BlackBerry::WebKit::JavaScriptVariant::JavaScriptVariant):
+        (BlackBerry::WebKit::JavaScriptVariant::~JavaScriptVariant):
+        (BlackBerry::WebKit::JavaScriptVariant::operator=):
+        (BlackBerry::WebKit::JavaScriptVariant::setType):
+        (BlackBerry::WebKit::JavaScriptVariant::type):
+        (BlackBerry::WebKit::JavaScriptVariant::setDouble):
+        (BlackBerry::WebKit::JavaScriptVariant::doubleValue):
+        (BlackBerry::WebKit::JavaScriptVariant::setString):
+        (BlackBerry::WebKit::JavaScriptVariant::stringValue):
+        (BlackBerry::WebKit::JavaScriptVariant::setBoolean):
+        (BlackBerry::WebKit::JavaScriptVariant::booleanValue):
+        * Api/JavaScriptVariant.h: Added.
+        (WebKit):
+        * Api/JavaScriptVariant_p.h: Added.
+        (WebKit):
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPage::executeJavaScriptFunction):
+        * Api/WebPage.h:
+
+2012-08-09  Leo Yang  <leoyang@rim.com>
+
+        [BlackBerry] Export InRegionScroller to fix build
+        https://bugs.webkit.org/show_bug.cgi?id=93635
+
+        Reviewed by Antonio Gomes.
+
+        Build fix.
+
+        * Api/InRegionScroller.h:
+
+2012-08-08  Jacky Jiang  <zhajiang@rim.com>
+
+        [BlackBerry] Implement about:memory-live
+        https://bugs.webkit.org/show_bug.cgi?id=93153
+
+        Reviewed by Yong Li.
+        Patch by Jacky Jiang  <zhajiang@rim.com>
+
+        Implementing about:memory-live to track memory peaks:
+        - about:memory-live/start: start tracking memory peaks.
+        - about:memory-live: show memory peaks every 30ms.
+        - about:memory-live/stop: stop tracking and show memory peaks.
+
+        Mainly track the following memory peaks:
+        - Total used memory (malloc + JSC).
+        - Total committed memory.
+        - Total mapped memory.
+
+        Add total committed memory for about:memory
+
+        * WebKitSupport/AboutData.cpp:
+        (BlackBerry::WebKit::memoryPage):
+        (WebKit):
+        (MemoryTracker):
+        (BlackBerry::WebKit::MemoryTracker::isActive):
+        (BlackBerry::WebKit::MemoryTracker::clear):
+        (BlackBerry::WebKit::MemoryTracker::peakTotalUsedMemory):
+        (BlackBerry::WebKit::MemoryTracker::peakTotalCommittedMemory):
+        (BlackBerry::WebKit::MemoryTracker::peakTotalMappedMemory):
+        (BlackBerry::WebKit::MemoryTracker::MemoryTracker):
+        (BlackBerry::WebKit::MemoryTracker::instance):
+        (BlackBerry::WebKit::MemoryTracker::start):
+        (BlackBerry::WebKit::MemoryTracker::stop):
+        (BlackBerry::WebKit::MemoryTracker::updateMemoryPeaks):
+        (BlackBerry::WebKit::memoryPeaksToHtmlTable):
+        (BlackBerry::WebKit::memoryLivePage):
+        (BlackBerry::WebKit::aboutData):
+
+2012-08-08  Antonio Gomes  <agomes@rim.com>
+
+        [BlackBerry] Tie up the scrolling machinery to the graphics tree when applicable for in-region scroll
+        https://bugs.webkit.org/show_bug.cgi?id=93482
+        PR #187672
+        Make InRegionScroller a simple public webkit/ API
+        PR #188677
+
+        Reviewed by Rob Buis.
+
+        In order to prepare InRegionScroller to be a public API
+        in webkit/, the patch:
+
+        1) Renamed the current InRegionScroller class to InRegionScrollerPrivate;
+        2) Moved InRegionScroller.cpp|h from WebKitSupport/ to Api/;
+        3) Renamed InRegionScroller.h to InRegionScroller_p.h;
+        4) Added a new public class implementation to InRegionScroller.h;
+        5) Adapted WebPage and TouchEventHandler classes to use InRegionScroller::d directly.
+
+        The most important API here is '::compositedSetScrollPosition'
+
+        It is a  UI/Compositing thread method only and sets the associated LayerCompositingThread
+        (camouflaged as a unsigned) for each created InRegionScrollableArea that supports
+        composited scrolling.
+
+        The way ::compositedSetScrollPosition "scrolls" a layer is by setting the boundsOrigin
+        property to the LayerCompositingThread's 'override' property in the UI/Compositing thread.
+
+        * Api/InRegionScroller.cpp: Renamed from Source/WebKit/blackberry/WebKitSupport/InRegionScroller.cpp.
+        (WebKit):
+        (BlackBerry::WebKit::InRegionScroller::InRegionScroller):
+        (BlackBerry::WebKit::InRegionScroller::~InRegionScroller):
+        (BlackBerry::WebKit::InRegionScroller::compositedSetScrollPosition):
+        (BlackBerry::WebKit::InRegionScrollerPrivate::InRegionScrollerPrivate):
+        (BlackBerry::WebKit::InRegionScrollerPrivate::setNode):
+        (BlackBerry::WebKit::InRegionScrollerPrivate::node):
+        (BlackBerry::WebKit::InRegionScrollerPrivate::reset):
+        (BlackBerry::WebKit::InRegionScrollerPrivate::hasNode):
+        (BlackBerry::WebKit::InRegionScrollerPrivate::canScroll):
+        (BlackBerry::WebKit::InRegionScrollerPrivate::compositedSetScrollPosition):
+        (BlackBerry::WebKit::InRegionScrollerPrivate::scrollBy):
+        (BlackBerry::WebKit::InRegionScrollerPrivate::inRegionScrollableAreasForPoint):
+        (BlackBerry::WebKit::InRegionScrollerPrivate::scrollNodeRecursively):
+        (BlackBerry::WebKit::InRegionScrollerPrivate::scrollRenderer):
+        (BlackBerry::WebKit::InRegionScrollerPrivate::adjustScrollDelta):
+        (BlackBerry::WebKit::canScrollInnerFrame):
+        (BlackBerry::WebKit::canScrollRenderBox):
+        (BlackBerry::WebKit::parentLayer):
+        (BlackBerry::WebKit::enclosingLayerNode):
+        (BlackBerry::WebKit::isNonRenderViewFixedPositionedContainer):
+        (BlackBerry::WebKit::pushBackInRegionScrollable):
+        * Api/InRegionScroller.h: Copied from Source/WebKit/blackberry/WebKitSupport/InRegionScroller.h.
+        (WebKit):
+        (InRegionScroller):
+        * Api/InRegionScroller_p.h: Renamed from Source/WebKit/blackberry/WebKitSupport/InRegionScroller.h.
+        (WebCore):
+        (WebKit):
+        (InRegionScrollerPrivate):
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::scrollBy):
+        (BlackBerry::WebKit::WebPagePrivate::notifyInRegionScrollStatusChanged):
+        (BlackBerry::WebKit::WebPagePrivate::clearDocumentData):
+        (BlackBerry::WebKit::WebPagePrivate::setScrollOriginPoint):
+        (BlackBerry::WebKit::WebPage::inRegionScroller):
+        (WebKit):
+        * Api/WebPage.h:
+        (WebKit):
+        * WebKitSupport/InRegionScrollableArea.cpp:
+        (BlackBerry::WebKit::InRegionScrollableArea::InRegionScrollableArea):
+        * WebKitSupport/TouchEventHandler.cpp:
+        (BlackBerry::WebKit::TouchEventHandler::drawTapHighlight):
+
+2012-08-08  Antonio Gomes  <agomes@rim.com>
+
+        [BlackBerry] Make WebOverlayPrivate::scheduleCompositingRun a WebPagePrivate method.
+        https://bugs.webkit.org/show_bug.cgi?id=93480
+        PR #188682
+
+        Reviewed by Rob Buis.
+
+        ... this way it can be used by others.
+
+        No behavioural change. Another preparation patch.
+
+        * Api/WebOverlay.cpp:
+        (BlackBerry::WebKit::WebOverlayPrivate::scheduleCompositingRun):
+        * Api/WebPage.cpp:
+        (WebKit):
+        (BlackBerry::WebKit::WebPagePrivate::scheduleCompositingRun):
+        * Api/WebPage_p.h:
+        (WebPagePrivate):
+
+2012-08-08  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r124887.
+        http://trac.webkit.org/changeset/124887
+        https://bugs.webkit.org/show_bug.cgi?id=93504
+
+        Dependent API being removed. (Requested by mfenton on
+        #webkit).
+
+        * Api/WebPageClient.h:
+        * WebKitSupport/InputHandler.cpp:
+        * WebKitSupport/InputHandler.h:
+        (InputHandler):
+        * WebKitSupport/TouchEventHandler.cpp:
+        (BlackBerry::WebKit::TouchEventHandler::handleTouchPoint):
+        (BlackBerry::WebKit::TouchEventHandler::spellCheck):
+        (WebKit):
+        * WebKitSupport/TouchEventHandler.h:
+        (TouchEventHandler):
+
+2012-08-08  Ed Baker  <edbaker@rim.com>
+
+        [BlackBerry] Add relayout after updating fixed reported size
+        https://bugs.webkit.org/show_bug.cgi?id=93116
+        PR #160059
+        
+        Reviewed by Antonio Gomes.
+        
+        Reviewed internally by Antonio Gomes.
+
+        On an orientation change and after fixed reported size is
+        updated perform a layout and update the fixed elements after
+        scrolling. This will recalculate the height and width of
+        fixed position elements using percentage values with the
+        new fixed reported size. Otherwise using the old fixed reported
+        size in the new orientation overflowing or clipping could occur.
+        
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::setViewportSize):
+
+2012-08-07  Charles Wei  <charles.wei@torchmobile.com.cn>
+
+        [BlackBerry] always set PolicyAction to PolicyIgnore if the chrome returns false for acceptNavigationRequest
+        https://bugs.webkit.org/show_bug.cgi?id=93251
+
+        Reviewed by George Staikos.
+
+        In acceptNavigationRequest(), webkit will ask if the chrome will accept the navigation request.
+        We will take this chance to see if the request is an internal-webkit protocol, otherwise,
+        we will try to launch an external application to handle the request, and ask webkit to ignore
+        the request by returning false in acceptNavigationRequest().
+
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::dispatchDecidePolicyForNavigationAction):
+
+2012-08-07  Konrad Piascik  <kpiascik@rim.com>
+
+        [BlackBerry] Change how devicePixelRatio is set.
+        https://bugs.webkit.org/show_bug.cgi?id=93385
+
+        Reviewed by Antonio Gomes.
+
+        Change devicePixelRatio to be set immediately after the page is created based
+        on the WebSetting.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::init):
+        (BlackBerry::WebKit::WebPagePrivate::recomputeVirtualViewportFromViewportArguments):
+
+2012-08-07  Antonio Gomes  <agomes@rim.com>
+
+        [BlackBerry] [FullScreen] No need to scroll 'x' to 0 before entering fullscreen
+        https://bugs.webkit.org/show_bug.cgi?id=91750
+        PR #178293
+
+        Reviewed by Rob Buis.
+
+        We are not adjusting the 'left' CSS property of the fullscreen wrapper
+        properly, so no need to scroll 'x' to 0 anymore.
+
+        Internally reviewed by Jacky Jiang.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::enterFullScreenForElement):
+
+2012-08-07  Antonio Gomes  <agomes@rim.com>
+
+        [BlackBerry][FullScreen] Remove the set/reset of touch modes code when entering/leaving fullscreen
+        https://bugs.webkit.org/show_bug.cgi?id=92520
+        PR #184511
+
+        Reviewed by Yong Li.
+        Internally reviewed by Gen Mak.
+
+        Remove touch mode set/reset when entering/leaving fullscreen
+        for media elements through the new FULLSCREEN_API code path.
+        The client now handles it.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::WebPagePrivate):
+        (BlackBerry::WebKit::WebPagePrivate::enterFullScreenForElement):
+        (BlackBerry::WebKit::WebPagePrivate::exitFullScreenForElement):
+        * Api/WebPage_p.h:
+        (WebPagePrivate):
+
+2012-08-07  Konrad Piascik  <kpiascik@rim.com>
+
+        [BlackBerry] Add missing include in FrameLoaderClienBlackBerry after Base64 moved.
+        https://bugs.webkit.org/show_bug.cgi?id=93383
+
+        Reviewed by Rob Buis.
+
+        Base64 moved from platform/text to wtf/text, need to add mssing
+        include.
+
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+
+2012-08-07  Konrad Piascik  <kpiascik@rim.com>
+
+        [BlackBerry] InspectorOverlay class duplicated in WebCore
+        https://bugs.webkit.org/show_bug.cgi?id=93124
+
+        Reviewed by Rob Buis.
+
+        Moved files to better align with namespace names.
+
+        * WebKitSupport/InspectorOverlay.cpp: Renamed from Source/WebKit/blackberry/WebCoreSupport/InspectorOverlay.cpp.
+        (WebKit):
+        (BlackBerry::WebKit::InspectorOverlay::create):
+        (BlackBerry::WebKit::InspectorOverlay::InspectorOverlay):
+        (BlackBerry::WebKit::InspectorOverlay::notifySyncRequired):
+        (BlackBerry::WebKit::InspectorOverlay::paintContents):
+        (BlackBerry::WebKit::InspectorOverlay::showDebugBorders):
+        (BlackBerry::WebKit::InspectorOverlay::showRepaintCounter):
+        (BlackBerry::WebKit::InspectorOverlay::~InspectorOverlay):
+        (BlackBerry::WebKit::InspectorOverlay::clear):
+        (BlackBerry::WebKit::InspectorOverlay::update):
+        * WebKitSupport/InspectorOverlay.h: Renamed from Source/WebKit/blackberry/WebCoreSupport/InspectorOverlay.h.
+        (WebCore):
+        (WebKit):
+        (InspectorOverlay):
+        (InspectorOverlayClient):
+        (BlackBerry::WebKit::InspectorOverlay::setClient):
+        (BlackBerry::WebKit::InspectorOverlay::notifyAnimationStarted):
+
+2012-08-07  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Update API for spell checking suggestions.
+        https://bugs.webkit.org/show_bug.cgi?id=93356
+
+        Reviewed by Antonio Gomes.
+
+        PR 163283.
+
+        Add connections for updated spell checking options request API.  Move
+        all this logic into InputHandler.
+
+        Reviewed Internally by Gen Mak and Nima Ghanavatian.
+
+        * Api/WebPageClient.h:
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::shouldRequestSpellCheckingOptionsForPoint):
+        (WebKit):
+        (BlackBerry::WebKit::InputHandler::requestSpellingCheckingOptions):
+        * WebKitSupport/InputHandler.h:
+        (Platform):
+        (InputHandler):
+        * WebKitSupport/TouchEventHandler.cpp:
+        (BlackBerry::WebKit::TouchEventHandler::handleTouchPoint):
+        * WebKitSupport/TouchEventHandler.h:
+        (TouchEventHandler):
+
+2012-08-06  Charles Wei  <charles.wei@torchmobile.com.cn>
+
+        [BlackBerry] About: shows PAGE_CACHE not enabled.
+        https://bugs.webkit.org/show_bug.cgi?id=93216
+
+        Reviewed by Antonio Gomes.
+
+        Page cache is a feature that can be enabled/disabled at runtime, there's no
+        MACRO named PAGE_CACHE to control the feature.
+
+        * WebCoreSupport/AboutDataEnableFeatures.in:
+
+2012-08-03  Yong Li  <yoli@rim.com>
+
+        [BlackBerry] FrameLoaderClient::restoreViewState() shouldn't trigger painting
+        https://bugs.webkit.org/show_bug.cgi?id=93141
+
+        Reviewed by Rob Buis.
+
+        PR# 172041.
+        It is not always safe to render the page at this point. So we post a message
+        instead.
+
+        * Api/WebPage.cpp:
+        (WebKit):
+        (BlackBerry::WebKit::WebPagePrivate::restoreHistoryViewState):
+        * Api/WebPage_p.h:
+        (WebPagePrivate):
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::restoreViewState):
+
+2012-08-03  Konrad Piascik  <kpiascik@rim.com>
+
+        [BlackBerry] InspectorOverlay class duplicated in WebCore
+        https://bugs.webkit.org/show_bug.cgi?id=93124
+
+        Reviewed by Rob Buis.
+
+        Changed namespace of InspectorOverlay from WebCore to
+        BlackBerry::WebKit
+
+        * Api/WebPage.cpp:
+        (WebKit):
+        (BlackBerry::WebKit::WebPagePrivate::setInspectorOverlayClient):
+        * Api/WebPage_p.h:
+        (WebPagePrivate):
+        * WebCoreSupport/InspectorClientBlackBerry.h:
+        * WebCoreSupport/InspectorOverlay.cpp:
+        (BlackBerry::WebKit::InspectorOverlay::create):
+        (BlackBerry::WebKit::InspectorOverlay::InspectorOverlay):
+        (BlackBerry::WebKit::InspectorOverlay::notifySyncRequired):
+        (BlackBerry::WebKit::InspectorOverlay::paintContents):
+        (BlackBerry::WebKit::InspectorOverlay::showDebugBorders):
+        (BlackBerry::WebKit::InspectorOverlay::showRepaintCounter):
+        (BlackBerry::WebKit::InspectorOverlay::contentsVisible):
+        (BlackBerry::WebKit::InspectorOverlay::update):
+        * WebCoreSupport/InspectorOverlay.h:
+        (WebKit):
+        (InspectorOverlayClient):
+        (InspectorOverlay):
+        (BlackBerry::WebKit::InspectorOverlay::notifyAnimationStarted):
+
+2012-08-03  Arvid Nilsson  <anilsson@rim.com>
+
+        [BlackBerry] Overlays display checkerboard that doesn't resolve
+        https://bugs.webkit.org/show_bug.cgi?id=93099
+
+        Reviewed by Antonio Gomes.
+
+        The WebKit-thread overlays, like tap highlight, inspector highlight and
+        selection are all part of a separate graphics layer tree rooted in
+        WebPagePrivate::m_overlayLayer.
+
+        When LayerRenderer needs to schedule a commit to reactively render
+        tiles and resolve checkerboard, it does so through the root layer.
+        Since the overlay layer root didn't have a GraphicsLayerClient, there
+        was no implementation of GraphicsLayerClient::notifySyncRequired() to
+        call, and a commit was never scheduled, thus checkerboard never
+        resolved.
+
+        Fixed by adding a fallback implementation of GraphicsLayerClient in
+        WebPagePrivate and hooking up the overlay root to it. Also, this
+        implementation can be shared by the various overlays to avoide code
+        duplication, specifically to implement notifySyncRequired(),
+        showDebugBorders() and showRepaintCounter() only once.
+
+        Fixing this revealed a bug where the web page would get stuck in an
+        endless sequence of commits. It turned out that
+        WebPagePrivate::updateDelegatedOverlays() was called right in the
+        middle of the commit operation, after performing the webkit thread part
+        of the commit operation but before we continued on the compositing
+        thread. Since updateDelegatedOverlays() typically mutates layers, this
+        is very bad (layers should not be mutated mid-commit). The mutations
+        also cause a new commit to scheduled from within the current, which
+        results in an endless sequence of commits.
+
+        Fixed this latter bug by moving the updateDelegatedOverlays() call to
+        the beginning of the method where it can cause no harm. This is before
+        we mark the web page as no longer needing commit, so even if the
+        implementation flips the "needs commit" bit, we will immediately flip
+        it back and proceed with commit as usual.
+
+        PR 187458, 184377
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::overlayLayer):
+        (BlackBerry::WebKit::WebPagePrivate::commitRootLayerIfNeeded):
+        (WebKit):
+        (BlackBerry::WebKit::WebPagePrivate::notifySyncRequired):
+        (BlackBerry::WebKit::WebPagePrivate::showDebugBorders):
+        (BlackBerry::WebKit::WebPagePrivate::showRepaintCounter):
+        * Api/WebPage_p.h:
+        (WebPagePrivate):
+        (BlackBerry::WebKit::WebPagePrivate::notifyAnimationStarted):
+        (BlackBerry::WebKit::WebPagePrivate::paintContents):
+        * WebCoreSupport/InspectorOverlay.cpp:
+        (WebCore::InspectorOverlay::notifySyncRequired):
+        (WebCore::InspectorOverlay::showDebugBorders):
+        (WebCore::InspectorOverlay::showRepaintCounter):
+        * WebKitSupport/DefaultTapHighlight.cpp:
+        (BlackBerry::WebKit::DefaultTapHighlight::notifySyncRequired):
+        (BlackBerry::WebKit::DefaultTapHighlight::showDebugBorders):
+        (WebKit):
+        (BlackBerry::WebKit::DefaultTapHighlight::showRepaintCounter):
+        * WebKitSupport/DefaultTapHighlight.h:
+        (DefaultTapHighlight):
+        * WebKitSupport/SelectionOverlay.cpp:
+        (BlackBerry::WebKit::SelectionOverlay::notifySyncRequired):
+        (BlackBerry::WebKit::SelectionOverlay::showDebugBorders):
+        (WebKit):
+        (BlackBerry::WebKit::SelectionOverlay::showRepaintCounter):
+        * WebKitSupport/SelectionOverlay.h:
+        (SelectionOverlay):
+
+2012-08-02  Arvid Nilsson  <anilsson@rim.com>
+
+        [BlackBerry] Add default implementation of GraphicsLayerClient::contentsVisible()
+        https://bugs.webkit.org/show_bug.cgi?id=93036
+
+        Reviewed by George Staikos.
+
+        Remove implementation of GraphicsLayerClient::contentsVisible() now
+        that it has a default implementation.
+
+        This also fixes a bug where memory usage for the inspector highlight
+        overlay would balloon because it returned true from contentsVisible()
+        which would cause the LayerTiler to populate all tiles. The default
+        implementation returns false instead.
+
+        PR 187458, 184377
+
+        * WebCoreSupport/InspectorOverlay.cpp:
+        (WebCore::InspectorOverlay::showRepaintCounter):
+        * WebCoreSupport/InspectorOverlay.h:
+        (InspectorOverlay):
+        * WebKitSupport/DefaultTapHighlight.h:
+        * WebKitSupport/SelectionOverlay.h:
+
+2012-08-02  Antonio Gomes  <agomes@rim.com>
+
+        Unreviewed debug build fix (bug 92889)
+
+        * WebKitSupport/InRegionScroller.cpp:
+        (BlackBerry::WebKit::pushBackInRegionScrollable):
+
+2012-08-02  Leo Yang  <leoyang@rim.com>
+
+        [BlackBerry] Rounding error of destination rect of checkerboard
+        https://bugs.webkit.org/show_bug.cgi?id=93012
+
+        Reviewed by Rob Buis.
+
+        Reviewed internally by Jakob Petsovits.
+
+        Intersect with the destination rectangle to eliminate the rounding error.
+
+        * Api/BackingStore.cpp:
+        (BlackBerry::WebKit::BackingStorePrivate::blitContents):
+
+2012-08-01  Antonio Gomes  <agomes@rim.com>
+
+        [BlackBerry] Implement InRegionScroller class as a in-region scroll controller
+        https://bugs.webkit.org/show_bug.cgi?id=92889
+        PR #186587
+
+        Reviewed by Yong Li.
+
+        Internally reviewed by Arvid Nilsson.
+
+        Moved all in-region scrolling code out of WebPagePrivate to the just
+        created InRegionScroller class. This class aims to:
+
+        1) Centralize all in-region scroll code and clean up WebPagePrivate as a consequence.
+        2) Be the bases to add UI/Compositing thread driven scrolls to in-region.
+
+        The patch does not change any functionallity change.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::WebPagePrivate):
+        (BlackBerry::WebKit::WebPagePrivate::init):
+        (BlackBerry::WebKit::WebPagePrivate::scrollBy):
+        (BlackBerry::WebKit::WebPagePrivate::notifyInRegionScrollStatusChanged):
+        (BlackBerry::WebKit::WebPagePrivate::clearDocumentData):
+        (BlackBerry::WebKit::WebPagePrivate::setScrollOriginPoint):
+        * Api/WebPage_p.h:
+        (WebPagePrivate):
+        * WebKitSupport/InRegionScrollableArea.cpp:
+        (BlackBerry::WebKit::InRegionScrollableArea::layer):
+        * WebKitSupport/InRegionScroller.cpp: Added.
+        (WebKit):
+        (BlackBerry::WebKit::canScrollInnerFrame):
+        (BlackBerry::WebKit::canScrollRenderBox):
+        (BlackBerry::WebKit::parentLayer):
+        (BlackBerry::WebKit::enclosingLayerNode):
+        (BlackBerry::WebKit::isNonRenderViewFixedPositionedContainer):
+        (BlackBerry::WebKit::pushBackInRegionScrollable):
+        (BlackBerry::WebKit::InRegionScroller::InRegionScroller):
+        (BlackBerry::WebKit::InRegionScroller::setNode):
+        (BlackBerry::WebKit::InRegionScroller::node):
+        (BlackBerry::WebKit::InRegionScroller::reset):
+        (BlackBerry::WebKit::InRegionScroller::isNull):
+        (BlackBerry::WebKit::InRegionScroller::scrollBy):
+        (BlackBerry::WebKit::InRegionScroller::inRegionScrollableAreasForPoint):
+        (BlackBerry::WebKit::InRegionScroller::scrollNodeRecursively):
+        (BlackBerry::WebKit::InRegionScroller::scrollRenderer):
+        (BlackBerry::WebKit::InRegionScroller::adjustScrollDelta):
+        * WebKitSupport/InRegionScroller.h: Added.
+        (WebCore):
+        (WebKit):
+        (InRegionScroller):
+        * WebKitSupport/TouchEventHandler.cpp:
+        (BlackBerry::WebKit::TouchEventHandler::drawTapHighlight):
+
+2012-08-01  Charles Wei  <charles.wei@torchmobile.com.cn>
+
+        [BlackBerry] Favicon should be Base64 encoded for cross-process passing
+        https://bugs.webkit.org/show_bug.cgi?id=92857
+
+        Reviewed by George Staikos.
+
+        The current implementation just passes the internal of SkPixels data to the client,
+        which can't be passed accross the process boundary to chrome for processing.
+        This patch makes the favicon Base64 encoded so that can be passed to chrome in another process.
+
+        * Api/WebPageClient.h:
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::dispatchDidReceiveIcon):
+
+2012-08-01  Jacky Jiang  <zhajiang@rim.com>
+
+        [BlackBerry] Allow client side to add and remove origin access whitelist entries
+        https://bugs.webkit.org/show_bug.cgi?id=92790
+
+        Reviewed by Yong Li.
+
+        PR: 172658
+        Add two new APIs to add and remove origin access whitelist entries.
+        Initialize the BlackBerryAllowCrossSiteRequests WebSetting to false.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::addOriginAccessWhitelistEntry):
+        (WebKit):
+        (BlackBerry::WebKit::WebPage::addOriginAccessWhitelistEntry):
+        (BlackBerry::WebKit::WebPagePrivate::removeOriginAccessWhitelistEntry):
+        (BlackBerry::WebKit::WebPage::removeOriginAccessWhitelistEntry):
+        * Api/WebPage.h:
+        * Api/WebPage_p.h:
+        (WebPagePrivate):
+        * Api/WebSettings.cpp:
+        (BlackBerry::WebKit::WebSettings::standardSettings):
+
+2012-08-01  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Consolidate suppression of keyboard requests.
+        https://bugs.webkit.org/show_bug.cgi?id=92871
+
+        Reviewed by Antonio Gomes.
+
+        Reduce VKB requests even more by applying the filter on
+        all requests during processing.
+
+        Reviewed Internally by Gen Mak.
+
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::focusedNodeChanged):
+        (BlackBerry::WebKit::InputHandler::notifyClientOfKeyboardVisibilityChange):
+
+2012-08-01  Arvid Nilsson  <anilsson@rim.com>
+
+        [BlackBerry] Disable tap highlight when transparent color is specified
+        https://bugs.webkit.org/show_bug.cgi?id=92849
+
+        Reviewed by Antonio Gomes.
+
+        When the web page specifies -webkit-tap-highlight-color:rgba(0,0,0,0)
+        or any color with alpha value 0, we should disable the tap highlight.
+
+        * WebKitSupport/DefaultTapHighlight.cpp:
+        (BlackBerry::WebKit::DefaultTapHighlight::draw):
+
+2012-07-31  Robin Cao  <robin.cao@torchmobile.com.cn>
+
+        [BlackBerry] Pass all file chooser settings to clients
+        https://bugs.webkit.org/show_bug.cgi?id=92237
+
+        Reviewed by Rob Buis.
+
+        Expose all file chooser settings to clients.
+
+        * Api/WebPageClient.h:
+        * WebCoreSupport/ChromeClientBlackBerry.cpp:
+        (WebCore::ChromeClientBlackBerry::runOpenPanel):
+
+2012-07-31  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Fix crash in InputHandler spell checking.
+        https://bugs.webkit.org/show_bug.cgi?id=92763
+
+        Reviewed by Antonio Gomes.
+
+        PR 185574.
+
+        Fix crash in getSpellChecker by guarding the calling paths
+        to ensure that m_currentFocusElement is valid.
+
+        Also add ASSERTs for previous crash.
+
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::spellCheckingRequestProcessed):
+        (BlackBerry::WebKit::InputHandler::spellCheckingRequestCancelled):
+        (BlackBerry::WebKit::InputHandler::getSpellChecker):
+
+2012-07-31  Genevieve Mak  <gmak@rim.com>
+
+        Send an onContextMenu event to the page content
+        so that context menus can be prevented. We use
+        the node's event handler because we want to use
+        the fat finger's node. If we use  the EventHandler's
+        sendContextMenuEvent it will hit test with the mouse
+        position which may not be what we want.
+        PR #184032
+        https://bugs.webkit.org/show_bug.cgi?id=92766
+
+        Reviewed by Antonio Gomes.
+        Reviewed Internally by Antonio Gomes.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::webContext):
+        (BlackBerry::WebKit::WebPagePrivate::contextNode):
+
+2012-07-31  Arvid Nilsson  <anilsson@rim.com>
+
+        [BlackBerry] Backing store output flickers when using WebPageCompositor
+        https://bugs.webkit.org/show_bug.cgi?id=90291
+
+        Reviewed by Antonio Gomes.
+
+        The backing store doesn't know when the API client swaps the buffers,
+        so it doesn't know when to signal the blit generation condition
+        variable. Fixed by using EGL fence sync instead, when available, so we
+        don't have to know.
+
+        Reviewed internally by Filip Spacek.
+
+        * Api/BackingStore.cpp:
+        (BlackBerry::WebKit::BackingStorePrivate::BackingStorePrivate):
+        (BlackBerry::WebKit::BackingStorePrivate::~BackingStorePrivate):
+        (BlackBerry::WebKit::BackingStorePrivate::render):
+        (BlackBerry::WebKit::BackingStorePrivate::blitContents):
+        (BlackBerry::WebKit::BackingStorePrivate::compositeContents):
+        * Api/BackingStore_p.h:
+        (BackingStorePrivate):
+        * WebKitSupport/BackingStoreTile.cpp:
+        (BlackBerry::WebKit::TileBuffer::TileBuffer):
+        * WebKitSupport/BackingStoreTile.h:
+        (BlackBerry::WebKit::TileBuffer::syncObject):
+        (BlackBerry::WebKit::TileBuffer::setSyncObject):
+        (TileBuffer):
+        * WebKitSupport/SurfacePool.cpp:
+        (WebKit):
+        (BlackBerry::WebKit::SurfacePool::SurfacePool):
+        (BlackBerry::WebKit::SurfacePool::initialize):
+        (BlackBerry::WebKit::SurfacePool::waitForBuffer):
+        (BlackBerry::WebKit::SurfacePool::notifyBuffersComposited):
+        * WebKitSupport/SurfacePool.h:
+        (SurfacePool):
+
+2012-07-30  Yoshifumi Inoue  <yosin@chromium.org>
+
+        [Forms] Get rid of Element::isReadOnlyFormControl other than CSS related
+        https://bugs.webkit.org/show_bug.cgi?id=92612
+
+        Reviewed by Kent Tamura.
+
+        This patch replaces Element::isReadOnlyFormControl() to
+        HTMLFormControlElement::readOnly() for preparation of introducing
+        Element::shouldMatchReadWriteSelector(), bug 92602.
+
+        * WebKitSupport/DOMSupport.cpp:
+        (BlackBerry::WebKit::DOMSupport::isTextBasedContentEditableElement): Replaced isReadOnlyFormControl() by HTMLTextFormControlElement::readOnly().
+
+2012-07-30  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Optimize the generation of selection details generation.
+        https://bugs.webkit.org/show_bug.cgi?id=92522
+
+        Reviewed by Antonio Gomes.
+
+        PR 179264.
+
+        Reduce the number of times we generate selection details notifications.
+
+        This removes several notifications that are handled by the standard
+        notification path and makes skipping duplicate notifications the default
+        so that only those that must generate a response do.
+
+        Reviewed Internally by Gen Mak.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::notifyTransformedContentsSizeChanged):
+        (BlackBerry::WebKit::WebPagePrivate::updateDelegatedOverlays):
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::setElementUnfocused):
+        * WebKitSupport/SelectionHandler.cpp:
+        (BlackBerry::WebKit::SelectionHandler::setCaretPosition):
+        (BlackBerry::WebKit::SelectionHandler::updateOrHandleInputSelection):
+        (BlackBerry::WebKit::SelectionHandler::setSelection):
+        (BlackBerry::WebKit::SelectionHandler::selectionPositionChanged):
+        * WebKitSupport/SelectionHandler.h:
+        (SelectionHandler):
+
+2012-07-30  Robin Cao  <robin.cao@torchmobile.com.cn>
+
+        [BlackBerry] Adapt to changes in the SharedArray platform API
+        https://bugs.webkit.org/show_bug.cgi?id=92631
+
+        Reviewed by Rob Buis.
+
+        Adapt to changes in the SharedArray platform API. No behavioural change.
+
+        Reviewed internally by Joe Mason.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPage::getBackForwardList):
+        * Api/WebPage.h:
+        * Api/WebPageClient.h:
+        * WebCoreSupport/ChromeClientBlackBerry.cpp:
+        (WebCore::ChromeClientBlackBerry::runOpenPanel):
+
+2012-07-30  Patrick Gansterer  <paroga@webkit.org>
+
+        Replace UnicodeWinCE with UnicodeWchar
+        https://bugs.webkit.org/show_bug.cgi?id=92539
+
+        Reviewed by Ryosuke Niwa.
+
+        UnicodeWinCE never contained WinCE specific code. UnicodeWchar
+        is a replacement for it, which is mainly based on the functions
+        from <wchar.h>. It is ment as a minimal Unicode backend, which
+        can be used very easy and has no external dependencies.
+
+        * WebCoreSupport/AboutDataUseFeatures.in:
+
 2012-07-27  Eli Fidler  <efidler@rim.com>
 
         [BlackBerry] Adapt to change in the FontInfo platform API.

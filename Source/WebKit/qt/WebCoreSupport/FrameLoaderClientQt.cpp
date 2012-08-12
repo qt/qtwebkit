@@ -372,6 +372,20 @@ void FrameLoaderClientQt::dispatchWillPerformClientRedirect(const KURL& url, dou
     notImplemented();
 }
 
+void FrameLoaderClientQt::dispatchDidNavigateWithinPage()
+{
+    if (!m_webFrame)
+        return;
+
+    FrameLoader* loader = m_frame->loader();
+    bool loaderCompleted = !(loader->activeDocumentLoader() && loader->activeDocumentLoader()->isLoadingInAPISense());
+
+    if (!loaderCompleted)
+        return;
+
+    dispatchDidCommitLoad();
+    dispatchDidFinishLoad();
+}
 
 void FrameLoaderClientQt::dispatchDidChangeLocationWithinPage()
 {
@@ -391,7 +405,7 @@ void FrameLoaderClientQt::dispatchDidPushStateWithinPage()
     if (dumpFrameLoaderCallbacks)
         printf("%s - dispatchDidPushStateWithinPage\n", qPrintable(drtDescriptionSuitableForTestResult(m_frame)));
 
-    notImplemented();
+    dispatchDidNavigateWithinPage();
 }
 
 void FrameLoaderClientQt::dispatchDidReplaceStateWithinPage()
@@ -399,7 +413,7 @@ void FrameLoaderClientQt::dispatchDidReplaceStateWithinPage()
     if (dumpFrameLoaderCallbacks)
         printf("%s - dispatchDidReplaceStateWithinPage\n", qPrintable(drtDescriptionSuitableForTestResult(m_frame)));
 
-    notImplemented();
+    dispatchDidNavigateWithinPage();
 }
 
 void FrameLoaderClientQt::dispatchDidPopStateWithinPage()
@@ -407,7 +421,7 @@ void FrameLoaderClientQt::dispatchDidPopStateWithinPage()
     if (dumpFrameLoaderCallbacks)
         printf("%s - dispatchDidPopStateWithinPage\n", qPrintable(drtDescriptionSuitableForTestResult(m_frame)));
 
-    notImplemented();
+    // No need to call dispatchDidNavigateWithinPage here, it's already been done in loadInSameDocument().
 }
 
 void FrameLoaderClientQt::dispatchWillClose()
@@ -1604,22 +1618,13 @@ PassRefPtr<Widget> FrameLoaderClientQt::createPlugin(const IntSize& pluginSize, 
         Vector<String> params = paramNames;
         Vector<String> values = paramValues;
         if (mimeType == "application/x-shockwave-flash") {
-#if HAVE(QT5)
-            const bool shouldInjectWmode = true;
-#else
             // Inject wmode=opaque when there is no client or the client is not a QWebView.
-            QWebPageClient* client = m_webFrame->page()->d->client.get();
-            const bool shouldInjectWmode = !(client && qobject_cast<QWidget*>(client->pluginParent()));
-#endif
-            if (shouldInjectWmode) {
-                // Inject wmode=opaque when there is no client or the client is not a QWebView.
-                size_t wmodeIndex = params.find("wmode");
-                if (wmodeIndex == WTF::notFound) {
-                    params.append("wmode");
-                    values.append("opaque");
-                } else if (equalIgnoringCase(values[wmodeIndex], "window"))
-                    values[wmodeIndex] = "opaque";
-            }
+            size_t wmodeIndex = params.find("wmode");
+            if (wmodeIndex == WTF::notFound) {
+                params.append("wmode");
+                values.append("opaque");
+            } else if (equalIgnoringCase(values[wmodeIndex], "window"))
+                values[wmodeIndex] = "opaque";
         }
 
         RefPtr<PluginView> pluginView = PluginView::create(m_frame, pluginSize, element, url,

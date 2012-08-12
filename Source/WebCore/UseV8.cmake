@@ -4,7 +4,6 @@ ADD_DEFINITIONS(-DWTF_CHANGES=1)
 LIST(APPEND WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/bindings/v8"
     "${WEBCORE_DIR}/bindings/v8/custom"
-    "${WEBCORE_DIR}/bindings/v8/specialization"
     "${JAVASCRIPTCORE_DIR}/runtime"
 )
 
@@ -17,6 +16,9 @@ LIST(APPEND WebCore_IDL_INCLUDES
 )
 
 LIST(APPEND WebCore_SOURCES
+    bindings/generic/BindingSecurity.cpp
+
+    bindings/v8/BindingState.cpp
     bindings/v8/DOMData.cpp
     bindings/v8/DOMDataStore.cpp
     bindings/v8/DOMWrapperWorld.cpp
@@ -44,7 +46,9 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/StaticDOMDataStore.cpp
     bindings/v8/V8AbstractEventListener.cpp
     bindings/v8/V8Binding.cpp
+    bindings/v8/V8BindingHelpers.cpp
     bindings/v8/V8Collection.cpp
+    bindings/v8/V8DOMConfiguration.cpp,
     bindings/v8/V8DOMMap.cpp
     bindings/v8/V8DOMWindowShell.cpp
     bindings/v8/V8DOMWrapper.cpp
@@ -52,14 +56,16 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/V8EventListenerList.cpp
     bindings/v8/V8GCController.cpp
     bindings/v8/V8GCForContextDispose.cpp
-    bindings/v8/V8Helpers.cpp
     bindings/v8/V8HiddenPropertyName.cpp
     bindings/v8/V8IsolatedContext.cpp
     bindings/v8/V8LazyEventListener.cpp
     bindings/v8/V8NodeFilterCondition.cpp
+    bindings/v8/V8PerContextData.cpp
+    bindings/v8/V8PerIsolateData.cpp
     bindings/v8/V8Proxy.cpp
     bindings/v8/V8RecursionScope.cpp
     bindings/v8/V8Utilities.cpp
+    bindings/v8/V8ValueCache.cpp
     bindings/v8/V8WindowErrorHandler.cpp
     bindings/v8/V8WorkerContextErrorHandler.cpp
     bindings/v8/V8WorkerContextEventListener.cpp
@@ -97,8 +103,6 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/custom/V8EventConstructors.cpp
     bindings/v8/custom/V8EventCustom.cpp
     bindings/v8/custom/V8FileReaderCustom.cpp
-    bindings/v8/custom/V8Float32ArrayCustom.cpp
-    bindings/v8/custom/V8Float64ArrayCustom.cpp
     bindings/v8/custom/V8GeolocationCustom.cpp
     bindings/v8/custom/V8HTMLAllCollectionCustom.cpp
     bindings/v8/custom/V8HTMLCanvasElementCustom.cpp
@@ -123,9 +127,6 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/custom/V8InjectedScriptHostCustom.cpp
     bindings/v8/custom/V8InjectedScriptManager.cpp
     bindings/v8/custom/V8InspectorFrontendHostCustom.cpp
-    bindings/v8/custom/V8Int16ArrayCustom.cpp
-    bindings/v8/custom/V8Int32ArrayCustom.cpp
-    bindings/v8/custom/V8Int8ArrayCustom.cpp
     bindings/v8/custom/V8LocationCustom.cpp
     bindings/v8/custom/V8MessageChannelConstructor.cpp
     bindings/v8/custom/V8MessageEventCustom.cpp
@@ -148,9 +149,6 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/custom/V8StorageCustom.cpp
     bindings/v8/custom/V8StyleSheetCustom.cpp
     bindings/v8/custom/V8StyleSheetListCustom.cpp
-    bindings/v8/custom/V8Uint16ArrayCustom.cpp
-    bindings/v8/custom/V8Uint32ArrayCustom.cpp
-    bindings/v8/custom/V8Uint8ArrayCustom.cpp
     bindings/v8/custom/V8WebGLRenderingContextCustom.cpp
     bindings/v8/custom/V8WebKitAnimationCustom.cpp
     bindings/v8/custom/V8WebKitPointConstructor.cpp
@@ -160,8 +158,6 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/custom/V8XMLHttpRequestConstructor.cpp
     bindings/v8/custom/V8XMLHttpRequestCustom.cpp
     bindings/v8/custom/V8XSLTProcessorCustom.cpp
-
-    bindings/v8/specialization/V8BindingState.cpp
 )
 
 LIST(APPEND WebCoreTestSupport_SOURCES

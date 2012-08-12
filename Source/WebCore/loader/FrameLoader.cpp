@@ -1501,6 +1501,10 @@ void FrameLoader::stopAllLoaders(ClearProvisionalItemPolicy clearProvisionalItem
     // If this method is called from within this method, infinite recursion can occur (3442218). Avoid this.
     if (m_inStopAllLoaders)
         return;
+    
+    // Calling stopLoading() on the provisional document loader can blow away
+    // the frame from underneath.
+    RefPtr<Frame> protect(m_frame);
 
     m_inStopAllLoaders = true;
 
@@ -3225,11 +3229,11 @@ NetworkingContext* FrameLoader::networkingContext() const
 
 void FrameLoader::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo<FrameLoader> info(memoryObjectInfo, this, MemoryInstrumentation::Loader);
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::Loader);
     info.addInstrumentedMember(m_documentLoader.get());
     info.addInstrumentedMember(m_provisionalDocumentLoader.get());
     info.addInstrumentedMember(m_policyDocumentLoader.get());
-    info.addString(m_outgoingReferrer);
+    info.addMember(m_outgoingReferrer);
     info.addInstrumentedHashSet(m_openedFrames);
 }
 

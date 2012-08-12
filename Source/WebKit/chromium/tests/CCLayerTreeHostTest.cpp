@@ -26,20 +26,18 @@
 
 #include "cc/CCLayerTreeHost.h"
 
-#include "AnimationIdVendor.h"
 #include "CCOcclusionTrackerTestCommon.h"
 #include "CCThreadedTest.h"
 #include "ContentLayerChromium.h"
-#include "GraphicsContext3DPrivate.h"
 #include "cc/CCGraphicsContext.h"
 #include "cc/CCLayerTreeHostImpl.h"
 #include "cc/CCSettings.h"
-#include "cc/CCTextureUpdater.h"
+#include "cc/CCTextureUpdateQueue.h"
 #include "cc/CCTimingFunction.h"
-#include "platform/WebThread.h"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <public/Platform.h>
+#include <public/WebThread.h>
 #include <wtf/MainThread.h>
 #include <wtf/OwnArrayPtr.h>
 
@@ -339,7 +337,7 @@ public:
         m_numCommits++;
         if (m_numCommits == 1) {
             // Make the viewport empty so the host says it can't draw.
-            m_layerTreeHost->setViewportSize(IntSize(0, 0));
+            m_layerTreeHost->setViewportSize(IntSize(0, 0), IntSize(0, 0));
 
             OwnArrayPtr<char> pixels(adoptArrayPtr(new char[4]));
             m_layerTreeHost->compositeAndReadback(static_cast<void*>(pixels.get()), IntRect(0, 0, 1, 1));
@@ -747,7 +745,7 @@ public:
     virtual void beginTest()
     {
         m_layerTreeHost->rootLayer()->setDrawOpacity(1);
-        m_layerTreeHost->setViewportSize(IntSize(10, 10));
+        m_layerTreeHost->setViewportSize(IntSize(10, 10), IntSize(10, 10));
         m_layerTreeHost->rootLayer()->setOpacity(0);
         postAddAnimationToMainThread();
     }
@@ -1006,8 +1004,8 @@ public:
 
     virtual void beginTest()
     {
-        m_layerTreeHost->setViewportSize(IntSize(20, 20));
-        m_layerTreeHost->setBackgroundColor(Color::gray);
+        m_layerTreeHost->setViewportSize(IntSize(20, 20), IntSize(20, 20));
+        m_layerTreeHost->setBackgroundColor(SK_ColorGRAY);
         m_layerTreeHost->setPageScaleFactorAndLimits(5, 5, 5);
 
         postSetNeedsCommitToMainThread();
@@ -1015,8 +1013,8 @@ public:
 
     virtual void commitCompleteOnCCThread(CCLayerTreeHostImpl* impl)
     {
-        EXPECT_EQ(IntSize(20, 20), impl->viewportSize());
-        EXPECT_EQ(Color::gray, impl->backgroundColor());
+        EXPECT_EQ(IntSize(20, 20), impl->layoutViewportSize());
+        EXPECT_EQ(SK_ColorGRAY, impl->backgroundColor());
         EXPECT_EQ(5, impl->pageScale());
 
         endTest();
@@ -1160,9 +1158,9 @@ public:
     int paintContentsCount() { return m_paintContentsCount; }
     void resetPaintContentsCount() { m_paintContentsCount = 0; }
 
-    virtual void update(CCTextureUpdater& updater, const CCOcclusionTracker* occlusion, CCRenderingStats& stats) OVERRIDE
+    virtual void update(CCTextureUpdateQueue& queue, const CCOcclusionTracker* occlusion, CCRenderingStats& stats) OVERRIDE
     {
-        ContentLayerChromium::update(updater, occlusion, stats);
+        ContentLayerChromium::update(queue, occlusion, stats);
         m_paintContentsCount++;
     }
 
@@ -1191,7 +1189,7 @@ public:
     virtual void beginTest()
     {
         m_layerTreeHost->setRootLayer(m_updateCheckLayer);
-        m_layerTreeHost->setViewportSize(IntSize(10, 10));
+        m_layerTreeHost->setViewportSize(IntSize(10, 10), IntSize(10, 10));
 
         postSetNeedsCommitToMainThread();
     }
@@ -1239,10 +1237,9 @@ public:
 
     virtual void beginTest()
     {
-        // The device viewport should be scaled by the device scale factor.
-        m_layerTreeHost->setViewportSize(IntSize(40, 40));
+        m_layerTreeHost->setViewportSize(IntSize(40, 40), IntSize(60, 60));
         m_layerTreeHost->setDeviceScaleFactor(1.5);
-        EXPECT_EQ(IntSize(40, 40), m_layerTreeHost->viewportSize());
+        EXPECT_EQ(IntSize(40, 40), m_layerTreeHost->layoutViewportSize());
         EXPECT_EQ(IntSize(60, 60), m_layerTreeHost->deviceViewportSize());
 
         m_rootLayer->addChild(m_childLayer);
@@ -1273,7 +1270,7 @@ public:
         ASSERT_EQ(1u, impl->rootLayer()->children().size());
 
         // Device viewport is scaled.
-        EXPECT_EQ(IntSize(40, 40), impl->viewportSize());
+        EXPECT_EQ(IntSize(40, 40), impl->layoutViewportSize());
         EXPECT_EQ(IntSize(60, 60), impl->deviceViewportSize());
 
         CCLayerImpl* root = impl->rootLayer();
@@ -1347,7 +1344,7 @@ public:
     virtual void beginTest()
     {
         m_layerTreeHost->setRootLayer(m_layer);
-        m_layerTreeHost->setViewportSize(IntSize(10, 10));
+        m_layerTreeHost->setViewportSize(IntSize(10, 10), IntSize(10, 10));
 
         postSetNeedsCommitToMainThread();
         postSetNeedsRedrawToMainThread();
@@ -1447,7 +1444,7 @@ public:
     virtual void beginTest()
     {
         m_layerTreeHost->setRootLayer(m_parent);
-        m_layerTreeHost->setViewportSize(IntSize(10, 20));
+        m_layerTreeHost->setViewportSize(IntSize(10, 20), IntSize(10, 20));
 
         WebTransformationMatrix identityMatrix;
         setLayerPropertiesForTesting(m_parent.get(), 0, identityMatrix, FloatPoint(0, 0), FloatPoint(0, 0), IntSize(10, 20), true);
@@ -1543,10 +1540,10 @@ public:
             break;
         case 3:
             m_child->setNeedsDisplay();
-            m_layerTreeHost->setViewportSize(IntSize(10, 10));
+            m_layerTreeHost->setViewportSize(IntSize(10, 10), IntSize(10, 10));
             break;
         case 4:
-            m_layerTreeHost->setViewportSize(IntSize(10, 20));
+            m_layerTreeHost->setViewportSize(IntSize(10, 20), IntSize(10, 20));
             break;
         default:
             ASSERT_NOT_REACHED();
@@ -1574,7 +1571,7 @@ class TestLayerChromium : public LayerChromium {
 public:
     static PassRefPtr<TestLayerChromium> create() { return adoptRef(new TestLayerChromium()); }
 
-    virtual void update(CCTextureUpdater&, const CCOcclusionTracker* occlusion, CCRenderingStats&) OVERRIDE
+    virtual void update(CCTextureUpdateQueue&, const CCOcclusionTracker* occlusion, CCRenderingStats&) OVERRIDE
     {
         // Gain access to internals of the CCOcclusionTracker.
         const TestCCOcclusionTracker* testOcclusion = static_cast<const TestCCOcclusionTracker*>(occlusion);
@@ -1627,10 +1624,10 @@ public:
         setTestLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
 
         m_layerTreeHost->setRootLayer(rootLayer);
-        m_layerTreeHost->setViewportSize(rootLayer->bounds());
+        m_layerTreeHost->setViewportSize(rootLayer->bounds(), rootLayer->bounds());
         ASSERT_TRUE(m_layerTreeHost->initializeLayerRendererIfNeeded());
-        CCTextureUpdater updater;
-        m_layerTreeHost->updateLayers(updater, std::numeric_limits<size_t>::max());
+        CCTextureUpdateQueue queue;
+        m_layerTreeHost->updateLayers(queue, std::numeric_limits<size_t>::max());
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), grandChild->occludedScreenSpace().bounds());
@@ -1646,8 +1643,8 @@ public:
         setLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
 
         m_layerTreeHost->setRootLayer(rootLayer);
-        m_layerTreeHost->setViewportSize(rootLayer->bounds());
-        m_layerTreeHost->updateLayers(updater, std::numeric_limits<size_t>::max());
+        m_layerTreeHost->setViewportSize(rootLayer->bounds(), rootLayer->bounds());
+        m_layerTreeHost->updateLayers(queue, std::numeric_limits<size_t>::max());
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), grandChild->occludedScreenSpace().bounds());
@@ -1664,8 +1661,8 @@ public:
         setTestLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
 
         m_layerTreeHost->setRootLayer(rootLayer);
-        m_layerTreeHost->setViewportSize(rootLayer->bounds());
-        m_layerTreeHost->updateLayers(updater, std::numeric_limits<size_t>::max());
+        m_layerTreeHost->setViewportSize(rootLayer->bounds(), rootLayer->bounds());
+        m_layerTreeHost->updateLayers(queue, std::numeric_limits<size_t>::max());
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), grandChild->occludedScreenSpace().bounds());
@@ -1684,8 +1681,8 @@ public:
         setTestLayerPropertiesForTesting(grandChild.get(), child.get(), identityMatrix, FloatPoint(0, 0), FloatPoint(10, 10), IntSize(500, 500), true);
 
         m_layerTreeHost->setRootLayer(rootLayer);
-        m_layerTreeHost->setViewportSize(rootLayer->bounds());
-        m_layerTreeHost->updateLayers(updater, std::numeric_limits<size_t>::max());
+        m_layerTreeHost->setViewportSize(rootLayer->bounds(), rootLayer->bounds());
+        m_layerTreeHost->updateLayers(queue, std::numeric_limits<size_t>::max());
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), grandChild->occludedScreenSpace().bounds());
@@ -1706,8 +1703,8 @@ public:
         child->setMaskLayer(mask.get());
 
         m_layerTreeHost->setRootLayer(rootLayer);
-        m_layerTreeHost->setViewportSize(rootLayer->bounds());
-        m_layerTreeHost->updateLayers(updater, std::numeric_limits<size_t>::max());
+        m_layerTreeHost->setViewportSize(rootLayer->bounds(), rootLayer->bounds());
+        m_layerTreeHost->updateLayers(queue, std::numeric_limits<size_t>::max());
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), grandChild->occludedScreenSpace().bounds());
@@ -1728,8 +1725,8 @@ public:
         child->setMaskLayer(mask.get());
 
         m_layerTreeHost->setRootLayer(rootLayer);
-        m_layerTreeHost->setViewportSize(rootLayer->bounds());
-        m_layerTreeHost->updateLayers(updater, std::numeric_limits<size_t>::max());
+        m_layerTreeHost->setViewportSize(rootLayer->bounds(), rootLayer->bounds());
+        m_layerTreeHost->updateLayers(queue, std::numeric_limits<size_t>::max());
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), child2->occludedScreenSpace().bounds());
@@ -1751,8 +1748,8 @@ public:
         child->setOpacity(0.5);
 
         m_layerTreeHost->setRootLayer(rootLayer);
-        m_layerTreeHost->setViewportSize(rootLayer->bounds());
-        m_layerTreeHost->updateLayers(updater, std::numeric_limits<size_t>::max());
+        m_layerTreeHost->setViewportSize(rootLayer->bounds(), rootLayer->bounds());
+        m_layerTreeHost->updateLayers(queue, std::numeric_limits<size_t>::max());
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), grandChild->occludedScreenSpace().bounds());
@@ -1774,8 +1771,8 @@ public:
         child->setOpacity(0.5);
 
         m_layerTreeHost->setRootLayer(rootLayer);
-        m_layerTreeHost->setViewportSize(rootLayer->bounds());
-        m_layerTreeHost->updateLayers(updater, std::numeric_limits<size_t>::max());
+        m_layerTreeHost->setViewportSize(rootLayer->bounds(), rootLayer->bounds());
+        m_layerTreeHost->updateLayers(queue, std::numeric_limits<size_t>::max());
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), child2->occludedScreenSpace().bounds());
@@ -1835,10 +1832,10 @@ public:
         }
 
         m_layerTreeHost->setRootLayer(rootLayer);
-        m_layerTreeHost->setViewportSize(rootLayer->bounds());
+        m_layerTreeHost->setViewportSize(rootLayer->bounds(), rootLayer->bounds());
         ASSERT_TRUE(m_layerTreeHost->initializeLayerRendererIfNeeded());
-        CCTextureUpdater updater;
-        m_layerTreeHost->updateLayers(updater, std::numeric_limits<size_t>::max());
+        CCTextureUpdateQueue queue;
+        m_layerTreeHost->updateLayers(queue, std::numeric_limits<size_t>::max());
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), child2->occludedScreenSpace().bounds());
@@ -1864,8 +1861,8 @@ public:
         }
 
         m_layerTreeHost->setRootLayer(rootLayer);
-        m_layerTreeHost->setViewportSize(rootLayer->bounds());
-        m_layerTreeHost->updateLayers(updater, std::numeric_limits<size_t>::max());
+        m_layerTreeHost->setViewportSize(rootLayer->bounds(), rootLayer->bounds());
+        m_layerTreeHost->updateLayers(queue, std::numeric_limits<size_t>::max());
         m_layerTreeHost->commitComplete();
 
         EXPECT_EQ_RECT(IntRect(), child2->occludedScreenSpace().bounds());
@@ -1924,10 +1921,10 @@ public:
         }
 
         m_layerTreeHost->setRootLayer(layers[0].get());
-        m_layerTreeHost->setViewportSize(layers[0]->bounds());
+        m_layerTreeHost->setViewportSize(layers[0]->bounds(), layers[0]->bounds());
         ASSERT_TRUE(m_layerTreeHost->initializeLayerRendererIfNeeded());
-        CCTextureUpdater updater;
-        m_layerTreeHost->updateLayers(updater, std::numeric_limits<size_t>::max());
+        CCTextureUpdateQueue queue;
+        m_layerTreeHost->updateLayers(queue, std::numeric_limits<size_t>::max());
         m_layerTreeHost->commitComplete();
 
         for (int i = 0; i < numSurfaces-1; ++i) {
@@ -1951,7 +1948,7 @@ public:
 
 SINGLE_AND_MULTI_THREAD_TEST_F(CCLayerTreeHostTestManySurfaces)
 
-// A loseContext(1) should lead to a didRecreateContext(true)
+// A loseContext(1) should lead to a didRecreateOutputSurface(true)
 class CCLayerTreeHostTestSetSingleLostContext : public CCLayerTreeHostTest {
 public:
     CCLayerTreeHostTestSetSingleLostContext()
@@ -1968,7 +1965,7 @@ public:
         m_layerTreeHost->loseContext(1);
     }
 
-    virtual void didRecreateContext(bool succeeded)
+    virtual void didRecreateOutputSurface(bool succeeded)
     {
         EXPECT_TRUE(succeeded);
         endTest();
@@ -1984,7 +1981,7 @@ TEST_F(CCLayerTreeHostTestSetSingleLostContext, runMultiThread)
     runTest(true);
 }
 
-// A loseContext(10) should lead to a didRecreateContext(false), and
+// A loseContext(10) should lead to a didRecreateOutputSurface(false), and
 // a finishAllRendering() should not hang.
 class CCLayerTreeHostTestSetRepeatedLostContext : public CCLayerTreeHostTest {
 public:
@@ -2002,7 +1999,7 @@ public:
         m_layerTreeHost->loseContext(10);
     }
 
-    virtual void didRecreateContext(bool succeeded)
+    virtual void didRecreateOutputSurface(bool succeeded)
     {
         EXPECT_FALSE(succeeded);
         m_layerTreeHost->finishAllRendering();
@@ -2141,7 +2138,7 @@ public:
 
         // Any valid CCAnimationCurve will do here.
         OwnPtr<CCAnimationCurve> curve(CCEaseTimingFunction::create());
-        OwnPtr<CCActiveAnimation> animation(CCActiveAnimation::create(curve.release(), AnimationIdVendor::getNextAnimationId(), AnimationIdVendor::getNextGroupId(), CCActiveAnimation::Opacity));
+        OwnPtr<CCActiveAnimation> animation(CCActiveAnimation::create(curve.release(), 1, 1, CCActiveAnimation::Opacity));
         layer->layerAnimationController()->addAnimation(animation.release());
 
         // We add the animation *before* attaching the layer to the tree.
@@ -2173,7 +2170,7 @@ public:
 
     virtual void beginTest() OVERRIDE
     {
-        m_layerTreeHost->setViewportSize(IntSize(10, 10));
+        m_layerTreeHost->setViewportSize(IntSize(10, 10), IntSize(10, 10));
         m_layerTreeHost->rootLayer()->setBounds(IntSize(10, 10));
         
         m_rootScrollLayer = ContentLayerChromium::create(&m_mockDelegate);
@@ -2283,7 +2280,7 @@ public:
 
     virtual void beginTest()
     {
-        m_layerTreeHost->setViewportSize(IntSize(100, 100));
+        m_layerTreeHost->setViewportSize(IntSize(100, 100), IntSize(100, 100));
 
         m_rootLayer->setBounds(IntSize(100, 100));
         m_surfaceLayer1->setBounds(IntSize(100, 100));

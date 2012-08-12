@@ -16,10 +16,6 @@ CONFIG += staticlib
 
 DEFINES += QT_MAKEDLL
 
-!haveQt(5) {
-    INCLUDEPATH += $$PWD/../WTF/wtf/qt/compat
-}
-
 RESOURCES += \
     $$PWD/WebCore.qrc
 
@@ -69,10 +65,13 @@ SOURCES += \
     accessibility/AccessibilityTableRow.cpp \
     accessibility/AXObjectCache.cpp \
     bindings/generic/ActiveDOMCallback.cpp \
+    bindings/generic/BindingSecurity.cpp \
     bindings/generic/RuntimeEnabledFeatures.cpp
 
 SOURCES += \
      bindings/ScriptControllerBase.cpp \
+     bindings/js/ArrayValue.cpp \
+     bindings/js/BindingState.cpp \
      bindings/js/CallbackFunction.cpp \
      bindings/js/DOMObjectHashTableMap.cpp \
      bindings/js/DOMWrapperWorld.cpp \
@@ -128,8 +127,6 @@ SOURCES += \
      bindings/js/JSEventTargetCustom.cpp \
      bindings/js/JSExceptionBase.cpp \
      bindings/js/JSFileReaderCustom.cpp \
-     bindings/js/JSFloat32ArrayCustom.cpp \
-     bindings/js/JSFloat64ArrayCustom.cpp \
      bindings/js/JSGeolocationCustom.cpp \
      bindings/js/JSHTMLAllCollectionCustom.cpp \
      bindings/js/JSHTMLAppletElementCustom.cpp \
@@ -155,9 +152,6 @@ SOURCES += \
      bindings/js/JSInjectedScriptHostCustom.cpp \
      bindings/js/JSInjectedScriptManager.cpp \
      bindings/js/JSInspectorFrontendHostCustom.cpp \
-     bindings/js/JSInt16ArrayCustom.cpp \
-     bindings/js/JSInt32ArrayCustom.cpp \
-     bindings/js/JSInt8ArrayCustom.cpp \
      bindings/js/JSLazyEventListener.cpp \
      bindings/js/JSLocationCustom.cpp \
      bindings/js/JSMainThreadExecState.cpp \
@@ -189,10 +183,6 @@ SOURCES += \
      bindings/js/JSTouchCustom.cpp \
      bindings/js/JSTouchListCustom.cpp \
      bindings/js/JSTreeWalkerCustom.cpp \
-     bindings/js/JSUint16ArrayCustom.cpp \
-     bindings/js/JSUint32ArrayCustom.cpp \
-     bindings/js/JSUint8ArrayCustom.cpp \
-     bindings/js/JSUint8ClampedArrayCustom.cpp \
      bindings/js/JSWebKitAnimationCustom.cpp \
      bindings/js/JSWebKitAnimationListCustom.cpp \
      bindings/js/JSWebKitCSSKeyframeRuleCustom.cpp \
@@ -228,17 +218,13 @@ SOURCES += \
      bridge/qt/qt_class.cpp \
      bridge/qt/qt_instance.cpp \
      bridge/qt/qt_pixmapruntime.cpp \
+     bridge/qt/qt_runtime.cpp \
      bridge/runtime_array.cpp \
      bridge/runtime_method.cpp \
      bridge/runtime_object.cpp \
      bridge/runtime_root.cpp \
      testing/js/WebCoreTestSupport.cpp
 
-haveQt(5) {
-    SOURCES += bridge/qt/qt_runtime.cpp
-} else {
-    SOURCES += bridge/qt/qt_runtime_qt4.cpp
-}
 
 SOURCES += \
     Modules/filesystem/DOMFilePath.cpp \
@@ -342,6 +328,7 @@ SOURCES += \
     css/WebKitCSSKeyframeRule.cpp \
     css/WebKitCSSKeyframesRule.cpp \
     css/WebKitCSSMatrix.cpp \
+    css/WebKitCSSMixFunctionValue.cpp \
     css/WebKitCSSRegionRule.cpp \
     css/WebKitCSSSVGDocumentValue.cpp \
     css/WebKitCSSShaderValue.cpp \
@@ -408,10 +395,12 @@ SOURCES += \
     dom/ExceptionBase.cpp \
     dom/ExceptionCodePlaceholder.cpp \
     dom/GenericEventQueue.cpp \
+    dom/GestureEvent.cpp \
     dom/IconURL.cpp \
     dom/IdTargetObserver.cpp \
     dom/IdTargetObserverRegistry.cpp \
     dom/KeyboardEvent.cpp \
+    dom/MemoryInstrumentation.cpp \
     dom/MessageChannel.cpp \
     dom/MessageEvent.cpp \
     dom/MessagePort.cpp \
@@ -735,7 +724,6 @@ SOURCES += \
     inspector/ConsoleMessage.cpp \
     inspector/ContentSearchUtils.cpp \
     inspector/DOMEditor.cpp \
-    inspector/DOMNodeHighlighter.cpp \
     inspector/DOMPatchSupport.cpp \
     inspector/IdentifiersFactory.cpp \
     inspector/InjectedScript.cpp \
@@ -764,6 +752,7 @@ SOURCES += \
     inspector/InspectorHistory.cpp \
     inspector/InspectorInstrumentation.cpp \
     inspector/InspectorMemoryAgent.cpp \
+    inspector/InspectorOverlay.cpp \
     inspector/InspectorPageAgent.cpp \
     inspector/InspectorProfilerAgent.cpp \
     inspector/InspectorResourceAgent.cpp \
@@ -776,6 +765,7 @@ SOURCES += \
     inspector/InspectorWebGLAgent.cpp \
     inspector/InspectorWorkerAgent.cpp \
     inspector/InstrumentingAgents.cpp \
+    inspector/MemoryInstrumentationImpl.cpp \
     inspector/NetworkResourcesData.cpp \
     inspector/PageConsoleAgent.cpp \
     inspector/PageDebuggerAgent.cpp \
@@ -845,6 +835,7 @@ SOURCES += \
     loader/SinkDocument.cpp \
     loader/SubframeLoader.cpp \
     loader/SubresourceLoader.cpp \
+    loader/SubstituteData.cpp \
     loader/TextResourceDecoder.cpp \
     loader/ThreadableLoader.cpp \
     page/animation/AnimationBase.cpp \
@@ -1275,9 +1266,11 @@ HEADERS += \
     accessibility/AXObjectCache.h \
     bindings/ScriptControllerBase.h \
     bindings/generic/ActiveDOMCallback.h \
+    bindings/generic/BindingSecurity.h \
     bindings/generic/RuntimeEnabledFeatures.h
 
 HEADERS += \
+    bindings/js/BindingState.h \
     bindings/js/CachedScriptSourceProvider.h \
     bindings/js/CallbackFunction.h \
     bindings/js/GCController.h \
@@ -1473,6 +1466,7 @@ HEADERS += \
     css/WebKitCSSKeyframeRule.h \
     css/WebKitCSSKeyframesRule.h \
     css/WebKitCSSMatrix.h \
+    css/WebKitCSSMixFunctionValue.h \
     css/WebKitCSSRegionRule.h \
     css/WebKitCSSSVGDocumentValue.h \
     css/WebKitCSSShaderValue.h \
@@ -1536,6 +1530,7 @@ HEADERS += \
     dom/ExceptionBase.h \
     dom/ExceptionCode.h \
     dom/FragmentScriptingPermission.h \
+    dom/GestureEvent.h \
     dom/IdTargetObserver.h \
     dom/IdTargetObserverRegistry.h \
     dom/KeyboardEvent.h \
@@ -1836,7 +1831,6 @@ HEADERS += \
     inspector/ConsoleMessage.h \
     inspector/ContentSearchUtils.h \
     inspector/DOMEditor.h \
-    inspector/DOMNodeHighlighter.h \
     inspector/DOMPatchSupport.h \
     inspector/IdentifiersFactory.h \
     inspector/InjectedScript.h \
@@ -1867,6 +1861,7 @@ HEADERS += \
     inspector/InspectorHistory.h \
     inspector/InspectorInstrumentation.h \
     inspector/InspectorMemoryAgent.h \
+    inspector/InspectorOverlay.h \
     inspector/InspectorPageAgent.h \
     inspector/InspectorProfilerAgent.h \
     inspector/InspectorResourceAgent.h \
@@ -1879,6 +1874,7 @@ HEADERS += \
     inspector/InspectorWebGLInstrumentation.h \
     inspector/InspectorWorkerAgent.h \
     inspector/InstrumentingAgents.h \
+    inspector/MemoryInstrumentationImpl.h \
     inspector/NetworkResourcesData.h \
     inspector/PageConsoleAgent.h \
     inspector/PageDebuggerAgent.h \
@@ -1935,6 +1931,7 @@ HEADERS += \
     loader/ProgressTracker.h \
     loader/ResourceLoader.h \
     loader/SubresourceLoader.h \
+    loader/SubstituteData.h \
     loader/TextResourceDecoder.h \
     loader/TextTrackLoader.h \
     loader/ThreadableLoader.h \
@@ -2091,6 +2088,8 @@ HEADERS += \
     platform/graphics/IntPointHash.h \
     platform/graphics/IntRect.h \
     platform/graphics/MediaPlayer.h \
+    platform/graphics/NativeImagePtr.h \
+    platform/graphics/opentype/OpenTypeVerticalData.h \
     platform/graphics/Path.h \
     platform/graphics/PathTraversalState.h \
     platform/graphics/Pattern.h \
@@ -2805,18 +2804,13 @@ mac {
         platform/text/cf/StringImplCF.cpp
 }
 
-haveQt(5) {
-    contains(QT_CONFIG,icu)|mac: SOURCES += platform/text/TextBreakIteratorICU.cpp
-    mac {
-        # For Mac we use the same SmartReplace implementation as the Apple port.
-        SOURCES += editing/SmartReplaceCF.cpp
-        INCLUDEPATH += $$PWD/icu
-    } else {
-        SOURCES += editing/SmartReplaceICU.cpp
-    }
+contains(QT_CONFIG,icu)|mac: SOURCES += platform/text/TextBreakIteratorICU.cpp
+mac {
+    # For Mac we use the same SmartReplace implementation as the Apple port.
+    SOURCES += editing/SmartReplaceCF.cpp
+    INCLUDEPATH += $$PWD/icu
 } else {
-    SOURCES += platform/text/qt/TextBreakIteratorQt.cpp \
-               editing/qt/SmartReplaceQt.cpp
+    SOURCES += editing/SmartReplaceICU.cpp
 }
 
 contains(DEFINES, ENABLE_NETSCAPE_PLUGIN_API=1) {
@@ -2835,11 +2829,6 @@ contains(DEFINES, ENABLE_NETSCAPE_PLUGIN_API=1) {
             SOURCES += \
                 plugins/qt/PluginPackageQt.cpp \
                 plugins/qt/PluginViewQt.cpp
-
-            haveQt(4) {
-                SOURCES += plugins/qt/PluginContainerQt.cpp
-                HEADERS += plugins/qt/PluginContainerQt.h
-            }
         }
     }
 
@@ -3015,9 +3004,13 @@ contains(DEFINES, ENABLE_FILE_SYSTEM=1) {
 
 contains(DEFINES, ENABLE_MEDIA_SOURCE=1) {
     HEADERS += \
+        Modules/mediasource/MediaSource.h \
+        Modules/mediasource/MediaSourceRegistry.h \
         Modules/mediasource/SourceBuffer.h \
         Modules/mediasource/SourceBufferList.h
     SOURCES += \
+        Modules/mediasource/MediaSource.cpp \
+        Modules/mediasource/MediaSourceRegistry.cpp \
         Modules/mediasource/SourceBuffer.cpp \
         Modules/mediasource/SourceBufferList.cpp
 }
@@ -3089,6 +3082,22 @@ contains(DEFINES, ENABLE_QUOTA=1) {
     SOURCES += \
         Modules/quota/DOMWindowQuota.cpp
         Modules/quota/StorageInfo.cpp
+}
+
+contains(DEFINES, ENABLE_GAMEPAD=1) {
+    HEADERS += \
+        Modules/gamepad/Gamepad.h\
+        Modules/gamepad/GamepadList.h \
+        Modules/gamepad/NavigatorGamepad.h \
+        platform/linux/GamepadDeviceLinux.h \
+        platform/Gamepads.h
+
+    SOURCES += \
+        Modules/gamepad/Gamepad.cpp \
+        Modules/gamepad/GamepadList.cpp \
+        Modules/gamepad/NavigatorGamepad.cpp \
+        platform/linux/GamepadDeviceLinux.cpp \
+        platform/qt/GamepadsQt.cpp
 }
 
 contains(DEFINES, ENABLE_VIDEO=1) {

@@ -950,7 +950,8 @@ bool AbstractState::execute(unsigned indexInBlock)
     }
             
     case PutByVal:
-    case PutByValAlias: {
+    case PutByValAlias:
+    case PutByValSafe: {
         node.setCanExit(true);
 
         Edge child1 = m_graph.varArgChild(node, 0);
@@ -966,7 +967,7 @@ bool AbstractState::execute(unsigned indexInBlock)
             || m_graph[child1].shouldSpeculateArguments()
 #endif
             ) {
-            ASSERT(node.op() == PutByVal);
+            ASSERT(node.op() == PutByVal || node.op() == PutByValSafe);
             clobberWorld(node.codeOrigin, indexInBlock);
             forNode(nodeIndex).makeTop();
             break;
@@ -1055,7 +1056,7 @@ bool AbstractState::execute(unsigned indexInBlock)
         ASSERT(m_graph[child1].shouldSpeculateArray());
         forNode(child1).filter(SpecArray);
         forNode(child2).filter(SpecInt32);
-        if (node.op() == PutByVal)
+        if (node.op() == PutByValSafe)
             clobberWorld(node.codeOrigin, indexInBlock);
         break;
     }
@@ -1335,7 +1336,7 @@ bool AbstractState::execute(unsigned indexInBlock)
             
     case PutScopedVar:
         node.setCanExit(false);
-        clobberStructures(indexInBlock);
+        clobberCapturedVars(node.codeOrigin);
         break;
             
     case GetById:
@@ -1415,7 +1416,8 @@ bool AbstractState::execute(unsigned indexInBlock)
         forNode(nodeIndex).set(SpecInt32);
         break;
             
-    case CheckStructure: {
+    case CheckStructure:
+    case ForwardCheckStructure: {
         // FIXME: We should be able to propagate the structure sets of constants (i.e. prototypes).
         AbstractValue& value = forNode(node.child1());
         node.setCanExit(
@@ -1431,6 +1433,7 @@ bool AbstractState::execute(unsigned indexInBlock)
         AbstractValue& value = forNode(node.child1());
         ASSERT(value.isClear() || isCellSpeculation(value.m_type)); // Value could be clear if we've proven must-exit due to a speculation statically known to be bad.
         value.filter(node.structure());
+        m_haveStructures = true;
         node.setCanExit(true);
         break;
     }
@@ -1609,6 +1612,12 @@ bool AbstractState::execute(unsigned indexInBlock)
 
 inline void AbstractState::clobberWorld(const CodeOrigin& codeOrigin, unsigned indexInBlock)
 {
+    clobberCapturedVars(codeOrigin);
+    clobberStructures(indexInBlock);
+}
+
+inline void AbstractState::clobberCapturedVars(const CodeOrigin& codeOrigin)
+{
     if (codeOrigin.inlineCallFrame) {
         const BitVector& capturedVars = codeOrigin.inlineCallFrame->capturedVars;
         for (size_t i = capturedVars.size(); i--;) {
@@ -1624,7 +1633,6 @@ inline void AbstractState::clobberWorld(const CodeOrigin& codeOrigin, unsigned i
         for (size_t i = m_variables.numberOfArguments(); i--;)
             m_variables.argument(i).makeTop();
     }
-    clobberStructures(indexInBlock);
 }
 
 inline void AbstractState::clobberStructures(unsigned indexInBlock)

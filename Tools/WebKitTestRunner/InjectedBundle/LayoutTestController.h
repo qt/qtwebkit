@@ -29,6 +29,7 @@
 #include "JSWrappable.h"
 #include <JavaScriptCore/JSRetainPtr.h>
 #include <WebKit2/WKBundleScriptWorld.h>
+#include <WebKit2/WKRetainPtr.h>
 #include <string>
 #include <wtf/PassRefPtr.h>
 
@@ -78,6 +79,7 @@ public:
     void dumpFullScreenCallbacks() { m_dumpFullScreenCallbacks = true; }
     void dumpFrameLoadCallbacks() { setShouldDumpFrameLoadCallbacks(true); }
     void dumpProgressFinishedCallback() { setShouldDumpProgressFinishedCallback(true); }
+    void dumpResourceResponseMIMETypes() { m_dumpResourceResponseMIMETypes = true; }
 
     void setShouldDumpFrameLoadCallbacks(bool value) { m_dumpFrameLoadCallbacks = value; }
     void setShouldDumpProgressFinishedCallback(bool value) { m_dumpProgressFinishedCallback = value; }
@@ -100,6 +102,8 @@ public:
     void setCustomPolicyDelegate(bool enabled, bool permissive = false);
     void addOriginAccessWhitelistEntry(JSStringRef sourceOrigin, JSStringRef destinationProtocol, JSStringRef destinationHost, bool allowDestinationSubdomains);
     void removeOriginAccessWhitelistEntry(JSStringRef sourceOrigin, JSStringRef destinationProtocol, JSStringRef destinationHost, bool allowDestinationSubdomains);
+    void setUserStyleSheetEnabled(bool);
+    void setUserStyleSheetLocation(JSStringRef);
 
     // Special DOM functions.
     JSValueRef computedStyleIncludingVisitedInfo(JSValueRef element);
@@ -158,7 +162,9 @@ public:
     bool shouldDumpPixels() const { return m_dumpPixels; }
     bool shouldDumpFullScreenCallbacks() const { return m_dumpFullScreenCallbacks; }
     bool shouldDumpFrameLoadCallbacks() const { return m_dumpFrameLoadCallbacks; }
-    bool shouldDumpProgressFinishedCallback() { return m_dumpProgressFinishedCallback; }
+    bool shouldDumpProgressFinishedCallback() const { return m_dumpProgressFinishedCallback; }
+    bool shouldDumpResourceResponseMIMETypes() const { return m_dumpResourceResponseMIMETypes; }
+
     bool isPolicyDelegateEnabled() const { return m_policyDelegateEnabled; }
     bool isPolicyDelegatePermissive() const { return m_policyDelegatePermissive; }
 
@@ -243,6 +249,7 @@ private:
     bool m_dumpFullScreenCallbacks;
     bool m_dumpFrameLoadCallbacks;
     bool m_dumpProgressFinishedCallback;
+    bool m_dumpResourceResponseMIMETypes;
     bool m_waitToDump; // True if waitUntilDone() has been called, but notifyDone() has not yet been called.
     bool m_testRepaint;
     bool m_testRepaintSweepHorizontally;
@@ -254,6 +261,9 @@ private:
     
     bool m_globalFlag;
     bool m_customFullScreenBehavior;
+
+    bool m_userStyleSheetEnabled;
+    WKRetainPtr<WKStringRef> m_userStyleSheetLocation;
 
     PlatformTimerRef m_waitToDumpWatchdogTimer;
 };

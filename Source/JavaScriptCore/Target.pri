@@ -26,10 +26,6 @@ CONFIG += staticlib
     }
 }
 
-wince* {
-    SOURCES += $$QT.core.sources/../3rdparty/ce-compat/ce_time.c
-}
-
 include(yarr/yarr.pri)
 
 INSTALLDEPS += all
@@ -126,6 +122,7 @@ SOURCES += \
     dfg/DFGSpeculativeJIT.cpp \
     dfg/DFGSpeculativeJIT32_64.cpp \
     dfg/DFGSpeculativeJIT64.cpp \
+    dfg/DFGStructureCheckHoistingPhase.cpp \
     dfg/DFGThunks.cpp \
     dfg/DFGValueSource.cpp \
     dfg/DFGVariableEvent.cpp \

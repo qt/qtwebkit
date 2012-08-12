@@ -106,6 +106,7 @@ endif
 
 Programs_DumpRenderTree_SOURCES = \
 	Tools/DumpRenderTree/DumpRenderTree.h \
+	Tools/DumpRenderTree/DumpRenderTreeCommon.cpp \
 	Tools/DumpRenderTree/DumpRenderTreePrefix.h \
 	Tools/DumpRenderTree/AccessibilityController.cpp \
 	Tools/DumpRenderTree/AccessibilityController.h \
@@ -255,7 +256,7 @@ EXTRA_DIST += \
 	Tools/gtk/common.py \
 	Tools/gtk/generate-gtkdoc \
 	Tools/gtk/gtkdoc.py \
-	Tools/gtk/run-api-tests \
+	Tools/jhbuild/jhbuildutils.py \
 	Tools/Scripts/VCSUtils.pm \
 	Tools/Scripts/run-gtk-tests \
 	Tools/Scripts/webkit-build-directory \

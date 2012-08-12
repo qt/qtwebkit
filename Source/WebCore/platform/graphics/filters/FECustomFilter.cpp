@@ -41,6 +41,7 @@
 #include "DrawingBuffer.h"
 #include "GraphicsContext3D.h"
 #include "ImageData.h"
+#include "NotImplemented.h"
 #include "RenderTreeAsText.h"
 #include "TextStream.h"
 #include "Texture.h"
@@ -122,30 +123,51 @@ void FECustomFilter::deleteRenderBuffers()
 
 void FECustomFilter::platformApplySoftware()
 {
-    Uint8ClampedArray* dstPixelArray = createPremultipliedImageResult();
+    if (!applyShader())
+        clearShaderResult();
+}
+
+void FECustomFilter::clearShaderResult()
+{
+    clearResult();
+    Uint8ClampedArray* dstPixelArray = createUnmultipliedImageResult();
     if (!dstPixelArray)
         return;
 
     FilterEffect* in = inputEffect(0);
+    setIsAlphaImage(in->isAlphaImage());
     IntRect effectDrawingRect = requestedRegionOfInputImageData(in->absolutePaintRect());
-    RefPtr<Uint8ClampedArray> srcPixelArray = in->asPremultipliedImage(effectDrawingRect);
+    in->copyUnmultipliedImage(dstPixelArray, effectDrawingRect);
+}
+
+bool FECustomFilter::applyShader()
+{
+    Uint8ClampedArray* dstPixelArray = createUnmultipliedImageResult();
+    if (!dstPixelArray)
+        return false;
+
+    FilterEffect* in = inputEffect(0);
+    IntRect effectDrawingRect = requestedRegionOfInputImageData(in->absolutePaintRect());
+    RefPtr<Uint8ClampedArray> srcPixelArray = in->asUnmultipliedImage(effectDrawingRect);
     
     IntSize newContextSize(effectDrawingRect.size());
     bool hadContext = m_context;
     if (!m_context && !initializeContext())
-        return;
+        return false;
     m_context->makeContextCurrent();
     
     if (!hadContext || m_contextSize != newContextSize)
         resizeContext(newContextSize);
 
+#if !PLATFORM(BLACKBERRY) // BlackBerry defines its own Texture class.
     // Do not draw the filter if the input image cannot fit inside a single GPU texture.
     if (m_inputTexture->tiles().numTilesX() != 1 || m_inputTexture->tiles().numTilesY() != 1)
-        return;
+        return false;
+#endif
     
     // The shader had compiler errors. We cannot draw anything.
     if (!m_compiledProgram->isInitialized())
-        return;
+        return false;
 
     m_context->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, m_frameBuffer);
     m_context->viewport(0, 0, newContextSize.width(), newContextSize.height());
@@ -159,6 +181,8 @@ void FECustomFilter::platformApplySoftware()
     
     ASSERT(static_cast<size_t>(newContextSize.width() * newContextSize.height() * 4) == dstPixelArray->length());
     m_context->readPixels(0, 0, newContextSize.width(), newContextSize.height(), GraphicsContext3D::RGBA, GraphicsContext3D::UNSIGNED_BYTE, dstPixelArray->data());
+
+    return true;
 }
 
 bool FECustomFilter::initializeContext()
@@ -168,11 +192,7 @@ bool FECustomFilter::initializeContext()
     if (!m_context)
         return false;
     m_context->makeContextCurrent();
-    
-    // FIXME: The shader and the mesh can be shared across multiple elements when possible.
-    // Sharing the shader means it's no need to analyze / compile and upload to GPU again.
-    // https://bugs.webkit.org/show_bug.cgi?id=88427
-    m_compiledProgram = m_program->compileProgramWithContext(m_context.get());
+    m_compiledProgram = m_globalContext->getCompiledProgram(m_program->programInfo());
 
     // FIXME: Sharing the mesh would just save the time needed to upload it to the GPU, so I assume we could
     // benchmark that for performance.
@@ -185,7 +205,11 @@ bool FECustomFilter::initializeContext()
 
 void FECustomFilter::resizeContext(const IntSize& newContextSize)
 {
+#if !PLATFORM(BLACKBERRY) // BlackBerry defines its own Texture class
     m_inputTexture = Texture::create(m_context.get(), Texture::RGBA8, newContextSize.width(), newContextSize.height());
+#else
+    m_inputTexture = Texture::create(true);
+#endif
     
     if (!m_frameBuffer)
         m_frameBuffer = m_context->createFramebuffer();
@@ -269,8 +293,12 @@ void FECustomFilter::bindProgramAndBuffers(Uint8ClampedArray* srcPixelArray)
     if (m_compiledProgram->samplerLocation() != -1) {
         m_context->activeTexture(GraphicsContext3D::TEXTURE0);
         m_context->uniform1i(m_compiledProgram->samplerLocation(), 0);
+#if !PLATFORM(BLACKBERRY)
         m_inputTexture->load(srcPixelArray->data());
         m_inputTexture->bindTile(0);
+#else
+        notImplemented();
+#endif
     }
     
     if (m_compiledProgram->projectionMatrixLocation() != -1) {

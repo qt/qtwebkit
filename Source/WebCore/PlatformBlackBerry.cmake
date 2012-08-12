@@ -129,7 +129,6 @@ LIST(APPEND WebCore_INCLUDE_DIRECTORIES
 
 # BlackBerry sources
 LIST(APPEND WebCore_SOURCES
-    bindings/js/ScriptControllerBlackBerry.cpp
     editing/blackberry/EditorBlackBerry.cpp
     editing/blackberry/SmartReplaceBlackBerry.cpp
     page/blackberry/AccessibilityObjectBlackBerry.cpp
@@ -272,6 +271,7 @@ IF (WTF_USE_ACCELERATED_COMPOSITING)
         ${WEBCORE_DIR}/platform/graphics/blackberry/GraphicsLayerBlackBerry.cpp
         ${WEBCORE_DIR}/platform/graphics/blackberry/LayerAnimation.cpp
         ${WEBCORE_DIR}/platform/graphics/blackberry/LayerCompositingThread.cpp
+        ${WEBCORE_DIR}/platform/graphics/blackberry/LayerFilterRenderer.cpp
         ${WEBCORE_DIR}/platform/graphics/blackberry/LayerRenderer.cpp
         ${WEBCORE_DIR}/platform/graphics/blackberry/LayerRendererSurface.cpp
         ${WEBCORE_DIR}/platform/graphics/blackberry/LayerTile.cpp

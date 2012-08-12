@@ -37,7 +37,6 @@
 #include "SVGLengthContext.h"
 #include "SVGPropertyTearOff.h"
 #include "V8Binding.h"
-#include "V8BindingMacros.h"
 
 namespace WebCore {
 
@@ -97,7 +96,7 @@ v8::Handle<v8::Value> V8SVGLength::convertToSpecifiedUnitsCallback(const v8::Arg
         return V8Proxy::setDOMException(ec, args.GetIsolate());
 
     wrapper->commitChange();
-    return v8::Handle<v8::Value>();
+    return v8Undefined();
 }
 
 } // namespace WebCore

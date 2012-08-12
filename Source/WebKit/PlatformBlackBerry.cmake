@@ -10,15 +10,15 @@ LIST(APPEND WebKit_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/html/canvas"
     "${WEBCORE_DIR}/html/parser" # For HTMLParserIdioms.h
     "${WEBCORE_DIR}/loader/appcache"
-    "${WEBCORE_DIR}/notifications"
     "${WEBCORE_DIR}/platform/blackberry"
     "${WEBCORE_DIR}/platform/graphics/blackberry"
     "${WEBCORE_DIR}/platform/graphics/blackberry/skia"
     "${WEBCORE_DIR}/platform/graphics/skia"
     "${WEBCORE_DIR}/platform/network/blackberry"
-    "${WEBCORE_DIR}/Modules/websockets"
     "${WEBCORE_DIR}/Modules/geolocation"
+    "${WEBCORE_DIR}/Modules/notifications"
     "${WEBCORE_DIR}/Modules/vibration"
+    "${WEBCORE_DIR}/Modules/websockets"
     "${WEBKIT_DIR}/blackberry/Api"
     "${WEBKIT_DIR}/blackberry/WebCoreSupport"
     "${WEBKIT_DIR}/blackberry/WebKitSupport"
@@ -57,6 +57,7 @@ ADD_DEFINITIONS(-DUSER_PROCESSES)
 LIST(APPEND WebKit_SOURCES
     blackberry/Api/BackingStore.cpp
     blackberry/Api/BlackBerryGlobal.cpp
+    blackberry/Api/InRegionScroller.cpp
     blackberry/Api/WebAnimation.cpp
     blackberry/Api/WebKitMIMETypeConverter.cpp
     blackberry/Api/WebKitTextCodec.cpp
@@ -68,6 +69,7 @@ LIST(APPEND WebKit_SOURCES
     blackberry/Api/WebSettings.cpp
     blackberry/Api/WebString.cpp
     blackberry/Api/WebViewportArguments.cpp
+    blackberry/Api/JavaScriptVariant.cpp
     blackberry/WebCoreSupport/AutofillManager.cpp
     blackberry/WebCoreSupport/CacheClientBlackBerry.cpp
     blackberry/WebCoreSupport/ChromeClientBlackBerry.cpp
@@ -84,7 +86,6 @@ LIST(APPEND WebKit_SOURCES
     blackberry/WebCoreSupport/GeolocationControllerClientBlackBerry.cpp
     blackberry/WebCoreSupport/IconDatabaseClientBlackBerry.cpp
     blackberry/WebCoreSupport/InspectorClientBlackBerry.cpp
-    blackberry/WebCoreSupport/InspectorOverlay.cpp
     blackberry/WebCoreSupport/JavaScriptDebuggerBlackBerry.cpp
     blackberry/WebCoreSupport/NotificationPresenterImpl.cpp
     blackberry/WebCoreSupport/VibrationClientBlackBerry.cpp
@@ -100,6 +101,8 @@ LIST(APPEND WebKit_SOURCES
     blackberry/WebKitSupport/FrameLayers.cpp
     blackberry/WebKitSupport/InPageSearchManager.cpp
     blackberry/WebKitSupport/InputHandler.cpp
+    blackberry/WebKitSupport/InRegionScrollableArea.cpp
+    blackberry/WebKitSupport/InspectorOverlay.cpp
     blackberry/WebKitSupport/RenderQueue.cpp
     blackberry/WebKitSupport/SelectionHandler.cpp
     blackberry/WebKitSupport/SelectionOverlay.cpp

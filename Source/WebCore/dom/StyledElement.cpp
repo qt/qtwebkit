@@ -127,7 +127,7 @@ void StyledElement::updateStyleAttribute() const
     ASSERT(!isStyleAttributeValid());
     setIsStyleAttributeValid();
     if (const StylePropertySet* inlineStyle = this->inlineStyle())
-        const_cast<StyledElement*>(this)->setAttribute(styleAttr, inlineStyle->asText(), InUpdateStyleAttribute);
+        const_cast<StyledElement*>(this)->setSynchronizedLazyAttribute(styleAttr, inlineStyle->asText());
 }
 
 StyledElement::StyledElement(const QualifiedName& name, Document* document, ConstructionType type)
@@ -170,10 +170,12 @@ void StyledElement::classAttributeChanged(const AtomicString& newClassString)
     if (hasClass) {
         const bool shouldFoldCase = document()->inQuirksMode();
         ensureAttributeData()->setClass(newClassString, shouldFoldCase);
-        if (DOMTokenList* classList = optionalClassList())
-            static_cast<ClassList*>(classList)->reset(newClassString);
     } else if (attributeData())
         mutableAttributeData()->clearClass();
+
+    if (DOMTokenList* classList = optionalClassList())
+        static_cast<ClassList*>(classList)->reset(newClassString);
+
     setNeedsStyleRecalc();
 }
 

@@ -34,6 +34,7 @@
 #include "CanvasRenderingContext.h"
 #include "Document.h"
 #include "ExceptionCode.h"
+#include "Frame.h"
 #include "Node.h"
 #include "TouchList.h"
 #include "XPathNSResolver.h"
@@ -77,7 +78,7 @@ v8::Handle<v8::Value> V8Document::evaluateCallback(const v8::Arguments& args)
 
     RefPtr<XPathNSResolver> resolver = V8DOMWrapper::getXPathNSResolver(args[2]);
     if (!resolver && !args[2]->IsNull() && !args[2]->IsUndefined())
-        return throwError(TYPE_MISMATCH_ERR, args.GetIsolate());
+        return V8Proxy::setDOMException(TYPE_MISMATCH_ERR, args.GetIsolate());
 
     int type = toInt32(args[3]);
     RefPtr<XPathResult> inResult;
@@ -90,7 +91,7 @@ v8::Handle<v8::Value> V8Document::evaluateCallback(const v8::Arguments& args)
         return throwError(exceptionCatcher.Exception(), args.GetIsolate());
 
     if (ec)
-        return throwError(ec, args.GetIsolate());
+        return V8Proxy::setDOMException(ec, args.GetIsolate());
 
     return toV8(result.release(), args.GetIsolate());
 }
@@ -131,8 +132,8 @@ v8::Handle<v8::Value> toV8(Document* impl, v8::Isolate* isolate, bool forceNewOb
     if (wrapper.IsEmpty())
         return wrapper;
     if (!V8IsolatedContext::getEntered()) {
-        if (V8Proxy* proxy = V8Proxy::retrieve(impl->frame()))
-            proxy->windowShell()->updateDocumentWrapper(wrapper);
+        if (Frame* frame = impl->frame())
+            frame->script()->windowShell()->updateDocumentWrapper(wrapper);
     }
     return wrapper;
 }

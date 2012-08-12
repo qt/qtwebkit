@@ -184,13 +184,3 @@ class QtPort(Port):
             return False
         return result
 
-    def _supports_switching_pixel_tests_per_test(self):
-        return True
-
-    def _should_run_as_pixel_test(self, test_input):
-        return any(test_input.test_name.startswith(directory)
-                   for directory in QtPort._default_pixel_test_directories())
-
-    @staticmethod
-    def _default_pixel_test_directories():
-        return ['compositing']

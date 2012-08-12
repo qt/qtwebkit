@@ -51,6 +51,8 @@ using namespace std;
 
 namespace WebCore {
 
+using namespace HTMLNames;
+
 inline static Decimal sliderPosition(HTMLInputElement* element)
 {
     const StepRange stepRange(element->createStepRange(RejectAny));
@@ -214,9 +216,14 @@ bool SliderThumbElement::isEnabledFormControl() const
     return hostInput()->isEnabledFormControl();
 }
 
-bool SliderThumbElement::isReadOnlyFormControl() const
+bool SliderThumbElement::shouldMatchReadOnlySelector() const
 {
-    return hostInput()->isReadOnlyFormControl();
+    return hostInput()->shouldMatchReadOnlySelector();
+}
+
+bool SliderThumbElement::shouldMatchReadWriteSelector() const
+{
+    return hostInput()->shouldMatchReadWriteSelector();
 }
 
 Node* SliderThumbElement::focusDelegate()
@@ -265,7 +272,21 @@ void SliderThumbElement::setPositionFromPoint(const LayoutPoint& point)
     const Decimal ratio = Decimal::fromDouble(static_cast<double>(position) / trackSize);
     const Decimal fraction = isVertical || !renderBox()->style()->isLeftToRightDirection() ? Decimal(1) - ratio : ratio;
     StepRange stepRange(input->createStepRange(RejectAny));
-    const Decimal value = stepRange.clampValue(stepRange.valueFromProportion(fraction));
+    Decimal value = stepRange.clampValue(stepRange.valueFromProportion(fraction));
+
+#if ENABLE(DATALIST_ELEMENT)
+    const LayoutUnit snappingThreshold = renderer()->theme()->sliderTickSnappingThreshold();
+    if (snappingThreshold > 0) {
+        Decimal closest = input->findClosestTickMarkValue(value);
+        if (closest.isFinite()) {
+            double closestFraction = stepRange.proportionFromValue(closest).toDouble();
+            double closestRatio = isVertical || !renderBox()->style()->isLeftToRightDirection() ? 1.0 - closestFraction : closestFraction;
+            LayoutUnit closestPosition = trackSize * closestRatio;
+            if ((closestPosition - position).abs() <= snappingThreshold)
+                value = closest;
+        }
+    }
+#endif
 
     // FIXME: This is no longer being set from renderer. Consider updating the method name.
     input->setValueFromRenderer(serializeForNumberType(value));
@@ -303,7 +324,7 @@ void SliderThumbElement::defaultEventHandler(Event* event)
     // FIXME: Should handle this readonly/disabled check in more general way.
     // Missing this kind of check is likely to occur elsewhere if adding it in each shadow element.
     HTMLInputElement* input = hostInput();
-    if (!input || input->isReadOnlyFormControl() || !input->isEnabledFormControl()) {
+    if (!input || input->readOnly() || !input->isEnabledFormControl()) {
         stopDragging();
         HTMLDivElement::defaultEventHandler(event);
         return;
@@ -329,6 +350,24 @@ void SliderThumbElement::defaultEventHandler(Event* event)
     }
 
     HTMLDivElement::defaultEventHandler(event);
+}
+
+bool SliderThumbElement::willRespondToMouseMoveEvents()
+{
+    const HTMLInputElement* input = hostInput();
+    if (input && !input->readOnly() && input->isEnabledFormControl() && m_inDragMode)
+        return true;
+
+    return HTMLDivElement::willRespondToMouseMoveEvents();
+}
+
+bool SliderThumbElement::willRespondToMouseClickEvents()
+{
+    const HTMLInputElement* input = hostInput();
+    if (input && !input->readOnly() && input->isEnabledFormControl())
+        return true;
+
+    return HTMLDivElement::willRespondToMouseClickEvents();
 }
 
 void SliderThumbElement::detach()

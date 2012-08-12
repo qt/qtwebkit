@@ -34,6 +34,7 @@ namespace WebCore {
 class CSSStyleSheet;
 class CachedCSSStyleSheet;
 class Document;
+class MemoryObjectInfo;
 class Node;
 class SecurityOrigin;
 class StyleRuleBase;
@@ -78,6 +79,7 @@ public:
     const String& charset() const { return m_parserContext.charset; }
 
     bool loadCompleted() const { return m_loadCompleted; }
+    bool hasFailedOrCanceledSubresources() const;
 
     KURL completeURL(const String& url) const;
     void addSubresourceStyleURLs(ListHashSet<KURL>&);
@@ -136,6 +138,8 @@ public:
     bool isInMemoryCache() const { return m_isInMemoryCache; }
     void addedToMemoryCache();
     void removedFromMemoryCache();
+
+    void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     StyleSheetContents(StyleRuleImport* ownerRule, const String& originalURL, const KURL& baseURL, const CSSParserContext&);

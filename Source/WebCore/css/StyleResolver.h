@@ -102,6 +102,7 @@ public:
         , m_result(result)
     {
     }
+    void reportMemoryUsage(MemoryObjectInfo*) const;
 
     MediaQueryExp m_expression;
     bool m_result;
@@ -273,14 +274,14 @@ public:
     void loadPendingResources();
 
     struct RuleFeature {
-        RuleFeature(StyleRule* rule, CSSSelector* selector, bool hasDocumentSecurityOrigin)
+        RuleFeature(StyleRule* rule, unsigned selectorIndex, bool hasDocumentSecurityOrigin)
             : rule(rule)
-            , selector(selector)
+            , selectorIndex(selectorIndex)
             , hasDocumentSecurityOrigin(hasDocumentSecurityOrigin) 
         { 
         }
         StyleRule* rule;
-        CSSSelector* selector;
+        unsigned selectorIndex;
         bool hasDocumentSecurityOrigin;
     };
     struct Features {
@@ -320,6 +321,7 @@ private:
 
     struct MatchedProperties {
         MatchedProperties() : possiblyPaddedMember(0) { }
+        void reportMemoryUsage(MemoryObjectInfo*) const;
         
         RefPtr<StylePropertySet> properties;
         union {
@@ -347,7 +349,7 @@ private:
     };
 
     static void addMatchedProperties(MatchResult&, const StylePropertySet* properties, StyleRule* = 0, unsigned linkMatchType = SelectorChecker::MatchAll, bool inRegionRule = false);
-    void addElementStyleProperties(MatchResult&, StylePropertySet*, bool isCacheable = true);
+    void addElementStyleProperties(MatchResult&, const StylePropertySet*, bool isCacheable = true);
 
     void matchAllRules(MatchResult&, bool includeSMILProperties);
     void matchUARules(MatchResult&);
@@ -447,6 +449,7 @@ private:
 
     static unsigned computeMatchedPropertiesHash(const MatchedProperties*, unsigned size);
     struct MatchedPropertiesCacheItem {
+        void reportMemoryUsage(MemoryObjectInfo*) const;
         Vector<MatchedProperties> matchedProperties;
         MatchRanges ranges;
         RefPtr<RenderStyle> renderStyle;
@@ -470,7 +473,8 @@ private:
 
     RefPtr<StaticCSSRuleList> m_ruleList;
 
-    HashSet<CSSPropertyID> m_pendingImageProperties;
+    typedef HashMap<CSSPropertyID, RefPtr<CSSValue> > PendingImagePropertyMap;
+    PendingImagePropertyMap m_pendingImageProperties;
 
     OwnPtr<MediaQueryEvaluator> m_medium;
     RefPtr<RenderStyle> m_rootDefaultStyle;

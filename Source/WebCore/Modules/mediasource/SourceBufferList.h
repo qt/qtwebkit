@@ -34,11 +34,12 @@
 #if ENABLE(MEDIA_SOURCE)
 
 #include "EventTarget.h"
-#include "SourceBuffer.h"
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
+
+class SourceBuffer;
 
 class SourceBufferList : public RefCounted<SourceBufferList>, public EventTarget {
 public:

@@ -43,7 +43,7 @@
 #include <WebKit2/WKBundleScriptWorld.h>
 #include <WebKit2/WKRetainPtr.h>
 #include <WebKit2/WKSerializedScriptValue.h>
-#include <WebKit2/WebKit2.h>
+#include <WebKit2/WebKit2_C.h>
 #include <wtf/CurrentTime.h>
 #include <wtf/HashMap.h>
 #include <wtf/text/StringBuilder.h>
@@ -77,6 +77,7 @@ LayoutTestController::LayoutTestController()
     , m_dumpFullScreenCallbacks(false)
     , m_dumpFrameLoadCallbacks(false)
     , m_dumpProgressFinishedCallback(false)
+    , m_dumpResourceResponseMIMETypes(false)
     , m_waitToDump(false)
     , m_testRepaint(false)
     , m_testRepaintSweepHorizontally(false)
@@ -85,6 +86,8 @@ LayoutTestController::LayoutTestController()
     , m_policyDelegatePermissive(false)
     , m_globalFlag(false)
     , m_customFullScreenBehavior(false)
+    , m_userStyleSheetEnabled(false)
+    , m_userStyleSheetLocation(adoptWK(WKStringCreateWithUTF8CString("")))
 {
     platformInitialize();
 }
@@ -415,7 +418,6 @@ void LayoutTestController::clearBackForwardList()
 
 void LayoutTestController::makeWindowObject(JSContextRef context, JSObjectRef windowObject, JSValueRef* exception)
 {
-    setProperty(context, windowObject, "layoutTestController", this, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete, exception);
     setProperty(context, windowObject, "testRunner", this, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete, exception);
 }
 
@@ -662,6 +664,23 @@ void LayoutTestController::setAlwaysAcceptCookies(bool accept)
 double LayoutTestController::preciseTime()
 {
     return currentTime();
+}
+
+void LayoutTestController::setUserStyleSheetEnabled(bool enabled)
+{
+    m_userStyleSheetEnabled = enabled;
+
+    WKRetainPtr<WKStringRef> emptyUrl = adoptWK(WKStringCreateWithUTF8CString(""));
+    WKStringRef location = enabled ? m_userStyleSheetLocation.get() : emptyUrl.get();
+    WKBundleSetUserStyleSheetLocation(InjectedBundle::shared().bundle(), InjectedBundle::shared().pageGroup(), location);
+}
+
+void LayoutTestController::setUserStyleSheetLocation(JSStringRef location)
+{
+    m_userStyleSheetLocation = adoptWK(WKStringCreateWithJSString(location));
+
+    if (m_userStyleSheetEnabled)
+        setUserStyleSheetEnabled(true);
 }
 
 } // namespace WTR

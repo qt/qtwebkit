@@ -31,7 +31,8 @@
 #include "config.h"
 #include "V8DOMWindowShell.h"
 
-#include "PlatformSupport.h"
+#include "BindingState.h"
+#include "ContentSecurityPolicy.h"
 #include "DateExtension.h"
 #include "DocumentLoader.h"
 #include "Frame.h"
@@ -39,6 +40,7 @@
 #include "MemoryUsageSupport.h"
 #include "Page.h"
 #include "PageGroup.h"
+#include "PlatformSupport.h"
 #include "RuntimeEnabledFeatures.h"
 #include "SafeAllocation.h"
 #include "ScriptCallStack.h"
@@ -48,8 +50,6 @@
 #include "StorageNamespace.h"
 #include "StylePropertySet.h"
 #include "V8Binding.h"
-#include "V8BindingPerContextData.h"
-#include "V8BindingState.h"
 #include "V8Collection.h"
 #include "V8DOMMap.h"
 #include "V8DOMWindow.h"
@@ -59,6 +59,7 @@
 #include "V8HiddenPropertyName.h"
 #include "V8History.h"
 #include "V8Location.h"
+#include "V8PerContextData.h"
 #include "V8Proxy.h"
 #include "WorkerContextExecutionProxy.h"
 
@@ -104,7 +105,7 @@ static void reportFatalErrorInV8(const char* location, const char* message)
 static void v8UncaughtExceptionHandler(v8::Handle<v8::Message> message, v8::Handle<v8::Value> data)
 {
     // Use the frame where JavaScript is called from.
-    Frame* frame = V8Proxy::retrieveFrameForEnteredContext();
+    Frame* frame = firstFrame(BindingState::instance());
     if (!frame)
         return;
 
@@ -152,7 +153,7 @@ static void reportUnsafeJavaScriptAccess(v8::Local<v8::Object> host, v8::AccessT
 {
     Frame* target = getTargetFrame(host, data);
     if (target)
-        V8Proxy::reportUnsafeAccessTo(target);
+        V8Proxy::reportUnsafeAccessTo(target->document());
 }
 
 PassRefPtr<V8DOMWindowShell> V8DOMWindowShell::create(Frame* frame)
@@ -298,7 +299,11 @@ bool V8DOMWindowShell::initContextIfNeeded()
 #if ENABLE(JAVASCRIPT_DEBUGGER)
         ScriptProfiler::initialize();
 #endif
-        V8BindingPerIsolateData::ensureInitialized(v8::Isolate::GetCurrent());
+        V8PerIsolateData::ensureInitialized(v8::Isolate::GetCurrent());
+
+        // FIXME: Remove the following 2 lines when V8 default has changed.
+        const char es5ReadonlyFlag[] = "--es5_readonly";
+        v8::V8::SetFlagsFromString(es5ReadonlyFlag, sizeof(es5ReadonlyFlag));
 
         isV8Initialized = true;
     }
@@ -323,7 +328,7 @@ bool V8DOMWindowShell::initContextIfNeeded()
 #endif
     }
 
-    m_perContextData = V8BindingPerContextData::create(m_context);
+    m_perContextData = V8PerContextData::create(m_context);
     if (!m_perContextData->init()) {
         disposeContextHandles();
         return false;
@@ -337,6 +342,9 @@ bool V8DOMWindowShell::initContextIfNeeded()
     updateDocument();
 
     setSecurityToken();
+
+    if (m_frame->document())
+        v8Context->AllowCodeGenerationFromStrings(m_frame->document()->contentSecurityPolicy()->allowEval(0, ContentSecurityPolicy::SuppressReport));
 
     m_frame->loader()->client()->didCreateScriptContext(m_context, 0, 0);
 
@@ -362,13 +370,12 @@ v8::Persistent<v8::Context> V8DOMWindowShell::createNewContext(v8::Handle<v8::Ob
         return result;
 
     // Used to avoid sleep calls in unload handlers.
-    if (!V8Proxy::registeredExtensionWithV8(DateExtension::get()))
-        V8Proxy::registerExtension(DateExtension::get());
+    V8Proxy::registerExtensionIfNeeded(DateExtension::get());
 
 #if ENABLE(JAVASCRIPT_I18N_API)
     // Enables experimental i18n API in V8.
-    if (RuntimeEnabledFeatures::javaScriptI18NAPIEnabled() && !V8Proxy::registeredExtensionWithV8(v8_i18n::Extension::get()))
-        V8Proxy::registerExtension(v8_i18n::Extension::get());
+    if (RuntimeEnabledFeatures::javaScriptI18NAPIEnabled())
+        V8Proxy::registerExtensionIfNeeded(v8_i18n::Extension::get());
 #endif
 
     // Dynamically tell v8 about our extensions now.
@@ -413,7 +420,7 @@ bool V8DOMWindowShell::installDOMWindow(v8::Handle<v8::Context> context, DOMWind
     // Wrap the window.
     V8DOMWrapper::setDOMWrapper(jsWindow, &V8DOMWindow::info, window);
     V8DOMWrapper::setDOMWrapper(v8::Handle<v8::Object>::Cast(jsWindow->GetPrototype()), &V8DOMWindow::info, window);
-    V8DOMWrapper::setJSWrapperForDOMObject(PassRefPtr<DOMWindow>(window), v8::Persistent<v8::Object>::New(jsWindow));
+    V8DOMWrapper::setJSWrapperForDOMObject(PassRefPtr<DOMWindow>(window), jsWindow);
 
     // Insert the window instance as the prototype of the shadow object.
     v8::Handle<v8::Object> v8RealGlobal = v8::Handle<v8::Object>::Cast(context->Global()->GetPrototype());
@@ -549,7 +556,7 @@ void V8DOMWindowShell::updateDocument()
 v8::Handle<v8::Value> getter(v8::Local<v8::String> property, const v8::AccessorInfo& info)
 {
     // FIXME(antonm): consider passing AtomicStringImpl directly.
-    AtomicString name = v8StringToAtomicWebCoreString(property);
+    AtomicString name = v8ValueToAtomicWebCoreString(property);
     HTMLDocument* htmlDocument = V8HTMLDocument::toNative(info.Holder());
     ASSERT(htmlDocument);
     v8::Handle<v8::Value> result = V8HTMLDocument::GetNamedProperty(htmlDocument, name, info.GetIsolate());

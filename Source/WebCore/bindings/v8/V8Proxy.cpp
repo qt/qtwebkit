@@ -31,6 +31,7 @@
 #include "config.h"
 #include "V8Proxy.h"
 
+#include "BindingState.h"
 #include "CachedMetadata.h"
 #include "DateExtension.h"
 #include "Document.h"
@@ -49,7 +50,6 @@
 #include "Settings.h"
 #include "StylePropertySet.h"
 #include "V8Binding.h"
-#include "V8BindingState.h"
 #include "V8Collection.h"
 #include "V8DOMCoreException.h"
 #include "V8DOMMap.h"
@@ -78,60 +78,13 @@
 
 namespace WebCore {
 
-static V8Extensions& staticExtensionsList()
+void V8Proxy::reportUnsafeAccessTo(Document* targetDocument)
 {
-    DEFINE_STATIC_LOCAL(V8Extensions, extensions, ());
-    return extensions;
-}
-
-void batchConfigureAttributes(v8::Handle<v8::ObjectTemplate> instance, 
-                              v8::Handle<v8::ObjectTemplate> proto, 
-                              const BatchedAttribute* attributes, 
-                              size_t attributeCount)
-{
-    for (size_t i = 0; i < attributeCount; ++i)
-        configureAttribute(instance, proto, attributes[i]);
-}
-
-void batchConfigureCallbacks(v8::Handle<v8::ObjectTemplate> proto, 
-                             v8::Handle<v8::Signature> signature, 
-                             v8::PropertyAttribute attributes,
-                             const BatchedCallback* callbacks,
-                             size_t callbackCount)
-{
-    for (size_t i = 0; i < callbackCount; ++i) {
-        proto->Set(v8::String::New(callbacks[i].name),
-                   v8::FunctionTemplate::New(callbacks[i].callback, 
-                                             v8::Handle<v8::Value>(),
-                                             signature),
-                   attributes);
-    }
-}
-
-void batchConfigureConstants(v8::Handle<v8::FunctionTemplate> functionDescriptor,
-                             v8::Handle<v8::ObjectTemplate> proto,
-                             const BatchedConstant* constants,
-                             size_t constantCount)
-{
-    for (size_t i = 0; i < constantCount; ++i) {
-        const BatchedConstant* constant = &constants[i];
-        functionDescriptor->Set(v8::String::New(constant->name), v8Integer(constant->value), v8::ReadOnly);
-        proto->Set(v8::String::New(constant->name), v8Integer(constant->value), v8::ReadOnly);
-    }
-}
-
-typedef HashMap<Node*, v8::Object*> DOMNodeMap;
-typedef HashMap<void*, v8::Object*> DOMObjectMap;
-typedef HashMap<int, v8::FunctionTemplate*> FunctionTemplateMap;
-
-void V8Proxy::reportUnsafeAccessTo(Frame* target)
-{
-    ASSERT(target);
-    Document* targetDocument = target->document();
     if (!targetDocument)
         return;
 
-    Frame* source = V8Proxy::retrieveFrameForEnteredContext();
+    // FIXME: We should pass both the active and target documents in as arguments.
+    Frame* source = firstFrame(BindingState::instance());
     if (!source)
         return;
 
@@ -197,23 +150,18 @@ bool V8Proxy::handleOutOfMemory()
 
     // Warning, error, disable JS for this frame?
     Frame* frame = V8Proxy::retrieveFrame(context);
+    if (!frame)
+        return true;
 
-    V8Proxy* proxy = V8Proxy::retrieve(frame);
-    if (proxy) {
-        // Clean m_context, and event handlers.
-        proxy->clearForClose();
-
-        proxy->windowShell()->destroyGlobal();
-    }
+    frame->script()->proxy()->clearForClose();
+    frame->script()->windowShell()->destroyGlobal();
 
 #if PLATFORM(CHROMIUM)
     PlatformSupport::notifyJSOutOfMemory(frame);
 #endif
 
-    // Disable JS.
-    Settings* settings = frame->settings();
-    ASSERT(settings);
-    settings->setScriptEnabled(false);
+    if (Settings* settings = frame->settings())
+        settings->setScriptEnabled(false);
 
     return true;
 }
@@ -268,16 +216,6 @@ v8::Local<v8::Array> V8Proxy::evaluateInIsolatedWorld(int worldID, const Vector<
         isolatedContext->destroy();
 
     return handleScope.Close(results);
-}
-
-void V8Proxy::setIsolatedWorldSecurityOrigin(int worldID, PassRefPtr<SecurityOrigin> prpSecurityOriginIn)
-{
-    ASSERT(worldID);
-    RefPtr<SecurityOrigin> securityOrigin = prpSecurityOriginIn;
-    m_isolatedWorldSecurityOrigins.set(worldID, securityOrigin);
-    IsolatedWorldMap::iterator iter = m_isolatedWorlds.find(worldID);
-    if (iter != m_isolatedWorlds.end())
-        iter->second->setSecurityOrigin(securityOrigin);
 }
 
 PassOwnPtr<v8::ScriptData> V8Proxy::precompileScript(v8::Handle<v8::String> code, CachedScript* cachedScript)
@@ -490,63 +428,12 @@ Frame* V8Proxy::retrieveFrame(v8::Handle<v8::Context> context)
     return 0;
 }
 
-Frame* V8Proxy::retrieveFrameForEnteredContext()
-{
-    v8::Handle<v8::Context> context = v8::Context::GetEntered();
-    if (context.IsEmpty())
-        return 0;
-    return retrieveFrame(context);
-}
-
-Frame* V8Proxy::retrieveFrameForCurrentContext()
-{
-    v8::Handle<v8::Context> context = v8::Context::GetCurrent();
-    if (context.IsEmpty())
-        return 0;
-    return retrieveFrame(context);
-}
-
-DOMWindow* V8Proxy::retrieveWindowForCallingContext()
-{
-    v8::Handle<v8::Context> context = v8::Context::GetCalling();
-    if (context.IsEmpty())
-        return 0;
-    return retrieveWindow(context);
-}
-
-Frame* V8Proxy::retrieveFrameForCallingContext()
-{
-    v8::Handle<v8::Context> context = v8::Context::GetCalling();
-    if (context.IsEmpty())
-        return 0;
-    return retrieveFrame(context);
-}
-
-V8Proxy* V8Proxy::retrieve()
-{
-    DOMWindow* window = retrieveWindow(currentContext());
-    ASSERT(window);
-    return retrieve(window->frame());
-}
-
-V8Proxy* V8Proxy::retrieve(Frame* frame)
-{
-    return frame ? frame->script()->proxy() : 0;
-}
-
-V8Proxy* V8Proxy::retrieve(ScriptExecutionContext* context)
-{
-    if (!context || !context->isDocument())
-        return 0;
-    return retrieve(static_cast<Document*>(context)->frame());
-}
-
-V8BindingPerContextData* V8Proxy::retrievePerContextData(Frame* frame)
+V8PerContextData* V8Proxy::retrievePerContextData(Frame* frame)
 {
     V8IsolatedContext* isolatedContext;
     if (UNLIKELY(!!(isolatedContext = V8IsolatedContext::getEntered())))
         return isolatedContext->perContextData();
-    return V8Proxy::retrieve(frame)->windowShell()->perContextData();
+    return frame->script()->windowShell()->perContextData();
 }
 
 void V8Proxy::resetIsolatedWorlds()
@@ -561,10 +448,12 @@ void V8Proxy::resetIsolatedWorlds()
 
 void V8Proxy::hintForGCIfNecessary()
 {
-    V8BindingPerIsolateData* data = V8BindingPerIsolateData::current();
-    if (data->isLowMemoryNotificationHint()) {
-        data->clearLowMemoryNotificationHint();
-        v8::V8::LowMemoryNotification();
+    V8PerIsolateData* data = V8PerIsolateData::current();
+    if (data->shouldCollectGarbageSoon()) {
+        const int longIdlePauseInMs = 1000;
+        data->clearShouldCollectGarbageSoon();
+        v8::V8::ContextDisposedNotification();
+        v8::V8::IdleNotification(longIdlePauseInMs);
     }
 }
 
@@ -601,8 +490,8 @@ static void DOMExceptionStackSetter(v8::Local<v8::String> name, v8::Local<v8::Va
 
 v8::Handle<v8::Value> V8Proxy::setDOMException(int ec, v8::Isolate* isolate)
 {
-    if (ec <= 0)
-        return v8::Handle<v8::Value>();
+    if (ec <= 0 || v8::V8::IsExecutionTerminating())
+        return v8Undefined();
 
     if (ec == NATIVE_TYPE_ERR) {
         const char* message = 0;
@@ -617,7 +506,7 @@ v8::Handle<v8::Value> V8Proxy::setDOMException(int ec, v8::Isolate* isolate)
     }
 
     if (exception.IsEmpty())
-        return v8::Handle<v8::Value>();
+        return v8Undefined();
 
     // Attach an Error object to the DOMException. This is then lazily used to get the stack value.
     v8::Handle<v8::Value> error = v8::Exception::Error(v8String(description.description, isolate));
@@ -645,7 +534,7 @@ v8::Handle<v8::Value> V8Proxy::throwError(ErrorType type, const char* message, v
         return v8::ThrowException(v8::Exception::Error(v8String(message, isolate)));
     default:
         ASSERT_NOT_REACHED();
-        return v8::Handle<v8::Value>();
+        return v8Undefined();
     }
 }
 
@@ -715,16 +604,10 @@ bool V8Proxy::matchesCurrentContext()
 
 v8::Local<v8::Context> V8Proxy::mainWorldContext(Frame* frame)
 {
-    V8Proxy* proxy = retrieve(frame);
-    if (!proxy)
+    if (!frame)
         return v8::Local<v8::Context>();
 
-    return proxy->mainWorldContext();
-}
-
-v8::Local<v8::Context> V8Proxy::currentContext()
-{
-    return v8::Context::GetCurrent();
+    return frame->script()->proxy()->mainWorldContext();
 }
 
 v8::Handle<v8::Value> V8Proxy::checkNewLegal(const v8::Arguments& args)
@@ -735,33 +618,21 @@ v8::Handle<v8::Value> V8Proxy::checkNewLegal(const v8::Arguments& args)
     return args.This();
 }
 
-void V8Proxy::registerExtensionWithV8(v8::Extension* extension)
+V8Extensions& V8Proxy::extensions()
 {
-    // If the extension exists in our list, it was already registered with V8.
-    if (!registeredExtensionWithV8(extension))
-        v8::RegisterExtension(extension);
+    DEFINE_STATIC_LOCAL(V8Extensions, extensions, ());
+    return extensions;
 }
 
-bool V8Proxy::registeredExtensionWithV8(v8::Extension* extension)
+void V8Proxy::registerExtensionIfNeeded(v8::Extension* extension)
 {
     const V8Extensions& registeredExtensions = extensions();
     for (size_t i = 0; i < registeredExtensions.size(); ++i) {
         if (registeredExtensions[i] == extension)
-            return true;
+            return;
     }
-
-    return false;
-}
-
-void V8Proxy::registerExtension(v8::Extension* extension)
-{
-    registerExtensionWithV8(extension);
-    staticExtensionsList().append(extension);
-}
-
-const V8Extensions& V8Proxy::extensions()
-{
-    return staticExtensionsList();
+    v8::RegisterExtension(extension);
+    extensions().append(extension);
 }
 
 bool V8Proxy::setContextDebugId(int debugId)
@@ -795,26 +666,11 @@ int V8Proxy::contextDebugId(v8::Handle<v8::Context> context)
     return atoi(comma + 1);
 }
 
-void V8Proxy::collectIsolatedContexts(Vector<std::pair<ScriptState*, SecurityOrigin*> >& result)
-{
-    v8::HandleScope handleScope;
-    for (IsolatedWorldMap::iterator it = m_isolatedWorlds.begin(); it != m_isolatedWorlds.end(); ++it) {
-        V8IsolatedContext* isolatedContext = it->second;
-        if (!isolatedContext->securityOrigin())
-            continue;
-        v8::Handle<v8::Context> v8Context = isolatedContext->context();
-        if (v8Context.IsEmpty())
-            continue;
-        ScriptState* scriptState = ScriptState::forContext(v8::Local<v8::Context>::New(v8Context));
-        result.append(std::pair<ScriptState*, SecurityOrigin*>(scriptState, isolatedContext->securityOrigin()));
-    }
-}
-
 v8::Local<v8::Context> toV8Context(ScriptExecutionContext* context, const WorldContextHandle& worldContext)
 {
     if (context->isDocument()) {
-        if (V8Proxy* proxy = V8Proxy::retrieve(context))
-            return worldContext.adjustedContext(proxy);
+        if (Frame* frame = static_cast<Document*>(context)->frame())
+            return worldContext.adjustedContext(frame->script()->proxy());
 #if ENABLE(WORKERS)
     } else if (context->isWorkerContext()) {
         if (WorkerContextExecutionProxy* proxy = static_cast<WorkerContext*>(context)->script()->proxy())

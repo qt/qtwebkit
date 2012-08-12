@@ -485,6 +485,17 @@ void RenderLayer::computeRepaintRects(LayoutPoint* offsetFromRoot)
     m_outlineBox = renderer()->outlineBoundsForRepaint(repaintContainer, offsetFromRoot);
 }
 
+
+void RenderLayer::computeRepaintRectsIncludingDescendants()
+{
+    // FIXME: computeRepaintRects() has to walk up the parent chain for every layer to compute the rects.
+    // We should make this more efficient.
+    computeRepaintRects();
+
+    for (RenderLayer* layer = firstChild(); layer; layer = layer->nextSibling())
+        layer->computeRepaintRectsIncludingDescendants();
+}
+
 void RenderLayer::clearRepaintRects()
 {
     ASSERT(!m_hasVisibleContent);
@@ -1446,7 +1457,7 @@ void RenderLayer::convertToLayerCoords(const RenderLayer* ancestorLayer, LayoutP
         // If the fixed layer's container is the root, just add in the offset of the view. We can obtain this by calling
         // localToAbsolute() on the RenderView.
         FloatPoint absPos = renderer()->localToAbsolute(FloatPoint(), true);
-        location += flooredLayoutSize(absPos);
+        location += LayoutSize(absPos.x(), absPos.y());
         return;
     }
 
@@ -1668,7 +1679,7 @@ void RenderLayer::scrollTo(int x, int y)
     // We should have a RenderView if we're trying to scroll.
     ASSERT(view);
     if (view) {
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
         // Update dashboard regions, scrolling may change the clip of a
         // particular region.
         view->frameView()->updateDashboardRegions();
@@ -2229,6 +2240,10 @@ void RenderLayer::invalidateScrollbarRect(Scrollbar* scrollbar, const IntRect& r
     IntRect scrollRect = rect;
     RenderBox* box = renderBox();
     ASSERT(box);
+    // If we are not yet inserted into the tree, there is no need to repaint.
+    if (!box->parent())
+        return;
+
     if (scrollbar == m_vBar.get())
         scrollRect.move(verticalScrollbarStart(0, box->width()), box->borderTop());
     else
@@ -2315,7 +2330,7 @@ void RenderLayer::setHasHorizontalScrollbar(bool hasScrollbar)
     if (m_vBar)
         m_vBar->styleChanged();
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
     // Force an update since we know the scrollbars have changed things.
     if (renderer()->document()->hasDashboardRegions())
         renderer()->document()->setDashboardRegionsDirty(true);
@@ -2338,7 +2353,7 @@ void RenderLayer::setHasVerticalScrollbar(bool hasScrollbar)
     if (m_vBar)
         m_vBar->styleChanged();
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
     // Force an update since we know the scrollbars have changed things.
     if (renderer()->document()->hasDashboardRegions())
         renderer()->document()->setDashboardRegionsDirty(true);
@@ -2522,13 +2537,17 @@ void RenderLayer::updateScrollbarsAfterLayout()
     RenderBox* box = renderBox();
     ASSERT(box);
 
+    // List box parts handle the scrollbars by themselves so we have nothing to do.
+    if (box->style()->appearance() == ListboxPart)
+        return;
+
     bool hasHorizontalOverflow = this->hasHorizontalOverflow();
     bool hasVerticalOverflow = this->hasVerticalOverflow();
 
     // overflow:scroll should just enable/disable.
-    if (m_hBar && renderer()->style()->overflowX() == OSCROLL)
+    if (renderer()->style()->overflowX() == OSCROLL)
         m_hBar->setEnabled(hasHorizontalOverflow);
-    if (m_vBar && renderer()->style()->overflowY() == OSCROLL)
+    if (renderer()->style()->overflowY() == OSCROLL)
         m_vBar->setEnabled(hasVerticalOverflow);
 
     // overflow:auto may need to lay out again if scrollbars got added/removed.
@@ -2543,7 +2562,7 @@ void RenderLayer::updateScrollbarsAfterLayout()
 
         updateSelfPaintingLayer();
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
         // Force an update since we know the scrollbars have changed things.
         if (renderer()->document()->hasDashboardRegions())
             renderer()->document()->setDashboardRegionsDirty(true);
@@ -4818,33 +4837,45 @@ void RenderLayer::updateStackingContextsAfterStyleChange(const RenderStyle* oldS
     }
 }
 
-static bool overflowCanHaveAScrollbar(EOverflow overflow)
+static bool overflowRequiresScrollbar(EOverflow overflow)
 {
-    return overflow == OAUTO || overflow == OSCROLL || overflow == OOVERLAY;
+    return overflow == OSCROLL;
+}
+
+static bool overflowDefinesAutomaticScrollbar(EOverflow overflow)
+{
+    return overflow == OAUTO || overflow == OOVERLAY;
 }
 
 void RenderLayer::updateScrollbarsAfterStyleChange(const RenderStyle* oldStyle)
 {
     // Overflow are a box concept.
-    if (!renderBox())
+    RenderBox* box = renderBox();
+    if (!box)
         return;
 
-    EOverflow overflowX = renderBox()->style()->overflowX();
-    EOverflow overflowY = renderBox()->style()->overflowY();
-    if (hasHorizontalScrollbar() && !overflowCanHaveAScrollbar(overflowX))
-        setHasHorizontalScrollbar(false);
-    if (hasVerticalScrollbar() && !overflowCanHaveAScrollbar(overflowY))
-        setHasVerticalScrollbar(false);
+    // List box parts handle the scrollbars by themselves so we have nothing to do.
+    if (box->style()->appearance() == ListboxPart)
+        return;
+
+    EOverflow overflowX = box->style()->overflowX();
+    EOverflow overflowY = box->style()->overflowY();
+
+    // To avoid doing a relayout in updateScrollbarsAfterLayout, we try to keep any automatic scrollbar that was already present.
+    bool needsHorizontalScrollbar = (hasHorizontalScrollbar() && overflowDefinesAutomaticScrollbar(overflowX)) || overflowRequiresScrollbar(overflowX);
+    bool needsVerticalScrollbar = (hasVerticalScrollbar() && overflowDefinesAutomaticScrollbar(overflowY)) || overflowRequiresScrollbar(overflowY);
+    setHasHorizontalScrollbar(needsHorizontalScrollbar);
+    setHasVerticalScrollbar(needsVerticalScrollbar);
 
     // With overflow: scroll, scrollbars are always visible but may be disabled.
     // When switching to another value, we need to re-enable them (see bug 11985).
-    if (hasHorizontalScrollbar() && oldStyle->overflowX() == OSCROLL && overflowX != OSCROLL) {
-        ASSERT(overflowCanHaveAScrollbar(overflowX));
+    if (needsHorizontalScrollbar && oldStyle && oldStyle->overflowX() == OSCROLL && overflowX != OSCROLL) {
+        ASSERT(hasHorizontalScrollbar());
         m_hBar->setEnabled(true);
     }
 
-    if (hasVerticalScrollbar() && oldStyle->overflowY() == OSCROLL && overflowY != OSCROLL) {
-        ASSERT(overflowCanHaveAScrollbar(overflowY));
+    if (needsVerticalScrollbar && oldStyle && oldStyle->overflowY() == OSCROLL && overflowY != OSCROLL) {
+        ASSERT(hasVerticalScrollbar());
         m_vBar->setEnabled(true);
     }
 

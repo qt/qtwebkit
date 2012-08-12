@@ -6,10 +6,12 @@ SET(WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/Modules/geolocation"
     "${WEBCORE_DIR}/Modules/indexeddb"
     "${WEBCORE_DIR}/Modules/intents"
+    "${WEBCORE_DIR}/Modules/mediasource"
     "${WEBCORE_DIR}/Modules/mediastream"
     "${WEBCORE_DIR}/Modules/networkinfo"
     "${WEBCORE_DIR}/Modules/notifications"
     "${WEBCORE_DIR}/Modules/protocolhandler"
+    "${WEBCORE_DIR}/Modules/proximity"
     "${WEBCORE_DIR}/Modules/quota"
     "${WEBCORE_DIR}/Modules/vibration"
     "${WEBCORE_DIR}/Modules/webaudio"
@@ -50,6 +52,7 @@ SET(WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/graphics/filters/arm"
     "${WEBCORE_DIR}/platform/graphics/harfbuzz"
     "${WEBCORE_DIR}/platform/graphics/harfbuzz/ng"
+    "${WEBCORE_DIR}/platform/graphics/opentype"
     "${WEBCORE_DIR}/platform/graphics/transforms"
     "${WEBCORE_DIR}/platform/image-decoders"
     "${WEBCORE_DIR}/platform/image-decoders/bmp"
@@ -104,11 +107,18 @@ SET(WebCore_INCLUDE_DIRECTORIES
 )
 
 SET(WebCore_IDL_INCLUDES
+    Modules/battery
     Modules/filesystem
     Modules/gamepad
     Modules/geolocation
     Modules/indexeddb
+    Modules/intents
+    Modules/mediastream
+    Modules/networkinfo
+    Modules/notifications
     Modules/quota
+    Modules/speech
+    Modules/vibration
     Modules/webaudio
     Modules/webdatabase
     Modules/websockets
@@ -118,6 +128,8 @@ SET(WebCore_IDL_INCLUDES
     fileapi
     html
     html/canvas
+    html/shadow
+    html/track
     inspector
     loader/appcache
     page
@@ -191,6 +203,10 @@ SET(WebCore_IDL_FILES
     Modules/intents/IntentResultCallback.idl
     Modules/intents/NavigatorIntents.idl
 
+    Modules/mediasource/MediaSource.idl
+    Modules/mediasource/SourceBuffer.idl
+    Modules/mediasource/SourceBufferList.idl
+
     Modules/mediastream/DOMWindowMediaStream.idl
     Modules/mediastream/IceCallback.idl
     Modules/mediastream/IceCandidate.idl
@@ -206,6 +222,7 @@ SET(WebCore_IDL_FILES
     Modules/mediastream/NavigatorUserMediaErrorCallback.idl
     Modules/mediastream/NavigatorUserMediaSuccessCallback.idl
     Modules/mediastream/PeerConnection00.idl
+    Modules/mediastream/RTCPeerConnection.idl
     Modules/mediastream/SessionDescription.idl
 
     Modules/networkinfo/NavigatorNetworkInfoConnection.idl
@@ -218,7 +235,9 @@ SET(WebCore_IDL_FILES
     Modules/notifications/WorkerContextNotifications.idl
 
     Modules/protocolhandler/NavigatorRegisterProtocolHandler.idl
-    
+
+    Modules/proximity/DeviceProximityEvent.idl
+
     Modules/quota/DOMWindowQuota.idl
     Modules/quota/StorageInfo.idl
     Modules/quota/StorageInfoErrorCallback.idl
@@ -249,6 +268,7 @@ SET(WebCore_IDL_FILES
     Modules/webaudio/DynamicsCompressorNode.idl
     Modules/webaudio/JavaScriptAudioNode.idl
     Modules/webaudio/MediaElementAudioSourceNode.idl
+    Modules/webaudio/MediaStreamAudioSourceNode.idl
     Modules/webaudio/OfflineAudioCompletionEvent.idl
     Modules/webaudio/Oscillator.idl
     Modules/webaudio/RealtimeAnalyserNode.idl
@@ -814,6 +834,10 @@ SET(WebCore_SOURCES
     Modules/intents/IntentRequest.cpp
     Modules/intents/NavigatorIntents.cpp
 
+    Modules/mediasource/MediaSource.cpp
+    Modules/mediasource/SourceBuffer.cpp
+    Modules/mediasource/SourceBufferList.cpp
+
     Modules/mediastream/IceCandidate.cpp
     Modules/mediastream/LocalMediaStream.cpp
     Modules/mediastream/MediaStream.cpp
@@ -825,6 +849,7 @@ SET(WebCore_SOURCES
     Modules/mediastream/MediaStreamTrackList.cpp
     Modules/mediastream/NavigatorMediaStream.cpp
     Modules/mediastream/PeerConnection00.cpp
+    Modules/mediastream/RTCPeerConnection.cpp
     Modules/mediastream/SessionDescription.cpp
     Modules/mediastream/UserMediaController.cpp
     Modules/mediastream/UserMediaRequest.cpp
@@ -841,6 +866,8 @@ SET(WebCore_SOURCES
     Modules/notifications/WorkerContextNotifications.cpp
 
     Modules/protocolhandler/NavigatorRegisterProtocolHandler.cpp
+
+    Modules/proximity/DeviceProximityEvent.cpp
 
     Modules/quota/DOMWindowQuota.cpp
     Modules/quota/StorageInfo.cpp
@@ -879,6 +906,7 @@ SET(WebCore_SOURCES
     Modules/webaudio/DynamicsCompressorNode.cpp
     Modules/webaudio/JavaScriptAudioNode.cpp
     Modules/webaudio/MediaElementAudioSourceNode.cpp
+    Modules/webaudio/MediaStreamAudioSourceNode.cpp
     Modules/webaudio/OfflineAudioCompletionEvent.cpp
     Modules/webaudio/OfflineAudioDestinationNode.cpp
     Modules/webaudio/Oscillator.cpp
@@ -954,6 +982,7 @@ SET(WebCore_SOURCES
     bindings/ScriptControllerBase.cpp
 
     bindings/generic/ActiveDOMCallback.cpp
+    bindings/generic/BindingSecurity.cpp
     bindings/generic/RuntimeEnabledFeatures.cpp
 
     css/CSSAspectRatioValue.cpp
@@ -1036,6 +1065,7 @@ SET(WebCore_SOURCES
     css/WebKitCSSMatrix.cpp
     css/WebKitCSSRegionRule.cpp
     css/WebKitCSSSVGDocumentValue.cpp
+    css/WebKitCSSShaderValue.cpp
     css/WebKitCSSTransformValue.cpp
     css/WrapShapeFunctions.cpp
 
@@ -1101,10 +1131,12 @@ SET(WebCore_SOURCES
     dom/ExceptionBase.cpp
     dom/ExceptionCodePlaceholder.cpp
     dom/GenericEventQueue.cpp
+    dom/GestureEvent.cpp
     dom/IconURL.cpp
     dom/IdTargetObserver.cpp
     dom/IdTargetObserverRegistry.cpp
     dom/KeyboardEvent.cpp
+    dom/MemoryInstrumentation.cpp
     dom/MessageChannel.cpp
     dom/MessageEvent.cpp
     dom/MessagePortChannel.cpp
@@ -1486,7 +1518,6 @@ SET(WebCore_SOURCES
     inspector/ConsoleMessage.cpp
     inspector/ContentSearchUtils.cpp
     inspector/DOMEditor.cpp
-    inspector/DOMNodeHighlighter.cpp
     inspector/DOMPatchSupport.cpp
     inspector/IdentifiersFactory.cpp
     inspector/InjectedScript.cpp
@@ -1518,6 +1549,7 @@ SET(WebCore_SOURCES
     inspector/InspectorIndexedDBAgent.cpp
     inspector/InspectorInstrumentation.cpp
     inspector/InspectorMemoryAgent.cpp
+    inspector/InspectorOverlay.cpp
     inspector/InspectorProfilerAgent.cpp
     inspector/InspectorResourceAgent.cpp
     inspector/InspectorRuntimeAgent.cpp
@@ -1529,6 +1561,7 @@ SET(WebCore_SOURCES
     inspector/InspectorWebGLAgent.cpp
     inspector/InspectorWorkerAgent.cpp
     inspector/InstrumentingAgents.cpp
+    inspector/MemoryInstrumentationImpl.cpp
     inspector/NetworkResourcesData.cpp
     inspector/PageConsoleAgent.cpp
     inspector/PageDebuggerAgent.cpp
@@ -1572,6 +1605,7 @@ SET(WebCore_SOURCES
     loader/SinkDocument.cpp
     loader/SubframeLoader.cpp
     loader/SubresourceLoader.cpp
+    loader/SubstituteData.cpp
     loader/TextResourceDecoder.cpp
     loader/TextTrackLoader.cpp
     loader/ThreadableLoader.cpp
@@ -1601,6 +1635,7 @@ SET(WebCore_SOURCES
     loader/cache/CachedResourceHandle.cpp
     loader/cache/CachedResourceLoader.cpp
     loader/cache/CachedScript.cpp
+    loader/cache/CachedShader.cpp
     loader/cache/CachedSVGDocument.cpp
     loader/cache/CachedTextTrack.cpp
     loader/cache/CachedXSLStyleSheet.cpp
@@ -1817,10 +1852,12 @@ SET(WebCore_SOURCES
     platform/graphics/TiledBackingStore.cpp
     platform/graphics/WidthIterator.cpp
 
+    platform/graphics/filters/CustomFilterCompiledProgram.cpp
     platform/graphics/filters/CustomFilterGlobalContext.cpp
     platform/graphics/filters/CustomFilterMesh.cpp
+    platform/graphics/filters/CustomFilterOperation.cpp
     platform/graphics/filters/CustomFilterProgram.cpp
-    platform/graphics/filters/CustomFilterCompiledProgram.cpp
+    platform/graphics/filters/CustomFilterProgramInfo.cpp
     platform/graphics/filters/DistantLightSource.cpp
     platform/graphics/filters/FEBlend.cpp
     platform/graphics/filters/FEColorMatrix.cpp
@@ -1845,16 +1882,15 @@ SET(WebCore_SOURCES
     platform/graphics/filters/FilterOperations.cpp
     platform/graphics/filters/LightSource.cpp
     platform/graphics/filters/PointLightSource.cpp
-    platform/graphics/filters/SpotLightSource.cpp
     platform/graphics/filters/SourceAlpha.cpp
     platform/graphics/filters/SourceGraphic.cpp
+    platform/graphics/filters/SpotLightSource.cpp
 
     platform/graphics/filters/arm/NEONHelpers.h
     platform/graphics/filters/arm/FEBlendNEON.h
     platform/graphics/filters/arm/FECompositeArithmeticNEON.h
     platform/graphics/filters/arm/FEGaussianBlurNEON.h
     platform/graphics/filters/arm/FELightingNEON.cpp
-    platform/graphics/filters/arm/FELightingNEON.h
 
     platform/graphics/texmap/TextureMapper.cpp
     platform/graphics/texmap/TextureMapperBackingStore.cpp
@@ -1882,6 +1918,7 @@ SET(WebCore_SOURCES
     platform/mediastream/MediaHints.cpp
     platform/mediastream/MediaStreamCenter.cpp
     platform/mediastream/PeerConnection00Handler.cpp
+    platform/mediastream/RTCPeerConnectionHandler.cpp
     platform/mediastream/SessionDescriptionDescriptor.cpp
 
     platform/mock/DeviceMotionClientMock.cpp
@@ -2647,20 +2684,6 @@ SET(WebCoreTestSupport_SOURCES
     testing/Internals.cpp
     testing/InternalSettings.cpp
 )
-
-IF (ENABLE_MEDIA_SOURCE)
-    LIST(APPEND WebCore_INCLUDE_DIRECTORIES
-        ${WEBCORE_DIR}/Modules/mediasource
-    )
-    LIST(APPEND WebCore_IDL_FILES
-        Modules/mediasource/SourceBuffer.idl
-        Modules/mediasource/SourceBufferList.idl
-    )
-    LIST(APPEND WebCore_SOURCES
-        Modules/mediasource/SourceBuffer.cpp
-        Modules/mediasource/SourceBufferList.cpp
-    )
-ENDIF()
 
 # Modules that the bindings generator scripts may use
 SET(SCRIPTS_RESOLVE_SUPPLEMENTAL

@@ -188,6 +188,7 @@ public:
     static bool peerConnectionEnabled() { return isMediaStreamEnabled && isPeerConnectionEnabled; }
     static void setPeerConnectionEnabled(bool isEnabled) { isPeerConnectionEnabled = isEnabled; }
     static bool webkitPeerConnection00Enabled() { return peerConnectionEnabled(); }
+    static bool webkitRTCPeerConnectionEnabled() { return peerConnectionEnabled(); }
 #endif
 
 #if ENABLE(GAMEPAD)
@@ -218,6 +219,9 @@ public:
 #if ENABLE(SHADOW_DOM)
     static bool shadowDOMEnabled() { return isShadowDOMEnabled; }
     static void setShadowDOMEnabled(bool isEnabled) { isShadowDOMEnabled = isEnabled; }
+
+    static bool authorShadowDOMForAnyElementEnabled() { return isAuthorShadowDOMForAnyElementEnabled; }
+    static void setAuthorShadowDOMForAnyElementEnabled(bool isEnabled) { isAuthorShadowDOMForAnyElementEnabled = isEnabled; }
 #endif
 
 #if ENABLE(STYLE_SCOPED)
@@ -324,6 +328,8 @@ private:
 
 #if ENABLE(SHADOW_DOM)
     static bool isShadowDOMEnabled;
+
+    static bool isAuthorShadowDOMForAnyElementEnabled;
 #endif
 
 #if ENABLE(STYLE_SCOPED)

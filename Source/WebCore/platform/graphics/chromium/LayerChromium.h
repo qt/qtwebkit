@@ -52,14 +52,18 @@
 #include <wtf/text/StringHash.h>
 #include <wtf/text/WTFString.h>
 
+namespace WebKit {
+class WebAnimationDelegate;
+}
 
 namespace WebCore {
 
 class CCActiveAnimation;
+struct CCAnimationEvent;
 class CCLayerAnimationDelegate;
 class CCLayerImpl;
 class CCLayerTreeHost;
-class CCTextureUpdater;
+class CCTextureUpdateQueue;
 class ScrollbarLayerChromium;
 struct CCAnimationEvent;
 struct CCRenderingStats;
@@ -158,9 +162,6 @@ public:
     const IntRect& visibleContentRect() const { return m_visibleContentRect; }
     void setVisibleContentRect(const IntRect& visibleContentRect) { m_visibleContentRect = visibleContentRect; }
 
-    const IntRect& scissorRect() const { return m_scissorRect; }
-    void setScissorRect(const IntRect& scissorRect) { m_scissorRect = scissorRect; }
-
     void setScrollPosition(const IntPoint&);
     const IntPoint& scrollPosition() const { return m_scrollPosition; }
 
@@ -196,8 +197,8 @@ public:
     void setUseParentBackfaceVisibility(bool useParentBackfaceVisibility) { m_useParentBackfaceVisibility = useParentBackfaceVisibility; }
     bool useParentBackfaceVisibility() const { return m_useParentBackfaceVisibility; }
 
-    virtual void setIsNonCompositedContent(bool);
-    bool isNonCompositedContent() const { return m_isNonCompositedContent; }
+    virtual void setUseLCDText(bool);
+    bool useLCDText() const { return m_useLCDText; }
 
     virtual void setLayerTreeHost(CCLayerTreeHost*);
 
@@ -212,7 +213,7 @@ public:
 
     // These methods typically need to be overwritten by derived classes.
     virtual bool drawsContent() const { return m_isDrawable; }
-    virtual void update(CCTextureUpdater&, const CCOcclusionTracker*, CCRenderingStats&) { }
+    virtual void update(CCTextureUpdateQueue&, const CCOcclusionTracker*, CCRenderingStats&) { }
     virtual bool needMoreUpdates() { return false; }
     virtual void setIsMask(bool) { }
     virtual void bindContentsTexture() { }
@@ -280,7 +281,7 @@ public:
     void setLayerAnimationController(PassOwnPtr<CCLayerAnimationController>);
     PassOwnPtr<CCLayerAnimationController> releaseLayerAnimationController();
 
-    void setLayerAnimationDelegate(CCLayerAnimationDelegate* layerAnimationDelegate) { m_layerAnimationDelegate = layerAnimationDelegate; }
+    void setLayerAnimationDelegate(WebKit::WebAnimationDelegate* layerAnimationDelegate) { m_layerAnimationDelegate = layerAnimationDelegate; }
 
     bool hasActiveAnimation() const;
 
@@ -346,10 +347,6 @@ private:
     // Uses layer's content space.
     IntRect m_visibleContentRect;
 
-    // During drawing, identifies the region outside of which nothing should be drawn.
-    // This is the intersection of the layer's drawableContentRect and damage (if damage tracking is enabled).
-    // Uses target surface's space.
-    IntRect m_scissorRect;
     IntPoint m_scrollPosition;
     IntSize m_maxScrollPosition;
     bool m_scrollable;
@@ -373,7 +370,7 @@ private:
     bool m_masksToBounds;
     bool m_opaque;
     bool m_doubleSided;
-    bool m_isNonCompositedContent;
+    bool m_useLCDText;
     bool m_preserves3D;
     bool m_useParentBackfaceVisibility;
     bool m_alwaysReserveTextures;
@@ -402,7 +399,7 @@ private:
     IntRect m_drawableContentRect;
     float m_contentsScale;
 
-    CCLayerAnimationDelegate* m_layerAnimationDelegate;
+    WebKit::WebAnimationDelegate* m_layerAnimationDelegate;
     LayerChromiumScrollDelegate* m_layerScrollDelegate;
 };
 

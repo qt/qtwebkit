@@ -56,6 +56,7 @@ class Database;
 class Element;
 class EventContext;
 class DocumentLoader;
+class DeviceOrientationData;
 class GeolocationPosition;
 class GraphicsContext;
 class HitTestResult;
@@ -112,6 +113,8 @@ public:
     static void mediaQueryResultChanged(Document*);
     static void didPushShadowRoot(Element* host, ShadowRoot*);
     static void willPopShadowRoot(Element* host, ShadowRoot*);
+    static void didCreateNamedFlow(Document*, const AtomicString& name);
+    static void didRemoveNamedFlow(Document*, const AtomicString& name);
 
     static void mouseDidMoveOverElement(Page*, const HitTestResult&, unsigned modifierFlags);
     static bool handleMousePress(Page*);
@@ -199,9 +202,9 @@ public:
     static void addMessageToConsole(WorkerContext*, MessageSource, MessageType, MessageLevel, const String& message, const String&, unsigned lineNumber);
 #endif
     static void consoleCount(Page*, PassRefPtr<ScriptArguments>, PassRefPtr<ScriptCallStack>);
-    static void startConsoleTiming(Page*, const String& title);
-    static void stopConsoleTiming(Page*, const String& title, PassRefPtr<ScriptCallStack>);
-    static void consoleTimeStamp(Page*, PassRefPtr<ScriptArguments>);
+    static void startConsoleTiming(Frame*, const String& title);
+    static void stopConsoleTiming(Frame*, const String& title, PassRefPtr<ScriptCallStack>);
+    static void consoleTimeStamp(Frame*, PassRefPtr<ScriptArguments>);
 
     static void didRequestAnimationFrame(Document*, int callbackId);
     static void didCancelAnimationFrame(Document*, int callbackId);
@@ -267,6 +270,8 @@ public:
     static void registerInstrumentingAgents(InstrumentingAgents*);
     static void unregisterInstrumentingAgents(InstrumentingAgents*);
 
+    static DeviceOrientationData* overrideDeviceOrientation(Page*, DeviceOrientationData*);
+
 private:
 #if ENABLE(INSPECTOR)
     static WTF::ThreadSpecific<InspectorTimelineAgent*>& threadSpecificTimelineAgentForOrphanEvents();
@@ -287,6 +292,8 @@ private:
     static void mediaQueryResultChangedImpl(InstrumentingAgents*);
     static void didPushShadowRootImpl(InstrumentingAgents*, Element* host, ShadowRoot*);
     static void willPopShadowRootImpl(InstrumentingAgents*, Element* host, ShadowRoot*);
+    static void didCreateNamedFlowImpl(InstrumentingAgents*, Document*, const AtomicString& name);
+    static void didRemoveNamedFlowImpl(InstrumentingAgents*, Document*, const AtomicString& name);
 
     static void mouseDidMoveOverElementImpl(InstrumentingAgents*, const HitTestResult&, unsigned modifierFlags);
     static bool handleMousePressImpl(InstrumentingAgents*);
@@ -371,9 +378,9 @@ private:
     static void addMessageToConsoleImpl(InstrumentingAgents*, MessageSource, MessageType, MessageLevel, const String& message, PassRefPtr<ScriptArguments>, PassRefPtr<ScriptCallStack>);
     static void addMessageToConsoleImpl(InstrumentingAgents*, MessageSource, MessageType, MessageLevel, const String& message, const String& scriptId, unsigned lineNumber);
     static void consoleCountImpl(InstrumentingAgents*, PassRefPtr<ScriptArguments>, PassRefPtr<ScriptCallStack>);
-    static void startConsoleTimingImpl(InstrumentingAgents*, const String& title);
-    static void stopConsoleTimingImpl(InstrumentingAgents*, const String& title, PassRefPtr<ScriptCallStack>);
-    static void consoleTimeStampImpl(InstrumentingAgents*, PassRefPtr<ScriptArguments>);
+    static void startConsoleTimingImpl(InstrumentingAgents*, Frame*, const String& title);
+    static void stopConsoleTimingImpl(InstrumentingAgents*, Frame*, const String& title, PassRefPtr<ScriptCallStack>);
+    static void consoleTimeStampImpl(InstrumentingAgents*, Frame*, PassRefPtr<ScriptArguments>);
 
     static void didRequestAnimationFrameImpl(InstrumentingAgents*, int callbackId, Frame*);
     static void didCancelAnimationFrameImpl(InstrumentingAgents*, int callbackId, Frame*);
@@ -431,6 +438,7 @@ private:
     static GeolocationPosition* overrideGeolocationPositionImpl(InstrumentingAgents*, GeolocationPosition*);
 #endif
 
+    static DeviceOrientationData* overrideDeviceOrientationImpl(InstrumentingAgents*, DeviceOrientationData*);
     static int s_frontendCounter;
 #endif
 };
@@ -550,6 +558,24 @@ inline void InspectorInstrumentation::willPopShadowRoot(Element* host, ShadowRoo
     FAST_RETURN_IF_NO_FRONTENDS(void());
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(host->ownerDocument()))
         willPopShadowRootImpl(instrumentingAgents, host, root);
+#endif
+}
+
+inline void InspectorInstrumentation::didCreateNamedFlow(Document* document, const AtomicString& name)
+{
+#if ENABLE(INSPECTOR)
+    FAST_RETURN_IF_NO_FRONTENDS(void());
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
+        didCreateNamedFlowImpl(instrumentingAgents, document, name);
+#endif
+}
+
+inline void InspectorInstrumentation::didRemoveNamedFlow(Document* document, const AtomicString& name)
+{
+#if ENABLE(INSPECTOR)
+    FAST_RETURN_IF_NO_FRONTENDS(void());
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForDocument(document))
+        didRemoveNamedFlowImpl(instrumentingAgents, document, name);
 #endif
 }
 
@@ -1386,7 +1412,6 @@ inline void InspectorInstrumentation::didFireAnimationFrame(const InspectorInstr
 #endif
 }
 
-
 #if ENABLE(GEOLOCATION)
 inline GeolocationPosition* InspectorInstrumentation::overrideGeolocationPosition(Page* page, GeolocationPosition* position)
 {
@@ -1398,6 +1423,16 @@ inline GeolocationPosition* InspectorInstrumentation::overrideGeolocationPositio
     return position;
 }
 #endif
+
+inline DeviceOrientationData* InspectorInstrumentation::overrideDeviceOrientation(Page* page, DeviceOrientationData* deviceOrientation)
+{
+#if ENABLE(INSPECTOR)
+    FAST_RETURN_IF_NO_FRONTENDS(deviceOrientation);
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForPage(page))
+        return overrideDeviceOrientationImpl(instrumentingAgents, deviceOrientation);
+#endif
+    return deviceOrientation;
+}
 
 #if ENABLE(INSPECTOR)
 inline bool InspectorInstrumentation::collectingHTMLParseErrors(Page* page)

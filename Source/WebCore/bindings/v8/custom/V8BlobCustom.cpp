@@ -35,7 +35,6 @@
 #include "V8ArrayBuffer.h"
 #include "V8ArrayBufferView.h"
 #include "V8Binding.h"
-#include "V8BindingMacros.h"
 #include "V8Blob.h"
 #include "V8File.h"
 #include "V8Proxy.h"
@@ -87,7 +86,7 @@ v8::Handle<v8::Value> V8Blob::constructorCallback(const v8::Arguments& args)
         if (!args[1]->IsObject())
             return V8Proxy::throwTypeError("Second argument of the constructor is not of type Object", args.GetIsolate());
 
-        Dictionary dictionary(args[1]);
+        EXCEPTION_BLOCK(Dictionary, dictionary, Dictionary(args[1], args.GetIsolate()));
 
         v8::TryCatch tryCatchEndings;
         bool containsEndings = dictionary.get("endings", endings);

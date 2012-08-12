@@ -1,3 +1,570 @@
+2012-08-11  Sam Weinig  <sam@webkit.org>
+
+        Enable XPC Service based WebProcess with runtime flag
+        https://bugs.webkit.org/show_bug.cgi?id=93773
+
+        Reviewed by Dan Bernstein.
+
+        * wtf/Platform.h:
+        Define HAVE_XPC on 10.7 and later.
+
+2012-08-11  Benjamin Poulain  <bpoulain@apple.com>
+
+        Do the DecimalNumber to String conversion on 8 bits
+        https://bugs.webkit.org/show_bug.cgi?id=93683
+
+        Reviewed by Andreas Kling.
+
+        Modify DecimalNumber to do the conversion to string on LChar instead of UChar.
+
+        * wtf/DecimalNumber.cpp:
+        (WTF::DecimalNumber::toStringDecimal):
+        (WTF::DecimalNumber::toStringExponential):
+        * wtf/DecimalNumber.h:
+        (DecimalNumber):
+        * wtf/dtoa.h:
+        * wtf/text/StringBuffer.h:
+        (WTF::StringBuffer::operator[]): StringBuffer::operator[] was incorrectly typed to UChar, making
+        the method impossible to instanciate with LChar.
+        * wtf/text/WTFString.h:
+        (String):
+        (WTF::String::adopt): String::adopt() is modified to work with both LChar and UChar. StringImpl
+        already support that.
+        (WTF::appendNumber): Add support for any type that can instanciate the template.
+
+2012-08-11  Benjamin Poulain  <benjamin@webkit.org>
+
+        WebCore::findAtomicString(PropertyName) always convert the name to 16bits
+        https://bugs.webkit.org/show_bug.cgi?id=93685
+
+        Reviewed by Geoffrey Garen.
+
+        Previously, WebCore::findAtomicString() was causing a conversion for the 8bit property name
+        to a 16bits due to the call to StringImpl::character16().
+
+        This patch fixes the issue by adding support for both 8bits and 16bits string in AtomicString::find().
+
+        * wtf/text/AtomicString.cpp:
+        (HashAndCharacters):
+        (WTF::HashAndCharactersTranslator::hash):
+        (WTF::HashAndCharactersTranslator::equal):
+        (WTF::HashAndCharactersTranslator::translate):
+        Use a template to make the struct and the translator independant of the CharacterType.
+
+        (WTF::AtomicString::add):
+        (WTF::findString):
+        (WTF::AtomicString::find): Change the API to take a StringImpl*. AtomicString can use
+        it efficiently to find the right string.
+        * wtf/text/AtomicString.h:
+        (AtomicString):
+        * wtf/text/StringImpl.h:
+        (StringImpl): Adapt the friends translator to support the template.
+
+2012-08-10  Benjamin Poulain  <bpoulain@apple.com>
+
+        Add support for String initialization from literal to WTFString
+        https://bugs.webkit.org/show_bug.cgi?id=93426
+
+        Reviewed by Anders Carlsson.
+
+        This patch adds two constructor to WTF::String in order to support fast initialization from literal:
+        -String(ASCIILiteral): Constructor similar to String(const char*) while being faster. This constructor
+         does not incur any overhead over String(const char*).
+        -String(char[], ConstructFromLiteralTag): Template constructor that encode explicitely the size of the
+         string.
+
+        String(ASCIILiteral) is expected to be used in most cases to avoid regressions. This constructor was
+        added because of what we have learned from r124922: inlining the string length in the code causes a code bloat
+        that is not always welcome.
+
+        Regarding performance of string initialization, the constructors performance are (6 characters string):
+        -String(ASCIILiteral): 16% faster.
+        -String(char[], ConstructFromLiteralTag): 33% faster (the delta increases with the string length).
+
+        In addition, no memory is allocated for the characters.
+
+        * wtf/text/StringImpl.cpp:
+        * wtf/text/StringImpl.h:
+        (WTF::StringImpl::createFromLiteral): Extend StringImpl::createFromLiteral to have a version
+        with strlen() which avoids loading one extra argument.
+        * wtf/text/WTFString.cpp:
+        (WTF::String::String):
+        * wtf/text/WTFString.h:
+        (WTF::String::String):
+        (ASCIILiteral): This class is aimed at making the construction of WTFString from a literal very easy.
+        By using the explicit constructor ASCIILiteral(char *), one can expect the implicit conversion to String
+        when needed.
+        (WTF::ASCIILiteral::ASCIILiteral):
+        (WTF::ASCIILiteral::operator const char*):
+
+2012-08-08  Benjamin Poulain  <bpoulain@apple.com>
+
+        Use char* instead of LChar* for the public interface of String construction from literals
+        https://bugs.webkit.org/show_bug.cgi?id=93402
+
+        Reviewed by Michael Saboff.
+
+        When the initialization from literal was added, some constructor/initialization function were
+        using LChar for convenience.
+
+        Since those function should only take ASCII characters, using LChar* could cause confusion. This
+        patch intents to clarify this by using char* for all those APIs.
+
+        * wtf/text/AtomicString.cpp:
+        (WTF::CharBufferFromLiteralDataTranslator::hash):
+        (WTF::CharBufferFromLiteralDataTranslator::equal):
+        (WTF::CharBufferFromLiteralDataTranslator::translate):
+        (WTF::AtomicString::addFromLiteralData):
+        * wtf/text/AtomicString.h:
+        (WTF::AtomicString::AtomicString):
+        (AtomicString):
+        * wtf/text/StringImpl.cpp:
+        (WTF::StringImpl::createFromLiteral):
+        * wtf/text/StringImpl.h:
+        (StringImpl):
+        (WTF::StringImpl::StringImpl):
+        (WTF::StringImpl::createFromLiteral):
+
+2012-08-08  Patrick Gansterer  <paroga@webkit.org>
+
+        Remove ce_time.(cpp|h) from list of source files
+        https://bugs.webkit.org/show_bug.cgi?id=93446
+
+        Reviewed by Simon Hausmann.
+
+        r125004 removed the last dependency on functions defined in ce_time.cpp.
+
+        * wtf/PlatformWinCE.cmake:
+
+2012-08-08  Alvaro Lopez Ortega  <alvaro@alobbs.com>
+
+        Atomics.h has incorrect GCC test for ext/atomicity.h when using LSB compilers
+        https://bugs.webkit.org/show_bug.cgi?id=51974
+
+        Reviewed by Simon Hausmann.
+
+        * wtf/Atomics.h: Inhibits the inclusion of the atomicity.h GNU C++
+        extension when compiling with a LSB compliant compiler. Thanks to
+        Craig Scott for the new precompiler check code.
+
+2012-08-07  Yoshifumi Inoue  <yosin@chromium.org>
+
+        [WTF] Add using WTF::msPerHour into DateMath.h
+        https://bugs.webkit.org/show_bug.cgi?id=93428
+
+        Reviewed by Kent Tamura.
+
+        This patch adds "using WTF::msPerHour" into DateMath.h for some codes
+        which will use it, e.g. bug 92960. Note: DateMath.h already has had
+        using statements for msPerDay, msPerMinute and msPerSecond.
+
+        * wtf/DateMath.h: Added "using WTF::msPerHour".
+
+2012-08-07  Benjamin Poulain  <benjamin@webkit.org>
+
+        Use the initialization from literal for JSC's Identifiers
+        https://bugs.webkit.org/show_bug.cgi?id=93193
+
+        Reviewed by Geoffrey Garen.
+
+        * wtf/text/StringImpl.h: Update the names for the HashTranslator used by Identifier.
+
+2012-07-19  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Remove Qt 4 specific code paths
+        https://bugs.webkit.org/show_bug.cgi?id=88161
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * WTF.pri:
+        * WTF.pro:
+        * wtf/qt/StringQt.cpp:
+        (WTF::String::String):
+        (WTF::String::operator QString):
+        * wtf/qt/UtilsQt.h: Removed.
+        * wtf/qt/compat/QGuiApplication: Removed.
+        * wtf/qt/compat/qguiapplication.h: Removed.
+        * wtf/text/StringImpl.cpp:
+        (WTF::StringImpl::~StringImpl):
+        (WTF):
+        * wtf/text/StringImpl.h:
+        (StringImpl):
+
+2012-08-06  Patrick Gansterer  <paroga@webkit.org>
+
+        [WIN] Remove dependency on pthread from MachineStackMarker
+        https://bugs.webkit.org/show_bug.cgi?id=68429
+
+        Reviewed by Geoffrey Garen.
+
+        Windows has no support for calling a destructor for thread specific data.
+        Since we need more control over creating and deleting thread specific keys
+        we can not simply extend WTF::ThreadSpecific with this functionality.
+
+        All thread specific keys created via the new API get stored in a list.
+        After a thread function finished we iterate over this list and call
+        the registered destructor for every item if needed.
+
+        * wtf/ThreadSpecific.h:
+        (WTF):
+        (WTF::threadSpecificKeyCreate): Added wrapper around pthread_key_create.
+        (WTF::threadSpecificKeyDelete): Added wrapper around pthread_key_delete.
+        (WTF::threadSpecificSet): Added wrapper around pthread_setspecific.
+        (WTF::threadSpecificGet): Added wrapper around pthread_getspecific.
+        * wtf/ThreadSpecificWin.cpp:
+
+2012-08-04  No'am Rosenthal  <noam.rosenthal@nokia.com>
+
+        [Qt] UI_SIDE_COMPOSITING code has confusing names
+        https://bugs.webkit.org/show_bug.cgi?id=93164
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Renamed UI_SIDE_COMPOSITING to COORDINATED_GRAPHICS.
+
+        * wtf/Platform.h:
+
+2012-08-03  Michael Saboff  <msaboff@apple.com>
+
+        Convert HTML parser to handle 8-bit resources without converting to UChar*
+        https://bugs.webkit.org/show_bug.cgi?id=90321
+
+        Reviewed by Adam Barth.
+
+        * wtf/text/WTFString.h:
+        (WTF::String::dataSize): New method to return the number of bytes 
+        the string requires.  This replaces a harcoded calculation based on
+        length and sizeof(UChar).
+
+2012-08-03  Benjamin Poulain  <benjamin@webkit.org>
+
+        StringImpl created from literal should be BufferInternal
+        https://bugs.webkit.org/show_bug.cgi?id=92940
+
+        Reviewed by Anders Carlsson.
+
+        The ownership of string created from literal should be BufferInternal so that
+        StringImpl never tries to delete the characters.
+
+        The ownership was accidentaly set to BufferOwned in r123689.
+
+        * wtf/text/StringImpl.cpp:
+        (WTF::StringImpl::createFromLiteral): Update to use the new constructor.
+        * wtf/text/StringImpl.h:
+        (WTF::StringImpl::StringImpl):
+        Add a new constructor making the construction from literal explicit.
+        Add the flag s_hashFlagHasTerminatingNullCharacter since the data has the terminating
+        null character.
+
+2012-08-02  Patrick Gansterer  <paroga@webkit.org>
+
+        Move getLocalTime() as static inline function to DateMath
+        https://bugs.webkit.org/show_bug.cgi?id=92955
+
+        Reviewed by Ryosuke Niwa.
+
+        getCurrentLocalTime() and getLocalTime() has been superseded with the
+        GregorianDateTime class. So we can move it into DateMath.cpp as an static inline
+        function. This allows us to remove the dependecy on time() and localtime()
+        for Windows CE, where this functions require the ce_time library to work.
+
+        * wtf/CurrentTime.cpp:
+        (WTF):
+        * wtf/CurrentTime.h:
+        * wtf/DateMath.cpp:
+        (WTF):
+        (WTF::getLocalTime):
+
+2012-08-02  Patrick Gansterer  <paroga@webkit.org>
+
+        [WINCE] Return 0 at calculateDSTOffset(double, double)
+        https://bugs.webkit.org/show_bug.cgi?id=92953
+
+        Reviewed by Ryosuke Niwa.
+
+        localtime() is implemented as a call to gmtime() in ce_time.c.
+        Since this will never return correct values, returning 0 instead
+        does not remove any existing functionality, but decreases the
+        dependency on the (external) ce_time implementation.
+
+        * wtf/DateMath.cpp:
+        (WTF::calculateDSTOffsetSimple):
+
+2012-08-02  Arnaud Renevier  <a.renevier@sisa.samsung.com>
+
+        TypedArray set method is slow when called with another typed array
+        https://bugs.webkit.org/show_bug.cgi?id=92556
+
+        Reviewed by Kenneth Russell.
+
+        Add an checkInboundData function to TypedArrayBase to check if a
+        position will be not be out of bound or overflow from the typed array.
+
+        * wtf/TypedArrayBase.h:
+        (WTF::TypedArrayBase::checkInboundData):
+        (TypedArrayBase):
+
+2012-08-01  Patrick Gansterer  <paroga@webkit.org>
+
+        Replace WTF::getCurrentLocalTime() with GregorianDateTime::setToCurrentLocalTime()
+        https://bugs.webkit.org/show_bug.cgi?id=92286
+
+        Reviewed by Geoffrey Garen.
+
+        Add a method to GregorianDateTime to set its values to the current locale time.
+        Replacing all occurrences of getCurrentLocalTime with the new function allows
+        us to remove getCurrentLocalTime in a next step.
+
+        * GNUmakefile.list.am:
+        * WTF.gypi:
+        * WTF.pro:
+        * WTF.vcproj/WTF.vcproj:
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/CMakeLists.txt:
+        * wtf/DateMath.cpp:
+        (WTF::dayInYear):
+        * wtf/DateMath.h:
+        (WTF):
+        * wtf/GregorianDateTime.cpp: Added.
+        (WTF):
+        (WTF::GregorianDateTime::setToCurrentLocalTime):
+        * wtf/GregorianDateTime.h:
+        (GregorianDateTime):
+
+2012-08-01  Patrick Gansterer  <paroga@webkit.org>
+
+        Fix FastMalloc build with assertions enabled.
+
+        * wtf/FastMalloc.cpp:
+        (WTF::TCMalloc_PageHeap::isScavengerSuspended):
+        (WTF::TCMalloc_PageHeap::scheduleScavenger):
+        (WTF::TCMalloc_PageHeap::suspendScavenger):
+
+2012-08-01  Patrick Gansterer  <paroga@webkit.org>
+
+        Export StringImpl::sizeInBytes() with WTF_EXPORT_STRING_API
+        https://bugs.webkit.org/show_bug.cgi?id=92851
+
+        Reviewed by Hajime Morita.
+
+        r124069 missed to change one export macro, which is needed
+        to make the windows port with USE(EXPORT_MACROS).
+
+        * wtf/text/StringImpl.h:
+        (StringImpl):
+
+2012-08-01  Patrick Gansterer  <paroga@webkit.org>
+
+        [WIN] Add missing WTF export macros to functions
+        https://bugs.webkit.org/show_bug.cgi?id=92842
+
+        Reviewed by Hajime Morita.
+
+        When we switch the windows port to USE(EXPORT_MACROS) we
+        need to export all functions referenced by WebKit.dll.
+
+        * wtf/ThreadingPrimitives.h:
+        (WTF):
+        * wtf/dtoa.h:
+        (WTF):
+        * wtf/dtoa/double-conversion.h:
+        (StringToDoubleConverter):
+        * wtf/unicode/UTF8.h:
+
+2012-07-31  Sam Weinig  <sam@webkit.org>
+
+        Stop masking 8 bits off of the visited link hash. We need all the bits!
+        https://bugs.webkit.org/show_bug.cgi?id=92799
+
+        Reviewed by Anders Carlsson.
+
+        * wtf/StringHasher.h:
+        (WTF::StringHasher::hashWithTop8BitsMasked):
+        (WTF::StringHasher::hash):
+        (StringHasher):
+        (WTF::StringHasher::computeHashAndMaskTop8Bits):
+        (WTF::StringHasher::hashMemory):
+        (WTF::StringHasher::avalancheBits):
+        Rename existing computeHash and hash functions to computeHashAndMaskTop8Bits
+        and hashWithTop8BitsMasked respectively. Add new computeHash and hash functions
+        that do the StringHash without the masking.
+
+        * wtf/text/AtomicString.cpp:
+        (WTF::CStringTranslator::hash):
+        (WTF::UCharBufferTranslator::hash):
+        (WTF::HashAndCharactersTranslator::hash):
+        (WTF::SubstringTranslator::hash):
+        (WTF::LCharBufferFromLiteralDataTranslator::hash):
+        (WTF::AtomicString::fromUTF8Internal):
+        * wtf/text/StringHash.h:
+        (WTF::CaseFoldingHash::hash):
+        * wtf/text/StringImpl.h:
+        (WTF::StringImpl::setHash):
+        * wtf/text/StringStatics.cpp:
+        (WTF::StringImpl::hashSlowCase):
+        * wtf/unicode/UTF8.cpp:
+        (WTF::Unicode::calculateStringHashAndLengthFromUTF8MaskingTop8Bits):
+        * wtf/unicode/UTF8.h:
+        Update for new function names.
+
+2012-07-31  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        Add a mechanism to dump the stack trace in case of a crash
+        https://bugs.webkit.org/show_bug.cgi?id=92666
+
+        Reviewed by Csaba Osztrogonác.
+
+        Unix based ports can make use of signal handlers to dump the stack
+        trace in case of a crash. This is specially handy when a test crashes on
+        the bot without hitting an assertion, we might have a chance to see
+        some insightful information at the reports.
+
+        * wtf/Assertions.cpp:
+        * wtf/Assertions.h:
+
+2012-07-31  Stephen Chenney  <schenney@chromium.org>
+
+        xmlserializer strips xlink from xlink:html svg image tag
+        https://bugs.webkit.org/show_bug.cgi?id=79586
+
+        Reviewed by Nikolas Zimmermann.
+
+        Add WTF::xlinkAtom as a global AtomicString constant.
+
+        * wtf/text/AtomicString.h:
+        (WTF): Add xlinkAtom.
+        * wtf/text/StringStatics.cpp:
+        (WTF): Add xlinkAtom.
+        (WTF::AtomicString::init): Add xlinkAtom.
+
+2012-07-30  Patrick Gansterer  <paroga@webkit.org>
+
+        Add WTF_EXPORT_PRIVATE to deleteOwnedPtr()
+        https://bugs.webkit.org/show_bug.cgi?id=92668
+
+        Reviewed by Hajime Morita.
+
+        When using export macros all non-inlined deleteOwnedPtr()
+        functions need to be declared with WTF_EXPORT_PRIVATE.
+
+        * wtf/OwnPtrCommon.h:
+        (WTF):
+
+2012-07-30  Wei James  <james.wei@intel.com>
+
+        atomicDecrement() never reach 0 on Android so no deref() will be called
+        https://bugs.webkit.org/show_bug.cgi?id=92635
+
+        Reviewed by Adam Barth.
+
+        With Android NDK 7b and later, __atomic_dec()  is implemented by
+        __sync_fetch_and_sub(), which will result in that atomicDecrement()
+        returns the old value instead of new one.
+
+        * wtf/Atomics.h:
+        (WTF):
+        (WTF::atomicIncrement):
+        (WTF::atomicDecrement):
+
+2012-07-30  Patrick Gansterer  <paroga@webkit.org>
+
+        Add function to calculate the day in year from a date
+        https://bugs.webkit.org/show_bug.cgi?id=92671
+
+        Reviewed by Ryosuke Niwa.
+
+        Replace monthToDayInYear() with dayInYear() which takes a whole
+        date for calculation and will be used for bug 92286 later.
+
+        * wtf/DateMath.cpp:
+        (WTF::dayInYear):
+        (WTF::dateToDaysFrom1970):
+
+2012-07-30  Patrick Gansterer  <paroga@webkit.org>
+
+        Add special export macro for string related functions
+        https://bugs.webkit.org/show_bug.cgi?id=92624
+
+        Reviewed by Hajime Morita.
+
+        The windows port compiles string related code into every binary for performance reasons (see r59187).
+        Add the WTF_EXPORT_STRING_API define to allow this behaviour with export macros too.
+
+        * wtf/ExportMacros.h:
+        * wtf/text/AtomicString.h:
+        (AtomicString):
+        * wtf/text/StringImpl.h:
+        (StringImpl):
+        (WTF):
+        * wtf/text/WTFString.h:
+        (WTF):
+        (String):
+
+2012-07-30  Patrick Gansterer  <paroga@webkit.org>
+
+        Replace UnicodeWinCE with UnicodeWchar
+        https://bugs.webkit.org/show_bug.cgi?id=92539
+
+        Reviewed by Ryosuke Niwa.
+
+        UnicodeWinCE never contained WinCE specific code. UnicodeWchar
+        is a replacement for it, which is mainly based on the functions
+        from <wchar.h>. It is ment as a minimal Unicode backend, which
+        can be used very easy and has no external dependencies.
+
+        * WTF.gyp/WTF.gyp:
+        * WTF.gypi:
+        * wtf/Platform.h:
+        * wtf/PlatformWinCE.cmake:
+        * wtf/unicode/Unicode.h:
+        * wtf/unicode/wchar/UnicodeWchar.cpp: Added.
+        (Unicode):
+        (WTF::Unicode::category):
+        (WTF::Unicode::combiningClass):
+        (WTF::Unicode::direction):
+        (WTF::Unicode::decompositionType):
+        (WTF::Unicode::hasLineBreakingPropertyComplexContext):
+        (WTF::Unicode::mirroredChar):
+        (WTF::Unicode::convertWithFunction):
+        (WTF::Unicode::foldCase):
+        (WTF::Unicode::toLower):
+        (WTF::Unicode::toUpper):
+        * wtf/unicode/wchar/UnicodeWchar.h: Added.
+        (Unicode):
+        (WTF::Unicode::isAlphanumeric):
+        (WTF::Unicode::isDigit):
+        (WTF::Unicode::isLetter):
+        (WTF::Unicode::isLower):
+        (WTF::Unicode::isPrintableChar):
+        (WTF::Unicode::isPunct):
+        (WTF::Unicode::isSpace):
+        (WTF::Unicode::isUpper):
+        (WTF::Unicode::isArabicChar):
+        (WTF::Unicode::isSeparatorSpace):
+        (WTF::Unicode::foldCase):
+        (WTF::Unicode::toLower):
+        (WTF::Unicode::toUpper):
+        (WTF::Unicode::toTitleCase):
+        (WTF::Unicode::umemcasecmp):
+        * wtf/unicode/wince/UnicodeWinCE.cpp: Removed.
+        * wtf/unicode/wince/UnicodeWinCE.h: Removed.
+
+2012-07-26  Yury Semikhatsky  <yurys@chromium.org>
+
+        Web Inspector: move StringImpl size calculation to StringImpl
+        https://bugs.webkit.org/show_bug.cgi?id=92359
+
+        Reviewed by Pavel Feldman.
+
+        Moved stringSize(StringImpl*) implementation from InspectorMemoryAgent to
+        StringImpl::sizeInBytes();
+
+        * wtf/text/StringImpl.cpp:
+        (WTF::StringImpl::sizeInBytes):
+        (WTF):
+        * wtf/text/StringImpl.h:
+        (StringImpl):
+
 2012-07-28  Patrick Gansterer  <paroga@webkit.org>
 
         [WIN] Add missing export macro to friend decleration.

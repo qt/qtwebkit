@@ -35,12 +35,12 @@
 #include "DocumentLoader.h"
 #include "EventTargetHeaders.h"
 #include "EventTargetInterfaces.h"
+#include "Frame.h"
 #include "FrameLoaderClient.h"
 #include "SafeAllocation.h"
 #include "StylePropertySet.h"
 #include "V8AbstractEventListener.h"
 #include "V8Binding.h"
-#include "V8BindingPerContextData.h"
 #include "V8Collection.h"
 #include "V8EventListener.h"
 #include "V8EventListenerList.h"
@@ -51,6 +51,7 @@
 #include "V8NamedNodeMap.h"
 #include "V8NodeFilterCondition.h"
 #include "V8NodeList.h"
+#include "V8PerContextData.h"
 #include "V8Proxy.h"
 #include "V8StyleSheet.h"
 #include "V8WorkerContextEventListener.h"
@@ -70,18 +71,22 @@
 
 namespace WebCore {
 
-void V8DOMWrapper::setJSWrapperForDOMNode(PassRefPtr<Node> node, v8::Persistent<v8::Object> wrapper, v8::Isolate* isolate)
+v8::Persistent<v8::Object> V8DOMWrapper::setJSWrapperForDOMNode(PassRefPtr<Node> node, v8::Handle<v8::Object> wrapper, v8::Isolate* isolate)
 {
-    ASSERT(maybeDOMWrapper(wrapper));
+    v8::Persistent<v8::Object> wrapperHandle = v8::Persistent<v8::Object>::New(wrapper);
+    ASSERT(maybeDOMWrapper(wrapperHandle));
     ASSERT(!node->isActiveNode());
-    getDOMNodeMap(isolate).set(node.leakRef(), wrapper);
+    getDOMNodeMap(isolate).set(node.leakRef(), wrapperHandle);
+    return wrapperHandle;
 }
 
-void V8DOMWrapper::setJSWrapperForActiveDOMNode(PassRefPtr<Node> node, v8::Persistent<v8::Object> wrapper, v8::Isolate* isolate)
+v8::Persistent<v8::Object> V8DOMWrapper::setJSWrapperForActiveDOMNode(PassRefPtr<Node> node, v8::Handle<v8::Object> wrapper, v8::Isolate* isolate)
 {
-    ASSERT(maybeDOMWrapper(wrapper));
+    v8::Persistent<v8::Object> wrapperHandle = v8::Persistent<v8::Object>::New(wrapper);
+    ASSERT(maybeDOMWrapper(wrapperHandle));
     ASSERT(node->isActiveNode());
-    getActiveDOMNodeMap(isolate).set(node.leakRef(), wrapper);
+    getActiveDOMNodeMap(isolate).set(node.leakRef(), wrapperHandle);
+    return wrapperHandle;
 }
 
 v8::Local<v8::Function> V8DOMWrapper::constructorForType(WrapperTypeInfo* type, DOMWindow* window)
@@ -90,7 +95,7 @@ v8::Local<v8::Function> V8DOMWrapper::constructorForType(WrapperTypeInfo* type, 
     if (!frame)
         return v8::Local<v8::Function>();
 
-    if (V8BindingPerContextData* contextData = V8Proxy::retrievePerContextData(frame))
+    if (V8PerContextData* contextData = V8Proxy::retrievePerContextData(frame))
         return contextData->constructorForType(type);
 
     return v8::Local<v8::Function>();
@@ -105,14 +110,14 @@ v8::Local<v8::Function> V8DOMWrapper::constructorForType(WrapperTypeInfo* type, 
 }
 #endif
 
-V8BindingPerContextData* V8DOMWrapper::perContextData(V8Proxy* proxy)
+V8PerContextData* V8DOMWrapper::perContextData(V8Proxy* proxy)
 {
     V8DOMWindowShell* shell = proxy->windowShell();
     return shell ? shell->perContextData() : 0;
 }
 
 #if ENABLE(WORKERS)
-V8BindingPerContextData* V8DOMWrapper::perContextData(WorkerContext*)
+V8PerContextData* V8DOMWrapper::perContextData(WorkerContext*)
 {
     WorkerScriptController* controller = WorkerScriptController::controllerForContext();
     WorkerContextExecutionProxy* proxy = controller ? controller->proxy() : 0;
@@ -166,7 +171,7 @@ v8::Local<v8::Object> V8DOMWrapper::instantiateV8Object(V8Proxy* proxy, WrapperT
 #if ENABLE(WORKERS)
     WorkerContext* workerContext = 0;
 #endif
-    V8BindingPerContextData* contextData = 0;
+    V8PerContextData* contextData = 0;
     V8IsolatedContext* isolatedContext;
     if (UNLIKELY(!!(isolatedContext = V8IsolatedContext::getEntered()))) {
         contextData = isolatedContext->perContextData();
@@ -177,7 +182,7 @@ v8::Local<v8::Object> V8DOMWrapper::instantiateV8Object(V8Proxy* proxy, WrapperT
             if (isWrapperOfType(globalPrototype, &V8DOMWindow::info)) {
                 Frame* frame = V8DOMWindow::toNative(globalPrototype)->frame();
                 if (frame && frame->script()->canExecuteScripts(NotAboutToExecuteScript))
-                    proxy = V8Proxy::retrieve(frame);
+                    proxy = frame->script()->proxy();
             }
 #if ENABLE(WORKERS)
             else if (isWrapperOfType(globalPrototype, &V8WorkerContext::info))
@@ -268,7 +273,7 @@ v8::Handle<v8::Value> V8DOMWrapper::convertEventTargetToV8Object(EventTarget* ta
     DOM_EVENT_TARGET_INTERFACES_FOR_EACH(TRY_TO_WRAP_WITH_INTERFACE)
 
     ASSERT_NOT_REACHED();
-    return v8::Handle<v8::Value>();
+    return v8Undefined();
 }
 
 PassRefPtr<EventListener> V8DOMWrapper::getEventListener(v8::Local<v8::Value> value, bool isAttribute, ListenerLookupType lookup)

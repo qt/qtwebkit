@@ -39,14 +39,7 @@
 #include "WebElement.h"
 #include "WebInputEvent.h"
 #include "WebInputEventConversion.h"
-#include "WebKit.h"
 #include "WebPlugin.h"
-#include "platform/WebRect.h"
-#include "platform/WebString.h"
-#include "platform/WebURL.h"
-#include "platform/WebURLError.h"
-#include "platform/WebURLRequest.h"
-#include "platform/WebVector.h"
 #include "WebViewImpl.h"
 #include "WrappedResourceResponse.h"
 
@@ -56,6 +49,7 @@
 #include "Frame.h"
 #include "FrameLoadRequest.h"
 #include "FrameView.h"
+#include "GestureEvent.h"
 #include "GraphicsContext.h"
 #include "HitTestResult.h"
 #include "HostWindow.h"
@@ -77,6 +71,12 @@
 #include "WheelEvent.h"
 #include <public/Platform.h>
 #include <public/WebClipboard.h>
+#include <public/WebRect.h>
+#include <public/WebString.h>
+#include <public/WebURL.h>
+#include <public/WebURLError.h>
+#include <public/WebURLRequest.h>
+#include <public/WebVector.h>
 
 #if ENABLE(GESTURE_EVENTS)
 #include "PlatformGestureEvent.h"
@@ -188,6 +188,8 @@ void WebPluginContainerImpl::handleEvent(Event* event)
         handleKeyboardEvent(static_cast<KeyboardEvent*>(event));
     else if (eventNames().isTouchEventType(event->type()))
         handleTouchEvent(static_cast<TouchEvent*>(event));
+    else if (eventNames().isGestureEventType(event->type()))
+        handleGestureEvent(static_cast<GestureEvent*>(event));
 
     // FIXME: it would be cleaner if Widget::handleEvent returned true/false and
     // HTMLPluginElement called setDefaultHandled or defaultEventHandler.
@@ -557,6 +559,11 @@ bool WebPluginContainerImpl::getFormValue(String& value)
     return false;
 }
 
+bool WebPluginContainerImpl::supportsKeyboardFocus() const
+{
+    return m_webPlugin->supportsKeyboardFocus();
+}
+
 void WebPluginContainerImpl::willDestroyPluginLoadObserver(WebPluginLoadObserver* observer)
 {
     size_t pos = m_pluginLoadObservers.find(observer);
@@ -566,12 +573,12 @@ void WebPluginContainerImpl::willDestroyPluginLoadObserver(WebPluginLoadObserver
 }
 
 #if USE(ACCELERATED_COMPOSITING)
-WebCore::LayerChromium* WebPluginContainerImpl::platformLayer() const
+WebLayer* WebPluginContainerImpl::platformLayer() const
 {
     if (m_textureId)
-        return m_textureLayer.unwrap<LayerChromium>();
+        return const_cast<WebExternalTextureLayer*>(&m_textureLayer);
     if (m_ioSurfaceId)
-        return m_ioSurfaceLayer.unwrap<LayerChromium>();
+        return const_cast<WebIOSurfaceLayer*>(&m_ioSurfaceLayer);
     return 0;
 }
 #endif
@@ -728,6 +735,17 @@ void WebPluginContainerImpl::handleKeyboardEvent(KeyboardEvent* event)
 void WebPluginContainerImpl::handleTouchEvent(TouchEvent* event)
 {
     WebTouchEventBuilder webEvent(this, *event);
+    if (webEvent.type == WebInputEvent::Undefined)
+        return;
+    WebCursorInfo cursorInfo;
+    if (m_webPlugin->handleInputEvent(webEvent, cursorInfo))
+        event->setDefaultHandled();
+    // FIXME: Can a plugin change the cursor from a touch-event callback?
+}
+
+void WebPluginContainerImpl::handleGestureEvent(GestureEvent* event)
+{
+    WebGestureEventBuilder webEvent(this, *event);
     if (webEvent.type == WebInputEvent::Undefined)
         return;
     WebCursorInfo cursorInfo;

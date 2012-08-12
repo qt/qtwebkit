@@ -479,6 +479,15 @@ public:
             SpeculatedType prediction = at(varArgChild(node, 0)).prediction();
             if (!isActionableMutableArraySpeculation(prediction))
                 return false;
+            return true;
+        }
+            
+        case PutByValSafe: {
+            if (!at(varArgChild(node, 1)).shouldSpeculateInteger())
+                return false;
+            SpeculatedType prediction = at(varArgChild(node, 0)).prediction();
+            if (!isActionableMutableArraySpeculation(prediction))
+                return false;
             if (isArraySpeculation(prediction))
                 return false;
             return true;
@@ -524,6 +533,7 @@ public:
             return !isPredictedNumerical(node);
         case GetByVal:
         case PutByVal:
+        case PutByValSafe:
         case PutByValAlias:
             return !byValIsPure(node);
         default:
@@ -566,6 +576,42 @@ public:
         if (node.flags() & NodeHasVarArgs)
             return varArgChild(node, index);
         return node.children.child(index);
+    }
+    
+    void vote(Edge edge, unsigned ballot)
+    {
+        switch (at(edge).op()) {
+        case ValueToInt32:
+        case UInt32ToNumber:
+            edge = at(edge).child1();
+            break;
+        default:
+            break;
+        }
+        
+        if (at(edge).op() == GetLocal)
+            at(edge).variableAccessData()->vote(ballot);
+    }
+    
+    void vote(Node& node, unsigned ballot)
+    {
+        if (node.flags() & NodeHasVarArgs) {
+            for (unsigned childIdx = node.firstChild();
+                 childIdx < node.firstChild() + node.numChildren();
+                 childIdx++)
+                vote(m_varArgChildren[childIdx], ballot);
+            return;
+        }
+        
+        if (!node.child1())
+            return;
+        vote(node.child1(), ballot);
+        if (!node.child2())
+            return;
+        vote(node.child2(), ballot);
+        if (!node.child3())
+            return;
+        vote(node.child3(), ballot);
     }
     
     JSGlobalData& m_globalData;

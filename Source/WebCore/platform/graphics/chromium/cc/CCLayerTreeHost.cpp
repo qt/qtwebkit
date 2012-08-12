@@ -133,7 +133,7 @@ void CCLayerTreeHost::initializeLayerRenderer()
     TRACE_EVENT0("cc", "CCLayerTreeHost::initializeLayerRenderer");
     if (!m_proxy->initializeLayerRenderer()) {
         // Uh oh, better tell the client that we can't do anything with this context.
-        m_client->didRecreateContext(false);
+        m_client->didRecreateOutputSurface(false);
         return;
     }
 
@@ -166,7 +166,7 @@ CCLayerTreeHost::RecreateResult CCLayerTreeHost::recreateContext()
         m_numTimesRecreateShouldFail--;
 
     if (recreated) {
-        m_client->didRecreateContext(true);
+        m_client->didRecreateOutputSurface(true);
         m_contextLost = false;
         return RecreateSucceeded;
     }
@@ -185,7 +185,7 @@ CCLayerTreeHost::RecreateResult CCLayerTreeHost::recreateContext()
 
     // We have tried too many times to recreate the context. Tell the host to fall
     // back to software rendering.
-    m_client->didRecreateContext(false);
+    m_client->didRecreateOutputSurface(false);
     return RecreateFailedAndGaveUp;
 }
 
@@ -242,7 +242,7 @@ void CCLayerTreeHost::finishCommitOnImplThread(CCLayerTreeHostImpl* hostImpl)
         hostImpl->setNeedsAnimateLayers();
 
     hostImpl->setSourceFrameNumber(commitNumber());
-    hostImpl->setViewportSize(viewportSize());
+    hostImpl->setViewportSize(layoutViewportSize(), deviceViewportSize());
     hostImpl->setDeviceScaleFactor(deviceScaleFactor());
     hostImpl->setPageScaleFactorAndLimits(m_pageScaleFactor, m_minPageScaleFactor, m_maxPageScaleFactor);
     hostImpl->setBackgroundColor(m_backgroundColor);
@@ -251,29 +251,38 @@ void CCLayerTreeHost::finishCommitOnImplThread(CCLayerTreeHostImpl* hostImpl)
     m_commitNumber++;
 }
 
+void CCLayerTreeHost::setFontAtlas(PassOwnPtr<CCFontAtlas> fontAtlas)
+{
+    m_fontAtlas = fontAtlas;
+    setNeedsCommit();
+}
+
 void CCLayerTreeHost::willCommit()
 {
     m_client->willCommit();
     if (m_rootLayer && m_settings.showDebugInfo()) {
         if (!m_hudLayer)
-            m_hudLayer = HeadsUpDisplayLayerChromium::create(m_settings, layerRendererCapabilities().maxTextureSize);
-        m_rootLayer->addChild(m_hudLayer);
+            m_hudLayer = HeadsUpDisplayLayerChromium::create();
+
+        if (m_fontAtlas)
+            m_hudLayer->setFontAtlas(m_fontAtlas.release());
+
+        if (m_hudLayer->parent() != m_rootLayer.get()) {
+            m_hudLayer->removeFromParent();
+            m_rootLayer->addChild(m_hudLayer);
+        }
     }
 }
 
 void CCLayerTreeHost::commitComplete()
 {
-    if (m_hudLayer)
-        m_hudLayer->removeFromParent();
     m_deleteTextureAfterCommitList.clear();
     m_client->didCommit();
 }
 
 PassOwnPtr<CCGraphicsContext> CCLayerTreeHost::createContext()
 {
-    if (settings().forceSoftwareCompositing)
-        return CCGraphicsContext::create2D();
-    return CCGraphicsContext::create3D(m_client->createContext3D());
+    return m_client->createOutputSurface();
 }
 
 PassOwnPtr<CCLayerTreeHostImpl> CCLayerTreeHost::createLayerTreeHostImpl(CCLayerTreeHostImplClient* client)
@@ -364,15 +373,13 @@ void CCLayerTreeHost::setRootLayer(PassRefPtr<LayerChromium> rootLayer)
     setNeedsCommit();
 }
 
-void CCLayerTreeHost::setViewportSize(const IntSize& viewportSize)
+void CCLayerTreeHost::setViewportSize(const IntSize& layoutViewportSize, const IntSize& deviceViewportSize)
 {
-    if (viewportSize == m_viewportSize)
+    if (layoutViewportSize == m_layoutViewportSize && deviceViewportSize == m_deviceViewportSize)
         return;
 
-    m_viewportSize = viewportSize;
-
-    m_deviceViewportSize = viewportSize;
-    m_deviceViewportSize.scale(m_deviceScaleFactor);
+    m_layoutViewportSize = layoutViewportSize;
+    m_deviceViewportSize = deviceViewportSize;
 
     setNeedsCommit();
 }
@@ -447,7 +454,7 @@ bool CCLayerTreeHost::initializeLayerRendererIfNeeded()
 }
 
 
-void CCLayerTreeHost::updateLayers(CCTextureUpdater& updater, size_t memoryAllocationLimitBytes)
+void CCLayerTreeHost::updateLayers(CCTextureUpdateQueue& queue, size_t memoryAllocationLimitBytes)
 {
     ASSERT(m_layerRendererInitialized);
     ASSERT(memoryAllocationLimitBytes);
@@ -455,15 +462,15 @@ void CCLayerTreeHost::updateLayers(CCTextureUpdater& updater, size_t memoryAlloc
     if (!rootLayer())
         return;
 
-    if (viewportSize().isEmpty())
+    if (layoutViewportSize().isEmpty())
         return;
 
     m_contentsTextureManager->setMaxMemoryLimitBytes(memoryAllocationLimitBytes);
 
-    updateLayers(rootLayer(), updater);
+    updateLayers(rootLayer(), queue);
 }
 
-void CCLayerTreeHost::updateLayers(LayerChromium* rootLayer, CCTextureUpdater& updater)
+void CCLayerTreeHost::updateLayers(LayerChromium* rootLayer, CCTextureUpdateQueue& queue)
 {
     TRACE_EVENT0("cc", "CCLayerTreeHost::updateLayers");
 
@@ -472,15 +479,13 @@ void CCLayerTreeHost::updateLayers(LayerChromium* rootLayer, CCTextureUpdater& u
     {
         TRACE_EVENT0("cc", "CCLayerTreeHost::updateLayers::calcDrawEtc");
         CCLayerTreeHostCommon::calculateDrawTransforms(rootLayer, deviceViewportSize(), m_deviceScaleFactor, layerRendererCapabilities().maxTextureSize, updateList);
-
-        FloatRect rootScissorRect(FloatPoint(0, 0), deviceViewportSize());
-        CCLayerTreeHostCommon::calculateVisibleAndScissorRects(updateList, rootScissorRect);
+        CCLayerTreeHostCommon::calculateVisibleRects(updateList);
     }
 
     // Reset partial texture update requests.
     m_partialTextureUpdateRequests = 0;
 
-    bool needMoreUpdates = paintLayerContents(updateList, updater);
+    bool needMoreUpdates = paintLayerContents(updateList, queue);
     if (m_triggerIdleUpdates && needMoreUpdates)
         setNeedsCommit();
 
@@ -556,7 +561,7 @@ size_t CCLayerTreeHost::calculateMemoryForRenderSurfaces(const LayerList& update
     return readbackBytes + maxBackgroundTextureBytes + contentsTextureBytes;
 }
 
-bool CCLayerTreeHost::paintMasksForRenderSurface(LayerChromium* renderSurfaceLayer, CCTextureUpdater& updater)
+bool CCLayerTreeHost::paintMasksForRenderSurface(LayerChromium* renderSurfaceLayer, CCTextureUpdateQueue& queue)
 {
     // Note: Masks and replicas only exist for layers that own render surfaces. If we reach this point
     // in code, we already know that at least something will be drawn into this render surface, so the
@@ -565,26 +570,26 @@ bool CCLayerTreeHost::paintMasksForRenderSurface(LayerChromium* renderSurfaceLay
     bool needMoreUpdates = false;
     LayerChromium* maskLayer = renderSurfaceLayer->maskLayer();
     if (maskLayer) {
-        maskLayer->update(updater, 0, m_renderingStats);
+        maskLayer->update(queue, 0, m_renderingStats);
         needMoreUpdates |= maskLayer->needMoreUpdates();
     }
 
     LayerChromium* replicaMaskLayer = renderSurfaceLayer->replicaLayer() ? renderSurfaceLayer->replicaLayer()->maskLayer() : 0;
     if (replicaMaskLayer) {
-        replicaMaskLayer->update(updater, 0, m_renderingStats);
+        replicaMaskLayer->update(queue, 0, m_renderingStats);
         needMoreUpdates |= replicaMaskLayer->needMoreUpdates();
     }
     return needMoreUpdates;
 }
 
-bool CCLayerTreeHost::paintLayerContents(const LayerList& renderSurfaceLayerList, CCTextureUpdater& updater)
+bool CCLayerTreeHost::paintLayerContents(const LayerList& renderSurfaceLayerList, CCTextureUpdateQueue& queue)
 {
     // Use FrontToBack to allow for testing occlusion and performing culling during the tree walk.
     typedef CCLayerIterator<LayerChromium, Vector<RefPtr<LayerChromium> >, RenderSurfaceChromium, CCLayerIteratorActions::FrontToBack> CCLayerIteratorType;
 
     bool needMoreUpdates = false;
     bool recordMetricsForFrame = true; // FIXME: In the future, disable this when about:tracing is off.
-    CCOcclusionTracker occlusionTracker(IntRect(IntPoint(), deviceViewportSize()), recordMetricsForFrame);
+    CCOcclusionTracker occlusionTracker(m_rootLayer->renderSurface()->contentRect(), recordMetricsForFrame);
     occlusionTracker.setMinimumTrackingSize(m_settings.minimumOcclusionTrackingSize);
 
     prioritizeTextures(renderSurfaceLayerList, occlusionTracker.overdrawMetrics());
@@ -595,10 +600,10 @@ bool CCLayerTreeHost::paintLayerContents(const LayerList& renderSurfaceLayerList
 
         if (it.representsTargetRenderSurface()) {
             ASSERT(it->renderSurface()->drawOpacity() || it->renderSurface()->drawOpacityIsAnimating());
-            needMoreUpdates |= paintMasksForRenderSurface(*it, updater);
+            needMoreUpdates |= paintMasksForRenderSurface(*it, queue);
         } else if (it.representsItself()) {
             ASSERT(!it->bounds().isEmpty());
-            it->update(updater, &occlusionTracker, m_renderingStats);
+            it->update(queue, &occlusionTracker, m_renderingStats);
             needMoreUpdates |= it->needMoreUpdates();
         }
 
@@ -705,8 +710,6 @@ void CCLayerTreeHost::setDeviceScaleFactor(float deviceScaleFactor)
         return;
     m_deviceScaleFactor = deviceScaleFactor;
 
-    m_deviceViewportSize = m_viewportSize;
-    m_deviceViewportSize.scale(m_deviceScaleFactor);
     setNeedsCommit();
 }
 

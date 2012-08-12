@@ -46,6 +46,7 @@
 #include "FontFeatureSettings.h"
 #include "FontFeatureValue.h"
 #include "FontValue.h"
+#include "MemoryInstrumentation.h"
 #include "Pair.h"
 #include "Rect.h"
 #include "RenderBox.h"
@@ -67,6 +68,7 @@
 #include "CustomFilterNumberParameter.h"
 #include "CustomFilterOperation.h"
 #include "CustomFilterParameter.h"
+#include "WebKitCSSMixFunctionValue.h"
 #endif
 
 #if ENABLE(CSS_FILTERS)
@@ -74,7 +76,7 @@
 #include "WebKitCSSFilterValue.h"
 #endif
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
 #include "DashboardRegion.h"
 #endif
 
@@ -174,6 +176,7 @@ static const CSSPropertyID computedProperties[] = {
     CSSPropertyTabSize,
     CSSPropertyTextAlign,
     CSSPropertyTextDecoration,
+    CSSPropertyWebkitTextDecorationLine,
     CSSPropertyTextIndent,
     CSSPropertyTextRendering,
     CSSPropertyTextShadow,
@@ -339,6 +342,9 @@ static const CSSPropertyID computedProperties[] = {
     CSSPropertyWebkitRegionBreakAfter,
     CSSPropertyWebkitRegionBreakBefore,
     CSSPropertyWebkitRegionBreakInside,
+#endif
+#if ENABLE(WIDGET_REGION)
+    CSSPropertyWebkitWidgetRegion,
 #endif
 #if ENABLE(CSS_EXCLUSIONS)
     CSSPropertyWebkitWrapFlow,
@@ -874,10 +880,19 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForFilter(RenderStyle* st
                 shadersList->append(program->vertexShader()->cssValue());
             else
                 shadersList->append(cssValuePool().createIdentifierValue(CSSValueNone));
-            if (program->fragmentShader())
+
+            const CustomFilterProgramMixSettings mixSettings = program->mixSettings();
+            if (mixSettings.enabled) {
+                RefPtr<WebKitCSSMixFunctionValue> mixFunction = WebKitCSSMixFunctionValue::create();
+                mixFunction->append(program->fragmentShader()->cssValue());
+                mixFunction->append(cssValuePool().createValue(mixSettings.blendMode));
+                mixFunction->append(cssValuePool().createValue(mixSettings.compositeOperator));
+                shadersList->append(mixFunction.release());
+            } else if (program->fragmentShader())
                 shadersList->append(program->fragmentShader()->cssValue());
             else
                 shadersList->append(cssValuePool().createIdentifierValue(CSSValueNone));
+
             filterValue->append(shadersList.release());
             
             RefPtr<CSSValueList> meshParameters = CSSValueList::createSpaceSeparated();
@@ -1176,6 +1191,7 @@ static PassRefPtr<CSSValue> renderUnicodeBidiFlagsToCSSValue(EUnicodeBidi unicod
 
 static PassRefPtr<CSSValue> renderTextDecorationFlagsToCSSValue(int textDecoration)
 {
+    // Blink value is ignored.
     RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
     if (textDecoration & UNDERLINE)
         list->append(cssValuePool().createIdentifierValue(CSSValueUnderline));
@@ -1183,8 +1199,6 @@ static PassRefPtr<CSSValue> renderTextDecorationFlagsToCSSValue(int textDecorati
         list->append(cssValuePool().createIdentifierValue(CSSValueOverline));
     if (textDecoration & LINE_THROUGH)
         list->append(cssValuePool().createIdentifierValue(CSSValueLineThrough));
-    if (textDecoration & BLINK)
-        list->append(cssValuePool().createIdentifierValue(CSSValueBlink));
 
     if (!list->length())
         return cssValuePool().createIdentifierValue(CSSValueNone);
@@ -1689,7 +1703,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         case CSSPropertyWebkitJustifyContent:
             return cssValuePool().createValue(style->justifyContent());
         case CSSPropertyWebkitOrder:
-            return cssValuePool().createValue(style->order());
+            return cssValuePool().createValue(style->order(), CSSPrimitiveValue::CSS_NUMBER);
 #endif
         case CSSPropertyFloat:
             return cssValuePool().createValue(style->floating());
@@ -1934,6 +1948,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         case CSSPropertyTextAlign:
             return cssValuePool().createValue(style->textAlign());
         case CSSPropertyTextDecoration:
+        case CSSPropertyWebkitTextDecorationLine:
             return renderTextDecorationFlagsToCSSValue(style->textDecoration());
         case CSSPropertyWebkitTextDecorationsInEffect:
             return renderTextDecorationFlagsToCSSValue(style->textDecorationsInEffect());
@@ -2072,8 +2087,13 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             if (style->boxSizing() == CONTENT_BOX)
                 return cssValuePool().createIdentifierValue(CSSValueContentBox);
             return cssValuePool().createIdentifierValue(CSSValueBorderBox);
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
 #if ENABLE(DASHBOARD_SUPPORT)
         case CSSPropertyWebkitDashboardRegion:
+#endif
+#if ENABLE(WIDGET_REGION)
+        case CSSPropertyWebkitWidgetRegion:
+#endif
         {
             const Vector<StyleDashboardRegion>& regions = style->dashboardRegions();
             unsigned count = regions.size();
@@ -2674,6 +2694,12 @@ PassRefPtr<StylePropertySet> CSSComputedStyleDeclaration::copyPropertiesInSet(co
             list.append(CSSProperty(set[i], value.release(), false));
     }
     return StylePropertySet::create(list.data(), list.size());
+}
+
+void CSSComputedStyleDeclaration::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    info.addInstrumentedMember(m_node);
 }
 
 CSSRule* CSSComputedStyleDeclaration::parentRule() const

@@ -528,6 +528,9 @@ public:
 #endif
 
     void getContentsAsString(PassRefPtr<StringCallback>);
+#if ENABLE(MHTML)
+    void getContentsAsMHTMLData(PassRefPtr<DataCallback>, bool useBinaryEncoding);
+#endif
     void getMainResourceDataOfFrame(WebFrameProxy*, PassRefPtr<DataCallback>);
     void getResourceDataFromFrame(WebFrameProxy*, WebURL*, PassRefPtr<DataCallback>);
     void getRenderTreeExternalRepresentation(PassRefPtr<StringCallback>);
@@ -831,9 +834,13 @@ private:
 #endif
 
 #if PLATFORM(QT)
-    void didChangeContentsSize(const WebCore::IntSize&);
     void didFindZoomableArea(const WebCore::IntPoint&, const WebCore::IntRect&);
 #endif
+
+#if PLATFORM(QT) || PLATFORM(EFL)
+    void didChangeContentsSize(const WebCore::IntSize&);
+#endif
+
 #if ENABLE(TOUCH_EVENTS)
     void needTouchEvents(bool);
 #endif

@@ -49,10 +49,14 @@ var ClassNames = {
     MonthSelector: "month-selector",
     MonthSelectorBox: "month-selector-box",
     MonthSelectorPopup: "month-selector-popup",
+    MonthSelectorPopupContents: "month-selector-popup-contents",
+    MonthSelectorPopupEntry: "month-selector-popup-entry",
+    MonthSelectorPopupSizer: "month-selector-popup-sizer",
     MonthSelectorWall: "month-selector-wall",
     NoFocusRing: "no-focus-ring",
     NotThisMonth: "not-this-month",
     Selected: "day-selected",
+    SelectedMonthYear: "selected-month-year",
     TodayButton: "today-button",
     TodayClearArea: "today-clear-area",
     Unavailable: "unavailable",
@@ -220,6 +224,25 @@ function serializeDate(year, month, day) {
     return yearString + "-" + ("0" + (month + 1)).substr(-2, 2) + "-" + ("0" + day).substr(-2, 2);
 }
 
+/**
+ * @param {!number} width
+ * @param {!number} height
+ */
+function resizeWindow(width, height) {
+    if (window.frameElement) {
+        window.frameElement.style.width = width + "px";
+        window.frameElement.style.height = height + "px";
+    } else {
+        window.resizeTo(width, height);
+    }
+}
+
+function showMain() {
+    var main = $("main");
+    main.style.webkitTransition = "opacity 0.1s ease";
+    main.style.opacity = "1";
+}
+
 // ----------------------------------------------------------------
 // Initialization
 
@@ -282,9 +305,11 @@ function initialize(args) {
     main.classList.add(ClassNames.NoFocusRing);
 
     var errorString = validateArguments(args);
-    if (errorString)
+    if (errorString) {
         main.textContent = "Internal error: " + errorString;
-    else {
+        resizeWindow(main.offsetWidth, main.offsetHeight);
+        showMain();
+    } else {
         global.params = args;
         checkLimits();
         layout();
@@ -333,14 +358,8 @@ function fixWindowSize() {
     daysAreaElement.style.tableLayout = "fixed";
     document.getElementsByClassName(ClassNames.YearMonthUpper)[0].style.display = "-webkit-box";
     document.getElementsByClassName(ClassNames.MonthSelectorBox)[0].style.display = "block";
-    main.style.webkitTransition = "opacity 0.1s ease";
-    main.style.opacity = "1";
-    if (window.frameElement) {
-        window.frameElement.style.width = desiredBodyWidth + "px";
-        window.frameElement.style.height = mainHeight + "px";
-    } else {
-        window.resizeTo(desiredBodyWidth, mainHeight);
-    }
+    resizeWindow(desiredBodyWidth, mainHeight);
+    showMain();
 }
 
 function checkLimits() {
@@ -432,10 +451,17 @@ YearMonthController.prototype.attachTo = function(main) {
     var box = createElement("div", ClassNames.MonthSelectorBox);
     innerContainer.appendChild(box);
     // We can't use <select> popup in PagePopup.
-    // FIXME: The popup-menu emulation by a listbox is not great.
-    this._monthPopup = createElement("select", ClassNames.MonthSelectorPopup);
+    this._monthPopup = createElement("div", ClassNames.MonthSelectorPopup);
     this._monthPopup.addEventListener("click", bind(this._handleYearMonthChange, this), false);
     this._monthPopup.addEventListener("keydown", bind(this._handleMonthPopupKey, this), false);
+    this._monthPopup.addEventListener("mousemove", bind(this._handleMouseMove, this), false);
+    this._updateSelectionOnMouseMove = true;
+    this._monthPopup.tabIndex = 0;
+    this._monthPopupContents = createElement("div", ClassNames.MonthSelectorPopupContents);
+    this._monthPopup.appendChild(this._monthPopupContents);
+    // Sizer used to determine the width of the viewport in the popup menu.
+    var sizer = createElement("div", ClassNames.MonthSelectorPopupSizer);
+    this._monthPopup.appendChild(sizer);
     box.appendChild(this._monthPopup);
     this._month = createElement("div", ClassNames.MonthSelector);
     this._month.addEventListener("click", bind(this._showPopup, this), false);
@@ -462,7 +488,7 @@ YearMonthController.prototype.attachTo = function(main) {
     }
     this._month.style.minWidth = maxWidth + 'px';
 
-    global.firstFocusableControl = this._left2; // FIXME: Shoud it be this.month?
+    global.firstFocusableControl = this._left2; // FIXME: Should it be this.month?
 };
 
 YearMonthController.addTenYearsButtons = false;
@@ -559,36 +585,83 @@ YearMonthController.prototype._redraw = function() {
     if (this._right3)
         this._right3.disabled = current + 13 > max;
     this._month.innerText = formatYearMonth(this._currentYear, this._currentMonth);
-    while (this._monthPopup.hasChildNodes())
-        this._monthPopup.removeChild(this._monthPopup.firstChild);
+    while (this._monthPopupContents.hasChildNodes())
+        this._monthPopupContents.removeChild(this._monthPopupContents.firstChild);
+
     for (var m = current - 6; m <= current + 6; m++) {
         if (m < min || m > max)
             continue;
-        var option = createElement("option", undefined, formatYearMonth(Math.floor(m / 12), m % 12));
-        option.value = String(Math.floor(m / 12)) + "-" + String(m % 12);
-        this._monthPopup.appendChild(option);
+        var option = createElement("div", ClassNames.MonthSelectorPopupEntry, formatYearMonth(Math.floor(m / 12), m % 12));
+        option.dataset.value = String(Math.floor(m / 12)) + "-" + String(m % 12);
+        this._monthPopupContents.appendChild(option);
         if (m == current)
-            option.selected = true;
+            option.classList.add(ClassNames.SelectedMonthYear);
     }
 };
 
 YearMonthController.prototype._showPopup = function() {
-    this._monthPopup.size = Math.max(4, Math.min(10, this._monthPopup.length));
     this._monthPopup.style.display = "block";
-    this._monthPopup.style.position = "absolute";
     this._monthPopup.style.zIndex = "1000"; // Larger than the days area.
     this._monthPopup.style.left = this._month.offsetLeft + (this._month.offsetWidth - this._monthPopup.offsetWidth) / 2 + "px";
     this._monthPopup.style.top = this._month.offsetTop + this._month.offsetHeight + "px";
-    this._monthPopup.focus();
 
     this._wall.style.display = "block";
     this._wall.style.zIndex = "999"; // This should be smaller than the z-index of monthPopup.
+
+    var popupHeight = this._monthPopup.clientHeight;
+    var fullHeight = this._monthPopupContents.clientHeight;
+    if (fullHeight > popupHeight) {
+        var selected = this._getSelection();
+        if (selected) {
+           var bottom = selected.offsetTop + selected.clientHeight;
+           if (bottom > popupHeight)
+               this._monthPopup.scrollTop = bottom - popupHeight;
+        }
+        var sizer = document.querySelector("." + ClassNames.MonthSelectorPopupSizer);
+        var scrollWidth = this._monthPopupContents.clientWidth - sizer.clientWidth;
+        if (scrollWidth > 0)
+            this._monthPopup.style.webkitPaddingEnd = scrollWidth + 'px';
+    }
+    this._monthPopup.focus();
 };
 
 YearMonthController.prototype._closePopup = function() {
     this._monthPopup.style.display = "none";
     this._wall.style.display = "none";
+    var container = document.querySelector("." + ClassNames.DaysAreaContainer);
+    container.focus();
 };
+
+/**
+ * @return {Element} Selected element in the month-year popup.
+ */
+YearMonthController.prototype._getSelection = function()
+{
+    return document.querySelector("." + ClassNames.SelectedMonthYear);
+}
+
+/**
+ * @param {Event} event
+ */
+YearMonthController.prototype._handleMouseMove = function(event)
+{
+    if (!this._updateSelectionOnMouseMove) {
+        // Selection update turned off while navigating with keyboard to prevent a mouse
+        // move trigged during a scroll from resetting the selection. Automatically
+        // rearm control to enable mouse-based selection.
+        this._updateSelectionOnMouseMove = true;
+    } else {
+        var target = event.target;
+        var selection = this._getSelection();
+        if (target && target != selection && target.classList.contains(ClassNames.MonthSelectorPopupEntry)) {
+            if (selection)
+                selection.classList.remove(ClassNames.SelectedMonthYear);
+            target.classList.add(ClassNames.SelectedMonthYear);
+        }
+    }
+    event.stopPropagation();
+    event.preventDefault();
+}
 
 /**
  * @param {Event} event
@@ -596,7 +669,38 @@ YearMonthController.prototype._closePopup = function() {
 YearMonthController.prototype._handleMonthPopupKey = function(event)
 {
     var key = event.keyIdentifier;
-    if (key == "U+001B") {
+    if (key == "Down") {
+        var selected = this._getSelection();
+        if (selected) {
+            var next = selected.nextSibling;
+            if (next) {
+                selected.classList.remove(ClassNames.SelectedMonthYear);
+                next.classList.add(ClassNames.SelectedMonthYear);
+                var bottom = next.offsetTop + next.clientHeight;
+                if (bottom > this._monthPopup.scrollTop + this._monthPopup.clientHeight) {
+                    this._updateSelectionOnMouseMove = false;
+                    this._monthPopup.scrollTop = bottom - this._monthPopup.clientHeight;
+                }
+            }
+        }
+        event.stopPropagation();
+        event.preventDefault();
+    } else if (key == "Up") {
+        var selected = this._getSelection();
+        if (selected) {
+            var previous = selected.previousSibling;
+            if (previous) {
+                selected.classList.remove(ClassNames.SelectedMonthYear);
+                previous.classList.add(ClassNames.SelectedMonthYear);
+                if (previous.offsetTop < this._monthPopup.scrollTop) {
+                    this._updateSelectionOnMouseMove = false;
+                    this._monthPopup.scrollTop = previous.offsetTop;
+                }
+            }
+        }
+        event.stopPropagation();
+        event.preventDefault();
+    } else if (key == "U+001B") {
         this._closePopup();
         event.stopPropagation();
         event.preventDefault();
@@ -609,8 +713,11 @@ YearMonthController.prototype._handleMonthPopupKey = function(event)
 
 YearMonthController.prototype._handleYearMonthChange = function() {
     this._closePopup();
-
-    var result = this._monthPopup.value.match(/(\d+)-(\d+)/);
+    var selection = this._getSelection();
+    if (!selection)
+        return;
+    var value = selection.dataset.value;
+    var result  = value.match(/(\d+)-(\d+)/);
     if (!result)
         return;
     var newYear = Number(result[1]);

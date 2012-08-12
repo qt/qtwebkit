@@ -25086,6 +25086,22 @@
 				Name="mediasource"
 				>
 				<File
+					RelativePath="..\Modules\mediasource\MediaSource.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\mediasource\MediaSource.h"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\mediasource\MediaSourceRegistry.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\Modules\mediasource\MediaSourceRegistry.h"
+					>
+				</File>
+				<File
 					RelativePath="..\Modules\mediasource\SourceBuffer.cpp"
 					>
 				</File>
@@ -27615,6 +27631,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\loader\SubstituteData.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\loader\SubstituteData.h"
 				>
 			</File>
@@ -29531,6 +29551,10 @@
 				</File>
 				<File
 					RelativePath="..\platform\graphics\MediaPlayer.h"
+					>
+				</File>
+ 				<File
+					RelativePath="..\platform\graphics\NativeImagePtr.h"
 					>
 				</File>
 				<File
@@ -31670,6 +31694,14 @@
 					</File>
 					<File
 						RelativePath="..\platform\graphics\filters\CustomFilterProgram.h"
+						>
+					</File>
+					<File
+						RelativePath="..\platform\graphics\filters\CustomFilterProgramInfo.cpp"
+						>
+					</File>
+					<File
+						RelativePath="..\platform\graphics\filters\CustomFilterProgramInfo.h"
 						>
 					</File>
 					<File
@@ -37764,6 +37796,14 @@
 			</File>
 			<File
 				RelativePath="..\css\WebKitCSSMatrix.h"
+				>
+			</File>
+			<File
+				RelativePath="..\css\WebKitCSSMixFunctionValue.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\css\WebKitCSSMixFunctionValue.h"
 				>
 			</File>
 			<File
@@ -51531,6 +51571,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\dom\MemoryInstrumentation.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\dom\MemoryInstrumentation.h"
 				>
 			</File>
@@ -63766,19 +63810,11 @@
 					>
 				</File>
 				<File
-					RelativePath="..\bindings\generic\BindingDOMWindow.h"
+					RelativePath="..\bindings\generic\BindingSecurity.cpp"
 					>
 				</File>
 				<File
 					RelativePath="..\bindings\generic\BindingSecurity.h"
-					>
-				</File>
-				<File
-					RelativePath="..\bindings\generic\BindingSecurityBase.cpp"
-					>
-				</File>
-				<File
-					RelativePath="..\bindings\generic\BindingSecurityBase.h"
 					>
 				</File>
 				<File
@@ -63797,6 +63833,62 @@
 			<Filter
 				Name="js"
 				>
+                                <File
+                                        RelativePath="..\bindings\js\ArrayValue.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Debug_Cairo_CFLite|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release_Cairo_CFLite|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Debug_All|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+				</File>
+				<File
+                                        RelativePath="..\bindings\js\ArrayValue.h"
+					>
+				</File>
 				<File
 					RelativePath="..\bindings\js\CachedScriptSourceProvider.h"
 					>
@@ -63852,6 +63944,62 @@
 							Name="VCCLCompilerTool"
 						/>
 					</FileConfiguration>
+				</File>
+				<File
+					RelativePath="..\bindings\js\BindingState.cpp"
+					>
+					<FileConfiguration
+						Name="Debug|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Debug_Cairo_CFLite|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Release_Cairo_CFLite|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Debug_All|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+					<FileConfiguration
+						Name="Production|Win32"
+						ExcludedFromBuild="true"
+						>
+						<Tool
+							Name="VCCLCompilerTool"
+						/>
+					</FileConfiguration>
+				</File>
+				<File
+					RelativePath="..\bindings\js\BindingState.h"
+					>
 				</File>
 				<File
 					RelativePath="..\bindings\js\CallbackFunction.h"
@@ -73799,30 +73947,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\inspector\DOMNodeHighlighter.cpp"
-				>
-				<FileConfiguration
-					Name="Release|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-				<FileConfiguration
-					Name="Production|Win32"
-					ExcludedFromBuild="true"
-					>
-					<Tool
-						Name="VCCLCompilerTool"
-					/>
-				</FileConfiguration>
-			</File>
-			<File
-				RelativePath="..\inspector\DOMNodeHighlighter.h"
-				>
-			</File>
-			<File
 				RelativePath="..\inspector\DOMPatchSupport.cpp"
 				>
 				<FileConfiguration
@@ -74595,6 +74719,30 @@
 				>
 			</File>
 			<File
+				RelativePath="..\inspector\InspectorOverlay.cpp"
+				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\inspector\InspectorOverlay.h"
+				>
+			</File>
+			<File
 				RelativePath="..\inspector\InspectorPageAgent.cpp"
 				>
 				<FileConfiguration
@@ -74892,6 +75040,30 @@
 			</File>
 			<File
 				RelativePath="..\inspector\InstrumentingAgents.h"
+				>
+			</File>
+			<File
+				RelativePath="..\inspector\MemoryInstrumentationImpl.cpp"
+				>
+				<FileConfiguration
+					Name="Release|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+				<FileConfiguration
+					Name="Production|Win32"
+					ExcludedFromBuild="true"
+					>
+					<Tool
+						Name="VCCLCompilerTool"
+					/>
+				</FileConfiguration>
+			</File>
+			<File
+				RelativePath="..\inspector\MemoryInstrumentationImpl.h"
 				>
 			</File>
 			<File
@@ -75254,6 +75426,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\inspector\front-end\CodeMirrorTextEditor.js"
+					>
+				</File>
+				<File
 					RelativePath="..\inspector\front-end\Color.js"
 					>
 				</File>
@@ -75322,6 +75498,34 @@
 					>
 				</File>
 				<File
+					RelativePath="..\inspector\front-end\cm\codemirror.css"
+					>
+				</File>
+				<File
+					RelativePath="..\inspector\front-end\cm\codemirror.js"
+					>
+				</File>
+				<File
+					RelativePath="..\inspector\front-end\cm\css.js"
+					>
+				</File>
+				<File
+					RelativePath="..\inspector\front-end\cm\htmlmixed.js"
+					>
+				</File>
+				<File
+					RelativePath="..\inspector\front-end\cm\javascript.js"
+					>
+				</File>
+				<File
+					RelativePath="..\inspector\front-end\cm\xml.js"
+					>
+				</File>
+				<File
+					RelativePath="..\inspector\front-end\cmdevtools.css"
+					>
+				</File>
+				<File
 					RelativePath="..\inspector\front-end\Database.js"
 					>
 				</File>
@@ -75347,6 +75551,10 @@
 				</File>
 				<File
 					RelativePath="..\inspector\front-end\DebuggerScriptMapping.js"
+					>
+				</File>
+				<File
+					RelativePath="..\inspector\front-end\DefaultTextEditor.js"
 					>
 				</File>
 				<File
@@ -75451,6 +75659,10 @@
 				</File>
 				<File
 					RelativePath="..\inspector\front-end\FileSystemView.js"
+					>
+				</File>
+				<File
+					RelativePath="..\inspector\front-end\FileUtils.js"
 					>
 				</File>
 				<File
@@ -75711,6 +75923,10 @@
 				</File>
 				<File
 					RelativePath="..\inspector\front-end\ProfilesPanel.js"
+					>
+				</File>
+				<File
+					RelativePath="..\inspector\front-end\ProgressBar.js"
 					>
 				</File>
 				<File

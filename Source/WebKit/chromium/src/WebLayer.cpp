@@ -24,12 +24,10 @@
  */
 
 #include "config.h"
-#include "platform/WebLayer.h"
+#include <public/WebLayer.h>
 
-#include "Color.h"
 #include "LayerChromium.h"
 #include "SkMatrix44.h"
-#include "TransformationMatrix.h"
 #include "WebLayerImpl.h"
 #include <public/WebFilterOperations.h>
 #include <public/WebFloatPoint.h>
@@ -144,6 +142,14 @@ void WebLayer::replaceChild(const WebLayer& reference, const WebLayer& newLayer)
     m_private->replaceChild(ref.unwrap<LayerChromium>(), newLayer);
 }
 
+void WebLayer::setChildren(const WebVector<WebLayer>& webChildren)
+{
+    Vector<RefPtr<LayerChromium> > children(webChildren.size());
+    for (size_t i = 0; i < webChildren.size(); ++i)
+        children[i] = webChildren[i].unwrap<LayerChromium>();
+    m_private->setChildren(children);
+}
+
 void WebLayer::removeFromParent()
 {
     m_private->removeFromParent();
@@ -203,6 +209,12 @@ void WebLayer::setMaskLayer(const WebLayer& maskLayer)
 WebLayer WebLayer::maskLayer() const
 {
     return WebLayer(m_private->maskLayer());
+}
+
+void WebLayer::setReplicaLayer(const WebLayer& replicaLayer)
+{
+    WebLayer ref = replicaLayer;
+    m_private->setReplicaLayer(ref.unwrap<LayerChromium>());
 }
 
 void WebLayer::setOpacity(float opacity)
@@ -310,6 +322,53 @@ void WebLayer::setDebugBorderWidth(float width)
     m_private->setDebugBorderWidth(width);
 }
 
+void WebLayer::setDebugName(WebString name)
+{
+    m_private->setDebugName(name);
+}
+
+void WebLayer::setAnimationDelegate(WebAnimationDelegate* delegate)
+{
+    m_private->setLayerAnimationDelegate(delegate);
+}
+
+bool WebLayer::addAnimation(const WebAnimation& animation)
+{
+    return m_private->addAnimation(animation);
+}
+
+void WebLayer::removeAnimation(int animationId)
+{
+    m_private->removeAnimation(animationId);
+}
+
+void WebLayer::removeAnimation(int animationId, WebAnimation::TargetProperty targetProperty)
+{
+    m_private->layerAnimationController()->removeAnimation(animationId, static_cast<CCActiveAnimation::TargetProperty>(targetProperty));
+}
+
+void WebLayer::pauseAnimation(int animationId, double timeOffset)
+{
+    m_private->pauseAnimation(animationId, timeOffset);
+}
+
+void WebLayer::suspendAnimations(double monotonicTime)
+{
+    m_private->suspendAnimations(monotonicTime);
+}
+
+void WebLayer::resumeAnimations(double monotonicTime)
+{
+    m_private->resumeAnimations(monotonicTime);
+}
+
+void WebLayer::transferAnimationsTo(WebLayer* other)
+{
+    ASSERT(other);
+    if (other)
+        other->m_private->setLayerAnimationController(m_private->releaseLayerAnimationController());
+}
+
 void WebLayer::setAlwaysReserveTextures(bool reserve)
 {
     m_private->setAlwaysReserveTextures(reserve);
@@ -318,6 +377,11 @@ void WebLayer::setAlwaysReserveTextures(bool reserve)
 void WebLayer::setForceRenderSurface(bool forceRenderSurface)
 {
     m_private->setForceRenderSurface(forceRenderSurface);
+}
+
+void WebLayer::clearRenderSurface()
+{
+    m_private->clearRenderSurface();
 }
 
 WebLayer::WebLayer(const PassRefPtr<LayerChromium>& node)

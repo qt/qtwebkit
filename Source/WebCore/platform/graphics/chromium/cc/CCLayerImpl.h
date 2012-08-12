@@ -49,6 +49,8 @@ class CCLayerSorter;
 class CCLayerTreeHostImpl;
 class CCRenderer;
 class CCQuadSink;
+class CCScrollbarAnimationController;
+class CCScrollbarLayerImpl;
 class LayerChromium;
 
 class CCLayerImpl : public CCLayerAnimationControllerClient {
@@ -148,8 +150,8 @@ public:
     void setUseParentBackfaceVisibility(bool useParentBackfaceVisibility) { m_useParentBackfaceVisibility = useParentBackfaceVisibility; }
     bool useParentBackfaceVisibility() const { return m_useParentBackfaceVisibility; }
 
-    void setIsNonCompositedContent(bool isNonCompositedContent) { m_isNonCompositedContent = isNonCompositedContent; }
-    bool isNonCompositedContent() const { return m_isNonCompositedContent; }
+    void setUseLCDText(bool useLCDText) { m_useLCDText = useLCDText; }
+    bool useLCDText() const { return m_useLCDText; }
 
     void setSublayerTransform(const WebKit::WebTransformationMatrix&);
     const WebKit::WebTransformationMatrix& sublayerTransform() const { return m_sublayerTransform; }
@@ -175,9 +177,6 @@ public:
     bool drawOpacityIsAnimating() const { return m_drawOpacityIsAnimating; }
     void setDrawOpacityIsAnimating(bool drawOpacityIsAnimating) { m_drawOpacityIsAnimating = drawOpacityIsAnimating; }
 
-    const IntRect& scissorRect() const { return m_scissorRect; }
-    void setScissorRect(const IntRect& rect) { m_scissorRect = rect; }
-
     CCLayerImpl* renderTarget() const { ASSERT(!m_renderTarget || m_renderTarget->renderSurface()); return m_renderTarget; }
     void setRenderTarget(CCLayerImpl* target) { m_renderTarget = target; }
 
@@ -191,7 +190,7 @@ public:
     void setScrollPosition(const IntPoint&);
 
     const IntSize& maxScrollPosition() const {return m_maxScrollPosition; }
-    void setMaxScrollPosition(const IntSize& maxScrollPosition) { m_maxScrollPosition = maxScrollPosition; }
+    void setMaxScrollPosition(const IntSize&);
 
     const FloatSize& scrollDelta() const { return m_scrollDelta; }
     void setScrollDelta(const FloatSize&);
@@ -265,6 +264,14 @@ public:
     // until the new context has been created successfully.
     virtual void didLoseContext();
 
+    CCScrollbarAnimationController* scrollbarAnimationController() const { return m_scrollbarAnimationController.get(); }
+
+    CCScrollbarLayerImpl* horizontalScrollbarLayer() const;
+    void setHorizontalScrollbarLayer(CCScrollbarLayerImpl*);
+
+    CCScrollbarLayerImpl* verticalScrollbarLayer() const;
+    void setVerticalScrollbarLayer(CCScrollbarLayerImpl*);
+
 protected:
     explicit CCLayerImpl(int);
 
@@ -331,7 +338,7 @@ private:
     bool m_drawCheckerboardForMissingTiles;
     WebKit::WebTransformationMatrix m_sublayerTransform;
     WebKit::WebTransformationMatrix m_transform;
-    bool m_isNonCompositedContent;
+    bool m_useLCDText;
 
     bool m_drawsContent;
     bool m_forceRenderSurface;
@@ -376,10 +383,6 @@ private:
     bool m_betweenWillDrawAndDidDraw;
 #endif
 
-    // During drawing, identifies the region outside of which nothing should be drawn.
-    // Uses target surface's space.
-    IntRect m_scissorRect;
-
     // Render surface associated with this layer. The layer and its descendants
     // will render to this surface.
     OwnPtr<CCRenderSurface> m_renderSurface;
@@ -395,6 +398,9 @@ private:
 
     // Manages animations for this layer.
     OwnPtr<CCLayerAnimationController> m_layerAnimationController;
+
+    // Manages scrollbars for this layer
+    OwnPtr<CCScrollbarAnimationController> m_scrollbarAnimationController;
 };
 
 void sortLayers(Vector<CCLayerImpl*>::iterator first, Vector<CCLayerImpl*>::iterator end, CCLayerSorter*);

@@ -38,7 +38,8 @@ class CCInputHandler;
 class CCLayerTreeHost;
 class CCScheduler;
 class CCScopedThreadProxy;
-class CCTextureUpdater;
+class CCTextureUpdateQueue;
+class CCTextureUpdateController;
 class CCThread;
 class CCThreadProxyContextRecreationTimer;
 
@@ -76,6 +77,7 @@ public:
     // CCLayerTreeHostImplClient implementation
     virtual void didLoseContextOnImplThread() OVERRIDE;
     virtual void onSwapBuffersCompleteOnImplThread() OVERRIDE;
+    virtual void onVSyncParametersChanged(double monotonicTimebase, double intervalInSeconds) OVERRIDE;
     virtual void setNeedsRedrawOnImplThread() OVERRIDE;
     virtual void setNeedsCommitOnImplThread() OVERRIDE;
     virtual void postAnimationEventsToMainThreadOnImplThread(PassOwnPtr<CCAnimationEventsVector>, double wallClockTime) OVERRIDE;
@@ -99,13 +101,11 @@ private:
     struct BeginFrameAndCommitState {
         BeginFrameAndCommitState()
             : monotonicFrameBeginTime(0)
-            , updater(0)
         {
         }
 
         double monotonicFrameBeginTime;
         OwnPtr<CCScrollAndScaleSet> scrollInfo;
-        CCTextureUpdater* updater;
         bool contentsTexturesWereDeleted;
         size_t memoryAllocationLimitBytes;
     };
@@ -127,7 +127,7 @@ private:
         IntRect rect;
     };
     void forceBeginFrameOnImplThread(CCCompletionEvent*);
-    void beginFrameCompleteOnImplThread(CCCompletionEvent*);
+    void beginFrameCompleteOnImplThread(CCCompletionEvent*, PassOwnPtr<CCTextureUpdateQueue>);
     void beginFrameAbortedOnImplThread();
     void requestReadbackOnImplThread(ReadbackRequest*);
     void requestStartPageScaleAnimationOnImplThread(IntSize targetPosition, bool useAnchor, float scale, double durationSec);
@@ -183,10 +183,12 @@ private:
     // Set when the main thread is waiting on layers to be drawn.
     CCCompletionEvent* m_textureAcquisitionCompletionEventOnImplThread;
 
-    OwnPtr<CCTextureUpdater> m_currentTextureUpdaterOnImplThread;
+    OwnPtr<CCTextureUpdateController> m_currentTextureUpdateControllerOnImplThread;
 
     // Set when the next draw should post didCommitAndDrawFrame to the main thread.
     bool m_nextFrameIsNewlyCommittedFrameOnImplThread;
+
+    bool m_renderVSyncEnabled;
 };
 
 }

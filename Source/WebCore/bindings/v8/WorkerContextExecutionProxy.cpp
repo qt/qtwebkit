@@ -42,10 +42,10 @@
 #include "SharedWorker.h"
 #include "SharedWorkerContext.h"
 #include "V8Binding.h"
-#include "V8BindingPerContextData.h"
 #include "V8DOMMap.h"
 #include "V8DOMWindowShell.h"
 #include "V8DedicatedWorkerContext.h"
+#include "V8PerContextData.h"
 #include "V8Proxy.h"
 #include "V8RecursionScope.h"
 #include "V8SharedWorkerContext.h"
@@ -122,12 +122,16 @@ void WorkerContextExecutionProxy::initIsolate()
     v8::V8::SetGlobalGCPrologueCallback(&V8GCController::gcPrologue);
     v8::V8::SetGlobalGCEpilogueCallback(&V8GCController::gcEpilogue);
 
+    // FIXME: Remove the following 2 lines when V8 default has changed.
+    const char es5ReadonlyFlag[] = "--es5_readonly";
+    v8::V8::SetFlagsFromString(es5ReadonlyFlag, sizeof(es5ReadonlyFlag));
+
     v8::ResourceConstraints resource_constraints;
     uint32_t here;
     resource_constraints.set_stack_limit(&here - kWorkerMaxStackSize / sizeof(uint32_t*));
     v8::SetResourceConstraints(&resource_constraints);
 
-    V8BindingPerIsolateData::ensureInitialized(v8::Isolate::GetCurrent());
+    V8PerIsolateData::ensureInitialized(v8::Isolate::GetCurrent());
 }
 
 bool WorkerContextExecutionProxy::initContextIfNeeded()
@@ -153,7 +157,7 @@ bool WorkerContextExecutionProxy::initContextIfNeeded()
 
     v8::Context::Scope scope(context);
 
-    m_perContextData = V8BindingPerContextData::create(m_context);
+    m_perContextData = V8PerContextData::create(m_context);
     if (!m_perContextData->init()) {
         dispose();
         return false;
@@ -179,7 +183,7 @@ bool WorkerContextExecutionProxy::initContextIfNeeded()
     // Wrap the object.
     V8DOMWrapper::setDOMWrapper(jsWorkerContext, contextType, m_workerContext);
 
-    V8DOMWrapper::setJSWrapperForDOMObject(PassRefPtr<WorkerContext>(m_workerContext), v8::Persistent<v8::Object>::New(jsWorkerContext));
+    V8DOMWrapper::setJSWrapperForDOMObject(PassRefPtr<WorkerContext>(m_workerContext), jsWorkerContext);
 
     // Insert the object instance as the prototype of the shadow object.
     v8::Handle<v8::Object> globalObject = v8::Handle<v8::Object>::Cast(m_context->Global()->GetPrototype());

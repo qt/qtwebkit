@@ -28,6 +28,8 @@
 #include "GraphicsContext3D.h"
 #include "ProgramBinding.h"
 #include "ShaderChromium.h"
+#include <wtf/OwnPtr.h>
+#include <wtf/PassOwnPtr.h>
 
 namespace WebKit {
 class WebGraphicsContext3D;
@@ -38,10 +40,15 @@ class IntSize;
 
 class TextureCopier {
 public:
-    // Copy the base level contents of |sourceTextureId| to |destTextureId|. Both texture objects
+    struct Parameters {
+        unsigned sourceTexture;
+        unsigned destTexture;
+        IntSize size;
+    };
+    // Copy the base level contents of |sourceTexture| to |destTexture|. Both texture objects
     // must be complete and have a base level of |size| dimensions. The color formats do not need
-    // to match, but |destTextureId| must have a renderable format.
-    virtual void copyTexture(unsigned sourceTextureId, unsigned destTextureId, const IntSize&) = 0;
+    // to match, but |destTexture| must have a renderable format.
+    virtual void copyTexture(Parameters) = 0;
     virtual void flush() = 0;
 
 protected:
@@ -59,8 +66,8 @@ public:
     }
     virtual ~AcceleratedTextureCopier();
 
-    virtual void copyTexture(unsigned sourceTextureId, unsigned destTextureId, const IntSize&);
-    virtual void flush();
+    virtual void copyTexture(Parameters) OVERRIDE;
+    virtual void flush() OVERRIDE;
 
 protected:
     AcceleratedTextureCopier(WebKit::WebGraphicsContext3D*, bool usingBindUniforms);

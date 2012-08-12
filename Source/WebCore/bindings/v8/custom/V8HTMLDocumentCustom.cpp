@@ -31,6 +31,7 @@
 #include "config.h"
 #include "V8HTMLDocument.h"
 
+#include "BindingState.h"
 #include "Frame.h"
 #include "HTMLAllCollection.h"
 #include "HTMLDocument.h"
@@ -45,6 +46,7 @@
 #include "V8Node.h"
 #include "V8Proxy.h"
 #include "V8RecursionScope.h"
+#include <wtf/text/StringBuilder.h>
 #include <wtf/OwnArrayPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/StdLibExtras.h>
@@ -82,11 +84,11 @@ v8::Local<v8::Object> V8HTMLDocument::WrapInShadowObject(v8::Local<v8::Object> w
 v8::Handle<v8::Value> V8HTMLDocument::GetNamedProperty(HTMLDocument* htmlDocument, const AtomicString& key, v8::Isolate* isolate)
 {
     if (!htmlDocument->hasNamedItem(key.impl()) && !htmlDocument->hasExtraNamedItem(key.impl()))
-        return v8::Handle<v8::Value>();
+        return v8Undefined();
 
     RefPtr<HTMLCollection> items = htmlDocument->documentNamedItems(key);
     if (items->isEmpty())
-        return v8::Handle<v8::Value>();
+        return v8Undefined();
 
     if (items->hasExactlyOneItem()) {
         Node* node = items->item(0);
@@ -108,17 +110,17 @@ v8::Handle<v8::Value> V8HTMLDocument::GetNamedProperty(HTMLDocument* htmlDocumen
 //   document.write() --> document.write("")
 static String writeHelperGetString(const v8::Arguments& args)
 {
-    String str = "";
+    StringBuilder builder;
     for (int i = 0; i < args.Length(); ++i)
-        str += toWebCoreString(args[i]);
-    return str;
+        builder.append(toWebCoreString(args[i]));
+    return builder.toString();
 }
 
 v8::Handle<v8::Value> V8HTMLDocument::writeCallback(const v8::Arguments& args)
 {
     INC_STATS("DOM.HTMLDocument.write()");
     HTMLDocument* htmlDocument = V8HTMLDocument::toNative(args.Holder());
-    Frame* frame = V8Proxy::retrieveFrameForCallingContext();
+    Frame* frame = activeFrame(BindingState::instance());
     htmlDocument->write(writeHelperGetString(args), frame ? frame->document() : NULL);
     return v8::Undefined();
 }
@@ -127,7 +129,7 @@ v8::Handle<v8::Value> V8HTMLDocument::writelnCallback(const v8::Arguments& args)
 {
     INC_STATS("DOM.HTMLDocument.writeln()");
     HTMLDocument* htmlDocument = V8HTMLDocument::toNative(args.Holder());
-    Frame* frame = V8Proxy::retrieveFrameForCallingContext();
+    Frame* frame = activeFrame(BindingState::instance());
     htmlDocument->writeln(writeHelperGetString(args), frame ? frame->document() : NULL);
     return v8::Undefined();
 }
@@ -155,16 +157,11 @@ v8::Handle<v8::Value> V8HTMLDocument::openCallback(const v8::Arguments& args)
             for (int i = 0; i < args.Length(); i++)
                 params[i] = args[i];
 
-            V8Proxy* proxy = V8Proxy::retrieve(frame.get());
-            if (!proxy)
-                return v8::Undefined();
-
-            v8::Local<v8::Value> result = proxy->callFunction(v8::Local<v8::Function>::Cast(function), global, args.Length(), params.get());
-            return result;
+            return frame->script()->proxy()->callFunction(v8::Local<v8::Function>::Cast(function), global, args.Length(), params.get());
         }
     }
 
-    Frame* frame = V8Proxy::retrieveFrameForCallingContext();
+    Frame* frame = activeFrame(BindingState::instance());
     htmlDocument->open(frame ? frame->document() : NULL);
     // Return the document.
     return args.Holder();
@@ -192,8 +189,8 @@ v8::Handle<v8::Value> toV8(HTMLDocument* impl, v8::Isolate* isolate, bool forceN
     if (wrapper.IsEmpty())
         return wrapper;
     if (!V8IsolatedContext::getEntered()) {
-        if (V8Proxy* proxy = V8Proxy::retrieve(impl->frame()))
-            proxy->windowShell()->updateDocumentWrapper(wrapper);
+        if (Frame* frame = impl->frame())
+            frame->script()->windowShell()->updateDocumentWrapper(wrapper);
     }
     return wrapper;
 }

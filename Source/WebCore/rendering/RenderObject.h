@@ -26,8 +26,7 @@
 #ifndef RenderObject_h
 #define RenderObject_h
 
-#include "CachedImage.h"
-#include "Document.h"
+#include "CachedImageClient.h"
 #include "Element.h"
 #include "FractionalLayoutUnit.h"
 #include "FloatQuad.h"
@@ -46,6 +45,7 @@ namespace WebCore {
 class AffineTransform;
 class AnimationController;
 class Cursor;
+class Document;
 class HitTestPoint;
 class HitTestResult;
 class InlineBox;
@@ -107,9 +107,16 @@ enum PlaceGeneratedRunInFlag {
     DoNotPlaceGeneratedRunIn
 };
 
+enum MapLocalToContainerMode {
+    IsFixed = 1 << 0,
+    UseTransforms = 1 << 1,
+    ApplyContainerFlip = 1 << 2
+};
+typedef unsigned MapLocalToContainerFlags;
+
 const int caretWidth = 1;
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
 struct DashboardRegionValue {
     bool operator==(const DashboardRegionValue& o) const
     {
@@ -636,7 +643,7 @@ public:
     // repaint and do not need a relayout
     virtual void updateFromElement() { }
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
     virtual void addDashboardRegions(Vector<DashboardRegionValue>&);
     void collectDashboardRegions(Vector<DashboardRegionValue>&);
 #endif
@@ -844,7 +851,6 @@ public:
 
     // Virtual function helpers for the deprecated Flexible Box Layout (display: -webkit-box).
     virtual bool isDeprecatedFlexibleBox() const { return false; }
-    virtual bool isFlexingChildren() const { return false; }
     virtual bool isStretchingChildren() const { return false; }
 
     // Virtual function helper for the new FlexibleBox Layout (display: -webkit-flex).
@@ -878,8 +884,7 @@ public:
 
     // Map points and quads through elements, potentially via 3d transforms. You should never need to call these directly; use
     // localToAbsolute/absoluteToLocal methods instead.
-    enum ApplyContainerFlipOrNot { DoNotApplyContainerFlip, ApplyContainerFlip };
-    virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, bool useTransforms, bool fixed, TransformState&, ApplyContainerFlipOrNot = ApplyContainerFlip, bool* wasFixed = 0) const;
+    virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, TransformState&, MapLocalToContainerFlags mode = ApplyContainerFlip, bool* wasFixed = 0) const;
     virtual void mapAbsoluteToLocalPoint(bool fixed, bool useTransforms, TransformState&) const;
 
     // Pushes state onto RenderGeometryMap about how to map coordinates from this renderer to its container, or ancestorToStopAt (whichever is encountered first).
@@ -926,6 +931,8 @@ protected:
     void arenaDelete(RenderArena*, void* objectBase);
 
     virtual LayoutRect outlineBoundsForRepaint(RenderBoxModelObject* /*repaintContainer*/, LayoutPoint* /*cachedOffsetToRepaintContainer*/ = 0) const { return LayoutRect(); }
+
+    virtual bool canBeReplacedWithInlineRunIn() const;
 
 private:
     RenderStyle* firstLineStyleSlowCase() const;

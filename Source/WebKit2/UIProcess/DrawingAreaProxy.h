@@ -90,13 +90,13 @@ public:
 
     virtual void colorSpaceDidChange() { }
 
-#if USE(UI_SIDE_COMPOSITING)
+#if USE(COORDINATED_GRAPHICS)
     virtual void updateViewport();
     virtual WebCore::IntRect viewportVisibleRect() const { return contentsRect(); }
     virtual WebCore::IntRect contentsRect() const;
     virtual bool isBackingStoreReady() const { return true; }
     LayerTreeCoordinatorProxy* layerTreeCoordinatorProxy() const { return m_layerTreeCoordinatorProxy.get(); }
-    virtual void setVisibleContentsRect(const WebCore::IntRect& visibleContentsRect, float scale, const WebCore::FloatPoint& trajectoryVector, const WebCore::FloatPoint& accurateVisibleContentsPosition = WebCore::FloatPoint()) { }
+    virtual void setVisibleContentsRect(const WebCore::FloatRect& visibleContentsRect, float scale, const WebCore::FloatPoint& trajectoryVector) { }
     virtual void createTileForLayer(int layerID, int tileID, const WebKit::UpdateInfo&) { }
     virtual void updateTileForLayer(int layerID, int tileID, const WebKit::UpdateInfo&) { }
     virtual void removeTileForLayer(int layerID, int tileID) { }
@@ -113,7 +113,7 @@ protected:
     WebCore::IntSize m_size;
     WebCore::IntSize m_scrollOffset;
 
-#if USE(UI_SIDE_COMPOSITING)
+#if USE(COORDINATED_GRAPHICS)
     OwnPtr<LayerTreeCoordinatorProxy> m_layerTreeCoordinatorProxy;
 #endif
 

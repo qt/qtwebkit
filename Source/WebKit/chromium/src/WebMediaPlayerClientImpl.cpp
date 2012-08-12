@@ -23,18 +23,16 @@
 #include "WebFrameClient.h"
 #include "WebFrameImpl.h"
 #include "WebHelperPluginImpl.h"
-#include "WebKit.h"
 #include "WebMediaPlayer.h"
 #include "WebViewImpl.h"
-#include "cc/CCProxy.h"
-#include "platform/WebCString.h"
-#include "platform/WebCanvas.h"
-#include "platform/WebKitPlatformSupport.h"
-#include "platform/WebRect.h"
-#include "platform/WebSize.h"
-#include "platform/WebString.h"
-#include "platform/WebURL.h"
+#include <public/Platform.h>
+#include <public/WebCString.h>
+#include <public/WebCanvas.h>
 #include <public/WebMimeRegistry.h>
+#include <public/WebRect.h>
+#include <public/WebSize.h>
+#include <public/WebString.h>
+#include <public/WebURL.h>
 
 #if USE(ACCELERATED_COMPOSITING)
 #include "RenderLayerCompositor.h"
@@ -342,10 +340,10 @@ void WebMediaPlayerClientImpl::cancelLoad()
 }
 
 #if USE(ACCELERATED_COMPOSITING)
-LayerChromium* WebMediaPlayerClientImpl::platformLayer() const
+WebLayer* WebMediaPlayerClientImpl::platformLayer() const
 {
     ASSERT(m_supportsAcceleratedCompositing);
-    return m_videoLayer.unwrap<LayerChromium>();
+    return const_cast<WebVideoLayer*>(&m_videoLayer);
 }
 #endif
 
@@ -841,14 +839,12 @@ void WebMediaPlayerClientImpl::startDelayedLoad()
 void WebMediaPlayerClientImpl::didReceiveFrame()
 {
     // No lock since this gets called on the client's thread.
-    ASSERT(CCProxy::isImplThread());
     m_videoFrameProviderClient->didReceiveFrame();
 }
 
 void WebMediaPlayerClientImpl::didUpdateMatrix(const float* matrix)
 {
     // No lock since this gets called on the client's thread.
-    ASSERT(CCProxy::isImplThread());
     m_videoFrameProviderClient->didUpdateMatrix(matrix);
 }
 

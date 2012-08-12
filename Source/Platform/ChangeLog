@@ -1,3 +1,716 @@
+2012-08-09  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Remove forwarding headers for compositor-related WebKit API and update includes
+        https://bugs.webkit.org/show_bug.cgi?id=93669
+
+        Reviewed by Adam Barth.
+
+        Removes a no-longer-necessary transitional define.
+
+        * chromium/public/WebCompositor.h:
+
+2012-08-06  Nat Duca  <nduca@chromium.org>
+
+        [chromium] Expose CCGraphicsContext as WebCompositorOutputSurface
+        https://bugs.webkit.org/show_bug.cgi?id=92890
+
+        Reviewed by James Robinson.
+
+        The CCGraphicsContext was introduced as a wrapper around the 2D
+        and 3D output for the compositor. However, it is a CC only
+        concept. We want to be able to make 2D and ubercomp-mode IPCs on
+        behalf of the compositor. This patch allows this by pushing this
+        abstraction out to the Chrome-visible layer of the compositor,
+        changing the name to OutputSurface based on discussions on
+        wkb.ug/90736. A future patch will rename the CCGraphicsContext to
+        CCOutputSurface.
+
+        * Platform.gypi:
+        * chromium/public/WebCompositorOutputSurface.h: Added.
+        (WebKit):
+        (WebCompositorOutputSurface):
+        (WebKit::WebCompositorOutputSurface::~WebCompositorOutputSurface):
+        (WebKit::WebCompositorOutputSurface::Capabilities::Capabilities):
+        (Capabilities):
+        * chromium/public/WebCompositorOutputSurfaceClient.h: Added.
+        (WebKit):
+        (WebCompositorOutputSurfaceClient):
+        (WebKit::WebCompositorOutputSurfaceClient::~WebCompositorOutputSurfaceClient):
+        * chromium/public/WebLayerTreeView.h:
+        (WebKit::WebLayerTreeView::Settings::Settings):
+        (Settings):
+        * chromium/public/WebLayerTreeViewClient.h:
+        (WebKit):
+        (WebLayerTreeViewClient):
+        (WebKit::WebLayerTreeViewClient::createContext3D):
+        (WebKit::WebLayerTreeViewClient::createOutputSurface):
+
+2012-08-09  Nat Duca  <nduca@chromium.org>
+
+        Unreviewed, rolling out r125212.
+        http://trac.webkit.org/changeset/125212
+        https://bugs.webkit.org/show_bug.cgi?id=92890
+
+        Compile failure on mac dbg builder
+
+        * Platform.gypi:
+        * chromium/public/WebCompositorOutputSurface.h: Removed.
+        * chromium/public/WebCompositorOutputSurfaceClient.h: Removed.
+        * chromium/public/WebLayerTreeView.h:
+        (WebKit::WebLayerTreeView::Settings::Settings):
+        (Settings):
+        * chromium/public/WebLayerTreeViewClient.h:
+        (WebKit):
+        (WebLayerTreeViewClient):
+
+2012-08-06  Nat Duca  <nduca@chromium.org>
+
+        [chromium] Expose CCGraphicsContext as WebCompositorOutputSurface
+        https://bugs.webkit.org/show_bug.cgi?id=92890
+
+        Reviewed by James Robinson.
+
+        The CCGraphicsContext was introduced as a wrapper around the 2D
+        and 3D output for the compositor. However, it is a CC only
+        concept. We want to be able to make 2D and ubercomp-mode IPCs on
+        behalf of the compositor. This patch allows this by pushing this
+        abstraction out to the Chrome-visible layer of the compositor,
+        changing the name to OutputSurface based on discussions on
+        wkb.ug/90736. A future patch will rename the CCGraphicsContext to
+        CCOutputSurface.
+
+        * Platform.gypi:
+        * chromium/public/WebCompositorOutputSurface.h: Added.
+        (WebKit):
+        (WebCompositorOutputSurface):
+        (WebKit::WebCompositorOutputSurface::~WebCompositorOutputSurface):
+        (WebKit::WebCompositorOutputSurface::Capabilities::Capabilities):
+        (Capabilities):
+        * chromium/public/WebCompositorOutputSurfaceClient.h: Added.
+        (WebKit):
+        (WebCompositorOutputSurfaceClient):
+        (WebKit::WebCompositorOutputSurfaceClient::~WebCompositorOutputSurfaceClient):
+        * chromium/public/WebLayerTreeView.h:
+        (WebKit::WebLayerTreeView::Settings::Settings):
+        (Settings):
+        * chromium/public/WebLayerTreeViewClient.h:
+        (WebKit):
+        (WebLayerTreeViewClient):
+        (WebKit::WebLayerTreeViewClient::createContext3D):
+        (WebKit::WebLayerTreeViewClient::createOutputSurface):
+
+2012-08-08  Adrienne Walker  <enne@google.com>
+
+        [chromium] Move scrollbar pointer into WebScrollbarThemePainter
+        https://bugs.webkit.org/show_bug.cgi?id=93541
+
+        Reviewed by James Robinson.
+
+        Update WebScrollbarThemePainter to encapsulate a pointer to the
+        scrollbar as well. Lion scrollbars and RenderScrollbars are both
+        incompatible with wrapping a scrollbar in a WebScrollbar.
+
+        ScrollbarTheme(Chromium)Mac attaches extra data to a scrollbar based
+        on the pointer value (via a static map keyed on the pointer) so
+        passing an object that returns all the same values for the
+        ScrollbarThemeClient interface but has a different pointer will fail
+        to paint.
+
+        RenderScrollbar does static casts on the ScrollbarThemeClient pointer
+        that it is passed, assuming that it is the same. Therefore, it also
+        cannot use a WebScrollbar.
+
+        To fix this, push the real scrollbar pointer into the painter.
+
+        * chromium/public/WebScrollbarThemePainter.h:
+        (WebCore):
+        (WebKit::WebScrollbarThemePainter::WebScrollbarThemePainter):
+        (WebScrollbarThemePainter):
+
+2012-08-07  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Only use public Platform API in NonCompositedContentHost
+        https://bugs.webkit.org/show_bug.cgi?id=93423
+
+        Reviewed by Adrienne Walker.
+
+        Adds setters to control text antialiasing and checkerboarding behavior for content layers.
+
+        * chromium/public/WebContentLayer.h:
+        (WebContentLayer):
+
+2012-08-08  Nate Chapin  <japhet@chromium.org>
+
+        [chromium] Upstream android's FlingAnimator
+        https://bugs.webkit.org/show_bug.cgi?id=92900
+
+        Reviewed by James Robinson.
+
+        No new tests yet, will be added once this code is called.
+
+        * Platform.gypi:
+        * chromium/public/Platform.h:
+        (WebKit):
+        (WebKit::Platform::createFlingAnimator):
+        * chromium/public/WebFlingAnimator.h: Added.
+        (WebKit):
+        (WebFlingAnimator):
+        (WebKit::WebFlingAnimator::~WebFlingAnimator):
+
+2012-08-07  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Switch PlatformLayer typedef to Platform API type for PLATFORM(CHROMIUM)
+        https://bugs.webkit.org/show_bug.cgi?id=93335
+
+        Reviewed by Adrienne Walker.
+
+        Add APIs to control scrolling behavior on WebScrollableLayer.
+
+        * chromium/public/WebScrollableLayer.h:
+        (WebScrollableLayer):
+
+2012-08-07  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Use WebCompositor interface in Platform API instead of CCProxy to query threaded compositor status
+        https://bugs.webkit.org/show_bug.cgi?id=93398
+
+        Reviewed by Adam Barth.
+
+        Adds thread status query interfaces to WebCompositor for WebKit code that wants to know if we are in threaded
+        mode.
+
+        * chromium/public/WebCompositor.h:
+        (WebCompositor):
+
+2012-08-07  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Move WebCompositor interface into Platform API
+        https://bugs.webkit.org/show_bug.cgi?id=93391
+
+        Reviewed by Adam Barth.
+
+        WebCompositor is logically part of the Platform API, along with WebLayerTreeView and the WebLayer types.
+
+        * chromium/public/WebCompositor.h: Renamed from Source/WebKit/chromium/public/WebCompositorClient.h.
+        (WebKit):
+        (WebCompositor):
+        (WebKit::WebCompositor::~WebCompositor):
+
+2012-08-06  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Remove lingering unwrap<>() calls in GraphicsLayerChromium.cpp
+        https://bugs.webkit.org/show_bug.cgi?id=93319
+
+        Reviewed by Adrienne Walker.
+
+        Adds a few more entry points to WebLayer that are being used by GraphicsLayerChromium.
+
+        * chromium/public/WebLayer.h:
+        (WebLayer):
+
+2012-08-06  Antoine Labour  <piman@chromium.org>
+
+        [chromium] add sync points and GL_CHROMIUM_texture_mailbox entrypoints to WebGraphicsContext3D
+        https://bugs.webkit.org/show_bug.cgi?id=93313
+
+        Reviewed by James Robinson.
+
+        Sync points already landed chromium-side, mailbos at https://chromiumcodereview.appspot.com/10829209/
+
+        * chromium/public/WebGraphicsContext3D.h:
+        (WebKit::WebGraphicsContext3D::insertSyncPoint):
+        (WebKit::WebGraphicsContext3D::waitSyncPoint):
+        (WebGraphicsContext3D):
+        (WebKit::WebGraphicsContext3D::genMailboxCHROMIUM):
+        (WebKit::WebGraphicsContext3D::produceTextureCHROMIUM):
+        (WebKit::WebGraphicsContext3D::consumeTextureCHROMIUM):
+
+2012-08-06  Adrienne Walker  <enne@google.com>
+
+        [chromium] Convert WebScrollbarThemeGeometry from a concrete class to an interface
+        https://bugs.webkit.org/show_bug.cgi?id=93308
+
+        Reviewed by James Robinson.
+
+        Convert WebScrollbarThemeGeometry to be an interface. Update
+        WebScrollbarLayer to take a pointer to this interface.
+
+        * chromium/public/WebScrollbarLayer.h:
+        (WebScrollbarLayer):
+        * chromium/public/WebScrollbarThemeGeometry.h:
+        (WebScrollbarThemeGeometry):
+
+2012-08-06  Adam Barth  <abarth@webkit.org>
+
+        [Chromium] WebTouchCandidatesInfo should be part of the Client API
+        https://bugs.webkit.org/show_bug.cgi?id=93088
+
+        Reviewed by Eric Seidel.
+
+        All the input related interfaces are part of the client (rather than
+        the platform) part of the API. This patch moves WebTouchCandidatesInfo
+        to the client part of the API.
+
+        * Platform.gypi:
+        * chromium/public/WebTouchCandidatesInfo.h: Removed.
+
+2012-08-03  Nico Weber  <thakis@chromium.org>
+
+        [chromium] Add API to make it possible to request all variants of a WebImage
+        https://bugs.webkit.org/show_bug.cgi?id=92933
+
+        Reviewed by Adam Barth.
+
+        Part of http://crbug.com/138550
+
+        * chromium/public/WebImage.h:
+        (WebImage):
+
+2012-08-03  Alexandre Elias  <aelias@google.com>
+
+        [chromium] Move ubercomp quads back into CC
+        https://bugs.webkit.org/show_bug.cgi?id=93062
+
+        Reviewed by James Robinson.
+
+        Because GTFO is almost done, we can move back the quad types
+        to CC and pickle them there.  This patch moves everything back
+        to where it was before and changes types like WebRect to IntRect.
+
+        As a bonus, I also added CCRenderPassDrawQuad and CCYUVVideoDrawQuad
+        (which had been left in the CC files) to CCDrawQuad::size(), so now
+        every quad type is ready for serialization.
+
+        * Platform.gypi:
+        * chromium/public/WebCompositorCheckerboardQuad.h: Removed.
+        * chromium/public/WebCompositorDebugBorderQuad.h: Removed.
+        * chromium/public/WebCompositorIOSurfaceQuad.h: Removed.
+        * chromium/public/WebCompositorQuad.h: Removed.
+        * chromium/public/WebCompositorSharedQuadState.h: Removed.
+        * chromium/public/WebCompositorSolidColorQuad.h: Removed.
+        * chromium/public/WebCompositorStreamVideoQuad.h: Removed.
+        * chromium/public/WebCompositorTextureQuad.h: Removed.
+        * chromium/public/WebCompositorTileQuad.h: Removed.
+
+2012-08-02  Alexandre Elias  <aelias@google.com>
+
+        [chromium] deviceViewportSize cleanup
+        https://bugs.webkit.org/show_bug.cgi?id=92794
+
+        Reviewed by Adrienne Walker.
+
+        In the future, CSS layout size will become increasingly disassociated
+        from physical device size, and it will become impossible to infer one
+        from the other inside the compositor.  Therefore, this patch allows
+        deviceViewportSize to be explicitly passed in by the outside client.
+
+        I also renamed the existing viewportSize field to "layoutViewportSize"
+        for clarity, and converted its uses to deviceViewportSize since
+        that is more appropriate.
+
+        I had to add some default-value scaffolding to WebLayerTreeView in
+        order to avoid breaking ui/compositor.  We can delete it once that's
+        updated.
+
+        * chromium/public/WebLayerTreeView.h:
+        (WebLayerTreeView):
+
+2012-08-01  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Wrap shared context getters in WebKit API and avoid WebCore::GraphicsContext3D use in compositor internals
+        https://bugs.webkit.org/show_bug.cgi?id=92917
+
+        Reviewed by Adrienne Walker.
+
+        This adds Platform API for creating and accessing shared GraphicsContext3D and Ganesh contexts from the main or
+        compositor threads. These can be used for evaluating filters or doing accelerated painting. These contexts are
+        generally leaked until lost or process exit, the details are documented in WebSharedGraphicsContext3D.h
+
+        * Platform.gypi:
+        * chromium/public/WebSharedGraphicsContext3D.h: Added.
+        (WebKit):
+        (WebSharedGraphicsContext3D):
+
+2012-08-02  Peter Beverloo  <peter@chromium.org>
+
+        [Chromium] Add a stub for WebView::getTouchHighlightQuads()
+        https://bugs.webkit.org/show_bug.cgi?id=92997
+
+        Reviewed by Adam Barth.
+
+        Chrome on Android will be using this method for the link preview
+        implementation, discussion about which is available in Bug 79150. Since
+        that system is fairly big, will require refactoring, and the unavailable
+        APIs are blocking API compatibility, add a stub for now.
+
+        Together with the WebView API, also add the "WebTouchCandidatesInfo"
+        structure which is being used by it.
+
+        * Platform.gypi: List WebTouchCandidatesInfo.h
+        * chromium/public/WebTouchCandidatesInfo.h: Added.
+        (WebKit):
+        (WebTouchCandidatesInfo):
+        (WebKit::WebTouchCandidatesInfo::WebTouchCandidatesInfo):
+
+2012-08-02  Tommy Widenflycht  <tommyw@google.com>
+
+        MediaStream API: Add RTCPeerConnectionHandler infrastructure
+        https://bugs.webkit.org/show_bug.cgi?id=92866
+
+        Reviewed by Adam Barth.
+
+        Introducing RTCPeerConnectionHandler & RTCPeerConnectionHandlerClient,
+        together with the Chromium WebKit interface, following the pattern of
+        the previous PeerConnection00Handler but with the optimizations from MediaStreamCenter.
+
+        * Platform.gypi:
+        * chromium/public/Platform.h:
+        (WebKit):
+        (Platform):
+        (WebKit::Platform::createRTCPeerConnectionHandler):
+        * chromium/public/WebRTCPeerConnectionHandler.h: Added.
+        (WebKit):
+        (WebRTCPeerConnectionHandler):
+        (WebKit::WebRTCPeerConnectionHandler::~WebRTCPeerConnectionHandler):
+        * chromium/public/WebRTCPeerConnectionHandlerClient.h: Added.
+        (WebKit):
+        (WebRTCPeerConnectionHandlerClient):
+        (WebKit::WebRTCPeerConnectionHandlerClient::~WebRTCPeerConnectionHandlerClient):
+
+2012-08-02  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r124439.
+        http://trac.webkit.org/changeset/124439
+        https://bugs.webkit.org/show_bug.cgi?id=92980
+
+        Broke Chromium Mac Release compile (Requested by apavlov on
+        #webkit).
+
+        * Platform.gypi:
+        * chromium/public/Platform.h:
+        (WebKit):
+        (Platform):
+        (WebKit::Platform::createPeerConnectionHandler):
+        * chromium/public/WebRTCPeerConnectionHandler.h: Removed.
+        * chromium/public/WebRTCPeerConnectionHandlerClient.h: Removed.
+
+2012-08-02  Tommy Widenflycht  <tommyw@google.com>
+
+        MediaStream API: Add RTCPeerConnectionHandler infrastructure
+        https://bugs.webkit.org/show_bug.cgi?id=92866
+
+        Reviewed by Kentaro Hara.
+
+        Introducing RTCPeerConnectionHandler & RTCPeerConnectionHandlerClient,
+        together with the Chromium WebKit interface, following the pattern of
+        the previous PeerConnection00Handler but with the optimizations from MediaStreamCenter.
+
+        * Platform.gypi:
+        * chromium/public/Platform.h:
+        (WebKit):
+        (Platform):
+        (WebKit::Platform::createRTCPeerConnectionHandler):
+        * chromium/public/WebRTCPeerConnectionHandler.h: Added.
+        (WebKit):
+        (WebRTCPeerConnectionHandler):
+        (WebKit::WebRTCPeerConnectionHandler::~WebRTCPeerConnectionHandler):
+        * chromium/public/WebRTCPeerConnectionHandlerClient.h: Added.
+        (WebKit):
+        (WebRTCPeerConnectionHandlerClient):
+        (WebKit::WebRTCPeerConnectionHandlerClient::~WebRTCPeerConnectionHandlerClient):
+
+2012-08-02  Hironori Bono  <hbono@chromium.org>
+
+        [Chromium] Implement hyphenation for Chromium
+        https://bugs.webkit.org/show_bug.cgi?id=48610
+
+        Reviewed by Eric Seidel.
+
+        This change adds a couple of methods canHyphenate and computeLastHyphenLocation
+        to Platform so Chromium can implement them. Also, this change uses these methods
+        to implement the hyphenation methods of WebCore. (This change does not change
+        any behaviors until Chromium implements these methods.)
+
+        * chromium/public/Platform.h:
+        (Platform):
+        (WebKit::Platform::canHyphenate): Added a stub method so Chromium can implement it.
+        (WebKit::Platform::computeLastHyphenLocation): ditto.
+
+2012-08-02  Tommy Widenflycht  <tommyw@google.com>
+
+        MediaStream API: Move RTCConfiguration to its proper place
+        https://bugs.webkit.org/show_bug.cgi?id=92867
+
+        Reviewed by Adam Barth.
+
+        This patch moves RTCConfiguration to Source/WebCore/platform/mediastream,
+        and adds its WebKit interface for chromium.
+
+        * Platform.gypi:
+        * chromium/public/WebRTCConfiguration.h: Added.
+        (WebCore):
+        (WebKit):
+        (WebRTCICEServer):
+        (WebKit::WebRTCICEServer::WebRTCICEServer):
+        (WebKit::WebRTCICEServer::~WebRTCICEServer):
+        (WebKit::WebRTCICEServer::operator=):
+        (WebKit::WebRTCICEServer::isNull):
+        (WebRTCConfiguration):
+        (WebKit::WebRTCConfiguration::WebRTCConfiguration):
+        (WebKit::WebRTCConfiguration::~WebRTCConfiguration):
+        (WebKit::WebRTCConfiguration::operator=):
+        (WebKit::WebRTCConfiguration::isNull):
+
+2012-08-01  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Move compositor HUD font atlas initialization code out of compositor core
+        https://bugs.webkit.org/show_bug.cgi?id=92924
+
+        Reviewed by Adrienne Walker.
+
+        The chromium compositor does not have any text rendering capabilities. It generally does not need them, but it
+        is helpful for some debugging aids to be able to render at least ASCII text to the screen. This provides an API
+        on WebLayerTreeView by which an embedder can provide an ASCII glyph atlas to use for displaying debug
+        information.
+
+        * chromium/public/WebLayerTreeView.h:
+        (WebLayerTreeView):
+
+2012-08-01  Jian Li  <jianli@chromium.org>
+
+        Unreviewed. Fix build break for chromium.
+
+        * Platform.gypi:
+
+2012-08-01  Jian Li  <jianli@chromium.org>
+
+        [chromium] Make WebKit API support draggable region change update
+        https://bugs.webkit.org/show_bug.cgi?id=92813
+
+        Reviewed by Adam Barth.
+
+        Add WebDraggableRegion for chromium's usage.
+
+        * Platform.gypi:
+
+2012-08-01  Antoine Labour  <piman@chromium.org>
+
+        [chromium] factor out the optimization pass in CCRenderSurfaceFilters::apply
+        https://bugs.webkit.org/show_bug.cgi?id=92453
+
+        Reviewed by James Robinson.
+
+        This separates the "optimization" pass in CCRenderSurfaceFilters::apply
+        to resolve a succession of color matrix filters into a single operation.
+        This allows testing of that code.
+        This introduces a new generic color matrix WebFilterOperation, which can
+        also be used on its own.
+
+        * Platform.gypi:
+        * chromium/public/WebFilterOperation.h:
+        (WebKit::WebFilterOperation::matrix):
+        (WebKit::WebFilterOperation::createColorMatrixFilter):
+        (WebFilterOperation):
+        (WebKit::WebFilterOperation::WebFilterOperation):
+        * chromium/src/WebFilterOperation.cpp: Copied from Source/WebCore/platform/graphics/chromium/cc/CCRenderSurfaceFilters.h.
+        (WebKit):
+        (WebKit::WebFilterOperation::equals):
+        (WebKit::WebFilterOperation::WebFilterOperation):
+        * chromium/src/WebFilterOperations.cpp:
+        (WebKit::WebFilterOperations::hasFilterThatAffectsOpacity):
+
+2012-08-01  Tommy Widenflycht  <tommyw@google.com>
+
+        MediaStream API: Add ExtraData capability to MediaStreamSource
+        https://bugs.webkit.org/show_bug.cgi?id=92860
+
+        Reviewed by Adam Barth.
+
+        The Chromium port needs to store some related data in MediaStreamSource objects.
+
+        * chromium/public/WebMediaStreamSource.h:
+        (ExtraData):
+        (WebKit::WebMediaStreamSource::ExtraData::~ExtraData):
+        (WebMediaStreamSource):
+
+2012-08-01  Alexei Filippov  <alexeif@chromium.org>
+
+        Web Inspector: count DOM storage cache memory for native snapshot
+        https://bugs.webkit.org/show_bug.cgi?id=91617
+
+        Reviewed by Yury Semikhatsky.
+
+        Add memory size used for DOM storage cache reporting interface.
+
+        * chromium/public/WebStorageArea.h:
+        (WebStorageArea):
+        (WebKit::WebStorageArea::memoryBytesUsedByCache):
+
+2012-07-31  Chris Rogers  <crogers@google.com>
+
+        Allow AudioDestination to support local/live audio input
+        https://bugs.webkit.org/show_bug.cgi?id=90318
+
+        Reviewed by Kenneth Russell.
+
+        * chromium/public/WebAudioDevice.h:
+        (WebKit::WebAudioDevice::RenderCallback::render):
+        (RenderCallback):
+
+2012-07-31  Ian Vollick  <vollick@chromium.org>
+
+        [chromium] Use WebAnimation and related classes in GraphicsLayerChromium and AnimTranslationUtil
+        https://bugs.webkit.org/show_bug.cgi?id=90468
+
+        Reviewed by James Robinson.
+
+        * Platform.gypi:
+        * chromium/public/WebAnimation.h:
+        (WebAnimation):
+        (WebKit::WebAnimation::WebAnimation):
+        * chromium/public/WebAnimationDelegate.h: Renamed from Source/WebCore/platform/graphics/chromium/cc/CCLayerAnimationDelegate.h.
+        (WebKit):
+        (WebAnimationDelegate):
+        * chromium/public/WebLayer.h:
+        (WebKit):
+        (WebLayer):
+
+2012-07-30  Keishi Hattori  <keishi@webkit.org>
+
+        Implement datalist UI for input type color for Chromium
+        https://bugs.webkit.org/show_bug.cgi?id=92075
+
+        Reviewed by Kent Tamura.
+
+        * chromium/public/WebLocalizedString.h: Added OtherColorLabel.
+
+2012-07-30  Adrienne Walker  <enne@google.com>
+
+        [chromium] Wrap ScrollbarLayerChromium in WebScrollbarLayer
+        https://bugs.webkit.org/show_bug.cgi?id=91032
+
+        Reviewed by James Robinson.
+
+        Add WebScrollbarLayer class to the Platform API.
+
+        * Platform.gypi:
+        * chromium/public/WebScrollbarLayer.h: Added.
+        (WebCore):
+        (WebKit):
+        (WebScrollbarLayer):
+        (WebKit::WebScrollbarLayer::WebScrollbarLayer):
+        (WebKit::WebScrollbarLayer::~WebScrollbarLayer):
+        (WebKit::WebScrollbarLayer::operator=):
+
+2012-06-29  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Remove WebTransformationMatrix::mapPoint overrides
+        https://bugs.webkit.org/show_bug.cgi?id=90329
+
+        Reviewed by Adrienne Walker.
+
+        Remove clipping-unaware mapPoint functions from the WebTransformationMatrix interface.
+
+        * chromium/public/WebTransformationMatrix.h:
+        (WebTransformationMatrix):
+
+2012-07-30  John Bates  <jbates@google.com>
+
+        Plumb vsync-enabled flag up to compositor thread and support disable-vsync
+        https://bugs.webkit.org/show_bug.cgi?id=92323
+
+        Reviewed by James Robinson.
+
+        * chromium/public/WebLayerTreeView.h:
+        (WebKit::WebLayerTreeView::Settings::Settings):
+        (Settings):
+
+2012-07-30  Adrienne Walker  <enne@google.com>
+
+        [chromium] Remove dependency on ScrollbarTheme from the compositor
+        https://bugs.webkit.org/show_bug.cgi?id=90528
+
+        Reviewed by James Robinson.
+
+        Flesh out WebScrollbar functions enough to be able to implement
+        the parts of ScrollbarThemeClient that Chromium uses.
+
+        Wrap ScrollbarThemeComposite in the Platform API via two different
+        classes: WebScrollbarThemePainter is the non-threadsafe version that
+        is used to paint parts of a scrollbar into a context. This is intended
+        to only be used on the main thread. WebScrollbarThemeGeometry is the
+        threadsafe version, used to get the location and sizes of scrollbar
+        parts on both threads, so they can be painted on the main thread and
+        composited on the compositor thread.
+
+        Unfortunately, there is no way to enforce these thread safety issues,
+        as other ports use the ScrollbarTheme hierarchy differently than
+        Chromium does. On the bright side, other than painting, the
+        ScrollbarTheme code is largely functional and we can enforce this
+        internally for the Chromium port.
+
+        * Platform.gypi:
+        * chromium/public/WebScrollbar.h:
+        (WebCore):
+        (WebKit):
+        (WebScrollbar):
+        * chromium/public/WebScrollbarThemeGeometry.h: Added.
+        (WebCore):
+        (WebKit):
+        (WebScrollbarThemeGeometry):
+        (WebKit::WebScrollbarThemeGeometry::WebScrollbarThemeGeometry):
+        (WebKit::WebScrollbarThemeGeometry::~WebScrollbarThemeGeometry):
+        (WebKit::WebScrollbarThemeGeometry::operator=):
+        (WebKit::WebScrollbarThemeGeometry::isNull):
+        * chromium/public/WebScrollbarThemePainter.h: Added.
+        (WebCore):
+        (WebKit):
+        (WebScrollbarThemePainter):
+        (WebKit::WebScrollbarThemePainter::WebScrollbarThemePainter):
+        (WebKit::WebScrollbarThemePainter::~WebScrollbarThemePainter):
+        (WebKit::WebScrollbarThemePainter::operator=):
+        (WebKit::WebScrollbarThemePainter::isNull):
+
+2012-07-30  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r124025.
+        http://trac.webkit.org/changeset/124025
+        https://bugs.webkit.org/show_bug.cgi?id=92658
+
+        Causes color-suggestion-picker-appearance layout test to time
+        out on all Chromium platforms (Requested by tomhudson_ on
+        #webkit).
+
+        * chromium/public/WebLocalizedString.h:
+
+2012-07-30  Keishi Hattori  <keishi@webkit.org>
+
+        Implement datalist UI for input type color for Chromium
+        https://bugs.webkit.org/show_bug.cgi?id=92075
+
+        Reviewed by Kent Tamura.
+
+        * chromium/public/WebLocalizedString.h: Added OtherColorLabel.
+
+2012-07-30  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r124004.
+        http://trac.webkit.org/changeset/124004
+        https://bugs.webkit.org/show_bug.cgi?id=92622
+
+        Broke Android build (Requested by keishi on #webkit).
+
+        * chromium/public/WebLocalizedString.h:
+
+2012-07-30  Keishi Hattori  <keishi@webkit.org>
+
+        Implement datalist UI for input type color for Chromium
+        https://bugs.webkit.org/show_bug.cgi?id=92075
+
+        Reviewed by Kent Tamura.
+
+        * chromium/public/WebLocalizedString.h: Added OtherColorLabel.
+
 2012-07-25  Min Qin  <qinmin@chromium.org>
 
         Upstream declaration of WebGraphicsContext3D::createStreamTextureCHROMIUM() for android

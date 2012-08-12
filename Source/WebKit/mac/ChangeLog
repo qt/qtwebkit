@@ -1,3 +1,67 @@
+2012-08-09  Kinuko Yasuda  <kinuko@chromium.org>
+
+        http/tests/security/mixedContent/blob-url-in-iframe.html fails on Mac
+        https://bugs.webkit.org/show_bug.cgi?id=88736
+
+        Reviewed by Alexey Proskuryakov.
+
+        WebView::_canHandleRequest should return true for "blob:" URL so that it can be shown in iframe.
+
+        * WebView/WebView.mm:
+        (+[WebView _canHandleRequest:forMainFrame:]):
+
+2012-08-08  Shane Stephens  <shanestephens@google.com>
+
+        Compile flag for CSS Hierarchies
+        https://bugs.webkit.org/show_bug.cgi?id=92433
+
+        Reviewed by Tony Chang.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-08-05  Peter Wang  <peter.wang@torchmobile.com.cn>
+
+        Web Inspector: [JSC] implement setting breakpoints by line:column
+        https://bugs.webkit.org/show_bug.cgi?id=53003
+
+        Unreviewed, just changed the interface according the changes of base class JSC::Debugger.
+
+        No JSC can provide the column info of current JS statement, mac porting can use it to support
+        "Pretty Print" debug mode.
+
+        * WebView/WebScriptDebugger.h:
+        (WebScriptDebugger):
+        * WebView/WebScriptDebugger.mm:
+        (WebScriptDebugger::callEvent):
+        (WebScriptDebugger::atStatement):
+        (WebScriptDebugger::returnEvent):
+        (WebScriptDebugger::exception):
+        (WebScriptDebugger::willExecuteProgram):
+        (WebScriptDebugger::didExecuteProgram):
+        (WebScriptDebugger::didReachBreakpoint):
+
+2012-08-01  Jian Li  <jianli@chromium.org>
+
+        Add new CSS property "-webkit-widget-region" to expose dashboard region support for other port
+        https://bugs.webkit.org/show_bug.cgi?id=90298
+
+        Reviewed by Adam Barth.
+
+        * Configurations/FeatureDefines.xcconfig: Add ENABLE_WIDGET_REGION define.
+
+2012-08-01  Antti Koivisto  <antti@apple.com>
+
+        Assertion failure in inspector/profiler/heap-snapshot-containment-show-all.html on Lion bot
+        https://bugs.webkit.org/show_bug.cgi?id=92888
+
+        Reviewed by Andreas Kling.
+
+        Protect the WebInspectorWindowController so it doesn't get destroyed during [WebView close] and cause
+        unsafe [WebView dealloc].
+
+        * WebCoreSupport/WebInspectorClient.mm:
+        (-[WebInspectorWindowController destroyInspectorView:]):
+
 2012-07-29  Rik Cabanier  <cabanier@adobe.com>
 
         Add ENABLE_CSS_COMPOSITING flag

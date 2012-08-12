@@ -42,6 +42,7 @@
 #include "Color.h"
 #include "ColorSpace.h"
 #include "CompositionUnderlineVectorBuilder.h"
+#include "CompositorHUDFontAtlas.h"
 #include "ContextFeaturesClientImpl.h"
 #include "ContextMenu.h"
 #include "ContextMenuController.h"
@@ -81,7 +82,6 @@
 #include "InspectorInstrumentation.h"
 #include "KeyboardCodes.h"
 #include "KeyboardEvent.h"
-#include "LayerChromium.h"
 #include "LayerPainterChromium.h"
 #include "MIMETypeRegistry.h"
 #include "NodeRenderStyle.h"
@@ -97,7 +97,6 @@
 #include "PlatformMouseEvent.h"
 #include "PlatformThemeChromiumLinux.h"
 #include "PlatformWheelEvent.h"
-#include "PointerLock.h"
 #include "PointerLockController.h"
 #include "PopupContainer.h"
 #include "PopupMenuClient.h"
@@ -133,7 +132,6 @@
 #include "WebInputElement.h"
 #include "WebInputEvent.h"
 #include "WebInputEventConversion.h"
-#include "WebKit.h"
 #include "WebMediaPlayerAction.h"
 #include "WebNode.h"
 #include "WebPagePopupImpl.h"
@@ -145,15 +143,13 @@
 #include "WebRuntimeFeatures.h"
 #include "WebSettingsImpl.h"
 #include "WebTextInputInfo.h"
+#include "WebTouchCandidatesInfo.h"
 #include "WebViewClient.h"
 #include "WheelEvent.h"
-#include "cc/CCProxy.h"
-#include "cc/CCSettings.h"
 #include "painting/GraphicsContextBuilder.h"
-#include "platform/WebKitPlatformSupport.h"
-#include "platform/WebString.h"
-#include "platform/WebVector.h"
 #include <public/Platform.h>
+#include <public/WebCompositor.h>
+#include <public/WebCompositorOutputSurface.h>
 #include <public/WebDragData.h>
 #include <public/WebFloatPoint.h>
 #include <public/WebGraphicsContext3D.h>
@@ -162,6 +158,8 @@
 #include <public/WebLayerTreeView.h>
 #include <public/WebPoint.h>
 #include <public/WebRect.h>
+#include <public/WebString.h>
+#include <public/WebVector.h>
 #include <wtf/CurrentTime.h>
 #include <wtf/MainThread.h>
 #include <wtf/RefPtr.h>
@@ -195,7 +193,7 @@ static const int touchPointPadding = 32;
 static const float minScaleDifference = 0.01f;
 static const float doubleTapZoomContentDefaultMargin = 5;
 static const float doubleTapZoomContentMinimumMargin = 2;
-static const double doubleTabZoomAnimationDurationInSeconds = 0.25;
+static const double doubleTapZoomAnimationDurationInSeconds = 0.25;
 
 // Constants for zooming in on a focused text field.
 static const double scrollAndScaleAnimationDurationInSeconds = 0.2;
@@ -763,21 +761,42 @@ void WebViewImpl::transferActiveWheelFlingAnimation(const WebActiveWheelFlingPar
 
 void WebViewImpl::renderingStats(WebRenderingStats& stats) const
 {
-    ASSERT(isAcceleratedCompositingActive());
     if (!m_layerTreeView.isNull())
         m_layerTreeView.renderingStats(stats);
 }
 
-void WebViewImpl::startPageScaleAnimation(const IntPoint& scroll, bool useAnchor, float newScale, double durationInSeconds)
+void WebViewImpl::startPageScaleAnimation(const IntPoint& targetPosition, bool useAnchor, float newScale, double durationInSeconds)
 {
-    if (!m_layerTreeView.isNull())
-        m_layerTreeView.startPageScaleAnimation(scroll, useAnchor, newScale, durationInSeconds);
+    if (m_layerTreeView.isNull())
+        return;
+
+    IntPoint clampedPoint = targetPosition;
+    if (!useAnchor)
+        clampedPoint = clampOffsetAtScale(targetPosition, newScale);
+
+    if (!durationInSeconds && !useAnchor) {
+        setPageScaleFactor(newScale, clampedPoint);
+        return;
+    }
+
+    m_layerTreeView.startPageScaleAnimation(targetPosition, useAnchor, newScale, durationInSeconds);
 }
 #endif
 
 WebViewBenchmarkSupport* WebViewImpl::benchmarkSupport()
 {
     return &m_benchmarkSupport;
+}
+
+WebVector<WebFloatQuad> WebViewImpl::getTouchHighlightQuads(const WebPoint& point,
+                                                            int padding,
+                                                            WebTouchCandidatesInfo& outTouchInfo,
+                                                            WebColor& outTapHighlightColor)
+{
+    // FIXME: Upstream this function from the chromium-android branch.
+    notImplemented();
+
+    return WebVector<WebFloatQuad>();
 }
 
 bool WebViewImpl::handleKeyEvent(const WebKeyboardEvent& event)
@@ -1112,7 +1131,7 @@ void WebViewImpl::animateZoomAroundPoint(const IntPoint& point, AutoZoomType zoo
     computeScaleAndScrollForHitRect(WebRect(point.x(), point.y(), 0, 0), zoomType, scale, scroll);
 
     bool isDoubleTap = (zoomType == DoubleTap);
-    double durationInSeconds = isDoubleTap ? doubleTabZoomAnimationDurationInSeconds : 0;
+    double durationInSeconds = isDoubleTap ? doubleTapZoomAnimationDurationInSeconds : 0;
     startPageScaleAnimation(scroll, isDoubleTap, scale, durationInSeconds);
 #endif
 }
@@ -1611,7 +1630,7 @@ void WebViewImpl::didBeginFrame()
 void WebViewImpl::updateAnimations(double monotonicFrameBeginTime)
 {
 #if ENABLE(REQUEST_ANIMATION_FRAME)
-    TRACE_EVENT("WebViewImpl::updateAnimations", this, 0);
+    TRACE_EVENT0("webkit", "WebViewImpl::updateAnimations");
 
     WebFrameImpl* webframe = mainFrameImpl();
     if (!webframe)
@@ -1634,7 +1653,7 @@ void WebViewImpl::updateAnimations(double monotonicFrameBeginTime)
 
 void WebViewImpl::layout()
 {
-    TRACE_EVENT("WebViewImpl::layout", this, 0);
+    TRACE_EVENT0("webkit", "WebViewImpl::layout");
     PageWidgetDelegate::layout(m_page.get());
 }
 
@@ -1677,7 +1696,7 @@ void WebViewImpl::paint(WebCanvas* canvas, const WebRect& rect)
         if (canvas) {
             // Clip rect to the confines of the rootLayerTexture.
             IntRect resizeRect(rect);
-            resizeRect.intersect(IntRect(IntPoint(0, 0), m_layerTreeView.viewportSize()));
+            resizeRect.intersect(IntRect(IntPoint(0, 0), m_layerTreeView.deviceViewportSize()));
             doPixelReadbackToCanvas(canvas, resizeRect);
         }
 #endif
@@ -1704,7 +1723,7 @@ void WebViewImpl::themeChanged()
 void WebViewImpl::composite(bool)
 {
 #if USE(ACCELERATED_COMPOSITING)
-    if (CCProxy::hasImplThread())
+    if (WebCompositor::threadingEnabled())
         m_layerTreeView.setNeedsRedraw();
     else {
         ASSERT(isAcceleratedCompositingActive());
@@ -3509,7 +3528,7 @@ void WebViewImpl::setRootGraphicsLayer(GraphicsLayer* layer)
     }
 
     if (layer)
-        m_rootLayer = WebLayer(layer->platformLayer());
+        m_rootLayer = *layer->platformLayer();
 
     if (!m_layerTreeView.isNull())
         m_layerTreeView.setRootLayer(layer ? &m_rootLayer : 0);
@@ -3564,7 +3583,7 @@ WebCore::GraphicsLayer* WebViewImpl::rootGraphicsLayer()
 void WebViewImpl::scheduleAnimation()
 {
     if (isAcceleratedCompositingActive()) {
-        if (CCProxy::hasImplThread()) {
+        if (WebCompositor::threadingEnabled()) {
             ASSERT(!m_layerTreeView.isNull());
             m_layerTreeView.setNeedsAnimate();
         } else
@@ -3609,14 +3628,14 @@ void WebViewImpl::setIsAcceleratedCompositingActive(bool active)
 
         m_client->didActivateCompositor(m_layerTreeView.compositorIdentifier());
     } else {
-        TRACE_EVENT("WebViewImpl::setIsAcceleratedCompositingActive(true)", this, 0);
+        TRACE_EVENT0("webkit", "WebViewImpl::setIsAcceleratedCompositingActive(true)");
 
         WebLayerTreeView::Settings layerTreeViewSettings;
         layerTreeViewSettings.acceleratePainting = page()->settings()->acceleratedDrawingEnabled();
         layerTreeViewSettings.showFPSCounter = settingsImpl()->showFPSCounter();
         layerTreeViewSettings.showPlatformLayerTree = settingsImpl()->showPlatformLayerTree();
         layerTreeViewSettings.showPaintRects = settingsImpl()->showPaintRects();
-        layerTreeViewSettings.forceSoftwareCompositing = settings()->forceSoftwareCompositing();
+        layerTreeViewSettings.renderVSyncEnabled = settingsImpl()->renderVSyncEnabled();
 
         layerTreeViewSettings.defaultTileSize = settingsImpl()->defaultTileSize();
         layerTreeViewSettings.maxUntiledLayerSize = settingsImpl()->maxUntiledLayerSize();
@@ -3646,6 +3665,15 @@ void WebViewImpl::setIsAcceleratedCompositingActive(bool active)
             m_compositorCreationFailed = false;
             if (m_pageOverlays)
                 m_pageOverlays->update();
+
+            // Only allocate the font atlas if we have reason to use the heads-up display.
+            if (layerTreeViewSettings.showFPSCounter || layerTreeViewSettings.showPlatformLayerTree) {
+                TRACE_EVENT0("cc", "WebViewImpl::setIsAcceleratedCompositingActive(true) initialize font atlas");
+                WebRect asciiToRectTable[128];
+                int fontHeight;
+                SkBitmap bitmap = WebCore::CompositorHUDFontAtlas::generateFontAtlas(asciiToRectTable, fontHeight);
+                m_layerTreeView.setFontAtlas(bitmap, asciiToRectTable, fontHeight);
+            }
         } else {
             m_nonCompositedContentHost.clear();
             m_isAcceleratedCompositingActive = false;
@@ -3659,47 +3687,63 @@ void WebViewImpl::setIsAcceleratedCompositingActive(bool active)
 
 #endif
 
-PassOwnPtr<WebKit::WebGraphicsContext3D> WebViewImpl::createCompositorGraphicsContext3D()
-{
-    if (settings()->forceSoftwareCompositing())
-        CRASH();
+namespace {
 
-    // Explicitly disable antialiasing for the compositor. As of the time of
-    // this writing, the only platform that supported antialiasing for the
-    // compositor was Mac OS X, because the on-screen OpenGL context creation
-    // code paths on Windows and Linux didn't yet have multisampling support.
-    // Mac OS X essentially always behaves as though it's rendering offscreen.
-    // Multisampling has a heavy cost especially on devices with relatively low
-    // fill rate like most notebooks, and the Mac implementation would need to
-    // be optimized to resolve directly into the IOSurface shared between the
-    // GPU and browser processes. For these reasons and to avoid platform
-    // disparities we explicitly disable antialiasing.
+// Adapts a pure WebGraphicsContext3D into a WebCompositorOutputSurface until
+// downstream code can be updated to produce output surfaces directly.
+class WebGraphicsContextToOutputSurfaceAdapter : public WebCompositorOutputSurface {
+public:
+    explicit WebGraphicsContextToOutputSurfaceAdapter(PassOwnPtr<WebGraphicsContext3D> context)
+        : m_context3D(context)
+        , m_client(0)
+    {
+    }
+
+    virtual bool bindToClient(WebCompositorOutputSurfaceClient* client) OVERRIDE
+    {
+        ASSERT(client);
+        if (!m_context3D->makeContextCurrent())
+            return false;
+        m_client = client;
+        return true;
+    }
+
+    virtual const Capabilities& capabilities() const OVERRIDE
+    {
+        return m_capabilities;
+    }
+
+    virtual WebGraphicsContext3D* context3D() const OVERRIDE
+    {
+        return m_context3D.get();
+    }
+
+    virtual void sendFrameToParentCompositor(const WebCompositorFrame&) OVERRIDE
+    {
+    }
+
+private:
+    OwnPtr<WebGraphicsContext3D> m_context3D;
+    Capabilities m_capabilities;
+    WebCompositorOutputSurfaceClient* m_client;
+};
+
+} // namespace
+
+WebGraphicsContext3D* WebViewImpl::createContext3D()
+{
+    // Temporarily, if the output surface can't be created, create a WebGraphicsContext3D
+    // directly. This allows bootstrapping the output surface system while downstream
+    // users of the API still use the old approach.
     WebKit::WebGraphicsContext3D::Attributes attributes;
     attributes.antialias = false;
     attributes.shareResources = true;
-
-    OwnPtr<WebGraphicsContext3D> webContext = adoptPtr(client()->createGraphicsContext3D(attributes));
-    if (!webContext)
-        return nullptr;
-
-    return webContext.release();
+    return m_client->createGraphicsContext3D(attributes);
 }
 
-WebKit::WebGraphicsContext3D* WebViewImpl::createContext3D()
+WebCompositorOutputSurface* WebViewImpl::createOutputSurface()
 {
-    if (settings()->forceSoftwareCompositing())
-        CRASH();
-
-    OwnPtr<WebKit::WebGraphicsContext3D> webContext;
-
-    // If we've already created an onscreen context for this view, return that.
-    if (m_temporaryOnscreenGraphicsContext3D)
-        webContext = m_temporaryOnscreenGraphicsContext3D.release();
-    else // Otherwise make a new one.
-        webContext = createCompositorGraphicsContext3D();
-    // The caller takes ownership of this object, but since there's no equivalent of PassOwnPtr<> in the WebKit API
-    // we return a raw pointer.
-    return webContext.leakPtr();
+    return m_client->createOutputSurface();
 }
 
 void WebViewImpl::applyScrollAndScale(const WebSize& scrollDelta, float pageScaleDelta)
@@ -3749,7 +3793,11 @@ void WebViewImpl::didCompleteSwapBuffers()
 
 void WebViewImpl::didRebindGraphicsContext(bool success)
 {
+    didRecreateOutputSurface(success);
+}
 
+void WebViewImpl::didRecreateOutputSurface(bool success)
+{
     // Switch back to software rendering mode, if necessary
     if (!success) {
         ASSERT(m_isAcceleratedCompositingActive);
@@ -3768,7 +3816,7 @@ void WebViewImpl::didRebindGraphicsContext(bool success)
 
 void WebViewImpl::scheduleComposite()
 {
-    ASSERT(!CCProxy::hasImplThread());
+    ASSERT(!WebCompositor::threadingEnabled());
     m_client->scheduleComposite();
 }
 
@@ -3786,7 +3834,10 @@ void WebViewImpl::updateLayerTreeViewport()
     float deviceScale = m_deviceScaleInCompositor;
     m_nonCompositedContentHost->setViewport(visibleRect.size(), view->contentsSize(), scroll, view->scrollOrigin(), deviceScale);
 
-    m_layerTreeView.setViewportSize(size());
+    IntSize layoutViewportSize = size();
+    IntSize deviceViewportSize = size();
+    deviceViewportSize.scale(deviceScale);
+    m_layerTreeView.setViewportSize(layoutViewportSize, deviceViewportSize);
     m_layerTreeView.setPageScaleFactorAndLimits(pageScaleFactor(), m_minimumPageScaleFactor, m_maximumPageScaleFactor);
 }
 
@@ -3802,6 +3853,34 @@ void WebViewImpl::selectAutofillSuggestionAtIndex(unsigned listIndex)
 {
     if (m_autofillPopupClient && listIndex < m_autofillPopupClient->getSuggestionsCount())
         m_autofillPopupClient->valueChanged(listIndex);
+}
+
+bool WebViewImpl::detectContentIntentOnTouch(const WebPoint& position, WebInputEvent::Type touchType)
+{
+    ASSERT(touchType == WebInputEvent::GestureTap || touchType == WebInputEvent::GestureLongPress);
+    HitTestResult touchHit = hitTestResultForWindowPos(position);
+
+    if (touchHit.isContentEditable())
+        return false;
+
+    Node* node = touchHit.innerNode();
+    if (!node || !node->isTextNode())
+        return false;
+
+    // FIXME: Should we not detect content intents in nodes that have event listeners?
+
+    WebContentDetectionResult content = m_client->detectContentIntentAround(touchHit);
+    if (!content.isValid())
+        return false;
+
+    if (touchType == WebInputEvent::GestureLongPress) {
+        // Select the detected content as a block.
+        focusedFrame()->selectRange(content.range());
+        return true;
+    }
+
+    m_client->scheduleContentIntent(content.intent());
+    return true;
 }
 
 void WebViewImpl::setVisibilityState(WebPageVisibilityState visibilityState,

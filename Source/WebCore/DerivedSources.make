@@ -106,6 +106,7 @@ BINDING_IDLS = \
     $(WebCore)/Modules/indexeddb/IDBVersionChangeEvent.idl \
     $(WebCore)/Modules/indexeddb/IDBVersionChangeRequest.idl \
     $(WebCore)/Modules/indexeddb/WorkerContextIndexedDatabase.idl \
+    $(WebCore)/Modules/mediasource/MediaSource.idl \
     $(WebCore)/Modules/mediasource/SourceBuffer.idl \
     $(WebCore)/Modules/mediasource/SourceBufferList.idl \
     $(WebCore)/Modules/notifications/DOMWindowNotifications.idl \
@@ -140,6 +141,7 @@ BINDING_IDLS = \
     $(WebCore)/Modules/webaudio/DynamicsCompressorNode.idl \
     $(WebCore)/Modules/webaudio/JavaScriptAudioNode.idl \
     $(WebCore)/Modules/webaudio/MediaElementAudioSourceNode.idl \
+    $(WebCore)/Modules/webaudio/MediaStreamAudioSourceNode.idl \
     $(WebCore)/Modules/webaudio/Oscillator.idl \
     $(WebCore)/Modules/webaudio/OfflineAudioCompletionEvent.idl \
     $(WebCore)/Modules/webaudio/RealtimeAnalyserNode.idl \
@@ -694,8 +696,16 @@ endif
 
 endif # MACOS
 
+ifndef ENABLE_WIDGET_REGION
+    ENABLE_WIDGET_REGION = 0
+endif
+
 ifeq ($(ENABLE_ORIENTATION_EVENTS), 1)
     ADDITIONAL_IDL_DEFINES := $(ADDITIONAL_IDL_DEFINES) ENABLE_ORIENTATION_EVENTS
+endif
+
+ifeq ($(ENABLE_WIDGET_REGION), 1)
+    ADDITIONAL_IDL_DEFINES := $(ADDITIONAL_IDL_DEFINES) ENABLE_WIDGET_REGION
 endif
 
 # --------
@@ -947,15 +957,36 @@ preprocess_idls_script = perl $(addprefix -I $(WebCore)/, $(sort $(dir $(1)))) $
 # JS bindings generator
 
 IDL_INCLUDES = \
+    $(WebCore)/Modules/battery \
+    $(WebCore)/Modules/filesystem \
+    $(WebCore)/Modules/gamepad \
+    $(WebCore)/Modules/geolocation \
+    $(WebCore)/Modules/indexeddb \
+    $(WebCore)/Modules/intents \
+    $(WebCore)/Modules/mediasource \
+    $(WebCore)/Modules/mediastream \
+    $(WebCore)/Modules/networkinfo \
+    $(WebCore)/Modules/notifications \
+    $(WebCore)/Modules/speech \
+    $(WebCore)/Modules/vibration \
+    $(WebCore)/Modules/webaudio \
+    $(WebCore)/Modules/webdatabase \
+    $(WebCore)/Modules/websockets \
+    $(WebCore)/css \
     $(WebCore)/dom \
     $(WebCore)/fileapi \
     $(WebCore)/html \
-    $(WebCore)/css \
-    $(WebCore)/Modules/mediasource \
-    $(WebCore)/Modules/notifications \
+    $(WebCore)/html/canvas \
+    $(WebCore)/html/shadow \
+    $(WebCore)/html/track \
+    $(WebCore)/inspector \
+    $(WebCore)/loader/appcache \
     $(WebCore)/page \
-    $(WebCore)/xml \
-    $(WebCore)/svg
+    $(WebCore)/plugins \
+    $(WebCore)/storage \
+    $(WebCore)/svg \
+    $(WebCore)/workers \
+    $(WebCore)/xml
 
 IDL_COMMON_ARGS = $(IDL_INCLUDES:%=--include %) --write-dependencies --outputDir .
 

@@ -37,12 +37,6 @@ Q_DECLARE_METATYPE(Qt::BrushStyle)
 Q_DECLARE_METATYPE(QVariantList)
 Q_DECLARE_METATYPE(QVariantMap)
 
-#if QT_VERSION >= QT_VERSION_CHECK(5, 0, 0)
-#define OwnershipClass QWebFrame
-#else
-#define OwnershipClass QScriptEngine
-#endif
-
 class MyQObject : public QObject {
     Q_OBJECT
 
@@ -448,10 +442,6 @@ public:
     {
         emit mySignalWithDateTimeArg(dt);
     }
-    void emitMySignalWithRegexArg(QRegExp r)
-    {
-        emit mySignalWithRegexArg(r);
-    }
 
 public Q_SLOTS:
     void mySlot()
@@ -548,12 +538,6 @@ public Q_SLOTS:
         m_actuals << arg;
     }
 
-    void myOverloadedSlot(const QRegExp &arg)
-    {
-        m_qtFunctionInvoked = 34;
-        m_actuals << arg;
-    }
-
     void myOverloadedSlot(const QVariant &arg)
     {
         m_qtFunctionInvoked = 35;
@@ -581,7 +565,6 @@ Q_SIGNALS:
     void mySignalWithDoubleArg(double);
     void mySignal2(bool arg = false);
     void mySignalWithDateTimeArg(QDateTime);
-    void mySignalWithRegexArg(QRegExp);
 
 private:
     int m_intValue;
@@ -658,6 +641,7 @@ private slots:
     void qObjectWrapperWithSameIdentity();
     void introspectQtMethods_data();
     void introspectQtMethods();
+    void scriptablePlugin();
 
 private:
     QString evalJS(const QString& s)
@@ -1147,7 +1131,7 @@ void tst_QObjectBridge::callQtInvokable()
         QString type;
         QString ret = evalJS("myObject.myInvokableWithVoidStarArg(123)", type);
         QCOMPARE(type, sError);
-        QCOMPARE(ret, QLatin1String("TypeError: incompatible type of argument(s) in call to myInvokableWithVoidStarArg(); candidates were\n    myInvokableWithVoidStarArg(void*)"));
+        QCOMPARE(ret, QLatin1String("Error: incompatible type of argument(s) in call to myInvokableWithVoidStarArg(); candidates were\n    myInvokableWithVoidStarArg(void*)"));
         QCOMPARE(m_myObject->qtFunctionInvoked(), -1);
     }
 
@@ -1156,7 +1140,7 @@ void tst_QObjectBridge::callQtInvokable()
         QString type;
         QString ret = evalJS("myObject.myInvokableWithAmbiguousArg(123)", type);
         QCOMPARE(type, sError);
-        QCOMPARE(ret, QLatin1String("TypeError: ambiguous call of overloaded function myInvokableWithAmbiguousArg(); candidates were\n    myInvokableWithAmbiguousArg(int)\n    myInvokableWithAmbiguousArg(uint)"));
+        QCOMPARE(ret, QLatin1String("Error: ambiguous call of overloaded function myInvokableWithAmbiguousArg(); candidates were\n    myInvokableWithAmbiguousArg(int)\n    myInvokableWithAmbiguousArg(uint)"));
     }
 
     m_myObject->resetQtFunctionInvoked();
@@ -1385,7 +1369,7 @@ void tst_QObjectBridge::callQtInvokable()
         QString type;
         QString ret = evalJS("myObject.myInvokableWithIntArg()", type);
         QCOMPARE(type, sError);
-        QCOMPARE(ret, QLatin1String("SyntaxError: too few arguments in call to myInvokableWithIntArg(); candidates are\n    myInvokableWithIntArg(int,int)\n    myInvokableWithIntArg(int)"));
+        QCOMPARE(ret, QLatin1String("Error: too few arguments in call to myInvokableWithIntArg(); candidates are\n    myInvokableWithIntArg(int,int)\n    myInvokableWithIntArg(int)"));
     }
 
     // call function where not all types have been registered
@@ -1394,7 +1378,7 @@ void tst_QObjectBridge::callQtInvokable()
         QString type;
         QString ret = evalJS("myObject.myInvokableWithBrushStyleArg(0)", type);
         QCOMPARE(type, sError);
-        QCOMPARE(ret, QLatin1String("TypeError: cannot call myInvokableWithBrushStyleArg(): unknown type `Qt::BrushStyle'"));
+        QCOMPARE(ret, QLatin1String("Error: cannot call myInvokableWithBrushStyleArg(): unknown type `Qt::BrushStyle'"));
         QCOMPARE(m_myObject->qtFunctionInvoked(), -1);
     }
 
@@ -1404,7 +1388,7 @@ void tst_QObjectBridge::callQtInvokable()
         QString type;
         QString ret = evalJS("myObject.myInvokableWithQBrushArg(null)", type);
         QCOMPARE(type, sError);
-        QCOMPARE(ret, QLatin1String("TypeError: incompatible type of argument(s) in call to myInvokableWithQBrushArg(); candidates were\n    myInvokableWithQBrushArg(QBrush)"));
+        QCOMPARE(ret, QLatin1String("Error: incompatible type of argument(s) in call to myInvokableWithQBrushArg(); candidates were\n    myInvokableWithQBrushArg(QBrush)"));
         QCOMPARE(m_myObject->qtFunctionInvoked(), -1);
     }
 }
@@ -1422,7 +1406,7 @@ void tst_QObjectBridge::connectAndDisconnect()
         QCOMPARE(type, sError);
     }
 
-    evalJS("myHandler = function() { window.gotSignal = true; window.signalArgs = arguments; window.slotThisObject = this; window.signalSender = __qt_sender__; }");
+    evalJS("myHandler = function() { window.gotSignal = true; window.signalArgs = arguments; window.slotThisObject = this; }");
 
     QCOMPARE(evalJS("myObject.mySignal.connect(myHandler)"), sUndefined);
 
@@ -1430,7 +1414,6 @@ void tst_QObjectBridge::connectAndDisconnect()
     evalJS("myObject.mySignal()");
     QCOMPARE(evalJS("gotSignal"), sTrue);
     QCOMPARE(evalJS("signalArgs.length == 0"), sTrue);
-    QCOMPARE(evalJS("signalSender"), evalJS("myObject"));
     QCOMPARE(evalJS("slotThisObject == window"), sTrue);
 
     evalJS("gotSignal = false");
@@ -1494,7 +1477,6 @@ void tst_QObjectBridge::connectAndDisconnect()
     QCOMPARE(evalJS("gotSignal"), sTrue);
     QCOMPARE(evalJS("signalArgs.length == 0"), sTrue);
     QCOMPARE(evalJS("slotThisObject"), evalJS("otherObject"));
-    QCOMPARE(evalJS("signalSender"), evalJS("myObject"));
     QCOMPARE(evalJS("slotThisObject.name"), QLatin1String("foo"));
     QCOMPARE(evalJS("myObject.mySignal.disconnect(otherObject, myHandler)"), sUndefined);
 
@@ -1505,7 +1487,6 @@ void tst_QObjectBridge::connectAndDisconnect()
     QCOMPARE(evalJS("gotSignal"), sTrue);
     QCOMPARE(evalJS("signalArgs.length == 1"), sTrue);
     QCOMPARE(evalJS("slotThisObject == yetAnotherObject"), sTrue);
-    QCOMPARE(evalJS("signalSender == myObject"), sTrue);
     QCOMPARE(evalJS("slotThisObject.name"), QLatin1String("bar"));
     QCOMPARE(evalJS("myObject.mySignal2.disconnect(yetAnotherObject, myHandler)"), sUndefined);
 
@@ -1515,7 +1496,6 @@ void tst_QObjectBridge::connectAndDisconnect()
     QCOMPARE(evalJS("gotSignal"), sTrue);
     QCOMPARE(evalJS("signalArgs.length == 1"), sTrue);
     QCOMPARE(evalJS("slotThisObject == myObject"), sTrue);
-    QCOMPARE(evalJS("signalSender == myObject"), sTrue);
     QCOMPARE(evalJS("myObject.mySignal2.disconnect(myObject, myHandler)"), sUndefined);
 
     // connect(obj, string)
@@ -1756,11 +1736,6 @@ void tst_QObjectBridge::overloadedSlots()
     evalJS("myObject.myOverloadedSlot(new Date())");
     QCOMPARE(m_myObject->qtFunctionInvoked(), 32);
 
-    // should pick myOverloadedSlot(QRegExp)
-    m_myObject->resetQtFunctionInvoked();
-    evalJS("myObject.myOverloadedSlot(new RegExp())");
-    QCOMPARE(m_myObject->qtFunctionInvoked(), 34);
-
     // should pick myOverloadedSlot(QVariant)
     /* XFAIL
     m_myObject->resetQtFunctionInvoked();
@@ -1831,9 +1806,7 @@ void tst_QObjectBridge::enumerate_data()
         << "dp1" << "dp2" << "dp3"
         // inherited signals and slots
         << "destroyed(QObject*)" << "destroyed()"
-#if defined(HAVE_QT5) && HAVE_QT5
         << "objectNameChanged(QString)"
-#endif
         << "deleteLater()"
         // not included because it's private:
         // << "_q_reregisterTimers(void*)"
@@ -1982,8 +1955,6 @@ void tst_QObjectBridge::typeConversion()
     QCOMPARE(evalJS("window.__date_equals"), sTrue);
     evalJS("delete window.__date_equals");
     evalJS("myObject.mySignalWithDateTimeArg.disconnect(checkDate); delete checkDate;");
-
-    // ### RegExps
 }
 
 class StringListTestObject : public QObject {
@@ -2000,7 +1971,7 @@ void tst_QObjectBridge::arrayObjectEnumerable()
     QWebPage page;
     QWebFrame* frame = page.mainFrame();
     QObject* qobject = new StringListTestObject();
-    frame->addToJavaScriptWindowObject("test", qobject, OwnershipClass::ScriptOwnership);
+    frame->addToJavaScriptWindowObject("test", qobject, QWebFrame::ScriptOwnership);
 
     const QString script("var stringArray = test.stringList();"
                          "var result = '';"
@@ -2041,7 +2012,7 @@ void tst_QObjectBridge::ownership()
         {
             QWebPage page;
             QWebFrame* frame = page.mainFrame();
-            frame->addToJavaScriptWindowObject("test", ptr.data(), OwnershipClass::ScriptOwnership);
+            frame->addToJavaScriptWindowObject("test", ptr.data(), QWebFrame::ScriptOwnership);
         }
         QVERIFY(!ptr);
     }
@@ -2052,7 +2023,7 @@ void tst_QObjectBridge::ownership()
         {
             QWebPage page;
             QWebFrame* frame = page.mainFrame();
-            frame->addToJavaScriptWindowObject("test", ptr.data(), OwnershipClass::QtOwnership);
+            frame->addToJavaScriptWindowObject("test", ptr.data(), QWebFrame::QtOwnership);
         }
         QVERIFY(ptr.data() == before);
         delete ptr.data();
@@ -2062,7 +2033,7 @@ void tst_QObjectBridge::ownership()
         QObject* child = new QObject(parent);
         QWebPage page;
         QWebFrame* frame = page.mainFrame();
-        frame->addToJavaScriptWindowObject("test", child, OwnershipClass::QtOwnership);
+        frame->addToJavaScriptWindowObject("test", child, QWebFrame::QtOwnership);
         QVariant v = frame->evaluateJavaScript("test");
         QCOMPARE(qvariant_cast<QObject*>(v), child);
         delete parent;
@@ -2075,7 +2046,7 @@ void tst_QObjectBridge::ownership()
         {
             QWebPage page;
             QWebFrame* frame = page.mainFrame();
-            frame->addToJavaScriptWindowObject("test", ptr.data(), OwnershipClass::AutoOwnership);
+            frame->addToJavaScriptWindowObject("test", ptr.data(), QWebFrame::AutoOwnership);
         }
         // no parent, so it should be like ScriptOwnership
         QVERIFY(!ptr);
@@ -2087,7 +2058,7 @@ void tst_QObjectBridge::ownership()
         {
             QWebPage page;
             QWebFrame* frame = page.mainFrame();
-            frame->addToJavaScriptWindowObject("test", child.data(), OwnershipClass::AutoOwnership);
+            frame->addToJavaScriptWindowObject("test", child.data(), QWebFrame::AutoOwnership);
         }
         // has parent, so it should be like QtOwnership
         QVERIFY(child);
@@ -2129,7 +2100,7 @@ void tst_QObjectBridge::qObjectWrapperWithSameIdentity()
     QWebFrame* mainFrame = m_view->page()->mainFrame();
     QCOMPARE(mainFrame->toPlainText(), QString("test"));
 
-    mainFrame->addToJavaScriptWindowObject("test", new TestFactory, OwnershipClass::ScriptOwnership);
+    mainFrame->addToJavaScriptWindowObject("test", new TestFactory, QWebFrame::ScriptOwnership);
 
     mainFrame->evaluateJavaScript("triggerBug();");
     QCOMPARE(mainFrame->toPlainText(), QString("test1"));
@@ -2187,6 +2158,48 @@ void tst_QObjectBridge::webElementSlotOnly()
     m_page->mainFrame()->addToJavaScriptWindowObject("myWebElementSlotObject", &object);
     evalJS("myWebElementSlotObject.doSomethingWithWebElement(document.body)");
     QCOMPARE(evalJS("myWebElementSlotObject.tagName"), QString("BODY"));
+}
+
+class TestPluginWidget : public QWidget {
+    Q_OBJECT
+public:
+    TestPluginWidget() { }
+
+public slots:
+    int slotWithReturnValue() { return 42; }
+};
+
+class TestWebPage : public QWebPage {
+    Q_OBJECT
+public:
+    TestWebPage(QObject* parent = 0)
+        : QWebPage(parent)
+        , creationCount(0)
+    { }
+
+    int creationCount;
+
+protected:
+    virtual QObject* createPlugin(const QString&, const QUrl&, const QStringList&, const QStringList&)
+    {
+        creationCount++;
+        return new TestPluginWidget;
+    }
+};
+
+void tst_QObjectBridge::scriptablePlugin()
+{
+    QWebView view;
+    TestWebPage* page = new TestWebPage;
+    view.setPage(page);
+    page->setParent(&view);
+    view.settings()->setAttribute(QWebSettings::PluginsEnabled, true);
+
+    page->mainFrame()->setHtml("<object width=100 height=100 type=\"application/x-qt-plugin\"></object>");
+    QCOMPARE(page->creationCount, 1);
+
+    QVariant result = page->mainFrame()->evaluateJavaScript("document.querySelector(\"object\").slotWithReturnValue()");
+    QCOMPARE(result.toString(), QLatin1String("42"));
 }
 
 QTEST_MAIN(tst_QObjectBridge)

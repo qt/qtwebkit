@@ -33,14 +33,19 @@ LIST(APPEND WebKit2_SOURCES
     Shared/soup/WebCoreArgumentCodersSoup.cpp
 
     UIProcess/API/C/efl/WKView.cpp
+    
+    UIProcess/API/cpp/efl/WKEinaSharedString.cpp
 
     UIProcess/API/C/soup/WKContextSoup.cpp
     UIProcess/API/C/soup/WKSoupRequestManager.cpp
 
     UIProcess/API/efl/BatteryProvider.cpp
+    UIProcess/API/efl/EflViewportHandler.cpp
     UIProcess/API/efl/NetworkInfoProvider.cpp
     UIProcess/API/efl/PageClientImpl.cpp
     UIProcess/API/efl/VibrationProvider.cpp
+    UIProcess/API/efl/ewk_back_forward_list.cpp
+    UIProcess/API/efl/ewk_back_forward_list_item.cpp
     UIProcess/API/efl/ewk_context.cpp
     UIProcess/API/efl/ewk_context_download_client.cpp
     UIProcess/API/efl/ewk_context_request_manager_client.cpp
@@ -55,10 +60,12 @@ LIST(APPEND WebKit2_SOURCES
     UIProcess/API/efl/ewk_url_response.cpp
     UIProcess/API/efl/ewk_url_scheme_request.cpp
     UIProcess/API/efl/ewk_view.cpp
+    UIProcess/API/efl/ewk_view_find_client.cpp
     UIProcess/API/efl/ewk_view_form_client.cpp
     UIProcess/API/efl/ewk_view_loader_client.cpp
     UIProcess/API/efl/ewk_view_policy_client.cpp
     UIProcess/API/efl/ewk_view_resource_load_client.cpp
+    UIProcess/API/efl/ewk_view_ui_client.cpp
     UIProcess/API/efl/ewk_web_error.cpp
     UIProcess/API/efl/ewk_web_resource.cpp
 
@@ -76,7 +83,6 @@ LIST(APPEND WebKit2_SOURCES
     UIProcess/soup/WebSoupRequestManagerProxy.cpp
 
     UIProcess/Launcher/efl/ProcessLauncherEfl.cpp
-    UIProcess/Launcher/efl/ThreadLauncherEfl.cpp
 
     UIProcess/Plugins/unix/PluginInfoStoreUnix.cpp
 
@@ -119,6 +125,7 @@ LIST(APPEND WebKit2_INCLUDE_DIRECTORIES
     "${WEBKIT2_DIR}/Shared/soup"
     "${WEBKIT2_DIR}/UIProcess/API/C/efl"
     "${WEBKIT2_DIR}/UIProcess/API/C/soup"
+    "${WEBKIT2_DIR}/UIProcess/API/cpp/efl"
     "${WEBKIT2_DIR}/UIProcess/API/efl"
     "${WEBKIT2_DIR}/UIProcess/soup"
     "${WEBKIT2_DIR}/WebProcess/Downloads/soup"
@@ -147,6 +154,7 @@ LIST(APPEND WebKit2_LIBRARIES
     ${EFREET_LIBRARIES}
     ${Freetype_LIBRARIES}
     ${LIBXML2_LIBRARIES}
+    ${OPENGL_LIBRARIES}
     ${SQLITE_LIBRARIES}
     ${FONTCONFIG_LIBRARIES}
     ${PNG_LIBRARY}
@@ -154,13 +162,6 @@ LIST(APPEND WebKit2_LIBRARIES
     ${CMAKE_DL_LIBS}
     ${Glib_LIBRARIES}
     ${LIBSOUP24_LIBRARIES}
-)
-
-LIST (APPEND WebKit2_FORWARDING_HEADERS_DIRECTORIES
-    Shared/API/c/efl
-    Shared/API/c/soup
-    UIProcess/API/C/efl
-    UIProcess/API/C/soup
 )
 
 LIST (APPEND WebProcess_SOURCES
@@ -175,14 +176,27 @@ LIST (APPEND WebProcess_LIBRARIES
     ${EVAS_LIBRARIES}
     ${LIBXML2_LIBRARIES}
     ${LIBXSLT_LIBRARIES}
+    ${OPENGL_LIBRARIES}
     ${SQLITE_LIBRARIES}
 )
 
 ADD_DEFINITIONS(-DDEFAULT_THEME_PATH=\"${CMAKE_INSTALL_PREFIX}/${DATA_INSTALL_DIR}/themes\")
 
+ADD_CUSTOM_TARGET(forwarding-headerEfl
+    COMMAND ${PERL_EXECUTABLE} ${WEBKIT2_DIR}/Scripts/generate-forwarding-headers.pl ${WEBKIT2_DIR} ${DERIVED_SOURCES_WEBKIT2_DIR}/include efl
+)
+SET(ForwardingHeaders_NAME forwarding-headerEfl)
+
+ADD_CUSTOM_TARGET(forwarding-headerSoup
+    COMMAND ${PERL_EXECUTABLE} ${WEBKIT2_DIR}/Scripts/generate-forwarding-headers.pl ${WEBKIT2_DIR} ${DERIVED_SOURCES_WEBKIT2_DIR}/include soup
+)
+SET(ForwardingNetworkHeaders_NAME forwarding-headerSoup)
+
 CONFIGURE_FILE(efl/ewebkit2.pc.in ${CMAKE_BINARY_DIR}/WebKit2/efl/ewebkit2.pc @ONLY)
 SET (EWebKit2_HEADERS
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/EWebKit2.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_back_forward_list.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_back_forward_list_item.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_context.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_cookie_manager.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_download_job.h"

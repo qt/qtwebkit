@@ -21,6 +21,7 @@
 #include "config.h"
 #include "JSDOMBinding.h"
 
+#include "BindingSecurity.h"
 #include "DOMObjectHashTableMap.h"
 #include "DOMStringList.h"
 #include "ExceptionCode.h"
@@ -114,7 +115,7 @@ AtomicStringImpl* findAtomicString(PropertyName propertyName)
     if (!impl)
         return 0;
     ASSERT(impl->existingHash());
-    return AtomicString::find(impl->characters(), impl->length(), impl->existingHash());
+    return AtomicString::find(impl);
 }
 
 String valueToStringWithNullCheck(ExecState* exec, JSValue value)
@@ -221,35 +222,24 @@ void setDOMException(ExecState* exec, ExceptionCode ec)
 
 #undef TRY_TO_CREATE_EXCEPTION
 
-DOMWindow* activeDOMWindow(ExecState* exec)
-{
-    return asJSDOMWindow(exec->lexicalGlobalObject())->impl();
-}
-
-DOMWindow* firstDOMWindow(ExecState* exec)
-{
-    return asJSDOMWindow(exec->dynamicGlobalObject())->impl();
-}
-
 bool shouldAllowAccessToNode(ExecState* exec, Node* node)
 {
-    return node && shouldAllowAccessToFrame(exec, node->document()->frame());
+    return BindingSecurity::shouldAllowAccessToNode(exec, node);
 }
 
 bool shouldAllowAccessToFrame(ExecState* exec, Frame* frame)
 {
-    if (!frame)
-        return false;
-    JSDOMWindow* window = toJSDOMWindow(frame, currentWorld(exec));
-    return window && window->allowsAccessFrom(exec);
+    return BindingSecurity::shouldAllowAccessToFrame(exec, frame);
 }
 
 bool shouldAllowAccessToFrame(ExecState* exec, Frame* frame, String& message)
 {
     if (!frame)
         return false;
-    JSDOMWindow* window = toJSDOMWindow(frame, currentWorld(exec));
-    return window && window->allowsAccessFrom(exec, message);
+    bool result = BindingSecurity::shouldAllowAccessToFrame(exec, frame, DoNotReportSecurityError);
+    // FIXME: The following line of code should move somewhere that it can be shared with immediatelyReportUnsafeAccessTo.
+    message = frame->domWindow()->crossDomainAccessErrorMessage(activeDOMWindow(exec));
+    return result;
 }
 
 void printErrorMessageForFrame(Frame* frame, const String& message)

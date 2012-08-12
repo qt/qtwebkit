@@ -24,10 +24,17 @@
 
 #include "StdLibExtras.h"
 #include "ThreadingPrimitives.h"
+#include <wtf/DoublyLinkedList.h>
 
 #if !USE(PTHREADS)
 
 namespace WTF {
+
+static DoublyLinkedList<PlatformThreadSpecificKey>& destructorsList()
+{
+    DEFINE_STATIC_LOCAL(DoublyLinkedList<PlatformThreadSpecificKey>, staticList, ());
+    return staticList;
+}
 
 static Mutex& destructorsMutex()
 {
@@ -35,56 +42,38 @@ static Mutex& destructorsMutex()
     return staticMutex;
 }
 
-class ThreadSpecificKeyValue {
+class PlatformThreadSpecificKey : public DoublyLinkedListNode<PlatformThreadSpecificKey> {
 public:
-    ThreadSpecificKeyValue(void (*destructor)(void *))
+    friend class DoublyLinkedListNode<PlatformThreadSpecificKey>;
+
+    PlatformThreadSpecificKey(void (*destructor)(void *))
         : m_destructor(destructor)
     {
         m_tlsKey = TlsAlloc();
         if (m_tlsKey == TLS_OUT_OF_INDEXES)
             CRASH();
-
-        MutexLocker locker(destructorsMutex());
-        m_next = m_first;
-        m_first = this;
     }
 
-    ~ThreadSpecificKeyValue()
+    ~PlatformThreadSpecificKey()
     {
-        MutexLocker locker(destructorsMutex());
-        ThreadSpecificKeyValue** next = &m_first;
-        while (*next != this) {
-            ASSERT(*next);
-            next = &(*next)->m_next;
-        }
-        *next = (*next)->m_next;
-
         TlsFree(m_tlsKey);
     }
 
     void setValue(void* data) { TlsSetValue(m_tlsKey, data); }
     void* value() { return TlsGetValue(m_tlsKey); }
 
-    static void callDestructors()
+    void callDestructor()
     {
-        MutexLocker locker(destructorsMutex());
-        ThreadSpecificKeyValue* next = m_first;
-        while (next) {
-            if (void* data = next->value())
-                next->m_destructor(data);
-            next = next->m_next;
-        }
+       if (void* data = value())
+            m_destructor(data);
     }
 
 private:
     void (*m_destructor)(void *);
     DWORD m_tlsKey;
-    ThreadSpecificKeyValue* m_next;
-
-    static ThreadSpecificKeyValue* m_first;
+    PlatformThreadSpecificKey* m_prev;
+    PlatformThreadSpecificKey* m_next;
 };
-
-ThreadSpecificKeyValue* ThreadSpecificKeyValue::m_first = 0;
 
 long& tlsKeyCount()
 {
@@ -98,22 +87,27 @@ DWORD* tlsKeys()
     return keys;
 }
 
-void ThreadSpecificKeyCreate(ThreadSpecificKey* key, void (*destructor)(void *))
+void threadSpecificKeyCreate(ThreadSpecificKey* key, void (*destructor)(void *))
 {
-    *key = new ThreadSpecificKeyValue(destructor);
+    *key = new PlatformThreadSpecificKey(destructor);
+
+    MutexLocker locker(destructorsMutex());
+    destructorsList().push(*key);
 }
 
-void ThreadSpecificKeyDelete(ThreadSpecificKey key)
+void threadSpecificKeyDelete(ThreadSpecificKey key)
 {
+    MutexLocker locker(destructorsMutex());
+    destructorsList().remove(key);
     delete key;
 }
 
-void ThreadSpecificSet(ThreadSpecificKey key, void* data)
+void threadSpecificSet(ThreadSpecificKey key, void* data)
 {
     key->setValue(data);
 }
 
-void* ThreadSpecificGet(ThreadSpecificKey key)
+void* threadSpecificGet(ThreadSpecificKey key)
 {
     return key->value();
 }
@@ -127,7 +121,13 @@ void ThreadSpecificThreadExit()
             data->destructor(data);
     }
 
-    ThreadSpecificKeyValue::callDestructors();
+    MutexLocker locker(destructorsMutex());
+    PlatformThreadSpecificKey* key = destructorsList().head();
+    while (key) {
+        PlatformThreadSpecificKey* nextKey = key->next();
+        key->callDestructor();
+        key = nextKey;
+    }
 }
 
 } // namespace WTF

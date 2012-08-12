@@ -42,6 +42,7 @@
 #include "WrapperTypeInfo.h"
 #include <v8.h>
 #include <wtf/Forward.h>
+#include <wtf/HashMap.h>
 #include <wtf/PassRefPtr.h> // so generated bindings don't have to
 #include <wtf/Vector.h>
 #include <wtf/text/TextPosition.h>
@@ -61,66 +62,25 @@ namespace WebCore {
     class ScriptExecutionContext;
     class ScriptSourceCode;
     class SecurityOrigin;
-    class V8BindingPerContextData;
+    class V8PerContextData;
     class V8EventListener;
     class V8IsolatedContext;
     class WorldContextHandle;
-
-    // The following Batch structs and methods are used for setting multiple
-    // properties on an ObjectTemplate, used from the generated bindings
-    // initialization (ConfigureXXXTemplate). This greatly reduces the binary
-    // size by moving from code driven setup to data table driven setup.
-
-    // BatchedAttribute translates into calls to SetAccessor() on either the
-    // instance or the prototype ObjectTemplate, based on |onProto|.
-    struct BatchedAttribute {
-        const char* const name;
-        v8::AccessorGetter getter;
-        v8::AccessorSetter setter;
-        WrapperTypeInfo* data;
-        v8::AccessControl settings;
-        v8::PropertyAttribute attribute;
-        bool onProto;
-    };
-
-    void batchConfigureAttributes(v8::Handle<v8::ObjectTemplate>, v8::Handle<v8::ObjectTemplate>, const BatchedAttribute*, size_t attributeCount);
-
-    template<class ObjectOrTemplate>
-    inline void configureAttribute(v8::Handle<ObjectOrTemplate> instance, v8::Handle<ObjectOrTemplate> proto, const BatchedAttribute& attribute)
-    {
-        (attribute.onProto ? proto : instance)->SetAccessor(v8::String::New(attribute.name),
-            attribute.getter,
-            attribute.setter,
-            v8::External::Wrap(attribute.data),
-            attribute.settings,
-            attribute.attribute);
-    }
-
-    // BatchedConstant translates into calls to Set() for setting up an object's
-    // constants. It sets the constant on both the FunctionTemplate and the
-    // ObjectTemplate. PropertyAttributes is always ReadOnly.
-    struct BatchedConstant {
-        const char* const name;
-        int value;
-    };
-
-    void batchConfigureConstants(v8::Handle<v8::FunctionTemplate>, v8::Handle<v8::ObjectTemplate>, const BatchedConstant*, size_t constantCount);
-
-    struct BatchedCallback {
-        const char* const name;
-        v8::InvocationCallback callback;
-    };
-
-    void batchConfigureCallbacks(v8::Handle<v8::ObjectTemplate>, 
-                                 v8::Handle<v8::Signature>,
-                                 v8::PropertyAttribute,
-                                 const BatchedCallback*, 
-                                 size_t callbackCount);
 
     const int kMaxRecursionDepth = 22;
 
     // The list of extensions that are registered for use with V8.
     typedef WTF::Vector<v8::Extension*> V8Extensions;
+
+    // Note: although the pointer is raw, the instance is kept alive by a strong
+    // reference to the v8 context it contains, which is not made weak until we
+    // call world->destroy().
+    //
+    // FIXME: We want to eventually be holding window shells instead of the
+    //        IsolatedContext directly.
+    typedef HashMap<int, V8IsolatedContext*> IsolatedWorldMap;
+
+    typedef HashMap<int, RefPtr<SecurityOrigin> > IsolatedWorldSecurityOriginMap;
 
     class V8Proxy {
     public:
@@ -150,8 +110,6 @@ namespace WebCore {
         // constructors.
         v8::Local<v8::Array> evaluateInIsolatedWorld(int worldID, const Vector<ScriptSourceCode>& sources, int extensionGroup);
 
-        void setIsolatedWorldSecurityOrigin(int worldID, PassRefPtr<SecurityOrigin>);
-
         // Evaluate a script file in the current execution environment.
         // The caller must hold an execution context.
         // If cannot evalute the script, it returns an error.
@@ -172,57 +130,16 @@ namespace WebCore {
         // Returns the window object associated with a context.
         static DOMWindow* retrieveWindow(v8::Handle<v8::Context>);
 
-        // Returns V8Proxy object of the currently executing context.
-        static V8Proxy* retrieve();
-        // Returns V8Proxy object associated with a frame.
-        static V8Proxy* retrieve(Frame*);
-        // Returns V8Proxy object associated with a script execution context.
-        static V8Proxy* retrieve(ScriptExecutionContext*);
-
         // Returns the frame object of the window object associated with
         // a context.
         static Frame* retrieveFrame(v8::Handle<v8::Context>);
 
-        static V8BindingPerContextData* retrievePerContextData(Frame*);
-
-        // The three functions below retrieve WebFrame instances relating the
-        // currently executing JavaScript. Since JavaScript can make function calls
-        // across frames, though, we need to be more precise.
-        //
-        // For example, imagine that a JS function in frame A calls a function in
-        // frame B, which calls native code, which wants to know what the 'active'
-        // frame is.
-        //
-        // The 'entered context' is the context where execution first entered the
-        // script engine; the context that is at the bottom of the JS function stack.
-        // RetrieveFrameForEnteredContext() would return Frame A in our example.
-        // This frame is often referred to as the "dynamic global object."
-        //
-        // The 'current context' is the context the JS engine is currently inside of;
-        // the context that is at the top of the JS function stack.
-        // RetrieveFrameForCurrentContext() would return Frame B in our example.
-        // This frame is often referred to as the "lexical global object."
-        //
-        // Finally, the 'calling context' is the context one below the current
-        // context on the JS function stack. For example, if function f calls
-        // function g, then the calling context will be the context associated with
-        // f. This context is commonly used by DOM security checks because they want
-        // to know who called them.
-        //
-        // If you are unsure which of these functions to use, ask abarth.
-        //
-        // NOTE: These cannot be declared as inline function, because VS complains at
-        // linking time.
-        static Frame* retrieveFrameForEnteredContext();
-        static Frame* retrieveFrameForCurrentContext();
-        static DOMWindow* retrieveWindowForCallingContext();
-        static Frame* retrieveFrameForCallingContext();
+        static V8PerContextData* retrievePerContextData(Frame*);
 
         // Returns V8 Context of a frame. If none exists, creates
         // a new context. It is potentially slow and consumes memory.
         static v8::Local<v8::Context> context(Frame*);
         static v8::Local<v8::Context> mainWorldContext(Frame*);
-        static v8::Local<v8::Context> currentContext();
 
         // If the current context causes out of memory, JavaScript setting
         // is disabled and it returns true.
@@ -253,20 +170,20 @@ namespace WebCore {
 
         bool setContextDebugId(int id);
         static int contextDebugId(v8::Handle<v8::Context>);
-        void collectIsolatedContexts(Vector<std::pair<ScriptState*, SecurityOrigin*> >&);
 
         // Registers a v8 extension to be available on webpages. Will only
         // affect v8 contexts initialized after this call. Takes ownership of
         // the v8::Extension object passed.
-        static void registerExtension(v8::Extension*);
+        static void registerExtensionIfNeeded(v8::Extension*);
+        static V8Extensions& extensions();
 
-        static void registerExtensionWithV8(v8::Extension*);
-        static bool registeredExtensionWithV8(v8::Extension*);
+        static void reportUnsafeAccessTo(Document* targetDocument);
 
-        static const V8Extensions& extensions();
+        // FIXME: Move m_isolatedWorlds to ScriptController and remove this getter.
+        IsolatedWorldMap& isolatedWorlds() { return m_isolatedWorlds; }
 
-        // Report an unsafe attempt to access the given frame on the console.
-        static void reportUnsafeAccessTo(Frame* target);
+        // FIXME: Move m_isolatedWorldSecurityOrigins to ScriptController and remove this getter.
+        IsolatedWorldSecurityOriginMap& isolatedWorldSecurityOrigins() { return m_isolatedWorldSecurityOrigins; }
 
     private:
         void resetIsolatedWorlds();
@@ -274,20 +191,6 @@ namespace WebCore {
         void hintForGCIfNecessary();
 
         PassOwnPtr<v8::ScriptData> precompileScript(v8::Handle<v8::String>, CachedScript*);
-
-        static const char* rangeExceptionName(int exceptionCode);
-        static const char* eventExceptionName(int exceptionCode);
-        static const char* xmlHttpRequestExceptionName(int exceptionCode);
-        static const char* domExceptionName(int exceptionCode);
-        static const char* xpathExceptionName(int exceptionCode);
-
-#if ENABLE(SVG)
-        static const char* svgExceptionName(int exceptionCode);
-#endif
-
-#if ENABLE(SQL_DATABASE)
-        static const char* sqlExceptionName(int exceptionCode);
-#endif
 
         Frame* m_frame;
 
@@ -300,28 +203,12 @@ namespace WebCore {
         // The isolated worlds we are tracking for this frame. We hold them alive
         // here so that they can be used again by future calls to
         // evaluateInIsolatedWorld().
-        //
-        // Note: although the pointer is raw, the instance is kept alive by a strong
-        // reference to the v8 context it contains, which is not made weak until we
-        // call world->destroy().
-        //
-        // FIXME: We want to eventually be holding window shells instead of the
-        //        IsolatedContext directly.
-        typedef HashMap<int, V8IsolatedContext*> IsolatedWorldMap;
         IsolatedWorldMap m_isolatedWorlds;
         
-        typedef HashMap<int, RefPtr<SecurityOrigin> > IsolatedWorldSecurityOriginMap;
         IsolatedWorldSecurityOriginMap m_isolatedWorldSecurityOrigins;
     };
 
     v8::Local<v8::Context> toV8Context(ScriptExecutionContext*, const WorldContextHandle& worldContext);
-
-    inline v8::Handle<v8::Primitive> throwError(ExceptionCode ec, v8::Isolate* isolate = 0)
-    {
-        if (!v8::V8::IsExecutionTerminating())
-            V8Proxy::setDOMException(ec, isolate);
-        return v8::Undefined();
-    }
 
     inline v8::Handle<v8::Primitive> throwError(v8::Local<v8::Value> exception, v8::Isolate* isolate = 0)
     {
@@ -329,11 +216,6 @@ namespace WebCore {
             v8::ThrowException(exception);
         return v8::Undefined();
     }
-
-    enum IndependentMode {
-        MarkIndependent,
-        DoNotMarkIndependent
-    };
 }
 
 #endif // V8Proxy_h

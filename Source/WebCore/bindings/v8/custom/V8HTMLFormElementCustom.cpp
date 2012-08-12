@@ -48,7 +48,7 @@ v8::Handle<v8::Value> V8HTMLFormElement::indexedPropertyGetter(uint32_t index, c
 
     RefPtr<Node> formElement = form->elements()->item(index);
     if (!formElement)
-        return v8::Handle<v8::Value>();
+        return v8Undefined();
     return toV8(formElement.release(), info.GetIsolate());
 }
 
@@ -56,7 +56,7 @@ v8::Handle<v8::Value> V8HTMLFormElement::namedPropertyGetter(v8::Local<v8::Strin
 {
     INC_STATS("DOM.HTMLFormElement.NamedPropertyGetter");
     HTMLFormElement* imp = V8HTMLFormElement::toNative(info.Holder());
-    AtomicString v = v8StringToAtomicWebCoreString(name);
+    AtomicString v = v8ValueToAtomicWebCoreString(name);
 
     // Call getNamedElements twice, first time check if it has a value
     // and let HTMLFormElement update its cache.
@@ -65,7 +65,7 @@ v8::Handle<v8::Value> V8HTMLFormElement::namedPropertyGetter(v8::Local<v8::Strin
         Vector<RefPtr<Node> > elements;
         imp->getNamedElements(v, elements);
         if (elements.isEmpty())
-            return v8::Handle<v8::Value>();
+            return v8Undefined();
     }
 
     // Second call may return different results from the first call,

@@ -944,7 +944,17 @@ void InjectedBundlePage::didInitiateLoadForResource(WKBundlePageRef, WKBundleFra
 
 // Resource Load Client Callbacks
 
-WKURLRequestRef InjectedBundlePage::willSendRequestForFrame(WKBundlePageRef, WKBundleFrameRef, uint64_t, WKURLRequestRef request, WKURLResponseRef)
+static inline bool isLocalHost(WKStringRef host)
+{
+    return WKStringIsEqualToUTF8CString(host, "127.0.0.1") || WKStringIsEqualToUTF8CString(host, "localhost");
+}
+
+static inline bool isHTTPOrHTTPSScheme(WKStringRef scheme)
+{
+    return WKStringIsEqualToUTF8CStringIgnoringCase(scheme, "http") || WKStringIsEqualToUTF8CStringIgnoringCase(scheme, "https");
+}
+
+WKURLRequestRef InjectedBundlePage::willSendRequestForFrame(WKBundlePageRef, WKBundleFrameRef frame, uint64_t, WKURLRequestRef request, WKURLResponseRef)
 {
     if (InjectedBundle::shared().isTestRunning() && InjectedBundle::shared().layoutTestController()->willSendRequestReturnsNull())
         return 0;
@@ -954,22 +964,48 @@ WKURLRequestRef InjectedBundlePage::willSendRequestForFrame(WKBundlePageRef, WKB
     WKRetainPtr<WKStringRef> scheme = adoptWK(WKURLCopyScheme(url.get()));
     WKRetainPtr<WKStringRef> urlString = adoptWK(WKURLCopyString(url.get()));
     if (host && !WKStringIsEmpty(host.get())
-        && (WKStringIsEqualToUTF8CStringIgnoringCase(scheme.get(), "http") || WKStringIsEqualToUTF8CStringIgnoringCase(scheme.get(), "https"))
-        && !WKStringIsEqualToUTF8CString(host.get(), "127.0.0.1")
+        && isHTTPOrHTTPSScheme(scheme.get())
         && !WKStringIsEqualToUTF8CString(host.get(), "255.255.255.255") // Used in some tests that expect to get back an error.
-        && !WKStringIsEqualToUTF8CStringIgnoringCase(host.get(), "localhost")) {
-        InjectedBundle::shared().stringBuilder()->append("Blocked access to external URL ");
-        InjectedBundle::shared().stringBuilder()->append(toWTFString(urlString));
-        InjectedBundle::shared().stringBuilder()->append("\n");
-        return 0;
+        && !isLocalHost(host.get())) {
+        bool mainFrameIsExternal = false;
+        if (InjectedBundle::shared().isTestRunning()) {
+            WKBundleFrameRef mainFrame = InjectedBundle::shared().topLoadingFrame();
+            WKRetainPtr<WKURLRef> mainFrameURL = adoptWK(WKBundleFrameCopyURL(mainFrame));
+            if (!mainFrameURL || WKStringIsEqualToUTF8CString(adoptWK(WKURLCopyString(mainFrameURL.get())).get(), "about:blank"))
+                mainFrameURL = adoptWK(WKBundleFrameCopyProvisionalURL(mainFrame));
+
+            WKRetainPtr<WKStringRef> mainFrameHost = WKURLCopyHostName(mainFrameURL.get());
+            WKRetainPtr<WKStringRef> mainFrameScheme = WKURLCopyScheme(mainFrameURL.get());
+            mainFrameIsExternal = isHTTPOrHTTPSScheme(mainFrameScheme.get()) && !isLocalHost(mainFrameHost.get());
+        }
+        if (!mainFrameIsExternal) {
+            InjectedBundle::shared().stringBuilder()->append("Blocked access to external URL ");
+            InjectedBundle::shared().stringBuilder()->append(toWTFString(urlString));
+            InjectedBundle::shared().stringBuilder()->append("\n");
+            return 0;
+        }
     }
 
     WKRetain(request);
     return request;
 }
 
-void InjectedBundlePage::didReceiveResponseForResource(WKBundlePageRef, WKBundleFrameRef, uint64_t, WKURLResponseRef)
+void InjectedBundlePage::didReceiveResponseForResource(WKBundlePageRef, WKBundleFrameRef, uint64_t, WKURLResponseRef response)
 {
+    if (!InjectedBundle::shared().isTestRunning())
+        return;
+
+    if (!InjectedBundle::shared().layoutTestController()->shouldDumpResourceResponseMIMETypes())
+        return;
+
+    WKRetainPtr<WKURLRef> url = adoptWK(WKURLResponseCopyURL(response));
+    WKRetainPtr<WKStringRef> urlString = adoptWK(WKURLCopyLastPathComponent(url.get()));
+    WKRetainPtr<WKStringRef> mimeTypeString = adoptWK(WKURLResponseCopyMIMEType(response));
+
+    InjectedBundle::shared().stringBuilder()->append(toWTFString(urlString));
+    InjectedBundle::shared().stringBuilder()->append(" has MIME type ");
+    InjectedBundle::shared().stringBuilder()->append(toWTFString(mimeTypeString));
+    InjectedBundle::shared().stringBuilder()->append("\n");
 }
 
 void InjectedBundlePage::didReceiveContentLengthForResource(WKBundlePageRef, WKBundleFrameRef, uint64_t, uint64_t)

@@ -1,20 +1,2443 @@
-2012-06-13  Patrick Gansterer  <paroga@webkit.org>
+2012-08-10  Yong Li  <yoli@rim.com>
+
+        [BlackBerry] GCActivityCallback should always schedule GC even allocated bytes is a small number
+        https://bugs.webkit.org/show_bug.cgi?id=93650
+
+        Reviewed by Rob Buis.
+
+        Even a small number of allocated JS objects could hold expensive resources.
+
+        * runtime/GCActivityCallbackBlackBerry.cpp:
+        (JSC::DefaultGCActivityCallback::didAllocate):
+
+2012-08-09  Yong Li  <yoli@rim.com>
+
+        [QNX] Implement getCPUTime() for OS(QNX)
+        https://bugs.webkit.org/show_bug.cgi?id=93516
+
+        Reviewed by George Staikos.
+
+        Implement getCPUTime() with CLOCK_THREAD_CPUTIME_ID so it will tell
+        exactly how long the current thread has spent without being impacted
+        by other things.
+
+        * runtime/TimeoutChecker.cpp:
+        (JSC::getCPUTime):
+
+2012-08-08  Shane Stephens  <shanestephens@google.com>
+
+        Compile flag for CSS Hierarchies
+        https://bugs.webkit.org/show_bug.cgi?id=92433
+
+        Reviewed by Tony Chang.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-08-08  Benjamin Poulain  <bpoulain@apple.com>
+
+        Use char* instead of LChar* for the public interface of String construction from literals
+        https://bugs.webkit.org/show_bug.cgi?id=93402
+
+        Reviewed by Michael Saboff.
+
+        Update JSC' Identifier to use StringImpl::createFromLiteral with a char*.
+
+        * runtime/Identifier.cpp:
+        (JSC::IdentifierASCIIStringTranslator::translate):
+
+2012-08-08  Patrick Gansterer  <paroga@webkit.org>
+
+        Remove ce_time.(cpp|h) from list of source files
+        https://bugs.webkit.org/show_bug.cgi?id=93446
+
+        Reviewed by Simon Hausmann.
+
+        r125004 removed the last dependency on functions defined in ce_time.cpp.
+
+        * Target.pri:
+
+2012-08-08  Patrick Gansterer  <paroga@webkit.org>
+
+        [WIN] Use GetTimeZoneInformation() for getting the timezone name
+        https://bugs.webkit.org/show_bug.cgi?id=91936
+
+        Reviewed by Ryosuke Niwa.
+
+        The MS CRT implementation of strftime calls the same functions in the background.
+        Using them directly avoids the overhead of parsing the format string and removes
+        the dependency on strftime() for WinCE where this function does not exist.
+
+        * runtime/DateConversion.cpp:
+        (JSC::formatTime):
+
+2012-08-07  Gabor Ballabas  <gaborb@inf.u-szeged.hu>
+
+        Refactor magic numbers in the ARM port of DFG-JIT
+        https://bugs.webkit.org/show_bug.cgi?id=93348
+
+        Reviewed by Eric Seidel.
+
+        Introduce new names for hard-coded magic numbers.
+        Refactor constant with confusing names to more descriptive ones.
+
+        * assembler/ARMAssembler.cpp:
+        (JSC::ARMAssembler::patchConstantPoolLoad):
+        (JSC::ARMAssembler::getOp2):
+        (JSC::ARMAssembler::genInt):
+        (JSC::ARMAssembler::getImm):
+        (JSC::ARMAssembler::moveImm):
+        (JSC::ARMAssembler::encodeComplexImm):
+        (JSC::ARMAssembler::dataTransfer32):
+        (JSC::ARMAssembler::dataTransfer16):
+        (JSC::ARMAssembler::dataTransferFloat):
+        (JSC::ARMAssembler::executableCopy):
+        * assembler/ARMAssembler.h:
+        (JSC::ARMAssembler::emitInstruction):
+        (JSC::ARMAssembler::ands_r):
+        (JSC::ARMAssembler::eors_r):
+        (JSC::ARMAssembler::subs_r):
+        (JSC::ARMAssembler::rsbs_r):
+        (JSC::ARMAssembler::adds_r):
+        (JSC::ARMAssembler::adcs_r):
+        (JSC::ARMAssembler::sbcs_r):
+        (JSC::ARMAssembler::rscs_r):
+        (JSC::ARMAssembler::tst_r):
+        (JSC::ARMAssembler::teq_r):
+        (JSC::ARMAssembler::cmp_r):
+        (JSC::ARMAssembler::cmn_r):
+        (JSC::ARMAssembler::orrs_r):
+        (JSC::ARMAssembler::movs_r):
+        (JSC::ARMAssembler::bics_r):
+        (JSC::ARMAssembler::mvns_r):
+        (JSC::ARMAssembler::muls_r):
+        (JSC::ARMAssembler::ldr_imm):
+        (JSC::ARMAssembler::ldr_un_imm):
+        (JSC::ARMAssembler::dtr_u):
+        (JSC::ARMAssembler::dtr_ur):
+        (JSC::ARMAssembler::dtr_dr):
+        (JSC::ARMAssembler::dtrh_u):
+        (JSC::ARMAssembler::dtrh_ur):
+        (JSC::ARMAssembler::fdtr_u):
+        (JSC::ARMAssembler::push_r):
+        (JSC::ARMAssembler::pop_r):
+        (JSC::ARMAssembler::getLdrImmAddress):
+        (JSC::ARMAssembler::getLdrImmAddressOnPool):
+        (JSC::ARMAssembler::patchConstantPoolLoad):
+        (JSC::ARMAssembler::repatchCompact):
+        (JSC::ARMAssembler::replaceWithJump):
+        (JSC::ARMAssembler::replaceWithLoad):
+        (JSC::ARMAssembler::replaceWithAddressComputation):
+        (JSC::ARMAssembler::getOp2Byte):
+        (JSC::ARMAssembler::getOp2Half):
+        (JSC::ARMAssembler::getImm16Op2):
+        (JSC::ARMAssembler::placeConstantPoolBarrier):
+        (JSC::ARMAssembler::getConditionalField):
+        * assembler/MacroAssemblerARM.cpp:
+        (JSC::MacroAssemblerARM::load32WithUnalignedHalfWords):
+        * assembler/MacroAssemblerARM.h:
+        (JSC::MacroAssemblerARM::and32):
+        (JSC::MacroAssemblerARM::branch32):
+        (JSC::MacroAssemblerARM::branchTest32):
+        (JSC::MacroAssemblerARM::branchTruncateDoubleToInt32):
+
+2012-08-07  Benjamin Poulain  <benjamin@webkit.org>
+
+        Use the initialization from literal for JSC's Identifiers
+        https://bugs.webkit.org/show_bug.cgi?id=93193
+
+        Reviewed by Geoffrey Garen.
+
+        This patches modify Identifier ot take advantage of the new initialization from literal.
+
+        In addition to the memory savings (~600bytes per instance), this gives us a 2% speed
+        improvement on CommonIdentifiers on average.
+
+        * runtime/CommonIdentifiers.cpp:
+        (JSC::CommonIdentifiers::CommonIdentifiers):
+        Null and empty strings are forbidden for literal initialization. Use the most efficient constructors
+        instead of a literal.
+
+        * runtime/Identifier.cpp:
+        (IdentifierASCIIStringTranslator):
+        Rename IdentifierCStringTranslator to IdentifierASCIIStringTranslator to make the text encoding
+        explicit.
+        (JSC::IdentifierASCIIStringTranslator::hash):
+        (JSC::IdentifierASCIIStringTranslator::equal):
+        (JSC::IdentifierASCIIStringTranslator::translate): Use the fast initialization from literal.
+        (JSC::Identifier::add):
+        * runtime/Identifier.h:
+        (JSC::Identifier::Identifier):
+
+2012-08-07  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt][Win] Remove pthreads linkage
+
+        Reviewed by Csaba Osztrogonác.
+
+        After r124823 linkage to pthreads is not needed anymore for the Windows
+        build.
+
+        * JavaScriptCore.pri:
+
+2012-08-07  Gabor Ballabas  <gaborb@inf.u-szeged.hu>
+
+        Refactor emit*Inst functions and introduce toARMWord functions in DFG-JIT's traditional ARM port
+        https://bugs.webkit.org/show_bug.cgi?id=93266
+
+        Reviewed by Csaba Osztrogonác.
+
+        First part of a bigger refactoring issue trying to make traditional
+        ARM DFG-JIT port easier to read and understand.
+
+
+        * assembler/ARMAssembler.h:
+        (JSC::ARMAssembler::emitInstruction):
+        (JSC::ARMAssembler::emitDoublePrecisionInstruction):
+        (JSC::ARMAssembler::emitSinglePrecisionInstruction):
+        (JSC::ARMAssembler::and_r):
+        (JSC::ARMAssembler::ands_r):
+        (JSC::ARMAssembler::eor_r):
+        (JSC::ARMAssembler::eors_r):
+        (JSC::ARMAssembler::sub_r):
+        (JSC::ARMAssembler::subs_r):
+        (JSC::ARMAssembler::rsb_r):
+        (JSC::ARMAssembler::rsbs_r):
+        (JSC::ARMAssembler::add_r):
+        (JSC::ARMAssembler::adds_r):
+        (JSC::ARMAssembler::adc_r):
+        (JSC::ARMAssembler::adcs_r):
+        (JSC::ARMAssembler::sbc_r):
+        (JSC::ARMAssembler::sbcs_r):
+        (JSC::ARMAssembler::rsc_r):
+        (JSC::ARMAssembler::rscs_r):
+        (JSC::ARMAssembler::tst_r):
+        (JSC::ARMAssembler::teq_r):
+        (JSC::ARMAssembler::cmp_r):
+        (JSC::ARMAssembler::cmn_r):
+        (JSC::ARMAssembler::orr_r):
+        (JSC::ARMAssembler::orrs_r):
+        (JSC::ARMAssembler::mov_r):
+        (JSC::ARMAssembler::movw_r):
+        (JSC::ARMAssembler::movt_r):
+        (JSC::ARMAssembler::movs_r):
+        (JSC::ARMAssembler::bic_r):
+        (JSC::ARMAssembler::bics_r):
+        (JSC::ARMAssembler::mvn_r):
+        (JSC::ARMAssembler::mvns_r):
+        (JSC::ARMAssembler::mul_r):
+        (JSC::ARMAssembler::muls_r):
+        (JSC::ARMAssembler::mull_r):
+        (JSC::ARMAssembler::vmov_f64_r):
+        (JSC::ARMAssembler::vadd_f64_r):
+        (JSC::ARMAssembler::vdiv_f64_r):
+        (JSC::ARMAssembler::vsub_f64_r):
+        (JSC::ARMAssembler::vmul_f64_r):
+        (JSC::ARMAssembler::vcmp_f64_r):
+        (JSC::ARMAssembler::vsqrt_f64_r):
+        (JSC::ARMAssembler::vabs_f64_r):
+        (JSC::ARMAssembler::vneg_f64_r):
+        (JSC::ARMAssembler::ldr_imm):
+        (JSC::ARMAssembler::ldr_un_imm):
+        (JSC::ARMAssembler::dtr_u):
+        (JSC::ARMAssembler::dtr_ur):
+        (JSC::ARMAssembler::dtr_d):
+        (JSC::ARMAssembler::dtr_dr):
+        (JSC::ARMAssembler::dtrh_u):
+        (JSC::ARMAssembler::dtrh_ur):
+        (JSC::ARMAssembler::dtrh_d):
+        (JSC::ARMAssembler::dtrh_dr):
+        (JSC::ARMAssembler::fdtr_u):
+        (JSC::ARMAssembler::fdtr_d):
+        (JSC::ARMAssembler::push_r):
+        (JSC::ARMAssembler::pop_r):
+        (JSC::ARMAssembler::vmov_vfp64_r):
+        (JSC::ARMAssembler::vmov_arm64_r):
+        (JSC::ARMAssembler::vmov_vfp32_r):
+        (JSC::ARMAssembler::vmov_arm32_r):
+        (JSC::ARMAssembler::vcvt_f64_s32_r):
+        (JSC::ARMAssembler::vcvt_s32_f64_r):
+        (JSC::ARMAssembler::vcvt_u32_f64_r):
+        (JSC::ARMAssembler::vcvt_f64_f32_r):
+        (JSC::ARMAssembler::vcvt_f32_f64_r):
+        (JSC::ARMAssembler::vmrs_apsr):
+        (JSC::ARMAssembler::clz_r):
+        (JSC::ARMAssembler::bx):
+        (JSC::ARMAssembler::blx):
+        (JSC::ARMAssembler::linkJump):
+        (JSC::ARMAssembler::toARMWord):
+        (ARMAssembler):
+
+2012-08-06  Patrick Gansterer  <paroga@webkit.org>
 
         [WIN] Remove dependency on pthread from MachineStackMarker
         https://bugs.webkit.org/show_bug.cgi?id=68429
 
-        Reviewed by NOBODY (OOPS!).
+        Reviewed by Geoffrey Garen.
 
-        Implement pthread TLS functionality with native windows functions.
+        Windows has no support for calling a destructor for thread specific data.
+        Since we need more control over creating and deleting thread specific keys
+        we can not simply extend WTF::ThreadSpecific with this functionality.
 
-        * heap/MachineStackMarker.cpp: Use the new functions instead of pthread directly.
+        All thread specific keys created via the new API get stored in a list.
+        After a thread function finished we iterate over this list and call
+        the registered destructor for every item if needed.
+
+        * heap/MachineStackMarker.cpp:  Use the new functions instead of pthread directly.
+        (JSC::MachineThreads::~MachineThreads):
+        (JSC::MachineThreads::makeUsableFromMultipleThreads):
+        (JSC::MachineThreads::addCurrentThread):
         * heap/MachineStackMarker.h:
-        * wtf/ThreadSpecific.h:
-        (WTF::ThreadSpecificKeyCreate): Added wrapper around pthread_key_create.
-        (WTF::ThreadSpecificKeyDelete): Added wrapper around pthread_key_delete.
-        (WTF::ThreadSpecificSet): Added wrapper around pthread_setspecific.
-        (WTF::ThreadSpecificGet): Added wrapper around pthread_getspecific.
-        * wtf/ThreadSpecificWin.cpp:
+        (MachineThreads):
+
+2012-08-06  Patrick Gansterer  <paroga@webkit.org>
+
+        Unify JSC date and time formating functions
+        https://bugs.webkit.org/show_bug.cgi?id=92282
+
+        Reviewed by Geoffrey Garen.
+
+        Replace the existing functions for formating GregorianDateTime
+        with one single function. This removes some code duplications
+        in DatePrototype and is a preperation to fix encoding issues,
+        since we can add UChar* values to the resulting string now.
+
+        * runtime/DateConstructor.cpp:
+        (JSC::callDate):
+        * runtime/DateConversion.cpp:
+        (JSC::formatDateTime):
+        * runtime/DateConversion.h:
+        (JSC):
+        * runtime/DatePrototype.cpp:
+        (JSC::formateDateInstance):
+        (JSC::dateProtoFuncToString):
+        (JSC::dateProtoFuncToUTCString):
+        (JSC::dateProtoFuncToDateString):
+        (JSC::dateProtoFuncToTimeString):
+        (JSC::dateProtoFuncToGMTString):
+
+2012-08-06  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix make distcheck.
+
+        * GNUmakefile.list.am: Add missing header file.
+
+2012-08-05  Peter Wang  <peter.wang@torchmobile.com.cn>
+
+        Web Inspector: [JSC] implement setting breakpoints by line:column
+        https://bugs.webkit.org/show_bug.cgi?id=53003
+
+        Reviewed by Geoffrey Garen.
+
+        Add a counter to Lexer to record the column info of each Token. Add a column parameter to
+        op_debug, cti_op_debug, and _llint_op_debug byte-code command.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dump):
+        * bytecode/Opcode.h:
+        (JSC):
+        (JSC::padOpcodeName):
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::resolve):
+        (JSC::BytecodeGenerator::emitDebugHook):
+        * bytecompiler/BytecodeGenerator.h:
+        (BytecodeGenerator):
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::ArrayNode::toArgumentList):
+        (JSC::ApplyFunctionCallDotNode::emitBytecode):
+        (JSC::ConstStatementNode::emitBytecode):
+        (JSC::EmptyStatementNode::emitBytecode):
+        (JSC::DebuggerStatementNode::emitBytecode):
+        (JSC::ExprStatementNode::emitBytecode):
+        (JSC::VarStatementNode::emitBytecode):
+        (JSC::IfNode::emitBytecode):
+        (JSC::IfElseNode::emitBytecode):
+        (JSC::DoWhileNode::emitBytecode):
+        (JSC::WhileNode::emitBytecode):
+        (JSC::ForNode::emitBytecode):
+        (JSC::ForInNode::emitBytecode):
+        (JSC::ContinueNode::emitBytecode):
+        (JSC::BreakNode::emitBytecode):
+        (JSC::ReturnNode::emitBytecode):
+        (JSC::WithNode::emitBytecode):
+        (JSC::SwitchNode::emitBytecode):
+        (JSC::LabelNode::emitBytecode):
+        (JSC::ThrowNode::emitBytecode):
+        (JSC::TryNode::emitBytecode):
+        (JSC::ProgramNode::emitBytecode):
+        (JSC::EvalNode::emitBytecode):
+        (JSC::FunctionBodyNode::emitBytecode):
+        * debugger/Debugger.h:
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::unwindCallFrame):
+        (JSC::Interpreter::throwException):
+        (JSC::Interpreter::debug):
+        (JSC::Interpreter::privateExecute):
+        * interpreter/Interpreter.h:
+        (Interpreter):
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_debug):
+        * jit/JITOpcodes32_64.cpp:
+        (JSC::JIT::emit_op_debug):
+        * jit/JITStubs.cpp:
+        (JSC::DEFINE_STUB_FUNCTION):
+        * llint/LLIntSlowPaths.cpp:
+        (JSC::LLInt::LLINT_SLOW_PATH_DECL):
+        * llint/LowLevelInterpreter.asm:
+        * parser/ASTBuilder.h:
+        (ASTBuilder):
+        (JSC::ASTBuilder::createCommaExpr):
+        (JSC::ASTBuilder::createLogicalNot):
+        (JSC::ASTBuilder::createUnaryPlus):
+        (JSC::ASTBuilder::createVoid):
+        (JSC::ASTBuilder::thisExpr):
+        (JSC::ASTBuilder::createResolve):
+        (JSC::ASTBuilder::createObjectLiteral):
+        (JSC::ASTBuilder::createArray):
+        (JSC::ASTBuilder::createNumberExpr):
+        (JSC::ASTBuilder::createString):
+        (JSC::ASTBuilder::createBoolean):
+        (JSC::ASTBuilder::createNull):
+        (JSC::ASTBuilder::createBracketAccess):
+        (JSC::ASTBuilder::createDotAccess):
+        (JSC::ASTBuilder::createRegExp):
+        (JSC::ASTBuilder::createNewExpr):
+        (JSC::ASTBuilder::createConditionalExpr):
+        (JSC::ASTBuilder::createAssignResolve):
+        (JSC::ASTBuilder::createFunctionExpr):
+        (JSC::ASTBuilder::createFunctionBody):
+        (JSC::ASTBuilder::createGetterOrSetterProperty):
+        (JSC::ASTBuilder::createArgumentsList):
+        (JSC::ASTBuilder::createPropertyList):
+        (JSC::ASTBuilder::createFuncDeclStatement):
+        (JSC::ASTBuilder::createBlockStatement):
+        (JSC::ASTBuilder::createExprStatement):
+        (JSC::ASTBuilder::createIfStatement):
+        (JSC::ASTBuilder::createForLoop):
+        (JSC::ASTBuilder::createForInLoop):
+        (JSC::ASTBuilder::createEmptyStatement):
+        (JSC::ASTBuilder::createVarStatement):
+        (JSC::ASTBuilder::createReturnStatement):
+        (JSC::ASTBuilder::createBreakStatement):
+        (JSC::ASTBuilder::createContinueStatement):
+        (JSC::ASTBuilder::createTryStatement):
+        (JSC::ASTBuilder::createSwitchStatement):
+        (JSC::ASTBuilder::createWhileStatement):
+        (JSC::ASTBuilder::createDoWhileStatement):
+        (JSC::ASTBuilder::createLabelStatement):
+        (JSC::ASTBuilder::createWithStatement):
+        (JSC::ASTBuilder::createThrowStatement):
+        (JSC::ASTBuilder::createDebugger):
+        (JSC::ASTBuilder::createConstStatement):
+        (JSC::ASTBuilder::appendConstDecl):
+        (JSC::ASTBuilder::combineCommaNodes):
+        (JSC::ASTBuilder::appendBinaryOperation):
+        (JSC::ASTBuilder::createAssignment):
+        (JSC::ASTBuilder::createNumber):
+        (JSC::ASTBuilder::makeTypeOfNode):
+        (JSC::ASTBuilder::makeDeleteNode):
+        (JSC::ASTBuilder::makeNegateNode):
+        (JSC::ASTBuilder::makeBitwiseNotNode):
+        (JSC::ASTBuilder::makeMultNode):
+        (JSC::ASTBuilder::makeDivNode):
+        (JSC::ASTBuilder::makeModNode):
+        (JSC::ASTBuilder::makeAddNode):
+        (JSC::ASTBuilder::makeSubNode):
+        (JSC::ASTBuilder::makeLeftShiftNode):
+        (JSC::ASTBuilder::makeRightShiftNode):
+        (JSC::ASTBuilder::makeURightShiftNode):
+        (JSC::ASTBuilder::makeBitOrNode):
+        (JSC::ASTBuilder::makeBitAndNode):
+        (JSC::ASTBuilder::makeBitXOrNode):
+        (JSC::ASTBuilder::makeFunctionCallNode):
+        (JSC::ASTBuilder::makeBinaryNode):
+        (JSC::ASTBuilder::makeAssignNode):
+        (JSC::ASTBuilder::makePrefixNode):
+        (JSC::ASTBuilder::makePostfixNode):
+        * parser/Lexer.cpp:
+        (JSC::::setCode):
+        (JSC::::internalShift):
+        (JSC::::shift):
+        (JSC::::lex):
+        * parser/Lexer.h:
+        (Lexer):
+        (JSC::Lexer::currentColumnNumber):
+        (JSC::::lexExpectIdentifier):
+        * parser/NodeConstructors.h:
+        (JSC::Node::Node):
+        (JSC::ExpressionNode::ExpressionNode):
+        (JSC::StatementNode::StatementNode):
+        (JSC::NullNode::NullNode):
+        (JSC::BooleanNode::BooleanNode):
+        (JSC::NumberNode::NumberNode):
+        (JSC::StringNode::StringNode):
+        (JSC::RegExpNode::RegExpNode):
+        (JSC::ThisNode::ThisNode):
+        (JSC::ResolveNode::ResolveNode):
+        (JSC::ArrayNode::ArrayNode):
+        (JSC::PropertyListNode::PropertyListNode):
+        (JSC::ObjectLiteralNode::ObjectLiteralNode):
+        (JSC::BracketAccessorNode::BracketAccessorNode):
+        (JSC::DotAccessorNode::DotAccessorNode):
+        (JSC::ArgumentListNode::ArgumentListNode):
+        (JSC::NewExprNode::NewExprNode):
+        (JSC::EvalFunctionCallNode::EvalFunctionCallNode):
+        (JSC::FunctionCallValueNode::FunctionCallValueNode):
+        (JSC::FunctionCallResolveNode::FunctionCallResolveNode):
+        (JSC::FunctionCallBracketNode::FunctionCallBracketNode):
+        (JSC::FunctionCallDotNode::FunctionCallDotNode):
+        (JSC::CallFunctionCallDotNode::CallFunctionCallDotNode):
+        (JSC::ApplyFunctionCallDotNode::ApplyFunctionCallDotNode):
+        (JSC::PrePostResolveNode::PrePostResolveNode):
+        (JSC::PostfixResolveNode::PostfixResolveNode):
+        (JSC::PostfixBracketNode::PostfixBracketNode):
+        (JSC::PostfixDotNode::PostfixDotNode):
+        (JSC::PostfixErrorNode::PostfixErrorNode):
+        (JSC::DeleteResolveNode::DeleteResolveNode):
+        (JSC::DeleteBracketNode::DeleteBracketNode):
+        (JSC::DeleteDotNode::DeleteDotNode):
+        (JSC::DeleteValueNode::DeleteValueNode):
+        (JSC::VoidNode::VoidNode):
+        (JSC::TypeOfResolveNode::TypeOfResolveNode):
+        (JSC::TypeOfValueNode::TypeOfValueNode):
+        (JSC::PrefixResolveNode::PrefixResolveNode):
+        (JSC::PrefixBracketNode::PrefixBracketNode):
+        (JSC::PrefixDotNode::PrefixDotNode):
+        (JSC::PrefixErrorNode::PrefixErrorNode):
+        (JSC::UnaryOpNode::UnaryOpNode):
+        (JSC::UnaryPlusNode::UnaryPlusNode):
+        (JSC::NegateNode::NegateNode):
+        (JSC::BitwiseNotNode::BitwiseNotNode):
+        (JSC::LogicalNotNode::LogicalNotNode):
+        (JSC::BinaryOpNode::BinaryOpNode):
+        (JSC::MultNode::MultNode):
+        (JSC::DivNode::DivNode):
+        (JSC::ModNode::ModNode):
+        (JSC::AddNode::AddNode):
+        (JSC::SubNode::SubNode):
+        (JSC::LeftShiftNode::LeftShiftNode):
+        (JSC::RightShiftNode::RightShiftNode):
+        (JSC::UnsignedRightShiftNode::UnsignedRightShiftNode):
+        (JSC::LessNode::LessNode):
+        (JSC::GreaterNode::GreaterNode):
+        (JSC::LessEqNode::LessEqNode):
+        (JSC::GreaterEqNode::GreaterEqNode):
+        (JSC::ThrowableBinaryOpNode::ThrowableBinaryOpNode):
+        (JSC::InstanceOfNode::InstanceOfNode):
+        (JSC::InNode::InNode):
+        (JSC::EqualNode::EqualNode):
+        (JSC::NotEqualNode::NotEqualNode):
+        (JSC::StrictEqualNode::StrictEqualNode):
+        (JSC::NotStrictEqualNode::NotStrictEqualNode):
+        (JSC::BitAndNode::BitAndNode):
+        (JSC::BitOrNode::BitOrNode):
+        (JSC::BitXOrNode::BitXOrNode):
+        (JSC::LogicalOpNode::LogicalOpNode):
+        (JSC::ConditionalNode::ConditionalNode):
+        (JSC::ReadModifyResolveNode::ReadModifyResolveNode):
+        (JSC::AssignResolveNode::AssignResolveNode):
+        (JSC::ReadModifyBracketNode::ReadModifyBracketNode):
+        (JSC::AssignBracketNode::AssignBracketNode):
+        (JSC::AssignDotNode::AssignDotNode):
+        (JSC::ReadModifyDotNode::ReadModifyDotNode):
+        (JSC::AssignErrorNode::AssignErrorNode):
+        (JSC::CommaNode::CommaNode):
+        (JSC::ConstStatementNode::ConstStatementNode):
+        (JSC::EmptyStatementNode::EmptyStatementNode):
+        (JSC::DebuggerStatementNode::DebuggerStatementNode):
+        (JSC::ExprStatementNode::ExprStatementNode):
+        (JSC::VarStatementNode::VarStatementNode):
+        (JSC::IfNode::IfNode):
+        (JSC::IfElseNode::IfElseNode):
+        (JSC::DoWhileNode::DoWhileNode):
+        (JSC::WhileNode::WhileNode):
+        (JSC::ForNode::ForNode):
+        (JSC::ContinueNode::ContinueNode):
+        (JSC::BreakNode::BreakNode):
+        (JSC::ReturnNode::ReturnNode):
+        (JSC::WithNode::WithNode):
+        (JSC::LabelNode::LabelNode):
+        (JSC::ThrowNode::ThrowNode):
+        (JSC::TryNode::TryNode):
+        (JSC::FuncExprNode::FuncExprNode):
+        (JSC::FuncDeclNode::FuncDeclNode):
+        (JSC::SwitchNode::SwitchNode):
+        (JSC::ConstDeclNode::ConstDeclNode):
+        (JSC::BlockNode::BlockNode):
+        (JSC::ForInNode::ForInNode):
+        * parser/Nodes.cpp:
+        (JSC::StatementNode::setLoc):
+        (JSC):
+        (JSC::ScopeNode::ScopeNode):
+        (JSC::ProgramNode::ProgramNode):
+        (JSC::ProgramNode::create):
+        (JSC::EvalNode::EvalNode):
+        (JSC::EvalNode::create):
+        (JSC::FunctionBodyNode::FunctionBodyNode):
+        (JSC::FunctionBodyNode::create):
+        * parser/Nodes.h:
+        (Node):
+        (JSC::Node::columnNo):
+        (ExpressionNode):
+        (StatementNode):
+        (JSC::StatementNode::column):
+        (NullNode):
+        (BooleanNode):
+        (NumberNode):
+        (StringNode):
+        (RegExpNode):
+        (ThisNode):
+        (ResolveNode):
+        (ArrayNode):
+        (PropertyListNode):
+        (ObjectLiteralNode):
+        (BracketAccessorNode):
+        (DotAccessorNode):
+        (ArgumentListNode):
+        (NewExprNode):
+        (EvalFunctionCallNode):
+        (FunctionCallValueNode):
+        (FunctionCallResolveNode):
+        (FunctionCallBracketNode):
+        (FunctionCallDotNode):
+        (CallFunctionCallDotNode):
+        (ApplyFunctionCallDotNode):
+        (PrePostResolveNode):
+        (PostfixResolveNode):
+        (PostfixBracketNode):
+        (PostfixDotNode):
+        (PostfixErrorNode):
+        (DeleteResolveNode):
+        (DeleteBracketNode):
+        (DeleteDotNode):
+        (DeleteValueNode):
+        (VoidNode):
+        (TypeOfResolveNode):
+        (TypeOfValueNode):
+        (PrefixResolveNode):
+        (PrefixBracketNode):
+        (PrefixDotNode):
+        (PrefixErrorNode):
+        (UnaryOpNode):
+        (UnaryPlusNode):
+        (NegateNode):
+        (BitwiseNotNode):
+        (LogicalNotNode):
+        (BinaryOpNode):
+        (MultNode):
+        (DivNode):
+        (ModNode):
+        (AddNode):
+        (SubNode):
+        (LeftShiftNode):
+        (RightShiftNode):
+        (UnsignedRightShiftNode):
+        (LessNode):
+        (GreaterNode):
+        (LessEqNode):
+        (GreaterEqNode):
+        (ThrowableBinaryOpNode):
+        (InstanceOfNode):
+        (InNode):
+        (EqualNode):
+        (NotEqualNode):
+        (StrictEqualNode):
+        (NotStrictEqualNode):
+        (BitAndNode):
+        (BitOrNode):
+        (BitXOrNode):
+        (LogicalOpNode):
+        (ConditionalNode):
+        (ReadModifyResolveNode):
+        (AssignResolveNode):
+        (ReadModifyBracketNode):
+        (AssignBracketNode):
+        (AssignDotNode):
+        (ReadModifyDotNode):
+        (AssignErrorNode):
+        (CommaNode):
+        (ConstDeclNode):
+        (ConstStatementNode):
+        (BlockNode):
+        (EmptyStatementNode):
+        (DebuggerStatementNode):
+        (ExprStatementNode):
+        (VarStatementNode):
+        (IfNode):
+        (IfElseNode):
+        (DoWhileNode):
+        (WhileNode):
+        (ForNode):
+        (ForInNode):
+        (ContinueNode):
+        (BreakNode):
+        (ReturnNode):
+        (WithNode):
+        (LabelNode):
+        (ThrowNode):
+        (TryNode):
+        (ScopeNode):
+        (ProgramNode):
+        (EvalNode):
+        (FunctionBodyNode):
+        (FuncExprNode):
+        (FuncDeclNode):
+        (SwitchNode):
+        * parser/Parser.cpp:
+        (JSC::::parseSourceElements):
+        (JSC::::parseVarDeclaration):
+        (JSC::::parseConstDeclaration):
+        (JSC::::parseDoWhileStatement):
+        (JSC::::parseWhileStatement):
+        (JSC::::parseVarDeclarationList):
+        (JSC::::parseConstDeclarationList):
+        (JSC::::parseForStatement):
+        (JSC::::parseBreakStatement):
+        (JSC::::parseContinueStatement):
+        (JSC::::parseReturnStatement):
+        (JSC::::parseThrowStatement):
+        (JSC::::parseWithStatement):
+        (JSC::::parseSwitchStatement):
+        (JSC::::parseTryStatement):
+        (JSC::::parseDebuggerStatement):
+        (JSC::::parseBlockStatement):
+        (JSC::::parseStatement):
+        (JSC::::parseFunctionBody):
+        (JSC::::parseFunctionInfo):
+        (JSC::::parseFunctionDeclaration):
+        (JSC::::parseExpressionOrLabelStatement):
+        (JSC::::parseExpressionStatement):
+        (JSC::::parseIfStatement):
+        (JSC::::parseExpression):
+        (JSC::::parseAssignmentExpression):
+        (JSC::::parseConditionalExpression):
+        (JSC::::parseBinaryExpression):
+        (JSC::::parseProperty):
+        (JSC::::parseObjectLiteral):
+        (JSC::::parseStrictObjectLiteral):
+        (JSC::::parseArrayLiteral):
+        (JSC::::parsePrimaryExpression):
+        (JSC::::parseArguments):
+        (JSC::::parseMemberExpression):
+        (JSC::::parseUnaryExpression):
+        * parser/Parser.h:
+        (JSC::Parser::next):
+        (JSC::Parser::nextExpectIdentifier):
+        (JSC::Parser::tokenStart):
+        (JSC::Parser::tokenLine):
+        (JSC::Parser::tokenEnd):
+        (JSC::Parser::tokenLocation):
+        (Parser):
+        (JSC::Parser::getTokenName):
+        (JSC::::parse):
+        * parser/ParserTokens.h:
+        (JSC::JSTokenLocation::JSTokenLocation):
+        (JSTokenLocation):
+        (JSToken):
+        * parser/SourceProviderCacheItem.h:
+        (JSC::SourceProviderCacheItem::closeBraceToken):
+        * parser/SyntaxChecker.h:
+        (JSC::SyntaxChecker::makeFunctionCallNode):
+        (JSC::SyntaxChecker::createCommaExpr):
+        (JSC::SyntaxChecker::makeAssignNode):
+        (JSC::SyntaxChecker::makePrefixNode):
+        (JSC::SyntaxChecker::makePostfixNode):
+        (JSC::SyntaxChecker::makeTypeOfNode):
+        (JSC::SyntaxChecker::makeDeleteNode):
+        (JSC::SyntaxChecker::makeNegateNode):
+        (JSC::SyntaxChecker::makeBitwiseNotNode):
+        (JSC::SyntaxChecker::createLogicalNot):
+        (JSC::SyntaxChecker::createUnaryPlus):
+        (JSC::SyntaxChecker::createVoid):
+        (JSC::SyntaxChecker::thisExpr):
+        (JSC::SyntaxChecker::createResolve):
+        (JSC::SyntaxChecker::createObjectLiteral):
+        (JSC::SyntaxChecker::createArray):
+        (JSC::SyntaxChecker::createNumberExpr):
+        (JSC::SyntaxChecker::createString):
+        (JSC::SyntaxChecker::createBoolean):
+        (JSC::SyntaxChecker::createNull):
+        (JSC::SyntaxChecker::createBracketAccess):
+        (JSC::SyntaxChecker::createDotAccess):
+        (JSC::SyntaxChecker::createRegExp):
+        (JSC::SyntaxChecker::createNewExpr):
+        (JSC::SyntaxChecker::createConditionalExpr):
+        (JSC::SyntaxChecker::createAssignResolve):
+        (JSC::SyntaxChecker::createFunctionExpr):
+        (JSC::SyntaxChecker::createFunctionBody):
+        (JSC::SyntaxChecker::createArgumentsList):
+        (JSC::SyntaxChecker::createPropertyList):
+        (JSC::SyntaxChecker::createFuncDeclStatement):
+        (JSC::SyntaxChecker::createBlockStatement):
+        (JSC::SyntaxChecker::createExprStatement):
+        (JSC::SyntaxChecker::createIfStatement):
+        (JSC::SyntaxChecker::createForLoop):
+        (JSC::SyntaxChecker::createForInLoop):
+        (JSC::SyntaxChecker::createEmptyStatement):
+        (JSC::SyntaxChecker::createVarStatement):
+        (JSC::SyntaxChecker::createReturnStatement):
+        (JSC::SyntaxChecker::createBreakStatement):
+        (JSC::SyntaxChecker::createContinueStatement):
+        (JSC::SyntaxChecker::createTryStatement):
+        (JSC::SyntaxChecker::createSwitchStatement):
+        (JSC::SyntaxChecker::createWhileStatement):
+        (JSC::SyntaxChecker::createWithStatement):
+        (JSC::SyntaxChecker::createDoWhileStatement):
+        (JSC::SyntaxChecker::createLabelStatement):
+        (JSC::SyntaxChecker::createThrowStatement):
+        (JSC::SyntaxChecker::createDebugger):
+        (JSC::SyntaxChecker::createConstStatement):
+        (JSC::SyntaxChecker::appendConstDecl):
+        (JSC::SyntaxChecker::createGetterOrSetterProperty):
+        (JSC::SyntaxChecker::combineCommaNodes):
+        (JSC::SyntaxChecker::operatorStackPop):
+
+2012-08-03  Filip Pizlo  <fpizlo@apple.com>
+
+        Crashes in dfgBuildPutByIdList when clicking on just about anything on Google Maps
+        https://bugs.webkit.org/show_bug.cgi?id=92691
+
+        Reviewed by Mark Hahnenberg.
+
+        The state of the stubs was changing after we determined the type (by virtue of the slow path
+        function that was called), since the get or put (in this case put) could cause arbitrary
+        side effects. Perhaps a full-blown fix would be to eliminate our reliance of the slow path
+        function to determine what to do, but an easier fix for now is to have the slow path give up
+        if its assumptions were invalidated by a side effect.
+
+        * dfg/DFGOperations.cpp:
+        * jit/JITStubs.cpp:
+        (JSC::DEFINE_STUB_FUNCTION):
+
+2012-08-03  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG handling of get_by_id should always inject a ForceOSRExit node if there is no prediction
+        https://bugs.webkit.org/show_bug.cgi?id=93162
+
+        Reviewed by Mark Hahnenberg.
+
+        This simplifies the DFG IR by ensuring that all nodes that use value profiles will be preceded
+        by a ForceOSRExit if the value profile had no data.
+
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::parseBlock):
+
+2012-08-03  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG::StructureCheckHoistingPhase keeps a Node& around for too long
+        https://bugs.webkit.org/show_bug.cgi?id=93157
+
+        Reviewed by Mark Hahnenberg.
+
+        * dfg/DFGStructureCheckHoistingPhase.cpp:
+        (JSC::DFG::StructureCheckHoistingPhase::run):
+
+2012-08-02  Patrick Gansterer  <paroga@webkit.org>
+
+        Move getLocalTime() as static inline function to DateMath
+        https://bugs.webkit.org/show_bug.cgi?id=92955
+
+        Reviewed by Ryosuke Niwa.
+
+        getCurrentLocalTime() and getLocalTime() has been superseded with the
+        GregorianDateTime class. So we can move it into DateMath.cpp as an static inline
+        function. This allows us to remove the dependecy on time() and localtime()
+        for Windows CE, where this functions require the ce_time library to work.
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.def:
+
+2012-08-02  Filip Pizlo  <fpizlo@apple.com>
+
+        ASSERTION FAILED: at(m_compileIndex).canExit() || m_isCheckingArgumentTypes
+        https://bugs.webkit.org/show_bug.cgi?id=91074
+
+        Reviewed by Mark Hahnenberg.
+
+        Fixes a bug where the speculative JIT was performing an unnecessary speculation that the
+        CFA had proven shouldn't be performed, leading to asserts that a node should not have
+        exit sites. This is a debug-only assert with no release symptom - we were just emitting
+        a check that was not reachable.
+        
+        Also found, and fixed, a bug where structure check hoisting was slightly confusing the
+        CFA by inserting GetLocal's into the graph. CSE would clean the GetLocal's up, which
+        would make the backend happy - but the CFA would produce subtly wrong results.
+
+        * bytecode/SpeculatedType.h:
+        (JSC::isOtherOrEmptySpeculation):
+        (JSC):
+        * dfg/DFGDriver.cpp:
+        (JSC::DFG::compile):
+        * dfg/DFGGraph.cpp:
+        (JSC::DFG::Graph::dump):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compileObjectToObjectOrOtherEquality):
+        (JSC::DFG::SpeculativeJIT::compilePeepHoleObjectToObjectOrOtherEquality):
+
+2012-08-02  Filip Pizlo  <fpizlo@apple.com>
+
+        Unreviewed, build fix for DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE).
+
+        * dfg/DFGStructureCheckHoistingPhase.cpp:
+        (JSC::DFG::StructureCheckHoistingPhase::run):
+
+2012-08-01  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Remove all uses of ClassInfo for JSStrings in JIT code
+        https://bugs.webkit.org/show_bug.cgi?id=92935
+
+        Reviewed by Geoffrey Garen.
+
+        This is the first step in removing our dependence on in-object ClassInfo pointers
+        in JIT code. Most of the changes are to check the Structure, which is unique for 
+        JSString primitives.
+
+        * bytecode/SpeculatedType.cpp:
+        (JSC::speculationFromClassInfo):
+        (JSC::speculationFromStructure): Changed to check the TypeInfo in the Structure
+        since there wasn't a JSGlobalData immediately available to grab the JSString 
+        Structure out of.
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compileGetIndexedPropertyStorage):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * jit/JITInlineMethods.h:
+        (JSC::JIT::emitLoadCharacterString):
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::privateCompileCTIMachineTrampolines):
+        (JSC::JIT::emit_op_to_primitive):
+        (JSC::JIT::emit_op_convert_this):
+        * jit/JITOpcodes32_64.cpp:
+        (JSC::JIT::privateCompileCTIMachineTrampolines):
+        (JSC::JIT::emit_op_to_primitive):
+        (JSC::JIT::emitSlow_op_eq):
+        (JSC::JIT::emitSlow_op_neq):
+        (JSC::JIT::compileOpStrictEq):
+        (JSC::JIT::emit_op_convert_this):
+        * jit/JITPropertyAccess.cpp:
+        (JSC::JIT::stringGetByValStubGenerator):
+        (JSC::JIT::emitSlow_op_get_by_val):
+        * jit/JITPropertyAccess32_64.cpp:
+        (JSC::JIT::stringGetByValStubGenerator):
+        (JSC::JIT::emitSlow_op_get_by_val):
+        * jit/SpecializedThunkJIT.h:
+        (JSC::SpecializedThunkJIT::loadJSStringArgument):
+        * jit/ThunkGenerators.cpp:
+        (JSC::stringCharLoad):
+        (JSC::charCodeAtThunkGenerator):
+        (JSC::charAtThunkGenerator):
+
+2012-08-02  Filip Pizlo  <fpizlo@apple.com>
+
+        Unreviewed, missed a style goof in the previous patch: "NodeIndex nodeIndex"
+        in a method signature is painfully redundant.
+
+        * dfg/DFGSpeculativeJIT.h:
+        (SpeculativeJIT):
+
+2012-08-02  Filip Pizlo  <fpizlo@apple.com>
+
+        DFGSpeculativeJIT.h has too many inline method bodies
+        https://bugs.webkit.org/show_bug.cgi?id=92957
+
+        Reviewed by Antti Koivisto.
+
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::speculationCheck):
+        (DFG):
+        (JSC::DFG::SpeculativeJIT::speculationWatchpoint):
+        (JSC::DFG::SpeculativeJIT::forwardSpeculationCheck):
+        (JSC::DFG::SpeculativeJIT::speculationCheckWithConditionalDirection):
+        (JSC::DFG::SpeculativeJIT::terminateSpeculativeExecution):
+        (JSC::DFG::SpeculativeJIT::terminateSpeculativeExecutionWithConditionalDirection):
+        * dfg/DFGSpeculativeJIT.h:
+        (SpeculativeJIT):
+
+2012-08-01  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r124406.
+        http://trac.webkit.org/changeset/124406
+        https://bugs.webkit.org/show_bug.cgi?id=92951
+
+        it set the Mac bots on fire (Requested by pizlo on #webkit).
+
+        * bytecode/Opcode.h:
+        (JSC):
+        (JSC::padOpcodeName):
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::emitDebugHook):
+        * bytecompiler/BytecodeGenerator.h:
+        (BytecodeGenerator):
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::ArrayNode::toArgumentList):
+        (JSC::ApplyFunctionCallDotNode::emitBytecode):
+        (JSC::ConditionalNode::emitBytecode):
+        (JSC::ConstStatementNode::emitBytecode):
+        (JSC::EmptyStatementNode::emitBytecode):
+        (JSC::DebuggerStatementNode::emitBytecode):
+        (JSC::ExprStatementNode::emitBytecode):
+        (JSC::VarStatementNode::emitBytecode):
+        (JSC::IfNode::emitBytecode):
+        (JSC::IfElseNode::emitBytecode):
+        (JSC::DoWhileNode::emitBytecode):
+        (JSC::WhileNode::emitBytecode):
+        (JSC::ForNode::emitBytecode):
+        (JSC::ForInNode::emitBytecode):
+        (JSC::ContinueNode::emitBytecode):
+        (JSC::BreakNode::emitBytecode):
+        (JSC::ReturnNode::emitBytecode):
+        (JSC::WithNode::emitBytecode):
+        (JSC::SwitchNode::emitBytecode):
+        (JSC::LabelNode::emitBytecode):
+        (JSC::ThrowNode::emitBytecode):
+        (JSC::TryNode::emitBytecode):
+        (JSC::ProgramNode::emitBytecode):
+        (JSC::EvalNode::emitBytecode):
+        (JSC::FunctionBodyNode::emitBytecode):
+        * debugger/Debugger.h:
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::unwindCallFrame):
+        (JSC::Interpreter::throwException):
+        (JSC::Interpreter::debug):
+        * interpreter/Interpreter.h:
+        (Interpreter):
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_debug):
+        * jit/JITOpcodes32_64.cpp:
+        (JSC::JIT::emit_op_debug):
+        * jit/JITStubs.cpp:
+        (JSC::DEFINE_STUB_FUNCTION):
+        * llint/LLIntSlowPaths.cpp:
+        (JSC::LLInt::LLINT_SLOW_PATH_DECL):
+        * parser/ASTBuilder.h:
+        (ASTBuilder):
+        (JSC::ASTBuilder::createCommaExpr):
+        (JSC::ASTBuilder::createLogicalNot):
+        (JSC::ASTBuilder::createUnaryPlus):
+        (JSC::ASTBuilder::createVoid):
+        (JSC::ASTBuilder::thisExpr):
+        (JSC::ASTBuilder::createResolve):
+        (JSC::ASTBuilder::createObjectLiteral):
+        (JSC::ASTBuilder::createArray):
+        (JSC::ASTBuilder::createNumberExpr):
+        (JSC::ASTBuilder::createString):
+        (JSC::ASTBuilder::createBoolean):
+        (JSC::ASTBuilder::createNull):
+        (JSC::ASTBuilder::createBracketAccess):
+        (JSC::ASTBuilder::createDotAccess):
+        (JSC::ASTBuilder::createRegExp):
+        (JSC::ASTBuilder::createNewExpr):
+        (JSC::ASTBuilder::createConditionalExpr):
+        (JSC::ASTBuilder::createAssignResolve):
+        (JSC::ASTBuilder::createFunctionExpr):
+        (JSC::ASTBuilder::createFunctionBody):
+        (JSC::ASTBuilder::createGetterOrSetterProperty):
+        (JSC::ASTBuilder::createArgumentsList):
+        (JSC::ASTBuilder::createPropertyList):
+        (JSC::ASTBuilder::createFuncDeclStatement):
+        (JSC::ASTBuilder::createBlockStatement):
+        (JSC::ASTBuilder::createExprStatement):
+        (JSC::ASTBuilder::createIfStatement):
+        (JSC::ASTBuilder::createForLoop):
+        (JSC::ASTBuilder::createForInLoop):
+        (JSC::ASTBuilder::createEmptyStatement):
+        (JSC::ASTBuilder::createVarStatement):
+        (JSC::ASTBuilder::createReturnStatement):
+        (JSC::ASTBuilder::createBreakStatement):
+        (JSC::ASTBuilder::createContinueStatement):
+        (JSC::ASTBuilder::createTryStatement):
+        (JSC::ASTBuilder::createSwitchStatement):
+        (JSC::ASTBuilder::createWhileStatement):
+        (JSC::ASTBuilder::createDoWhileStatement):
+        (JSC::ASTBuilder::createLabelStatement):
+        (JSC::ASTBuilder::createWithStatement):
+        (JSC::ASTBuilder::createThrowStatement):
+        (JSC::ASTBuilder::createDebugger):
+        (JSC::ASTBuilder::createConstStatement):
+        (JSC::ASTBuilder::appendConstDecl):
+        (JSC::ASTBuilder::combineCommaNodes):
+        (JSC::ASTBuilder::appendBinaryOperation):
+        (JSC::ASTBuilder::createAssignment):
+        (JSC::ASTBuilder::createNumber):
+        (JSC::ASTBuilder::makeTypeOfNode):
+        (JSC::ASTBuilder::makeDeleteNode):
+        (JSC::ASTBuilder::makeNegateNode):
+        (JSC::ASTBuilder::makeBitwiseNotNode):
+        (JSC::ASTBuilder::makeMultNode):
+        (JSC::ASTBuilder::makeDivNode):
+        (JSC::ASTBuilder::makeModNode):
+        (JSC::ASTBuilder::makeAddNode):
+        (JSC::ASTBuilder::makeSubNode):
+        (JSC::ASTBuilder::makeLeftShiftNode):
+        (JSC::ASTBuilder::makeRightShiftNode):
+        (JSC::ASTBuilder::makeURightShiftNode):
+        (JSC::ASTBuilder::makeBitOrNode):
+        (JSC::ASTBuilder::makeBitAndNode):
+        (JSC::ASTBuilder::makeBitXOrNode):
+        (JSC::ASTBuilder::makeFunctionCallNode):
+        (JSC::ASTBuilder::makeBinaryNode):
+        (JSC::ASTBuilder::makeAssignNode):
+        (JSC::ASTBuilder::makePrefixNode):
+        (JSC::ASTBuilder::makePostfixNode):
+        * parser/Lexer.cpp:
+        (JSC::::setCode):
+        (JSC::::internalShift):
+        (JSC::::shift):
+        (JSC::::lex):
+        * parser/Lexer.h:
+        (Lexer):
+        (JSC::::lexExpectIdentifier):
+        * parser/NodeConstructors.h:
+        (JSC::Node::Node):
+        (JSC::ExpressionNode::ExpressionNode):
+        (JSC::StatementNode::StatementNode):
+        (JSC::NullNode::NullNode):
+        (JSC::BooleanNode::BooleanNode):
+        (JSC::NumberNode::NumberNode):
+        (JSC::StringNode::StringNode):
+        (JSC::RegExpNode::RegExpNode):
+        (JSC::ThisNode::ThisNode):
+        (JSC::ResolveNode::ResolveNode):
+        (JSC::ArrayNode::ArrayNode):
+        (JSC::PropertyListNode::PropertyListNode):
+        (JSC::ObjectLiteralNode::ObjectLiteralNode):
+        (JSC::BracketAccessorNode::BracketAccessorNode):
+        (JSC::DotAccessorNode::DotAccessorNode):
+        (JSC::ArgumentListNode::ArgumentListNode):
+        (JSC::NewExprNode::NewExprNode):
+        (JSC::EvalFunctionCallNode::EvalFunctionCallNode):
+        (JSC::FunctionCallValueNode::FunctionCallValueNode):
+        (JSC::FunctionCallResolveNode::FunctionCallResolveNode):
+        (JSC::FunctionCallBracketNode::FunctionCallBracketNode):
+        (JSC::FunctionCallDotNode::FunctionCallDotNode):
+        (JSC::CallFunctionCallDotNode::CallFunctionCallDotNode):
+        (JSC::ApplyFunctionCallDotNode::ApplyFunctionCallDotNode):
+        (JSC::PrePostResolveNode::PrePostResolveNode):
+        (JSC::PostfixResolveNode::PostfixResolveNode):
+        (JSC::PostfixBracketNode::PostfixBracketNode):
+        (JSC::PostfixDotNode::PostfixDotNode):
+        (JSC::PostfixErrorNode::PostfixErrorNode):
+        (JSC::DeleteResolveNode::DeleteResolveNode):
+        (JSC::DeleteBracketNode::DeleteBracketNode):
+        (JSC::DeleteDotNode::DeleteDotNode):
+        (JSC::DeleteValueNode::DeleteValueNode):
+        (JSC::VoidNode::VoidNode):
+        (JSC::TypeOfResolveNode::TypeOfResolveNode):
+        (JSC::TypeOfValueNode::TypeOfValueNode):
+        (JSC::PrefixResolveNode::PrefixResolveNode):
+        (JSC::PrefixBracketNode::PrefixBracketNode):
+        (JSC::PrefixDotNode::PrefixDotNode):
+        (JSC::PrefixErrorNode::PrefixErrorNode):
+        (JSC::UnaryOpNode::UnaryOpNode):
+        (JSC::UnaryPlusNode::UnaryPlusNode):
+        (JSC::NegateNode::NegateNode):
+        (JSC::BitwiseNotNode::BitwiseNotNode):
+        (JSC::LogicalNotNode::LogicalNotNode):
+        (JSC::BinaryOpNode::BinaryOpNode):
+        (JSC::MultNode::MultNode):
+        (JSC::DivNode::DivNode):
+        (JSC::ModNode::ModNode):
+        (JSC::AddNode::AddNode):
+        (JSC::SubNode::SubNode):
+        (JSC::LeftShiftNode::LeftShiftNode):
+        (JSC::RightShiftNode::RightShiftNode):
+        (JSC::UnsignedRightShiftNode::UnsignedRightShiftNode):
+        (JSC::LessNode::LessNode):
+        (JSC::GreaterNode::GreaterNode):
+        (JSC::LessEqNode::LessEqNode):
+        (JSC::GreaterEqNode::GreaterEqNode):
+        (JSC::ThrowableBinaryOpNode::ThrowableBinaryOpNode):
+        (JSC::InstanceOfNode::InstanceOfNode):
+        (JSC::InNode::InNode):
+        (JSC::EqualNode::EqualNode):
+        (JSC::NotEqualNode::NotEqualNode):
+        (JSC::StrictEqualNode::StrictEqualNode):
+        (JSC::NotStrictEqualNode::NotStrictEqualNode):
+        (JSC::BitAndNode::BitAndNode):
+        (JSC::BitOrNode::BitOrNode):
+        (JSC::BitXOrNode::BitXOrNode):
+        (JSC::LogicalOpNode::LogicalOpNode):
+        (JSC::ConditionalNode::ConditionalNode):
+        (JSC::ReadModifyResolveNode::ReadModifyResolveNode):
+        (JSC::AssignResolveNode::AssignResolveNode):
+        (JSC::ReadModifyBracketNode::ReadModifyBracketNode):
+        (JSC::AssignBracketNode::AssignBracketNode):
+        (JSC::AssignDotNode::AssignDotNode):
+        (JSC::ReadModifyDotNode::ReadModifyDotNode):
+        (JSC::AssignErrorNode::AssignErrorNode):
+        (JSC::CommaNode::CommaNode):
+        (JSC::ConstStatementNode::ConstStatementNode):
+        (JSC::EmptyStatementNode::EmptyStatementNode):
+        (JSC::DebuggerStatementNode::DebuggerStatementNode):
+        (JSC::ExprStatementNode::ExprStatementNode):
+        (JSC::VarStatementNode::VarStatementNode):
+        (JSC::IfNode::IfNode):
+        (JSC::IfElseNode::IfElseNode):
+        (JSC::DoWhileNode::DoWhileNode):
+        (JSC::WhileNode::WhileNode):
+        (JSC::ForNode::ForNode):
+        (JSC::ContinueNode::ContinueNode):
+        (JSC::BreakNode::BreakNode):
+        (JSC::ReturnNode::ReturnNode):
+        (JSC::WithNode::WithNode):
+        (JSC::LabelNode::LabelNode):
+        (JSC::ThrowNode::ThrowNode):
+        (JSC::TryNode::TryNode):
+        (JSC::FuncExprNode::FuncExprNode):
+        (JSC::FuncDeclNode::FuncDeclNode):
+        (JSC::SwitchNode::SwitchNode):
+        (JSC::ConstDeclNode::ConstDeclNode):
+        (JSC::BlockNode::BlockNode):
+        (JSC::ForInNode::ForInNode):
+        * parser/Nodes.cpp:
+        (JSC):
+        (JSC::StatementNode::setLoc):
+        (JSC::ScopeNode::ScopeNode):
+        (JSC::ProgramNode::ProgramNode):
+        (JSC::ProgramNode::create):
+        (JSC::EvalNode::EvalNode):
+        (JSC::EvalNode::create):
+        (JSC::FunctionBodyNode::FunctionBodyNode):
+        (JSC::FunctionBodyNode::create):
+        * parser/Nodes.h:
+        (Node):
+        (ExpressionNode):
+        (StatementNode):
+        (NullNode):
+        (BooleanNode):
+        (NumberNode):
+        (StringNode):
+        (RegExpNode):
+        (ThisNode):
+        (ResolveNode):
+        (ArrayNode):
+        (PropertyListNode):
+        (ObjectLiteralNode):
+        (BracketAccessorNode):
+        (DotAccessorNode):
+        (ArgumentListNode):
+        (NewExprNode):
+        (EvalFunctionCallNode):
+        (FunctionCallValueNode):
+        (FunctionCallResolveNode):
+        (FunctionCallBracketNode):
+        (FunctionCallDotNode):
+        (CallFunctionCallDotNode):
+        (ApplyFunctionCallDotNode):
+        (PrePostResolveNode):
+        (PostfixResolveNode):
+        (PostfixBracketNode):
+        (PostfixDotNode):
+        (PostfixErrorNode):
+        (DeleteResolveNode):
+        (DeleteBracketNode):
+        (DeleteDotNode):
+        (DeleteValueNode):
+        (VoidNode):
+        (TypeOfResolveNode):
+        (TypeOfValueNode):
+        (PrefixResolveNode):
+        (PrefixBracketNode):
+        (PrefixDotNode):
+        (PrefixErrorNode):
+        (UnaryOpNode):
+        (UnaryPlusNode):
+        (NegateNode):
+        (BitwiseNotNode):
+        (LogicalNotNode):
+        (BinaryOpNode):
+        (MultNode):
+        (DivNode):
+        (ModNode):
+        (AddNode):
+        (SubNode):
+        (LeftShiftNode):
+        (RightShiftNode):
+        (UnsignedRightShiftNode):
+        (LessNode):
+        (GreaterNode):
+        (LessEqNode):
+        (GreaterEqNode):
+        (ThrowableBinaryOpNode):
+        (InstanceOfNode):
+        (InNode):
+        (EqualNode):
+        (NotEqualNode):
+        (StrictEqualNode):
+        (NotStrictEqualNode):
+        (BitAndNode):
+        (BitOrNode):
+        (BitXOrNode):
+        (LogicalOpNode):
+        (ConditionalNode):
+        (ReadModifyResolveNode):
+        (AssignResolveNode):
+        (ReadModifyBracketNode):
+        (AssignBracketNode):
+        (AssignDotNode):
+        (ReadModifyDotNode):
+        (AssignErrorNode):
+        (CommaNode):
+        (ConstDeclNode):
+        (ConstStatementNode):
+        (BlockNode):
+        (EmptyStatementNode):
+        (DebuggerStatementNode):
+        (ExprStatementNode):
+        (VarStatementNode):
+        (IfNode):
+        (IfElseNode):
+        (DoWhileNode):
+        (WhileNode):
+        (ForNode):
+        (ForInNode):
+        (ContinueNode):
+        (BreakNode):
+        (ReturnNode):
+        (WithNode):
+        (LabelNode):
+        (ThrowNode):
+        (TryNode):
+        (ScopeNode):
+        (ProgramNode):
+        (EvalNode):
+        (FunctionBodyNode):
+        (FuncExprNode):
+        (FuncDeclNode):
+        (SwitchNode):
+        * parser/Parser.cpp:
+        (JSC::::parseSourceElements):
+        (JSC::::parseVarDeclaration):
+        (JSC::::parseConstDeclaration):
+        (JSC::::parseDoWhileStatement):
+        (JSC::::parseWhileStatement):
+        (JSC::::parseVarDeclarationList):
+        (JSC::::parseConstDeclarationList):
+        (JSC::::parseForStatement):
+        (JSC::::parseBreakStatement):
+        (JSC::::parseContinueStatement):
+        (JSC::::parseReturnStatement):
+        (JSC::::parseThrowStatement):
+        (JSC::::parseWithStatement):
+        (JSC::::parseSwitchStatement):
+        (JSC::::parseTryStatement):
+        (JSC::::parseDebuggerStatement):
+        (JSC::::parseBlockStatement):
+        (JSC::::parseStatement):
+        (JSC::::parseFunctionBody):
+        (JSC::::parseFunctionInfo):
+        (JSC::::parseFunctionDeclaration):
+        (JSC::::parseExpressionOrLabelStatement):
+        (JSC::::parseExpressionStatement):
+        (JSC::::parseIfStatement):
+        (JSC::::parseExpression):
+        (JSC::::parseAssignmentExpression):
+        (JSC::::parseConditionalExpression):
+        (JSC::::parseBinaryExpression):
+        (JSC::::parseProperty):
+        (JSC::::parseObjectLiteral):
+        (JSC::::parseStrictObjectLiteral):
+        (JSC::::parseArrayLiteral):
+        (JSC::::parsePrimaryExpression):
+        (JSC::::parseArguments):
+        (JSC::::parseMemberExpression):
+        (JSC::::parseUnaryExpression):
+        * parser/Parser.h:
+        (JSC::Parser::next):
+        (JSC::Parser::nextExpectIdentifier):
+        (JSC::Parser::tokenStart):
+        (JSC::Parser::tokenLine):
+        (JSC::Parser::tokenEnd):
+        (JSC::Parser::getTokenName):
+        (JSC::::parse):
+        * parser/ParserTokens.h:
+        (JSC::JSTokenInfo::JSTokenInfo):
+        (JSTokenInfo):
+        (JSToken):
+        * parser/SourceProviderCacheItem.h:
+        (JSC::SourceProviderCacheItem::closeBraceToken):
+        * parser/SyntaxChecker.h:
+        (JSC::SyntaxChecker::makeFunctionCallNode):
+        (JSC::SyntaxChecker::createCommaExpr):
+        (JSC::SyntaxChecker::makeAssignNode):
+        (JSC::SyntaxChecker::makePrefixNode):
+        (JSC::SyntaxChecker::makePostfixNode):
+        (JSC::SyntaxChecker::makeTypeOfNode):
+        (JSC::SyntaxChecker::makeDeleteNode):
+        (JSC::SyntaxChecker::makeNegateNode):
+        (JSC::SyntaxChecker::makeBitwiseNotNode):
+        (JSC::SyntaxChecker::createLogicalNot):
+        (JSC::SyntaxChecker::createUnaryPlus):
+        (JSC::SyntaxChecker::createVoid):
+        (JSC::SyntaxChecker::thisExpr):
+        (JSC::SyntaxChecker::createResolve):
+        (JSC::SyntaxChecker::createObjectLiteral):
+        (JSC::SyntaxChecker::createArray):
+        (JSC::SyntaxChecker::createNumberExpr):
+        (JSC::SyntaxChecker::createString):
+        (JSC::SyntaxChecker::createBoolean):
+        (JSC::SyntaxChecker::createNull):
+        (JSC::SyntaxChecker::createBracketAccess):
+        (JSC::SyntaxChecker::createDotAccess):
+        (JSC::SyntaxChecker::createRegExp):
+        (JSC::SyntaxChecker::createNewExpr):
+        (JSC::SyntaxChecker::createConditionalExpr):
+        (JSC::SyntaxChecker::createAssignResolve):
+        (JSC::SyntaxChecker::createFunctionExpr):
+        (JSC::SyntaxChecker::createFunctionBody):
+        (JSC::SyntaxChecker::createArgumentsList):
+        (JSC::SyntaxChecker::createPropertyList):
+        (JSC::SyntaxChecker::createFuncDeclStatement):
+        (JSC::SyntaxChecker::createBlockStatement):
+        (JSC::SyntaxChecker::createExprStatement):
+        (JSC::SyntaxChecker::createIfStatement):
+        (JSC::SyntaxChecker::createForLoop):
+        (JSC::SyntaxChecker::createForInLoop):
+        (JSC::SyntaxChecker::createEmptyStatement):
+        (JSC::SyntaxChecker::createVarStatement):
+        (JSC::SyntaxChecker::createReturnStatement):
+        (JSC::SyntaxChecker::createBreakStatement):
+        (JSC::SyntaxChecker::createContinueStatement):
+        (JSC::SyntaxChecker::createTryStatement):
+        (JSC::SyntaxChecker::createSwitchStatement):
+        (JSC::SyntaxChecker::createWhileStatement):
+        (JSC::SyntaxChecker::createWithStatement):
+        (JSC::SyntaxChecker::createDoWhileStatement):
+        (JSC::SyntaxChecker::createLabelStatement):
+        (JSC::SyntaxChecker::createThrowStatement):
+        (JSC::SyntaxChecker::createDebugger):
+        (JSC::SyntaxChecker::createConstStatement):
+        (JSC::SyntaxChecker::appendConstDecl):
+        (JSC::SyntaxChecker::createGetterOrSetterProperty):
+        (JSC::SyntaxChecker::combineCommaNodes):
+        (JSC::SyntaxChecker::operatorStackPop):
+
+2012-08-01  Peter Wang  <peter.wang@torchmobile.com.cn>
+
+        Web Inspector: [JSC] implement setting breakpoints by line:column
+        https://bugs.webkit.org/show_bug.cgi?id=53003
+
+        Reviewed by Geoffrey Garen.
+
+        Add a counter in lexer to record the column of each token. Debugger will use column info
+        in "Pretty Print" debug mode of Inspector.
+
+        * bytecode/Opcode.h:
+        (JSC):
+        (JSC::padOpcodeName):
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::emitDebugHook):
+        * bytecompiler/BytecodeGenerator.h:
+        (BytecodeGenerator):
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::ArrayNode::toArgumentList):
+        (JSC::ApplyFunctionCallDotNode::emitBytecode):
+        (JSC::ConditionalNode::emitBytecode):
+        (JSC::ConstStatementNode::emitBytecode):
+        (JSC::EmptyStatementNode::emitBytecode):
+        (JSC::DebuggerStatementNode::emitBytecode):
+        (JSC::ExprStatementNode::emitBytecode):
+        (JSC::VarStatementNode::emitBytecode):
+        (JSC::IfNode::emitBytecode):
+        (JSC::IfElseNode::emitBytecode):
+        (JSC::DoWhileNode::emitBytecode):
+        (JSC::WhileNode::emitBytecode):
+        (JSC::ForNode::emitBytecode):
+        (JSC::ForInNode::emitBytecode):
+        (JSC::ContinueNode::emitBytecode):
+        (JSC::BreakNode::emitBytecode):
+        (JSC::ReturnNode::emitBytecode):
+        (JSC::WithNode::emitBytecode):
+        (JSC::SwitchNode::emitBytecode):
+        (JSC::LabelNode::emitBytecode):
+        (JSC::ThrowNode::emitBytecode):
+        (JSC::TryNode::emitBytecode):
+        (JSC::ProgramNode::emitBytecode):
+        (JSC::EvalNode::emitBytecode):
+        (JSC::FunctionBodyNode::emitBytecode):
+        * debugger/Debugger.h:
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::unwindCallFrame):
+        (JSC::Interpreter::throwException):
+        (JSC::Interpreter::debug):
+        * interpreter/Interpreter.h:
+        (Interpreter):
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_debug):
+        * jit/JITOpcodes32_64.cpp:
+        (JSC::JIT::emit_op_debug):
+        * jit/JITStubs.cpp:
+        (JSC::DEFINE_STUB_FUNCTION):
+        * llint/LLIntSlowPaths.cpp:
+        (JSC::LLInt::LLINT_SLOW_PATH_DECL):
+        * parser/ASTBuilder.h:
+        (ASTBuilder):
+        (JSC::ASTBuilder::createCommaExpr):
+        (JSC::ASTBuilder::createLogicalNot):
+        (JSC::ASTBuilder::createUnaryPlus):
+        (JSC::ASTBuilder::createVoid):
+        (JSC::ASTBuilder::thisExpr):
+        (JSC::ASTBuilder::createResolve):
+        (JSC::ASTBuilder::createObjectLiteral):
+        (JSC::ASTBuilder::createArray):
+        (JSC::ASTBuilder::createNumberExpr):
+        (JSC::ASTBuilder::createString):
+        (JSC::ASTBuilder::createBoolean):
+        (JSC::ASTBuilder::createNull):
+        (JSC::ASTBuilder::createBracketAccess):
+        (JSC::ASTBuilder::createDotAccess):
+        (JSC::ASTBuilder::createRegExp):
+        (JSC::ASTBuilder::createNewExpr):
+        (JSC::ASTBuilder::createConditionalExpr):
+        (JSC::ASTBuilder::createAssignResolve):
+        (JSC::ASTBuilder::createFunctionExpr):
+        (JSC::ASTBuilder::createFunctionBody):
+        (JSC::ASTBuilder::createGetterOrSetterProperty):
+        (JSC::ASTBuilder::createArgumentsList):
+        (JSC::ASTBuilder::createPropertyList):
+        (JSC::ASTBuilder::createFuncDeclStatement):
+        (JSC::ASTBuilder::createBlockStatement):
+        (JSC::ASTBuilder::createExprStatement):
+        (JSC::ASTBuilder::createIfStatement):
+        (JSC::ASTBuilder::createForLoop):
+        (JSC::ASTBuilder::createForInLoop):
+        (JSC::ASTBuilder::createEmptyStatement):
+        (JSC::ASTBuilder::createVarStatement):
+        (JSC::ASTBuilder::createReturnStatement):
+        (JSC::ASTBuilder::createBreakStatement):
+        (JSC::ASTBuilder::createContinueStatement):
+        (JSC::ASTBuilder::createTryStatement):
+        (JSC::ASTBuilder::createSwitchStatement):
+        (JSC::ASTBuilder::createWhileStatement):
+        (JSC::ASTBuilder::createDoWhileStatement):
+        (JSC::ASTBuilder::createLabelStatement):
+        (JSC::ASTBuilder::createWithStatement):
+        (JSC::ASTBuilder::createThrowStatement):
+        (JSC::ASTBuilder::createDebugger):
+        (JSC::ASTBuilder::createConstStatement):
+        (JSC::ASTBuilder::appendConstDecl):
+        (JSC::ASTBuilder::combineCommaNodes):
+        (JSC::ASTBuilder::appendBinaryOperation):
+        (JSC::ASTBuilder::createAssignment):
+        (JSC::ASTBuilder::createNumber):
+        (JSC::ASTBuilder::makeTypeOfNode):
+        (JSC::ASTBuilder::makeDeleteNode):
+        (JSC::ASTBuilder::makeNegateNode):
+        (JSC::ASTBuilder::makeBitwiseNotNode):
+        (JSC::ASTBuilder::makeMultNode):
+        (JSC::ASTBuilder::makeDivNode):
+        (JSC::ASTBuilder::makeModNode):
+        (JSC::ASTBuilder::makeAddNode):
+        (JSC::ASTBuilder::makeSubNode):
+        (JSC::ASTBuilder::makeLeftShiftNode):
+        (JSC::ASTBuilder::makeRightShiftNode):
+        (JSC::ASTBuilder::makeURightShiftNode):
+        (JSC::ASTBuilder::makeBitOrNode):
+        (JSC::ASTBuilder::makeBitAndNode):
+        (JSC::ASTBuilder::makeBitXOrNode):
+        (JSC::ASTBuilder::makeFunctionCallNode):
+        (JSC::ASTBuilder::makeBinaryNode):
+        (JSC::ASTBuilder::makeAssignNode):
+        (JSC::ASTBuilder::makePrefixNode):
+        (JSC::ASTBuilder::makePostfixNode):
+        * parser/Lexer.cpp:
+        (JSC::::setCode):
+        (JSC::::internalShift):
+        (JSC::::shift):
+        (JSC::::lex):
+        * parser/Lexer.h:
+        (Lexer):
+        (JSC::Lexer::currentColumnNumber):
+        (JSC::::lexExpectIdentifier):
+        * parser/NodeConstructors.h:
+        (JSC::Node::Node):
+        (JSC::ExpressionNode::ExpressionNode):
+        (JSC::StatementNode::StatementNode):
+        (JSC::NullNode::NullNode):
+        (JSC::BooleanNode::BooleanNode):
+        (JSC::NumberNode::NumberNode):
+        (JSC::StringNode::StringNode):
+        (JSC::RegExpNode::RegExpNode):
+        (JSC::ThisNode::ThisNode):
+        (JSC::ResolveNode::ResolveNode):
+        (JSC::ArrayNode::ArrayNode):
+        (JSC::PropertyListNode::PropertyListNode):
+        (JSC::ObjectLiteralNode::ObjectLiteralNode):
+        (JSC::BracketAccessorNode::BracketAccessorNode):
+        (JSC::DotAccessorNode::DotAccessorNode):
+        (JSC::ArgumentListNode::ArgumentListNode):
+        (JSC::NewExprNode::NewExprNode):
+        (JSC::EvalFunctionCallNode::EvalFunctionCallNode):
+        (JSC::FunctionCallValueNode::FunctionCallValueNode):
+        (JSC::FunctionCallResolveNode::FunctionCallResolveNode):
+        (JSC::FunctionCallBracketNode::FunctionCallBracketNode):
+        (JSC::FunctionCallDotNode::FunctionCallDotNode):
+        (JSC::CallFunctionCallDotNode::CallFunctionCallDotNode):
+        (JSC::ApplyFunctionCallDotNode::ApplyFunctionCallDotNode):
+        (JSC::PrePostResolveNode::PrePostResolveNode):
+        (JSC::PostfixResolveNode::PostfixResolveNode):
+        (JSC::PostfixBracketNode::PostfixBracketNode):
+        (JSC::PostfixDotNode::PostfixDotNode):
+        (JSC::PostfixErrorNode::PostfixErrorNode):
+        (JSC::DeleteResolveNode::DeleteResolveNode):
+        (JSC::DeleteBracketNode::DeleteBracketNode):
+        (JSC::DeleteDotNode::DeleteDotNode):
+        (JSC::DeleteValueNode::DeleteValueNode):
+        (JSC::VoidNode::VoidNode):
+        (JSC::TypeOfResolveNode::TypeOfResolveNode):
+        (JSC::TypeOfValueNode::TypeOfValueNode):
+        (JSC::PrefixResolveNode::PrefixResolveNode):
+        (JSC::PrefixBracketNode::PrefixBracketNode):
+        (JSC::PrefixDotNode::PrefixDotNode):
+        (JSC::PrefixErrorNode::PrefixErrorNode):
+        (JSC::UnaryOpNode::UnaryOpNode):
+        (JSC::UnaryPlusNode::UnaryPlusNode):
+        (JSC::NegateNode::NegateNode):
+        (JSC::BitwiseNotNode::BitwiseNotNode):
+        (JSC::LogicalNotNode::LogicalNotNode):
+        (JSC::BinaryOpNode::BinaryOpNode):
+        (JSC::MultNode::MultNode):
+        (JSC::DivNode::DivNode):
+        (JSC::ModNode::ModNode):
+        (JSC::AddNode::AddNode):
+        (JSC::SubNode::SubNode):
+        (JSC::LeftShiftNode::LeftShiftNode):
+        (JSC::RightShiftNode::RightShiftNode):
+        (JSC::UnsignedRightShiftNode::UnsignedRightShiftNode):
+        (JSC::LessNode::LessNode):
+        (JSC::GreaterNode::GreaterNode):
+        (JSC::LessEqNode::LessEqNode):
+        (JSC::GreaterEqNode::GreaterEqNode):
+        (JSC::ThrowableBinaryOpNode::ThrowableBinaryOpNode):
+        (JSC::InstanceOfNode::InstanceOfNode):
+        (JSC::InNode::InNode):
+        (JSC::EqualNode::EqualNode):
+        (JSC::NotEqualNode::NotEqualNode):
+        (JSC::StrictEqualNode::StrictEqualNode):
+        (JSC::NotStrictEqualNode::NotStrictEqualNode):
+        (JSC::BitAndNode::BitAndNode):
+        (JSC::BitOrNode::BitOrNode):
+        (JSC::BitXOrNode::BitXOrNode):
+        (JSC::LogicalOpNode::LogicalOpNode):
+        (JSC::ConditionalNode::ConditionalNode):
+        (JSC::ReadModifyResolveNode::ReadModifyResolveNode):
+        (JSC::AssignResolveNode::AssignResolveNode):
+        (JSC::ReadModifyBracketNode::ReadModifyBracketNode):
+        (JSC::AssignBracketNode::AssignBracketNode):
+        (JSC::AssignDotNode::AssignDotNode):
+        (JSC::ReadModifyDotNode::ReadModifyDotNode):
+        (JSC::AssignErrorNode::AssignErrorNode):
+        (JSC::CommaNode::CommaNode):
+        (JSC::ConstStatementNode::ConstStatementNode):
+        (JSC::EmptyStatementNode::EmptyStatementNode):
+        (JSC::DebuggerStatementNode::DebuggerStatementNode):
+        (JSC::ExprStatementNode::ExprStatementNode):
+        (JSC::VarStatementNode::VarStatementNode):
+        (JSC::IfNode::IfNode):
+        (JSC::IfElseNode::IfElseNode):
+        (JSC::DoWhileNode::DoWhileNode):
+        (JSC::WhileNode::WhileNode):
+        (JSC::ForNode::ForNode):
+        (JSC::ContinueNode::ContinueNode):
+        (JSC::BreakNode::BreakNode):
+        (JSC::ReturnNode::ReturnNode):
+        (JSC::WithNode::WithNode):
+        (JSC::LabelNode::LabelNode):
+        (JSC::ThrowNode::ThrowNode):
+        (JSC::TryNode::TryNode):
+        (JSC::FuncExprNode::FuncExprNode):
+        (JSC::FuncDeclNode::FuncDeclNode):
+        (JSC::SwitchNode::SwitchNode):
+        (JSC::ConstDeclNode::ConstDeclNode):
+        (JSC::BlockNode::BlockNode):
+        (JSC::ForInNode::ForInNode):
+        * parser/Nodes.cpp:
+        (JSC::StatementNode::setLoc):
+        (JSC):
+        (JSC::ScopeNode::ScopeNode):
+        (JSC::ProgramNode::ProgramNode):
+        (JSC::ProgramNode::create):
+        (JSC::EvalNode::EvalNode):
+        (JSC::EvalNode::create):
+        (JSC::FunctionBodyNode::FunctionBodyNode):
+        (JSC::FunctionBodyNode::create):
+        * parser/Nodes.h:
+        (Node):
+        (JSC::Node::columnNo):
+        (ExpressionNode):
+        (StatementNode):
+        (JSC::StatementNode::column):
+        (NullNode):
+        (BooleanNode):
+        (NumberNode):
+        (StringNode):
+        (RegExpNode):
+        (ThisNode):
+        (ResolveNode):
+        (ArrayNode):
+        (PropertyListNode):
+        (ObjectLiteralNode):
+        (BracketAccessorNode):
+        (DotAccessorNode):
+        (ArgumentListNode):
+        (NewExprNode):
+        (EvalFunctionCallNode):
+        (FunctionCallValueNode):
+        (FunctionCallResolveNode):
+        (FunctionCallBracketNode):
+        (FunctionCallDotNode):
+        (CallFunctionCallDotNode):
+        (ApplyFunctionCallDotNode):
+        (PrePostResolveNode):
+        (PostfixResolveNode):
+        (PostfixBracketNode):
+        (PostfixDotNode):
+        (PostfixErrorNode):
+        (DeleteResolveNode):
+        (DeleteBracketNode):
+        (DeleteDotNode):
+        (DeleteValueNode):
+        (VoidNode):
+        (TypeOfResolveNode):
+        (TypeOfValueNode):
+        (PrefixResolveNode):
+        (PrefixBracketNode):
+        (PrefixDotNode):
+        (PrefixErrorNode):
+        (UnaryOpNode):
+        (UnaryPlusNode):
+        (NegateNode):
+        (BitwiseNotNode):
+        (LogicalNotNode):
+        (BinaryOpNode):
+        (MultNode):
+        (DivNode):
+        (ModNode):
+        (AddNode):
+        (SubNode):
+        (LeftShiftNode):
+        (RightShiftNode):
+        (UnsignedRightShiftNode):
+        (LessNode):
+        (GreaterNode):
+        (LessEqNode):
+        (GreaterEqNode):
+        (ThrowableBinaryOpNode):
+        (InstanceOfNode):
+        (InNode):
+        (EqualNode):
+        (NotEqualNode):
+        (StrictEqualNode):
+        (NotStrictEqualNode):
+        (BitAndNode):
+        (BitOrNode):
+        (BitXOrNode):
+        (LogicalOpNode):
+        (ConditionalNode):
+        (ReadModifyResolveNode):
+        (AssignResolveNode):
+        (ReadModifyBracketNode):
+        (AssignBracketNode):
+        (AssignDotNode):
+        (ReadModifyDotNode):
+        (AssignErrorNode):
+        (CommaNode):
+        (ConstDeclNode):
+        (ConstStatementNode):
+        (BlockNode):
+        (EmptyStatementNode):
+        (DebuggerStatementNode):
+        (ExprStatementNode):
+        (VarStatementNode):
+        (IfNode):
+        (IfElseNode):
+        (DoWhileNode):
+        (WhileNode):
+        (ForNode):
+        (ForInNode):
+        (ContinueNode):
+        (BreakNode):
+        (ReturnNode):
+        (WithNode):
+        (LabelNode):
+        (ThrowNode):
+        (TryNode):
+        (ScopeNode):
+        (ProgramNode):
+        (EvalNode):
+        (FunctionBodyNode):
+        (FuncExprNode):
+        (FuncDeclNode):
+        (SwitchNode):
+        * parser/Parser.cpp:
+        (JSC::::parseSourceElements):
+        (JSC::::parseVarDeclaration):
+        (JSC::::parseConstDeclaration):
+        (JSC::::parseDoWhileStatement):
+        (JSC::::parseWhileStatement):
+        (JSC::::parseVarDeclarationList):
+        (JSC::::parseConstDeclarationList):
+        (JSC::::parseForStatement):
+        (JSC::::parseBreakStatement):
+        (JSC::::parseContinueStatement):
+        (JSC::::parseReturnStatement):
+        (JSC::::parseThrowStatement):
+        (JSC::::parseWithStatement):
+        (JSC::::parseSwitchStatement):
+        (JSC::::parseTryStatement):
+        (JSC::::parseDebuggerStatement):
+        (JSC::::parseBlockStatement):
+        (JSC::::parseStatement):
+        (JSC::::parseFunctionBody):
+        (JSC::::parseFunctionInfo):
+        (JSC::::parseFunctionDeclaration):
+        (JSC::::parseExpressionOrLabelStatement):
+        (JSC::::parseExpressionStatement):
+        (JSC::::parseIfStatement):
+        (JSC::::parseExpression):
+        (JSC::::parseAssignmentExpression):
+        (JSC::::parseConditionalExpression):
+        (JSC::::parseBinaryExpression):
+        (JSC::::parseProperty):
+        (JSC::::parseObjectLiteral):
+        (JSC::::parseStrictObjectLiteral):
+        (JSC::::parseArrayLiteral):
+        (JSC::::parsePrimaryExpression):
+        (JSC::::parseArguments):
+        (JSC::::parseMemberExpression):
+        (JSC::::parseUnaryExpression):
+        * parser/Parser.h:
+        (JSC::Parser::next):
+        (JSC::Parser::nextExpectIdentifier):
+        (JSC::Parser::tokenStart):
+        (JSC::Parser::tokenLine):
+        (JSC::Parser::tokenEnd):
+        (JSC::Parser::tokenLocation):
+        (Parser):
+        (JSC::Parser::getTokenName):
+        (JSC::::parse):
+        * parser/ParserTokens.h:
+        (JSC::JSTokenLocation::JSTokenLocation):
+        (JSTokenLocation):
+        (JSToken):
+        * parser/SourceProviderCacheItem.h:
+        (JSC::SourceProviderCacheItem::closeBraceToken):
+        * parser/SyntaxChecker.h:
+        (JSC::SyntaxChecker::makeFunctionCallNode):
+        (JSC::SyntaxChecker::createCommaExpr):
+        (JSC::SyntaxChecker::makeAssignNode):
+        (JSC::SyntaxChecker::makePrefixNode):
+        (JSC::SyntaxChecker::makePostfixNode):
+        (JSC::SyntaxChecker::makeTypeOfNode):
+        (JSC::SyntaxChecker::makeDeleteNode):
+        (JSC::SyntaxChecker::makeNegateNode):
+        (JSC::SyntaxChecker::makeBitwiseNotNode):
+        (JSC::SyntaxChecker::createLogicalNot):
+        (JSC::SyntaxChecker::createUnaryPlus):
+        (JSC::SyntaxChecker::createVoid):
+        (JSC::SyntaxChecker::thisExpr):
+        (JSC::SyntaxChecker::createResolve):
+        (JSC::SyntaxChecker::createObjectLiteral):
+        (JSC::SyntaxChecker::createArray):
+        (JSC::SyntaxChecker::createNumberExpr):
+        (JSC::SyntaxChecker::createString):
+        (JSC::SyntaxChecker::createBoolean):
+        (JSC::SyntaxChecker::createNull):
+        (JSC::SyntaxChecker::createBracketAccess):
+        (JSC::SyntaxChecker::createDotAccess):
+        (JSC::SyntaxChecker::createRegExp):
+        (JSC::SyntaxChecker::createNewExpr):
+        (JSC::SyntaxChecker::createConditionalExpr):
+        (JSC::SyntaxChecker::createAssignResolve):
+        (JSC::SyntaxChecker::createFunctionExpr):
+        (JSC::SyntaxChecker::createFunctionBody):
+        (JSC::SyntaxChecker::createArgumentsList):
+        (JSC::SyntaxChecker::createPropertyList):
+        (JSC::SyntaxChecker::createFuncDeclStatement):
+        (JSC::SyntaxChecker::createBlockStatement):
+        (JSC::SyntaxChecker::createExprStatement):
+        (JSC::SyntaxChecker::createIfStatement):
+        (JSC::SyntaxChecker::createForLoop):
+        (JSC::SyntaxChecker::createForInLoop):
+        (JSC::SyntaxChecker::createEmptyStatement):
+        (JSC::SyntaxChecker::createVarStatement):
+        (JSC::SyntaxChecker::createReturnStatement):
+        (JSC::SyntaxChecker::createBreakStatement):
+        (JSC::SyntaxChecker::createContinueStatement):
+        (JSC::SyntaxChecker::createTryStatement):
+        (JSC::SyntaxChecker::createSwitchStatement):
+        (JSC::SyntaxChecker::createWhileStatement):
+        (JSC::SyntaxChecker::createWithStatement):
+        (JSC::SyntaxChecker::createDoWhileStatement):
+        (JSC::SyntaxChecker::createLabelStatement):
+        (JSC::SyntaxChecker::createThrowStatement):
+        (JSC::SyntaxChecker::createDebugger):
+        (JSC::SyntaxChecker::createConstStatement):
+        (JSC::SyntaxChecker::appendConstDecl):
+        (JSC::SyntaxChecker::createGetterOrSetterProperty):
+        (JSC::SyntaxChecker::combineCommaNodes):
+        (JSC::SyntaxChecker::operatorStackPop):
+
+2012-08-01  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG should hoist structure checks
+        https://bugs.webkit.org/show_bug.cgi?id=92696
+
+        Reviewed by Gavin Barraclough.
+
+        This hoists structure checks in the same way that we would hoist array checks, but with added
+        complexity to cope with the fact that the structure of an object may change. This is handled
+        by performing a side effects analysis over the region in which the respective variable is
+        live. If a structure clobbering side effect may happen then we either hoist the structure
+        checks and fall back on structure transition watchpoints (if the watchpoint set is still
+        valid), or we avoid hoisting altogether.
+        
+        Doing this required teaching the CFA that we may have an expectation that an object has a
+        particular structure even after structure clobbering happens, in the sense that structure
+        proofs that were cobbered can be revived using watchpoints. CFA must know about this so that
+        OSR entry may know about it, since we cannot allow entry to happen if the variable has a
+        clobbered structure proof, will have a watchpoint to revive the proof, and the variable in
+        the baseline JIT has a completely unrelated structure.
+        
+        This is mostly performance neutral.
+
+        * CMakeLists.txt:
+        * GNUmakefile.list.am:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * Target.pri:
+        * bytecode/ValueRecovery.h:
+        (JSC::ValueRecovery::isSet):
+        (JSC::ValueRecovery::operator!):
+        (ValueRecovery):
+        * dfg/DFGAbstractState.cpp:
+        (JSC::DFG::AbstractState::execute):
+        (JSC::DFG::AbstractState::clobberWorld):
+        (DFG):
+        (JSC::DFG::AbstractState::clobberCapturedVars):
+        * dfg/DFGAbstractState.h:
+        (AbstractState):
+        * dfg/DFGAbstractValue.h:
+        (JSC::DFG::AbstractValue::clear):
+        (JSC::DFG::AbstractValue::isClear):
+        (JSC::DFG::AbstractValue::makeTop):
+        (JSC::DFG::AbstractValue::isTop):
+        (JSC::DFG::AbstractValue::set):
+        (JSC::DFG::AbstractValue::operator==):
+        (JSC::DFG::AbstractValue::merge):
+        (JSC::DFG::AbstractValue::filter):
+        (JSC::DFG::AbstractValue::validate):
+        (JSC::DFG::AbstractValue::validateForEntry):
+        (AbstractValue):
+        (JSC::DFG::AbstractValue::checkConsistency):
+        (JSC::DFG::AbstractValue::dump):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::setLocal):
+        (JSC::DFG::ByteCodeParser::getArgument):
+        (JSC::DFG::ByteCodeParser::setArgument):
+        (JSC::DFG::ByteCodeParser::parseBlock):
+        (JSC::DFG::ByteCodeParser::fixVariableAccessSpeculations):
+        * dfg/DFGCSEPhase.cpp:
+        (JSC::DFG::CSEPhase::checkStructureLoadElimination):
+        (JSC::DFG::CSEPhase::structureTransitionWatchpointElimination):
+        (JSC::DFG::CSEPhase::putStructureStoreElimination):
+        (JSC::DFG::CSEPhase::getLocalLoadElimination):
+        (JSC::DFG::CSEPhase::performNodeCSE):
+        * dfg/DFGDriver.cpp:
+        (JSC::DFG::compile):
+        * dfg/DFGGraph.cpp:
+        (JSC::DFG::Graph::dump):
+        * dfg/DFGGraph.h:
+        (JSC::DFG::Graph::vote):
+        (Graph):
+        * dfg/DFGNode.h:
+        (JSC::DFG::Node::convertToStructureTransitionWatchpoint):
+        (Node):
+        (JSC::DFG::Node::hasStructureSet):
+        * dfg/DFGNodeType.h:
+        (DFG):
+        * dfg/DFGOSREntry.cpp:
+        (JSC::DFG::prepareOSREntry):
+        * dfg/DFGPredictionPropagationPhase.cpp:
+        (JSC::DFG::PredictionPropagationPhase::propagate):
+        (PredictionPropagationPhase):
+        (JSC::DFG::PredictionPropagationPhase::doRoundOfDoubleVoting):
+        * dfg/DFGSpeculativeJIT.h:
+        (SpeculativeJIT):
+        (JSC::DFG::SpeculativeJIT::forwardSpeculationCheck):
+        (JSC::DFG::SpeculativeJIT::speculationCheckWithConditionalDirection):
+        (JSC::DFG::SpeculativeJIT::terminateSpeculativeExecutionWithConditionalDirection):
+        (JSC::DFG::SpeculateCellOperand::SpeculateCellOperand):
+        (JSC::DFG::SpeculateCellOperand::gpr):
+        (SpeculateCellOperand):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::fillSpeculateCell):
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::fillSpeculateCell):
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGStructureCheckHoistingPhase.cpp: Added.
+        (DFG):
+        (StructureCheckHoistingPhase):
+        (JSC::DFG::StructureCheckHoistingPhase::StructureCheckHoistingPhase):
+        (JSC::DFG::StructureCheckHoistingPhase::run):
+        (JSC::DFG::StructureCheckHoistingPhase::noticeStructureCheck):
+        (JSC::DFG::StructureCheckHoistingPhase::noticeClobber):
+        (JSC::DFG::StructureCheckHoistingPhase::clobber):
+        (CheckData):
+        (JSC::DFG::StructureCheckHoistingPhase::CheckData::CheckData):
+        (JSC::DFG::performStructureCheckHoisting):
+        * dfg/DFGStructureCheckHoistingPhase.h: Added.
+        (DFG):
+        * dfg/DFGVariableAccessData.h:
+        (VariableAccessData):
+        (JSC::DFG::VariableAccessData::VariableAccessData):
+        (JSC::DFG::VariableAccessData::mergeStructureCheckHoistingFailed):
+        (JSC::DFG::VariableAccessData::structureCheckHoistingFailed):
+        (JSC::DFG::VariableAccessData::clearVotes):
+        (JSC::DFG::VariableAccessData::vote):
+        (JSC::DFG::VariableAccessData::voteRatio):
+        (JSC::DFG::VariableAccessData::shouldUseDoubleFormatAccordingToVote):
+        * runtime/Options.h:
+        (JSC):
+
+2012-08-01  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG should distinguish between PutByVal's that clobber the world and ones that don't
+        https://bugs.webkit.org/show_bug.cgi?id=92923
+
+        Reviewed by Mark Hahnenberg.
+
+        This is performance-neutral. I also confirmed that it's neutral if we make the
+        clobbering variant (PutByValSafe) clobber all knowledge of what is an array,
+        which should feed nicely into work on removing uses of ClassInfo.
+
+        * bytecode/DFGExitProfile.h:
+        * dfg/DFGAbstractState.cpp:
+        (JSC::DFG::AbstractState::execute):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::parseBlock):
+        * dfg/DFGCSEPhase.cpp:
+        (JSC::DFG::CSEPhase::getByValLoadElimination):
+        (JSC::DFG::CSEPhase::checkStructureLoadElimination):
+        (JSC::DFG::CSEPhase::structureTransitionWatchpointElimination):
+        (JSC::DFG::CSEPhase::getByOffsetLoadElimination):
+        (JSC::DFG::CSEPhase::putByOffsetStoreElimination):
+        (JSC::DFG::CSEPhase::getPropertyStorageLoadElimination):
+        (JSC::DFG::CSEPhase::getIndexedPropertyStorageLoadElimination):
+        (JSC::DFG::CSEPhase::performNodeCSE):
+        * dfg/DFGFixupPhase.cpp:
+        (JSC::DFG::FixupPhase::fixupNode):
+        * dfg/DFGGraph.h:
+        (JSC::DFG::Graph::byValIsPure):
+        (JSC::DFG::Graph::clobbersWorld):
+        * dfg/DFGNodeType.h:
+        (DFG):
+        * dfg/DFGPredictionPropagationPhase.cpp:
+        (JSC::DFG::PredictionPropagationPhase::propagate):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+
+2012-08-01  Jian Li  <jianli@chromium.org>
+
+        Add new CSS property "-webkit-widget-region" to expose dashboard region support for other port
+        https://bugs.webkit.org/show_bug.cgi?id=90298
+
+        Reviewed by Adam Barth.
+
+        * Configurations/FeatureDefines.xcconfig: Add ENABLE_WIDGET_REGION define.
+
+2012-08-01  Patrick Gansterer  <paroga@webkit.org>
+
+        Replace WTF::getCurrentLocalTime() with GregorianDateTime::setToCurrentLocalTime()
+        https://bugs.webkit.org/show_bug.cgi?id=92286
+
+        Reviewed by Geoffrey Garen.
+
+        Add a method to GregorianDateTime to set its values to the current locale time.
+        Replacing all occurrences of getCurrentLocalTime with the new function allows
+        us to remove getCurrentLocalTime in a next step.
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.def:
+
+2012-08-01  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        C++ code should get ClassInfo from the Structure
+        https://bugs.webkit.org/show_bug.cgi?id=92892
+
+        Reviewed by Geoffrey Garen.
+
+        In our march to remove ClassInfo from our JSCell object headers, we can switch 
+        C++ code over to grabbing the ClassInfo from the Structure since it is finally 
+        safe to do so now that Structure access is safe during finalization/destruction. 
+        The remaining JIT code changes can be done in a separate patch.
+
+        * heap/MarkedBlock.cpp:
+        (JSC::MarkedBlock::callDestructor): We don't want to clear the Structure any more 
+        since the Structure should still be valid at this point.
+        * heap/WeakSetInlines.h:
+        (JSC::WeakBlock::finalize): Ditto.
+        * runtime/JSCell.h:
+        (JSC):
+        * runtime/Structure.h:
+        (JSC::JSCell::classInfo): Move JSCell's classInfo() to Structure.h so it can be 
+        inline. Use a different method of getting the JSCell's Structure based on 
+        whether we're in GC_VALIDATION mode or not, since always using get() will cause 
+        infinite recursion in GC_VALIDATION mode.
+        (JSC):
+
+2012-07-31  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        MarkedBlock::sweep() should sweep another block if it can't sweep a Structure block
+        https://bugs.webkit.org/show_bug.cgi?id=92819
+
+        Reviewed by Geoffrey Garen.
+
+        If we are forced to allocate a new block for Structures because we are unable to safely 
+        sweep our pre-existing Structure blocks, we should sweep another random block so that we 
+        can start sweeping Structure blocks sooner.
+
+        * heap/IncrementalSweeper.cpp:
+        (JSC::IncrementalSweeper::doSweep): Change to use sweepNextBlock.
+        (JSC):
+        (JSC::IncrementalSweeper::sweepNextBlock): 
+        * heap/IncrementalSweeper.h:
+        (IncrementalSweeper):
+        * heap/MarkedAllocator.cpp:
+        (JSC::MarkedAllocator::tryAllocateHelper): When we can't safely sweep 
+        our Structure blocks, call sweepNextBlock instead.
+
+2012-07-31  Sam Weinig  <sam@webkit.org>
+
+        Fix the Windows build.
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.def:
+
+2012-07-31  Geoffrey Garen  <ggaren@apple.com>
+
+        Maybe fix the GCC build.
+
+        * heap/HeapBlock.h:
+        (HeapBlock): Accommodate incorrect parsing in GCC.
+
+2012-07-31  Sam Weinig  <sam@webkit.org>
+
+        Stop masking 8 bits off of the visited link hash. We need all the bits!
+        https://bugs.webkit.org/show_bug.cgi?id=92799
+
+        Reviewed by Anders Carlsson.
+
+        * runtime/Identifier.cpp:
+        (JSC::IdentifierCStringTranslator::hash):
+        (JSC::IdentifierLCharFromUCharTranslator::hash):
+        * runtime/Identifier.h:
+        (JSC::IdentifierCharBufferTranslator::hash):
+        Update for new function names.
+
+2012-07-31  Geoffrey Garen  <ggaren@apple.com>
+
+        Maybe break the Windows build.
+
+        Reviewed by Anders Carlsson.
+
+        Formally objected to by Sam Weinig.
+
+        * heap/HeapBlock.h:
+        (HeapBlock): Try to slightly improve this because we don't want Windows to control our lives.
+
+2012-07-30  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Structures should be swept after all other objects
+        https://bugs.webkit.org/show_bug.cgi?id=92679
+
+        Reviewed by Filip Pizlo.
+
+        In order to get rid of ClassInfo from our objects, we need to be able to safely get the 
+        ClassInfo during the destruction of objects. We'd like to get the ClassInfo out of the 
+        Structure, but currently it is not safe to do so because the order of destruction of objects 
+        is not guaranteed to sweep objects before their corresponding Structure. We can fix this by 
+        sweeping Structures after everything else.
+
+        * heap/Heap.cpp:
+        (JSC::Heap::isSafeToSweepStructures): Add a function that checks if it is safe to sweep Structures.
+        If the Heap's IncrementalSweeper member is null, that means we're shutting down this VM and it is 
+        safe to sweep structures since we'll always do Structures last anyways due to the ordering of 
+        MarkedSpace::forEachBlock.
+        (JSC):
+        (JSC::Heap::didStartVMShutdown): Add this intermediate function to the Heap that ~JSGlobalData now
+        calls rather than calling the two HeapTimer objects individually. This allows the Heap to null out 
+        these pointers after it has invalidated them to prevent accidental use-after-free in the sweep() 
+        calls during lastChanceToFinalize().
+        * heap/Heap.h:
+        (Heap):
+        * heap/HeapTimer.h:
+        (HeapTimer):
+        * heap/IncrementalSweeper.cpp:
+        (JSC::IncrementalSweeper::structuresCanBeSwept): Determines if it is currently safe to sweep Structures.
+        This decision is based on whether we have gotten to the end of the vector of blocks that need sweeping
+        the first time.
+        (JSC):
+        (JSC::IncrementalSweeper::doSweep): We add a second pass over the vector to sweep Structures after we 
+        make our first pass. We now null out the slots as we sweep them so that we can quickly find the 
+        Structures during the second pass.
+        (JSC::IncrementalSweeper::startSweeping): Initialize our new Structure sweeping index.
+        (JSC::IncrementalSweeper::willFinishSweeping): Callback that is called by MarkedSpace::sweep to notify 
+        the IncrementalSweeper that we are going to sweep all of the remaining blocks in the Heap so it can 
+        assume that everything is taken care of in the correct order. Since MarkedSpace::forEachBlock 
+        iterates over the Structure blocks after all other blocks, the ordering property for sweeping Structures holds.
+        (JSC::IncrementalSweeper::IncrementalSweeper): Initialize Structure sweeping index.
+        * heap/IncrementalSweeper.h: Add declarations for new stuff.
+        (IncrementalSweeper):
+        * heap/MarkedAllocator.cpp:
+        (JSC::MarkedAllocator::tryAllocateHelper): We now check if the current block only contains structures and 
+        if so and it isn't safe to sweep Structures according to the Heap, we just return early instead of doing 
+        the normal lazy sweep. If this proves to be too much of a waste in the future we can add an extra clause that 
+        will sweep some number of other blocks in place of the current block to mitigate the cost of the floating 
+        Structure garbage.
+        (JSC::MarkedAllocator::addBlock):
+        * heap/MarkedAllocator.h:
+        (JSC::MarkedAllocator::zapFreeList): When we zap the free list in the MarkedAllocator, the current block is no 
+        longer valid to allocate from, so we set the current block to null.
+        * heap/MarkedBlock.cpp:
+        (JSC::MarkedBlock::sweepHelper): Added a couple assertions to make sure that we weren't trying to sweep Structures
+        at an unsafe time.
+        * heap/MarkedSpace.cpp:
+        (JSC::MarkedSpace::sweep): Notify the IncrementalSweeper that the MarkedSpace will finish all currently remaining sweeping.
+        (JSC): 
+        * heap/MarkedSpace.h:
+        (JSC):
+        * runtime/JSGlobalData.cpp:
+        (JSC::JSGlobalData::~JSGlobalData): Call the new Heap::didStartVMShutdown.
+
+2012-07-31  Geoffrey Garen  <ggaren@apple.com>
+
+        Fix all the other builds I just broke. Maybe fix the Windows build.
+
+        * heap/HeapBlock.h:
+        (HeapBlock): WTF?
+
+2012-07-31  Geoffrey Garen  <ggaren@apple.com>
+
+        Maybe fix the Windows build.
+
+        * heap/HeapBlock.h:
+        (HeapBlock): WTF?
+
+2012-07-31  Geoffrey Garen  <ggaren@apple.com>
+
+        Maybe fix the Windows build.
+
+        * heap/HeapBlock.h:
+        (HeapBlock): WTF?
+
+2012-07-31  Geoffrey Garen  <ggaren@apple.com>
+
+        Removed some public data and casting from the Heap
+        https://bugs.webkit.org/show_bug.cgi?id=92777
+
+        Reviewed by Oliver Hunt.
+
+        * heap/BlockAllocator.cpp:
+        (JSC::BlockAllocator::releaseFreeBlocks):
+        (JSC::BlockAllocator::blockFreeingThreadMain): Use the DeadBlock class
+        since HeapBlock is a template, and not a class, now. Call destroy()
+        instead of monkeying around with DeadBlock's internal data because
+        encapsulation is good.
+
+        * heap/BlockAllocator.h:
+        (DeadBlock): Added a class to represent a dead block, since HeapBlock is
+        a template now, and can't be instantiated directly.
+
+        (JSC::DeadBlock::DeadBlock):
+        (JSC::DeadBlock::create):
+        (BlockAllocator):
+        (JSC::BlockAllocator::allocate):
+        (JSC::BlockAllocator::deallocate): Use the DeadBlock class because
+        encapsulation is good.
+
+        * heap/CopiedBlock.h:
+        (CopiedBlock::destroy): No need for a destroy() function, since we
+        inherit one now.
+
+        (JSC::CopiedBlock::CopiedBlock):
+        (JSC::CopiedBlock::payloadEnd):
+        (JSC::CopiedBlock::capacity): Updated for some encapsulation inside
+        HeapBlock.
+
+        * heap/CopiedSpace.cpp:
+        (JSC::CopiedSpace::~CopiedSpace):
+        (JSC::CopiedSpace::doneCopying):
+        (JSC::CopiedSpace::size):
+        (JSC::CopiedSpace::capacity):
+        (JSC::isBlockListPagedOut): Removed a bunch of casting. This is no longer
+        necessary, now that our list and its nodes have the right type.
+
+        * heap/CopiedSpace.h: Use the right type in our data structures because
+        it improves clarity.
+
+        * heap/CopiedSpaceInlineMethods.h:
+        (JSC::CopiedSpace::startedCopying): Use swap to avoid duplicating it.
+
+        * heap/HeapBlock.h:
+        (HeapBlock): Made this a class template so we can return the right type
+        in linked list operations. Made our data private because encapsulation
+        is good.
+
+        (JSC::HeapBlock::destroy): Since we know our type, we can also eliminate
+        duplicate destroy() functions in our subclasses.
+
+        (JSC::HeapBlock::allocation): Added an accessor so we can hide our data.
+        By using const, this accessor prevents clients from accidentally deleting
+        our allocation.
+
+        * heap/MarkedAllocator.cpp:
+        (JSC::MarkedAllocator::isPagedOut):
+        (JSC::MarkedAllocator::tryAllocateHelper):
+        (JSC::MarkedAllocator::removeBlock): Removed a bunch of casting. This is
+        no longer necessary, now that our list and its nodes have the right type.
+
+        * heap/MarkedAllocator.h:
+        (MarkedAllocator):
+        (JSC::MarkedAllocator::reset):
+        (JSC::MarkedAllocator::forEachBlock): Use the right type, do less casting.
+
+        * heap/MarkedBlock.cpp: 
+        (JSC::MarkedBlock::destroy): Removed this function because our parent
+        class provides it for us now.
+
+        (JSC::MarkedBlock::MarkedBlock):
+        * heap/MarkedBlock.h:
+        (MarkedBlock):
+        (JSC::MarkedBlock::capacity): Updated for encapsulation.
+
+2012-07-31  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG OSR exit profiling has unusual oversights
+        https://bugs.webkit.org/show_bug.cgi?id=92728
+
+        Reviewed by Geoffrey Garen.
+
+        * dfg/DFGOSRExit.cpp:
+        (JSC::DFG::OSRExit::considerAddingAsFrequentExitSiteSlow):
+        * dfg/DFGSpeculativeJIT.h:
+        (JSC::DFG::SpeculativeJIT::speculationWatchpoint):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+
+2012-07-31  Chao-ying Fu  <fu@mips.com>
+
+        Add MIPS add32 function
+        https://bugs.webkit.org/show_bug.cgi?id=91522
+
+        Reviewed by Oliver Hunt.
+
+        Add isCompactPtrAlignedAddressOffset.
+        Add a new version of add32 that accepts AbsoluteAddress as inputs.
+
+        * assembler/MacroAssemblerMIPS.h:
+        (JSC::MacroAssemblerMIPS::isCompactPtrAlignedAddressOffset): New.
+        (MacroAssemblerMIPS):
+        (JSC::MacroAssemblerMIPS::add32): Support AbsoluteAddress as inputs.
+
+2012-07-30  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r124123.
+        http://trac.webkit.org/changeset/124123
+        https://bugs.webkit.org/show_bug.cgi?id=92700
+
+        ASSERT crashes terminate webkit Layout tests (Requested by
+        msaboff on #webkit).
+
+        * heap/Heap.cpp:
+        * heap/Heap.h:
+        (Heap):
+        * heap/IncrementalSweeper.cpp:
+        (JSC::IncrementalSweeper::doSweep):
+        (JSC::IncrementalSweeper::startSweeping):
+        (JSC::IncrementalSweeper::IncrementalSweeper):
+        (JSC):
+        * heap/IncrementalSweeper.h:
+        (IncrementalSweeper):
+        * heap/MarkedAllocator.cpp:
+        (JSC::MarkedAllocator::tryAllocateHelper):
+        (JSC::MarkedAllocator::addBlock):
+        * heap/MarkedAllocator.h:
+        (JSC::MarkedAllocator::zapFreeList):
+        * heap/MarkedBlock.cpp:
+        (JSC::MarkedBlock::sweepHelper):
+        * heap/MarkedSpace.cpp:
+        * heap/MarkedSpace.h:
+        (JSC::MarkedSpace::sweep):
+        (JSC):
+        * runtime/JSGlobalData.cpp:
+        (JSC::JSGlobalData::~JSGlobalData):
+
+2012-07-30  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Structures should be swept after all other objects
+        https://bugs.webkit.org/show_bug.cgi?id=92679
+
+        Reviewed by Filip Pizlo.
+
+        In order to get rid of ClassInfo from our objects, we need to be able to safely get the 
+        ClassInfo during the destruction of objects. We'd like to get the ClassInfo out of the 
+        Structure, but currently it is not safe to do so because the order of destruction of objects 
+        is not guaranteed to sweep objects before their corresponding Structure. We can fix this by 
+        sweeping Structures after everything else.
+
+        * heap/Heap.cpp:
+        (JSC::Heap::isSafeToSweepStructures): Add a function that checks if it is safe to sweep Structures.
+        If the Heap's IncrementalSweeper member is null, that means we're shutting down this VM and it is 
+        safe to sweep structures since we'll always do Structures last anyways due to the ordering of 
+        MarkedSpace::forEachBlock.
+        (JSC):
+        (JSC::Heap::didStartVMShutdown): Add this intermediate function to the Heap that ~JSGlobalData now
+        calls rather than calling the two HeapTimer objects individually. This allows the Heap to null out 
+        these pointers after it has invalidated them to prevent accidental use-after-free in the sweep() 
+        calls during lastChanceToFinalize().
+        * heap/Heap.h:
+        (Heap):
+        * heap/HeapTimer.h:
+        (HeapTimer):
+        * heap/IncrementalSweeper.cpp:
+        (JSC::IncrementalSweeper::structuresCanBeSwept): Determines if it is currently safe to sweep Structures.
+        This decision is based on whether we have gotten to the end of the vector of blocks that need sweeping
+        the first time.
+        (JSC):
+        (JSC::IncrementalSweeper::doSweep): We add a second pass over the vector to sweep Structures after we 
+        make our first pass. We now null out the slots as we sweep them so that we can quickly find the 
+        Structures during the second pass.
+        (JSC::IncrementalSweeper::startSweeping): Initialize our new Structure sweeping index.
+        (JSC::IncrementalSweeper::willFinishSweeping): Callback that is called by MarkedSpace::sweep to notify 
+        the IncrementalSweeper that we are going to sweep all of the remaining blocks in the Heap so it can 
+        assume that everything is taken care of in the correct order. Since MarkedSpace::forEachBlock 
+        iterates over the Structure blocks after all other blocks, the ordering property for sweeping Structures holds.
+        (JSC::IncrementalSweeper::IncrementalSweeper): Initialize Structure sweeping index.
+        * heap/IncrementalSweeper.h: Add declarations for new stuff.
+        (IncrementalSweeper):
+        * heap/MarkedAllocator.cpp:
+        (JSC::MarkedAllocator::tryAllocateHelper): We now check if the current block only contains structures and 
+        if so and it isn't safe to sweep Structures according to the Heap, we just return early instead of doing 
+        the normal lazy sweep. If this proves to be too much of a waste in the future we can add an extra clause that 
+        will sweep some number of other blocks in place of the current block to mitigate the cost of the floating 
+        Structure garbage.
+        (JSC::MarkedAllocator::addBlock):
+        * heap/MarkedAllocator.h:
+        (JSC::MarkedAllocator::zapFreeList): When we zap the free list in the MarkedAllocator, the current block is no 
+        longer valid to allocate from, so we set the current block to null.
+        * heap/MarkedBlock.cpp:
+        (JSC::MarkedBlock::sweepHelper): Added a couple assertions to make sure that we weren't trying to sweep Structures
+        at an unsafe time.
+        * heap/MarkedSpace.cpp:
+        (JSC::MarkedSpace::sweep): Notify the IncrementalSweeper that the MarkedSpace will finish all currently remaining sweeping.
+        (JSC): 
+        * heap/MarkedSpace.h:
+        (JSC):
+        * runtime/JSGlobalData.cpp:
+        (JSC::JSGlobalData::~JSGlobalData): Call the new Heap::didStartVMShutdown.
 
 2012-07-29  Filip Pizlo  <fpizlo@apple.com>
 

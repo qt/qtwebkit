@@ -313,6 +313,13 @@ StepRange HTMLInputElement::createStepRange(AnyStepHandling anyStepHandling) con
     return m_inputType->createStepRange(anyStepHandling);
 }
 
+#if ENABLE(DATALIST_ELEMENT)
+Decimal HTMLInputElement::findClosestTickMarkValue(const Decimal& value)
+{
+    return m_inputType->findClosestTickMarkValue(value);
+}
+#endif
+
 void HTMLInputElement::stepUp(int n, ExceptionCode& ec)
 {
     m_inputType->stepUp(n, ec);
@@ -619,6 +626,12 @@ void HTMLInputElement::parseAttribute(const Attribute& attribute)
     } else if (attribute.name() == typeAttr) {
         updateType();
     } else if (attribute.name() == valueAttr) {
+        // Changes to the value attribute may change whether or not this element has a default value.
+        // If this field is autocomplete=off that might affect the return value of needsSuspensionCallback.
+        if (m_autocomplete == Off) {
+            unregisterForSuspensionCallbackIfNeeded();
+            registerForSuspensionCallbackIfNeeded();
+        }
         // We only need to setChanged if the form is looking at the default value right now.
         if (!hasDirtyValue()) {
             updatePlaceholderVisibility(false);
@@ -1160,6 +1173,15 @@ void HTMLInputElement::defaultEventHandler(Event* evt)
         HTMLTextFormControlElement::defaultEventHandler(evt);
 }
 
+bool HTMLInputElement::willRespondToMouseClickEvents()
+{
+    // FIXME: Consider implementing willRespondToMouseClickEvents() in InputType if more accurate results are necessary.
+    if (!disabled())
+        return true;
+
+    return HTMLTextFormControlElement::willRespondToMouseClickEvents();
+}
+
 bool HTMLInputElement::isURLAttribute(const Attribute& attribute) const
 {
     return attribute.name() == srcAttr || attribute.name() == formactionAttr || HTMLTextFormControlElement::isURLAttribute(attribute);
@@ -1363,7 +1385,17 @@ bool HTMLInputElement::isOutOfRange() const
 
 bool HTMLInputElement::needsSuspensionCallback()
 {
-    return m_autocomplete == Off || m_inputType->shouldResetOnDocumentActivation();
+    if (m_inputType->shouldResetOnDocumentActivation())
+        return true;
+
+    // Sensitive input elements are marked with autocomplete=off, and we want to wipe them out
+    // when going back; returning true here arranges for us to call reset at the time
+    // the page is restored. Non-empty textual default values indicate that the field
+    // is not really sensitive -- there's no default value for an account number --
+    // and we would see unexpected results if we reset to something other than blank.
+    bool isSensitive = m_autocomplete == Off && !(m_inputType->isTextType() && !defaultValue().isEmpty());
+
+    return isSensitive;
 }
 
 void HTMLInputElement::registerForSuspensionCallbackIfNeeded()

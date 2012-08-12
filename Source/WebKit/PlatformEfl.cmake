@@ -88,7 +88,7 @@ IF (ENABLE_BATTERY_STATUS)
   )
 ENDIF ()
 
-IF (ENABLE_REGISTER_PROTOCOL_HANDLER OR ENABLE_CUSTOM_SCHEME_HANDLER)
+IF (ENABLE_REGISTER_PROTOCOL_HANDLER)
   LIST(APPEND WebKit_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/Modules/protocolhandler"
   )
@@ -136,6 +136,7 @@ LIST(APPEND WebKit_SOURCES
     efl/ewk/ewk_tiled_backing_store.cpp
     efl/ewk/ewk_tiled_matrix.cpp
     efl/ewk/ewk_tiled_model.cpp
+    efl/ewk/ewk_touch_event.cpp
     efl/ewk/ewk_util.cpp
     efl/ewk/ewk_view.cpp
     efl/ewk/ewk_view_single.cpp

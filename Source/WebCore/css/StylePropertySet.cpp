@@ -894,6 +894,16 @@ void StylePropertySet::addSubresourceStyleURLs(ListHashSet<KURL>& urls, StyleShe
         propertyAt(i).value()->addSubresourceStyleURLs(urls, contextStyleSheet);
 }
 
+bool StylePropertySet::hasFailedOrCanceledSubresources() const
+{
+    unsigned size = propertyCount();
+    for (unsigned i = 0; i < size; ++i) {
+        if (propertyAt(i).value()->hasFailedOrCanceledSubresources())
+            return true;
+    }
+    return false;
+}
+
 // This is the list of properties we want to copy in the copyBlockProperties() function.
 // It is the list of CSS properties that apply specially to block-level elements.
 static const CSSPropertyID blockProperties[] = {
@@ -1036,8 +1046,10 @@ PassRefPtr<StylePropertySet> StylePropertySet::copyPropertiesInSet(const CSSProp
     return StylePropertySet::create(list.data(), list.size());
 }
 
-CSSStyleDeclaration* StylePropertySet::ensureCSSStyleDeclaration() const
+CSSStyleDeclaration* StylePropertySet::ensureCSSStyleDeclaration()
 {
+    ASSERT(isMutable());
+
     if (m_ownsCSSOMWrapper) {
         ASSERT(!static_cast<CSSStyleDeclaration*>(propertySetCSSOMWrapperMap().get(this))->parentRule());
         ASSERT(!propertySetCSSOMWrapperMap().get(this)->parentElement());
@@ -1049,8 +1061,10 @@ CSSStyleDeclaration* StylePropertySet::ensureCSSStyleDeclaration() const
     return cssomWrapper;
 }
 
-CSSStyleDeclaration* StylePropertySet::ensureInlineCSSStyleDeclaration(const StyledElement* parentElement) const
+CSSStyleDeclaration* StylePropertySet::ensureInlineCSSStyleDeclaration(const StyledElement* parentElement)
 {
+    ASSERT(isMutable());
+
     if (m_ownsCSSOMWrapper) {
         ASSERT(propertySetCSSOMWrapperMap().get(this)->parentElement() == parentElement);
         return propertySetCSSOMWrapperMap().get(this);
@@ -1073,6 +1087,18 @@ unsigned StylePropertySet::averageSizeInBytes()
 {
     // Please update this if the storage scheme changes so that this longer reflects the actual size.
     return sizeof(StylePropertySet) + sizeof(CSSProperty) * 2;
+}
+
+void StylePropertySet::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    if (m_isMutable)
+        info.addVectorPtr(m_mutablePropertyVector);
+    else
+        info.addRawBuffer(m_properties, m_arraySize * sizeof(CSSProperty));
+    unsigned count = propertyCount();
+    for (unsigned i = 0; i < count; ++i)
+        info.addInstrumentedMember(propertyAt(i));
 }
 
 // See the function above if you need to update this.

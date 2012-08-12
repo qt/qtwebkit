@@ -389,6 +389,12 @@ WebInspector.loaded = function()
 {
     InspectorBackend.loadFromJSONIfNeeded();
 
+    if (WebInspector.WorkerManager.isDedicatedWorkerFrontend()) {
+        // Do not create socket for the worker front-end.
+        WebInspector.doLoadedDone();
+        return;
+    }
+
     var ws;
     if ("ws" in WebInspector.queryParamsObject)
         ws = "ws://" + WebInspector.queryParamsObject.ws;
@@ -431,7 +437,8 @@ WebInspector.doLoadedDone = function()
     ProfilerAgent.hasHeapProfiler(WebInspector._initializeCapability.bind(WebInspector, "heapProfilerPresent", null));
     TimelineAgent.supportsFrameInstrumentation(WebInspector._initializeCapability.bind(WebInspector, "timelineSupportsFrameInstrumentation", null));
     PageAgent.canOverrideDeviceMetrics(WebInspector._initializeCapability.bind(WebInspector, "canOverrideDeviceMetrics", null));
-    PageAgent.canOverrideGeolocation(WebInspector._initializeCapability.bind(WebInspector, "canOverrideGeolocation", WebInspector._doLoadedDoneWithCapabilities.bind(WebInspector)));
+    PageAgent.canOverrideGeolocation(WebInspector._initializeCapability.bind(WebInspector, "canOverrideGeolocation", null));
+    PageAgent.canOverrideDeviceOrientation(WebInspector._initializeCapability.bind(WebInspector, "canOverrideDeviceOrientation", WebInspector._doLoadedDoneWithCapabilities.bind(WebInspector)));
 }
 
 WebInspector._doLoadedDoneWithCapabilities = function()

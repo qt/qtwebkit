@@ -38,10 +38,10 @@
 
 namespace {
 // 100MB
-static int maximumResourcesContentSize = 100 * 1000 * 1000;
+static size_t maximumResourcesContentSize = 100 * 1000 * 1000;
 
 // 10MB
-static int maximumSingleResourceContentSize = 10 * 1000 * 1000;
+static size_t maximumSingleResourceContentSize = 10 * 1000 * 1000;
 }
 
 namespace WebCore {
@@ -66,6 +66,11 @@ void NetworkResourcesData::ResourceData::setContent(const String& content, bool 
     m_base64Encoded = base64Encoded;
 }
 
+static size_t contentSizeInBytes(const String& content)
+{
+    return content.isNull() ? 0 : content.impl()->sizeInBytes();
+}
+
 unsigned NetworkResourcesData::ResourceData::removeContent()
 {
     unsigned result = 0;
@@ -77,7 +82,7 @@ unsigned NetworkResourcesData::ResourceData::removeContent()
 
     if (hasContent()) {
         ASSERT(!hasData());
-        result = 2 * m_content.length();
+        result = contentSizeInBytes(m_content);
         m_content = String();
     }
     return result;
@@ -89,12 +94,12 @@ unsigned NetworkResourcesData::ResourceData::purgeContent()
     return removeContent();
 }
 
-int NetworkResourcesData::ResourceData::dataLength() const
+size_t NetworkResourcesData::ResourceData::dataLength() const
 {
     return m_dataBuffer ? m_dataBuffer->size() : 0;
 }
 
-void NetworkResourcesData::ResourceData::appendData(const char* data, int dataLength)
+void NetworkResourcesData::ResourceData::appendData(const char* data, size_t dataLength)
 {
     ASSERT(!hasContent());
     if (!m_dataBuffer)
@@ -103,14 +108,14 @@ void NetworkResourcesData::ResourceData::appendData(const char* data, int dataLe
         m_dataBuffer->append(data, dataLength);
 }
 
-int NetworkResourcesData::ResourceData::decodeDataToContent()
+size_t NetworkResourcesData::ResourceData::decodeDataToContent()
 {
     ASSERT(!hasContent());
-    int dataLength = m_dataBuffer->size();
+    size_t dataLength = m_dataBuffer->size();
     m_content = m_decoder->decode(m_dataBuffer->data(), m_dataBuffer->size());
     m_content += m_decoder->flush();
     m_dataBuffer = nullptr;
-    return 2 * m_content.length() - dataLength;
+    return contentSizeInBytes(m_content) - dataLength;
 }
 
 // NetworkResourcesData
@@ -179,7 +184,7 @@ void NetworkResourcesData::setResourceContent(const String& requestId, const Str
     ResourceData* resourceData = m_requestIdToResourceDataMap.get(requestId);
     if (!resourceData)
         return;
-    int dataLength = 2 * content.length();
+    size_t dataLength = contentSizeInBytes(content);
     if (dataLength > m_maximumSingleResourceContentSize)
         return;
     if (resourceData->isContentPurged())
@@ -194,7 +199,7 @@ void NetworkResourcesData::setResourceContent(const String& requestId, const Str
     }
 }
 
-void NetworkResourcesData::maybeAddResourceData(const String& requestId, const char* data, int dataLength)
+void NetworkResourcesData::maybeAddResourceData(const String& requestId, const char* data, size_t dataLength)
 {
     ResourceData* resourceData = m_requestIdToResourceDataMap.get(requestId);
     if (!resourceData)
@@ -220,7 +225,7 @@ void NetworkResourcesData::maybeDecodeDataToContent(const String& requestId)
     if (!resourceData->hasData())
         return;
     m_contentSize += resourceData->decodeDataToContent();
-    int dataLength = 2 * resourceData->content().length();
+    size_t dataLength = contentSizeInBytes(resourceData->content());
     if (dataLength > m_maximumSingleResourceContentSize)
         m_contentSize -= resourceData->purgeContent();
 }
@@ -283,7 +288,7 @@ void NetworkResourcesData::clear(const String& preservedLoaderId)
     m_requestIdToResourceDataMap.swap(preservedMap);
 }
 
-void NetworkResourcesData::setResourcesDataSizeLimits(int maximumResourcesContentSize, int maximumSingleResourceContentSize)
+void NetworkResourcesData::setResourcesDataSizeLimits(size_t maximumResourcesContentSize, size_t maximumSingleResourceContentSize)
 {
     clear();
     m_maximumResourcesContentSize = maximumResourcesContentSize;
@@ -302,7 +307,7 @@ void NetworkResourcesData::ensureNoDataForRequestId(const String& requestId)
     }
 }
 
-bool NetworkResourcesData::ensureFreeSpace(int size)
+bool NetworkResourcesData::ensureFreeSpace(size_t size)
 {
     if (size > m_maximumResourcesContentSize)
         return false;

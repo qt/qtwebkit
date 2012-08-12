@@ -79,9 +79,6 @@ class WebContext : public APIObject, private CoreIPC::Connection::QueueClient {
 public:
     static const Type APIType = TypeContext;
 
-    static WebContext* sharedProcessContext();
-    static WebContext* sharedThreadContext();
-
     static PassRefPtr<WebContext> create(const String& injectedBundlePath);
     virtual ~WebContext();
 
@@ -136,8 +133,8 @@ public:
     void addVisitedLink(const String&);
     void addVisitedLinkHash(WebCore::LinkHash);
 
-    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-    void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
+    void didReceiveMessage(WebProcessProxy*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    void didReceiveSyncMessage(WebProcessProxy*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
 
     void setCacheModel(CacheModel);
     CacheModel cacheModel() const { return m_cacheModel; }
@@ -159,6 +156,8 @@ public:
     DownloadProxy* createDownloadProxy();
     WebDownloadClient& downloadClient() { return m_downloadClient; }
     void downloadFinished(DownloadProxy*);
+
+    WebHistoryClient& historyClient() { return m_historyClient; }
 
     static HashSet<String, CaseFoldingHash> pdfAndPostScriptMIMETypes();
 
@@ -229,12 +228,6 @@ private:
     void platformInitializeWebProcess(WebProcessCreationParameters&);
     void platformInvalidateContext();
     
-    // History client
-    void didNavigateWithNavigationData(uint64_t pageID, const WebNavigationDataStore& store, uint64_t frameID);
-    void didPerformClientRedirect(uint64_t pageID, const String& sourceURLString, const String& destinationURLString, uint64_t frameID);
-    void didPerformServerRedirect(uint64_t pageID, const String& sourceURLString, const String& destinationURLString, uint64_t frameID);
-    void didUpdateHistoryTitle(uint64_t pageID, const String& title, const String& url, uint64_t frameID);
-
     // Plugins
     void getPlugins(CoreIPC::Connection*, uint64_t requestID, bool refresh);
     void getPluginPath(const String& mimeType, const String& urlString, String& pluginPath, bool& blocked);

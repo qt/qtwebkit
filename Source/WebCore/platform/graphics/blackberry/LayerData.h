@@ -34,6 +34,7 @@
 #define LayerData_h
 
 #include "Color.h"
+#include "FilterOperations.h"
 #include "FloatPoint.h"
 #include "FloatRect.h"
 #include "IntRect.h"
@@ -58,6 +59,25 @@ public:
     enum LayerProgramShader { LayerProgramShaderRGBA = 0,
                               LayerProgramShaderBGRA,
                               NumberOfLayerProgramShaders };
+
+#if ENABLE(CSS_FILTERS)
+    enum CSSFilterShaders { CSSFilterShaderGrayscale = 0,
+                            CSSFilterShaderSepia,
+                            CSSFilterShaderSaturate,
+                            CSSFilterShaderHueRotate,
+                            CSSFilterShaderInvert,
+                            CSSFilterShaderBrightness,
+                            CSSFilterShaderContrast,
+                            CSSFilterShaderOpacity,
+                            CSSFilterShaderBlurY,
+                            CSSFilterShaderBlurX,
+                            CSSFilterShaderShadow,
+                            CSSFilterShaderPassthrough,
+#if ENABLE(CSS_SHADERS)
+                            CSSFilterShaderCustom,
+#endif
+                            NumberOfCSSFilterShaders };
+#endif
 
     LayerData(LayerType type)
         : m_layerType(type)
@@ -115,9 +135,15 @@ public:
 
     float opacity() const { return m_opacity; }
 
+#if ENABLE(CSS_FILTERS)
+    FilterOperations filters() const { return m_filters; }
+#endif
+
     bool isOpaque() const { return m_isOpaque; }
 
     FloatPoint position() const { return m_position; }
+
+    FloatPoint boundsOrigin() const { return m_boundsOrigin; }
 
     // This is currently only used for perspective transform, see GraphicsLayer::setChildrenTransform()
     const TransformationMatrix& sublayerTransform() const { return m_sublayerTransform; }
@@ -169,6 +195,7 @@ protected:
     IntSize m_bounds;
     FloatPoint m_position;
     FloatPoint m_anchorPoint;
+    FloatPoint m_boundsOrigin;
     Color m_backgroundColor;
     Color m_borderColor;
 
@@ -177,6 +204,9 @@ protected:
     TransformationMatrix m_sublayerTransform;
 
     float m_opacity;
+#if ENABLE(CSS_FILTERS)
+    FilterOperations m_filters;
+#endif
     float m_anchorPointZ;
     float m_borderWidth;
 

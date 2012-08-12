@@ -79,6 +79,9 @@ LayerCompositingThread::LayerCompositingThread(LayerType type, LayerCompositingT
     , m_visible(false)
     , m_commitScheduled(false)
     , m_client(client)
+#if ENABLE(CSS_FILTERS)
+    , m_filterOperationsChanged(false)
+#endif
 {
 }
 
@@ -266,7 +269,6 @@ void LayerCompositingThread::drawTextures(double scale, int positionLocation, in
         m_layerRenderer->addLayerToReleaseTextureResourcesList(this);
         pthread_mutex_lock(m_frontBufferLock);
 
-        glDisable(GL_SCISSOR_TEST);
         glBindTexture(GL_TEXTURE_2D, m_texID);
         glVertexAttribPointer(positionLocation, 2, GL_FLOAT, GL_FALSE, 0, &m_transformedBounds);
         float upsideDown[4 * 2] = { 0, 1,  0, 0,  1, 0,  1, 1 };
@@ -517,6 +519,8 @@ bool LayerCompositingThread::updateAnimations(double currentTime)
             m_transform = m_override->transform();
         if (m_override->isOpacitySet())
             m_opacity = m_override->opacity();
+        if (m_override->isBoundsOriginSet())
+            m_boundsOrigin = m_override->boundsOrigin();
 
         for (size_t i = 0; i < m_override->animations().size(); ++i) {
             LayerAnimation* animation = m_override->animations()[i].get();

@@ -30,6 +30,7 @@
 #include "MediaQuery.h"
 
 #include "MediaQueryExp.h"
+#include "MemoryInstrumentation.h"
 #include <wtf/NonCopyingSort.h>
 #include <wtf/text/StringBuilder.h>
 
@@ -131,6 +132,14 @@ String MediaQuery::cssText() const
         const_cast<MediaQuery*>(this)->m_serializationCache = serialize();
 
     return m_serializationCache;
+}
+
+void MediaQuery::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    info.addMember(m_mediaType);
+    info.addInstrumentedVectorPtr(m_expressions);
+    info.addMember(m_serializationCache);
 }
 
 } //namespace

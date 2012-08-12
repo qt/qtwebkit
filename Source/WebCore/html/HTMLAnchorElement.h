@@ -94,6 +94,8 @@ public:
 
     bool isLiveLink() const;
 
+    virtual bool willRespondToMouseClickEvents() OVERRIDE;
+
     bool hasRel(uint32_t relation) const;
     void setRel(const String&);
     
@@ -155,9 +157,7 @@ inline LinkHash HTMLAnchorElement::visitedLinkHash() const
 // Functions shared with the other anchor elements (i.e., SVG).
 
 bool isEnterKeyKeydownEvent(Event*);
-bool isMiddleMouseButtonEvent(Event*);
 bool isLinkClick(Event*);
-void handleLinkClick(Event*, Document*, const String& url, const String& target, bool hideReferrer = false);
 
 } // namespace WebCore
 

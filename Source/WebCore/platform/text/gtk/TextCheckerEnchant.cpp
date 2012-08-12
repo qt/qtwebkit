@@ -24,12 +24,13 @@
 #include <pango/pango.h>
 #include <wtf/gobject/GOwnPtr.h>
 #include <wtf/text/CString.h>
+#include <wtf/text/StringBuilder.h>
 
 using namespace WebCore;
 
 static const size_t maximumNumberOfSuggestions = 10;
 
-static void getAvailableDictionariesCallback(const char* const languageTag, const char* const, const char* const, const char* const, void* data)
+static void enchantDictDescribeCallback(const char* const languageTag, const char* const, const char* const, const char* const, void* data)
 {
     Vector<CString>* dictionaries = static_cast<Vector<CString>*>(data);
     dictionaries->append(languageTag);
@@ -80,16 +81,17 @@ void TextCheckerEnchant::checkSpellingOfString(const String& string, int& misspe
         return;
     Vector<EnchantDict*>::const_iterator dictIter = m_enchantDictionaries.begin();
 
-    GOwnPtr<gchar> cString(g_strdup(string.utf8().data()));
-    size_t length = string.utf8().length();
-
     PangoLanguage* language(pango_language_get_default());
-    GOwnPtr<PangoLogAttr> attrs(g_new(PangoLogAttr, length + 1));
+    size_t numberOfCharacters = string.length();
+    GOwnPtr<PangoLogAttr> attrs(g_new(PangoLogAttr, numberOfCharacters + 1));
+
+    CString utf8String = string.utf8();
+    const char* cString = utf8String.data();
 
     // pango_get_log_attrs uses an aditional position at the end of the text.
-    pango_get_log_attrs(cString.get(), -1, -1, language, attrs.get(), length + 1);
+    pango_get_log_attrs(cString, -1, -1, language, attrs.get(), numberOfCharacters + 1);
 
-    for (size_t i = 0; i < length + 1; i++) {
+    for (size_t i = 0; i < numberOfCharacters + 1; i++) {
         // We go through each character until we find an is_word_start,
         // then we get into an inner loop to find the is_word_end corresponding
         // to it.
@@ -98,7 +100,7 @@ void TextCheckerEnchant::checkSpellingOfString(const String& string, int& misspe
             int end = i;
             int wordLength;
 
-            while (attrs.get()[end].is_word_end < 1  || wordEndIsAContractionApostrophe(cString.get(), end))
+            while (attrs.get()[end].is_word_end < 1  || wordEndIsAContractionApostrophe(cString, end))
                 end++;
 
             wordLength = end - start;
@@ -106,8 +108,8 @@ void TextCheckerEnchant::checkSpellingOfString(const String& string, int& misspe
             // check characters twice.
             i = end;
 
-            gchar* cstart = g_utf8_offset_to_pointer(cString.get(), start);
-            gint bytes = static_cast<gint>(g_utf8_offset_to_pointer(cString.get(), end) - cstart);
+            gchar* cstart = g_utf8_offset_to_pointer(cString, start);
+            gint bytes = static_cast<gint>(g_utf8_offset_to_pointer(cString, end) - cstart);
             GOwnPtr<gchar> word(g_new0(gchar, bytes + 1));
 
             g_utf8_strncpy(word.get(), cstart, wordLength);
@@ -161,9 +163,9 @@ void TextCheckerEnchant::updateSpellCheckingLanguages(const String& languages)
         Vector<String> languagesVector;
         languages.split(static_cast<UChar>(','), languagesVector);
         for (Vector<String>::const_iterator iter = languagesVector.begin(); iter != languagesVector.end(); ++iter) {
-            GOwnPtr<gchar> currentLanguage(g_strdup(iter->utf8().data()));
-            if (enchant_broker_dict_exists(m_broker, currentLanguage.get())) {
-                EnchantDict* dict = enchant_broker_request_dict(m_broker, currentLanguage.get());
+            CString currentLanguage = iter->utf8();
+            if (enchant_broker_dict_exists(m_broker, currentLanguage.data())) {
+                EnchantDict* dict = enchant_broker_request_dict(m_broker, currentLanguage.data());
                 spellDictionaries.append(dict);
             }
         }
@@ -175,7 +177,7 @@ void TextCheckerEnchant::updateSpellCheckingLanguages(const String& languages)
         } else {
             // No dictionaries selected, we get one from the list.
             Vector<CString> allDictionaries;
-            enchant_broker_list_dicts(m_broker, getAvailableDictionariesCallback, &allDictionaries);
+            enchant_broker_list_dicts(m_broker, enchantDictDescribeCallback, &allDictionaries);
             if (!allDictionaries.isEmpty()) {
                 EnchantDict* dict = enchant_broker_request_dict(m_broker, allDictionaries[0].data());
                 spellDictionaries.append(dict);
@@ -184,6 +186,26 @@ void TextCheckerEnchant::updateSpellCheckingLanguages(const String& languages)
     }
     freeEnchantBrokerDictionaries();
     m_enchantDictionaries = spellDictionaries;
+}
+
+String TextCheckerEnchant::getSpellCheckingLanguages()
+{
+    if (m_enchantDictionaries.isEmpty())
+        return String();
+
+    // Get a Vector<CString> with the list of languages in use.
+    Vector<CString> currentDictionaries;
+    for (Vector<EnchantDict*>::const_iterator iter = m_enchantDictionaries.begin(); iter != m_enchantDictionaries.end(); ++iter)
+        enchant_dict_describe(*iter, enchantDictDescribeCallback, &currentDictionaries);
+
+    // Build the result String;
+    StringBuilder builder;
+    for (Vector<CString>::const_iterator iter = currentDictionaries.begin(); iter != currentDictionaries.end(); ++iter) {
+        if (iter != currentDictionaries.begin())
+            builder.append(",");
+        builder.append(String::fromUTF8(iter->data()));
+    }
+    return builder.toString();
 }
 
 void TextCheckerEnchant::freeEnchantBrokerDictionaries()

@@ -32,6 +32,7 @@
 #if ENABLE(INSPECTOR)
 #include "V8InjectedScriptHost.h"
 
+#include "BindingState.h"
 #include "Database.h"
 #include "InjectedScript.h"
 #include "InjectedScriptHost.h"
@@ -40,7 +41,6 @@
 #include "ScriptDebugServer.h"
 #include "ScriptValue.h"
 #include "V8Binding.h"
-#include "V8BindingState.h"
 #include "V8Database.h"
 #include "V8Float32Array.h"
 #include "V8Float64Array.h"
@@ -205,7 +205,7 @@ static v8::Handle<v8::Array> getJSListenerFunctions(Document* document, const Ev
         V8AbstractEventListener* v8Listener = static_cast<V8AbstractEventListener*>(listener.get());
         v8::Local<v8::Context> context = toV8Context(document, v8Listener->worldContext());
         // Hide listeners from other contexts.
-        if (context != V8Proxy::currentContext())
+        if (context != v8::Context::GetCurrent())
             continue;
         v8::Local<v8::Object> function = v8Listener->getListenerObject(document);
         v8::Local<v8::Object> listenerEntry = v8::Object::New();

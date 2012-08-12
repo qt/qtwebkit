@@ -22,6 +22,7 @@
 #include "CSSProperty.h"
 
 #include "CSSValueList.h"
+#include "MemoryInstrumentation.h"
 #include "PlatformString.h"
 #include "RenderStyleConstants.h"
 #include "StylePropertyShorthand.h"
@@ -339,6 +340,7 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitPrintColorAdjust:
     case CSSPropertyWebkitRtlOrdering:
     case CSSPropertyWebkitTextCombine:
+    case CSSPropertyWebkitTextDecorationLine:
     case CSSPropertyWebkitTextDecorationsInEffect:
     case CSSPropertyWebkitTextEmphasis:
     case CSSPropertyWebkitTextEmphasisColor:
@@ -682,6 +684,9 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
 #if ENABLE(DASHBOARD_SUPPORT)
     case CSSPropertyWebkitDashboardRegion:
 #endif
+#if ENABLE(WIDGET_REGION)
+    case CSSPropertyWebkitWidgetRegion:
+#endif
         return false;
     case CSSPropertyInvalid:
         ASSERT_NOT_REACHED();
@@ -689,6 +694,12 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     }
     ASSERT_NOT_REACHED();
     return false;
+}
+
+void CSSProperty::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    info.addInstrumentedMember(m_value);
 }
 
 } // namespace WebCore

@@ -21,321 +21,189 @@
 #include "config.h"
 #include "RenderQuote.h"
 
-#include "Document.h"
-#include "Element.h"
-#include "HTMLElement.h"
-#include "QuotesData.h"
-#include "RenderStyle.h"
-#include <algorithm>
 #include <wtf/text/AtomicString.h>
-#include <wtf/text/CString.h>
 
-#define UNKNOWN_DEPTH -1
+#define U(x) ((const UChar*)L##x)
 
 namespace WebCore {
-static inline void adjustDepth(int &depth, QuoteType type)
-{
-    switch (type) {
-    case OPEN_QUOTE:
-    case NO_OPEN_QUOTE:
-        ++depth;
-        break;
-    case CLOSE_QUOTE:
-    case NO_CLOSE_QUOTE:
-        if (depth)
-            --depth;
-        break;
-    default:
-        ASSERT_NOT_REACHED();
-    }
-}
 
 RenderQuote::RenderQuote(Document* node, QuoteType quote)
     : RenderText(node, StringImpl::empty())
     , m_type(quote)
-    , m_depth(UNKNOWN_DEPTH)
+    , m_depth(0)
     , m_next(0)
     , m_previous(0)
+    , m_attached(false)
 {
-    view()->addRenderQuote();
 }
 
 RenderQuote::~RenderQuote()
 {
+    ASSERT(!m_attached);
+    ASSERT(!m_next && !m_previous);
 }
 
 void RenderQuote::willBeDestroyed()
 {
-    if (view())
-        view()->removeRenderQuote();
+    detachQuote();
     RenderText::willBeDestroyed();
 }
 
-const char* RenderQuote::renderName() const
-{
-    return "RenderQuote";
-}
+typedef HashMap<AtomicString, const QuotesData*, CaseFoldingHash> QuotesMap;
 
-// This function places a list of quote renderers starting at "this" in the list of quote renderers already
-// in the document's renderer tree.
-// The assumptions are made (for performance):
-// 1. The list of quotes already in the renderers tree of the document is already in a consistent state
-// (All quote renderers are linked and have the correct depth set)
-// 2. The quote renderers of the inserted list are in a tree of renderers of their own which has been just
-// inserted in the main renderer tree with its root as child of some renderer.
-// 3. The quote renderers in the inserted list have depths consistent with their position in the list relative
-// to "this", thus if "this" does not need to change its depth upon insertion, the other renderers in the list don't
-// need to either.
-void RenderQuote::placeQuote()
-{
-    RenderQuote* head = this;
-    ASSERT(!head->m_previous);
-    RenderQuote* tail = 0;
-    for (RenderObject* predecessor = head->previousInPreOrder(); predecessor; predecessor = predecessor->previousInPreOrder()) {
-        if (!predecessor->isQuote())
-            continue;
-        head->m_previous = toRenderQuote(predecessor);
-        if (head->m_previous->m_next) {
-            // We need to splice the list of quotes headed by head into the document's list of quotes.
-            tail = head;
-            while (tail->m_next)
-                 tail = tail->m_next;
-            tail->m_next = head->m_previous->m_next;
-            ASSERT(tail->m_next->m_previous == head->m_previous);
-            tail->m_next->m_previous =  tail;
-            tail = tail->m_next; // This marks the splicing point here there may be a depth discontinuity
-        }
-        head->m_previous->m_next = head;
-        ASSERT(head->m_previous->m_depth != UNKNOWN_DEPTH);
-        break;
-    }
-    int newDepth;
-    if (!head->m_previous) {
-        newDepth = 0;
-        goto skipNewDepthCalc;
-    }
-    newDepth = head->m_previous->m_depth;
-    do {
-        adjustDepth(newDepth, head->m_previous->m_type);
-skipNewDepthCalc:
-        if (head->m_depth == newDepth) { // All remaining depth should be correct except if splicing was done.
-            if (!tail) // We've done the post splicing section already or there was no splicing.
-                break;
-            head = tail; // Continue after the splicing point
-            tail = 0; // Mark the possible splicing point discontinuity fixed.
-            newDepth = head->m_previous->m_depth;
-            continue;
-        }
-        head->m_depth = newDepth;
-        // FIXME: If the width and height of the quotation characters does not change we may only need to
-        // Invalidate the renderer's area not a relayout.
-        head->setNeedsLayoutAndPrefWidthsRecalc();
-        head = head->m_next;
-        if (head == tail) // We are at the splicing point
-            tail = 0; // Mark the possible depth discontinuity fixed.
-    } while (head);
-}
-
-#define ARRAY_SIZE(Carray) (sizeof(Carray) / sizeof(*Carray))
-#define LANGUAGE_DATA(name, languageSourceArray) { name, languageSourceArray, ARRAY_SIZE(languageSourceArray) }
-#define U(x) ((const UChar*)L##x)
-
-static const UChar* simpleQuotes[] = {U("\""), U("\""), U("'"), U("'")};
-
-static const UChar* englishQuotes[] = {U("\x201C"), U("\x201D"), U("\x2018"), U("\x2019")};
-static const UChar* norwegianQuotes[] = { U("\x00AB"), U("\x00BB"), U("\x2039"), U("\x203A") };
-static const UChar* romanianQuotes[] = { U("\x201E"), U("\x201D")};
-static const UChar* russianQuotes[] = { U("\x00AB"), U("\x00BB"), U("\x201E"), U("\x201C") };
-#undef U
-
-struct LanguageData {
-    const char *name;
-    const UChar* const* const array;
-    const int arraySize;
-    bool operator<(const LanguageData& compareTo) const
-    {
-        return strcmp(name, compareTo.name);
-    }
-};
-
-// Data mast be alphabetically sorted and in all lower case for fast comparison
-LanguageData languageData[] = {
-    LANGUAGE_DATA("en", englishQuotes),
-    LANGUAGE_DATA("no", norwegianQuotes),
-    LANGUAGE_DATA("ro", romanianQuotes),
-    LANGUAGE_DATA("ru", russianQuotes)
-};
-#undef LANGUAGE_DATA
-const LanguageData* const languageDataEnd = languageData + ARRAY_SIZE(languageData);
-
-#define defaultLanguageQuotesSource simpleQuotes
-#define defaultLanguageQuotesCount ARRAY_SIZE(defaultLanguageQuotesSource)
-
-static QuotesData* defaultLanguageQuotesValue = 0;
-static const QuotesData* defaultLanguageQuotes()
-{
-    if (!defaultLanguageQuotesValue) {
-        defaultLanguageQuotesValue = QuotesData::create(defaultLanguageQuotesCount);
-        if (!defaultLanguageQuotesValue)
-            return 0;
-        String* data = defaultLanguageQuotesValue->data();
-        for (size_t i = 0; i < defaultLanguageQuotesCount; ++i)
-            data[i] = defaultLanguageQuotesSource[i];
-    }
-    return defaultLanguageQuotesValue;
-}
-#undef defaultLanguageQuotesSource
-#undef defaultLanguageQuotesCount
-
-typedef HashMap<RefPtr<AtomicStringImpl>, QuotesData* > QuotesMap;
-
-static QuotesMap& quotesMap()
+static const QuotesMap& quotesDataLanguageMap()
 {
     DEFINE_STATIC_LOCAL(QuotesMap, staticQuotesMap, ());
+    if (staticQuotesMap.size())
+        return staticQuotesMap;
+    // FIXME: Expand this table to include all the languages in https://bug-3234-attachments.webkit.org/attachment.cgi?id=2135
+    staticQuotesMap.set("en", QuotesData::create(U("\x201C"), U("\x201D"), U("\x2018"), U("\x2019")).leakRef());
+    staticQuotesMap.set("no", QuotesData::create(U("\x00AB"), U("\x00BB"), U("\x2039"), U("\x203A")).leakRef());
+    staticQuotesMap.set("ro", QuotesData::create(U("\x201E"), U("\x201D")).leakRef());
+    staticQuotesMap.set("ru", QuotesData::create(U("\x00AB"), U("\x00BB"), U("\x201E"), U("\x201C")).leakRef());
     return staticQuotesMap;
 }
 
-static const QuotesData* quotesForLanguage(AtomicStringImpl* language)
+static const QuotesData* basicQuotesData()
 {
-    QuotesData* returnValue;
-    AtomicString lower(language->lower());
-    returnValue = quotesMap().get(lower.impl());
-    if (returnValue)
-        return returnValue;
-    CString s(static_cast<const String&>(lower).ascii());
-    LanguageData request = { s.buffer()->data(), 0, 0 };
-    const LanguageData* lowerBound = std::lower_bound<const LanguageData*, const LanguageData>(languageData, languageDataEnd, request);
-    if (lowerBound == languageDataEnd)
-        return defaultLanguageQuotes();
-    if (strncmp(lowerBound->name, request.name, strlen(lowerBound->name)))
-        return defaultLanguageQuotes();
-    returnValue = QuotesData::create(lowerBound->arraySize);
-    if (!returnValue)
-        return defaultLanguageQuotes();
-    String* data = returnValue->data();
-    for (int i = 0; i < lowerBound->arraySize; ++i)
-        data[i] = lowerBound->array[i];
-    quotesMap().set(lower.impl(), returnValue);
-    return returnValue;
-}
-#undef ARRAY_SIZE
-
-static const QuotesData* defaultQuotes(const RenderObject* object)
-{
-    DEFINE_STATIC_LOCAL(String, langString, ("lang"));
-    Node* node =  object->generatingNode();
-    Element* element;
-    if (!node) {
-        element = object->document()->body();
-        if (!element)
-            element = object->document()->documentElement();
-    } else if (!node->isElementNode()) {
-        element = node->parentElement();
-        if (!element)
-            return defaultLanguageQuotes();
-    } else
-      element = toElement(node);
-    const AtomicString* language;
-    while ((language = &element->getAttribute(langString)) && language->isNull()) {
-        element = element->parentElement();
-        if (!element)
-            return defaultLanguageQuotes();
-    }
-    return quotesForLanguage(language->impl());
+    static const QuotesData* staticBasicQuotes = QuotesData::create(U("\""), U("\""), U("'"), U("'")).leakRef();
+    return staticBasicQuotes;
 }
 
 PassRefPtr<StringImpl> RenderQuote::originalText() const
 {
-    if (!parent())
-        return 0;
-    ASSERT(m_depth != UNKNOWN_DEPTH);
-    const QuotesData* quotes = style()->quotes();
-    if (!quotes)
-        quotes = defaultQuotes(this);
-    if (!quotes->length)
-        return emptyAtom.impl();
-    int index = m_depth * 2;
     switch (m_type) {
     case NO_OPEN_QUOTE:
     case NO_CLOSE_QUOTE:
-        return emptyString().impl();
+        return StringImpl::empty();
     case CLOSE_QUOTE:
-        if (index)
-            --index;
-        else
-            ++index;
-        break;
+        // FIXME: When m_depth is 0 we should return empty string.
+        return quotesData()->getCloseQuote(std::max(m_depth - 1, 0)).impl();
     case OPEN_QUOTE:
-        break;
-    default:
-        ASSERT_NOT_REACHED();
-        return emptyAtom.impl();
+        return quotesData()->getOpenQuote(m_depth).impl();
     }
-    if (index >= quotes->length)
-        index = (quotes->length-2) | (index & 1);
-    if (index < 0)
-        return emptyAtom.impl();
-    return quotes->data()[index].impl();
+    ASSERT_NOT_REACHED();
+    return StringImpl::empty();
 }
 
 void RenderQuote::computePreferredLogicalWidths(float lead)
 {
+    if (!m_attached)
+        attachQuote();
     setTextInternal(originalText());
     RenderText::computePreferredLogicalWidths(lead);
 }
 
-void RenderQuote::rendererSubtreeAttached(RenderObject* renderer)
+const QuotesData* RenderQuote::quotesData() const
 {
-    ASSERT(renderer->view());
-    if (!renderer->view()->hasRenderQuotes())
-        return;
-    for (RenderObject* descendant = renderer; descendant; descendant = descendant->nextInPreOrder(renderer))
-        if (descendant->isQuote()) {
-            toRenderQuote(descendant)->placeQuote();
-            break;
-        }
+    if (QuotesData* customQuotes = style()->quotes())
+        return customQuotes;
+
+    AtomicString language = style()->locale();
+    if (language.isNull())
+        return basicQuotesData();
+    const QuotesData* quotes = quotesDataLanguageMap().get(language);
+    if (!quotes)
+        return basicQuotesData();
+    return quotes;
 }
 
-void RenderQuote::rendererRemovedFromTree(RenderObject* renderer)
+void RenderQuote::attachQuote()
 {
-    ASSERT(renderer->view());
-    if (!renderer->view()->hasRenderQuotes())
-        return;
-    for (RenderObject* descendant = renderer; descendant; descendant = descendant->nextInPreOrder(renderer))
-        if (descendant->isQuote()) {
-            RenderQuote* removedQuote = toRenderQuote(descendant);
-            RenderQuote* lastQuoteBefore = removedQuote->m_previous;
-            removedQuote->m_previous = 0;
-            int depth = removedQuote->m_depth;
-            for (descendant = descendant->nextInPreOrder(renderer); descendant; descendant = descendant->nextInPreOrder(renderer))
-                if (descendant->isQuote())
-                    removedQuote = toRenderQuote(descendant);
-            RenderQuote* quoteAfter = removedQuote->m_next;
-            removedQuote->m_next = 0;
-            if (lastQuoteBefore)
-                lastQuoteBefore->m_next = quoteAfter;
-            if (quoteAfter) {
-                quoteAfter->m_previous = lastQuoteBefore;
-                do {
-                    if (depth == quoteAfter->m_depth)
-                        break;
-                    quoteAfter->m_depth = depth;
-                    quoteAfter->setNeedsLayoutAndPrefWidthsRecalc();
-                    adjustDepth(depth, quoteAfter->m_type);
-                    quoteAfter = quoteAfter->m_next;
-                } while (quoteAfter);
-            }
-            break;
-        }
-}
+    ASSERT(view());
+    ASSERT(!m_attached);
+    ASSERT(!m_next && !m_previous);
 
-void RenderQuote::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
-{
-    const QuotesData* newQuotes = style()->quotes();
-    const QuotesData* oldQuotes = oldStyle ? oldStyle->quotes() : 0;
-    if (!QuotesData::equal(newQuotes, oldQuotes))
+    // FIXME: Don't set pref widths dirty during layout. See updateDepth() for
+    // more detail.
+    if (!isRooted()) {
         setNeedsLayoutAndPrefWidthsRecalc();
-    RenderText::styleDidChange(diff, oldStyle);
+        return;
+    }
+
+    if (!view()->renderQuoteHead()) {
+        view()->setRenderQuoteHead(this);
+        m_attached = true;
+        return;
+    }
+
+    for (RenderObject* predecessor = previousInPreOrder(); predecessor; predecessor = predecessor->previousInPreOrder()) {
+        // Skip unattached predecessors to avoid having stale m_previous pointers
+        // if the previous node is never attached and is then destroyed.
+        if (!predecessor->isQuote() || !toRenderQuote(predecessor)->isAttached())
+            continue;
+        m_previous = toRenderQuote(predecessor);
+        m_next = m_previous->m_next;
+        m_previous->m_next = this;
+        if (m_next)
+            m_next->m_previous = this;
+        break;
+    }
+
+    if (!m_previous) {
+        m_next = view()->renderQuoteHead();
+        view()->setRenderQuoteHead(this);
+        if (m_next)
+            m_next->m_previous = this;
+    }
+    m_attached = true;
+
+    for (RenderQuote* quote = this; quote; quote = quote->m_next)
+        quote->updateDepth();
+
+    ASSERT(!m_next || m_next->m_attached);
+    ASSERT(!m_next || m_next->m_previous == this);
+    ASSERT(!m_previous || m_previous->m_attached);
+    ASSERT(!m_previous || m_previous->m_next == this);
+}
+
+void RenderQuote::detachQuote()
+{
+    ASSERT(!m_next || m_next->m_attached);
+    ASSERT(!m_previous || m_previous->m_attached);
+    if (!m_attached)
+        return;
+    if (m_previous)
+        m_previous->m_next = m_next;
+    else if (view())
+        view()->setRenderQuoteHead(m_next);
+    if (m_next)
+        m_next->m_previous = m_previous;
+    if (!documentBeingDestroyed()) {
+        for (RenderQuote* quote = m_next; quote; quote = quote->m_next)
+            quote->updateDepth();
+    }
+    m_attached = false;
+    m_next = 0;
+    m_previous = 0;
+    m_depth = 0;
+}
+
+void RenderQuote::updateDepth()
+{
+    ASSERT(m_attached);
+    int oldDepth = m_depth;
+    m_depth = 0;
+    if (m_previous) {
+        m_depth = m_previous->m_depth;
+        switch (m_previous->m_type) {
+        case OPEN_QUOTE:
+        case NO_OPEN_QUOTE:
+            m_depth++;
+            break;
+        case CLOSE_QUOTE:
+        case NO_CLOSE_QUOTE:
+            if (m_depth)
+                m_depth--;
+            break;
+        }
+    }
+    // FIXME: Don't call setNeedsLayout or dirty our preferred widths during layout.
+    // This is likely to fail anyway as one of our ancestor will call setNeedsLayout(false),
+    // preventing the future layout to occur on |this|. The solution is to move that to a
+    // pre-layout phase.
+    if (oldDepth != m_depth)
+        setNeedsLayoutAndPrefWidthsRecalc();
 }
 
 } // namespace WebCore

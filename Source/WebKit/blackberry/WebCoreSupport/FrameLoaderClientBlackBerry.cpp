@@ -58,6 +58,9 @@
 #include "ProtectionSpace.h"
 #include "ScopePointer.h"
 #include "SharedBuffer.h"
+#include "SkData.h"
+#include "SkImageEncoder.h"
+#include "SkStream.h"
 #include "TextEncoding.h"
 #include "TouchEventHandler.h"
 #if ENABLE(WEBDOM)
@@ -65,12 +68,15 @@
 #endif
 #include "WebPageClient.h"
 
+#include <BlackBerryPlatformExecutableMessage.h>
 #include <BlackBerryPlatformLog.h>
 #include <BlackBerryPlatformMediaDocument.h>
+#include <BlackBerryPlatformMessageClient.h>
 #include <BlackBerryPlatformScreen.h>
 #include <JavaScriptCore/APICast.h>
 #include <network/FilterStream.h>
 #include <network/NetworkRequest.h>
+#include <wtf/text/Base64.h>
 
 using WTF::String;
 using namespace WebCore;
@@ -208,24 +214,23 @@ void FrameLoaderClientBlackBerry::dispatchDecidePolicyForNavigationAction(FrameP
         bool isFragmentScroll = url.hasFragmentIdentifier() && url != currentUrl && equalIgnoringFragmentIdentifier(currentUrl, url);
         decision = decidePolicyForExternalLoad(request, isFragmentScroll);
 
-        // Let the client have a chance to say whether this navigation should
-        // be ignored or not.
+        // Let the client have a chance to say whether this navigation should be ignored or not.
         NetworkRequest platformRequest;
         request.initializePlatformRequest(platformRequest, cookiesEnabled());
         if (platformRequest.getTargetType() == NetworkRequest::TargetIsUnknown)
             platformRequest.setTargetType(isMainFrame() ? NetworkRequest::TargetIsMainFrame : NetworkRequest::TargetIsSubframe);
 
-        if (isMainFrame() && !m_webPagePrivate->m_client->acceptNavigationRequest(
-            platformRequest, BlackBerry::Platform::NavigationType(action.type()))) {
-            if (action.type() == NavigationTypeFormSubmitted
-                || action.type() == NavigationTypeFormResubmitted)
-                m_frame->loader()->resetMultipleFormSubmissionProtection();
-
-            if (action.type() == NavigationTypeLinkClicked && url.hasFragmentIdentifier()) {
-                ResourceRequest emptyRequest;
-                m_frame->loader()->activeDocumentLoader()->setLastCheckedRequest(emptyRequest);
-            }
+        if (!m_webPagePrivate->m_client->acceptNavigationRequest(platformRequest, BlackBerry::Platform::NavigationType(action.type()))) {
             decision = PolicyIgnore;
+            if (isMainFrame()) {
+                if (action.type() == NavigationTypeFormSubmitted || action.type() == NavigationTypeFormResubmitted)
+                    m_frame->loader()->resetMultipleFormSubmissionProtection();
+
+                if (action.type() == NavigationTypeLinkClicked && url.hasFragmentIdentifier()) {
+                    ResourceRequest emptyRequest;
+                    m_frame->loader()->activeDocumentLoader()->setLastCheckedRequest(emptyRequest);
+                }
+            }
         }
     }
 
@@ -1082,28 +1087,10 @@ void FrameLoaderClientBlackBerry::restoreViewState()
     // When rotate happens, only zoom when previous page was zoomToFitScale, otherwise keep old scale.
     if (orientationChanged && viewState.isZoomToFitScale)
         scale = BlackBerry::Platform::Graphics::Screen::primaryScreen()->width() * scale / static_cast<double>(BlackBerry::Platform::Graphics::Screen::primaryScreen()->height());
-    m_webPagePrivate->m_backingStore->d->suspendScreenAndBackingStoreUpdates(); // don't flash checkerboard for the setScrollPosition call
-    m_frame->view()->setContentsSizeFromHistory(contentsSize);
 
-    // Here we need to set scroll position what we asked for.
-    // So we use ScrollView::setCanOverscroll(true).
-    bool oldCanOverscroll = m_frame->view()->canOverScroll();
-    m_frame->view()->setCanOverscroll(true);
-    m_webPagePrivate->setScrollPosition(scrollPosition);
-    m_frame->view()->setCanOverscroll(oldCanOverscroll);
-
-    m_webPagePrivate->m_shouldReflowBlock = viewState.shouldReflowBlock;
-
-    bool didZoom = m_webPagePrivate->zoomAboutPoint(scale, m_frame->view()->scrollPosition(), true /* enforceScaleClamping */, true /*forceRendering*/, true /*isRestoringZoomLevel*/);
-    // If we're already at that scale, then we should still force rendering
-    // since our scroll position changed.
-    m_webPagePrivate->m_backingStore->d->resumeScreenAndBackingStoreUpdates(BackingStore::RenderAndBlit);
-
-    if (!didZoom) {
-        // We need to notify the client of the scroll position and content size change(s) above even if we didn't scale.
-        m_webPagePrivate->notifyTransformedContentsSizeChanged();
-        m_webPagePrivate->notifyTransformedScrollChanged();
-    }
+    // It is not safe to render the page at this point. So we post a message instead. Messages have higher priority than timers.
+    BlackBerry::Platform::webKitThreadMessageClient()->dispatchMessage(BlackBerry::Platform::createMethodCallMessage(
+        &WebPagePrivate::restoreHistoryViewState, m_webPagePrivate, contentsSize, scrollPosition, scale, viewState.shouldReflowBlock));
 }
 
 PolicyAction FrameLoaderClientBlackBerry::decidePolicyForExternalLoad(const ResourceRequest& request, bool isFragmentScroll)
@@ -1184,13 +1171,22 @@ void FrameLoaderClientBlackBerry::dispatchDidReceiveIcon()
 {
     String url = m_frame->document()->url().string();
     NativeImageSkia* bitmap = iconDatabase().synchronousNativeIconForPageURL(url, IntSize(10, 10));
-    if (!bitmap)
+    if (!bitmap || bitmap->bitmap().empty())
         return;
 
-    bitmap->lockPixels();
+    SkAutoLockPixels locker(bitmap->bitmap());
+    SkDynamicMemoryWStream writer;
+    if (!SkImageEncoder::EncodeStream(&writer, bitmap->bitmap(), SkImageEncoder::kPNG_Type, 100)) {
+        BlackBerry::Platform::logAlways(BlackBerry::Platform::LogLevelInfo, "Failed to convert the icon to PNG format.");
+        return;
+    }
+    SkData* data = writer.copyToData();
+    Vector<char> out;
+    base64Encode(static_cast<const char*>(data->data()), data->size(), out);
+    out.append('\0'); // Make it null-terminated.
     String iconUrl = iconDatabase().synchronousIconURLForPageURL(url);
-    m_webPagePrivate->m_client->setFavicon(img->width(), img->height(), (unsigned char*)bitmap->getPixels(), iconUrl.utf8().data());
-    bitmap->unlockPixels();
+    m_webPagePrivate->m_client->setFavicon(out.data(), iconUrl.utf8().data());
+    data->unref();
 }
 
 bool FrameLoaderClientBlackBerry::canCachePage() const

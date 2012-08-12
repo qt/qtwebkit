@@ -469,6 +469,7 @@ sub SkipAttribute
 
     $codeGenerator->AssertNotSequenceType($attribute->signature->type);
     return 1 if $codeGenerator->GetArrayType($attribute->signature->type);
+    return 1 if $codeGenerator->IsTypedArrayType($attribute->signature->type);
 
     # This is for DynamicsCompressorNode.idl
     if ($attribute->signature->name eq "release") {
@@ -881,6 +882,7 @@ sub GenerateHeader
     if ($numFunctions > 0) {
         foreach my $function (@{$dataNode->functions}) {
             next if SkipFunction($function);
+            next if ($function->signature->name eq "set" and $dataNode->extendedAttributes->{"TypedArray"});
             my $functionName = $function->signature->name;
 
             my $returnType = GetObjCType($function->signature->type);
@@ -1501,6 +1503,7 @@ sub GenerateImplementation
     if ($numFunctions > 0) {
         foreach my $function (@{$dataNode->functions}) {
             next if SkipFunction($function);
+            next if ($function->signature->name eq "set" and $dataNode->extendedAttributes->{"TypedArray"});
             AddIncludesForType($function->signature->type);
 
             my $functionName = $function->signature->name;

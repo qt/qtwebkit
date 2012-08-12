@@ -35,7 +35,7 @@
 #include "cc/CCGraphicsContext.h"
 #include "cc/CCPrioritizedTexture.h"
 #include "cc/CCResourceProvider.h"
-#include "cc/CCTextureUpdater.h"
+#include "cc/CCTextureUpdateQueue.h"
 #include "cc/CCTiledLayerImpl.h"
 
 namespace WebKitTests {
@@ -122,7 +122,7 @@ public:
     const WebCore::FloatRect& lastNeedsDisplayRect() const { return m_lastNeedsDisplayRect; }
 
     // Updates the visibleContentRect().
-    virtual void update(WebCore::CCTextureUpdater&, const WebCore::CCOcclusionTracker*, WebCore::CCRenderingStats&) OVERRIDE;
+    virtual void update(WebCore::CCTextureUpdateQueue&, const WebCore::CCOcclusionTracker*, WebCore::CCRenderingStats&) OVERRIDE;
 
     virtual void setTexturePriorities(const WebCore::CCPriorityCalculator&) OVERRIDE;
 
@@ -153,7 +153,7 @@ protected:
 
 class FakeTextureCopier : public WebCore::TextureCopier {
 public:
-    virtual void copyTexture(unsigned, unsigned, const WebCore::IntSize&) { }
+    virtual void copyTexture(Parameters) { }
     virtual void flush() { }
 };
 
@@ -162,7 +162,7 @@ public:
     virtual bool isBusy() { return false; }
     virtual void beginUploads() { }
     virtual void endUploads() { }
-    virtual void uploadTexture(WebCore::LayerTextureUpdater::Texture* texture, WebCore::CCResourceProvider* resourceProvider, const WebCore::IntRect sourceRect, const WebCore::IntRect destRect) { texture->updateRect(resourceProvider, sourceRect, destRect); }
+    virtual void uploadTexture(WebCore::CCResourceProvider* resourceProvider, Parameters upload) { upload.texture->updateRect(resourceProvider, upload.sourceRect, upload.destRect); }
 };
 
 }

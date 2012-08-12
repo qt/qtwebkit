@@ -167,9 +167,9 @@ public:
     virtual void openDateTimePopup(int type, const WebString& value, const WebString& min, const WebString& max, double step) = 0;
     virtual void openColorPopup(const WebString& value) = 0;
 
-    virtual bool chooseFilenames(bool allowMultiple, const WebString& acceptTypes, const SharedArray<WebString>& initialFiles, unsigned initialFileSize, SharedArray<WebString>& chosenFiles, unsigned& chosenFileSize) = 0;
+    virtual bool chooseFilenames(bool allowMultiple, const SharedArray<WebString>& acceptTypes, const SharedArray<WebString>& initialFiles, const WebString& capture, SharedArray<WebString>& chosenFiles) = 0;
 
-    virtual void loadPluginForMimetype(int, int width, int height, const SharedArray<WebString>& paramNames, const SharedArray<WebString>& paramValues, int size, const char* url) = 0;
+    virtual void loadPluginForMimetype(int, int width, int height, const SharedArray<WebString>& paramNames, const SharedArray<WebString>& paramValues, const char* url) = 0;
     virtual void notifyPluginRectChanged(int, Platform::IntRect rectChanged) = 0;
     virtual void destroyPlugin(int) = 0;
     virtual void playMedia(int) = 0;
@@ -187,7 +187,7 @@ public:
     virtual unsigned long long databaseQuota(const unsigned short* origin, unsigned originLength, const unsigned short* databaseName, unsigned databaseNameLength, unsigned long long totalUsage, unsigned long long originUsage, unsigned long long estimatedSize) = 0;
 
     virtual void setIconForUrl(const char* originalPageUrl, const char* finalPageUrl, const char* iconUrl) = 0;
-    virtual void setFavicon(int width, int height, unsigned char* iconData, const char* url) = 0;
+    virtual void setFavicon(const char* dataInBase64, const char* url) = 0;
     virtual void setLargeIcon(const char* iconUrl) = 0;
     virtual void setWebAppCapable() = 0;
     virtual void setSearchProviderDetails(const char* title, const char* documentUrl) = 0;

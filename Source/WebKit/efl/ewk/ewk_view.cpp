@@ -103,7 +103,7 @@
 #include "ColorChooserClient.h"
 #endif
 
-#if ENABLE(REGISTER_PROTOCOL_HANDLER) || ENABLE(CUSTOM_SCHEME_HANDLER)
+#if ENABLE(REGISTER_PROTOCOL_HANDLER)
 #include "RegisterProtocolHandlerClientEfl.h"
 #endif
 
@@ -253,6 +253,9 @@ struct _Ewk_View_Private_Data {
 #endif
 #if ENABLE(INPUT_TYPE_COLOR)
     WebCore::ColorChooserClient* colorChooserClient;
+#endif
+#if ENABLE(REGISTER_PROTOCOL_HANDLER) || ENABLE(CUSTOM_SCHEME_HANDLER)
+    OwnPtr<WebCore::RegisterProtocolHandlerClientEfl> registerProtocolHandlerClient;
 #endif
     struct {
         Ewk_Menu menu;
@@ -761,8 +764,9 @@ static Ewk_View_Private_Data* _ewk_view_priv_new(Ewk_View_Smart_Data* smartData)
     WebCore::provideBatteryTo(priv->page.get(), new BatteryClientEfl(smartData->self));
 #endif
 
-#if ENABLE(REGISTER_PROTOCOL_HANDLER) || ENABLE(CUSTOM_SCHEME_HANDLER)
-    WebCore::provideRegisterProtocolHandlerTo(priv->page.get(), new WebCore::RegisterProtocolHandlerClientEfl(smartData->self));
+#if ENABLE(REGISTER_PROTOCOL_HANDLER)
+    priv->registerProtocolHandlerClient = WebCore::RegisterProtocolHandlerClientEfl::create(smartData->self);
+    WebCore::provideRegisterProtocolHandlerTo(priv->page.get(), priv->registerProtocolHandlerClient.get());
 #endif
 
     priv->pageSettings = priv->page->settings();

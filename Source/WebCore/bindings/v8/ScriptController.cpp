@@ -32,7 +32,7 @@
 #include "config.h"
 #include "ScriptController.h"
 
-#include "PlatformSupport.h"
+#include "BindingState.h"
 #include "Document.h"
 #include "ScriptCallStack.h"
 #include "ScriptCallStackFactory.h"
@@ -49,13 +49,12 @@
 #include "npruntime_impl.h"
 #include "npruntime_priv.h"
 #include "NPV8Object.h"
+#include "PlatformSupport.h"
 #include "ScriptSourceCode.h"
 #include "SecurityOrigin.h"
 #include "Settings.h"
 #include "UserGestureIndicator.h"
 #include "V8Binding.h"
-#include "V8BindingMacros.h"
-#include "V8BindingState.h"
 #include "V8DOMWindow.h"
 #include "V8Event.h"
 #include "V8HiddenPropertyName.h"
@@ -87,17 +86,17 @@ void ScriptController::setFlags(const char* string, int length)
 
 Frame* ScriptController::retrieveFrameForEnteredContext()
 {
-    return V8Proxy::retrieveFrameForEnteredContext();
+    return firstFrame(BindingState::instance());
 }
 
 Frame* ScriptController::retrieveFrameForCurrentContext()
 {
-    return V8Proxy::retrieveFrameForCurrentContext();
+    return currentFrame(BindingState::instance());
 }
 
 bool ScriptController::canAccessFromCurrentOrigin(Frame *frame)
 {
-    return !v8::Context::InContext() || V8BindingSecurity::canAccessFrame(V8BindingState::Only(), frame, true);
+    return !v8::Context::InContext() || BindingSecurity::shouldAllowAccessToFrame(BindingState::instance(), frame);
 }
 
 ScriptController::ScriptController(Frame* frame)
@@ -182,7 +181,11 @@ void ScriptController::evaluateInIsolatedWorld(unsigned worldID, const Vector<Sc
 
 void ScriptController::setIsolatedWorldSecurityOrigin(int worldID, PassRefPtr<SecurityOrigin> securityOrigin)
 {
-    m_proxy->setIsolatedWorldSecurityOrigin(worldID, securityOrigin);
+    ASSERT(worldID);
+    m_proxy->isolatedWorldSecurityOrigins().set(worldID, securityOrigin);
+    IsolatedWorldMap::iterator iter = m_proxy->isolatedWorlds().find(worldID);
+    if (iter != m_proxy->isolatedWorlds().end())
+        iter->second->setSecurityOrigin(securityOrigin);
 }
 
 // Evaluate a script file in the environment of this proxy.
@@ -274,8 +277,6 @@ bool ScriptController::haveInterpreter() const
 
 void ScriptController::enableEval()
 {
-    // We don't call initContextIfNeeded because contexts have eval enabled by default.
-
     v8::HandleScope handleScope;
     v8::Handle<v8::Context> v8Context = proxy()->windowShell()->context();
     if (v8Context.IsEmpty())
@@ -286,9 +287,6 @@ void ScriptController::enableEval()
 
 void ScriptController::disableEval()
 {
-    if (!proxy()->windowShell()->initContextIfNeeded())
-        return;
-
     v8::HandleScope handleScope;
     v8::Handle<v8::Context> v8Context = proxy()->windowShell()->context();
     if (v8Context.IsEmpty())
@@ -444,7 +442,17 @@ void ScriptController::setCaptureCallStackForUncaughtExceptions(bool value)
 
 void ScriptController::collectIsolatedContexts(Vector<std::pair<ScriptState*, SecurityOrigin*> >& result)
 {
-    m_proxy->collectIsolatedContexts(result);
+    v8::HandleScope handleScope;
+    for (IsolatedWorldMap::iterator it = m_proxy->isolatedWorlds().begin(); it != m_proxy->isolatedWorlds().end(); ++it) {
+        V8IsolatedContext* isolatedContext = it->second;
+        if (!isolatedContext->securityOrigin())
+            continue;
+        v8::Handle<v8::Context> v8Context = isolatedContext->context();
+        if (v8Context.IsEmpty())
+            continue;
+        ScriptState* scriptState = ScriptState::forContext(v8::Local<v8::Context>::New(v8Context));
+        result.append(std::pair<ScriptState*, SecurityOrigin*>(scriptState, isolatedContext->securityOrigin()));
+    }
 }
 #endif
 

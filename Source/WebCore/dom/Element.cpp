@@ -416,12 +416,8 @@ int Element::clientLeft()
 {
     document()->updateLayoutIgnorePendingStylesheets();
 
-    if (RenderBox* renderer = renderBox()) {
-        LayoutUnit clientLeft = renderer->clientLeft();
-        if (renderer->style() && renderer->style()->shouldPlaceBlockDirectionScrollbarOnLogicalLeft())
-            clientLeft += renderer->verticalScrollbarWidth();
-        return adjustForAbsoluteZoom(roundToInt(clientLeft), renderer);
-    }
+    if (RenderBox* renderer = renderBox())
+        return adjustForAbsoluteZoom(roundToInt(renderer->clientLeft()), renderer);
     return 0;
 }
 
@@ -656,31 +652,36 @@ void Element::setAttribute(const AtomicString& name, const AtomicString& value, 
 
     size_t index = ensureUpdatedAttributeData()->getAttributeItemIndex(localName, false);
     const QualifiedName& qName = index != notFound ? attributeItem(index)->name() : QualifiedName(nullAtom, localName, nullAtom);
-    setAttributeInternal(index, qName, value, NotInUpdateStyleAttribute);
+    setAttributeInternal(index, qName, value, NotInSynchronizationOfLazyAttribute);
 }
 
-void Element::setAttribute(const QualifiedName& name, const AtomicString& value, EInUpdateStyleAttribute inUpdateStyleAttribute)
+void Element::setAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    setAttributeInternal(ensureUpdatedAttributeData()->getAttributeItemIndex(name), name, value, inUpdateStyleAttribute);
+    setAttributeInternal(ensureUpdatedAttributeData()->getAttributeItemIndex(name), name, value, NotInSynchronizationOfLazyAttribute);
 }
 
-inline void Element::setAttributeInternal(size_t index, const QualifiedName& name, const AtomicString& value, EInUpdateStyleAttribute inUpdateStyleAttribute)
+void Element::setSynchronizedLazyAttribute(const QualifiedName& name, const AtomicString& value)
+{
+    setAttributeInternal(mutableAttributeData()->getAttributeItemIndex(name), name, value, InSynchronizationOfLazyAttribute);
+}
+
+inline void Element::setAttributeInternal(size_t index, const QualifiedName& name, const AtomicString& value, SynchronizationOfLazyAttribute inSynchronizationOfLazyAttribute)
 {
     ElementAttributeData* attributeData = mutableAttributeData();
 
     Attribute* old = index != notFound ? attributeData->attributeItem(index) : 0;
     if (value.isNull()) {
         if (old)
-            attributeData->removeAttribute(index, this, inUpdateStyleAttribute);
+            attributeData->removeAttribute(index, this, inSynchronizationOfLazyAttribute);
         return;
     }
 
     if (!old) {
-        attributeData->addAttribute(Attribute(name, value), this, inUpdateStyleAttribute);
+        attributeData->addAttribute(Attribute(name, value), this, inSynchronizationOfLazyAttribute);
         return;
     }
 
-    if (inUpdateStyleAttribute == NotInUpdateStyleAttribute)
+    if (inSynchronizationOfLazyAttribute == NotInSynchronizationOfLazyAttribute)
         willModifyAttribute(name, old->value(), value);
 
     if (RefPtr<Attr> attrNode = attrIfExists(name))
@@ -688,7 +689,7 @@ inline void Element::setAttributeInternal(size_t index, const QualifiedName& nam
     else
         old->setValue(value);
 
-    if (inUpdateStyleAttribute == NotInUpdateStyleAttribute)
+    if (inSynchronizationOfLazyAttribute == NotInSynchronizationOfLazyAttribute)
         didModifyAttribute(Attribute(old->name(), old->value()));
 }
 
@@ -755,9 +756,11 @@ static bool isEventHandlerAttribute(const QualifiedName& name)
     return name.namespaceURI().isNull() && name.localName().startsWith("on");
 }
 
+// FIXME: Share code with Element::isURLAttribute.
 static bool isAttributeToRemove(const QualifiedName& name, const AtomicString& value)
-{    
-    return (name.localName().endsWith(hrefAttr.localName()) || name == srcAttr || name == actionAttr) && protocolIsJavaScript(stripLeadingAndTrailingHTMLSpaces(value));       
+{
+    return (name.localName() == hrefAttr.localName() || name.localName() == nohrefAttr.localName()
+        || name == srcAttr || name == actionAttr || name == formactionAttr) && protocolIsJavaScript(stripLeadingAndTrailingHTMLSpaces(value));
 }
 
 void Element::parserSetAttributes(const Vector<Attribute>& attributeVector, FragmentScriptingPermission scriptingPermission)
@@ -1202,14 +1205,6 @@ ShadowRoot* Element::userAgentShadowRoot() const
     return 0;
 }
 
-ShadowRoot* Element::ensureShadowRoot()
-{
-    if (ElementShadow* shadow = this->shadow())
-        return shadow->oldestShadowRoot();
-
-    return ShadowRoot::create(this, ShadowRoot::UserAgentShadowRoot).get();
-}
-
 const AtomicString& Element::shadowPseudoId() const
 {
     return hasRareData() ? elementRareData()->m_shadowPseudoId : nullAtom;
@@ -1495,12 +1490,12 @@ void Element::removeAttribute(size_t index)
     mutableAttributeData()->removeAttribute(index, this);
 }
 
-void Element::removeAttribute(const String& name)
+void Element::removeAttribute(const AtomicString& name)
 {
     if (!attributeData())
         return;
 
-    String localName = shouldIgnoreAttributeCase(this) ? name.lower() : name;
+    AtomicString localName = shouldIgnoreAttributeCase(this) ? name.lower() : name;
     size_t index = attributeData()->getAttributeItemIndex(localName, false);
     if (index == notFound)
         return;
@@ -1508,12 +1503,12 @@ void Element::removeAttribute(const String& name)
     mutableAttributeData()->removeAttribute(index, this);
 }
 
-void Element::removeAttributeNS(const String& namespaceURI, const String& localName)
+void Element::removeAttributeNS(const AtomicString& namespaceURI, const AtomicString& localName)
 {
     removeAttribute(QualifiedName(nullAtom, localName, namespaceURI));
 }
 
-PassRefPtr<Attr> Element::getAttributeNode(const String& name)
+PassRefPtr<Attr> Element::getAttributeNode(const AtomicString& name)
 {
     const ElementAttributeData* attributeData = updatedAttributeData();
     if (!attributeData)
@@ -1521,7 +1516,7 @@ PassRefPtr<Attr> Element::getAttributeNode(const String& name)
     return attributeData->getAttributeNode(name, shouldIgnoreAttributeCase(this), this);
 }
 
-PassRefPtr<Attr> Element::getAttributeNodeNS(const String& namespaceURI, const String& localName)
+PassRefPtr<Attr> Element::getAttributeNodeNS(const AtomicString& namespaceURI, const AtomicString& localName)
 {
     const ElementAttributeData* attributeData = updatedAttributeData();
     if (!attributeData)
@@ -1529,18 +1524,18 @@ PassRefPtr<Attr> Element::getAttributeNodeNS(const String& namespaceURI, const S
     return attributeData->getAttributeNode(QualifiedName(nullAtom, localName, namespaceURI), this);
 }
 
-bool Element::hasAttribute(const String& name) const
+bool Element::hasAttribute(const AtomicString& name) const
 {
     if (!attributeData())
         return false;
 
     // This call to String::lower() seems to be required but
     // there may be a way to remove it.
-    String localName = shouldIgnoreAttributeCase(this) ? name.lower() : name;
+    AtomicString localName = shouldIgnoreAttributeCase(this) ? name.lower() : name;
     return updatedAttributeData()->getAttributeItem(localName, false);
 }
 
-bool Element::hasAttributeNS(const String& namespaceURI, const String& localName) const
+bool Element::hasAttributeNS(const AtomicString& namespaceURI, const AtomicString& localName) const
 {
     const ElementAttributeData* attributeData = updatedAttributeData();
     if (!attributeData)
@@ -1783,6 +1778,16 @@ unsigned Element::childElementCount() const
     return count;
 }
 
+bool Element::shouldMatchReadOnlySelector() const
+{
+    return false;
+}
+
+bool Element::shouldMatchReadWriteSelector() const
+{
+    return false;
+}
+
 bool Element::webkitMatchesSelector(const String& selector, ExceptionCode& ec)
 {
     if (selector.isEmpty()) {
@@ -1917,7 +1922,7 @@ void Element::setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(boo
 void Element::webkitRequestPointerLock()
 {
     if (document()->page())
-        document()->page()->pointerLockController()->requestPointerLock(this, 0, 0);
+        document()->page()->pointerLockController()->requestPointerLock(this);
 }
 #endif
 
@@ -1972,30 +1977,40 @@ PassRefPtr<WebKitAnimationList> Element::webkitGetAnimations() const
     return animController->animationsForRenderer(renderer());
 }
 
-const AtomicString& Element::webkitRegionOverflow() const
+RenderRegion* Element::renderRegion() const
+{
+    if (renderer() && renderer()->isRenderRegion())
+        return toRenderRegion(renderer());
+
+    return 0;
+}
+
+const AtomicString& Element::webkitRegionOverset() const
 {
     document()->updateLayoutIgnorePendingStylesheets();
 
-    if (document()->cssRegionsEnabled() && renderer() && renderer()->isRenderRegion()) {
-        RenderRegion* region = toRenderRegion(renderer());
-        switch (region->regionState()) {
-        case RenderRegion::RegionFit: {
-            DEFINE_STATIC_LOCAL(AtomicString, fitState, ("fit"));
-            return fitState;
-        }
-        case RenderRegion::RegionEmpty: {
-            DEFINE_STATIC_LOCAL(AtomicString, emptyState, ("empty"));
-            return emptyState;
-        }
-        case RenderRegion::RegionOverflow: {
-            DEFINE_STATIC_LOCAL(AtomicString, overflowState, ("overflow"));
-            return overflowState;
-        }
-        default:
-            break;
-        }
-    }
     DEFINE_STATIC_LOCAL(AtomicString, undefinedState, ("undefined"));
+    if (!document()->cssRegionsEnabled() || !renderRegion())
+        return undefinedState;
+
+    switch (renderRegion()->regionState()) {
+    case RenderRegion::RegionFit: {
+        DEFINE_STATIC_LOCAL(AtomicString, fitState, ("fit"));
+        return fitState;
+    }
+    case RenderRegion::RegionEmpty: {
+        DEFINE_STATIC_LOCAL(AtomicString, emptyState, ("empty"));
+        return emptyState;
+    }
+    case RenderRegion::RegionOverset: {
+        DEFINE_STATIC_LOCAL(AtomicString, overflowState, ("overset"));
+        return overflowState;
+    }
+    case RenderRegion::RegionUndefined:
+        return undefinedState;
+    }
+
+    ASSERT_NOT_REACHED();
     return undefinedState;
 }
 

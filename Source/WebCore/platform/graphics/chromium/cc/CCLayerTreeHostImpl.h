@@ -31,6 +31,7 @@
 #include "cc/CCLayerSorter.h"
 #include "cc/CCRenderPass.h"
 #include "cc/CCRenderer.h"
+#include <public/WebCompositorOutputSurfaceClient.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefPtr.h>
 
@@ -54,13 +55,16 @@ class CCLayerTreeHostImplClient {
 public:
     virtual void didLoseContextOnImplThread() = 0;
     virtual void onSwapBuffersCompleteOnImplThread() = 0;
+    virtual void onVSyncParametersChanged(double monotonicTimebase, double intervalInSeconds) = 0;
     virtual void setNeedsRedrawOnImplThread() = 0;
     virtual void setNeedsCommitOnImplThread() = 0;
     virtual void postAnimationEventsToMainThreadOnImplThread(PassOwnPtr<CCAnimationEventsVector>, double wallClockTime) = 0;
 };
 
 // CCLayerTreeHostImpl owns the CCLayerImpl tree as well as associated rendering state
-class CCLayerTreeHostImpl : public CCInputHandlerClient, CCRendererClient {
+class CCLayerTreeHostImpl : public CCInputHandlerClient,
+                            public CCRendererClient,
+                            public WebKit::WebCompositorOutputSurfaceClient {
     WTF_MAKE_NONCOPYABLE(CCLayerTreeHostImpl);
     typedef Vector<CCLayerImpl*> CCLayerList;
 
@@ -69,17 +73,17 @@ public:
     virtual ~CCLayerTreeHostImpl();
 
     // CCInputHandlerClient implementation
-    virtual CCInputHandlerClient::ScrollStatus scrollBegin(const IntPoint&, CCInputHandlerClient::ScrollInputType);
-    virtual void scrollBy(const IntSize&);
-    virtual void scrollEnd();
-    virtual void pinchGestureBegin();
-    virtual void pinchGestureUpdate(float, const IntPoint&);
-    virtual void pinchGestureEnd();
-    virtual void startPageScaleAnimation(const IntSize& targetPosition, bool anchorPoint, float pageScale, double startTime, double duration);
-    virtual CCActiveGestureAnimation* activeGestureAnimation() { return m_activeGestureAnimation.get(); }
+    virtual CCInputHandlerClient::ScrollStatus scrollBegin(const IntPoint&, CCInputHandlerClient::ScrollInputType) OVERRIDE;
+    virtual void scrollBy(const IntSize&) OVERRIDE;
+    virtual void scrollEnd() OVERRIDE;
+    virtual void pinchGestureBegin() OVERRIDE;
+    virtual void pinchGestureUpdate(float, const IntPoint&) OVERRIDE;
+    virtual void pinchGestureEnd() OVERRIDE;
+    virtual void startPageScaleAnimation(const IntSize& targetPosition, bool anchorPoint, float pageScale, double startTime, double duration) OVERRIDE;
+    virtual CCActiveGestureAnimation* activeGestureAnimation() OVERRIDE { return m_activeGestureAnimation.get(); }
     // To clear an active animation, pass nullptr.
-    virtual void setActiveGestureAnimation(PassOwnPtr<CCActiveGestureAnimation>);
-    virtual void scheduleAnimation();
+    virtual void setActiveGestureAnimation(PassOwnPtr<CCActiveGestureAnimation>) OVERRIDE;
+    virtual void scheduleAnimation() OVERRIDE;
 
     struct FrameData {
         Vector<IntRect> occludingScreenSpaceRects;
@@ -111,6 +115,9 @@ public:
     virtual void setFullRootLayerDamage() OVERRIDE;
     virtual void releaseContentsTextures() OVERRIDE;
     virtual void setMemoryAllocationLimitBytes(size_t) OVERRIDE;
+
+    // WebCompositorOutputSurfaceClient implementation.
+    virtual void onVSyncParametersChanged(double monotonicTimebase, double intervalInSeconds) OVERRIDE;
 
     // Implementation
     bool canDraw();
@@ -148,8 +155,8 @@ public:
     bool contentsTexturesWerePurgedSinceLastCommit() const { return m_contentsTexturesWerePurgedSinceLastCommit; }
     size_t memoryAllocationLimitBytes() const { return m_memoryAllocationLimitBytes; }
 
-    const IntSize& viewportSize() const { return m_viewportSize; }
-    void setViewportSize(const IntSize&);
+    void setViewportSize(const IntSize& layoutViewportSize, const IntSize& deviceViewportSize);
+    const IntSize& layoutViewportSize() const { return m_layoutViewportSize; }
 
     float deviceScaleFactor() const { return m_deviceScaleFactor; }
     void setDeviceScaleFactor(float);
@@ -213,6 +220,7 @@ protected:
 
     void animatePageScale(double monotonicTime);
     void animateGestures(double monotonicTime);
+    void animateScrollbars(double monotonicTime);
 
     // Exposed for testing.
     void calculateRenderSurfaceLayerList(CCLayerList&);
@@ -248,6 +256,8 @@ private:
     bool ensureRenderSurfaceLayerList();
     void clearCurrentlyScrollingLayer();
 
+    void animateScrollbarsRecursive(CCLayerImpl*, double monotonicTime);
+
     void dumpRenderSurfaces(TextStream&, int indent, const CCLayerImpl*) const;
 
     OwnPtr<CCGraphicsContext> m_context;
@@ -258,7 +268,7 @@ private:
     CCLayerImpl* m_currentlyScrollingLayerImpl;
     int m_scrollingLayerIdFromPreviousTree;
     CCLayerTreeSettings m_settings;
-    IntSize m_viewportSize;
+    IntSize m_layoutViewportSize;
     IntSize m_deviceViewportSize;
     float m_deviceScaleFactor;
     bool m_visible;
@@ -285,8 +295,6 @@ private:
     OwnPtr<CCLayerTreeHostImplTimeSourceAdapter> m_timeSourceClientAdapter;
 
     CCLayerSorter m_layerSorter;
-
-    FloatRect m_rootScissorRect;
 
     // List of visible layers for the most recently prepared frame. Used for
     // rendering and input event hit testing.

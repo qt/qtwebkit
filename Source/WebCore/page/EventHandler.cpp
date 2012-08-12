@@ -367,10 +367,11 @@ void EventHandler::clear()
 #if ENABLE(TOUCH_EVENTS)
     m_originatingTouchPointTargets.clear();
 #endif
-    m_maxMouseMovedDuration = 0;
 #if ENABLE(GESTURE_EVENTS)
-    m_baseEventType = PlatformEvent::NoType;
+    m_scrollGestureHandlingNode = 0;
 #endif
+    m_maxMouseMovedDuration = 0;
+    m_baseEventType = PlatformEvent::NoType;
 }
 
 void EventHandler::nodeWillBeRemoved(Node* nodeToBeRemoved)
@@ -2413,6 +2414,34 @@ bool EventHandler::handleGestureTapDown()
 
 bool EventHandler::handleGestureEvent(const PlatformGestureEvent& gestureEvent)
 {
+    // We don't use DoubleTap at the moment, it's mostly redundant with tap since tap now contains
+    // a tap count. FIXME: We should probably remove GestureDoubleTap (http://wkb.ug/93045).
+    if (gestureEvent.type() == PlatformEvent::GestureDoubleTap)
+        return false;
+
+    Node* eventTarget = 0;
+    if (gestureEvent.type() == PlatformEvent::GestureScrollEnd || gestureEvent.type() == PlatformEvent::GestureScrollUpdate)
+        eventTarget = m_scrollGestureHandlingNode.get();
+
+    if (!eventTarget) {
+        HitTestResult result = hitTestResultAtPoint(gestureEvent.position(), false, false, DontHitTestScrollbars, HitTestRequest::ReadOnly | HitTestRequest::Active);
+        eventTarget = targetNode(result);
+    }
+
+    if (eventTarget) {
+        bool eventSwallowed = eventTarget->dispatchGestureEvent(gestureEvent);
+
+        if (gestureEvent.type() == PlatformEvent::GestureScrollBegin) {
+            if (eventSwallowed)
+                m_scrollGestureHandlingNode = eventTarget;
+            else
+                m_scrollGestureHandlingNode = 0;
+        }
+
+        if (eventSwallowed)
+            return true;
+    }
+
     // FIXME: A more general scroll system (https://bugs.webkit.org/show_bug.cgi?id=80596) will
     // eliminate the need for this.
     TemporaryChange<PlatformEvent::Type> baseEventType(m_baseEventType, gestureEvent.type());
@@ -2443,25 +2472,35 @@ bool EventHandler::handleGestureEvent(const PlatformGestureEvent& gestureEvent)
 
 bool EventHandler::handleGestureTap(const PlatformGestureEvent& gestureEvent)
 {
-    // FIXME: Refactor this code to not hit test multiple times.
+    // FIXME: Refactor this code to not hit test multiple times. We use the adjusted position to ensure that the correct node is targeted by the later redundant hit tests.
     IntPoint adjustedPoint = gestureEvent.position();
 #if ENABLE(TOUCH_ADJUSTMENT)
-    if (!gestureEvent.area().isEmpty()) {
-        Node* targetNode = 0;
-        // For now we use the adjusted position to ensure the later redundant hit-tests hits the right node.
-        bestClickableNodeForTouchPoint(gestureEvent.position(), IntSize(gestureEvent.area().width() / 2, gestureEvent.area().height() / 2), adjustedPoint, targetNode);
-        if (!targetNode)
-            return false;
-    }
+    if (!gestureEvent.area().isEmpty() && !adjustGesturePosition(gestureEvent, adjustedPoint))
+        return false;
 #endif
 
-    bool defaultPrevented = false;
-    PlatformMouseEvent fakeMouseMove(adjustedPoint, gestureEvent.globalPosition(), NoButton, PlatformEvent::MouseMoved, /* clickCount */ 1, gestureEvent.shiftKey(), gestureEvent.ctrlKey(), gestureEvent.altKey(), gestureEvent.metaKey(), gestureEvent.timestamp());
-    PlatformMouseEvent fakeMouseDown(adjustedPoint, gestureEvent.globalPosition(), LeftButton, PlatformEvent::MousePressed, /* clickCount */ 1, gestureEvent.shiftKey(), gestureEvent.ctrlKey(), gestureEvent.altKey(), gestureEvent.metaKey(), gestureEvent.timestamp());
-    PlatformMouseEvent fakeMouseUp(adjustedPoint, gestureEvent.globalPosition(), LeftButton, PlatformEvent::MouseReleased, /* clickCount */ 1, gestureEvent.shiftKey(), gestureEvent.ctrlKey(), gestureEvent.altKey(), gestureEvent.metaKey(), gestureEvent.timestamp());
+    PlatformMouseEvent fakeMouseMove(adjustedPoint, gestureEvent.globalPosition(),
+        NoButton, PlatformEvent::MouseMoved, /* clickCount */ 0,
+        gestureEvent.shiftKey(), gestureEvent.ctrlKey(), gestureEvent.altKey(), gestureEvent.metaKey(), gestureEvent.timestamp());
     mouseMoved(fakeMouseMove);
+
+    int tapCount = 1;
+    // FIXME: deletaX is overloaded to mean different things for different gestures.
+    // http://wkb.ug/93123
+    if (gestureEvent.deltaX() > 0)
+        tapCount = static_cast<int>(gestureEvent.deltaX());
+
+    bool defaultPrevented = false;
+    PlatformMouseEvent fakeMouseDown(adjustedPoint, gestureEvent.globalPosition(),
+        LeftButton, PlatformEvent::MousePressed, tapCount,
+        gestureEvent.shiftKey(), gestureEvent.ctrlKey(), gestureEvent.altKey(), gestureEvent.metaKey(), gestureEvent.timestamp());
     defaultPrevented |= handleMousePressEvent(fakeMouseDown);
+
+    PlatformMouseEvent fakeMouseUp(adjustedPoint, gestureEvent.globalPosition(),
+        LeftButton, PlatformEvent::MouseReleased, tapCount,
+        gestureEvent.shiftKey(), gestureEvent.ctrlKey(), gestureEvent.altKey(), gestureEvent.metaKey(), gestureEvent.timestamp());
     defaultPrevented |= handleMouseReleaseEvent(fakeMouseUp);
+
     return defaultPrevented;
 }
 
@@ -2513,6 +2552,13 @@ bool EventHandler::bestZoomableAreaForTouchPoint(const IntPoint& touchCenter, co
     IntRect touchRect(touchCenter - touchRadius, touchRadius + touchRadius);
     RefPtr<StaticHashSetNodeList> nodeList = StaticHashSetNodeList::adopt(result.rectBasedTestResult());
     return findBestZoomableArea(targetNode, targetArea, touchCenter, touchRect, *nodeList.get());
+}
+
+bool EventHandler::adjustGesturePosition(const PlatformGestureEvent& gestureEvent, IntPoint& adjustedPoint)
+{
+    Node* targetNode = 0;
+    bestClickableNodeForTouchPoint(gestureEvent.position(), IntSize(gestureEvent.area().width() / 2, gestureEvent.area().height() / 2), adjustedPoint, targetNode);
+    return targetNode;
 }
 #endif
 
@@ -2625,7 +2671,13 @@ bool EventHandler::sendContextMenuEventForGesture(const PlatformGestureEvent& ev
 #else
     PlatformEvent::Type eventType = PlatformEvent::MousePressed;
 #endif
-    PlatformMouseEvent mouseEvent(event.position(), event.globalPosition(), RightButton, eventType, 1, false, false, false, false, WTF::currentTime());
+
+    IntPoint adjustedPoint = event.position();
+#if ENABLE(TOUCH_ADJUSTMENT)
+    if (!event.area().isEmpty())
+        adjustGesturePosition(event, adjustedPoint);
+#endif
+    PlatformMouseEvent mouseEvent(adjustedPoint, event.globalPosition(), RightButton, eventType, 1, false, false, false, false, WTF::currentTime());
     return sendContextMenuEvent(mouseEvent);
 }
 #endif // ENABLE(GESTURE_EVENTS)

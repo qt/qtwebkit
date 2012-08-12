@@ -39,6 +39,7 @@
 namespace WebCore {
 
 class AnimationList;
+class MemoryObjectInfo;
 class ShadowData;
 class StyleDeprecatedFlexibleBoxData;
 #if ENABLE(CSS_FILTERS)
@@ -56,7 +57,7 @@ class StyleTransformData;
 class ContentData;
 struct LengthSize;
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
 struct StyleDashboardRegion;
 #endif
 
@@ -89,6 +90,8 @@ public:
     bool animationDataEquivalent(const StyleRareNonInheritedData&) const;
     bool transitionDataEquivalent(const StyleRareNonInheritedData&) const;
 
+    void reportMemoryUsage(MemoryObjectInfo*) const;
+
     float opacity; // Whether or not we're transparent.
 
     float m_aspectRatioDenominator;
@@ -102,7 +105,7 @@ public:
     Length m_perspectiveOriginY;
 
     LineClampValue lineClamp; // An Apple extension.
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
     Vector<StyleDashboardRegion> m_dashboardRegions;
 #endif
 
@@ -146,7 +149,7 @@ public:
     Color m_visitedLinkBorderTopColor;
     Color m_visitedLinkBorderBottomColor;
 
-    float m_order;
+    int m_order;
 
     AtomicString m_flowThread;
     AtomicString m_regionThread;

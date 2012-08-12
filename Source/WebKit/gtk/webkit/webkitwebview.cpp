@@ -118,10 +118,6 @@
 #include "DeviceOrientationClientGtk.h"
 #endif
 
-#if ENABLE(REGISTER_PROTOCOL_HANDLER)
-#include "RegisterProtocolHandlerClientGtk.h"
-#endif
-
 /**
  * SECTION:webkitwebview
  * @short_description: The central class of the WebKitGTK+ API
@@ -2294,7 +2290,7 @@ static void webkit_web_view_class_init(WebKitWebViewClass* webViewClass)
      *
      * The default bindings for this signal is Ctrl-a.
      */
-    webkit_web_view_signals[SELECT_ALL] = g_signal_new("select-all",
+    webkit_web_view_signals[::SELECT_ALL] = g_signal_new("select-all",
             G_TYPE_FROM_CLASS(webViewClass),
             (GSignalFlags)(G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION),
             G_STRUCT_OFFSET(WebKitWebViewClass, select_all),
@@ -3635,7 +3631,8 @@ static void webkit_web_view_init(WebKitWebView* webView)
 #endif
 
 #if ENABLE(REGISTER_PROTOCOL_HANDLER)
-    WebCore::provideRegisterProtocolHandlerTo(priv->corePage, new WebKit::RegisterProtocolHandlerClient);
+    priv->registerProtocolHandlerClient = WebKit::RegisterProtocolHandlerClient::create();
+    WebCore::provideRegisterProtocolHandlerTo(priv->corePage, priv->registerProtocolHandlerClient.get());
 #endif
 
     if (DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled()) {
@@ -4422,7 +4419,7 @@ void webkit_web_view_select_all(WebKitWebView* webView)
 {
     g_return_if_fail(WEBKIT_IS_WEB_VIEW(webView));
 
-    g_signal_emit(webView, webkit_web_view_signals[SELECT_ALL], 0);
+    g_signal_emit(webView, webkit_web_view_signals[::SELECT_ALL], 0);
 }
 
 /**
@@ -5257,6 +5254,44 @@ GtkMenu* webkit_web_view_get_context_menu(WebKitWebView* webView)
 #else
     return 0;
 #endif
+}
+
+/**
+ * webkit_web_view_get_snapshot:
+ * @web_view: a #WebKitWebView
+ *
+ * Retrieves a snapshot with the visible contents of @webview.
+ *
+ * Returns: (transfer full): a @cairo_surface_t
+ *
+ * Since: 1.10
+ **/
+cairo_surface_t*
+webkit_web_view_get_snapshot(WebKitWebView* webView)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_VIEW(webView), 0);
+
+    Frame* frame = core(webView)->mainFrame();
+    if (!frame || !frame->contentRenderer() || !frame->view())
+        return 0;
+
+    frame->view()->updateLayoutAndStyleIfNeededRecursive();
+    GtkAllocation allocation;
+    gtk_widget_get_allocation(GTK_WIDGET(webView), &allocation);
+    cairo_surface_t* surface = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, allocation.width, allocation.height);
+    RefPtr<cairo_t> cr = adoptRef(cairo_create(surface));
+    GraphicsContext gc(cr.get());
+
+    IntRect rect = allocation;
+    gc.applyDeviceScaleFactor(frame->page()->deviceScaleFactor());
+    gc.save();
+    gc.clip(rect);
+    if (webView->priv->transparent)
+        gc.clearRect(rect);
+    frame->view()->paint(&gc, rect);
+    gc.restore();
+
+    return surface;
 }
 
 void webViewEnterFullscreen(WebKitWebView* webView, Node* node)

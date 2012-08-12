@@ -74,14 +74,14 @@ static void webkit_spell_checker_enchant_init(WebKitSpellCheckerEnchant* checker
 static void checkSpellingOfString(WebKitSpellChecker* checker, const char* string, int* misspellingLocation, int* misspellingLength)
 {
     WebKitSpellCheckerEnchantPrivate* priv = WEBKIT_SPELL_CHECKER_ENCHANT(checker)->priv;
-    priv->textCheckerEnchant->checkSpellingOfString(String(string), *misspellingLocation, *misspellingLength);
+    priv->textCheckerEnchant->checkSpellingOfString(String::fromUTF8(string), *misspellingLocation, *misspellingLength);
 }
 
 static char** getGuessesForWord(WebKitSpellChecker* checker, const char* word, const char* context)
 {
     WebKitSpellCheckerEnchantPrivate* priv = WEBKIT_SPELL_CHECKER_ENCHANT(checker)->priv;
 
-    Vector<String> guesses = priv->textCheckerEnchant->getGuessesForWord(String(word));
+    Vector<String> guesses = priv->textCheckerEnchant->getGuessesForWord(String::fromUTF8(word));
 
     if (guesses.isEmpty())
         return 0;
@@ -99,7 +99,7 @@ static char** getGuessesForWord(WebKitSpellChecker* checker, const char* word, c
 static void updateSpellCheckingLanguages(WebKitSpellChecker* checker, const char* languages)
 {
     WebKitSpellCheckerEnchantPrivate* priv = WEBKIT_SPELL_CHECKER_ENCHANT(checker)->priv;
-    priv->textCheckerEnchant->updateSpellCheckingLanguages(String(languages));
+    priv->textCheckerEnchant->updateSpellCheckingLanguages(String::fromUTF8(languages));
 }
 
 static char* getAutocorrectSuggestionsForMisspelledWord(WebKitSpellChecker* checker, const char* word)
@@ -110,13 +110,13 @@ static char* getAutocorrectSuggestionsForMisspelledWord(WebKitSpellChecker* chec
 static void learnWord(WebKitSpellChecker* checker, const char* word)
 {
     WebKitSpellCheckerEnchantPrivate* priv = WEBKIT_SPELL_CHECKER_ENCHANT(checker)->priv;
-    priv->textCheckerEnchant->learnWord(String(word));
+    priv->textCheckerEnchant->learnWord(String::fromUTF8(word));
 }
 
 static void ignoreWord(WebKitSpellChecker* checker, const char* word)
 {
     WebKitSpellCheckerEnchantPrivate* priv = WEBKIT_SPELL_CHECKER_ENCHANT(checker)->priv;
-    priv->textCheckerEnchant->ignoreWord(String(word));
+    priv->textCheckerEnchant->ignoreWord(String::fromUTF8(word));
 }
 
 static void webkit_spell_checker_enchant_spell_checker_interface_init(WebKitSpellCheckerInterface* interface)

@@ -44,6 +44,7 @@ module WTR {
         void dumpFullScreenCallbacks();
         void dumpFrameLoadCallbacks();
         void dumpProgressFinishedCallback();
+        void dumpResourceResponseMIMETypes();
 
         // Special options.
         void keepWebHistory();
@@ -62,6 +63,8 @@ module WTR {
         void setAuthorAndUserStylesEnabled(in boolean value);
         void addOriginAccessWhitelistEntry(in DOMString sourceOrigin, in DOMString destinationProtocol, in DOMString destinationHost, in boolean allowDestinationSubdomains);
         void removeOriginAccessWhitelistEntry(in DOMString sourceOrigin, in DOMString destinationProtocol, in DOMString destinationHost, in boolean allowDestinationSubdomains);
+        void setUserStyleSheetEnabled(in boolean value);
+        void setUserStyleSheetLocation(in DOMString location);
 
         // Special DOM functions.
         void clearBackForwardList();

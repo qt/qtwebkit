@@ -52,7 +52,7 @@ public:
 
     void setRegionRect(const LayoutRect& rect) { m_regionRect = rect; }
     LayoutRect regionRect() const { return m_regionRect; }
-    LayoutRect regionOverflowRect() const;
+    LayoutRect regionOversetRect() const;
 
     void attachRegion();
     void detachRegion();
@@ -88,13 +88,11 @@ public:
         RegionUndefined,
         RegionEmpty,
         RegionFit,
-        RegionOverflow
+        RegionOverset
     };
 
     RegionState regionState() const { return isValid() ? m_regionState : RegionUndefined; }
     void setRegionState(RegionState regionState) { m_regionState = regionState; }
-    void setDispatchRegionLayoutUpdateEvent(bool value) { m_dispatchRegionLayoutUpdateEvent = value; }
-    bool shouldDispatchRegionLayoutUpdateEvent() { return m_dispatchRegionLayoutUpdateEvent; }
     
     virtual LayoutUnit logicalWidthForFlowThreadContent() const;
     virtual LayoutUnit logicalHeightForFlowThreadContent() const;
@@ -108,6 +106,9 @@ private:
     void restoreRegionObjectsOriginalStyle();
     void setObjectStyleInRegion(RenderObject*, PassRefPtr<RenderStyle>, bool objectRegionStyleCached);
     void printRegionObjectsStyles();
+
+    void checkRegionStyle();
+
     RenderFlowThread* m_flowThread;
 
     // If this RenderRegion is displayed as part of another named flow,
@@ -139,7 +140,6 @@ private:
     bool m_isValid;
     bool m_hasCustomRegionStyle;
     RegionState m_regionState;
-    bool m_dispatchRegionLayoutUpdateEvent;
 };
 
 inline RenderRegion* toRenderRegion(RenderObject* object)

@@ -39,7 +39,6 @@
 #include "SQLResultSet.h"
 #include "SQLValue.h"
 #include "V8Binding.h"
-#include "V8BindingMacros.h"
 #include "V8Proxy.h"
 #include "V8SQLResultSet.h"
 #include <wtf/Vector.h>
@@ -53,7 +52,7 @@ v8::Handle<v8::Value> V8SQLTransactionSync::executeSqlCallback(const v8::Argumen
     INC_STATS("DOM.SQLTransactionSync.executeSql()");
 
     if (!args.Length())
-        return throwError(SYNTAX_ERR, args.GetIsolate());
+        return V8Proxy::setDOMException(SYNTAX_ERR, args.GetIsolate());
 
     STRING_TO_V8PARAMETER_EXCEPTION_BLOCK(V8Parameter<>, statement, args[0]);
 
@@ -61,7 +60,7 @@ v8::Handle<v8::Value> V8SQLTransactionSync::executeSqlCallback(const v8::Argumen
 
     if (args.Length() > 1 && !isUndefinedOrNull(args[1])) {
         if (!args[1]->IsObject())
-            return throwError(TYPE_MISMATCH_ERR, args.GetIsolate());
+            return V8Proxy::setDOMException(TYPE_MISMATCH_ERR, args.GetIsolate());
 
         uint32_t sqlArgsLength = 0;
         v8::Local<v8::Object> sqlArgsObject = args[1]->ToObject();

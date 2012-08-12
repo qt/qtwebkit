@@ -81,7 +81,7 @@ EXPORTS
     ?byteCompile@Yarr@JSC@@YA?AV?$PassOwnPtr@UBytecodePattern@Yarr@JSC@@@WTF@@AAUYarrPattern@12@PAVBumpPointerAllocator@4@@Z
     ?byteSize@SourceProviderCache@JSC@@QBEIXZ
     ?calculateDSTOffset@WTF@@YANNN@Z
-    ?calculateStringHashAndLengthFromUTF8@Unicode@WTF@@YAIPBD0AAI1@Z
+    ?calculateStringHashAndLengthFromUTF8MaskingTop8Bits@Unicode@WTF@@YAIPBD0AAI1@Z
     ?calculateUTCOffset@WTF@@YAHXZ
     ?calculatedFunctionName@DebuggerCallFrame@JSC@@QBE?AVUString@2@XZ
     ?call@JSC@@YA?AVJSValue@1@PAVExecState@1@V21@W4CallType@1@ABTCallData@1@1ABVArgList@1@@Z
@@ -201,7 +201,6 @@ EXPORTS
     ?getCallData@JSCell@JSC@@SA?AW4CallType@2@PAV12@AATCallData@2@@Z
     ?getCallableObjectSlow@JSC@@YAPAVJSCell@1@PAV21@@Z
     ?getConstructData@JSCell@JSC@@SA?AW4ConstructType@2@PAV12@AATConstructData@2@@Z
-    ?getCurrentLocalTime@WTF@@YAXPAUtm@@@Z
     ?getObject@JSCell@JSC@@QAEPAVJSObject@2@XZ
     ?getOwnPropertyDescriptor@JSGlobalObject@JSC@@SA_NPAVJSObject@2@PAVExecState@2@VPropertyName@2@AAVPropertyDescriptor@2@@Z
     ?getOwnPropertyDescriptor@JSObject@JSC@@SA_NPAV12@PAVExecState@2@VPropertyName@2@AAVPropertyDescriptor@2@@Z
@@ -315,6 +314,7 @@ EXPORTS
     ?setOrderLowerFirst@Collator@WTF@@QAEX_N@Z
     ?setPrototype@JSObject@JSC@@QAEXAAVJSGlobalData@2@VJSValue@2@@Z
     ?setSetter@PropertyDescriptor@JSC@@QAEXVJSValue@2@@Z
+    ?setToCurrentLocalTime@GregorianDateTime@WTF@@QAEXXZ
     ?setUndefined@PropertyDescriptor@JSC@@QAEXXZ
     ?setUnwrappedObject@JSGlobalThis@JSC@@IAEXAAVJSGlobalData@2@PAVJSGlobalObject@2@@Z
     ?setUpStaticFunctionSlot@JSC@@YA_NPAVExecState@1@PBVHashEntry@1@PAVJSObject@1@VPropertyName@1@AAVPropertySlot@1@@Z
@@ -352,8 +352,8 @@ EXPORTS
     ?toObject@JSCell@JSC@@QBEPAVJSObject@2@PAVExecState@2@PAVJSGlobalObject@2@@Z
     ?toObjectSlowCase@JSValue@JSC@@ABEPAVJSObject@2@PAVExecState@2@PAVJSGlobalObject@2@@Z
     ?toString@JSObject@JSC@@QBEPAVJSString@2@PAVExecState@2@@Z
-    ?toStringDecimal@DecimalNumber@WTF@@QBEIPA_WI@Z
-    ?toStringExponential@DecimalNumber@WTF@@QBEIPA_WI@Z
+    ?toStringDecimal@DecimalNumber@WTF@@QBEIPAEI@Z
+    ?toStringExponential@DecimalNumber@WTF@@QBEIPAEI@Z
     ?toStringSlowCase@JSValue@JSC@@ABEPAVJSString@2@PAVExecState@2@@Z
     ?toThisObject@JSObject@JSC@@SAPAV12@PAVJSCell@2@PAVExecState@2@@Z
     ?toThisObjectSlowCase@JSValue@JSC@@ABEPAVJSObject@2@PAVExecState@2@@Z

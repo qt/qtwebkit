@@ -26,6 +26,8 @@
  *
  * The following signals (see evas_object_smart_callback_add()) are emitted:
  *
+ * - "close,window", void: window is closed.
+ * - "create,window", Evas_Object**: a new window is created.
  * - "download,cancelled", Ewk_Download_Job*: reports that a download was effectively cancelled.
  * - "download,failed", Ewk_Download_Job_Error*: reports that a download failed with the given error.
  * - "download,finished", Ewk_Download_Job*: reports that a download completed successfully.
@@ -59,6 +61,7 @@
  * - "resource,request,new", const Ewk_Web_Resource_Request*: a resource request was initiated.
  * - "resource,request,response", Ewk_Web_Resource_Load_Response*: a response to a resource request was received.
  * - "resource,request,sent", const Ewk_Web_Resource_Request*: a resource request was sent.
+ * - "text,found", unsigned int*: the requested text was found and it gives the number of matches.
  * - "title,changed", const char*: title of the main frame was changed.
  * - "uri,changed", const char*: uri of the main frame was changed.
  */
@@ -66,6 +69,7 @@
 #ifndef ewk_view_h
 #define ewk_view_h
 
+#include "ewk_back_forward_list.h"
 #include "ewk_context.h"
 #include "ewk_download_job.h"
 #include "ewk_intent.h"
@@ -216,6 +220,62 @@ struct _Ewk_Download_Job_Error {
 };
 
 /**
+ * Enum values used to specify search options.
+ * @brief   Provides option to find text
+ * @info    Keep this in sync with WKFindOptions.h
+ */
+enum _Ewk_Find_Options {
+    EWK_FIND_OPTIONS_NONE, /**< no search flags, this means a case sensitive, no wrap, forward only search. */
+    EWK_FIND_OPTIONS_CASE_INSENSITIVE = 1 << 0, /**< case insensitive search. */
+    EWK_FIND_OPTIONS_AT_WORD_STARTS = 1 << 1, /**< search text only at the beginning of the words. */
+    EWK_FIND_OPTIONS_TREAT_MEDIAL_CAPITAL_AS_WORD_START = 1 << 2, /**< treat capital letters in the middle of words as word start. */
+    EWK_FIND_OPTIONS_BACKWARDS = 1 << 3, /**< search backwards. */
+    EWK_FIND_OPTIONS_WRAP_AROUND = 1 << 4, /**< if not present search will stop at the end of the document. */
+    EWK_FIND_OPTIONS_SHOW_OVERLAY = 1 << 5, /**< show overlay */
+    EWK_FIND_OPTIONS_SHOW_FIND_INDICATOR = 1 << 6, /**< show indicator */
+    EWK_FIND_OPTIONS_SHOW_HIGHLIGHT = 1 << 7 /**< show highlight */
+};
+typedef enum _Ewk_Find_Options Ewk_Find_Options;
+
+/**
+ * Sets the smart class APIs, enabling view to be inherited.
+ *
+ * @param api class definition to set, all members with the
+ *        exception of @a Evas_Smart_Class->data may be overridden, must
+ *        @b not be @c NULL
+ *
+ * @note @a Evas_Smart_Class->data is used to implement type checking and
+ *       is not supposed to be changed/overridden. If you need extra
+ *       data for your smart class to work, just extend
+ *       Ewk_View_Smart_Class instead.
+ *       The Evas_Object which inherits the ewk_view should use
+ *       ewk_view_smart_add() to create Evas_Object instead of
+ *       evas_object_smart_add() because it performs additional initialization
+ *       for the ewk_view.
+ *
+ * @return @c EINA_TRUE on success or @c EINA_FALSE on failure (probably
+ *         version mismatch)
+ *
+ * @see ewk_view_smart_add()
+ */
+EAPI Eina_Bool ewk_view_smart_class_set(Ewk_View_Smart_Class *api);
+
+/**
+ * Creates a new EFL WebKit view object with Evas_Smart and Ewk_Context.
+ *
+ * @note The Evas_Object which inherits the ewk_view should create its
+ *       Evas_Object using this API instead of evas_object_smart_add()
+ *       because the default initialization for ewk_view is done in this API.
+ *
+ * @param e canvas object where to create the view object
+ * @param smart Evas_Smart object. Its type should be EWK_VIEW_TYPE_STR
+ * @param context Ewk_Context object which is used for initializing
+ *
+ * @return view object on success or @c NULL on failure
+ */
+Evas_Object *ewk_view_smart_add(Evas *e, Evas_Smart *smart, Ewk_Context *context);
+
+/**
  * Creates a new EFL WebKit view object.
  *
  * @param e canvas object where to create the view object
@@ -334,6 +394,21 @@ EAPI Eina_Bool    ewk_view_back_possible(Evas_Object *o);
  * @return @c EINA_TRUE if it is possible to navigate forwards in the history, @c EINA_FALSE otherwise
  */
 EAPI Eina_Bool    ewk_view_forward_possible(Evas_Object *o);
+
+/**
+ * Gets the back-forward list associated with this view.
+ *
+ * The returned instance is unique for this view and thus multiple calls
+ * to this function with the same view as parameter returns the same
+ * handle. This handle is alive while view is alive, thus one
+ * might want to listen for EVAS_CALLBACK_DEL on given view
+ * (@a o) to know when to stop using returned handle.
+ *
+ * @param o view object to get navigation back-forward list
+ *
+ * @return the back-forward list instance handle associated with this view
+ */
+EAPI Ewk_Back_Forward_List *ewk_view_back_forward_list_get(const Evas_Object *o);
 
 /**
  * Gets the current title of the main frame.
@@ -493,6 +568,27 @@ EAPI const char  *ewk_view_setting_encoding_custom_get(const Evas_Object *o);
  * @return @c EINA_TRUE on success @c EINA_FALSE otherwise
  */
 EAPI Eina_Bool    ewk_view_setting_encoding_custom_set(Evas_Object *o, const char *encoding);
+
+/**
+* Searches the given string in the document.
+*
+* @param o view object to find text
+* @param text text to find
+* @param options options to find
+* @param max count to find, unlimited if 0
+*
+* @return @c EINA_TRUE on success, @c EINA_FALSE on errors
+*/
+EAPI Eina_Bool ewk_view_text_find(Evas_Object *o, const char *text, Ewk_Find_Options options, unsigned int max_match_count);
+
+/**
+* Clears the highlight of searched text.
+*
+* @param o view object to find text
+*
+* @return @c EINA_TRUE on success, @c EINA_FALSE on errors
+*/
+EAPI Eina_Bool ewk_view_text_find_highlight_clear(Evas_Object *o);
 
 #ifdef __cplusplus
 }

@@ -37,6 +37,7 @@
 
 #include "ExceptionCode.h"
 #include "JSArrayBuffer.h"
+#include "JSArrayBufferView.h"
 #include "JSBlob.h"
 #include "JSEventListener.h"
 #include "KURL.h"
@@ -100,6 +101,8 @@ JSValue JSWebSocket::send(ExecState* exec)
     bool result;
     if (message.inherits(&JSArrayBuffer::s_info))
         result = impl()->send(toArrayBuffer(message), ec);
+    else if (message.inherits(&JSArrayBufferView::s_info))
+        result = impl()->send(toArrayBufferView(message), ec);
     else if (message.inherits(&JSBlob::s_info))
         result = impl()->send(toBlob(message), ec);
     else {
@@ -114,38 +117,6 @@ JSValue JSWebSocket::send(ExecState* exec)
     }
 
     return jsBoolean(result);
-}
-
-JSValue JSWebSocket::close(ExecState* exec)
-{
-    // FIXME: We should implement [Clamp] for IDL binding code generator, and
-    // remove this custom method.
-    WebSocket* webSocket = static_cast<WebSocket*>(impl());
-    size_t argumentCount = exec->argumentCount();
-    int code = WebSocketChannel::CloseEventCodeNotSpecified;
-    String reason = "";
-    if (argumentCount >= 1) {
-        JSValue v = exec->argument(0);
-        double x = v.toNumber(exec);
-        double maxValue = static_cast<double>(std::numeric_limits<uint16_t>::max());
-        double minValue = static_cast<double>(std::numeric_limits<uint16_t>::min());
-        if (isnan(x))
-            x = 0.0;
-        else
-            x = clampTo(x, minValue, maxValue);
-        code = clampToInteger(x);
-        if (argumentCount >= 2) {
-            reason = ustringToString(exec->argument(1).toString(exec)->value(exec));
-            if (exec->hadException()) {
-                setDOMException(exec, SYNTAX_ERR);
-                return jsUndefined();
-            }
-        }
-    }
-    ExceptionCode ec = 0;
-    webSocket->close(code, reason, ec);
-    setDOMException(exec, ec);
-    return jsUndefined();
 }
 
 } // namespace WebCore

@@ -36,7 +36,6 @@
 #include "LayoutTestController.h"
 #include "MockWebPrerenderingSupport.h"
 #include "platform/WebArrayBufferView.h"
-#include "WebCompositor.h"
 #include "WebDataSource.h"
 #include "WebDocument.h"
 #include "WebElement.h"
@@ -44,23 +43,23 @@
 #include "WebHistoryItem.h"
 #include "WebIDBFactory.h"
 #include "WebTestingSupport.h"
-#include "platform/WebThread.h"
-#include "WebKit.h"
-#include "platform/WebKitPlatformSupport.h"
 #include "WebPermissions.h"
-#include "platform/WebPoint.h"
 #include "WebRuntimeFeatures.h"
 #include "WebScriptController.h"
 #include "WebSettings.h"
-#include "platform/WebSize.h"
-#include "platform/WebString.h"
-#include "platform/WebURLRequest.h"
-#include "platform/WebURLResponse.h"
 #include "WebView.h"
 #include "WebViewHost.h"
 #include "skia/ext/platform_canvas.h"
 #include "webkit/support/webkit_support.h"
 #include "webkit/support/webkit_support_gfx.h"
+#include <public/Platform.h>
+#include <public/WebCompositor.h>
+#include <public/WebPoint.h>
+#include <public/WebSize.h>
+#include <public/WebString.h>
+#include <public/WebThread.h>
+#include <public/WebURLRequest.h>
+#include <public/WebURLResponse.h>
 #include <algorithm>
 #include <cctype>
 #include <vector>
@@ -106,6 +105,7 @@ TestShell::TestShell()
     , m_testIsPreparing(false)
     , m_focusedWidget(0)
     , m_devTools(0)
+    , m_dumpPixelsForCurrentTest(false)
     , m_allowExternalPages(false)
     , m_acceleratedCompositingForVideoEnabled(false)
     , m_threadedCompositingEnabled(false)
@@ -152,7 +152,6 @@ void TestShell::initialize()
     m_webPermissions = adoptPtr(new WebPermissions(this));
     m_testInterfaces = adoptPtr(new TestInterfaces());
     m_layoutTestController = adoptPtr(new LayoutTestController(this));
-    m_eventSender = adoptPtr(new EventSender());
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     m_notificationPresenter = adoptPtr(new NotificationPresenter(this));
 #endif
@@ -163,7 +162,7 @@ void TestShell::initialize()
     WTF::initializeThreading();
 
     if (m_threadedCompositingEnabled) {
-        m_webCompositorThread = adoptPtr(WebKit::webKitPlatformSupport()->createThread("Compositor"));
+        m_webCompositorThread = adoptPtr(WebKit::Platform::current()->createThread("Compositor"));
         WebCompositor::initialize(m_webCompositorThread.get());
     } else
         WebCompositor::initialize(0);
@@ -178,8 +177,6 @@ void TestShell::createMainWindow()
     m_webView = m_webViewHost->webView();
     m_testInterfaces->setDelegate(m_webViewHost.get());
     m_testInterfaces->setWebView(m_webView);
-    m_eventSender->setDelegate(m_webViewHost.get());
-    m_eventSender->setWebView(m_webView);
     m_drtDevToolsAgent->setWebView(m_webView);
 }
 
@@ -187,8 +184,6 @@ TestShell::~TestShell()
 {
     m_testInterfaces->setDelegate(0);
     m_testInterfaces->setWebView(0);
-    m_eventSender->setDelegate(0);
-    m_eventSender->setWebView(0);
     m_drtDevToolsAgent->setWebView(0);
 }
 
@@ -237,12 +232,15 @@ void TestShell::resetWebSettings(WebView& webView)
     m_prefs.applyTo(&webView);
 }
 
-void TestShell::runFileTest(const TestParams& params)
+void TestShell::runFileTest(const TestParams& params, bool shouldDumpPixels)
 {
     ASSERT(params.testUrl.isValid());
+    m_dumpPixelsForCurrentTest = shouldDumpPixels;
     m_testIsPreparing = true;
     m_params = params;
     string testUrl = m_params.testUrl.spec();
+
+    m_layoutTestController->setShouldGeneratePixelResults(shouldDumpPixels);
 
     if (testUrl.find("loading/") != string::npos
         || testUrl.find("loading\\") != string::npos)
@@ -301,7 +299,6 @@ void TestShell::resetTestController()
     m_webPermissions->reset();
     m_testInterfaces->resetAll();
     m_layoutTestController->reset();
-    m_eventSender->reset();
     m_webViewHost->reset();
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     m_notificationPresenter->reset();
@@ -609,7 +606,7 @@ void TestShell::dump()
     if (dumpedAnything && m_params.printSeparators)
         m_printer.handleTextFooter();
 
-    if (m_params.dumpPixels && shouldGeneratePixelResults) {
+    if (m_dumpPixelsForCurrentTest && shouldGeneratePixelResults) {
         // Image output: we write the image data to the file given on the
         // command line (for the dump pixels argument), and the MD5 sum to
         // stdout.
@@ -730,7 +727,6 @@ void TestShell::bindJSObjectsToWindow(WebFrame* frame)
     m_testInterfaces->bindTo(frame);
     m_layoutTestController->bindToJavascript(frame, WebString::fromUTF8("layoutTestController"));
     m_layoutTestController->bindToJavascript(frame, WebString::fromUTF8("testRunner"));
-    m_eventSender->bindToJavascript(frame, WebString::fromUTF8("eventSender"));
 }
 
 WebViewHost* TestShell::createNewWindow(const WebKit::WebURL& url)

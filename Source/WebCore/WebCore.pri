@@ -7,8 +7,7 @@
 
 SOURCE_DIR = $${ROOT_WEBKIT_DIR}/Source/WebCore
 
-QT *= network sql
-haveQt(5): QT *= core-private gui-private
+QT *= network sql core-private gui-private
 
 WEBCORE_GENERATED_SOURCES_DIR = $${ROOT_BUILD_DIR}/Source/WebCore/$${GENERATED_SOURCES_DESTDIR}
 
@@ -57,6 +56,7 @@ INCLUDEPATH += \
     $$SOURCE_DIR/platform/graphics/filters \
     $$SOURCE_DIR/platform/graphics/filters/arm \
     $$SOURCE_DIR/platform/graphics/opengl \
+    $$SOURCE_DIR/platform/graphics/opentype \
     $$SOURCE_DIR/platform/graphics/qt \
     $$SOURCE_DIR/platform/graphics/surfaces \
     $$SOURCE_DIR/platform/graphics/texmap \
@@ -97,7 +97,6 @@ INCLUDEPATH += \
 INCLUDEPATH += \
     $$SOURCE_DIR/bridge/jsc \
     $$SOURCE_DIR/bindings/js \
-    $$SOURCE_DIR/bindings/js/specialization \
     $$SOURCE_DIR/bridge/c \
     $$SOURCE_DIR/testing/js
 
@@ -150,23 +149,20 @@ contains(DEFINES, ENABLE_NETSCAPE_PLUGIN_API=1) {
     }
 }
 
-contains(DEFINES, ENABLE_GEOLOCATION=1) {
-    CONFIG *= mobility
-    MOBILITY *= location
-}
-
 contains(DEFINES, ENABLE_ORIENTATION_EVENTS=1)|contains(DEFINES, ENABLE_DEVICE_ORIENTATION=1) {
-    haveQt(5) {
-        QT += sensors
-    } else {
-        CONFIG *= mobility
-        MOBILITY *= sensors
-    }
+    QT += sensors
 }
 
 contains(DEFINES, WTF_USE_QT_MOBILITY_SYSTEMINFO=1) {
      CONFIG *= mobility
      MOBILITY *= systeminfo
+}
+
+contains(DEFINES, ENABLE_GAMEPAD=1) {
+    INCLUDEPATH += \
+        $$SOURCE_DIR/platform/linux \
+        $$SOURCE_DIR/Modules/gamepad
+    PKGCONFIG += libudev
 }
 
 contains(DEFINES, ENABLE_VIDEO=1) {
@@ -193,7 +189,6 @@ contains(DEFINES, WTF_USE_3D_GRAPHICS=1) {
     contains(QT_CONFIG, opengles2): LIBS += -lEGL
     mac: LIBS += -framework IOSurface -framework CoreFoundation
     linux-*:contains(DEFINES, HAVE_XCOMPOSITE=1): LIBS += -lXcomposite
-    haveQt(4): QT *= opengl
 }
 
 !system-sqlite:exists( $${SQLITE3SRCDIR}/sqlite3.c ) {
@@ -204,29 +199,22 @@ contains(DEFINES, WTF_USE_3D_GRAPHICS=1) {
     LIBS += -lsqlite3
 }
 
-haveQt(5) {
-    # Qt5 allows us to use config tests to check for the presence of these libraries
-    config_libjpeg {
-        DEFINES += WTF_USE_LIBJPEG=1
-        LIBS += -ljpeg
-    } else {
-        warning("JPEG library not found! QImageDecoder will decode JPEG images.")
-    }
-    config_libpng {
-        DEFINES += WTF_USE_LIBPNG=1
-        LIBS += -lpng
-    } else {
-        warning("PNG library not found! QImageDecoder will decode PNG images.")
-    }
-    config_libwebp {
-        DEFINES += WTF_USE_WEBP=1
-        LIBS += -lwebp
-    }
+# Qt5 allows us to use config tests to check for the presence of these libraries
+config_libjpeg {
+    DEFINES += WTF_USE_LIBJPEG=1
+    LIBS += -ljpeg
 } else {
-    !win32-*:!mac {
-        DEFINES += WTF_USE_LIBJPEG=1 WTF_USE_LIBPNG=1
-        LIBS += -ljpeg -lpng
-    }
+    warning("JPEG library not found! QImageDecoder will decode JPEG images.")
+}
+config_libpng {
+    DEFINES += WTF_USE_LIBPNG=1
+    LIBS += -lpng
+} else {
+    warning("PNG library not found! QImageDecoder will decode PNG images.")
+}
+config_libwebp {
+    DEFINES += WTF_USE_WEBP=1
+    LIBS += -lwebp
 }
 
 win32-*|wince* {
@@ -276,8 +264,7 @@ unix:!mac:*-g++*:QMAKE_LFLAGS += -Wl,--gc-sections
 linux*-g++*:QMAKE_LFLAGS += $$QMAKE_LFLAGS_NOUNDEF
 
 unix|win32-g++* {
-    QMAKE_PKGCONFIG_REQUIRES = QtCore QtGui QtNetwork
-    haveQt(5): QMAKE_PKGCONFIG_REQUIRES += QtWidgets
+    QMAKE_PKGCONFIG_REQUIRES = QtCore QtGui QtNetwork QtWidgets
 }
 
 # Disable C++0x mode in WebCore for those who enabled it in their Qt's mkspec

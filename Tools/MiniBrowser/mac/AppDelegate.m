@@ -26,7 +26,6 @@
 #import "AppDelegate.h"
 
 #import "BrowserWindowController.h"
-#import "BrowserStatisticsWindowController.h"
 
 #import <WebKit2/WKContextPrivate.h>
 #import <WebKit2/WKStringCF.h>
@@ -113,11 +112,6 @@ static void populateVisitedLinks(WKContextRef context, const void *clientInfo)
 {
     self = [super init];
     if (self) {
-        if ([NSEvent modifierFlags] & NSShiftKeyMask)
-            _currentProcessModel = kProcessModelSharedSecondaryThread;
-        else
-            _currentProcessModel = kProcessModelSharedSecondaryProcess;
-
         WKContextHistoryClient historyClient = {
             kWKContextHistoryClientCurrentVersion,
             self,
@@ -127,10 +121,6 @@ static void populateVisitedLinks(WKContextRef context, const void *clientInfo)
             didUpdateHistoryTitle,
             populateVisitedLinks
         };
-
-        _threadContext = WKContextGetSharedThreadContext();
-        WKContextSetHistoryClient(_threadContext, &historyClient);
-        WKContextSetCacheModel(_threadContext, kWKCacheModelPrimaryWebBrowser);
 
         CFStringRef bundlePathCF = (CFStringRef)[[NSBundle mainBundle] pathForAuxiliaryExecutable:@"WebBundle.bundle"];
         WKStringRef bundlePath = WKStringCreateWithCFString(bundlePathCF);
@@ -153,6 +143,8 @@ static void populateVisitedLinks(WKContextRef context, const void *clientInfo)
         WKStringRef pageGroupIdentifier = WKStringCreateWithCFString(CFSTR("MiniBrowser"));
         _pageGroup = WKPageGroupCreateWithIdentifier(pageGroupIdentifier);
         WKRelease(pageGroupIdentifier);
+
+        _browserWindows = [[NSMutableSet alloc] init];
     }
 
     return self;
@@ -160,52 +152,16 @@ static void populateVisitedLinks(WKContextRef context, const void *clientInfo)
 
 - (IBAction)newWindow:(id)sender
 {
-    BrowserWindowController *controller = [[BrowserWindowController alloc] initWithContext:[self getCurrentContext] pageGroup:_pageGroup];
+    BrowserWindowController *controller = [[BrowserWindowController alloc] initWithContext:_processContext pageGroup:_pageGroup];
     [[controller window] makeKeyAndOrderFront:sender];
+    [_browserWindows addObject:[controller window]];
     
     [controller loadURLString:defaultURL];
 }
 
-- (WKContextRef)getCurrentContext
+- (void)browserWindowWillClose:(NSWindow *)window
 {
-    return (_currentProcessModel == kProcessModelSharedSecondaryThread) ? _threadContext : _processContext;
-}
-
-- (BOOL)validateMenuItem:(NSMenuItem *)menuItem
-{
-    if ([menuItem action] == @selector(setSharedProcessProcessModel:))
-        [menuItem setState:_currentProcessModel == kProcessModelSharedSecondaryProcess ? NSOnState : NSOffState];
-    else if ([menuItem action] == @selector(setSharedThreadProcessModel:))
-        [menuItem setState:_currentProcessModel == kProcessModelSharedSecondaryThread ? NSOnState : NSOffState];
-    return YES;
-}        
-
-- (void)_setProcessModel:(ProcessModel)processModel
-{
-    if (processModel == _currentProcessModel)
-        return;
- 
-    _currentProcessModel = processModel;
-}
-
-- (IBAction)setSharedProcessProcessModel:(id)sender
-{
-    [self _setProcessModel:kProcessModelSharedSecondaryProcess];
-}
-
-- (IBAction)setSharedThreadProcessModel:(id)sender
-{
-    [self _setProcessModel:kProcessModelSharedSecondaryThread];
-}
-
-- (IBAction)showStatisticsWindow:(id)sender
-{
-    static BrowserStatisticsWindowController* windowController;
-    if (!windowController)
-        windowController = [[BrowserStatisticsWindowController alloc] initWithThreadedWKContextRef:_threadContext
-                                                                               processWKContextRef:_processContext];
-
-    [[windowController window] makeKeyAndOrderFront:self];
+    [_browserWindows removeObject:window];
 }
 
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification
@@ -215,13 +171,11 @@ static void populateVisitedLinks(WKContextRef context, const void *clientInfo)
 
 - (void)applicationWillTerminate:(NSNotification *)notification
 {
-    NSArray* windows = [NSApp windows];
-    for (NSWindow* window in windows) {
+    for (NSWindow* window in _browserWindows) {
         id delegate = [window delegate];
-        if ([delegate isKindOfClass:[BrowserWindowController class]]) {
-            BrowserWindowController *controller = (BrowserWindowController *)delegate;
-            [controller applicationTerminating];
-        }
+        assert([delegate isKindOfClass:[BrowserWindowController class]]);
+        BrowserWindowController *controller = (BrowserWindowController *)delegate;
+        [controller applicationTerminating];
     }
 
     WKRelease(_processContext);
@@ -233,8 +187,10 @@ static void populateVisitedLinks(WKContextRef context, const void *clientInfo)
     NSArray* windows = [NSApp windows];
     for (NSWindow* window in windows) {
         id delegate = [window delegate];
-        if ([delegate isKindOfClass:[BrowserWindowController class]])
-            return (BrowserWindowController *)delegate;
+        assert([delegate isKindOfClass:[BrowserWindowController class]]);
+        BrowserWindowController *controller = (BrowserWindowController *)delegate;
+        assert([_browserWindows containsObject:[controller window]]);
+        return controller;
     }
 
     return 0;
@@ -261,7 +217,7 @@ static void populateVisitedLinks(WKContextRef context, const void *clientInfo)
 
     BrowserWindowController *controller = [self frontmostBrowserWindowController];
     if (!controller) {
-        controller = [[BrowserWindowController alloc] initWithContext:[self getCurrentContext] pageGroup:_pageGroup];
+        controller = [[BrowserWindowController alloc] initWithContext:_processContext pageGroup:_pageGroup];
         [[controller window] makeKeyAndOrderFront:self];
     }
     

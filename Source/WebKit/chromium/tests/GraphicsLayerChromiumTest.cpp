@@ -36,11 +36,10 @@
 #include "Matrix3DTransformOperation.h"
 #include "RotateTransformOperation.h"
 #include "TranslateTransformOperation.h"
-#include "WebCompositor.h"
-
 #include "cc/CCLayerTreeHost.h"
 #include "cc/CCLayerTreeHostImpl.h"
 #include "cc/CCSingleThreadProxy.h"
+#include <public/WebCompositor.h>
 
 #include <gtest/gtest.h>
 #include <public/WebGraphicsContext3D.h>
@@ -71,7 +70,7 @@ public:
         bool success = layerTreeHost->initialize();
         EXPECT_TRUE(success);
         layerTreeHost->setRootLayer(LayerChromium::create());
-        layerTreeHost->setViewportSize(IntSize(1, 1));
+        layerTreeHost->setViewportSize(IntSize(1, 1), IntSize(1, 1));
         return layerTreeHost.release();
     }
 
@@ -95,7 +94,7 @@ public:
         WebCompositor::setAcceleratedAnimationEnabled(true);
         WebCompositor::initialize(0);
         m_graphicsLayer = static_pointer_cast<GraphicsLayerChromium>(GraphicsLayer::create(&m_client));
-        m_platformLayer = static_cast<LayerChromium*>(m_graphicsLayer->platformLayer());
+        m_platformLayer = m_graphicsLayer->platformLayer()->unwrap<LayerChromium>();
         m_layerTreeHost = MockLayerTreeHost::create();
         m_platformLayer->setLayerTreeHost(m_layerTreeHost.get());
     }
@@ -133,7 +132,7 @@ TEST_F(GraphicsLayerChromiumTest, updateLayerPreserves3DWithAnimations)
 
     m_graphicsLayer->setPreserves3D(true);
 
-    m_platformLayer = static_cast<LayerChromium*>(m_graphicsLayer->platformLayer());
+    m_platformLayer = m_graphicsLayer->platformLayer()->unwrap<LayerChromium>();
     ASSERT_TRUE(m_platformLayer);
 
     ASSERT_TRUE(m_platformLayer->hasActiveAnimation());
@@ -142,7 +141,7 @@ TEST_F(GraphicsLayerChromiumTest, updateLayerPreserves3DWithAnimations)
 
     m_graphicsLayer->setPreserves3D(false);
 
-    m_platformLayer = static_cast<LayerChromium*>(m_graphicsLayer->platformLayer());
+    m_platformLayer = m_graphicsLayer->platformLayer()->unwrap<LayerChromium>();
     ASSERT_TRUE(m_platformLayer);
 
     ASSERT_FALSE(m_platformLayer->hasActiveAnimation());

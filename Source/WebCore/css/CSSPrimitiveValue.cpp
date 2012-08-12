@@ -31,6 +31,7 @@
 #include "Color.h"
 #include "Counter.h"
 #include "ExceptionCode.h"
+#include "MemoryInstrumentation.h"
 #include "Node.h"
 #include "Pair.h"
 #include "RGBColor.h"
@@ -43,7 +44,7 @@
 #include <wtf/text/StringBuffer.h>
 #include <wtf/text/StringBuilder.h>
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
 #include "DashboardRegion.h"
 #endif
 
@@ -330,7 +331,7 @@ void CSSPrimitiveValue::init(PassRefPtr<Quad> quad)
     m_value.quad = quad.leakRef();
 }
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
 void CSSPrimitiveValue::init(PassRefPtr<DashboardRegion> r)
 {
     m_primitiveUnitType = CSS_DASHBOARD_REGION;
@@ -827,15 +828,24 @@ Pair* CSSPrimitiveValue::getPairValue(ExceptionCode& ec) const
     return m_value.pair;
 }
 
-static String formatNumber(double number)
+static String formatNumber(double number, const char* suffix, unsigned suffixLength)
 {
     DecimalNumber decimal(number);
 
-    StringBuffer<UChar> buffer(decimal.bufferLengthForStringDecimal());
+    StringBuffer<LChar> buffer(decimal.bufferLengthForStringDecimal() + suffixLength);
     unsigned length = decimal.toStringDecimal(buffer.characters(), buffer.length());
-    ASSERT_UNUSED(length, length == buffer.length());
+    ASSERT(length + suffixLength == buffer.length());
+
+    for (unsigned i = 0; i < suffixLength; ++i)
+        buffer[length + i] = static_cast<LChar>(suffix[i]);
 
     return String::adopt(buffer);
+}
+
+template <unsigned characterCount>
+ALWAYS_INLINE static String formatNumber(double number, const char (&characters)[characterCount])
+{
+    return formatNumber(number, characters, characterCount - 1);
 }
 
 String CSSPrimitiveValue::customCssText() const
@@ -855,72 +865,72 @@ String CSSPrimitiveValue::customCssText() const
             break;
         case CSS_NUMBER:
         case CSS_PARSER_INTEGER:
-            text = formatNumber(m_value.num);
+            text = formatNumber(m_value.num, "");
             break;
         case CSS_PERCENTAGE:
-            text = formatNumber(m_value.num) + "%";
+            text = formatNumber(m_value.num, "%");
             break;
         case CSS_EMS:
-            text = formatNumber(m_value.num) + "em";
+            text = formatNumber(m_value.num, "em");
             break;
         case CSS_EXS:
-            text = formatNumber(m_value.num) + "ex";
+            text = formatNumber(m_value.num, "ex");
             break;
         case CSS_REMS:
-            text = formatNumber(m_value.num) + "rem";
+            text = formatNumber(m_value.num, "rem");
             break;
         case CSS_PX:
-            text = formatNumber(m_value.num) + "px";
+            text = formatNumber(m_value.num, "px");
             break;
         case CSS_CM:
-            text = formatNumber(m_value.num) + "cm";
+            text = formatNumber(m_value.num, "cm");
             break;
 #if ENABLE(CSS_IMAGE_RESOLUTION)
         case CSS_DPPX:
-            text = formatNumber(m_value.num) + "dppx";
+            text = formatNumber(m_value.num, "dppx");
             break;
         case CSS_DPI:
-            text = formatNumber(m_value.num) + "dpi";
+            text = formatNumber(m_value.num, "dpi");
             break;
         case CSS_DPCM:
-            text = formatNumber(m_value.num) + "dpcm";
+            text = formatNumber(m_value.num, "dpcm");
             break;
 #endif
         case CSS_MM:
-            text = formatNumber(m_value.num) + "mm";
+            text = formatNumber(m_value.num, "mm");
             break;
         case CSS_IN:
-            text = formatNumber(m_value.num) + "in";
+            text = formatNumber(m_value.num, "in");
             break;
         case CSS_PT:
-            text = formatNumber(m_value.num) + "pt";
+            text = formatNumber(m_value.num, "pt");
             break;
         case CSS_PC:
-            text = formatNumber(m_value.num) + "pc";
+            text = formatNumber(m_value.num, "pc");
             break;
         case CSS_DEG:
-            text = formatNumber(m_value.num) + "deg";
+            text = formatNumber(m_value.num, "deg");
             break;
         case CSS_RAD:
-            text = formatNumber(m_value.num) + "rad";
+            text = formatNumber(m_value.num, "rad");
             break;
         case CSS_GRAD:
-            text = formatNumber(m_value.num) + "grad";
+            text = formatNumber(m_value.num, "grad");
             break;
         case CSS_MS:
-            text = formatNumber(m_value.num) + "ms";
+            text = formatNumber(m_value.num, "ms");
             break;
         case CSS_S:
-            text = formatNumber(m_value.num) + "s";
+            text = formatNumber(m_value.num, "s");
             break;
         case CSS_HZ:
-            text = formatNumber(m_value.num) + "hz";
+            text = formatNumber(m_value.num, "hz");
             break;
         case CSS_KHZ:
-            text = formatNumber(m_value.num) + "khz";
+            text = formatNumber(m_value.num, "khz");
             break;
         case CSS_TURN:
-            text = formatNumber(m_value.num) + "turn";
+            text = formatNumber(m_value.num, "turn");
             break;
         case CSS_DIMENSION:
             // FIXME
@@ -1060,12 +1070,18 @@ String CSSPrimitiveValue::customCssText() const
                 text += m_value.pair->second()->cssText();
             }
             break;
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
         case CSS_DASHBOARD_REGION:
             for (DashboardRegion* region = getDashboardRegionValue(); region; region = region->m_next.get()) {
                 if (!text.isEmpty())
                     text.append(' ');
+#if ENABLE(DASHBOARD_SUPPORT) && ENABLE(WIDGET_REGION)
+                text += region->m_cssFunctionName;
+#elif ENABLE(DASHBOARD_SUPPORT)
                 text += "dashboard-region(";
+#else
+                text += "region(";
+#endif
                 text += region->m_label;
                 if (region->m_isCircle)
                     text += " circle";
@@ -1106,13 +1122,13 @@ String CSSPrimitiveValue::customCssText() const
             text = m_value.shape->cssText();
             break;
         case CSS_VW:
-            text = formatNumber(m_value.num) + "vw";
+            text = formatNumber(m_value.num, "vw");
             break;
         case CSS_VH:
-            text = formatNumber(m_value.num) + "vh";
+            text = formatNumber(m_value.num, "vh");
             break;
         case CSS_VMIN:
-            text = formatNumber(m_value.num) + "vmin";
+            text = formatNumber(m_value.num, "vmin");
             break;
 #if ENABLE(CSS_VARIABLES)
         case CSS_VARIABLE_NAME:
@@ -1188,7 +1204,7 @@ PassRefPtr<CSSPrimitiveValue> CSSPrimitiveValue::cloneForCSSOM() const
         // Pair is not exposed to the CSSOM, no need for a deep clone.
         result = CSSPrimitiveValue::create(m_value.pair);
         break;
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
     case CSS_DASHBOARD_REGION:
         // DashboardRegion is not exposed to the CSSOM, no need for a deep clone.
         result = CSSPrimitiveValue::create(m_value.region);
@@ -1250,6 +1266,50 @@ PassRefPtr<CSSPrimitiveValue> CSSPrimitiveValue::cloneForCSSOM() const
         result->setCSSOMSafe();
 
     return result;
+}
+
+void CSSPrimitiveValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    switch (m_primitiveUnitType) {
+    case CSS_ATTR:
+    case CSS_COUNTER_NAME:
+    case CSS_PARSER_IDENTIFIER:
+    case CSS_PARSER_HEXCOLOR:
+    case CSS_STRING:
+    case CSS_URI:
+#if ENABLE(CSS_VARIABLES)
+    case CSS_VARIABLE_NAME:
+#endif
+        // FIXME: detect other cases when m_value is StringImpl*
+        info.addMember(m_value.string);
+        break;
+    case CSS_COUNTER:
+        info.addMember(m_value.counter);
+        break;
+    case CSS_RECT:
+        info.addMember(m_value.rect);
+        break;
+    case CSS_QUAD:
+        info.addMember(m_value.quad);
+        break;
+    case CSS_PAIR:
+        info.addMember(m_value.pair);
+        break;
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
+    case CSS_DASHBOARD_REGION:
+        info.addMember(m_value.region);
+        break;
+#endif
+    case CSS_SHAPE:
+        info.addMember(m_value.shape);
+        break;
+    case CSS_CALC:
+        info.addMember(m_value.calc);
+        break;
+    default:
+        break;
+    }
 }
 
 } // namespace WebCore

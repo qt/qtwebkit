@@ -238,20 +238,10 @@ private:
 // with the appropriate signal of 'sender'. When execute() is called, it will call JS 'receiverFunction'.
 class QtConnectionObject : public QObject
 {
-#if HAVE(QT5)
     Q_OBJECT_FAKE
-#endif
 public:
     QtConnectionObject(JSContextRef, PassRefPtr<QtInstance> senderInstance, int signalIndex, JSObjectRef receiver, JSObjectRef receiverFunction);
     ~QtConnectionObject();
-
-#if !HAVE(QT5)
-    // Explicitly define these because want a custom qt_metacall(), so we can't use Q_OBJECT macro.
-    static const QMetaObject staticMetaObject;
-    virtual const QMetaObject *metaObject() const;
-    virtual void *qt_metacast(const char *);
-    virtual int qt_metacall(QMetaObject::Call, int, void **argv);
-#endif
 
     void execute(void **argv);
 
@@ -280,6 +270,8 @@ void registerCustomType(int qtMetaTypeId, ConvertToVariantFunction, ConvertToJSV
 
 QVariant convertValueToQVariant(ExecState* exec, JSValue value, QMetaType::Type hint, int *distance);
 JSValue convertQVariantToValue(ExecState* exec, PassRefPtr<RootObject> root, const QVariant& variant);
+
+void setException(JSContextRef, JSValueRef* exception, const QString& text);
 
 } // namespace Bindings
 } // namespace JSC

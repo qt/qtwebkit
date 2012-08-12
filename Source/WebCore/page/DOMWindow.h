@@ -111,7 +111,7 @@ namespace WebCore {
         static bool dispatchAllPendingBeforeUnloadEvents();
         static void dispatchAllPendingUnloadEvents();
 
-        static void adjustWindowRect(const FloatRect& screen, FloatRect& window, const FloatRect& pendingChanges);
+        void adjustWindowRect(const FloatRect& screen, FloatRect& window, const FloatRect& pendingChanges) const;
 
         // FIXME: We can remove this function once V8 showModalDialog is changed to use DOMWindow.
         static void parseModalDialogFeatures(const String&, HashMap<String, String>&);
@@ -353,6 +353,10 @@ namespace WebCore {
         DEFINE_ATTRIBUTE_EVENT_LISTENER(deviceorientation);
 #endif
 
+#if ENABLE(PROXIMITY_EVENTS)
+        DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitdeviceproximity);
+#endif
+
         // HTML 5 key/value storage
         Storage* sessionStorage(ExceptionCode&) const;
         Storage* localStorage(ExceptionCode&) const;
@@ -447,10 +451,6 @@ namespace WebCore {
 
 #if ENABLE(WEB_TIMING)
         mutable RefPtr<Performance> m_performance;
-#endif
-
-#if ENABLE(BLOB)
-        mutable RefPtr<DOMURL> m_domURL;
 #endif
     };
 

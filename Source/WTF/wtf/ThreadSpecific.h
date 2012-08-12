@@ -106,26 +106,26 @@ private:
 
 typedef pthread_key_t ThreadSpecificKey;
 
-inline void ThreadSpecificKeyCreate(ThreadSpecificKey* key, void (*destructor)(void *))
+inline void threadSpecificKeyCreate(ThreadSpecificKey* key, void (*destructor)(void *))
 {
     int error = pthread_key_create(key, destructor);
     if (error)
         CRASH();
 }
 
-inline void ThreadSpecificKeyDelete(ThreadSpecificKey key)
+inline void threadSpecificKeyDelete(ThreadSpecificKey key)
 {
     int error = pthread_key_delete(key);
     if (error)
         CRASH();
 }
 
-inline void ThreadSpecificSet(ThreadSpecificKey key, void* value)
+inline void threadSpecificSet(ThreadSpecificKey key, void* value)
 {
     pthread_setspecific(key, value);
 }
 
-inline void* ThreadSpecificGet(ThreadSpecificKey key)
+inline void* threadSpecificGet(ThreadSpecificKey key)
 {
     return pthread_getspecific(key);
 }
@@ -167,13 +167,13 @@ const int kMaxTlsKeySize = 256;
 WTF_EXPORT_PRIVATE long& tlsKeyCount();
 WTF_EXPORT_PRIVATE DWORD* tlsKeys();
 
-class ThreadSpecificKeyValue;
-typedef ThreadSpecificKeyValue* ThreadSpecificKey;
+class PlatformThreadSpecificKey;
+typedef PlatformThreadSpecificKey* ThreadSpecificKey;
 
-void ThreadSpecificKeyCreate(ThreadSpecificKey*, void (*)(void *));
-void ThreadSpecificKeyDelete(ThreadSpecificKey);
-void ThreadSpecificSet(ThreadSpecificKey, void*);
-void* ThreadSpecificGet(ThreadSpecificKey);
+void threadSpecificKeyCreate(ThreadSpecificKey*, void (*)(void *));
+void threadSpecificKeyDelete(ThreadSpecificKey);
+void threadSpecificSet(ThreadSpecificKey, void*);
+void* threadSpecificGet(ThreadSpecificKey);
 
 template<typename T>
 inline ThreadSpecific<T>::ThreadSpecific()

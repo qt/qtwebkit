@@ -38,8 +38,9 @@
 
 namespace WebCore {
 
-SourceBuffer::SourceBuffer(const String& id)
+SourceBuffer::SourceBuffer(const String& id, PassRefPtr<MediaSource> source)
     : m_id(id)
+    , m_source(source)
 {
 }
 
@@ -47,20 +48,34 @@ SourceBuffer::~SourceBuffer()
 {
 }
 
-PassRefPtr<TimeRanges> SourceBuffer::buffered(ExceptionCode&) const
+PassRefPtr<TimeRanges> SourceBuffer::buffered(ExceptionCode& ec) const
 {
-    // FIXME(91773): return buffered data from media source.
-    return 0;
+    if (!m_source) {
+        ec = INVALID_STATE_ERR;
+        return 0;
+    }
+
+    return m_source->buffered(id(), ec);
 }
 
-void SourceBuffer::append(PassRefPtr<Uint8Array>, ExceptionCode&)
+void SourceBuffer::append(PassRefPtr<Uint8Array> data, ExceptionCode& ec)
 {
-    // FIXME(91773): append the data to the media source.
+    if (!m_source) {
+        ec = INVALID_STATE_ERR;
+        return;
+    }
+
+    m_source->append(id(), data, ec);
 }
 
-void SourceBuffer::abort(ExceptionCode&)
+void SourceBuffer::abort(ExceptionCode& ec)
 {
-    // FIXME(91773): signal the media source to abort this source buffer.
+    if (!m_source) {
+        ec = INVALID_STATE_ERR;
+        return;
+    }
+
+    m_source->abort(id(), ec);
 }
 
 } // namespace WebCore

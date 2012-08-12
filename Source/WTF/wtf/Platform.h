@@ -517,7 +517,7 @@
 #define WTF_USE_QT4_UNICODE 1
 #endif
 #elif OS(WINCE)
-#define WTF_USE_WINCE_UNICODE 1
+#define WTF_USE_WCHAR_UNICODE 1
 #elif PLATFORM(GTK)
 /* The GTK+ Unicode backend is configurable */
 #else
@@ -532,6 +532,7 @@
 #define ENABLE_GESTURE_EVENTS 1
 #define ENABLE_RUBBER_BANDING 1
 #define WTF_USE_SCROLLBAR_PAINTER 1
+#define HAVE_XPC 1
 #endif
 #if !defined(ENABLE_JAVA_BRIDGE)
 #define ENABLE_JAVA_BRIDGE 1
@@ -1017,7 +1018,7 @@
 
 /* Compositing on the UI-process in WebKit2 */
 #if PLATFORM(QT)
-#define WTF_USE_UI_SIDE_COMPOSITING 1
+#define WTF_USE_COORDINATED_GRAPHICS 1
 #endif
 
 #if PLATFORM(MAC) || PLATFORM(IOS)

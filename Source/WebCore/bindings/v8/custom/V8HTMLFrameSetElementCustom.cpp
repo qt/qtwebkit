@@ -49,7 +49,7 @@ v8::Handle<v8::Value> V8HTMLFrameSetElement::namedPropertyGetter(v8::Local<v8::S
 {
     INC_STATS("DOM.HTMLFrameSetElement.NamedPropertyGetter");
     HTMLFrameSetElement* imp = V8HTMLFrameSetElement::toNative(info.Holder());
-    Node* frameNode = imp->children()->namedItem(v8StringToAtomicWebCoreString(name));
+    Node* frameNode = imp->children()->namedItem(v8ValueToAtomicWebCoreString(name));
     if (frameNode && frameNode->hasTagName(HTMLNames::frameTag)) {
         Document* doc = static_cast<HTMLFrameElement*>(frameNode)->contentDocument();
         if (!doc)
@@ -57,7 +57,7 @@ v8::Handle<v8::Value> V8HTMLFrameSetElement::namedPropertyGetter(v8::Local<v8::S
         if (Frame* frame = doc->frame())
             return toV8(frame->domWindow(), info.GetIsolate());
     }
-    return v8::Handle<v8::Value>();
+    return v8Undefined();
 }
 
 } // namespace WebCore

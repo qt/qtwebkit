@@ -219,6 +219,10 @@ layer at (0,0) size 800x34
 
     tests.add('websocket/tests/passes/text.html')
 
+    # For testing test are properly included from platform directories.
+    tests.add('platform/test-mac-leopard/http/test.html')
+    tests.add('platform/test-win-win7/http/test.html')
+
     # For --no-http tests, test that platform specific HTTP tests are properly skipped.
     tests.add('platform/test-snow-leopard/http/test.html')
     tests.add('platform/test-snow-leopard/websocket/test.html')
@@ -402,8 +406,8 @@ class TestPort(Port):
     def diff_image(self, expected_contents, actual_contents, tolerance=None):
         diffed = actual_contents != expected_contents
         if diffed:
-            return ["< %s\n---\n> %s\n" % (expected_contents, actual_contents), 1]
-        return (None, 0)
+            return ("< %s\n---\n> %s\n" % (expected_contents, actual_contents), 1, None)
+        return (None, 0, None)
 
     def layout_tests_dir(self):
         return LAYOUT_TEST_DIR
@@ -512,10 +516,6 @@ class TestPort(Port):
             VirtualTestSuite('virtual/passes', 'passes', ['--virtual-arg']),
             VirtualTestSuite('virtual/skipped', 'failures/expected', ['--virtual-arg2']),
         ]
-
-    def supports_switching_pixel_tests_per_test(self):
-        # Let it true so we can test the --pixel-test-directory option.
-        return True
 
 
 class TestDriver(Driver):

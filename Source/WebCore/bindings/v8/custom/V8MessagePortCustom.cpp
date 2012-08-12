@@ -48,7 +48,7 @@ static v8::Handle<v8::Value> handlePostMessageCallback(const v8::Arguments& args
     MessagePortArray portArray;
     ArrayBufferArray arrayBufferArray;
     if (args.Length() > 1) {
-        if (!extractTransferables(args[1], portArray, arrayBufferArray))
+        if (!extractTransferables(args[1], portArray, arrayBufferArray, args.GetIsolate()))
             return v8::Undefined();
     }
     bool didThrow = false;
@@ -62,7 +62,7 @@ static v8::Handle<v8::Value> handlePostMessageCallback(const v8::Arguments& args
         return v8::Undefined();
     ExceptionCode ec = 0;
     messagePort->postMessage(message.release(), &portArray, ec);
-    return throwError(ec, args.GetIsolate());
+    return V8Proxy::setDOMException(ec, args.GetIsolate());
 }
 
 v8::Handle<v8::Value> V8MessagePort::postMessageCallback(const v8::Arguments& args)

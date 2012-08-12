@@ -77,6 +77,7 @@ InternalSettings::Backup::Backup(Page* page, Settings* settings)
     , m_originalCSSExclusionsEnabled(RuntimeEnabledFeatures::cssExclusionsEnabled())
 #if ENABLE(SHADOW_DOM)
     , m_originalShadowDOMEnabled(RuntimeEnabledFeatures::shadowDOMEnabled())
+    , m_originalAuthorShadowDOMForAnyElementEnabled(RuntimeEnabledFeatures::authorShadowDOMForAnyElementEnabled())
 #endif
     , m_originalEditingBehavior(settings->editingBehaviorType())
     , m_originalFixedPositionCreatesStackingContext(settings->fixedPositionCreatesStackingContext())
@@ -90,6 +91,7 @@ InternalSettings::Backup::Backup(Page* page, Settings* settings)
 #if ENABLE(TEXT_AUTOSIZING)
     , m_originalTextAutosizingEnabled(settings->textAutosizingEnabled())
     , m_originalTextAutosizingWindowSizeOverride(settings->textAutosizingWindowSizeOverride())
+    , m_originalTextAutosizingFontScaleFactor(settings->textAutosizingFontScaleFactor())
 #endif
 #if ENABLE(DIALOG_ELEMENT)
     , m_originalDialogElementEnabled(RuntimeEnabledFeatures::dialogElementEnabled())
@@ -105,6 +107,7 @@ void InternalSettings::Backup::restoreTo(Page* page, Settings* settings)
     RuntimeEnabledFeatures::setCSSExclusionsEnabled(m_originalCSSExclusionsEnabled);
 #if ENABLE(SHADOW_DOM)
     RuntimeEnabledFeatures::setShadowDOMEnabled(m_originalShadowDOMEnabled);
+    RuntimeEnabledFeatures::setAuthorShadowDOMForAnyElementEnabled(m_originalAuthorShadowDOMForAnyElementEnabled);
 #endif
     settings->setEditingBehaviorType(m_originalEditingBehavior);
     settings->setFixedPositionCreatesStackingContext(m_originalFixedPositionCreatesStackingContext);
@@ -119,6 +122,7 @@ void InternalSettings::Backup::restoreTo(Page* page, Settings* settings)
 #if ENABLE(TEXT_AUTOSIZING)
     settings->setTextAutosizingEnabled(m_originalTextAutosizingEnabled);
     settings->setTextAutosizingWindowSizeOverride(m_originalTextAutosizingWindowSizeOverride);
+    settings->setTextAutosizingFontScaleFactor(m_originalTextAutosizingFontScaleFactor);
 #endif
 #if ENABLE(DIALOG_ELEMENT)
     RuntimeEnabledFeatures::setDialogElementEnabled(m_originalDialogElementEnabled);
@@ -273,6 +277,15 @@ void InternalSettings::setShadowDOMEnabled(bool enabled, ExceptionCode& ec)
 #endif
 }
 
+void InternalSettings::setAuthorShadowDOMForAnyElementEnabled(bool isEnabled)
+{
+#if ENABLE(SHADOW_DOM)
+    RuntimeEnabledFeatures::setAuthorShadowDOMForAnyElementEnabled(isEnabled);
+#else
+    UNUSED_PARAM(isEnabled);
+#endif
+}
+
 void InternalSettings::setTouchEventEmulationEnabled(bool enabled, ExceptionCode& ec)
 {
 #if ENABLE(TOUCH_EVENTS)
@@ -365,6 +378,17 @@ void InternalSettings::setTextAutosizingWindowSizeOverride(int width, int height
 #else
     UNUSED_PARAM(width);
     UNUSED_PARAM(height);
+    UNUSED_PARAM(ec);
+#endif
+}
+
+void InternalSettings::setTextAutosizingFontScaleFactor(float fontScaleFactor, ExceptionCode& ec)
+{
+#if ENABLE(TEXT_AUTOSIZING)
+    InternalSettingsGuardForSettings();
+    settings()->setTextAutosizingFontScaleFactor(fontScaleFactor);
+#else
+    UNUSED_PARAM(fontScaleFactor);
     UNUSED_PARAM(ec);
 #endif
 }
@@ -594,6 +618,12 @@ void InternalSettings::setMemoryInfoEnabled(bool enabled, ExceptionCode& ec)
 {
     InternalSettingsGuardForSettings();
     settings()->setMemoryInfoEnabled(enabled);
+}
+
+void InternalSettings::setThirdPartyStorageBlockingEnabled(bool enabled, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setThirdPartyStorageBlockingEnabled(enabled);
 }
 
 }
