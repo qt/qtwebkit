@@ -100,7 +100,7 @@ v8::Local<v8::Value> V8LazyEventListener::callListenerFunction(ScriptExecutionCo
     if (!frame->script()->canExecuteScripts(AboutToExecuteScript))
         return v8::Local<v8::Value>();
 
-    return frame->script()->proxy()->callFunction(handlerFunction, receiver, 1, parameters);
+    return frame->script()->callFunction(handlerFunction, receiver, 1, parameters);
 }
 
 static v8::Handle<v8::Value> V8LazyEventListenerToString(const v8::Arguments& args)
@@ -124,7 +124,7 @@ void V8LazyEventListener::prepareListenerObject(ScriptExecutionContext* context)
     if (!frame->script()->canExecuteScripts(NotAboutToExecuteScript))
         return;
     // Use the outer scope to hold context.
-    v8::Local<v8::Context> v8Context = worldContext().adjustedContext(frame->script()->proxy());
+    v8::Local<v8::Context> v8Context = worldContext().adjustedContext(frame->script());
     // Bail out if we cannot get the context.
     if (v8Context.IsEmpty())
         return;

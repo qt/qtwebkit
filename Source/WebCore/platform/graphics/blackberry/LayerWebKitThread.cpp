@@ -76,11 +76,6 @@ LayerWebKitThread::LayerWebKitThread(LayerType type, GraphicsLayerBlackBerry* ow
 
 LayerWebKitThread::~LayerWebKitThread()
 {
-    m_layerCompositingThread->clearAnimations();
-
-    if (m_frontBufferLock)
-        pthread_mutex_destroy(m_frontBufferLock);
-
     if (m_tiler)
         m_tiler->layerWebKitThreadDestroyed();
 
@@ -115,7 +110,14 @@ SkBitmap LayerWebKitThread::paintContents(const IntRect& contentsRect, double sc
     if (drawsContent()) { // Layer contents must be drawn into a canvas.
         IntRect untransformedContentsRect = contentsRect;
 
-        canvas = adoptPtr(new InstrumentedPlatformCanvas(contentsRect.width(), contentsRect.height()));
+        SkBitmap canvasBitmap;
+        canvasBitmap.setConfig(SkBitmap::kARGB_8888_Config, contentsRect.width(), contentsRect.height());
+        if (!canvasBitmap.allocPixels())
+            return SkBitmap();
+        canvasBitmap.setIsOpaque(false);
+        canvasBitmap.eraseColor(0);
+
+        canvas = adoptPtr(new InstrumentedPlatformCanvas(canvasBitmap));
         PlatformContextSkia skiaContext(canvas.get());
 
         GraphicsContext graphicsContext(&skiaContext);
@@ -164,18 +166,16 @@ bool LayerWebKitThread::contentsVisible(const IntRect& contentsRect) const
     return m_owner->contentsVisible(contentsRect);
 }
 
-void LayerWebKitThread::createFrontBufferLock()
-{
-    pthread_mutexattr_t mutexAttributes;
-    pthread_mutexattr_init(&mutexAttributes);
-    m_frontBufferLock = new pthread_mutex_t;
-    pthread_mutex_init(m_frontBufferLock, &mutexAttributes);
-}
-
 void LayerWebKitThread::updateTextureContentsIfNeeded()
 {
     if (m_tiler)
         m_tiler->updateTextureContentsIfNeeded(m_isMask ? 1.0 : contentsScale());
+}
+
+void LayerWebKitThread::commitPendingTextureUploads()
+{
+    if (m_tiler)
+        m_tiler->commitPendingTextureUploads();
 }
 
 void LayerWebKitThread::setContents(Image* contents)
@@ -199,7 +199,7 @@ void LayerWebKitThread::setDrawable(bool isDrawable)
 
     m_isDrawable = isDrawable;
 
-    setNeedsTexture(m_isDrawable && (drawsContent() || contents() || pluginView() || mediaPlayer() || m_texID));
+    setNeedsTexture(m_isDrawable && (drawsContent() || contents() || pluginView() || mediaPlayer()));
     setNeedsCommit();
 }
 
@@ -304,8 +304,7 @@ void LayerWebKitThread::commitOnCompositingThread()
     }
     m_position = oldPosition;
     updateLayerHierarchy();
-    if (m_tiler)
-        m_tiler->commitPendingTextureUploads();
+    commitPendingTextureUploads();
 
     size_t listSize = m_sublayers.size();
     for (size_t i = 0; i < listSize; i++)
@@ -516,6 +515,21 @@ void LayerWebKitThread::setSuspendedAnimations(const Vector<RefPtr<LayerAnimatio
     m_suspendedAnimations = animations;
     m_animationsChanged = true;
     setNeedsCommit();
+}
+
+void LayerWebKitThread::releaseLayerResources()
+{
+    deleteTextures();
+
+    size_t listSize = m_sublayers.size();
+    for (size_t i = 0; i < listSize; i++)
+        m_sublayers[i]->releaseLayerResources();
+
+    if (maskLayer())
+        maskLayer()->releaseLayerResources();
+
+    if (replicaLayer())
+        replicaLayer()->releaseLayerResources();
 }
 
 }

@@ -97,7 +97,7 @@ void ProcessingInstruction::setNodeValue(const String& nodeValue, ExceptionCode&
     setData(nodeValue, ec);
 }
 
-PassRefPtr<Node> ProcessingInstruction::cloneNode(bool /*deep*/)
+PassRefPtr<Node> ProcessingInstruction::cloneNode(bool /*deep*/, ExceptionCode&)
 {
     // FIXME: Is it a problem that this does not copy m_localHref?
     // What about other data members?
@@ -214,7 +214,7 @@ void ProcessingInstruction::setCSSStyleSheet(const String& href, const KURL& bas
     ASSERT(m_isCSS);
     CSSParserContext parserContext(document(), baseURL, charset);
 
-    RefPtr<StyleSheetContents> newSheet = StyleSheetContents::create(href, baseURL, parserContext);
+    RefPtr<StyleSheetContents> newSheet = StyleSheetContents::create(href, parserContext);
 
     RefPtr<CSSStyleSheet> cssSheet = CSSStyleSheet::create(newSheet, this);
     cssSheet->setDisabled(m_alternate);

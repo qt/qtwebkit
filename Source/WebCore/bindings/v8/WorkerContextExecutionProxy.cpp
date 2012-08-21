@@ -37,7 +37,6 @@
 
 #include "DedicatedWorkerContext.h"
 #include "Event.h"
-#include "SafeAllocation.h"
 #include "ScriptCallStack.h"
 #include "SharedWorker.h"
 #include "SharedWorkerContext.h"
@@ -45,6 +44,7 @@
 #include "V8DOMMap.h"
 #include "V8DOMWindowShell.h"
 #include "V8DedicatedWorkerContext.h"
+#include "V8ObjectConstructor.h"
 #include "V8PerContextData.h"
 #include "V8Proxy.h"
 #include "V8RecursionScope.h"
@@ -173,7 +173,7 @@ bool WorkerContextExecutionProxy::initContextIfNeeded()
         contextType = &V8SharedWorkerContext::info;
 #endif
     v8::Handle<v8::Function> workerContextConstructor = m_perContextData->constructorForType(contextType);
-    v8::Local<v8::Object> jsWorkerContext = SafeAllocation::newInstance(workerContextConstructor);
+    v8::Local<v8::Object> jsWorkerContext = V8ObjectConstructor::newInstance(workerContextConstructor);
     // Bail out if allocation failed.
     if (jsWorkerContext.IsEmpty()) {
         dispose();
@@ -228,7 +228,7 @@ ScriptValue WorkerContextExecutionProxy::evaluate(const String& script, const St
         state->lineNumber = message->GetLineNumber();
         state->sourceURL = toWebCoreString(message->GetScriptResourceName());
         if (m_workerContext->sanitizeScriptError(state->errorMessage, state->lineNumber, state->sourceURL))
-            state->exception = V8Proxy::throwError(V8Proxy::GeneralError, state->errorMessage.utf8().data());
+            state->exception = throwError(GeneralError, state->errorMessage.utf8().data());
         else
             state->exception = ScriptValue(exceptionCatcher.Exception());
 
@@ -253,7 +253,7 @@ v8::Local<v8::Value> WorkerContextExecutionProxy::runScript(v8::Handle<v8::Scrip
         script = V8Proxy::compileScript(code, "", TextPosition::minimumPosition());
     }
 
-    if (V8Proxy::handleOutOfMemory())
+    if (handleOutOfMemory())
         ASSERT(script.IsEmpty());
 
     if (script.IsEmpty())

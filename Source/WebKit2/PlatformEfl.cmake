@@ -5,7 +5,6 @@ LIST(APPEND WebKit2_LINK_FLAGS
     ${EFLDEPS_LDFLAGS}
     ${EFREET_LDFLAGS}
     ${EVAS_LDFLAGS}
-    ${LIBSOUP24_LDFLAGS}
 )
 
 LIST(APPEND WebKit2_SOURCES
@@ -142,8 +141,8 @@ LIST(APPEND WebKit2_INCLUDE_DIRECTORIES
     ${LIBXML2_INCLUDE_DIR}
     ${LIBXSLT_INCLUDE_DIRS}
     ${SQLITE_INCLUDE_DIRS}
-    ${Glib_INCLUDE_DIRS}
-    ${LIBSOUP24_INCLUDE_DIRS}
+    ${GLIB_INCLUDE_DIRS}
+    ${LIBSOUP_INCLUDE_DIRS}
     ${WTF_DIR}
 )
 
@@ -160,8 +159,10 @@ LIST(APPEND WebKit2_LIBRARIES
     ${PNG_LIBRARY}
     ${JPEG_LIBRARY}
     ${CMAKE_DL_LIBS}
-    ${Glib_LIBRARIES}
-    ${LIBSOUP24_LIBRARIES}
+    ${GLIB_LIBRARIES}
+    ${GLIB_GIO_LIBRARIES}
+    ${GLIB_GOBJECT_LIBRARIES}
+    ${LIBSOUP_LIBRARIES}
 )
 
 LIST (APPEND WebProcess_SOURCES
@@ -227,14 +228,17 @@ SET(EWK2UnitTests_LIBRARIES
     ${ECORE_LIBRARIES}
     ${ECORE_EVAS_LIBRARIES}
     ${EVAS_LIBRARIES}
-    ${LIBSOUP24_LIBRARIES}
+    ${GLIB_LIBRARIES}
+    ${GLIB_GIO_LIBRARIES}
+    ${GLIB_GOBJECT_LIBRARIES}
+    ${LIBSOUP_LIBRARIES}
     gtest
 )
 
 IF (ENABLE_GLIB_SUPPORT)
     LIST(APPEND EWK2UnitTests_LIBRARIES
-        ${Glib_LIBRARIES}
-        ${Gthread_LIBRARIES}
+        ${GLIB_LIBRARIES}
+        ${GLIB_GTHREAD_LIBRARIES}
     )
 ENDIF()
 
@@ -261,9 +265,12 @@ TARGET_LINK_LIBRARIES(ewk2UnitTestUtils ${EWK2UnitTests_LIBRARIES})
 # The "ewk" on the test name needs to be suffixed with "2", otherwise it
 # will clash with tests from the WebKit 1 test suite.
 SET(EWK2UnitTests_BINARIES
+    test_ewk2_back_forward_list
     test_ewk2_context
     test_ewk2_cookie_manager
     test_ewk2_download_job
+    test_ewk2_eina_shared_string
+    test_ewk2_intents
     test_ewk2_view
 )
 

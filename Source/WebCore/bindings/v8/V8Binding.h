@@ -32,19 +32,17 @@
 #define V8Binding_h
 
 #include "BindingSecurity.h"
-#include "DOMDataStore.h"
 #include "Document.h"
-#include "PlatformString.h"
-#include "V8BindingHelpers.h"
 #include "V8BindingMacros.h"
 #include "V8DOMConfiguration.h"
+#include "V8DOMWindowShell.h"
 #include "V8DOMWrapper.h"
-#include "V8GCController.h"
 #include "V8HiddenPropertyName.h"
+#include "V8ObjectConstructor.h"
 #include "V8PerIsolateData.h"
 #include "V8Proxy.h"
+#include "V8ThrowException.h"
 #include "V8ValueCache.h"
-#include <wtf/MathExtras.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/text/AtomicString.h>
 #include <v8.h>
@@ -52,57 +50,22 @@
 namespace WebCore {
 
     class DOMStringList;
-    class EventListener;
-    class EventTarget;
-    class ExternalStringVisitor;
-    class MemoryObjectInfo;
-    class ScriptGCEventListener;
 
-    class GCEventData {
-    public:
-        typedef Vector<ScriptGCEventListener*> GCEventListeners;
+    // Schedule a DOM exception to be thrown, if the exception code is different
+    // from zero.
+    v8::Handle<v8::Value> setDOMException(int, v8::Isolate*);
 
-        GCEventData() : startTime(0.0), usedHeapSize(0) { }
-        void clear()
-        {
-            startTime = 0.0;
-            usedHeapSize = 0;
-        }
-        GCEventListeners& listeners() { return m_listeners; }
+    // Schedule a JavaScript error to be thrown.
+    v8::Handle<v8::Value> throwError(ErrorType, const char*, v8::Isolate* = 0);
 
-        // FIXME: Make these members private.
-        double startTime;
-        size_t usedHeapSize;
+    // Schedule a JavaScript error to be thrown.
+    v8::Handle<v8::Value> throwError(v8::Local<v8::Value>, v8::Isolate* = 0);
 
-    private:
-        GCEventListeners m_listeners;
-    };
+    // A helper for throwing JavaScript TypeError.
+    v8::Handle<v8::Value> throwTypeError(const char* = 0, v8::Isolate* = 0);
 
-    class ConstructorMode {
-    public:
-        enum Mode {
-            WrapExistingObject,
-            CreateNewObject
-        };
-
-        ConstructorMode()
-        {
-            V8PerIsolateData* data = V8PerIsolateData::current();
-            m_previous = data->m_constructorMode;
-            data->m_constructorMode = WrapExistingObject;
-        }
-
-        ~ConstructorMode()
-        {
-            V8PerIsolateData* data = V8PerIsolateData::current();
-            data->m_constructorMode = m_previous;
-        }
-
-        static bool current() { return V8PerIsolateData::current()->m_constructorMode; }
-
-    private:
-        bool m_previous;
-    };
+    // A helper for throwing JavaScript TypeError for not enough arguments.
+    v8::Handle<v8::Value> throwNotEnoughArgumentsError(v8::Isolate*);
 
     // Since v8::Null(isolate) crashes if we pass a null isolate,
     // we need to use v8NullWithCheck(isolate) if an isolate can be null.
@@ -124,10 +87,10 @@ namespace WebCore {
     // Convert v8 types to a WTF::String. If the V8 string is not already
     // an external string then it is transformed into an external string at this
     // point to avoid repeated conversions.
-    String v8ValueToWebCoreString(v8::Handle<v8::Value>);
+    String toWebCoreString(v8::Handle<v8::Value>);
 
     // Convert a V8 value to a WTF::AtomicString.
-    AtomicString v8ValueToAtomicWebCoreString(v8::Handle<v8::Value>);
+    AtomicString toWebCoreAtomicString(v8::Handle<v8::Value>);
 
     // Return a V8 external string that shares the underlying buffer with the given
     // WebCore string. The reference counting mechanism is used to keep the
@@ -225,7 +188,7 @@ namespace WebCore {
     struct NativeValueTraits<String> {
         static inline String arrayNativeValue(const v8::Local<v8::Array>& array, size_t i)
         {
-            return v8ValueToWebCoreString(array->Get(i));
+            return toWebCoreString(array->Get(i));
         }
     };
 
@@ -267,7 +230,7 @@ namespace WebCore {
     inline v8::Handle<v8::Value> toV8Sequence(v8::Handle<v8::Value> value, uint32_t& length)
     {
         if (!value->IsObject()) {
-            V8Proxy::throwTypeError();
+            throwTypeError();
             return v8Undefined();
         }
 
@@ -277,7 +240,7 @@ namespace WebCore {
         EXCEPTION_BLOCK(v8::Local<v8::Value>, lengthValue, object->Get(v8::String::New("length")));
 
         if (lengthValue->IsUndefined() || lengthValue->IsNull()) {
-            V8Proxy::throwTypeError();
+            throwTypeError();
             return v8Undefined();
         }
 
@@ -286,11 +249,6 @@ namespace WebCore {
 
         return v8Value;
     }
-
-    // Enables caching v8 wrappers created for WTF::StringImpl.  Currently this cache requires
-    // all the calls (both to convert WTF::String to v8::String and to GC the handle)
-    // to be performed on the main thread.
-    void enableStringImplCache();
 
     // Convert a value to a 32-bit integer.  The conversion fails if the
     // value cannot be converted to an integer or converts to nan or to an infinity.
@@ -322,17 +280,6 @@ namespace WebCore {
     inline long long toInt64(v8::Local<v8::Value> value)
     {
         return static_cast<long long>(value->IntegerValue());
-    }
-
-    // FIXME: Drop this in favor of the type specific v8ValueToWebCoreString when we rework the code generation.
-    inline String toWebCoreString(v8::Handle<v8::Value> object)
-    {
-        return v8ValueToWebCoreString(object);
-    }
-
-    inline String toWebCoreString(const v8::Arguments& args, int index)
-    {
-        return v8ValueToWebCoreString(args[index]);
     }
 
     // The string returned by this function is still owned by the argument
@@ -379,12 +326,7 @@ namespace WebCore {
 
     inline String toWebCoreStringWithNullCheck(v8::Handle<v8::Value> value)
     {
-        return value->IsNull() ? String() : v8ValueToWebCoreString(value);
-    }
-
-    inline AtomicString toAtomicWebCoreStringWithNullCheck(v8::Handle<v8::Value> value)
-    {
-        return value->IsNull() ? AtomicString() : v8ValueToAtomicWebCoreString(value);
+        return value->IsNull() ? String() : toWebCoreString(value);
     }
 
     inline String toWebCoreStringWithNullOrUndefinedCheck(v8::Handle<v8::Value> value)
@@ -392,9 +334,9 @@ namespace WebCore {
         return (value->IsNull() || value->IsUndefined()) ? String() : toWebCoreString(value);
     }
 
-    inline v8::Handle<v8::String> v8UndetectableString(const String& str)
+    inline AtomicString toWebCoreAtomicStringWithNullCheck(v8::Handle<v8::Value> value)
     {
-        return v8::String::NewUndetectable(fromWebCoreString(str), str.length());
+        return value->IsNull() ? AtomicString() : toWebCoreAtomicString(value);
     }
 
     inline v8::Handle<v8::Value> v8StringOrNull(const String& str, v8::Isolate* isolate = 0)
@@ -405,11 +347,6 @@ namespace WebCore {
     inline v8::Handle<v8::Value> v8StringOrUndefined(const String& str, v8::Isolate* isolate = 0)
     {
         return str.isNull() ? v8::Handle<v8::Value>(v8::Undefined()) : v8::Handle<v8::Value>(v8String(str, isolate));
-    }
-
-    inline v8::Handle<v8::Value> v8StringOrFalse(const String& str, v8::Isolate* isolate = 0)
-    {
-        return str.isNull() ? v8::Handle<v8::Value>(v8Boolean(false)) : v8::Handle<v8::Value>(v8String(str, isolate));
     }
 
     inline double toWebCoreDate(v8::Handle<v8::Value> object)
@@ -429,7 +366,23 @@ namespace WebCore {
 
     String int32ToWebCoreString(int value);
 
-    PassRefPtr<DOMStringList> v8ValueToWebCoreDOMStringList(v8::Handle<v8::Value>);
+    PassRefPtr<DOMStringList> toDOMStringList(v8::Handle<v8::Value>);
+
+    // Returns the window object associated with a context.
+    DOMWindow* toDOMWindow(v8::Handle<v8::Context>);
+
+    // Returns the frame object of the window object associated with
+    // a context, if the window is currently being displayed in the Frame.
+    Frame* toFrameIfNotDetached(v8::Handle<v8::Context>);
+
+    // Returns the PerContextData associated with a frame for the current isolated world.
+    V8PerContextData* perContextDataForCurrentWorld(Frame*);
+
+    // If the current context causes out of memory, JavaScript setting
+    // is disabled and it returns true.
+    bool handleOutOfMemory();
+
+    void crashIfV8IsDead();
 
     class V8ParameterBase {
     public:

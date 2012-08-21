@@ -173,6 +173,10 @@ class ChromiumAndroidPort(chromium.ChromiumPort):
         # marked as slow tests on desktop platforms.
         return 10 * 1000
 
+    def driver_stop_timeout(self):
+        # DRT doesn't respond to closing stdin, so we might as well stop the driver immediately.
+        return 0.0
+
     def default_child_processes(self):
         return len(self._get_devices())
 
@@ -262,7 +266,9 @@ class ChromiumAndroidPort(chromium.ChromiumPort):
     def create_driver(self, worker_number, no_timeout=False):
         # We don't want the default DriverProxy which is not compatible with our driver.
         # See comments in ChromiumAndroidDriver.start().
-        return ChromiumAndroidDriver(self, worker_number, pixel_tests=self.get_option('pixel_tests'), no_timeout=no_timeout)
+        return ChromiumAndroidDriver(self, worker_number, pixel_tests=self.get_option('pixel_tests'),
+                                     # Force no timeout to avoid DumpRenderTree timeouts before NRWT.
+                                     no_timeout=True)
 
     def driver_cmd_line(self):
         # Override to return the actual DumpRenderTree command line.
@@ -545,13 +551,13 @@ class ChromiumAndroidDriver(driver.Driver):
                 not self._file_exists_on_device(self._out_fifo_path) and
                 not self._file_exists_on_device(self._err_fifo_path))
 
-    def run_test(self, driver_input):
+    def run_test(self, driver_input, stop_when_done):
         base = self._port.lookup_virtual_test_base(driver_input.test_name)
         if base:
             driver_input = copy.copy(driver_input)
             driver_input.args = self._port.lookup_virtual_test_args(driver_input.test_name)
             driver_input.test_name = base
-        return super(ChromiumAndroidDriver, self).run_test(driver_input)
+        return super(ChromiumAndroidDriver, self).run_test(driver_input, stop_when_done)
 
     def start(self, pixel_tests, per_test_args):
         # Only one driver instance is allowed because of the nature of Android activity.
@@ -657,15 +663,10 @@ class ChromiumAndroidDriver(driver.Driver):
             self._read_stderr_process.kill()
             self._read_stderr_process = None
 
-        # Stop and kill server_process because our pipe reading/writing processes won't quit
-        # by itself on close of the pipes.
-        if self._server_process:
-            self._server_process.stop(kill_directly=True)
-            self._server_process = None
         super(ChromiumAndroidDriver, self).stop()
 
         if self._forwarder_process:
-            self._forwarder_process.stop(kill_directly=True)
+            self._forwarder_process.kill()
             self._forwarder_process = None
 
         if not ChromiumAndroidDriver._loop_with_timeout(self._remove_all_pipes, DRT_START_STOP_TIMEOUT_SECS):

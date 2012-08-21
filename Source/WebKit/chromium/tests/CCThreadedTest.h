@@ -25,10 +25,10 @@
 #ifndef CCThreadedTest_h
 #define CCThreadedTest_h
 
+#include "CCLayerTreeHost.h"
+#include "CCLayerTreeHostImpl.h"
+#include "CCScopedThreadProxy.h"
 #include "CompositorFakeWebGraphicsContext3D.h"
-#include "cc/CCLayerTreeHost.h"
-#include "cc/CCLayerTreeHostImpl.h"
-#include "cc/CCScopedThreadProxy.h"
 #include <gtest/gtest.h>
 #include <public/WebAnimationDelegate.h>
 
@@ -134,6 +134,7 @@ protected:
     static void dispatchDidAddAnimation(void* self);
 
     virtual void runTest(bool threaded);
+    WebKit::WebThread* webThread() const { return m_webThread.get(); }
 
     WebCore::CCLayerTreeSettings m_settings;
     OwnPtr<MockCCLayerTreeHostClient> m_client;

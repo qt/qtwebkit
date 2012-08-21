@@ -46,22 +46,32 @@ namespace WebCore {
 
 PassRefPtr<IDBRequest> IDBRequest::create(ScriptExecutionContext* context, PassRefPtr<IDBAny> source, IDBTransaction* transaction)
 {
-    RefPtr<IDBRequest> request(adoptRef(new IDBRequest(context, source, transaction)));
+    RefPtr<IDBRequest> request(adoptRef(new IDBRequest(context, source, IDBTransactionBackendInterface::NormalTask, transaction)));
     request->suspendIfNeeded();
     return request.release();
 }
 
-IDBRequest::IDBRequest(ScriptExecutionContext* context, PassRefPtr<IDBAny> source, IDBTransaction* transaction)
+PassRefPtr<IDBRequest> IDBRequest::create(ScriptExecutionContext* context, PassRefPtr<IDBAny> source, IDBTransactionBackendInterface::TaskType taskType, IDBTransaction* transaction)
+{
+    RefPtr<IDBRequest> request(adoptRef(new IDBRequest(context, source, taskType, transaction)));
+    request->suspendIfNeeded();
+    return request.release();
+}
+
+IDBRequest::IDBRequest(ScriptExecutionContext* context, PassRefPtr<IDBAny> source, IDBTransactionBackendInterface::TaskType taskType, IDBTransaction* transaction)
     : ActiveDOMObject(context, this)
+    , m_result(0)
     , m_errorCode(0)
-    , m_source(source)
+    , m_contextStopped(false)
     , m_transaction(transaction)
     , m_readyState(PENDING)
     , m_requestAborted(false)
-    , m_contextStopped(false)
+    , m_source(source)
+    , m_taskType(taskType)
     , m_cursorType(IDBCursorBackendInterface::InvalidCursorType)
     , m_cursorDirection(IDBCursor::NEXT)
     , m_pendingCursor(0)
+    , m_didFireUpgradeNeededEvent(false)
 {
     if (m_transaction) {
         m_transaction->registerRequest(this);
@@ -199,15 +209,19 @@ PassRefPtr<IDBCursor> IDBRequest::getResultCursor()
     return 0;
 }
 
-void IDBRequest::setResultCursor(PassRefPtr<IDBCursor> prpCursor)
+void IDBRequest::setResultCursor(PassRefPtr<IDBCursor> cursor, PassRefPtr<IDBKey> key, PassRefPtr<IDBKey> primaryKey, PassRefPtr<SerializedScriptValue> value)
 {
     ASSERT(m_readyState == PENDING);
+    m_cursorKey = key;
+    m_cursorPrimaryKey = primaryKey;
+    m_cursorValue = value;
+
     if (m_cursorType == IDBCursorBackendInterface::IndexKeyCursor) {
-        m_result = IDBAny::create(prpCursor);
+        m_result = IDBAny::create(cursor);
         return;
     }
 
-    m_result = IDBAny::create(IDBCursorWithValue::fromCursor(prpCursor));
+    m_result = IDBAny::create(IDBCursorWithValue::fromCursor(cursor));
 }
 
 bool IDBRequest::shouldEnqueueEvent() const
@@ -250,7 +264,7 @@ void IDBRequest::onSuccess(PassRefPtr<DOMStringList> domStringList)
     enqueueEvent(createSuccessEvent());
 }
 
-void IDBRequest::onSuccess(PassRefPtr<IDBCursorBackendInterface> backend)
+void IDBRequest::onSuccess(PassRefPtr<IDBCursorBackendInterface> backend, PassRefPtr<IDBKey> key, PassRefPtr<IDBKey> primaryKey, PassRefPtr<SerializedScriptValue> value)
 {
     IDB_TRACE("IDBRequest::onSuccess(IDBCursor)");
     if (!shouldEnqueueEvent())
@@ -262,7 +276,7 @@ void IDBRequest::onSuccess(PassRefPtr<IDBCursorBackendInterface> backend)
         cursor = IDBCursor::create(backend, m_cursorDirection, this, m_source.get(), m_transaction.get());
     else
         cursor = IDBCursorWithValue::create(backend, m_cursorDirection, this, m_source.get(), m_transaction.get());
-    setResultCursor(cursor);
+    setResultCursor(cursor, key, primaryKey, value);
 
     enqueueEvent(createSuccessEvent());
 }
@@ -273,10 +287,15 @@ void IDBRequest::onSuccess(PassRefPtr<IDBDatabaseBackendInterface> backend)
     if (!shouldEnqueueEvent())
         return;
 
-    RefPtr<IDBDatabase> idbDatabase = IDBDatabase::create(scriptExecutionContext(), backend);
+    RefPtr<IDBDatabase> idbDatabase;
+    if (m_result) {
+        idbDatabase = m_result->idbDatabase();
+        ASSERT(idbDatabase);
+    } else {
+        idbDatabase = IDBDatabase::create(scriptExecutionContext(), backend);
+        m_result = IDBAny::create(idbDatabase.get());
+    }
     idbDatabase->registerFrontendCallbacks();
-
-    m_result = IDBAny::create(idbDatabase.release());
     enqueueEvent(createSuccessEvent());
 }
 
@@ -369,14 +388,14 @@ void IDBRequest::onSuccess(PassRefPtr<SerializedScriptValue> prpSerializedScript
     onSuccess(value.release());
 }
 
-void IDBRequest::onSuccessWithContinuation()
+void IDBRequest::onSuccess(PassRefPtr<IDBKey> key, PassRefPtr<IDBKey> primaryKey, PassRefPtr<SerializedScriptValue> value)
 {
-    IDB_TRACE("IDBRequest::onSuccessWithContinuation");
+    IDB_TRACE("IDBRequest::onSuccess(key, primaryKey, value)");
     if (!shouldEnqueueEvent())
         return;
 
     ASSERT(m_pendingCursor);
-    setResultCursor(m_pendingCursor.release());
+    setResultCursor(m_pendingCursor.release(), key, primaryKey, value);
     enqueueEvent(createSuccessEvent());
 }
 
@@ -422,8 +441,7 @@ bool IDBRequest::dispatchEvent(PassRefPtr<Event> event)
     ASSERT(m_enqueuedEvents.size());
     ASSERT(scriptExecutionContext());
     ASSERT(event->target() == this);
-    ASSERT_WITH_MESSAGE(m_readyState < DONE, "m_readyState < DONE(%d), was %d", DONE, m_readyState);
-
+    ASSERT_WITH_MESSAGE(m_readyState < DONE, "When dispatching event %s, m_readyState < DONE(%d), was %d", event->type().string().utf8().data(), DONE, m_readyState);
     if (event->type() != eventNames().blockedEvent)
         m_readyState = DONE;
 
@@ -448,21 +466,27 @@ bool IDBRequest::dispatchEvent(PassRefPtr<Event> event)
     if (event->type() == eventNames().successEvent) {
         cursorToNotify = getResultCursor();
         if (cursorToNotify)
-            cursorToNotify->setValueReady();
+            cursorToNotify->setValueReady(m_cursorKey.release(), m_cursorPrimaryKey.release(), m_cursorValue.release());
     }
 
     // FIXME: When we allow custom event dispatching, this will probably need to change.
-    ASSERT(event->type() == eventNames().successEvent || event->type() == eventNames().errorEvent || event->type() == eventNames().blockedEvent);
-    const bool setTransactionActive = m_transaction && (event->type() == eventNames().successEvent || (event->type() == eventNames().errorEvent && m_errorCode != IDBDatabaseException::IDB_ABORT_ERR));
+    ASSERT_WITH_MESSAGE(event->type() == eventNames().successEvent || event->type() == eventNames().errorEvent || event->type() == eventNames().blockedEvent || event->type() == eventNames().upgradeneededEvent, "event type was %s", event->type().string().utf8().data());
+    const bool setTransactionActive = m_transaction && (event->type() == eventNames().successEvent || event->type() == eventNames().upgradeneededEvent || (event->type() == eventNames().errorEvent && m_errorCode != IDBDatabaseException::IDB_ABORT_ERR));
 
     if (setTransactionActive)
         m_transaction->setActive(true);
+
     bool dontPreventDefault = IDBEventDispatcher::dispatch(event.get(), targets);
     if (setTransactionActive)
         m_transaction->setActive(false);
 
     if (cursorToNotify)
         cursorToNotify->postSuccessHandlerCallback();
+
+    if (event->type() == eventNames().upgradeneededEvent) {
+        ASSERT(!m_didFireUpgradeNeededEvent);
+        m_didFireUpgradeNeededEvent = true;
+    }
 
     if (m_transaction) {
         if (event->type() == eventNames().errorEvent && dontPreventDefault && !m_requestAborted) {
@@ -490,6 +514,16 @@ void IDBRequest::uncaughtExceptionInEventHandler()
     }
 }
 
+void IDBRequest::transactionDidFinishAndDispatch()
+{
+    ASSERT(m_transaction);
+    ASSERT(m_transaction->isVersionChange());
+    ASSERT(m_readyState == DONE);
+    ASSERT(scriptExecutionContext());
+    m_transaction.clear();
+    m_readyState = PENDING;
+}
+
 void IDBRequest::enqueueEvent(PassRefPtr<Event> event)
 {
     ASSERT(m_readyState == PENDING || m_readyState == DONE);
@@ -497,7 +531,7 @@ void IDBRequest::enqueueEvent(PassRefPtr<Event> event)
     if (m_contextStopped || !scriptExecutionContext())
         return;
 
-    ASSERT(m_readyState == PENDING);
+    ASSERT_WITH_MESSAGE(m_readyState == PENDING || m_didFireUpgradeNeededEvent, "When queueing event %s, m_readyState was %d", event->type().string().utf8().data(), m_readyState);
 
     EventQueue* eventQueue = scriptExecutionContext()->eventQueue();
     event->setTarget(this);

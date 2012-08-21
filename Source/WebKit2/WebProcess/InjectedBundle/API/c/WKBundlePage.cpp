@@ -47,7 +47,7 @@
 #include <WebCore/Page.h>
 
 #if ENABLE(WEB_INTENTS)
-#include "WebIntentData.h"
+#include "InjectedBundleIntent.h"
 #endif
 
 using namespace WebKit;
@@ -295,7 +295,9 @@ WKImageRef WKBundlePageCreateSnapshotWithOptions(WKBundlePageRef pageRef, WKRect
 
 WKImageRef WKBundlePageCreateSnapshotInViewCoordinates(WKBundlePageRef pageRef, WKRect rect, WKImageOptions options)
 {
-    RefPtr<WebImage> webImage = toImpl(pageRef)->scaledSnapshotWithOptions(toIntRect(rect), 1, snapshotOptionsFromImageOptions(options));
+    SnapshotOptions snapshotOptions = snapshotOptionsFromImageOptions(options);
+    snapshotOptions |= SnapshotOptionsInViewCoordinates;
+    RefPtr<WebImage> webImage = toImpl(pageRef)->scaledSnapshotWithOptions(toIntRect(rect), 1, snapshotOptions);
     return toAPI(webImage.release().leakRef());
 }
 
@@ -316,10 +318,10 @@ double WKBundlePageGetBackingScaleFactor(WKBundlePageRef pageRef)
     return toImpl(pageRef)->deviceScaleFactor();
 }
 
-void WKBundlePageDeliverIntentToFrame(WKBundlePageRef pageRef, WKBundleFrameRef frameRef, WKIntentDataRef intentRef)
+void WKBundlePageDeliverIntentToFrame(WKBundlePageRef pageRef, WKBundleFrameRef frameRef, WKBundleIntentRef intentRef)
 {
 #if ENABLE(WEB_INTENTS)
-    toImpl(pageRef)->deliverIntentToFrame(toImpl(frameRef)->frameID(), toImpl(intentRef)->store());
+    toImpl(pageRef)->deliverCoreIntentToFrame(toImpl(frameRef)->frameID(), toImpl(intentRef)->coreIntent());
 #endif
 }
 

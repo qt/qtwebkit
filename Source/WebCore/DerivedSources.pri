@@ -269,6 +269,7 @@ IDL_BINDINGS += \
     $$PWD/dom/WebKitNamedFlow.idl \
     $$PWD/dom/WebKitTransitionEvent.idl \
     $$PWD/dom/WheelEvent.idl \
+    $$PWD/editing/DOMTransaction.idl \
     $$PWD/editing/UndoManager.idl \
     $$PWD/fileapi/Blob.idl \
     $$PWD/fileapi/File.idl \
@@ -443,9 +444,9 @@ IDL_BINDINGS += \
     $$PWD/plugins/DOMMimeTypeArray.idl \
     $$PWD/storage/Storage.idl \
     $$PWD/storage/StorageEvent.idl \
-    $$PWD/testing/FastMallocStatistics.idl \
     $$PWD/testing/Internals.idl \
     $$PWD/testing/InternalSettings.idl \
+    $$PWD/testing/MallocStatistics.idl \
     $$PWD/workers/AbstractWorker.idl \
     $$PWD/workers/DedicatedWorkerContext.idl \
     $$PWD/workers/SharedWorker.idl \

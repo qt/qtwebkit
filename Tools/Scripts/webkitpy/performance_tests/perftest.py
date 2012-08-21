@@ -74,7 +74,7 @@ class PerfTest(object):
         return self.parse_output(output)
 
     def run_single(self, driver, path_or_url, time_out_ms, should_run_pixel_test=False):
-        return driver.run_test(DriverInput(path_or_url, time_out_ms, image_hash=None, should_run_pixel_test=should_run_pixel_test))
+        return driver.run_test(DriverInput(path_or_url, time_out_ms, image_hash=None, should_run_pixel_test=should_run_pixel_test), stop_when_done=False)
 
     def run_failed(self, output):
         if output.text == None or output.error:
@@ -112,7 +112,7 @@ class PerfTest(object):
         return False
 
     _description_regex = re.compile(r'^Description: (?P<description>.*)$', re.IGNORECASE)
-    _result_classes = ['Time', 'JS Heap', 'FastMalloc']
+    _result_classes = ['Time', 'JS Heap', 'Malloc']
     _result_class_regex = re.compile(r'^(?P<resultclass>' + r'|'.join(_result_classes) + '):')
     _statistics_keys = ['avg', 'median', 'stdev', 'min', 'max', 'unit']
     _score_regex = re.compile(r'^(?P<key>' + r'|'.join(_statistics_keys) + r')\s+(?P<value>[0-9\.]+)\s*(?P<unit>.*)')

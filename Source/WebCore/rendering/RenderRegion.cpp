@@ -193,9 +193,7 @@ void RenderRegion::layout()
 
 void RenderRegion::attachRegion()
 {
-    if (documentBeingDestroyed())
-        return;
-
+    ASSERT(view());
     ASSERT(!m_flowThread);
     // Initialize the flow thread reference and create the flow thread object if needed.
     // The flow thread lifetime is influenced by the number of regions attached to it,
@@ -357,6 +355,20 @@ void RenderRegion::restoreRegionObjectsOriginalStyle()
     m_renderObjectRegionStyle.swap(temp);
 }
 
+void RenderRegion::insertedIntoTree()
+{
+    RenderReplaced::insertedIntoTree();
+
+    attachRegion();
+}
+
+void RenderRegion::willBeRemovedFromTree()
+{
+    RenderReplaced::willBeRemovedFromTree();
+
+    detachRegion();
+}
+
 PassRefPtr<RenderStyle> RenderRegion::computeStyleInRegion(const RenderObject* object)
 {
     ASSERT(object);
@@ -399,6 +411,10 @@ void RenderRegion::computeChildrenStyleInRegion(const RenderObject* object)
  
 void RenderRegion::setObjectStyleInRegion(RenderObject* object, PassRefPtr<RenderStyle> styleInRegion, bool objectRegionStyleCached)
 {
+    ASSERT(object->inRenderFlowThread());
+    if (!object->inRenderFlowThread())
+        return;
+
     RefPtr<RenderStyle> objectOriginalStyle = object->style();
     object->setStyleInternal(styleInRegion);
 

@@ -26,7 +26,6 @@
 #include "ContentData.h"
 #include "CursorList.h"
 #include "CSSPropertyNames.h"
-#include "CSSWrapShapes.h"
 #include "FontSelector.h"
 #include "MemoryInstrumentation.h"
 #include "QuotesData.h"
@@ -489,6 +488,11 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
             return StyleDifferenceLayout;
     }
 
+#if ENABLE(TEXT_AUTOSIZING)
+    if (visual->m_textAutosizingMultiplier != other->visual->m_textAutosizingMultiplier)
+        return StyleDifferenceLayout;
+#endif
+
     if (inherited->line_height != other->inherited->line_height
         || inherited->list_style_image != other->inherited->list_style_image
         || inherited->font != other->inherited->font
@@ -563,9 +567,6 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
     const CounterDirectiveMap* mapB = other->rareNonInheritedData->m_counterDirectives.get();
     if (!(mapA == mapB || (mapA && mapB && *mapA == *mapB)))
         return StyleDifferenceLayout;
-    if (rareNonInheritedData->m_counterIncrement != other->rareNonInheritedData->m_counterIncrement
-        || rareNonInheritedData->m_counterReset != other->rareNonInheritedData->m_counterReset)
-        return StyleDifferenceLayout;
 
     if ((visibility() == COLLAPSE) != (other->visibility() == COLLAPSE))
         return StyleDifferenceLayout;
@@ -608,6 +609,11 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
                  || visual->clip != other->visual->clip || visual->hasClip != other->visual->hasClip)
             return StyleDifferenceRepaintLayer;
     }
+    
+#if ENABLE(CSS_COMPOSITING)
+    if (rareNonInheritedData->m_effectiveBlendMode != other->rareNonInheritedData->m_effectiveBlendMode)
+        return StyleDifferenceRepaintLayer;
+#endif
 
     if (rareNonInheritedData->opacity != other->rareNonInheritedData->opacity) {
 #if USE(ACCELERATED_COMPOSITING)
@@ -646,6 +652,9 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
         || rareInheritedData->userSelect != other->rareInheritedData->userSelect
         || rareNonInheritedData->userDrag != other->rareNonInheritedData->userDrag
         || rareNonInheritedData->m_borderFit != other->rareNonInheritedData->m_borderFit
+#if ENABLE(CSS3_TEXT_DECORATION)
+        || rareNonInheritedData->m_textDecorationStyle != other->rareNonInheritedData->m_textDecorationStyle
+#endif // CSS3_TEXT_DECORATION
         || rareInheritedData->textFillColor != other->rareInheritedData->textFillColor
         || rareInheritedData->textStrokeColor != other->rareInheritedData->textStrokeColor
         || rareInheritedData->textEmphasisColor != other->rareInheritedData->textEmphasisColor
@@ -943,6 +952,23 @@ static float calcConstraintScaleFor(const IntRect& rect, const RoundedRect::Radi
     return factor;
 }
 
+StyleImage* RenderStyle::listStyleImage() const { return inherited->list_style_image.get(); }
+void RenderStyle::setListStyleImage(PassRefPtr<StyleImage> v)
+{
+    if (inherited->list_style_image != v)
+        inherited.access()->list_style_image = v;
+}
+
+Color RenderStyle::color() const { return inherited->color; }
+Color RenderStyle::visitedLinkColor() const { return inherited->visitedLinkColor; }
+void RenderStyle::setColor(const Color& v) { SET_VAR(inherited, color, v) };
+void RenderStyle::setVisitedLinkColor(const Color& v) { SET_VAR(inherited, visitedLinkColor, v) }
+
+short RenderStyle::horizontalBorderSpacing() const { return inherited->horizontal_border_spacing; }
+short RenderStyle::verticalBorderSpacing() const { return inherited->vertical_border_spacing; }
+void RenderStyle::setHorizontalBorderSpacing(short v) { SET_VAR(inherited, horizontal_border_spacing, v) }
+void RenderStyle::setVerticalBorderSpacing(short v) { SET_VAR(inherited, vertical_border_spacing, v) }
+
 RoundedRect RenderStyle::getRoundedBorderFor(const LayoutRect& borderRect, RenderView* renderView, bool includeLogicalLeftEdge, bool includeLogicalRightEdge) const
 {
     IntRect snappedBorderRect(pixelSnappedIntRect(borderRect));
@@ -1165,12 +1191,80 @@ const Animation* RenderStyle::transitionForProperty(CSSPropertyID property) cons
     return 0;
 }
 
-void RenderStyle::setBlendedFontSize(int size)
+const Font& RenderStyle::font() const { return inherited->font; }
+const FontMetrics& RenderStyle::fontMetrics() const { return inherited->font.fontMetrics(); }
+const FontDescription& RenderStyle::fontDescription() const { return inherited->font.fontDescription(); }
+float RenderStyle::specifiedFontSize() const { return fontDescription().specifiedSize(); }
+float RenderStyle::computedFontSize() const { return fontDescription().computedSize(); }
+int RenderStyle::fontSize() const { return inherited->font.pixelSize(); }
+
+int RenderStyle::wordSpacing() const { return inherited->font.wordSpacing(); }
+int RenderStyle::letterSpacing() const { return inherited->font.letterSpacing(); }
+
+bool RenderStyle::setFontDescription(const FontDescription& v)
 {
+    if (inherited->font.fontDescription() != v) {
+        inherited.access()->font = Font(v, inherited->font.letterSpacing(), inherited->font.wordSpacing());
+        return true;
+    }
+    return false;
+}
+
+Length RenderStyle::specifiedLineHeight() const { return inherited->line_height; }
+Length RenderStyle::lineHeight() const
+{
+    const Length& lh = inherited->line_height;
+#if ENABLE(TEXT_AUTOSIZING)
+    // Unlike fontDescription().computedSize() and hence fontSize(), this is
+    // recalculated on demand as we only store the specified line height.
+    // FIXME: Should consider scaling the fixed part of any calc expressions
+    // too, though this involves messily poking into CalcExpressionLength.
+    float multiplier = textAutosizingMultiplier();
+    if (multiplier > 1 && lh.isFixed())
+        return Length(lh.value() * multiplier, Fixed);
+#endif
+    return lh;
+}
+void RenderStyle::setLineHeight(Length specifiedLineHeight) { SET_VAR(inherited, line_height, specifiedLineHeight); }
+
+int RenderStyle::computedLineHeight(RenderView* renderView) const
+{
+    const Length& lh = lineHeight();
+
+    // Negative value means the line height is not set. Use the font's built-in spacing.
+    if (lh.isNegative())
+        return fontMetrics().lineSpacing();
+
+    if (lh.isPercent())
+        return minimumValueForLength(lh, fontSize());
+
+    if (lh.isViewportPercentage())
+        return valueForLength(lh, 0, renderView);
+
+    return lh.value();
+}
+
+void RenderStyle::setWordSpacing(int v) { inherited.access()->font.setWordSpacing(v); }
+void RenderStyle::setLetterSpacing(int v) { inherited.access()->font.setLetterSpacing(v); }
+
+void RenderStyle::setFontSize(float size)
+{
+    // size must be specifiedSize if Text Autosizing is enabled, but computedSize if text
+    // zoom is enabled (if neither is enabled it's irrelevant as they're probably the same).
+
     FontSelector* currentFontSelector = font().fontSelector();
     FontDescription desc(fontDescription());
     desc.setSpecifiedSize(size);
     desc.setComputedSize(size);
+
+#if ENABLE(TEXT_AUTOSIZING)
+    float multiplier = textAutosizingMultiplier();
+    if (multiplier > 1) {
+        // FIXME: Large font sizes needn't be multiplied as much since they are already more legible.
+        desc.setComputedSize(size * multiplier);
+    }
+#endif
+
     setFontDescription(desc);
     font().update(currentFontSelector);
 }

@@ -5,6 +5,7 @@
  * Copyright (C) 2008 Eric Seidel <eric@webkit.org>
  * Copyright (C) 2008 Dirk Schulze <krit@webkit.org>
  * Copyright (C) 2010 Torch Mobile (Beijing) Co. Ltd. All rights reserved.
+ * Copyright (C) 2012 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -82,6 +83,8 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
+static const int defaultFontSize = 10;
+static const char* const defaultFontFamily = "sans-serif";
 static const char* const defaultFont = "10px sans-serif";
 
 static bool isOriginClean(CachedImage* cachedImage, SecurityOrigin* securityOrigin)
@@ -1986,7 +1989,34 @@ void CanvasRenderingContext2D::putImageData(ImageData* data, ImageBuffer::Coordi
 
 String CanvasRenderingContext2D::font() const
 {
-    return state().m_unparsedFont;
+    if (!state().m_realizedFont)
+        return defaultFont;
+
+    String serializedFont;
+    const FontDescription& fontDescription = state().m_font.fontDescription();
+
+    if (fontDescription.italic())
+        serializedFont += "italic ";
+    if (fontDescription.smallCaps() == FontSmallCapsOn)
+        serializedFont += "small-caps ";
+
+    serializedFont += String::number(fontDescription.computedPixelSize()) + "px";
+
+    const FontFamily& firstFontFamily = fontDescription.family();
+    for (const FontFamily* fontFamily = &firstFontFamily; fontFamily; fontFamily = fontFamily->next()) {
+        if (fontFamily != &firstFontFamily)
+            serializedFont += ",";
+
+        String family = fontFamily->family();
+        if (family.startsWith("-webkit-"))
+            family = family.substring(8);
+        if (family.contains(' '))
+            family = makeString('"', family, '"');
+
+        serializedFont += " " + family;
+    }
+
+    return serializedFont;
 }
 
 void CanvasRenderingContext2D::setFont(const String& newFont)
@@ -2009,6 +2039,18 @@ void CanvasRenderingContext2D::setFont(const String& newFont)
     RefPtr<RenderStyle> newStyle = RenderStyle::create();
     if (RenderStyle* computedStyle = canvas()->computedStyle())
         newStyle->setFontDescription(computedStyle->fontDescription());
+    else {
+        FontFamily fontFamily;
+        fontFamily.setFamily(defaultFontFamily);
+
+        FontDescription defaultFontDescription;
+        defaultFontDescription.setFamily(fontFamily);
+        defaultFontDescription.setSpecifiedSize(defaultFontSize);
+        defaultFontDescription.setComputedSize(defaultFontSize);
+
+        newStyle->setFontDescription(defaultFontDescription);
+    }
+
     newStyle->font().update(newStyle->font().fontSelector());
 
     // Now map the font property longhands into the style.
@@ -2104,6 +2146,16 @@ PassRefPtr<TextMetrics> CanvasRenderingContext2D::measureText(const String& text
     return metrics.release();
 }
 
+static void replaceCharacterInString(String& text, WTF::CharacterMatchFunctionPtr matchFunction, const String& replacement)
+{
+    const size_t replacementLength = replacement.length();
+    size_t index = 0;
+    while ((index = text.find(matchFunction, index)) != notFound) {
+        text.replace(index, 1, replacement);
+        index += replacementLength;
+    }
+}
+
 void CanvasRenderingContext2D::drawTextInternal(const String& text, float x, float y, bool fill, float maxWidth, bool useMaxWidth)
 {
     GraphicsContext* c = drawingContext();
@@ -2120,6 +2172,9 @@ void CanvasRenderingContext2D::drawTextInternal(const String& text, float x, flo
 
     const Font& font = accessFont();
     const FontMetrics& fontMetrics = font.fontMetrics();
+    // According to spec, all the space characters must be replaced with U+0020 SPACE characters.
+    String normalizedText = text;
+    replaceCharacterInString(normalizedText, isSpaceOrNewline, " ");
 
     // FIXME: Need to turn off font smoothing.
 
@@ -2128,7 +2183,7 @@ void CanvasRenderingContext2D::drawTextInternal(const String& text, float x, flo
     bool isRTL = direction == RTL;
     bool override = computedStyle ? isOverride(computedStyle->unicodeBidi()) : false;
 
-    TextRun textRun(text, 0, 0, TextRun::AllowTrailingExpansion, direction, override, true, TextRun::NoRounding);
+    TextRun textRun(normalizedText, 0, 0, TextRun::AllowTrailingExpansion, direction, override, true, TextRun::NoRounding);
     // Draw the item text at the correct point.
     FloatPoint location(x, y);
     switch (state().m_textBaseline) {
@@ -2149,7 +2204,7 @@ void CanvasRenderingContext2D::drawTextInternal(const String& text, float x, flo
         break;
     }
 
-    float fontWidth = font.width(TextRun(text, 0, 0, TextRun::AllowTrailingExpansion, direction, override));
+    float fontWidth = font.width(TextRun(normalizedText, 0, 0, TextRun::AllowTrailingExpansion, direction, override));
 
     useMaxWidth = (useMaxWidth && maxWidth < fontWidth);
     float width = useMaxWidth ? maxWidth : fontWidth;

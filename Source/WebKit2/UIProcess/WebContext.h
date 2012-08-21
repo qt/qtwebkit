@@ -75,7 +75,7 @@ struct WebProcessCreationParameters;
     
 typedef GenericCallback<WKDictionaryRef> DictionaryCallback;
 
-class WebContext : public APIObject, private CoreIPC::Connection::QueueClient {
+class WebContext : public APIObject {
 public:
     static const Type APIType = TypeContext;
 
@@ -90,10 +90,12 @@ public:
     void initializeDownloadClient(const WKContextDownloadClient*);
 
     ProcessModel processModel() const { return m_processModel; }
-    WebProcessProxy* process() const { return m_process.get(); }
 
-    template<typename U> bool sendToAllProcesses(const U& message);
-    template<typename U> bool sendToAllProcessesRelaunchingThemIfNecessary(const U& message);
+    // FIXME (Multi-WebProcess): Remove. No code should assume that there is a shared process.
+    WebProcessProxy* deprecatedSharedProcess();
+
+    template<typename U> void sendToAllProcesses(const U& message);
+    template<typename U> void sendToAllProcessesRelaunchingThemIfNecessary(const U& message);
     
     void processDidFinishLaunching(WebProcessProxy*);
 
@@ -198,7 +200,8 @@ public:
     String iconDatabasePath() const;
     void setLocalStorageDirectory(const String& dir) { m_overrideLocalStorageDirectory = dir; }
 
-    void ensureWebProcess();
+    void ensureSharedWebProcess();
+    PassRefPtr<WebProcessProxy> createNewWebProcess();
     void warmInitialProcess();
 
     bool shouldTerminate(WebProcessProxy*);
@@ -220,6 +223,8 @@ public:
 
     void fullKeyboardAccessModeChanged(bool fullKeyboardAccessEnabled);
 
+    void textCheckerStateChanged();
+
 private:
     WebContext(ProcessModel, const String& injectedBundlePath);
 
@@ -228,14 +233,6 @@ private:
     void platformInitializeWebProcess(WebProcessCreationParameters&);
     void platformInvalidateContext();
     
-    // Plugins
-    void getPlugins(CoreIPC::Connection*, uint64_t requestID, bool refresh);
-    void getPluginPath(const String& mimeType, const String& urlString, String& pluginPath, bool& blocked);
-#if !ENABLE(PLUGIN_PROCESS)
-    void didGetSitesWithPluginData(const Vector<String>& sites, uint64_t callbackID);
-    void didClearPluginSiteData(uint64_t callbackID);
-#endif
-
 #if PLATFORM(MAC)
     void getPasteboardTypes(const String& pasteboardName, Vector<String>& pasteboardTypes);
     void getPasteboardPathnamesForType(const String& pasteboardName, const String& pasteboardType, Vector<String>& pathnames);
@@ -253,14 +250,17 @@ private:
     void setPasteboardBufferForType(const String& pasteboardName, const String& pasteboardType, const SharedMemory::Handle&, uint64_t size);
 #endif
 
+#if !PLATFORM(MAC)
+    // FIXME: This a dummy message, to avoid breaking the build for platforms that don't require
+    // any synchronous messages, and should be removed when <rdar://problem/8775115> is fixed.
+    void dummy(bool&);
+#endif
+
     void didGetWebCoreStatistics(const StatisticsData&, uint64_t callbackID);
         
     // Implemented in generated WebContextMessageReceiver.cpp
     void didReceiveWebContextMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
     void didReceiveSyncWebContextMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
-    void didReceiveWebContextMessageOnConnectionWorkQueue(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, bool& didHandleMessage);
-
-    virtual void didReceiveMessageOnConnectionWorkQueue(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, bool& didHandleMessage) OVERRIDE;
 
     static void languageChanged(void* context);
     void languageChanged();
@@ -273,13 +273,9 @@ private:
     String localStorageDirectory() const;
     String platformDefaultLocalStorageDirectory() const;
 
-    void handleGetPlugins(uint64_t requestID, bool refresh);
-    void sendDidGetPlugins(uint64_t requestID, PassOwnPtr<Vector<WebCore::PluginInfo> >);
-
     ProcessModel m_processModel;
     
-    // FIXME: In the future, this should be one or more WebProcessProxies.
-    RefPtr<WebProcessProxy> m_process;
+    Vector<RefPtr<WebProcessProxy> > m_processes;
 
     RefPtr<WebPageGroup> m_defaultPageGroup;
 
@@ -352,23 +348,22 @@ private:
     bool m_processTerminationEnabled;
     
     HashMap<uint64_t, RefPtr<DictionaryCallback> > m_dictionaryCallbacks;
-
-    WorkQueue m_pluginWorkQueue;
 };
 
-template<typename U> inline bool WebContext::sendToAllProcesses(const U& message)
+template<typename U> inline void WebContext::sendToAllProcesses(const U& message)
 {
-    if (!m_process || !m_process->canSendMessage())
-        return false;
-
-    return m_process->send(message, 0);
+    size_t processCount = m_processes.size();
+    for (size_t i = 0; i < processCount; ++i) {
+        WebProcessProxy* process = m_processes[i].get();
+        if (process->canSendMessage())
+            process->send(message, 0);
+    }
 }
 
-template<typename U> bool WebContext::sendToAllProcessesRelaunchingThemIfNecessary(const U& message)
+template<typename U> void WebContext::sendToAllProcessesRelaunchingThemIfNecessary(const U& message)
 {
     relaunchProcessIfNecessary();
-
-    return m_process->send(message, 0);
+    sendToAllProcesses(message);
 }
 
 } // namespace WebKit

@@ -480,7 +480,13 @@ public:
     /**
      * Updates the pending sheet count and then calls updateActiveStylesheets.
      */
-    void removePendingSheet();
+    enum RemovePendingSheetNotificationType {
+        RemovePendingSheetNotifyImmediately,
+        RemovePendingSheetNotifyLater
+    };
+
+    void removePendingSheet(RemovePendingSheetNotificationType = RemovePendingSheetNotifyImmediately);
+    void notifyRemovePendingSheetIfNeeded();
 
     /**
      * This method returns true if all top-level stylesheets have loaded (including
@@ -766,8 +772,12 @@ public:
     void textNodesMerged(Text* oldNode, unsigned offset);
     void textNodeSplit(Text* oldNode);
 
+    void createDOMWindow();
+    void takeDOMWindowFrom(Document*);
+
+    DOMWindow* domWindow() const { return m_domWindow.get(); }
+    // In DOM Level 2, the Document's DOMWindow is called the defaultView.
     DOMWindow* defaultView() const { return domWindow(); } 
-    DOMWindow* domWindow() const;
 
     // Helper functions for forwarding DOMWindow event related tasks to the DOMWindow if it exists.
     void setWindowAttributeEventListener(const AtomicString& eventType, PassRefPtr<EventListener>);
@@ -793,12 +803,10 @@ public:
         ANIMATIONITERATION_LISTENER          = 0x400,
         TRANSITIONEND_LISTENER               = 0x800,
         BEFORELOAD_LISTENER                  = 0x1000,
-        TOUCH_LISTENER                       = 0x2000,
-        SCROLL_LISTENER                      = 0x4000
+        SCROLL_LISTENER                      = 0x2000
     };
 
     bool hasListenerType(ListenerType listenerType) const { return (m_listenerTypes & listenerType); }
-    void addListenerType(ListenerType listenerType) { m_listenerTypes = m_listenerTypes | listenerType; }
     void addListenerTypeIfNeeded(const AtomicString& eventType);
 
 #if ENABLE(MUTATION_OBSERVERS)
@@ -1198,7 +1206,7 @@ private:
     virtual String nodeName() const;
     virtual NodeType nodeType() const;
     virtual bool childTypeAllowed(NodeType) const;
-    virtual PassRefPtr<Node> cloneNode(bool deep);
+    virtual PassRefPtr<Node> cloneNode(bool deep, ExceptionCode&);
     virtual bool canReplaceChild(Node* newChild, Node* oldChild);
 
     virtual void refScriptExecutionContext() { ref(); }
@@ -1226,6 +1234,8 @@ private:
     void collectActiveStylesheets(Vector<RefPtr<StyleSheet> >&);
     bool testAddedStylesheetRequiresStyleRecalc(StyleSheetContents*);
     void analyzeStylesheetChange(StyleResolverUpdateFlag, const Vector<RefPtr<StyleSheet> >& newStylesheets, bool& requiresStyleResolverReset, bool& requiresFullStyleRecalc);
+    void didRemoveAllPendingStylesheet();
+    void setNeedsNotifyRemoveAllPendingStylesheet() { m_needsNotifyRemoveAllPendingStylesheet = true; }
 
     void seamlessParentUpdatedStylesheets();
     void notifySeamlessChildDocumentsOfStylesheetUpdate() const;
@@ -1257,6 +1267,9 @@ private:
     void setVisualUpdatesAllowed(bool);
     void visualUpdatesSuppressionTimerFired(Timer<Document>*);
 
+    void addListenerType(ListenerType listenerType) { m_listenerTypes |= listenerType; }
+    void addMutationEventListenerTypeIfEnabled(ListenerType);
+
     int m_guardRefCount;
 
     OwnPtr<StyleResolver> m_styleResolver;
@@ -1265,6 +1278,8 @@ private:
     Vector<OwnPtr<FontData> > m_customFonts;
 
     Frame* m_frame;
+    RefPtr<DOMWindow> m_domWindow;
+
     OwnPtr<CachedResourceLoader> m_cachedResourceLoader;
     RefPtr<DocumentParser> m_parser;
     RefPtr<ContextFeatures> m_contextFeatures;
@@ -1301,7 +1316,8 @@ private:
 
     // But sometimes you need to ignore pending stylesheet count to
     // force an immediate layout when requested by JS.
-    bool m_ignorePendingStylesheets;
+    bool m_ignorePendingStylesheets : 1;
+    bool m_needsNotifyRemoveAllPendingStylesheet : 1;
 
     // If we do ignore the pending stylesheet count, then we need to add a boolean
     // to track that this happened so that we can do a full repaint when the stylesheets
@@ -1554,6 +1570,12 @@ private:
     bool m_didDispatchViewportPropertiesChanged;
 #endif
 };
+
+inline void Document::notifyRemovePendingSheetIfNeeded()
+{
+    if (m_needsNotifyRemoveAllPendingStylesheet)
+        didRemoveAllPendingStylesheet();
+}
 
 // Put these methods here, because they require the Document definition, but we really want to inline them.
 

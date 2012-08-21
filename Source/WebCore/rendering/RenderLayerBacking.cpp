@@ -204,6 +204,9 @@ void RenderLayerBacking::createPrimaryGraphicsLayer()
 #if ENABLE(CSS_FILTERS)
     updateLayerFilters(renderer()->style());
 #endif
+#if ENABLE(CSS_COMPOSITING)
+    updateLayerBlendMode(renderer()->style());
+#endif
 }
 
 void RenderLayerBacking::destroyGraphicsLayers()
@@ -228,7 +231,7 @@ void RenderLayerBacking::updateLayerTransform(const RenderStyle* style)
     // baked into it, and we don't want that.
     TransformationMatrix t;
     if (m_owningLayer->hasTransform()) {
-        style->applyTransform(t, toRenderBox(renderer())->borderBoxRect().size(), RenderStyle::ExcludeTransformOrigin);
+        style->applyTransform(t, toRenderBox(renderer())->pixelSnappedBorderBoxRect().size(), RenderStyle::ExcludeTransformOrigin);
         makeMatrixRenderable(t, compositor()->canRender3DTransforms());
     }
     
@@ -239,6 +242,12 @@ void RenderLayerBacking::updateLayerTransform(const RenderStyle* style)
 void RenderLayerBacking::updateLayerFilters(const RenderStyle* style)
 {
     m_canCompositeFilters = m_graphicsLayer->setFilters(style->filter());
+}
+#endif
+
+#if ENABLE(CSS_COMPOSITING)
+void RenderLayerBacking::updateLayerBlendMode(const RenderStyle*)
+{
 }
 #endif
 
@@ -451,6 +460,10 @@ void RenderLayerBacking::updateGraphicsLayerGeometry()
         
 #if ENABLE(CSS_FILTERS)
     updateLayerFilters(renderer()->style());
+#endif
+
+#if ENABLE(CSS_COMPOSITING)
+    updateLayerBlendMode(renderer()->style());
 #endif
     
     m_owningLayer->updateDescendantDependentFlags();
@@ -1183,6 +1196,12 @@ void RenderLayerBacking::setRequiresOwnBackingStore(bool requiresOwnBacking)
     compositor()->repaintInCompositedAncestor(m_owningLayer, compositedBounds());
 }
 
+#if ENABLE(CSS_COMPOSITING)
+void RenderLayerBacking::setBlendMode(BlendMode)
+{
+}
+#endif
+
 void RenderLayerBacking::setContentsNeedDisplay()
 {
     ASSERT(!paintsIntoCompositedAncestor());
@@ -1242,7 +1261,7 @@ void RenderLayerBacking::paintIntoLayer(RenderLayer* rootLayer, GraphicsContext*
         paintFlags |= RenderLayer::PaintLayerPaintingCompositingMaskPhase;
         
     // FIXME: GraphicsLayers need a way to split for RenderRegions.
-    m_owningLayer->paintLayerContents(rootLayer, context, paintDirtyRect, paintBehavior, paintingRoot, 0, 0, paintFlags);
+    m_owningLayer->paintLayerContents(rootLayer, context, paintDirtyRect, LayoutSize(), paintBehavior, paintingRoot, 0, 0, paintFlags);
 
     if (m_owningLayer->containsDirtyOverlayScrollbars())
         m_owningLayer->paintOverlayScrollbars(context, paintDirtyRect, paintBehavior, paintingRoot);

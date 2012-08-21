@@ -30,6 +30,7 @@
 #ifndef CodeBlock_h
 #define CodeBlock_h
 
+#include "ArrayProfile.h"
 #include "BytecodeConventions.h"
 #include "CallLinkInfo.h"
 #include "CallReturnOffsetToBytecodeOffset.h"
@@ -229,6 +230,9 @@ namespace JSC {
             return *(binarySearch<MethodCallLinkInfo, unsigned, getMethodCallLinkInfoBytecodeIndex>(m_methodCallLinkInfos.begin(), m_methodCallLinkInfos.size(), bytecodeIndex));
         }
 
+#if ENABLE(LLINT)
+        Instruction* adjustPCIfAtCallSite(Instruction*);
+#endif
         unsigned bytecodeOffset(ExecState*, ReturnAddressPtr);
 
         unsigned bytecodeOffsetForCallAtIndex(unsigned index)
@@ -441,7 +445,7 @@ namespace JSC {
         MacroAssemblerCodePtr getJITCodeWithArityCheck() { return m_jitCodeWithArityCheck; }
         JITCode::JITType getJITType() { return m_jitCode.jitType(); }
         ExecutableMemoryHandle* executableMemory() { return getJITCode().getExecutableMemory(); }
-        virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*) = 0;
+        virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*, unsigned bytecodeIndex) = 0;
         virtual void jettison() = 0;
         enum JITCompilationResult { AlreadyCompiled, CouldNotCompile, CompiledSuccessfully };
         JITCompilationResult jitCompile(ExecState* exec)
@@ -751,8 +755,18 @@ namespace JSC {
         }
         
         unsigned executionEntryCount() const { return m_executionEntryCount; }
-#endif
 
+        unsigned numberOfArrayProfiles() const { return m_arrayProfiles.size(); }
+        const ArrayProfileVector& arrayProfiles() { return m_arrayProfiles; }
+        ArrayProfile* addArrayProfile(unsigned bytecodeOffset)
+        {
+            m_arrayProfiles.append(ArrayProfile(bytecodeOffset));
+            return &m_arrayProfiles.last();
+        }
+        ArrayProfile* getArrayProfile(unsigned bytecodeOffset);
+        ArrayProfile* getOrAddArrayProfile(unsigned bytecodeOffset);
+#endif
+        
         unsigned globalResolveInfoCount() const
         {
 #if ENABLE(JIT)    
@@ -1333,6 +1347,7 @@ namespace JSC {
         SegmentedVector<ValueProfile, 8> m_valueProfiles;
         SegmentedVector<RareCaseProfile, 8> m_rareCaseProfiles;
         SegmentedVector<RareCaseProfile, 8> m_specialFastCaseProfiles;
+        ArrayProfileVector m_arrayProfiles;
         unsigned m_executionEntryCount;
 #endif
 
@@ -1436,7 +1451,7 @@ namespace JSC {
         
 #if ENABLE(JIT)
     protected:
-        virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
+        virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*, unsigned bytecodeIndex);
         virtual void jettison();
         virtual bool jitCompileImpl(ExecState*);
         virtual CodeBlock* replacement();
@@ -1471,7 +1486,7 @@ namespace JSC {
         
 #if ENABLE(JIT)
     protected:
-        virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
+        virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*, unsigned bytecodeIndex);
         virtual void jettison();
         virtual bool jitCompileImpl(ExecState*);
         virtual CodeBlock* replacement();
@@ -1509,7 +1524,7 @@ namespace JSC {
         
 #if ENABLE(JIT)
     protected:
-        virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*);
+        virtual JSObject* compileOptimized(ExecState*, ScopeChainNode*, unsigned bytecodeIndex);
         virtual void jettison();
         virtual bool jitCompileImpl(ExecState*);
         virtual CodeBlock* replacement();

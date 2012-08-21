@@ -308,22 +308,48 @@ WebInspector.CSSNumberRegex = /^(-?(?:\d+(?:\.\d+)?|\.\d+))$/;
 
 WebInspector.StyleValueDelimiters = " \xA0\t\n\"':;,/()";
 
+
+/**
+  * @param {Event} event
+  * @return {?string}
+  */
+WebInspector._valueModificationDirection = function(event)
+{
+    var direction = null;
+    if (event.type === "mousewheel") {
+        if (event.wheelDeltaY > 0)
+            direction = "Up";
+        else if (event.wheelDeltaY < 0)
+            direction = "Down";
+    } else {
+        if (event.keyIdentifier === "Up" || event.keyIdentifier === "PageUp")
+            direction = "Up";
+        else if (event.keyIdentifier === "Down" || event.keyIdentifier === "PageDown")
+            direction = "Down";        
+    }
+    return direction;
+}
+
 /**
  * @param {string} hexString
  * @param {Event} event
  */
 WebInspector._modifiedHexValue = function(hexString, event)
 {
+    var direction = WebInspector._valueModificationDirection(event);
+    if (!direction)
+        return hexString;
+
     var number = parseInt(hexString, 16);
     if (isNaN(number) || !isFinite(number))
         return hexString;
 
     var maxValue = Math.pow(16, hexString.length) - 1;
-    var arrowKeyPressed = (event.keyIdentifier === "Up" || event.keyIdentifier === "Down");
-
+    var arrowKeyOrMouseWheelEvent = (event.keyIdentifier === "Up" || event.keyIdentifier === "Down" || event.type === "mousewheel");
     var delta;
-    if (arrowKeyPressed)
-        delta = (event.keyIdentifier === "Up") ? 1 : -1;
+
+    if (arrowKeyOrMouseWheelEvent)
+        delta = (direction === "Up") ? 1 : -1;
     else
         delta = (event.keyIdentifier === "PageUp") ? 16 : -16;
 
@@ -349,19 +375,23 @@ WebInspector._modifiedHexValue = function(hexString, event)
  */
 WebInspector._modifiedFloatNumber = function(number, event)
 {
-    var arrowKeyPressed = (event.keyIdentifier === "Up" || event.keyIdentifier === "Down");
+    var direction = WebInspector._valueModificationDirection(event);
+    if (!direction)
+        return number;
+    
+    var arrowKeyOrMouseWheelEvent = (event.keyIdentifier === "Up" || event.keyIdentifier === "Down" || event.type === "mousewheel");
 
     // Jump by 10 when shift is down or jump by 0.1 when Alt/Option is down.
     // Also jump by 10 for page up and down, or by 100 if shift is held with a page key.
     var changeAmount = 1;
-    if (event.shiftKey && !arrowKeyPressed)
+    if (event.shiftKey && !arrowKeyOrMouseWheelEvent)
         changeAmount = 100;
-    else if (event.shiftKey || !arrowKeyPressed)
+    else if (event.shiftKey || !arrowKeyOrMouseWheelEvent)
         changeAmount = 10;
     else if (event.altKey)
         changeAmount = 0.1;
 
-    if (event.keyIdentifier === "Down" || event.keyIdentifier === "PageDown")
+    if (direction === "Down")
         changeAmount *= -1;
 
     // Make the new number and constrain it to a precision of 6, this matches numbers the engine returns.
@@ -382,9 +412,9 @@ WebInspector._modifiedFloatNumber = function(number, event)
  */
 WebInspector.handleElementValueModifications = function(event, element, finishHandler, suggestionHandler, customNumberHandler)
 {
-    var arrowKeyPressed = (event.keyIdentifier === "Up" || event.keyIdentifier === "Down");
+    var arrowKeyOrMouseWheelEvent = (event.keyIdentifier === "Up" || event.keyIdentifier === "Down" || event.type === "mousewheel");
     var pageKeyPressed = (event.keyIdentifier === "PageUp" || event.keyIdentifier === "PageDown");
-    if (!arrowKeyPressed && !pageKeyPressed)
+    if (!arrowKeyOrMouseWheelEvent && !pageKeyPressed)
         return false;
 
     var selection = window.getSelection();
@@ -1005,6 +1035,54 @@ WebInspector.revertDomChanges = function(domChanges)
             entry.node.textContent = entry.oldText;
             break;
         }
+    }
+}
+
+/**
+ * @param {string} imageURL
+ * @param {boolean} showDimensions
+ * @param {function(Element=)} userCallback
+ * @param {Object=} precomputedDimensions
+ */
+WebInspector.buildImagePreviewContents = function(imageURL, showDimensions, userCallback, precomputedDimensions)
+{
+    var resource = WebInspector.resourceTreeModel.resourceForURL(imageURL);
+    if (!resource) {
+        userCallback();
+        return;
+    }
+
+    var imageElement = document.createElement("img");
+    imageElement.addEventListener("load", buildContent, false);
+    imageElement.addEventListener("error", errorCallback, false);
+    resource.populateImageSource(imageElement);
+
+    function errorCallback()
+    {
+        // Drop the event parameter when invoking userCallback.
+        userCallback();
+    }
+
+    function buildContent()
+    {
+        var container = document.createElement("table");
+        container.className = "image-preview-container";
+        var naturalWidth = precomputedDimensions ? precomputedDimensions.naturalWidth : imageElement.naturalWidth;
+        var naturalHeight = precomputedDimensions ? precomputedDimensions.naturalHeight : imageElement.naturalHeight;
+        var offsetWidth = precomputedDimensions ? precomputedDimensions.offsetWidth : naturalWidth;
+        var offsetHeight = precomputedDimensions ? precomputedDimensions.offsetHeight : naturalHeight;
+        var description;
+        if (showDimensions) {
+            if (offsetHeight === naturalHeight && offsetWidth === naturalWidth)
+                description = WebInspector.UIString("%d \xd7 %d pixels", offsetWidth, offsetHeight);
+            else
+                description = WebInspector.UIString("%d \xd7 %d pixels (Natural: %d \xd7 %d pixels)", offsetWidth, offsetHeight, naturalWidth, naturalHeight);
+        }
+
+        container.createChild("tr").createChild("td", "image-container").appendChild(imageElement);
+        if (description)
+            container.createChild("tr").createChild("td").createChild("span", "description").textContent = description;
+        userCallback(container);
     }
 }
 

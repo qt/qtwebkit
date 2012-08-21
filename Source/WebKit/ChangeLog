@@ -1,3 +1,71 @@
+2012-08-20  Dominik Röttsches  <dominik.rottsches@intel.com>
+
+        [EFL] Get rid of pango backend support once harfbuzz-ng is working
+        https://bugs.webkit.org/show_bug.cgi?id=92102
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Removing pango-specific includes and libraries.
+
+        * PlatformEfl.cmake: Pango sections removed.
+
+2012-08-17  Rob Buis  <rbuis@rim.com>
+
+        [BlackBerry] Remove some shared libraries from linking
+        https://bugs.webkit.org/show_bug.cgi?id=94253
+
+        Reviewed by Yong Li.
+
+        Remove some shared libraries.
+
+        * PlatformBlackBerry.cmake:
+
+2012-08-15  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Update manual tests and comments to refer to TestRunner instead of LayoutTestController
+        https://bugs.webkit.org/show_bug.cgi?id=94168
+
+        Reviewed by Kent Tamura.
+
+        * PlatformBlackBerry.cmake:
+
+2012-08-14  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] undefined reference to 'g_type_init' with gold linker
+        https://bugs.webkit.org/show_bug.cgi?id=93935
+
+        Unreviewed build fix. Link against glib-gobject to
+        fix linking error with gold linker.
+
+        * PlatformEfl.cmake:
+
+2012-08-11  Raphael Kubo da Costa  <rakuco@webkit.org>
+
+        [CMake] Rewrite FindLibSoup2.cmake.
+        https://bugs.webkit.org/show_bug.cgi?id=93191
+
+        Reviewed by Rob Buis.
+
+        * PlatformEfl.cmake: Use LIBSOUP_FOO instead of LIBSOUP24_FOO.
+
+2012-08-13  Raphael Kubo da Costa  <rakuco@webkit.org>
+
+        [CMake] Remove glib-related Find modules and write single new one instead.
+        https://bugs.webkit.org/show_bug.cgi?id=93786
+
+        Reviewed by Rob Buis.
+
+        * PlatformEfl.cmake: Use GLIB_* instead of Glib_*.
+
+2012-08-12  Loïc Yhuel  <loic.yhuel@softathome.com>
+
+        [Qt] Make it possible to build without QtTest/QtPrintSupport
+        https://bugs.webkit.org/show_bug.cgi?id=93492
+
+        Reviewed by Tor Arne Vestbø.
+
+        * WebKit1.pri: Optional printsupport
+
 2012-08-10  Joshua Netterfield  <jnetterfield@rim.com>
 
         [WebGL] Add support for EXT_robustness

@@ -1,3 +1,76 @@
+2012-08-15  Joanmarie Diggs  <jdiggs@igalia.com>
+
+        [Gtk] atk_text_set_caret_offset() fails for table cells
+        https://bugs.webkit.org/show_bug.cgi?id=83501
+
+        Reviewed by Chris Fleizach.
+
+        Update unit test to include setting the caret in a table cell via the AtkText interface.
+
+        * tests/testatk.c:
+        (testWebkitAtkCaretOffsets): Add setting the caret inside the text of a table cell.
+
+2012-08-15  Joanmarie Diggs  <jdiggs@igalia.com>
+
+        [Gtk] atk_text_get_text_at_offset() fails to provide the correct line for paragraphs in list items whose text wraps
+        https://bugs.webkit.org/show_bug.cgi?id=83435
+
+        Reviewed by Chris Fleizach.
+
+        Updated unit test to include a paragraph in a list item when testing atk_text_get_text_at_offset().
+
+        * tests/testatk.c:
+        (testWebkitAtkGetTextAtOffsetWithSpecialCharacters):
+
+2012-08-14  Adam Barth  <abarth@webkit.org>
+
+        Delete Frame::domWindow() and Frame::existingDOMWindow()
+        https://bugs.webkit.org/show_bug.cgi?id=93990
+
+        Reviewed by Eric Seidel.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::getPendingUnloadEventCount):
+
+2012-08-13  Tom Sepez  <tsepez@chromium.org>
+
+        [chromium] release FrameLoaderClientImpl::m_pluginWidget refptr upon Plugin Document detach.
+        https://bugs.webkit.org/show_bug.cgi?id=93283
+
+        Reviewed by Eric Seidel.
+
+        Change the client redirectDataToPlugin method(s) to expect the possibility of
+        a NULL argument, keeping existing behaviour otherwise.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::redirectDataToPlugin):
+
+2012-08-13  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Default signal handler for WebKitWebView::should-show-delete-interface-for-element overrides default result
+        https://bugs.webkit.org/show_bug.cgi?id=93600
+
+        Reviewed by Xan Lopez.
+
+        Instead of using the default editing signal handler for ::should-show-delete-interface-for-element,
+        do not use a default signal handler. This means that the result of the signal defaults to FALSE,
+        which is the expected value to ensure that the delete interface is not shown.
+
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_class_init): Do not install a default signal handler.
+
+2012-08-13  Mario Sanchez Prada  <msanchez@igalia.com>
+
+        [GTK] Implementation of atk_editable_text_insert_text ignores 'length' parameter
+        https://bugs.webkit.org/show_bug.cgi?id=93804
+
+        Reviewed by Carlos Garcia Campos.
+
+        Update unit tests to also check inserting a partial string.
+
+        * tests/testatk.c:
+        (testWebkitAtkTextChangedNotifications): Update test.
+
 2012-08-10  Alice Cheng  <alice_cheng@apple.com>
 
         Part 1 of: Extend -webkit-user-select with a new value "all"

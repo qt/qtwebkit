@@ -28,7 +28,7 @@
 
 #if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
 #include "DateTimeFieldElement.h"
-#include "TextControlInnerElements.h"
+#include "SpinButtonElement.h"
 
 namespace WebCore {
 
@@ -42,7 +42,7 @@ class StepRange;
 // representing date and time, such as
 //  - Year, Month, Day Of Month
 //  - Hour, Minute, Second, Millisecond, AM/PM
-class DateTimeEditElement : public HTMLDivElement, public DateTimeFieldElement::FieldEventHandler, private SpinButtonElement::StepActionHandler {
+class DateTimeEditElement : public HTMLDivElement, public DateTimeFieldElement::FieldEventHandler, private SpinButtonElement::SpinButtonOwner {
     WTF_MAKE_NONCOPYABLE(DateTimeEditElement);
 
 public:
@@ -51,9 +51,11 @@ public:
     class EditControlOwner {
     public:
         virtual ~EditControlOwner();
+        virtual void focusAndSelectEditControlOwner() = 0;
         virtual void editControlMouseFocus() = 0;
         virtual void editControlValueChanged() = 0;
         virtual bool isEditControlOwnerDisabled() const = 0;
+        virtual bool isEditControlOwnerFocused() const = 0;
         virtual bool isEditControlOwnerReadOnly() const = 0;
     };
 
@@ -101,7 +103,10 @@ private:
     virtual void fieldValueChanged() OVERRIDE FINAL;
     virtual void focusOnNextField() OVERRIDE FINAL;
 
-    // SpinButtonElement::StepActionHandler functions.
+    // SpinButtonElement::SpinButtonOwner functions.
+    virtual void focusAndSelectSpinButtonOwner() OVERRIDE FINAL;
+    virtual bool shouldSpinButtonRespondToMouseEvents() OVERRIDE FINAL;
+    virtual bool shouldSpinButtonRespondToWheelEvents() OVERRIDE FINAL;
     virtual void spinButtonStepDown() OVERRIDE FINAL;
     virtual void spinButtonStepUp() OVERRIDE FINAL;
 

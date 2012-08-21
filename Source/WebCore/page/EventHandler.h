@@ -169,10 +169,9 @@ public:
 
 #if ENABLE(TOUCH_ADJUSTMENT)
     bool bestClickableNodeForTouchPoint(const IntPoint& touchCenter, const IntSize& touchRadius, IntPoint& targetPoint, Node*& targetNode);
+    bool bestContextMenuNodeForTouchPoint(const IntPoint& touchCenter, const IntSize& touchRadius, IntPoint& targetPoint, Node*& targetNode);
     bool bestZoomableAreaForTouchPoint(const IntPoint& touchCenter, const IntSize& touchRadius, IntRect& targetArea, Node*& targetNode);
 
-    // FIXME: Add a gesture type parameter so that different candidate selection criteria may be used for
-    // different gesture types. Currently TouchAdjustment::nodeRespondsToTapGesture is used for all types.
     bool adjustGesturePosition(const PlatformGestureEvent&, IntPoint& adjustedPoint);
 #endif
 
@@ -230,8 +229,6 @@ public:
     bool handleTouchEvent(const PlatformTouchEvent&);
 #endif
 
-    static Node* targetNode(const HitTestResult&);
-
 private:
 #if ENABLE(DRAG_SUPPORT)
     static DragState& dragState();
@@ -246,8 +243,6 @@ private:
     void selectClosestWordOrLinkFromMouseEvent(const MouseEventWithHitTestResults&);
 
     bool handleMouseDoubleClickEvent(const PlatformMouseEvent&);
-
-    static Node* targetNode(const MouseEventWithHitTestResults&);
 
     bool handleMousePressEvent(const MouseEventWithHitTestResults&);
     bool handleMousePressEventSingleClick(const MouseEventWithHitTestResults&);

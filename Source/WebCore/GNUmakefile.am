@@ -1,8 +1,5 @@
 include $(srcdir)/Source/WebCore/GNUmakefile.list.am
 
-SVG_FEATURES :=
-HTML_FEATURES :=
-
 WEBCORE_CSS_PROPERTY_NAMES := $(WebCore)/css/CSSPropertyNames.in
 WEBCORE_CSS_VALUE_KEYWORDS := $(WebCore)/css/CSSValueKeywords.in
 
@@ -19,6 +16,7 @@ webcore_cppflags += \
 	-I$(srcdir)/Source/WebCore/Modules/mediastream \
 	-I$(srcdir)/Source/WebCore/Modules/notifications \
 	-I$(srcdir)/Source/WebCore/Modules/protocolhandler \
+	-I$(srcdir)/Source/WebCore/Modules/quota \
 	-I$(srcdir)/Source/WebCore/Modules/webaudio \
 	-I$(srcdir)/Source/WebCore/Modules/webdatabase \
 	-I$(srcdir)/Source/WebCore/Modules/websockets \
@@ -226,7 +224,6 @@ endif # END ENABLE_SQL_DATABASE
 # ----
 if ENABLE_DATALIST_ELEMENT
 FEATURE_DEFINES += ENABLE_DATALIST_ELEMENT=1
-HTML_FEATURES += ENABLE_DATALIST_ELEMENT=1
 webcore_cppflags += -DENABLE_DATALIST_ELEMENT=1
 endif # END ENABLE_DATALIST_ELEMENT
 
@@ -354,7 +351,6 @@ endif # END ENABLE_ORIENTATION_EVENTS
 # ----
 if ENABLE_VIDEO
 FEATURE_DEFINES += ENABLE_VIDEO=1
-HTML_FEATURES += ENABLE_VIDEO=1
 webcore_cppflags += -DENABLE_VIDEO=1
 
 if USE_GSTREAMER
@@ -464,10 +460,6 @@ endif
 if ENABLE_FILTERS
 FEATURE_DEFINES += ENABLE_FILTERS=1
 webcore_cppflags += -DENABLE_FILTERS=1
-if ENABLE_SVG
-SVG_FEATURES += ENABLE_FILTERS=1
-endif
-
 endif # END ENABLE_FILTERS
 
 # ----
@@ -503,10 +495,6 @@ endif # END ENABLE_CSS_FILTERS
 if ENABLE_CSS_COMPOSITING
 FEATURE_DEFINES += ENABLE_CSS_COMPOSITING=1
 webcore_cppflags += -DENABLE_CSS_COMPOSITING=1
-if ENABLE_SVG
-SVG_FEATURES += ENABLE_CSS_COMPOSITING=1
-endif
-
 endif # END ENABLE_CSS_COMPOSITING
 
 # ----
@@ -563,7 +551,6 @@ WEBCORE_CSS_VALUE_KEYWORDS += $(WebCore)/css/SVGCSSValueKeywords.in
 # SVG Features
 if ENABLE_SVG_FONTS
 FEATURE_DEFINES += ENABLE_SVG_FONTS=1
-SVG_FEATURES += ENABLE_SVG_FONTS=1
 webcore_cppflags += -DENABLE_SVG_FONTS=1
 endif
 
@@ -572,14 +559,8 @@ endif # END ENABLE_SVG
 # SVG tag and attribute names (need to pass an extra flag if svg experimental features are enabled)
 DerivedSources/WebCore/SVGNames.cpp: DerivedSources/WebCore/SVGElementFactory.cpp
 DerivedSources/WebCore/JSSVGElementWrapperFactory.cpp: DerivedSources/WebCore/SVGElementFactory.cpp
-
-if SVG_FLAGS
 DerivedSources/WebCore/SVGElementFactory.cpp: $(WebCore)/dom/make_names.pl $(WebCore)/svg/svgtags.in $(WebCore)/svg/svgattrs.in
-	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --tags $(WebCore)/svg/svgtags.in --attrs $(WebCore)/svg/svgattrs.in --extraDefines "$(SVG_FEATURES)" --factory --wrapperFactory --outputDir "$(GENSOURCES_WEBCORE)"
-else
-DerivedSources/WebCore/SVGElementFactory.cpp: $(WebCore)/dom/make_names.pl $(WebCore)/svg/svgtags.in $(WebCore)/svg/svgattrs.in
-	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --tags $(WebCore)/svg/svgtags.in --attrs $(WebCore)/svg/svgattrs.in --factory --wrapperFactory --outputDir "$(GENSOURCES_WEBCORE)"
-endif # SVG_FLAGS
+	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --tags $(WebCore)/svg/svgtags.in --attrs $(WebCore)/svg/svgattrs.in --extraDefines "$(FEATURE_DEFINES)" --factory --wrapperFactory --outputDir "$(GENSOURCES_WEBCORE)"
 
 # end SVG Features
 
@@ -741,6 +722,13 @@ webcore_cppflags += -DENABLE_CSS3_FLEXBOX=1
 endif  # END ENABLE_CSS3_FLEXBOX
 
 # ---
+# CSS3 Text Decoration support
+if ENABLE_CSS3_TEXT_DECORATION
+FEATURE_DEFINES += ENABLE_CSS3_TEXT_DECORATION=1
+webcore_cppflags += -DENABLE_CSS3_TEXT_DECORATION=1
+endif # END ENABLE_CSS3_TEXT_DECORATION
+
+# ---
 # Link prefetch support
 # ---
 if ENABLE_LINK_PREFETCH
@@ -849,13 +837,8 @@ DerivedSources/WebCore/JSHTMLElementWrapperFactory.cpp: DerivedSources/WebCore/H
 DerivedSources/WebCore/HTMLElementFactory.cpp: DerivedSources/WebCore/HTMLElementFactory.h
 DerivedSources/WebCore/HTMLElementFactory.h: DerivedSources/WebCore/HTMLNames.cpp
 DerivedSources/WebCore/HTMLNames.cpp: DerivedSources/WebCore/HTMLNames.h
-if HTML_FLAGS
 DerivedSources/WebCore/HTMLNames.h: $(WebCore)/dom/make_names.pl $(WebCore)/html/HTMLTagNames.in $(WebCore)/html/HTMLAttributeNames.in
-	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --tags $(WebCore)/html/HTMLTagNames.in --attrs $(WebCore)/html/HTMLAttributeNames.in --extraDefines "$(HTML_FEATURES)" --factory --wrapperFactory --outputDir "$(GENSOURCES_WEBCORE)"
-else
-DerivedSources/WebCore/HTMLNames.h: $(WebCore)/dom/make_names.pl $(WebCore)/html/HTMLTagNames.in $(WebCore)/html/HTMLAttributeNames.in
-	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --tags $(WebCore)/html/HTMLTagNames.in --attrs $(WebCore)/html/HTMLAttributeNames.in --factory --wrapperFactory --outputDir "$(GENSOURCES_WEBCORE)"
-endif # HTML_FLAGS
+	$(AM_V_GEN)$(PERL) -I$(WebCore)/bindings/scripts $< --tags $(WebCore)/html/HTMLTagNames.in --attrs $(WebCore)/html/HTMLAttributeNames.in --extraDefines "$(FEATURE_DEFINES)" --factory --wrapperFactory --outputDir "$(GENSOURCES_WEBCORE)"
 
 
 DerivedSources/WebCore/XMLNSNames.cpp DerivedSources/WebCore/XMLNSNames.h: $(WebCore)/dom/make_names.pl $(WebCore)/xml/xmlnsattrs.in
@@ -913,6 +896,7 @@ IDL_PATH := \
     $(WebCore)/Modules/mediasource \
     $(WebCore)/Modules/mediastream \
     $(WebCore)/Modules/notifications \
+    $(WebCore)/Modules/quota \
     $(WebCore)/Modules/webaudio \
     $(WebCore)/Modules/webdatabase \
     $(WebCore)/Modules/websockets \

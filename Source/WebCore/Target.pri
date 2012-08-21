@@ -74,6 +74,7 @@ SOURCES += \
      bindings/js/BindingState.cpp \
      bindings/js/CallbackFunction.cpp \
      bindings/js/DOMObjectHashTableMap.cpp \
+     bindings/js/DOMTransaction.cpp \
      bindings/js/DOMWrapperWorld.cpp \
      bindings/js/Dictionary.cpp \
      bindings/js/GCController.cpp \
@@ -96,7 +97,6 @@ SOURCES += \
      bindings/js/JSClipboardCustom.cpp \
      bindings/js/JSConsoleCustom.cpp \
      bindings/js/JSCoordinatesCustom.cpp \
-     bindings/js/JSCustomVoidCallback.cpp \
      bindings/js/JSCustomXPathNSResolver.cpp \
      bindings/js/JSDictionary.cpp \
      bindings/js/JSDOMBinding.cpp \
@@ -183,6 +183,7 @@ SOURCES += \
      bindings/js/JSTouchCustom.cpp \
      bindings/js/JSTouchListCustom.cpp \
      bindings/js/JSTreeWalkerCustom.cpp \
+     bindings/js/JSUndoManagerCustom.cpp \
      bindings/js/JSWebKitAnimationCustom.cpp \
      bindings/js/JSWebKitAnimationListCustom.cpp \
      bindings/js/JSWebKitCSSKeyframeRuleCustom.cpp \
@@ -720,6 +721,7 @@ SOURCES += \
     html/shadow/MeterShadowElement.cpp \
     html/shadow/ProgressShadowElement.cpp \
     html/shadow/SliderThumbElement.cpp \
+    html/shadow/SpinButtonElement.cpp \
     html/shadow/TextControlInnerElements.cpp \
     inspector/ConsoleMessage.cpp \
     inspector/ContentSearchUtils.cpp \
@@ -945,9 +947,11 @@ SOURCES += \
     platform/graphics/FontData.cpp \
     platform/graphics/Font.cpp \
     platform/graphics/FontCache.cpp \
+    platform/graphics/FontFastPath.cpp \
     platform/graphics/FractionalLayoutBoxExtent.cpp \
     platform/graphics/FractionalLayoutRect.cpp \
     platform/graphics/GeneratorGeneratedImage.cpp \
+    platform/graphics/GlyphPageTreeNode.cpp \
     platform/graphics/Gradient.cpp \
     platform/graphics/GraphicsContext.cpp \
     platform/graphics/GraphicsLayer.cpp \
@@ -962,6 +966,7 @@ SOURCES += \
     platform/graphics/Path.cpp \
     platform/graphics/PathTraversalState.cpp \
     platform/graphics/Pattern.cpp \
+    platform/graphics/qt/FontQt.cpp \
     platform/graphics/Region.cpp \
     platform/graphics/RoundedRect.cpp \
     platform/graphics/SegmentedFontData.cpp \
@@ -971,6 +976,7 @@ SOURCES += \
     platform/graphics/StringTruncator.cpp \
     platform/graphics/surfaces/GraphicsSurface.cpp \
     platform/graphics/surfaces/qt/GraphicsSurfaceQt.cpp \
+    platform/graphics/SurrogatePairAwareTextIterator.cpp \
     platform/graphics/TextRun.cpp \
     platform/graphics/TiledBackingStore.cpp \
     platform/graphics/transforms/AffineTransform.cpp \
@@ -984,6 +990,7 @@ SOURCES += \
     platform/graphics/transforms/TransformOperations.cpp \
     platform/graphics/transforms/TransformState.cpp \
     platform/graphics/transforms/TranslateTransformOperation.cpp \
+    platform/graphics/WidthIterator.cpp \
     platform/image-decoders/ImageDecoder.cpp \
     platform/image-decoders/bmp/BMPImageDecoder.cpp \
     platform/image-decoders/bmp/BMPImageReader.cpp \
@@ -1032,6 +1039,7 @@ SOURCES += \
     platform/network/ResourceResponseBase.cpp \
     platform/text/RegularExpression.cpp \
     platform/PlatformEvent.cpp \
+    platform/PlatformInstrumentation.cpp \
     platform/RuntimeApplicationChecks.cpp \
     platform/RunLoop.cpp \
     platform/SchemeRegistry.cpp \
@@ -1279,12 +1287,12 @@ HEADERS += \
     bindings/js/JSArrayBufferViewHelper.h \
     bindings/js/JSCSSStyleDeclarationCustom.h \
     bindings/js/JSCallbackData.h \
-    bindings/js/JSCustomVoidCallback.h \
     bindings/js/JSCustomXPathNSResolver.h \
     bindings/js/JSDictionary.h \
     bindings/js/JSDOMBinding.h \
     bindings/js/JSDOMGlobalObject.h \
     bindings/js/JSDOMStringMapCustom.h \
+    bindings/js/DOMTransaction.h \
     bindings/js/JSDOMWindowBase.h \
     bindings/js/JSDOMWindowCustom.h \
     bindings/js/JSDOMWindowShell.h \
@@ -2104,6 +2112,7 @@ HEADERS += \
     platform/graphics/ShadowBlur.h \
     platform/graphics/SimpleFontData.h \
     platform/graphics/surfaces/GraphicsSurface.h \
+    platform/graphics/SurrogatePairAwareTextIterator.h \
     platform/graphics/texmap/GraphicsLayerTextureMapper.h \
     platform/graphics/texmap/TextureMapper.h \
     platform/graphics/texmap/TextureMapperBackingStore.h \
@@ -2123,6 +2132,7 @@ HEADERS += \
     platform/graphics/transforms/TransformOperations.h \
     platform/graphics/transforms/TransformState.h \
     platform/graphics/transforms/TranslateTransformOperation.h \
+    platform/graphics/WidthIterator.h \
     platform/image-decoders/bmp/BMPImageDecoder.h \
     platform/image-decoders/bmp/BMPImageReader.h \
     platform/image-decoders/ico/ICOImageDecoder.h \
@@ -2645,9 +2655,9 @@ HEADERS += \
     svg/SVGVKernElement.h \
     svg/SVGZoomAndPan.h \
     svg/SVGZoomEvent.h \
-    testing/FastMallocStatistics.h \
     testing/Internals.h \
     testing/InternalSettings.h \
+    testing/MallocStatistics.h \
     workers/AbstractWorker.h \
     workers/DedicatedWorkerContext.h \
     workers/DedicatedWorkerThread.h \
@@ -2980,13 +2990,13 @@ contains(DEFINES, ENABLE_FILE_SYSTEM=1) {
         Modules/filesystem/FileEntrySync.h \
         Modules/filesystem/FileSystemCallback.h \
         Modules/filesystem/FileSystemCallbacks.h \
+        Modules/filesystem/FileSystemFlags.h \
         Modules/filesystem/FileWriter.h \
         Modules/filesystem/FileWriterBase.h \
         Modules/filesystem/FileWriterBaseCallback.h \
         Modules/filesystem/FileWriterCallback.h \
         Modules/filesystem/FileWriterClient.h \
         Modules/filesystem/FileWriterSync.h \
-        Modules/filesystem/WebKitFlags.h \
         Modules/filesystem/LocalFileSystem.h \
         Modules/filesystem/Metadata.h \
         Modules/filesystem/MetadataCallback.h \
@@ -2995,8 +3005,6 @@ contains(DEFINES, ENABLE_FILE_SYSTEM=1) {
         platform/FileMetadata.h
 
     SOURCES += \
-        bindings/js/JSDirectoryEntryCustom.cpp \
-        bindings/js/JSDirectoryEntrySyncCustom.cpp \
         bindings/js/JSEntryCustom.cpp \
         bindings/js/JSEntrySyncCustom.cpp \
         platform/AsyncFileSystem.cpp
@@ -3284,28 +3292,6 @@ contains(DEFINES, ENABLE_MATHML=1) {
         rendering/mathml/RenderMathMLSquareRoot.cpp \
         rendering/mathml/RenderMathMLSubSup.cpp \
         rendering/mathml/RenderMathMLUnderOver.cpp
-}
-
-# QRawFont transition handling.
-#
-# Even though QRawFont was already available in Qt 4.8, it had
-# limitations that made switching fully to it impossible.
-# We preserve the old code path when building with Qt 4.
-
-contains(DEFINES, HAVE_QRAWFONT=1) {
-    SOURCES += \
-        platform/graphics/qt/FontQt.cpp \
-        platform/graphics/FontFastPath.cpp \
-        platform/graphics/GlyphPageTreeNode.cpp \
-        platform/graphics/WidthIterator.cpp \
-        platform/graphics/SurrogatePairAwareTextIterator.cpp
-
-    HEADERS += \
-        platform/graphics/WidthIterator.h \
-        platform/graphics/SurrogatePairAwareTextIterator.h
-} else {
-    SOURCES += \
-        platform/graphics/qt/FontQt4.cpp
 }
 
 contains(DEFINES, ENABLE_TEXT_AUTOSIZING=1) {

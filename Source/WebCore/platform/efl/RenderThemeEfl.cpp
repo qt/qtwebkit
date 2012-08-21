@@ -42,6 +42,7 @@
 
 #include <Ecore_Evas.h>
 #include <Edje.h>
+#include <new>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
@@ -332,11 +333,12 @@ bool RenderThemeEfl::paintThemePart(RenderObject* object, FormType type, const P
 
         RenderSlider* renderSlider = toRenderSlider(object);
         HTMLInputElement* input = renderSlider->node()->toInputElement();
-        Edje_Message_Float_Set* msg;
         double valueRange = input->maximum() - input->minimum();
 
-        msg = static_cast<Edje_Message_Float_Set*>(alloca(sizeof(Edje_Message_Float_Set) + sizeof(float)));
+        OwnArrayPtr<char> buffer = adoptArrayPtr(new char[sizeof(Edje_Message_Float_Set) + sizeof(double)]);
+        Edje_Message_Float_Set* msg = new(buffer.get()) Edje_Message_Float_Set;
         msg->count = 2;
+
         if (valueRange > 0)
             msg->val[0] = static_cast<float>((input->valueAsNumber() - input->minimum()) / valueRange);
         else
@@ -346,15 +348,14 @@ bool RenderThemeEfl::paintThemePart(RenderObject* object, FormType type, const P
 #if ENABLE(PROGRESS_ELEMENT)
     } else if (type == ProgressBar) {
         RenderProgress* renderProgress = toRenderProgress(object);
-        Edje_Message_Float_Set* msg;
-        int max;
-        double value;
 
-        msg = static_cast<Edje_Message_Float_Set*>(alloca(sizeof(Edje_Message_Float_Set) + sizeof(float)));
-        max = rect.width();
-        value = renderProgress->position();
+        int max = rect.width();
+        double value = renderProgress->position();
 
+        OwnArrayPtr<char> buffer = adoptArrayPtr(new char[sizeof(Edje_Message_Float_Set) + sizeof(double)]);
+        Edje_Message_Float_Set* msg = new(buffer.get()) Edje_Message_Float_Set;
         msg->count = 2;
+
         if (object->style()->direction() == RTL)
             msg->val[0] = (1.0 - value) * max;
         else
@@ -452,8 +453,7 @@ void RenderThemeEfl::createEdje()
         else if (!edje_object_file_set(m_edje, m_themePath.utf8().data(), "webkit/base")) {
             Edje_Load_Error err = edje_object_load_error_get(m_edje);
             const char* errmsg = edje_load_error_str(err);
-            EINA_LOG_ERR("Could not load 'webkit/base' from theme %s: %s",
-                         m_themePath.utf8().data(), errmsg);
+            EINA_LOG_ERR("Could not set file: %s", errmsg);
             evas_object_del(m_edje);
             m_edje = 0;
         } else {
@@ -1240,7 +1240,7 @@ bool RenderThemeEfl::paintMediaSliderTrack(RenderObject* object, const PaintInfo
         IntPoint sliderTopRight = sliderTopLeft;
         sliderTopRight.move(0, rangeRect.height());
 
-        context->fillRect(FloatRect(rect), m_mediaPanelColor, ColorSpaceDeviceRGB);
+        context->fillRect(FloatRect(rangeRect), m_mediaPanelColor, ColorSpaceDeviceRGB);
     }
     context->restore();
     return true;

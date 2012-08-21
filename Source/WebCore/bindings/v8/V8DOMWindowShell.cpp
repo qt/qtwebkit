@@ -42,9 +42,9 @@
 #include "PageGroup.h"
 #include "PlatformSupport.h"
 #include "RuntimeEnabledFeatures.h"
-#include "SafeAllocation.h"
 #include "ScriptCallStack.h"
 #include "ScriptCallStackFactory.h"
+#include "ScriptController.h"
 #include "ScriptProfiler.h"
 #include "SecurityOrigin.h"
 #include "StorageNamespace.h"
@@ -59,6 +59,7 @@
 #include "V8HiddenPropertyName.h"
 #include "V8History.h"
 #include "V8Location.h"
+#include "V8ObjectConstructor.h"
 #include "V8PerContextData.h"
 #include "V8Proxy.h"
 #include "WorkerContextExecutionProxy.h"
@@ -334,7 +335,7 @@ bool V8DOMWindowShell::initContextIfNeeded()
         return false;
     }
 
-    if (!installDOMWindow(v8Context, m_frame->domWindow())) {
+    if (!installDOMWindow(v8Context, m_frame->document()->domWindow())) {
         disposeContextHandles();
         return false;
     }
@@ -370,16 +371,16 @@ v8::Persistent<v8::Context> V8DOMWindowShell::createNewContext(v8::Handle<v8::Ob
         return result;
 
     // Used to avoid sleep calls in unload handlers.
-    V8Proxy::registerExtensionIfNeeded(DateExtension::get());
+    ScriptController::registerExtensionIfNeeded(DateExtension::get());
 
 #if ENABLE(JAVASCRIPT_I18N_API)
     // Enables experimental i18n API in V8.
     if (RuntimeEnabledFeatures::javaScriptI18NAPIEnabled())
-        V8Proxy::registerExtensionIfNeeded(v8_i18n::Extension::get());
+        ScriptController::registerExtensionIfNeeded(v8_i18n::Extension::get());
 #endif
 
     // Dynamically tell v8 about our extensions now.
-    const V8Extensions& extensions = V8Proxy::extensions();
+    const V8Extensions& extensions = ScriptController::registeredExtensions();
     OwnArrayPtr<const char*> extensionNames = adoptArrayPtr(new const char*[extensions.size()]);
     int index = 0;
     for (size_t i = 0; i < extensions.size(); ++i) {
@@ -410,7 +411,7 @@ bool V8DOMWindowShell::installDOMWindow(v8::Handle<v8::Context> context, DOMWind
 {
     // Create a new JS window object and use it as the prototype for the  shadow global object.
     v8::Handle<v8::Function> windowConstructor = V8DOMWrapper::constructorForType(&V8DOMWindow::info, window);
-    v8::Local<v8::Object> jsWindow = SafeAllocation::newInstance(windowConstructor);
+    v8::Local<v8::Object> jsWindow = V8ObjectConstructor::newInstance(windowConstructor);
     // Bail out if allocation failed.
     if (jsWindow.IsEmpty())
         return false;
@@ -488,6 +489,12 @@ void V8DOMWindowShell::updateDocumentWrapperCache()
     }
     ASSERT(documentWrapper->IsObject());
     m_context->Global()->ForceSet(v8::String::New("document"), documentWrapper, static_cast<v8::PropertyAttribute>(v8::ReadOnly | v8::DontDelete));
+
+    // We also stash a reference to the document on the real global object so that
+    // DOMWindow objects we obtain from JavaScript references are guaranteed to have
+    // live Document objects.
+    v8::Handle<v8::Object> v8RealGlobal = v8::Handle<v8::Object>::Cast(m_context->Global()->GetPrototype());
+    v8RealGlobal->SetHiddenValue(V8HiddenPropertyName::document(), documentWrapper);
 }
 
 void V8DOMWindowShell::clearDocumentWrapperCache()
@@ -556,7 +563,7 @@ void V8DOMWindowShell::updateDocument()
 v8::Handle<v8::Value> getter(v8::Local<v8::String> property, const v8::AccessorInfo& info)
 {
     // FIXME(antonm): consider passing AtomicStringImpl directly.
-    AtomicString name = v8ValueToAtomicWebCoreString(property);
+    AtomicString name = toWebCoreAtomicString(property);
     HTMLDocument* htmlDocument = V8HTMLDocument::toNative(info.Holder());
     ASSERT(htmlDocument);
     v8::Handle<v8::Value> result = V8HTMLDocument::GetNamedProperty(htmlDocument, name, info.GetIsolate());

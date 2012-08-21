@@ -25,6 +25,11 @@
 #ifndef CCTiledLayerTestCommon_h
 #define CCTiledLayerTestCommon_h
 
+#include "CCGraphicsContext.h"
+#include "CCPrioritizedTexture.h"
+#include "CCResourceProvider.h"
+#include "CCTextureUpdateQueue.h"
+#include "CCTiledLayerImpl.h"
 #include "IntRect.h"
 #include "IntSize.h"
 #include "LayerTextureUpdater.h"
@@ -32,11 +37,6 @@
 #include "TextureCopier.h"
 #include "TextureUploader.h"
 #include "TiledLayerChromium.h"
-#include "cc/CCGraphicsContext.h"
-#include "cc/CCPrioritizedTexture.h"
-#include "cc/CCResourceProvider.h"
-#include "cc/CCTextureUpdateQueue.h"
-#include "cc/CCTiledLayerImpl.h"
 
 namespace WebKitTests {
 
@@ -49,7 +49,7 @@ public:
         Texture(FakeLayerTextureUpdater*, PassOwnPtr<WebCore::CCPrioritizedTexture>);
         virtual ~Texture();
 
-        virtual void updateRect(WebCore::CCResourceProvider* , const WebCore::IntRect&, const WebCore::IntRect&) OVERRIDE;
+        virtual void updateRect(WebCore::CCResourceProvider* , const WebCore::IntRect&, const WebCore::IntSize&) OVERRIDE;
         virtual void prepareRect(const WebCore::IntRect&, WebCore::CCRenderingStats&) OVERRIDE;
 
     private:
@@ -162,7 +162,7 @@ public:
     virtual bool isBusy() { return false; }
     virtual void beginUploads() { }
     virtual void endUploads() { }
-    virtual void uploadTexture(WebCore::CCResourceProvider* resourceProvider, Parameters upload) { upload.texture->updateRect(resourceProvider, upload.sourceRect, upload.destRect); }
+    virtual void uploadTexture(WebCore::CCResourceProvider* resourceProvider, Parameters upload) { upload.texture->updateRect(resourceProvider, upload.sourceRect, upload.destOffset); }
 };
 
 }

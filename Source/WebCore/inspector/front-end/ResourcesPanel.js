@@ -27,6 +27,15 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+importScript("ApplicationCacheItemsView.js");
+importScript("DOMStorageItemsView.js");
+importScript("DatabaseQueryView.js");
+importScript("DatabaseTableView.js");
+importScript("DirectoryContentView.js");
+importScript("IndexedDBViews.js");
+importScript("FileContentView.js");
+importScript("FileSystemView.js");
+
 /**
  * @constructor
  * @extends {WebInspector.Panel}
@@ -96,14 +105,11 @@ WebInspector.ResourcesPanel = function(database)
     WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.OnLoad, this._onLoadEventFired, this);
     WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.CachedResourcesLoaded, this._cachedResourcesLoaded, this);
     WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.WillLoadCachedResources, this._resetWithFrames, this);
+    if (WebInspector.resourceTreeModel.cachedResourcesLoaded())
+        this._cachedResourcesLoaded();
 }
 
 WebInspector.ResourcesPanel.prototype = {
-    get toolbarItemLabel()
-    {
-        return WebInspector.UIString("Resources");
-    },
-
     get statusBarItems()
     {
         return [this.storageViewStatusBarItemsContainer];

@@ -24,19 +24,19 @@
 
 #include "config.h"
 
-#include "cc/CCLayerTreeHostCommon.h"
+#include "CCLayerTreeHostCommon.h"
 
 #include "CCAnimationTestCommon.h"
+#include "CCLayerAnimationController.h"
+#include "CCLayerImpl.h"
+#include "CCLayerSorter.h"
 #include "CCLayerTreeTestCommon.h"
+#include "CCMathUtil.h"
+#include "CCProxy.h"
+#include "CCSingleThreadProxy.h"
+#include "CCThread.h"
 #include "ContentLayerChromium.h"
 #include "LayerChromium.h"
-#include "cc/CCLayerAnimationController.h"
-#include "cc/CCLayerImpl.h"
-#include "cc/CCLayerSorter.h"
-#include "cc/CCMathUtil.h"
-#include "cc/CCProxy.h"
-#include "cc/CCSingleThreadProxy.h"
-#include "cc/CCThread.h"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
@@ -607,6 +607,36 @@ TEST(CCLayerTreeHostCommonTest, verifyTransformsForFlatteningLayer)
     EXPECT_TRANSFORMATION_MATRIX_EQ(expectedChildScreenSpaceTransform, child->screenSpaceTransform());
     EXPECT_TRANSFORMATION_MATRIX_EQ(expectedGrandChildDrawTransform, grandChild->drawTransform());
     EXPECT_TRANSFORMATION_MATRIX_EQ(expectedGrandChildScreenSpaceTransform, grandChild->screenSpaceTransform());
+}
+
+TEST(CCLayerTreeHostCommonTest, verifyTransformsForDegenerateIntermediateLayer)
+{
+    // A layer that is empty in one axis, but not the other, was accidentally skipping a necessary translation.
+    // Without that translation, the coordinate space of the layer's drawTransform is incorrect.
+    //
+    // Normally this isn't a problem, because the layer wouldn't be drawn anyway, but if that layer becomes a renderSurface, then
+    // its drawTransform is implicitly inherited by the rest of the subtree, which then is positioned incorrectly as a result.
+
+    RefPtr<LayerChromium> root = LayerChromium::create();
+    RefPtr<LayerChromium> child = LayerChromium::create();
+    RefPtr<LayerChromiumWithForcedDrawsContent> grandChild = adoptRef(new LayerChromiumWithForcedDrawsContent());
+
+    // The child height is zero, but has non-zero width that should be accounted for while computing drawTransforms.
+    const WebTransformationMatrix identityMatrix;
+    setLayerPropertiesForTesting(root.get(), identityMatrix, identityMatrix, FloatPoint::zero(), FloatPoint::zero(), IntSize(100, 100), false);
+    setLayerPropertiesForTesting(child.get(), identityMatrix, identityMatrix, FloatPoint::zero(), FloatPoint::zero(), IntSize(10, 0), false);
+    setLayerPropertiesForTesting(grandChild.get(), identityMatrix, identityMatrix, FloatPoint::zero(), FloatPoint::zero(), IntSize(10, 10), false);
+
+    root->addChild(child);
+    child->addChild(grandChild);
+    child->setForceRenderSurface(true);
+
+    executeCalculateDrawTransformsAndVisibility(root.get());
+
+    ASSERT_TRUE(child->renderSurface());
+    EXPECT_TRANSFORMATION_MATRIX_EQ(identityMatrix, child->renderSurface()->drawTransform()); // This is the real test, the rest are sanity checks.
+    EXPECT_TRANSFORMATION_MATRIX_EQ(identityMatrix, child->drawTransform());
+    EXPECT_TRANSFORMATION_MATRIX_EQ(identityMatrix, grandChild->drawTransform());
 }
 
 TEST(CCLayerTreeHostCommonTest, verifyRenderSurfaceListForRenderSurfaceWithClippedLayer)

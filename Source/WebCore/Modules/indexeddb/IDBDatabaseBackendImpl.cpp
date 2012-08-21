@@ -267,6 +267,8 @@ void IDBDatabaseBackendImpl::setVersion(const String& version, PassRefPtr<IDBCal
     if (!transaction->scheduleTask(
             createCallbackTask(&IDBDatabaseBackendImpl::setVersionInternal, database, version, callbacks, transaction),
             createCallbackTask(&IDBDatabaseBackendImpl::resetVersion, database, m_version))) {
+        // FIXME: Remove one of the following lines.
+        ASSERT_NOT_REACHED();
         ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
     }
 }
@@ -444,10 +446,6 @@ void IDBDatabaseBackendImpl::openConnection(PassRefPtr<IDBCallbacks> callbacks)
 
 void IDBDatabaseBackendImpl::runIntVersionChangeTransaction(int64_t requestedVersion, PassRefPtr<IDBCallbacks> prpCallbacks)
 {
-    // FIXME: This function won't be reached until it's exposed to script in
-    // wbk.ug/92897.
-    ASSERT_NOT_REACHED();
-
     RefPtr<IDBCallbacks> callbacks = prpCallbacks;
     ASSERT(callbacks);
     for (DatabaseCallbacksSet::const_iterator it = m_databaseCallbacksSet.begin(); it != m_databaseCallbacksSet.end(); ++it) {
@@ -483,8 +481,11 @@ void IDBDatabaseBackendImpl::runIntVersionChangeTransaction(int64_t requestedVer
     OwnPtr<ScriptExecutionContext::Task> intVersionTask = createCallbackTask(&IDBDatabaseBackendImpl::setIntVersionInternal, database, requestedVersion, callbacks, transaction);
     // FIXME: Make this reset the integer version as well.
     OwnPtr<ScriptExecutionContext::Task> resetVersionOnAbortTask = createCallbackTask(&IDBDatabaseBackendImpl::resetVersion, database, m_version);
-    if (!transaction->scheduleTask(intVersionTask.release(), resetVersionOnAbortTask.release()))
+    if (!transaction->scheduleTask(intVersionTask.release(), resetVersionOnAbortTask.release())) {
+        // FIXME: Remove one of the following lines.
+        ASSERT_NOT_REACHED();
         ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
+    }
     m_pendingSecondHalfOpenWithVersionCalls.append(PendingOpenWithVersionCall::create(callbacks, requestedVersion));
 }
 

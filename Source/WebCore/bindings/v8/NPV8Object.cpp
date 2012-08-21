@@ -60,6 +60,24 @@ WrapperTypeInfo* npObjectTypeInfo()
 typedef Vector<V8NPObject*> V8NPObjectVector;
 typedef HashMap<int, V8NPObjectVector> V8NPObjectMap;
 
+static v8::Local<v8::Context> toV8Context(NPP npp, NPObject* npObject)
+{
+    V8NPObject* object = reinterpret_cast<V8NPObject*>(npObject);
+    DOMWindow* window = object->rootObject;
+    if (!window || !window->isCurrentlyDisplayedInFrame())
+        return v8::Local<v8::Context>();
+    return ScriptController::mainWorldContext(object->rootObject->frame());
+}
+
+static V8Proxy* toV8Proxy(NPObject* npObject)
+{
+    V8NPObject* object = reinterpret_cast<V8NPObject*>(npObject);
+    Frame* frame = object->rootObject->frame();
+    if (!frame)
+        return 0;
+    return frame->script()->proxy();
+}
+
 static V8NPObjectMap* staticV8NPObjectMap()
 {
     DEFINE_STATIC_LOCAL(V8NPObjectMap, v8npObjectMap, ());
@@ -226,13 +244,13 @@ bool _NPN_Invoke(NPP npp, NPObject* npObject, NPIdentifier methodName, const NPV
         return false;
     }
 
-    V8Proxy* proxy = toV8Proxy(npObject);
-    ASSERT(proxy);
+    Frame* frame = v8NpObject->rootObject->frame();
+    ASSERT(frame);
 
     // Call the function object.
     v8::Handle<v8::Function> function = v8::Handle<v8::Function>::Cast(functionObject);
     OwnArrayPtr<v8::Handle<v8::Value> > argv = createValueListFromVariantArgs(arguments, argumentCount, npObject);
-    v8::Local<v8::Value> resultObject = proxy->callFunction(function, v8NpObject->v8Object, argumentCount, argv.get());
+    v8::Local<v8::Value> resultObject = frame->script()->callFunction(function, v8NpObject->v8Object, argumentCount, argv.get());
 
     // If we had an error, return false.  The spec is a little unclear here, but says "Returns true if the method was
     // successfully invoked".  If we get an error return value, was that successfully invoked?
@@ -277,11 +295,11 @@ bool _NPN_InvokeDefault(NPP npp, NPObject* npObject, const NPVariant* arguments,
     v8::Local<v8::Value> resultObject;
     v8::Handle<v8::Function> function(v8::Function::Cast(*functionObject));
     if (!function->IsNull()) {
-        V8Proxy* proxy = toV8Proxy(npObject);
-        ASSERT(proxy);
+        Frame* frame = v8NpObject->rootObject->frame();
+        ASSERT(frame);
 
         OwnArrayPtr<v8::Handle<v8::Value> > argv = createValueListFromVariantArgs(arguments, argumentCount, npObject);
-        resultObject = proxy->callFunction(function, functionObject, argumentCount, argv.get());
+        resultObject = frame->script()->callFunction(function, functionObject, argumentCount, argv.get());
     }
     // If we had an error, return false.  The spec is a little unclear here, but says "Returns true if the method was
     // successfully invoked".  If we get an error return value, was that successfully invoked?
@@ -480,7 +498,7 @@ void _NPN_SetException(NPObject* npObject, const NPUTF8 *message)
     if (!npObject || npObject->_class != npScriptObjectClass) {
         // We won't be able to find a proper scope for this exception, so just throw it.
         // This is consistent with JSC, which throws a global exception all the time.
-        V8Proxy::throwError(V8Proxy::GeneralError, message);
+        throwError(GeneralError, message);
         return;
     }
     v8::HandleScope handleScope;
@@ -491,7 +509,7 @@ void _NPN_SetException(NPObject* npObject, const NPUTF8 *message)
     v8::Context::Scope scope(context);
     ExceptionCatcher exceptionCatcher;
 
-    V8Proxy::throwError(V8Proxy::GeneralError, message);
+    throwError(GeneralError, message);
 }
 
 bool _NPN_Enumerate(NPP npp, NPObject* npObject, NPIdentifier** identifier, uint32_t* count)
@@ -573,11 +591,10 @@ bool _NPN_Construct(NPP npp, NPObject* npObject, const NPVariant* arguments, uin
         v8::Local<v8::Value> resultObject;
         v8::Handle<v8::Function> ctor(v8::Function::Cast(*ctorObj));
         if (!ctor->IsNull()) {
-            V8Proxy* proxy = toV8Proxy(npObject);
-            ASSERT(proxy);
-
+            Frame* frame = object->rootObject->frame();
+            ASSERT(frame);
             OwnArrayPtr<v8::Handle<v8::Value> > argv = createValueListFromVariantArgs(arguments, argumentCount, npObject);
-            resultObject = proxy->newInstance(ctor, argumentCount, argv.get());
+            resultObject = V8ObjectConstructor::newInstanceInDocument(ctor, argumentCount, argv.get(), frame ? frame->document() : 0);
         }
 
         if (resultObject.IsEmpty())

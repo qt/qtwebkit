@@ -198,6 +198,11 @@ AttributeState elementSupportsAutocomplete(const Element* element)
     return elementAttributeState(element, HTMLNames::autocompleteAttr);
 }
 
+AttributeState elementSupportsSpellCheck(const Element* element)
+{
+    return elementAttributeState(element, HTMLNames::spellcheckAttr);
+}
+
 AttributeState elementAttributeState(const Element* element, const QualifiedName& attributeName)
 {
     // First we check the input item itself. If the attribute is not defined,
@@ -231,10 +236,7 @@ bool isTextBasedContentEditableElement(Element* element)
     if (!element)
         return false;
 
-    if (element->isTextFormControl() && static_cast<HTMLTextFormControlElement*>(element)->readOnly())
-        return false;
-
-    if (!element->isEnabledFormControl())
+    if (element->isReadOnlyFormControl() || !element->isEnabledFormControl())
         return false;
 
     if (isPopupInputField(element))
@@ -427,7 +429,7 @@ bool elementPatternMatches(const char* pattern, const HTMLInputElement* inputEle
                 return true;
 
             // Is the regex specifying a character count?
-            if (patternAttribute[patternString.length()] != '{' || !patternAttribute.endsWith('}'))
+            if (patternAttribute[patternString.length()] != '{' || !patternAttribute.endsWith("}"))
                 return false;
 
             // Make sure the number in the regex is actually a number.

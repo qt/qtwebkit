@@ -75,6 +75,8 @@ WebInspector.TimelinePresentationModel.initRecordStyles_ = function()
     recordStyles[recordTypes.Layout] = { title: WebInspector.UIString("Layout"), category: categories["rendering"] };
     recordStyles[recordTypes.RecalculateStyles] = { title: WebInspector.UIString("Recalculate Style"), category: categories["rendering"] };
     recordStyles[recordTypes.Paint] = { title: WebInspector.UIString("Paint"), category: categories["painting"] };
+    recordStyles[recordTypes.DecodeImage] = { title: WebInspector.UIString("Image Decode"), category: categories["painting"] };
+    recordStyles[recordTypes.ResizeImage] = { title: WebInspector.UIString("Image Resize"), category: categories["painting"] };
     recordStyles[recordTypes.CompositeLayers] = { title: WebInspector.UIString("Composite Layers"), category: categories["painting"] };
     recordStyles[recordTypes.ParseHTML] = { title: WebInspector.UIString("Parse"), category: categories["loading"] };
     recordStyles[recordTypes.TimerInstall] = { title: WebInspector.UIString("Install Timer"), category: categories["scripting"] };
@@ -165,6 +167,27 @@ WebInspector.TimelinePresentationModel.forAllRecords = function(recordsArray, pr
                 return;
             stack.pop();
         }
+    }
+}
+
+/**
+ * @param {string=} recordType
+ * @return {boolean}
+ */
+WebInspector.TimelinePresentationModel.needsPreviewElement = function(recordType)
+{
+    if (!recordType)
+        return false;
+    const recordTypes = WebInspector.TimelineModel.RecordType;
+    switch (recordType) {
+    case recordTypes.ScheduleResourceRequest:
+    case recordTypes.ResourceSendRequest:
+    case recordTypes.ResourceReceiveResponse:
+    case recordTypes.ResourceReceivedData:
+    case recordTypes.ResourceFinish:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -635,10 +658,24 @@ WebInspector.TimelinePresentationModel.Record.prototype = {
         return this.startTime <= time && time <= this.endTime;
     },
 
-    generatePopupContent: function()
+    /**
+     * @param {function(Element)} callback
+     */
+    generatePopupContent: function(callback)
+    {
+        if (WebInspector.TimelinePresentationModel.needsPreviewElement(this.type))
+            WebInspector.buildImagePreviewContents(this.url, false, this._generatePopupContentWithImagePreview.bind(this, callback));
+        else
+            this._generatePopupContentWithImagePreview(callback);
+    },
+
+    /**
+     * @param {function(Element)} callback
+     * @param {Element=} previewElement
+     */
+    _generatePopupContentWithImagePreview: function(callback, previewElement)
     {
         var contentHelper = new WebInspector.TimelinePresentationModel.PopupContentHelper(this.title);
-
         var text = WebInspector.UIString("%s (at %s)", Number.secondsToString(this._lastChildEndTime - this.startTime, true),
             Number.secondsToString(this._startTimeOffset));
         contentHelper._appendTextRow(WebInspector.UIString("Duration"), text);
@@ -676,6 +713,8 @@ WebInspector.TimelinePresentationModel.Record.prototype = {
             case recordTypes.ResourceReceivedData:
             case recordTypes.ResourceFinish:
                 contentHelper._appendElementRow(WebInspector.UIString("Resource"), this._linkifyLocation(this.url));
+                if (previewElement)
+                    contentHelper._appendElementRow(WebInspector.UIString("Preview"), previewElement);
                 if (this.data["requestMethod"])
                     contentHelper._appendTextRow(WebInspector.UIString("Request Method"), this.data["requestMethod"]);
                 if (typeof this.data["statusCode"] === "number")
@@ -718,7 +757,7 @@ WebInspector.TimelinePresentationModel.Record.prototype = {
         if (this.stackTrace)
             contentHelper._appendStackTrace(WebInspector.UIString("Call Stack"), this.stackTrace, this._linkifyCallFrame.bind(this));
 
-        return contentHelper._contentTable;
+        callback(contentHelper._contentTable);
     },
 
     _refreshDetails: function()
@@ -751,6 +790,10 @@ WebInspector.TimelinePresentationModel.Record.prototype = {
                 return this.data ? this.data["type"] : null;
             case WebInspector.TimelineModel.RecordType.Paint:
                 return this.data["width"] + "\u2009\u00d7\u2009" + this.data["height"];
+            case WebInspector.TimelineModel.RecordType.DecodeImage:
+                return this.data["imageType"];
+            case WebInspector.TimelineModel.RecordType.ResizeImage:
+                return this.data["cached"] ? WebInspector.UIString("cached") : WebInspector.UIString("non-cached");
             case WebInspector.TimelineModel.RecordType.TimerInstall:
             case WebInspector.TimelineModel.RecordType.TimerRemove:
                 return this._linkifyTopCallFrame(this.data["timerId"]);
@@ -854,6 +897,7 @@ WebInspector.TimelinePresentationModel._generateAggregatedInfo = function(aggreg
 
 /**
  * @constructor
+ * @param {string} title
  */
 WebInspector.TimelinePresentationModel.PopupContentHelper = function(title)
 {

@@ -24,8 +24,9 @@
 
 #include "config.h"
 
-#include "cc/CCDelayBasedTimeSource.h"
+#include "CCDelayBasedTimeSource.h"
 
+#include "TraceEvent.h"
 #include <algorithm>
 #include <wtf/CurrentTime.h>
 #include <wtf/MathExtras.h>
@@ -66,6 +67,7 @@ CCDelayBasedTimeSource::CCDelayBasedTimeSource(double intervalSeconds, CCThread*
 
 void CCDelayBasedTimeSource::setActive(bool active)
 {
+    TRACE_EVENT1("cc", "CCDelayBasedTimeSource::setActive", "active", active);
     if (!active) {
         m_state = STATE_INACTIVE;
         m_timer.stop();
@@ -86,7 +88,7 @@ void CCDelayBasedTimeSource::setActive(bool active)
 
     m_state = STATE_ACTIVE;
 
-    double now = monotonicallyIncreasingTime();
+    double now = monotonicTimeNow();
     postNextTickTask(now);
 }
 
@@ -104,7 +106,7 @@ void CCDelayBasedTimeSource::onTimerFired()
 {
     ASSERT(m_state != STATE_INACTIVE);
 
-    double now = monotonicallyIncreasingTime();
+    double now = monotonicTimeNow();
     m_lastTickTime = now;
 
     if (m_state == STATE_STARTING) {
@@ -155,9 +157,9 @@ void CCDelayBasedTimeSource::setTimebaseAndInterval(double timebase, double inte
     }
 }
 
-double CCDelayBasedTimeSource::monotonicallyIncreasingTime() const
+double CCDelayBasedTimeSource::monotonicTimeNow() const
 {
-    return WTF::monotonicallyIncreasingTime();
+    return monotonicallyIncreasingTime();
 }
 
 // This code tries to achieve an average tick rate as close to m_intervalMs as possible.

@@ -50,6 +50,7 @@ my (
     $channelMessagingSupport,
     $cspNextSupport,
     $css3FlexboxSupport,
+    $css3TextDecorationSupport,
     $cssBoxDecorationBreakSupport,
     $cssExclusionsSupport,
     $cssFiltersSupport,
@@ -135,6 +136,7 @@ my (
     $webSocketsSupport,
     $webTimingSupport,
     $workersSupport,
+    $xhrResponseBlobSupport,
     $xsltSupport,
 );
 
@@ -168,6 +170,9 @@ my @features = (
 
     { option => "css3-flexbox", desc => "Toggle CSS3 Flexbox support",
       define => "ENABLE_CSS3_FLEXBOX", default => 1, value => \$css3FlexboxSupport },
+
+    { option => "css3-text-decoration", desc => "Toggle CSS3 Text Decoration support",
+      define => "ENABLE_CSS3_TEXT_DECORATION", default => 0, value => \$css3TextDecorationSupport },
 
     { option => "css-hierarchies", desc => "Toggle CSS Hierarchy support",
       define => "ENABLE_CSS_HIERARCHIES", default => 0, value => \$cssHierarchiesSupport },
@@ -414,6 +419,9 @@ my @features = (
 
     { option => "workers", desc => "Toggle Workers support",
       define => "ENABLE_WORKERS", default => (isAppleWebKit() || isGtk() || isBlackBerry() || isEfl()), value => \$workersSupport },
+
+    { option => "xhr-response-blob", desc => "Toggle XHR Response BLOB support",
+      define => "ENABLE_XHR_RESPONSE_BLOB", default => isBlackBerry(), value => \$xhrResponseBlobSupport },
 
     { option => "xslt", desc => "Toggle XSLT support",
       define => "ENABLE_XSLT", default => 1, value => \$xsltSupport },

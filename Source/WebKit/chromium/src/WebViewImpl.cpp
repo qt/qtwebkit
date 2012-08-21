@@ -129,6 +129,7 @@
 #include "WebDevToolsAgentPrivate.h"
 #include "WebFrameImpl.h"
 #include "WebHelperPluginImpl.h"
+#include "WebHitTestResult.h"
 #include "WebInputElement.h"
 #include "WebInputEvent.h"
 #include "WebInputEventConversion.h"
@@ -266,9 +267,6 @@ static int webInputEventKeyStateToPlatformEventKeyState(int webInputEventKeyStat
 
 WebView* WebView::create(WebViewClient* client)
 {
-    // Keep runtime flag for device motion turned off until it's implemented.
-    WebRuntimeFeatures::enableDeviceMotion(false);
-
     // Pass the WebViewImpl's self-reference to the caller.
     return adoptRef(new WebViewImpl(client)).leakRef();
 }
@@ -410,6 +408,7 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     , m_isCancelingFullScreen(false)
     , m_benchmarkSupport(this)
 #if USE(ACCELERATED_COMPOSITING)
+    , m_rootLayer(0)
     , m_rootGraphicsLayer(0)
     , m_isAcceleratedCompositingActive(false)
     , m_compositorCreationFailed(false)
@@ -3514,6 +3513,7 @@ bool WebViewImpl::allowsAcceleratedCompositing()
 void WebViewImpl::setRootGraphicsLayer(GraphicsLayer* layer)
 {
     m_rootGraphicsLayer = layer;
+    m_rootLayer = layer ? layer->platformLayer() : 0;
 
     setIsAcceleratedCompositingActive(layer);
     if (m_nonCompositedContentHost) {
@@ -3527,11 +3527,8 @@ void WebViewImpl::setRootGraphicsLayer(GraphicsLayer* layer)
         m_nonCompositedContentHost->setScrollLayer(scrollLayer);
     }
 
-    if (layer)
-        m_rootLayer = *layer->platformLayer();
-
     if (!m_layerTreeView.isNull())
-        m_layerTreeView.setRootLayer(layer ? &m_rootLayer : 0);
+        m_layerTreeView.setRootLayer(m_rootLayer);
 
     IntRect damagedRect(0, 0, m_size.width, m_size.height);
     if (!m_isAcceleratedCompositingActive)
@@ -3644,7 +3641,7 @@ void WebViewImpl::setIsAcceleratedCompositingActive(bool active)
         m_nonCompositedContentHost->setShowDebugBorders(page()->settings()->showDebugBorders());
         m_nonCompositedContentHost->setOpaque(!isTransparent());
 
-        m_layerTreeView.initialize(this, m_rootLayer, layerTreeViewSettings);
+        m_layerTreeView.initialize(this, *m_rootLayer, layerTreeViewSettings);
         if (!m_layerTreeView.isNull()) {
             if (m_webSettings->applyDefaultDeviceScaleFactorInCompositor() && page()->deviceScaleFactor() != 1) {
                 ASSERT(page()->deviceScaleFactor());
@@ -3855,7 +3852,7 @@ void WebViewImpl::selectAutofillSuggestionAtIndex(unsigned listIndex)
         m_autofillPopupClient->valueChanged(listIndex);
 }
 
-bool WebViewImpl::detectContentIntentOnTouch(const WebPoint& position, WebInputEvent::Type touchType)
+bool WebViewImpl::detectContentOnTouch(const WebPoint& position, WebInputEvent::Type touchType)
 {
     ASSERT(touchType == WebInputEvent::GestureTap || touchType == WebInputEvent::GestureLongPress);
     HitTestResult touchHit = hitTestResultForWindowPos(position);
@@ -3869,7 +3866,7 @@ bool WebViewImpl::detectContentIntentOnTouch(const WebPoint& position, WebInputE
 
     // FIXME: Should we not detect content intents in nodes that have event listeners?
 
-    WebContentDetectionResult content = m_client->detectContentIntentAround(touchHit);
+    WebContentDetectionResult content = m_client->detectContentAround(touchHit);
     if (!content.isValid())
         return false;
 

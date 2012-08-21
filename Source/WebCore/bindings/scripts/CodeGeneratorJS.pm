@@ -193,7 +193,6 @@ sub GetCallbackClassName
 {
     my $className = shift;
 
-    return "JSCustomVoidCallback" if $className eq "VoidCallback";
     return "JS$className";
 }
 
@@ -2816,7 +2815,9 @@ END
             push(@implContent, "        return true;\n\n");
             push(@implContent, "    RefPtr<$className> protect(this);\n\n");
             push(@implContent, "    JSLockHolder lock(m_data->globalObject()->globalData());\n\n");
-            push(@implContent, "    ExecState* exec = m_data->globalObject()->globalExec();\n");
+            if (@params) {
+                push(@implContent, "    ExecState* exec = m_data->globalObject()->globalExec();\n");
+            }
             push(@implContent, "    MarkedArgumentBuffer args;\n");
 
             foreach my $param (@params) {
@@ -3067,7 +3068,6 @@ sub JSValueToNative
     }
 
     AddToImplIncludes("HTMLOptionElement.h", $conditional) if $type eq "HTMLOptionElement";
-    AddToImplIncludes("JSCustomVoidCallback.h", $conditional) if $type eq "VoidCallback";
     AddToImplIncludes("Event.h", $conditional) if $type eq "Event";
 
     my $arrayType = $codeGenerator->GetArrayType($type);
@@ -3118,7 +3118,6 @@ sub NativeToJSValue
         if (defined $conv) {
             return "jsStringOrNull(exec, $value)" if $conv eq "Null";
             return "jsStringOrUndefined(exec, $value)" if $conv eq "Undefined";
-            return "jsStringOrFalse(exec, $value)" if $conv eq "False";
 
             die "Unknown value for TreatReturnedNullStringAs extended attribute";
         }

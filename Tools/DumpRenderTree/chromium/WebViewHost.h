@@ -47,7 +47,7 @@
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
-class LayoutTestController;
+class DRTTestRunner;
 class MockWebSpeechInputController;
 class MockWebSpeechRecognizer;
 class SkCanvas;
@@ -264,6 +264,7 @@ class WebViewHost : public WebKit::WebViewClient, public WebKit::WebFrameClient,
     virtual void didRunInsecureContent(WebKit::WebFrame*, const WebKit::WebSecurityOrigin&, const WebKit::WebURL&);
     virtual void didDetectXSS(WebKit::WebFrame*, const WebKit::WebURL&, bool didBlockEntirePage);
     virtual void openFileSystem(WebKit::WebFrame*, WebKit::WebFileSystem::Type, long long size, bool create, WebKit::WebFileSystemCallbacks*);
+    virtual void deleteFileSystem(WebKit::WebFrame*, WebKit::WebFileSystem::Type, WebKit::WebFileSystemCallbacks*);
     virtual bool willCheckAndDispatchMessageEvent(WebKit::WebFrame* source, WebKit::WebSecurityOrigin target, WebKit::WebDOMMessageEvent);
     virtual void registerIntentService(WebKit::WebFrame*, const WebKit::WebIntentServiceInfo&);
     virtual void dispatchIntent(WebKit::WebFrame*, const WebKit::WebIntentRequest&);
@@ -277,7 +278,7 @@ class WebViewHost : public WebKit::WebViewClient, public WebKit::WebFrameClient,
     void finishLastTextCheck();
     virtual void fillSpellingSuggestionList(const WebKit::WebString& word, Vector<WebKit::WebString>* suggestions) OVERRIDE;
 
-    // Geolocation client mocks for LayoutTestController
+    // Geolocation client mocks for DRTTestRunner
     WebKit::WebGeolocationClientMock* geolocationClientMock();
 
     // Pending task list, Note taht the method is referred from MethodTask class.
@@ -302,7 +303,7 @@ private:
         CallbackMethodType m_callback;
     };
 
-    LayoutTestController* layoutTestController() const;
+    DRTTestRunner* testRunner() const;
 
     // Called the title of the page changes.
     // Can be used to update the title of the window.

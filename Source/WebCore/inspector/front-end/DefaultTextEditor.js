@@ -61,6 +61,8 @@ WebInspector.DefaultTextEditor = function(url, delegate)
     this._mainPanel.element.addEventListener("scroll", this._handleScrollChanged.bind(this), false);
     this._mainPanel._container.addEventListener("focus", this._handleFocused.bind(this), false);
 
+    this._gutterPanel.element.addEventListener("mousedown", this._onMouseDown.bind(this), true);
+
     this.element.appendChild(this._mainPanel.element);
     this.element.appendChild(this._gutterPanel.element);
 
@@ -135,24 +137,83 @@ WebInspector.DefaultTextEditor.prototype = {
         this._mainPanel.revealLine(lineNumber);
     },
 
-    /**
-     * @param {number} lineNumber
-     * @param {string|Element} decoration
-     */
-    addDecoration: function(lineNumber, decoration)
+    _onMouseDown: function(event)
     {
-        this._mainPanel.addDecoration(lineNumber, decoration);
-        this._gutterPanel.addDecoration(lineNumber, decoration);
+        var target = event.target.enclosingNodeOrSelfWithClass("webkit-line-number");
+        if (!target)
+            return;
+        this.dispatchEventToListeners(WebInspector.TextEditor.Events.GutterClick, { lineNumber: target.lineNumber, event: event });
     },
 
     /**
      * @param {number} lineNumber
-     * @param {string|Element} decoration
+     * @param {boolean} disabled
+     * @param {boolean} conditional
      */
-    removeDecoration: function(lineNumber, decoration)
+    addBreakpoint: function(lineNumber, disabled, conditional)
     {
-        this._mainPanel.removeDecoration(lineNumber, decoration);
-        this._gutterPanel.removeDecoration(lineNumber, decoration);
+        this.beginUpdates();
+        this._gutterPanel.addDecoration(lineNumber, "webkit-breakpoint");
+        if (disabled)
+            this._gutterPanel.addDecoration(lineNumber, "webkit-breakpoint-disabled");
+        else
+            this._gutterPanel.removeDecoration(lineNumber, "webkit-breakpoint-disabled");
+        if (conditional)
+            this._gutterPanel.addDecoration(lineNumber, "webkit-breakpoint-conditional");
+        else
+            this._gutterPanel.removeDecoration(lineNumber, "webkit-breakpoint-conditional");
+        this.endUpdates();
+    },
+
+    /**
+     * @param {number} lineNumber
+     */
+    removeBreakpoint: function(lineNumber)
+    {
+        this.beginUpdates();
+        this._gutterPanel.removeDecoration(lineNumber, "webkit-breakpoint");
+        this._gutterPanel.removeDecoration(lineNumber, "webkit-breakpoint-disabled");
+        this._gutterPanel.removeDecoration(lineNumber, "webkit-breakpoint-conditional");
+        this.endUpdates();
+    },
+
+    /**
+     * @param {number} lineNumber
+     */
+    setExecutionLine: function(lineNumber)
+    {
+        this._executionLineNumber = lineNumber;
+        this._mainPanel.addDecoration(lineNumber, "webkit-execution-line");
+        this._gutterPanel.addDecoration(lineNumber, "webkit-execution-line");
+    },
+
+    clearExecutionLine: function()
+    {
+        if (typeof this._executionLineNumber === "number") {
+            this._mainPanel.removeDecoration(this._executionLineNumber, "webkit-execution-line");
+            this._gutterPanel.removeDecoration(this._executionLineNumber, "webkit-execution-line");
+        }
+        delete this._executionLineNumber;
+    },
+
+    /**
+     * @param {number} lineNumber
+     * @param {Element} element
+     */
+    addDecoration: function(lineNumber, element)
+    {
+        this._mainPanel.addDecoration(lineNumber, element);
+        this._gutterPanel.addDecoration(lineNumber, element);
+    },
+
+    /**
+     * @param {number} lineNumber
+     * @param {Element} element
+     */
+    removeDecoration: function(lineNumber, element)
+    {
+        this._mainPanel.removeDecoration(lineNumber, element);
+        this._gutterPanel.removeDecoration(lineNumber, element);
     },
 
     /**
@@ -251,7 +312,6 @@ WebInspector.DefaultTextEditor.prototype = {
     _enterInternalTextChangeMode: function()
     {
         this._internalTextChangeMode = true;
-        this._delegate.beforeTextChanged();
     },
 
     /**
@@ -261,7 +321,7 @@ WebInspector.DefaultTextEditor.prototype = {
     _exitInternalTextChangeMode: function(oldRange, newRange)
     {
         this._internalTextChangeMode = false;
-        this._delegate.afterTextChanged(oldRange, newRange);
+        this._delegate.onTextChanged(oldRange, newRange);
     },
 
     _updatePanelOffsets: function()
@@ -325,8 +385,6 @@ WebInspector.DefaultTextEditor.prototype = {
         var modifiers = WebInspector.KeyboardShortcut.Modifiers;
 
         this._shortcuts = {};
-        var commitEditing = this._commitEditing.bind(this);
-        this._shortcuts[WebInspector.KeyboardShortcut.makeKey("s", modifiers.CtrlOrMeta)] = commitEditing;
 
         var handleEnterKey = this._mainPanel.handleEnterKey.bind(this._mainPanel);
         this._shortcuts[WebInspector.KeyboardShortcut.makeKey(keys.Enter.code, WebInspector.KeyboardShortcut.Modifiers.None)] = handleEnterKey;
@@ -364,17 +422,6 @@ WebInspector.DefaultTextEditor.prototype = {
             this._delegate.populateTextAreaContextMenu(contextMenu, target && target.lineNumber);
         }
         contextMenu.show(event);
-    },
-
-    _commitEditing: function()
-    {
-        if (this.readOnly())
-            return false;
-
-        this._delegate.commitEditing();
-        if (this._url && WebInspector.fileManager.isURLSaved(this._url))
-            WebInspector.fileManager.save(this._url, this._textModel.text(), false);
-        return true;
     },
 
     _handleScrollChanged: function(event)

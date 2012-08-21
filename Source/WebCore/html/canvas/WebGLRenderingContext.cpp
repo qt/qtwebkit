@@ -419,6 +419,10 @@ PassOwnPtr<WebGLRenderingContext> WebGLRenderingContext::create(HTMLCanvasElemen
         return nullptr;
     }
 
+    Extensions3D* extensions = context->getExtensions();
+    if (extensions->supports("GL_EXT_debug_marker"))
+        extensions->pushGroupMarkerEXT("WebGLRenderingContext");
+
     return adoptPtr(new WebGLRenderingContext(canvas, context, attributes));
 }
 
@@ -5169,13 +5173,14 @@ void WebGLRenderingContext::printWarningToConsole(const String& message)
 {
     if (!canvas())
         return;
+    // FIXME: This giant cascade of null checks seems a bit paranoid.
     Document* document = canvas()->document();
     if (!document)
         return;
     Frame* frame = document->frame();
     if (!frame)
         return;
-    DOMWindow* window = frame->domWindow();
+    DOMWindow* window = document->domWindow();
     if (!window)
         return;
     Console* console = window->console();

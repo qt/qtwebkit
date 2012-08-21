@@ -37,6 +37,7 @@ webkit_web_context_get_spell_checking_enabled
 webkit_web_context_set_spell_checking_enabled
 webkit_web_context_get_spell_checking_languages
 webkit_web_context_set_spell_checking_languages
+webkit_web_context_set_preferred_languages
 
 <SUBSECTION URI Scheme>
 WebKitURISchemeRequestCallback
@@ -75,9 +76,9 @@ webkit_web_view_new_with_context
 webkit_web_view_get_context
 webkit_web_view_load_uri
 webkit_web_view_load_html
+webkit_web_view_load_alternate_html
 webkit_web_view_load_plain_text
 webkit_web_view_load_request
-webkit_web_view_replace_content
 webkit_web_view_can_go_back
 webkit_web_view_go_back
 webkit_web_view_can_go_forward
@@ -325,6 +326,7 @@ webkit_uri_response_get_status_code
 webkit_uri_response_get_content_length
 webkit_uri_response_get_mime_type
 webkit_uri_response_get_https_status
+webkit_uri_response_get_suggested_filename
 
 <SUBSECTION Standard>
 WebKitURIResponseClass

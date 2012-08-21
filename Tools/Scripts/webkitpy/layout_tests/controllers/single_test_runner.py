@@ -41,15 +41,15 @@ from webkitpy.layout_tests.models.test_results import TestResult
 _log = logging.getLogger(__name__)
 
 
-def run_single_test(port, options, test_input, driver, worker_name):
-    runner = SingleTestRunner(options, port, driver, test_input, worker_name)
+def run_single_test(port, options, test_input, driver, worker_name, stop_when_done):
+    runner = SingleTestRunner(options, port, driver, test_input, worker_name, stop_when_done)
     return runner.run()
 
 
 class SingleTestRunner(object):
     (ALONGSIDE_TEST, PLATFORM_DIR, VERSION_DIR, UPDATE) = ('alongside', 'platform', 'version', 'update')
 
-    def __init__(self, options, port, driver, test_input, worker_name):
+    def __init__(self, options, port, driver, test_input, worker_name, stop_when_done):
         self._options = options
         self._port = port
         self._filesystem = port.host.filesystem
@@ -59,6 +59,7 @@ class SingleTestRunner(object):
         self._test_name = test_input.test_name
         self._should_run_pixel_test = test_input.should_run_pixel_test
         self._reference_files = test_input.reference_files
+        self._stop_when_done = stop_when_done
 
         if self._reference_files:
             # Detect and report a test which has a wrong combination of expectation files.
@@ -102,7 +103,7 @@ class SingleTestRunner(object):
         return self._run_compare_test()
 
     def _run_compare_test(self):
-        driver_output = self._driver.run_test(self._driver_input())
+        driver_output = self._driver.run_test(self._driver_input(), self._stop_when_done)
         expected_driver_output = self._expected_driver_output()
 
         if self._options.ignore_metrics:
@@ -116,7 +117,7 @@ class SingleTestRunner(object):
         return test_result
 
     def _run_rebaseline(self):
-        driver_output = self._driver.run_test(self._driver_input())
+        driver_output = self._driver.run_test(self._driver_input(), self._stop_when_done)
         failures = self._handle_error(driver_output)
         test_result_writer.write_test_result(self._filesystem, self._port, self._test_name, driver_output, None, failures)
         # FIXME: It the test crashed or timed out, it might be better to avoid
@@ -265,7 +266,10 @@ class SingleTestRunner(object):
         elif driver_output.image_hash != expected_driver_output.image_hash:
             diff_result = self._port.diff_image(driver_output.image, expected_driver_output.image)
             err_str = diff_result[2]
-            if err_str:
+            # FIXME: see https://bugs.webkit.org/show_bug.cgi?id=94277 and
+            # https://bugs.webkit.org/show_bug.cgi?id=81962; ImageDiff doesn't
+            # seem to be working with WTR properly and tons of tests are failing.
+            if err_str and not self._options.webkit_test_runner:
                 _log.warning('  %s : %s' % (self._test_name, err_str))
                 failures.append(test_failures.FailureImageHashMismatch())
                 driver_output.error = (driver_output.error or '') + err_str
@@ -279,7 +283,7 @@ class SingleTestRunner(object):
         return failures
 
     def _run_reftest(self):
-        test_output = self._driver.run_test(self._driver_input())
+        test_output = self._driver.run_test(self._driver_input(), self._stop_when_done)
         total_test_time = 0
         reference_output = None
         test_result = None
@@ -293,7 +297,7 @@ class SingleTestRunner(object):
         putAllMismatchBeforeMatch = sorted
         for expectation, reference_filename in putAllMismatchBeforeMatch(self._reference_files):
             reference_test_name = self._port.relative_test_filename(reference_filename)
-            reference_output = self._driver.run_test(DriverInput(reference_test_name, self._timeout, test_output.image_hash, should_run_pixel_test=True))
+            reference_output = self._driver.run_test(DriverInput(reference_test_name, self._timeout, test_output.image_hash, should_run_pixel_test=True), self._stop_when_done)
             test_result = self._compare_output_with_reference(test_output, reference_output, reference_filename, expectation == '!=')
 
             if (expectation == '!=' and test_result.failures) or (expectation == '==' and not test_result.failures):
@@ -314,6 +318,10 @@ class SingleTestRunner(object):
             return TestResult(self._test_name, failures, total_test_time, has_stderr)
         failures.extend(self._handle_error(driver_output2, reference_filename=reference_filename))
         if failures:
+            return TestResult(self._test_name, failures, total_test_time, has_stderr)
+
+        if self._options.webkit_test_runner and not self._options.pixel_tests:
+            # don't check pixel results for WTR/WK2; they're broken.
             return TestResult(self._test_name, failures, total_test_time, has_stderr)
 
         if not driver_output1.image_hash and not driver_output2.image_hash:

@@ -33,13 +33,13 @@
 #if USE(ACCELERATED_COMPOSITING)
 #include "LayerChromium.h"
 
+#include "CCActiveAnimation.h"
+#include "CCAnimationEvents.h"
+#include "CCLayerAnimationController.h"
+#include "CCLayerImpl.h"
+#include "CCLayerTreeHost.h"
+#include "CCSettings.h"
 #include "TextStream.h"
-#include "cc/CCActiveAnimation.h"
-#include "cc/CCAnimationEvents.h"
-#include "cc/CCLayerAnimationController.h"
-#include "cc/CCLayerImpl.h"
-#include "cc/CCLayerTreeHost.h"
-#include "cc/CCSettings.h"
 
 #include <public/WebAnimationDelegate.h>
 
@@ -81,7 +81,6 @@ LayerChromium::LayerChromium()
     , m_useLCDText(false)
     , m_preserves3D(false)
     , m_useParentBackfaceVisibility(false)
-    , m_alwaysReserveTextures(false)
     , m_drawCheckerboardForMissingTiles(false)
     , m_forceRenderSurface(false)
     , m_replicaLayer(0)
@@ -235,10 +234,11 @@ void LayerChromium::setBounds(const IntSize& size)
         setNeedsCommit();
 }
 
-const LayerChromium* LayerChromium::rootLayer() const
+LayerChromium* LayerChromium::rootLayer()
 {
-    const LayerChromium* layer = this;
-    for (LayerChromium* parent = layer->parent(); parent; layer = parent, parent = parent->parent()) { }
+    LayerChromium* layer = this;
+    while (layer->parent())
+        layer = layer->parent();
     return layer;
 }
 

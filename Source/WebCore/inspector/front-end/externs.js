@@ -96,6 +96,13 @@ Array.prototype.partition = function(comparator, left, right, pivotIndex) {}
  */
 Array.prototype.qselect = function(k, comparator) {}
 
+/**
+ * @this {Array.<*>}
+ * @param {string} field
+ * @return {Array.<*>}
+ */
+Array.prototype.select = function(field) {}
+
 DOMApplicationCache.prototype.UNCACHED = 0;
 DOMApplicationCache.prototype.IDLE = 1;
 DOMApplicationCache.prototype.CHECKING = 2;
@@ -112,14 +119,6 @@ InspectorBackend.runAfterPendingDispatches = function(message) {}
 
 // FIXME: remove everything below.
 var WebInspector = {}
-
-/**
- * @param {NetworkAgent.RequestId} requestId
- * @return {?WebInspector.NetworkRequest}
- */
-WebInspector.networkRequestById = function(requestId)
-{
-}
   
 WebInspector.panels = {};
 
@@ -239,3 +238,5 @@ difflib.SequenceMatcher.prototype.get_opcodes = function() { return []; }
 
 /** @constructor */
 WebInspector.CodeMirrorTextEditor = function(url, delegate) { }
+
+WebInspector.ProfileURLRegExp = "";

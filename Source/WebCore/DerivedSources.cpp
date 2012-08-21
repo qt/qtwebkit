@@ -100,6 +100,9 @@
 #include "JSDOMStringList.cpp"
 #include "JSDOMStringMap.cpp"
 #include "JSDOMTokenList.cpp"
+#if ENABLE(UNDO_MANAGER)
+#include "JSDOMTransaction.cpp"
+#endif
 #include "JSDOMURL.cpp"
 #include "JSDOMWindow.cpp"
 #include "JSElement.cpp"
@@ -477,6 +480,7 @@
 #include "JSUndoManager.cpp"
 #endif
 #include "JSValidityState.cpp"
+#include "JSVoidCallback.cpp"
 #include "JSWebKitAnimation.cpp"
 #include "JSWebKitAnimationEvent.cpp"
 #include "JSWebKitAnimationList.cpp"

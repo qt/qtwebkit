@@ -38,8 +38,6 @@ StyleRareNonInheritedData::StyleRareNonInheritedData()
     : opacity(RenderStyle::initialOpacity())
     , m_aspectRatioDenominator(RenderStyle::initialAspectRatioDenominator())
     , m_aspectRatioNumerator(RenderStyle::initialAspectRatioNumerator())
-    , m_counterIncrement(0)
-    , m_counterReset(0)
     , m_perspective(RenderStyle::initialPerspective())
     , m_perspectiveOriginX(RenderStyle::initialPerspectiveOriginX())
     , m_perspectiveOriginY(RenderStyle::initialPerspectiveOriginY())
@@ -72,12 +70,18 @@ StyleRareNonInheritedData::StyleRareNonInheritedData()
     , m_appearance(RenderStyle::initialAppearance())
     , m_borderFit(RenderStyle::initialBorderFit())
     , m_textCombine(RenderStyle::initialTextCombine())
+#if ENABLE(CSS3_TEXT_DECORATION)
+    , m_textDecorationStyle(RenderStyle::initialTextDecorationStyle())
+#endif // CSS3_TEXT_DECORATION
     , m_wrapFlow(RenderStyle::initialWrapFlow())
     , m_wrapThrough(RenderStyle::initialWrapThrough())
 #if USE(ACCELERATED_COMPOSITING)
     , m_runningAcceleratedAnimation(false)
 #endif
     , m_hasAspectRatio(false)
+#if ENABLE(CSS_COMPOSITING)
+    , m_effectiveBlendMode(RenderStyle::initialBlendMode())
+#endif
 {
     m_maskBoxImage.setMaskDefaults();
 }
@@ -87,8 +91,6 @@ StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonInherited
     , opacity(o.opacity)
     , m_aspectRatioDenominator(o.m_aspectRatioDenominator)
     , m_aspectRatioNumerator(o.m_aspectRatioNumerator)
-    , m_counterIncrement(o.m_counterIncrement)
-    , m_counterReset(o.m_counterReset)
     , m_perspective(o.m_perspective)
     , m_perspectiveOriginX(o.m_perspectiveOriginX)
     , m_perspectiveOriginY(o.m_perspectiveOriginY)
@@ -143,12 +145,18 @@ StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonInherited
     , m_appearance(o.m_appearance)
     , m_borderFit(o.m_borderFit)
     , m_textCombine(o.m_textCombine)
+#if ENABLE(CSS3_TEXT_DECORATION)
+    , m_textDecorationStyle(o.m_textDecorationStyle)
+#endif // CSS3_TEXT_DECORATION
     , m_wrapFlow(o.m_wrapFlow)
     , m_wrapThrough(o.m_wrapThrough)
 #if USE(ACCELERATED_COMPOSITING)
     , m_runningAcceleratedAnimation(o.m_runningAcceleratedAnimation)
 #endif
     , m_hasAspectRatio(o.m_hasAspectRatio)
+#if ENABLE(CSS_COMPOSITING)
+    , m_effectiveBlendMode(RenderStyle::initialBlendMode())
+#endif
 {
 }
 
@@ -161,8 +169,6 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
     return opacity == o.opacity
         && m_aspectRatioDenominator == o.m_aspectRatioDenominator
         && m_aspectRatioNumerator == o.m_aspectRatioNumerator
-        && m_counterIncrement == o.m_counterIncrement
-        && m_counterReset == o.m_counterReset
         && m_perspective == o.m_perspective
         && m_perspectiveOriginX == o.m_perspectiveOriginX
         && m_perspectiveOriginY == o.m_perspectiveOriginY
@@ -220,10 +226,16 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
         && m_appearance == o.m_appearance
         && m_borderFit == o.m_borderFit
         && m_textCombine == o.m_textCombine
+#if ENABLE(CSS3_TEXT_DECORATION)
+        && m_textDecorationStyle == o.m_textDecorationStyle
+#endif // CSS3_TEXT_DECORATION
         && m_wrapFlow == o.m_wrapFlow
         && m_wrapThrough == o.m_wrapThrough
 #if USE(ACCELERATED_COMPOSITING)
         && !m_runningAcceleratedAnimation && !o.m_runningAcceleratedAnimation
+#endif
+#if ENABLE(CSS_COMPOSITING)
+        && m_effectiveBlendMode == o.m_effectiveBlendMode
 #endif
         && m_hasAspectRatio == o.m_hasAspectRatio;
 }

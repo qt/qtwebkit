@@ -345,6 +345,7 @@ private:
                 break;
                 
             case StructureTransitionWatchpoint:
+            case ForwardStructureTransitionWatchpoint:
                 if (node.child1() == child1
                     && structureSet.contains(node.structure()))
                     return true;
@@ -418,6 +419,7 @@ private:
                 return false;
                 
             case StructureTransitionWatchpoint:
+            case ForwardStructureTransitionWatchpoint:
                 if (node.structure() == structure && node.child1() == child1)
                     return true;
                 break;
@@ -843,6 +845,8 @@ private:
         // At this point we will eliminate all references to this node.
         m_replacements[m_compileIndex] = replacement;
         
+        m_changed = true;
+        
         return true;
     }
     
@@ -856,6 +860,8 @@ private:
         ASSERT(node.refCount() == 1);
         ASSERT(node.mustGenerate());
         node.setOpAndDefaultFlags(Phantom);
+        
+        m_changed = true;
     }
     
     void eliminate(NodeIndex nodeIndex, NodeType phantomType = Phantom)
@@ -867,6 +873,8 @@ private:
             return;
         ASSERT(node.mustGenerate());
         node.setOpAndDefaultFlags(phantomType);
+        
+        m_changed = true;
     }
     
     void performNodeCSE(Node& node)
@@ -944,7 +952,7 @@ private:
             
         case GetLocal: {
             VariableAccessData* variableAccessData = node.variableAccessData();
-            if (m_fixpointState == FixpointNotConverged && !variableAccessData->isCaptured())
+            if (!variableAccessData->isCaptured())
                 break;
             NodeIndex relevantLocalOp;
             NodeIndex possibleReplacement = getLocalLoadElimination(variableAccessData->local(), relevantLocalOp, variableAccessData->isCaptured());
@@ -982,7 +990,7 @@ private:
             
         case GetLocalUnlinked: {
             NodeIndex relevantLocalOpIgnored;
-            m_changed |= setReplacement(getLocalLoadElimination(node.unlinkedLocal(), relevantLocalOpIgnored, true));
+            setReplacement(getLocalLoadElimination(node.unlinkedLocal(), relevantLocalOpIgnored, true));
             break;
         }
             
@@ -1117,6 +1125,7 @@ private:
             break;
             
         case StructureTransitionWatchpoint:
+        case ForwardStructureTransitionWatchpoint:
             if (structureTransitionWatchpointElimination(node.structure(), node.child1().index()))
                 eliminate();
             break;

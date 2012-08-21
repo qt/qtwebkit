@@ -49,7 +49,6 @@ LIST(APPEND WebCore_SOURCES
     bindings/js/JSClipboardCustom.cpp
     bindings/js/JSConsoleCustom.cpp
     bindings/js/JSCoordinatesCustom.cpp
-    bindings/js/JSCustomVoidCallback.cpp
     bindings/js/JSCustomXPathNSResolver.cpp
     bindings/js/JSDictionary.cpp
     bindings/js/JSDOMBinding.cpp
@@ -251,8 +250,6 @@ ENDIF ()
 
 if (ENABLE_FILE_SYSTEM)
     LIST(APPEND WebCore_SOURCES
-        bindings/js/JSDirectoryEntryCustom.cpp
-        bindings/js/JSDirectoryEntrySyncCustom.cpp
         bindings/js/JSEntryCustom.cpp
         bindings/js/JSEntrySyncCustom.cpp
     )
@@ -276,7 +273,6 @@ IF (ENABLE_WEB_AUDIO)
     LIST(APPEND WebCore_SOURCES
         bindings/js/JSAudioBufferSourceNodeCustom.cpp
         bindings/js/JSAudioContextCustom.cpp
-        bindings/js/JSConvolverNodeCustom.cpp
         bindings/js/JSJavaScriptAudioNodeCustom.cpp
     )
 ENDIF ()
@@ -284,6 +280,13 @@ ENDIF ()
 IF (ENABLE_WEB_INTENTS)
     LIST (APPEND WebCore_SOURCES
         bindings/js/JSIntentConstructor.cpp
+    )
+ENDIF ()
+
+IF (ENABLE_UNDO_MANAGER)
+    LIST (APPEND WebCore_SOURCES
+        bindings/js/DOMTransaction.cpp
+        bindings/js/JSUndoManagerCustom.cpp
     )
 ENDIF ()
 

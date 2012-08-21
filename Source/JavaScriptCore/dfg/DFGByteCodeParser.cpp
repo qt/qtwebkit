@@ -118,7 +118,7 @@ private:
     template<PhiStackType stackType>
     void processPhiStack();
     
-    void fixVariableAccessSpeculations();
+    void fixVariableAccessPredictions();
     // Add spill locations to nodes.
     void allocateVirtualRegisters();
     
@@ -2149,6 +2149,10 @@ bool ByteCodeParser::parseBlock(unsigned limit)
             
             NodeIndex base = get(currentInstruction[2].u.operand);
             NodeIndex property = get(currentInstruction[3].u.operand);
+            ArrayProfile* profile = currentInstruction[4].u.arrayProfile;
+            profile->computeUpdatedPrediction();
+            if (profile->hasDefiniteStructure())
+                addToGraph(CheckStructure, OpInfo(m_graph.addStructureSet(profile->expectedStructure())), base);
             NodeIndex propertyStorage = addToGraph(GetIndexedPropertyStorage, base, property);
             NodeIndex getByVal = addToGraph(GetByVal, OpInfo(0), OpInfo(prediction), base, property, propertyStorage);
             set(currentInstruction[1].u.operand, getByVal);
@@ -2160,6 +2164,15 @@ bool ByteCodeParser::parseBlock(unsigned limit)
             NodeIndex base = get(currentInstruction[1].u.operand);
             NodeIndex property = get(currentInstruction[2].u.operand);
             NodeIndex value = get(currentInstruction[3].u.operand);
+            
+            ArrayProfile* profile = currentInstruction[4].u.arrayProfile;
+            profile->computeUpdatedPrediction();
+            if (profile->hasDefiniteStructure())
+                addToGraph(CheckStructure, OpInfo(m_graph.addStructureSet(profile->expectedStructure())), base);
+
+#if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
+            dataLog("Slow case profile for bc#%u: %u\n", m_currentIndex, m_inlineStackTop->m_profiledBlock->rareCaseProfileForBytecodeOffset(m_currentIndex)->m_counter);
+#endif
 
             bool makeSafe =
                 m_inlineStackTop->m_profiledBlock->couldTakeSlowCase(m_currentIndex)
@@ -3017,7 +3030,7 @@ void ByteCodeParser::processPhiStack()
     }
 }
 
-void ByteCodeParser::fixVariableAccessSpeculations()
+void ByteCodeParser::fixVariableAccessPredictions()
 {
     for (unsigned i = 0; i < m_graph.m_variableAccessData.size(); ++i) {
         VariableAccessData* data = &m_graph.m_variableAccessData[i];
@@ -3349,7 +3362,27 @@ bool ByteCodeParser::parse()
             m_graph.m_blocks[blockIndex].clear();
     }
     
-    fixVariableAccessSpeculations();
+    fixVariableAccessPredictions();
+    
+    for (BlockIndex blockIndex = 0; blockIndex < m_graph.m_blocks.size(); ++blockIndex) {
+        BasicBlock* block = m_graph.m_blocks[blockIndex].get();
+        if (!block)
+            continue;
+        if (!block->isOSRTarget)
+            continue;
+        if (block->bytecodeBegin != m_graph.m_osrEntryBytecodeIndex)
+            continue;
+        for (size_t i = 0; i < m_graph.m_mustHandleValues.size(); ++i) {
+            NodeIndex nodeIndex = block->variablesAtHead.operand(
+                m_graph.m_mustHandleValues.operandForIndex(i));
+            if (nodeIndex == NoNode)
+                continue;
+            Node& node = m_graph[nodeIndex];
+            ASSERT(node.hasLocal());
+            node.variableAccessData()->predict(
+                speculationFromValue(m_graph.m_mustHandleValues[i]));
+        }
+    }
     
     m_graph.m_preservedVars = m_preservedVars;
     m_graph.m_localVars = m_numLocals;

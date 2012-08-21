@@ -57,9 +57,10 @@ WebInspector.UISourceCodeFrame.prototype = {
 
         this._isCommittingEditing = true;
         this._uiSourceCode.commitWorkingCopy(this._didEditContent.bind(this));
+        delete this._isCommittingEditing;
     },
 
-    afterTextChanged: function(oldRange, newRange)
+    onTextChanged: function(oldRange, newRange)
     {
         this._uiSourceCode.setWorkingCopy(this._textEditor.text());
     },
@@ -70,7 +71,6 @@ WebInspector.UISourceCodeFrame.prototype = {
             WebInspector.log(error, WebInspector.ConsoleMessage.MessageLevel.Error, true);
             return;
         }
-        delete this._isCommittingEditing;
     },
 
     /**

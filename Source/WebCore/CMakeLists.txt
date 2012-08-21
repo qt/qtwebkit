@@ -392,6 +392,7 @@ SET(WebCore_IDL_FILES
     dom/WebKitTransitionEvent.idl
     dom/WheelEvent.idl
 
+    editing/DOMTransaction.idl
     editing/UndoManager.idl
 
     fileapi/Blob.idl
@@ -1503,6 +1504,7 @@ SET(WebCore_SOURCES
     html/shadow/MeterShadowElement.cpp
     html/shadow/ProgressShadowElement.cpp
     html/shadow/SliderThumbElement.cpp
+    html/shadow/SpinButtonElement.cpp
     html/shadow/TextControlInnerElements.cpp
 
     html/track/LoadableTextTrack.cpp
@@ -1750,6 +1752,7 @@ SET(WebCore_SOURCES
     platform/MIMETypeRegistry.cpp
     platform/MemoryPressureHandler.cpp
     platform/PlatformEvent.cpp
+    platform/PlatformInstrumentation.cpp
     platform/RunLoop.cpp
     platform/RuntimeApplicationChecks.cpp
     platform/ScrollAnimator.cpp
@@ -2544,9 +2547,22 @@ IF (WTF_USE_3D_GRAPHICS)
     LIST(APPEND WebCore_LIBRARIES
         ${OPENGL_gl_LIBRARY}
     )
+
+    IF (BISON_VERSION EQUAL "2.5")
+        # Bison 2.5 can not compile generated glslang.
+        # See https://bugs.webkit.org/show_bug.cgi?id=93487
+        LIST(APPEND WebCore_SOURCES
+            ${THIRDPARTY_DIR}/ANGLE/src/compiler/glslang_lex.cpp
+            ${THIRDPARTY_DIR}/ANGLE/src/compiler/glslang_tab.cpp
+        )
+    ELSE ()
+        LIST(APPEND WebCore_SOURCES
+            ${DERIVED_SOURCES_WEBCORE_DIR}/glslang.cpp
+            ${DERIVED_SOURCES_WEBCORE_DIR}/glslang_tab.cpp
+        )
+    ENDIF ()
+
     LIST(APPEND WebCore_SOURCES
-        ${DERIVED_SOURCES_WEBCORE_DIR}/glslang.cpp
-        ${DERIVED_SOURCES_WEBCORE_DIR}/glslang_tab.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/BuiltInFunctionEmulator.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/CodeGenGLSL.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/Compiler.cpp
@@ -2566,8 +2582,6 @@ IF (WTF_USE_3D_GRAPHICS)
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/DetectDiscontinuity.h
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/DetectRecursion.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/ForLoopUnroll.cpp
-        ${THIRDPARTY_DIR}/ANGLE/src/compiler/glslang_lex.cpp
-        ${THIRDPARTY_DIR}/ANGLE/src/compiler/glslang_tab.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/InfoSink.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/Initialize.cpp
         ${THIRDPARTY_DIR}/ANGLE/src/compiler/InitializeDll.cpp
@@ -2675,9 +2689,9 @@ SET(WebCoreTestSupport_IDL_INCLUDES
 )
 
 SET(WebCoreTestSupport_IDL_FILES
-    testing/FastMallocStatistics.idl
     testing/Internals.idl
     testing/InternalSettings.idl
+    testing/MallocStatistics.idl
 )
 
 SET(WebCoreTestSupport_SOURCES

@@ -30,14 +30,27 @@
 
 #include "ImmutableArray.h"
 #include "ImmutableDictionary.h"
+#include "WebProcessProxy.h"
+#include "WebSerializedScriptValue.h"
 #include "WebString.h"
 #include "WebURL.h"
 
 namespace WebKit {
 
-WebIntentData::WebIntentData(const IntentData& store)
+WebIntentData::WebIntentData(const IntentData& store, WebProcessProxy* process)
     : m_store(store)
+    , m_process(process)
 {
+}
+
+WebIntentData::~WebIntentData()
+{
+    // Remove MessagePortChannels from WebProcess.
+    if (m_process) {
+        size_t numMessagePorts = m_store.messagePorts.size();
+        for (size_t i = 0; i < numMessagePorts; ++i)
+            m_process->removeMessagePortChannel(m_store.messagePorts[i]);
+    }
 }
 
 PassRefPtr<WebSerializedScriptValue> WebIntentData::data() const
@@ -66,6 +79,7 @@ PassRefPtr<ImmutableDictionary> WebIntentData::extras() const
     HashMap<String, String>::const_iterator end = m_store.extras.end();
     for (HashMap<String, String>::const_iterator it = m_store.extras.begin(); it != end; ++it)
         wkExtras.set(it->first, WebString::create(it->second));
+
     return ImmutableDictionary::adopt(wkExtras);
 }
 

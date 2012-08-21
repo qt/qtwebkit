@@ -1,3 +1,245 @@
+2012-08-20  George Staikos  <staikos@webkit.org>
+
+        [BlackBerry] Enable XHR Response BLOB
+        https://bugs.webkit.org/show_bug.cgi?id=94525
+
+        Reviewed by Rob Buis.
+
+        Add the XHR response blob enable feature to the cmake build system and
+        enable it for BlackBerry.
+
+        * Source/cmake/OptionsBlackBerry.cmake: Add the feature and enable
+        * Source/cmakeconfig.h.cmake: Add the feature
+
+2012-08-20  Dominik Röttsches  <dominik.rottsches@intel.com>
+
+        [EFL] Get rid of pango backend support once harfbuzz-ng is working
+        https://bugs.webkit.org/show_bug.cgi?id=92102
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Removing choice of font backend, Pango detection not required any more.
+
+        * Source/cmake/FindPango.cmake: Removed.
+        * Source/cmake/LibFindMacros.cmake: Removed.
+        * Source/cmake/OptionsEfl.cmake: Removing choice of font backend.
+
+2012-08-17  Raphael Kubo da Costa  <rakuco@webkit.org>
+
+        [CMake] Add FindDBus.cmake and use it in the EFL port.
+        https://bugs.webkit.org/show_bug.cgi?id=94319
+
+        Reviewed by Daniel Bates.
+
+        Currently, the Battery Status-related code in the EFL port uses
+        libdbus but does not directly include its directories or link
+        against it, relying instead on the compiler flags coming via
+        EDbus's pkg-config information.
+
+        That will break once we stop obtaining EFL's include directories
+        and library paths from pkg-config, so write FindDBus.cmake to
+        prepare for that.
+
+        * Source/cmake/FindDBus.cmake: Added.
+        * Source/cmake/OptionsEfl.cmake: Look for D-Bus if BATTERY_STATUS
+        support is enabled.
+
+2012-08-17  Rob Buis  <rbuis@rim.com>
+
+        [BlackBerry] Remove some shared libraries from linking
+        https://bugs.webkit.org/show_bug.cgi?id=94253
+
+        Reviewed by Yong Li.
+
+        Remove some shared libraries.
+
+        * Source/cmake/OptionsBlackBerry.cmake:
+
+2012-08-16  Gustavo Noronha Silva  <gns@gnome.org>
+
+        Unreviewed speculative 32 bits build fix.
+
+        * Source/autotools/symbols.filter: add symbol version that gets
+        generated in 32 bits build.
+
+2012-08-16  Max Feil  <mfeil@rim.com>
+
+        [BlackBerry] Some media controls are mispositioned for dynamic live streams (HLS)
+        https://bugs.webkit.org/show_bug.cgi?id=94176
+
+        Reviewed by Antonio Gomes.
+
+        An automated layout test is not possible for this patch because
+        dynamic live streams require a special dedicated web server.
+        Putting an external video URL into an automated test is not
+        correct either. So I have created a manual test that points to
+        an external HLS video that works today.
+
+        * ManualTests/blackberry/video-hls-controls.html: Added.
+
+2012-08-16  Marja Hölttä  <marja@chromium.org>
+
+        FormController, WebHistoryItem: Enable reading selected file names from document state
+        https://bugs.webkit.org/show_bug.cgi?id=91231
+
+        Reviewed by Jochen Eisinger.
+
+        This change enables Chromium to set up file permissions properly when
+        the session restore feature restores a page with selected files.
+
+        * Source/autotools/symbols.filter: Exported FormController::getReferencedFilePaths and HistoryController::saveDocumentAndScrollState.
+
+2012-08-15  Kent Tamura  <tkent@chromium.org>
+
+        Calendar Picker: Localize numbers in a calendar picker
+        https://bugs.webkit.org/show_bug.cgi?id=93704
+
+        Reviewed by Hajime Morita.
+
+        * ManualTests/forms/calendar-picker.html:
+        Add a mock pagePopupController.localizeNumberString().
+
+2012-08-15  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Update manual tests and comments to refer to TestRunner instead of LayoutTestController
+        https://bugs.webkit.org/show_bug.cgi?id=94168
+
+        Reviewed by Kent Tamura.
+
+        * ManualTests/resources/multiFileResources/post-echo-and-notify-done.cgi:
+
+2012-08-15  Bruno de Oliveira Abinader  <bruno.abinader@basyskom.com>
+
+        [css3-text] Add CSS3 Text decoration compile flag
+        https://bugs.webkit.org/show_bug.cgi?id=93863
+
+        Reviewed by Julien Chaffraix.
+
+        This patch handles the compile flag implementation, which will come disabled by
+        default, thus not exposing the CSS3 text decoration features to the web, unless
+        when explicitly enabling it with "--css3-text-decoration" build parameter.
+
+        * Source/cmake/WebKitFeatures.cmake:
+        * Source/cmakeconfig.h.cmake:
+        * configure.ac:
+
+2012-08-15  Brady Eidson  <beidson@apple.com>
+
+        Removing a plug-in element from a page opened in a background tab in Safari crashes
+        <rdar://problem/12057991> and https://bugs.webkit.org/show_bug.cgi?id=93913
+
+        Reviewed by Beth Dakin.
+
+        * Source/autotools/symbols.filter: Allow this symbol through for DRT's sake.
+
+2012-08-14  Keishi Hattori  <keishi@webkit.org>
+
+        Share common code between calendar picker and color suggestion picker
+        https://bugs.webkit.org/show_bug.cgi?id=93802
+
+        Reviewed by Kent Tamura.
+
+        * ManualTests/forms/calendar-picker.html:
+        * ManualTests/forms/color-suggestion-picker.html:
+
+2012-08-14  Milian Wolff  <milian.wolff@kdab.com>
+
+        [Qt] QtWebKit linking fails for QNX cross build
+        https://bugs.webkit.org/show_bug.cgi?id=93460
+
+        Reviewed by Simon Hausmann.
+
+        The GCC 4.4.2 used by the QNX BBNDK 2.0.1 fails to link QtWebKit.
+        Apparently it does not properly support the linker invokation using
+        -Wl,-whole-archive -l... -Wl,-no-whole-archive
+        yielding a "cc: no files to process" error. This patch works around
+        this issue by adding an empty dummy file (and thus object file) to
+        the linking stage.
+
+        * Source/api.pri:
+
+2012-08-14  Keishi Hattori  <keishi@webkit.org>
+
+        Move page popup resources to separate directory
+        https://bugs.webkit.org/show_bug.cgi?id=93932
+
+        Reviewed by Kent Tamura.
+
+        * ManualTests/forms/calendar-picker.html:
+        * ManualTests/forms/color-suggestion-picker.html:
+
+2012-08-11  Raphael Kubo da Costa  <rakuco@webkit.org>
+
+        [CMake] Rewrite FindLibSoup2.cmake.
+        https://bugs.webkit.org/show_bug.cgi?id=93191
+
+        Reviewed by Rob Buis.
+
+        The existing LibSoup2 was imported from somewhere else and not
+        only did it contain a lot of unnecessary cruft to look for libsoup
+        2.2 (which we do not support anyway), but it also relied on the
+        paths returned by pkg-config for setting the library and include
+        paths.
+
+        For one, this meant "-lsoup-2.4" was passed to the linked instead
+        of "-L/path/to/libsoup-2.4.so", which would sometimes make a
+        system version of libsoup to be picked up instead of the one
+        installed by, say, jhbuild.
+
+        The new FindLibSoup.cmake now only looks for libsoup 2.4 and
+        relies on pkg-config solely for retrieving the current LibSoup
+        version.
+
+        * Source/cmake/FindLibSoup.cmake: Added.
+        * Source/cmake/FindLibSoup2.cmake: Removed.
+        * Source/cmake/OptionsEfl.cmake: Look for LibSoup instead of
+        LibSoup2, look for the GObject component of Glib.
+
+2012-08-13  Raphael Kubo da Costa  <rakuco@webkit.org>
+
+        [CMake] Remove glib-related Find modules and write single new one instead.
+        https://bugs.webkit.org/show_bug.cgi?id=93786
+
+        Reviewed by Rob Buis.
+
+        As part of the ongoing effort to write proper Find modules that use
+        absolute include and library paths instead of the short ones from
+        pkg-config, replace Find{GIO,Glib,Gthread}.cmake with a single
+        FindGLIB.cmake that optionally detects components such as GIO and
+        GObject.
+
+        Library paths are now defined as "/full/path/to/libfoo.so" instead of
+        simply "foo", so that the linker receives a full path and we can then
+        avoid accidentally picking up a libfoo.so installed into /usr/lib
+        instead of a local one built with jhbuild.
+
+        * Source/cmake/FindGIO.cmake: Removed.
+        * Source/cmake/FindGLIB.cmake: Added.
+        * Source/cmake/FindGlib.cmake: Removed.
+        * Source/cmake/FindGthread.cmake: Removed.
+        * Source/cmake/OptionsEfl.cmake: Look for GLIB with the GIO component.
+
+2012-08-13  Zan Dobersek  <zandobersek@gmail.com>
+
+        [Gtk] Remove SVG_FEATURES and HTML_FEATURES from Source/WebCore/GNUmakefile.am
+        https://bugs.webkit.org/show_bug.cgi?id=90693
+
+        Reviewed by Philippe Normand.
+
+        Remove exportation of SVG_FLAGS and HTML_FLAGS as Automake conditionals
+        as they are not required anymore.
+
+        * configure.ac:
+
+2012-08-12  Loïc Yhuel  <loic.yhuel@softathome.com>
+
+        [Qt] Make it possible to build without QtTest/QtPrintSupport
+        https://bugs.webkit.org/show_bug.cgi?id=93492
+
+        Reviewed by Tor Arne Vestbø.
+
+        * Source/QtWebKit.pro: Disable tests if no testlib
+
 2012-08-10  Rob Buis  <rbuis@rim.com>
 
         [BlackBerry] Enable relro link option for JSC executable

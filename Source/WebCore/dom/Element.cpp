@@ -146,6 +146,13 @@ Element::~Element()
         ASSERT(m_attributeData);
         m_attributeData->detachAttrObjectsFromElement(this);
     }
+
+#if ENABLE(UNDO_MANAGER)
+    if (hasRareData() && elementRareData()->m_undoManager) {
+        elementRareData()->m_undoManager->disconnect();
+        elementRareData()->m_undoManager.clear();
+    }
+#endif
 }
 
 inline ElementRareData* Element::elementRareData() const
@@ -169,7 +176,7 @@ DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, error);
 DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, focus);
 DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, load);
 
-PassRefPtr<Node> Element::cloneNode(bool deep)
+PassRefPtr<Node> Element::cloneNode(bool deep, ExceptionCode&)
 {
     return deep ? cloneElementWithChildren() : cloneElementWithoutChildren();
 }
@@ -724,26 +731,26 @@ void Element::attributeChanged(const Attribute& attribute)
     const QualifiedName& attrName = attribute.name();
     if (attrName == aria_activedescendantAttr) {
         // any change to aria-activedescendant attribute triggers accessibility focus change, but document focus remains intact
-        document()->axObjectCache()->handleActiveDescendantChanged(renderer());
+        document()->axObjectCache()->handleActiveDescendantChanged(this);
     } else if (attrName == roleAttr) {
         // the role attribute can change at any time, and the AccessibilityObject must pick up these changes
-        document()->axObjectCache()->handleAriaRoleChanged(renderer());
+        document()->axObjectCache()->handleAriaRoleChanged(this);
     } else if (attrName == aria_valuenowAttr) {
         // If the valuenow attribute changes, AX clients need to be notified.
-        document()->axObjectCache()->postNotification(renderer(), AXObjectCache::AXValueChanged, true);
+        document()->axObjectCache()->postNotification(this, AXObjectCache::AXValueChanged, true);
     } else if (attrName == aria_labelAttr || attrName == aria_labeledbyAttr || attrName == altAttr || attrName == titleAttr) {
         // If the content of an element changes due to an attribute change, notify accessibility.
-        document()->axObjectCache()->contentChanged(renderer());
+        document()->axObjectCache()->contentChanged(this);
     } else if (attrName == aria_checkedAttr)
-        document()->axObjectCache()->checkedStateChanged(renderer());
+        document()->axObjectCache()->checkedStateChanged(this);
     else if (attrName == aria_selectedAttr)
-        document()->axObjectCache()->selectedChildrenChanged(renderer());
+        document()->axObjectCache()->selectedChildrenChanged(this);
     else if (attrName == aria_expandedAttr)
-        document()->axObjectCache()->handleAriaExpandedChange(renderer());
+        document()->axObjectCache()->handleAriaExpandedChange(this);
     else if (attrName == aria_hiddenAttr)
-        document()->axObjectCache()->childrenChanged(renderer());
+        document()->axObjectCache()->childrenChanged(this);
     else if (attrName == aria_invalidAttr)
-        document()->axObjectCache()->postNotification(renderer(), AXObjectCache::AXInvalidStatusChanged, true);
+        document()->axObjectCache()->postNotification(this, AXObjectCache::AXInvalidStatusChanged, true);
 }
 
 // Returns true is the given attribute is an event handler.
@@ -2237,7 +2244,7 @@ PassRefPtr<UndoManager> Element::undoManager()
     }
     ElementRareData* data = ensureElementRareData();
     if (!data->m_undoManager)
-        data->m_undoManager = UndoManager::create(this);
+        data->m_undoManager = UndoManager::create(document(), this);
     return data->m_undoManager;
 }
 
@@ -2249,7 +2256,6 @@ void Element::disconnectUndoManager()
     UndoManager* undoManager = data->m_undoManager.get();
     if (!undoManager)
         return;
-    undoManager->clearUndoRedo();
     undoManager->disconnect();
     data->m_undoManager.clear();
 }

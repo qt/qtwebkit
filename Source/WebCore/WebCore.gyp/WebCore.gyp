@@ -115,6 +115,7 @@
       '../platform/chromium/support',
       '../platform/graphics',
       '../platform/graphics/chromium',
+      '../platform/graphics/chromium/cc',
       '../platform/graphics/filters',
       '../platform/graphics/filters/arm',
       '../platform/graphics/gpu',
@@ -164,7 +165,6 @@
     'bindings_idl_files!': [
       # Custom bindings in bindings/v8/custom exist for these.
       '../dom/EventListener.idl',
-      '../html/VoidCallback.idl',
 
       # Bindings with custom Objective-C implementations.
       '../page/AbstractView.idl',
@@ -903,10 +903,29 @@
           ],
         },
         {
+          'action_name': 'PickerCommon',
+          'inputs': [
+            '../Resources/pagepopups/pickerCommon.css',
+            '../Resources/pagepopups/pickerCommon.js',
+          ],
+          'outputs': [
+            '<(SHARED_INTERMEDIATE_DIR)/webkit/PickerCommon.h',
+            '<(SHARED_INTERMEDIATE_DIR)/webkit/PickerCommon.cpp',
+          ],
+          'action': [
+            'python',
+            '../make-file-arrays.py',
+            '--condition=ENABLE(CALENDAR_PICKER)',
+            '--out-h=<(SHARED_INTERMEDIATE_DIR)/webkit/PickerCommon.h',
+            '--out-cpp=<(SHARED_INTERMEDIATE_DIR)/webkit/PickerCommon.cpp',
+            '<@(_inputs)',
+          ],
+        },
+        {
           'action_name': 'CalendarPicker',
           'inputs': [
-            '../Resources/calendarPicker.css',
-            '../Resources/calendarPicker.js',
+            '../Resources/pagepopups/calendarPicker.css',
+            '../Resources/pagepopups/calendarPicker.js',
           ],
           'outputs': [
             '<(SHARED_INTERMEDIATE_DIR)/webkit/CalendarPicker.h',
@@ -924,7 +943,7 @@
         {
           'action_name': 'CalendarPickerMac',
           'inputs': [
-            '../Resources/calendarPickerMac.css',
+            '../Resources/pagepopups/calendarPickerMac.css',
           ],
           'outputs': [
             '<(SHARED_INTERMEDIATE_DIR)/webkit/CalendarPickerMac.h',
@@ -942,8 +961,8 @@
         {
           'action_name': 'ColorSuggestionPicker',
           'inputs': [
-            '../Resources/colorSuggestionPicker.css',
-            '../Resources/colorSuggestionPicker.js',
+            '../Resources/pagepopups/colorSuggestionPicker.css',
+            '../Resources/pagepopups/colorSuggestionPicker.js',
           ],
           'outputs': [
             '<(SHARED_INTERMEDIATE_DIR)/webkit/ColorSuggestionPicker.h',
@@ -1213,6 +1232,7 @@
         '<(SHARED_INTERMEDIATE_DIR)/webkit/EventTargetHeaders.h',
         '<(SHARED_INTERMEDIATE_DIR)/webkit/EventTargetInterfaces.h',
         '<(SHARED_INTERMEDIATE_DIR)/webkit/ExceptionCodeDescription.cpp',
+        '<(SHARED_INTERMEDIATE_DIR)/webkit/PickerCommon.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/webkit/UserAgentStyleSheetsData.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/webkit/V8HTMLElementWrapperFactory.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/webkit/XLinkNames.cpp',
@@ -1430,6 +1450,7 @@
               # such as:
               # com.google.Chrome[] objc[]: Class ScrollbarPrefsObserver is implemented in both .../Google Chrome.app/Contents/Versions/.../Google Chrome Helper.app/Contents/MacOS/../../../Google Chrome Framework.framework/Google Chrome Framework and /System/Library/Frameworks/WebKit.framework/Versions/A/Frameworks/WebCore.framework/Versions/A/WebCore. One of the two will be used. Which one is undefined.
               'WebCascadeList=ChromiumWebCoreObjCWebCascadeList',
+              'WebCoreFlippedView=ChromiumWebCoreObjCWebCoreFlippedView',
               'WebScrollbarPrefsObserver=ChromiumWebCoreObjCWebScrollbarPrefsObserver',
               'WebCoreRenderThemeNotificationObserver=ChromiumWebCoreObjCWebCoreRenderThemeNotificationObserver',
               'WebFontCache=ChromiumWebCoreObjCWebFontCache',
@@ -1715,6 +1736,8 @@
             ['include', 'platform/mac/ScrollbarThemeMac\\.mm$'],
             ['include', 'platform/mac/ScrollAnimatorMac\\.mm$'],
             ['include', 'platform/mac/ScrollElasticityController\\.mm$'],
+            ['include', 'platform/mac/ThemeMac\\.h$'],
+            ['include', 'platform/mac/ThemeMac\\.mm$'],
             ['include', 'platform/mac/WebCoreSystemInterface\\.mm$'],
             ['include', 'platform/mac/WebCoreTextRenderer\\.mm$'],
             ['include', 'platform/text/mac/ShapeArabic\\.c$'],
@@ -2186,8 +2209,8 @@
       ],
       'sources': [
         '<@(webcore_test_support_files)',
-        '<(SHARED_INTERMEDIATE_DIR)/webcore/bindings/V8FastMallocStatistics.cpp',
-        '<(SHARED_INTERMEDIATE_DIR)/webkit/bindings/V8FastMallocStatistics.h',
+        '<(SHARED_INTERMEDIATE_DIR)/webcore/bindings/V8MallocStatistics.cpp',
+        '<(SHARED_INTERMEDIATE_DIR)/webkit/bindings/V8MallocStatistics.h',
         '<(SHARED_INTERMEDIATE_DIR)/webcore/bindings/V8Internals.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/webkit/bindings/V8Internals.h',
         '<(SHARED_INTERMEDIATE_DIR)/webcore/bindings/V8InternalSettings.cpp',

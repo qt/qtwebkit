@@ -219,13 +219,15 @@ public:
 #if ENABLE(CSS_SHADERS)
     PassRefPtr<WebKitCSSMixFunctionValue> parseMixFunction(CSSParserValue*);
     PassRefPtr<WebKitCSSFilterValue> parseCustomFilter(CSSParserValue*);
+    PassRefPtr<CSSValueList> parseCustomFilterTransform(CSSParserValueList*);
 #endif
 #endif
 
     static bool isBlendMode(int ident);
     static bool isCompositeOperator(int ident);
 
-    PassRefPtr<CSSValueList> parseTransform(CSSParserValueList*);
+    PassRefPtr<CSSValueList> parseTransform();
+    PassRefPtr<CSSValue> parseTransformValue(CSSParserValue*);
     bool parseTransformOrigin(CSSPropertyID propId, CSSPropertyID& propId1, CSSPropertyID& propId2, CSSPropertyID& propId3, RefPtr<CSSValue>&, RefPtr<CSSValue>&, RefPtr<CSSValue>&);
     bool parsePerspectiveOrigin(CSSPropertyID propId, CSSPropertyID& propId1, CSSPropertyID& propId2,  RefPtr<CSSValue>&, RefPtr<CSSValue>&);
 
@@ -246,8 +248,6 @@ public:
     bool parseRegionThread(CSSPropertyID, bool important);
 
     bool parseFontVariantLigatures(bool important);
-
-    int yyparse();
 
     CSSParserSelector* createFloatingSelector();
     PassOwnPtr<CSSParserSelector> sinkFloatingSelector(CSSParserSelector*);

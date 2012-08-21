@@ -93,6 +93,11 @@ LIST(APPEND WebCore_SOURCES
   platform/text/efl/TextBreakIteratorInternalICUEfl.cpp
 )
 
+IF (ENABLE_BATTERY_STATUS)
+    LIST(APPEND WebCore_INCLUDE_DIRECTORIES ${DBUS_INCLUDE_DIRS})
+    LIST(APPEND WebCore_LIBRARIES ${DBUS_LIBRARIES})
+ENDIF ()
+
 IF (ENABLE_NETSCAPE_PLUGIN_API)
   LIST(APPEND WebCore_SOURCES
     plugins/PluginDatabase.cpp
@@ -168,26 +173,6 @@ IF (WTF_USE_CAIRO)
       ${HARFBUZZ_LIBRARIES}
     )
   ENDIF ()
-
-  IF (WTF_USE_PANGO)
-    LIST(APPEND WebCore_INCLUDE_DIRECTORIES
-      "${WEBCORE_DIR}/platform/graphics/pango"
-      ${Pango_INCLUDE_DIRS}
-    )
-    LIST(APPEND WebCore_SOURCES
-      platform/graphics/pango/FontPango.cpp
-      platform/graphics/pango/FontCachePango.cpp
-      platform/graphics/pango/FontCustomPlatformDataPango.cpp
-      platform/graphics/pango/FontPlatformDataPango.cpp
-      platform/graphics/pango/GlyphPageTreeNodePango.cpp
-      platform/graphics/pango/SimpleFontDataPango.cpp
-      platform/graphics/pango/PangoUtilities.cpp
-    )
-    LIST(APPEND WebCore_LIBRARIES
-      ${Pango_LIBRARY}
-      ${Pango_Cairo_LIBRARY}
-    )
-  ENDIF ()
 ENDIF ()
 
 IF (WTF_USE_ICU_UNICODE)
@@ -222,8 +207,10 @@ LIST(APPEND WebCore_LIBRARIES
   ${LIBXSLT_LIBRARIES}
   ${PNG_LIBRARY}
   ${SQLITE_LIBRARIES}
-  ${Glib_LIBRARIES}
-  ${LIBSOUP24_LIBRARIES}
+  ${GLIB_LIBRARIES}
+  ${GLIB_GIO_LIBRARIES}
+  ${GLIB_GOBJECT_LIBRARIES}
+  ${LIBSOUP_LIBRARIES}
   ${ZLIB_LIBRARIES}
 )
 
@@ -237,8 +224,8 @@ LIST(APPEND WebCore_INCLUDE_DIRECTORIES
   ${LIBXML2_INCLUDE_DIR}
   ${LIBXSLT_INCLUDE_DIR}
   ${SQLITE_INCLUDE_DIR}
-  ${Glib_INCLUDE_DIRS}
-  ${LIBSOUP24_INCLUDE_DIRS}
+  ${GLIB_INCLUDE_DIRS}
+  ${LIBSOUP_INCLUDE_DIRS}
   ${ZLIB_INCLUDE_DIRS}
 )
 

@@ -26,9 +26,11 @@
 #include "InRegionScrollableArea.h"
 #include "InRegionScroller_p.h"
 #include "LayerCompositingThread.h"
+#include "LayerWebKitThread.h"
 #include "Page.h"
 #include "RenderBox.h"
 #include "RenderLayer.h"
+#include "RenderLayerBacking.h"
 #include "RenderObject.h"
 #include "RenderView.h"
 #include "WebPage_p.h"
@@ -43,7 +45,6 @@ static bool canScrollRenderBox(RenderBox*);
 static RenderLayer* parentLayer(RenderLayer*);
 static Node* enclosingLayerNode(RenderLayer*);
 static bool isNonRenderViewFixedPositionedContainer(RenderLayer*);
-static void pushBackInRegionScrollable(std::vector<Platform::ScrollViewBase*>&, InRegionScrollableArea*, InRegionScrollerPrivate*);
 
 InRegionScroller::InRegionScroller(WebPagePrivate* webPagePrivate)
     : d(new InRegionScrollerPrivate(webPagePrivate))
@@ -56,10 +57,20 @@ InRegionScroller::~InRegionScroller()
     delete d;
 }
 
-bool InRegionScroller::compositedSetScrollPosition(unsigned camouflagedLayer, const Platform::IntPoint& scrollPosition)
+bool InRegionScroller::setScrollPositionCompositingThread(unsigned camouflagedLayer, const Platform::IntPoint& scrollPosition)
 {
     ASSERT(Platform::userInterfaceThreadMessageClient()->isCurrentThread());
-    return d->compositedSetScrollPosition(camouflagedLayer, d->m_webPage->mapFromTransformed(scrollPosition));
+
+    // FIXME: Negative values won't work with map{To,From}Transform methods.
+    return d->setScrollPositionCompositingThread(camouflagedLayer, d->m_webPage->mapFromTransformed(scrollPosition));
+}
+
+bool InRegionScroller::setScrollPositionWebKitThread(unsigned camouflagedLayer, const Platform::IntPoint& scrollPosition)
+{
+    ASSERT(Platform::webKitThreadMessageClient()->isCurrentThread());
+
+    // FIXME: Negative values won't work with map{To,From}Transform methods.
+    return d->setScrollPositionWebKitThread(camouflagedLayer, d->m_webPage->mapFromTransformed(scrollPosition));
 }
 
 InRegionScrollerPrivate::InRegionScrollerPrivate(WebPagePrivate* webPagePrivate)
@@ -80,6 +91,10 @@ WebCore::Node* InRegionScrollerPrivate::node() const
 void InRegionScrollerPrivate::reset()
 {
     setNode(0);
+
+    for (size_t i = 0; i < m_activeInRegionScrollableAreas.size(); ++i)
+        delete m_activeInRegionScrollableAreas[i];
+    m_activeInRegionScrollableAreas.clear();
 }
 
 bool InRegionScrollerPrivate::hasNode() const
@@ -92,13 +107,34 @@ bool InRegionScrollerPrivate::canScroll() const
     return hasNode();
 }
 
-bool InRegionScrollerPrivate::compositedSetScrollPosition(unsigned camouflagedLayer, const WebCore::IntPoint& scrollPosition)
+bool InRegionScrollerPrivate::setScrollPositionCompositingThread(unsigned camouflagedLayer, const WebCore::IntPoint& scrollPosition)
 {
-    LayerCompositingThread* scrollLayer = reinterpret_cast<LayerCompositingThread*>(camouflagedLayer);
-    scrollLayer->override()->setBoundsOrigin(WebCore::FloatPoint(scrollPosition.x(), scrollPosition.y()));
+    LayerCompositingThread* scrollLayer = reinterpret_cast<LayerWebKitThread*>(camouflagedLayer)->layerCompositingThread();
 
-    m_webPage->scheduleCompositingRun();
+    // FIXME: Clamp maximum and minimum scroll positions as a last attempt to fix round errors.
+    scrollLayer->override()->setBoundsOrigin(scrollPosition);
+
+    // The client is going to blitVisibleContens, which allow us benefit from "defer blits" technique.
     return true;
+}
+
+bool InRegionScrollerPrivate::setScrollPositionWebKitThread(unsigned camouflagedLayer, const WebCore::IntPoint& scrollPosition)
+{
+    RenderLayer* layer = 0;
+
+    LayerWebKitThread* layerWebKitThread = reinterpret_cast<LayerWebKitThread*>(camouflagedLayer);
+    ASSERT(layerWebKitThread);
+    if (layerWebKitThread->owner()) {
+        GraphicsLayer* graphicsLayer = layerWebKitThread->owner();
+        RenderLayerBacking* backing = static_cast<RenderLayerBacking*>(graphicsLayer->client());
+        layer = backing->owningLayer();
+    }
+
+    if (!layer)
+        return false;
+
+    // FIXME: Clamp maximum and minimum scroll positions as a last attempt to fix round errors.
+    return setLayerScrollPosition(layer, scrollPosition);
 }
 
 bool InRegionScrollerPrivate::scrollBy(const Platform::IntSize& delta)
@@ -111,15 +147,14 @@ bool InRegionScrollerPrivate::scrollBy(const Platform::IntSize& delta)
     return scrollNodeRecursively(node(), delta);
 }
 
-std::vector<Platform::ScrollViewBase*> InRegionScrollerPrivate::inRegionScrollableAreasForPoint(const WebCore::IntPoint& point)
+void InRegionScrollerPrivate::calculateInRegionScrollableAreasForPoint(const WebCore::IntPoint& point)
 {
-    std::vector<Platform::ScrollViewBase*> validReturn;
-    std::vector<Platform::ScrollViewBase*> emptyReturn;
+    ASSERT(m_activeInRegionScrollableAreas.empty());
 
     HitTestResult result = m_webPage->m_mainFrame->eventHandler()->hitTestResultAtPoint(m_webPage->mapFromViewportToContents(point), false /*allowShadowContent*/);
     Node* node = result.innerNonSharedNode();
     if (!node || !node->renderer())
-        return emptyReturn;
+        return;
 
     RenderLayer* layer = node->renderer()->enclosingLayer();
     do {
@@ -128,37 +163,39 @@ std::vector<Platform::ScrollViewBase*> InRegionScrollerPrivate::inRegionScrollab
         if (renderer->isRenderView()) {
             if (RenderView* renderView = toRenderView(renderer)) {
                 FrameView* view = renderView->frameView();
-                if (!view)
-                    return emptyReturn;
+                if (!view) {
+                    reset();
+                    return;
+                }
 
                 if (canScrollInnerFrame(view->frame())) {
-                    pushBackInRegionScrollable(validReturn, new InRegionScrollableArea(m_webPage, layer), this);
+                    pushBackInRegionScrollable(new InRegionScrollableArea(m_webPage, layer));
                     continue;
                 }
             }
         } else if (canScrollRenderBox(layer->renderBox())) {
-            pushBackInRegionScrollable(validReturn, new InRegionScrollableArea(m_webPage, layer), this);
+            pushBackInRegionScrollable(new InRegionScrollableArea(m_webPage, layer));
             continue;
         }
 
         // If we run into a fix positioned layer, set the last scrollable in-region object
         // as not able to propagate scroll to its parent scrollable.
-        if (isNonRenderViewFixedPositionedContainer(layer) && validReturn.size()) {
-            Platform::ScrollViewBase* end = validReturn.back();
+        if (isNonRenderViewFixedPositionedContainer(layer) && m_activeInRegionScrollableAreas.size()) {
+            Platform::ScrollViewBase* end = m_activeInRegionScrollableAreas.back();
             end->setCanPropagateScrollingToEnclosingScrollable(false);
         }
 
     } while (layer = parentLayer(layer));
 
-    if (validReturn.empty())
-        return emptyReturn;
+    if (m_activeInRegionScrollableAreas.empty())
+        return;
 
     // Post-calculate the visible window rects in reverse hit test order so
     // we account for all and any clipping rects.
     WebCore::IntRect recursiveClippingRect(WebCore::IntPoint::zero(), m_webPage->transformedViewportSize());
 
-    std::vector<Platform::ScrollViewBase*>::reverse_iterator rend = validReturn.rend();
-    for (std::vector<Platform::ScrollViewBase*>::reverse_iterator rit = validReturn.rbegin(); rit != rend; ++rit) {
+    std::vector<Platform::ScrollViewBase*>::reverse_iterator rend = m_activeInRegionScrollableAreas.rend();
+    for (std::vector<Platform::ScrollViewBase*>::reverse_iterator rit = m_activeInRegionScrollableAreas.rbegin(); rit != rend; ++rit) {
 
         InRegionScrollableArea* curr = static_cast<InRegionScrollableArea*>(*rit);
         RenderLayer* layer = curr->layer();
@@ -188,8 +225,34 @@ std::vector<Platform::ScrollViewBase*> InRegionScrollerPrivate::inRegionScrollab
             recursiveClippingRect = visibleWindowRect;
         }
     }
+}
 
-    return validReturn;
+const std::vector<Platform::ScrollViewBase*>& InRegionScrollerPrivate::activeInRegionScrollableAreas() const
+{
+    return m_activeInRegionScrollableAreas;
+}
+
+bool InRegionScrollerPrivate::setLayerScrollPosition(RenderLayer* layer, const IntPoint& scrollPosition)
+{
+    RenderObject* layerRenderer = layer->renderer();
+    ASSERT(layerRenderer);
+
+    if (layerRenderer->isRenderView()) { // #document case.
+        FrameView* view = toRenderView(layerRenderer)->frameView();
+        ASSERT(view);
+
+        Frame* frame = view->frame();
+        ASSERT_UNUSED(frame, frame);
+
+        view->setScrollPosition(scrollPosition);
+        return true;
+    }
+
+    // RenderBox-based elements case (scrollable boxes (div's, p's, textarea's, etc)).
+    layer->scrollToOffset(scrollPosition.x(), scrollPosition.y());
+    // FIXME_agomes: Please recheck if it is needed still!
+    layer->renderer()->repaint(true);
+    return true;
 }
 
 bool InRegionScrollerPrivate::scrollNodeRecursively(WebCore::Node* node, const WebCore::IntSize& delta)
@@ -376,16 +439,15 @@ static bool isNonRenderViewFixedPositionedContainer(RenderLayer* layer)
     return o->isOutOfFlowPositioned() && o->style()->position() == FixedPosition;
 }
 
-static void pushBackInRegionScrollable(std::vector<Platform::ScrollViewBase*>& vector, InRegionScrollableArea* scrollableArea, InRegionScrollerPrivate* scroller)
+void InRegionScrollerPrivate::pushBackInRegionScrollable(InRegionScrollableArea* scrollableArea)
 {
-    ASSERT(scroller);
     ASSERT(!scrollableArea->isNull());
 
     scrollableArea->setCanPropagateScrollingToEnclosingScrollable(!isNonRenderViewFixedPositionedContainer(scrollableArea->layer()));
-    vector.push_back(scrollableArea);
-    if (vector.size() == 1) {
+    m_activeInRegionScrollableAreas.push_back(scrollableArea);
+    if (m_activeInRegionScrollableAreas.size() == 1) {
         // FIXME: Use RenderLayer::renderBox()->node() instead?
-        scroller->setNode(enclosingLayerNode(scrollableArea->layer()));
+        setNode(enclosingLayerNode(scrollableArea->layer()));
     }
 }
 

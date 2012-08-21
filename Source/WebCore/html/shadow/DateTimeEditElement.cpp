@@ -202,7 +202,7 @@ DateTimeEditElement::~DateTimeEditElement()
         m_fields[fieldIndex]->removeEventHandler();
 
     if (m_spinButton)
-        m_spinButton->removeStepActionHandler();
+        m_spinButton->removeSpinButtonOwner();
 }
 
 void DateTimeEditElement::addField(PassRefPtr<DateTimeFieldElement> field)
@@ -228,6 +228,13 @@ void DateTimeEditElement::disabledStateChanged()
 DateTimeFieldElement* DateTimeEditElement::fieldAt(size_t fieldIndex) const
 {
     return fieldIndex < m_fields.size() ? m_fields[fieldIndex] : 0;
+}
+
+void DateTimeEditElement::focusAndSelectSpinButtonOwner()
+{
+    if (!m_editControlOwner)
+        return;
+    m_editControlOwner->focusAndSelectEditControlOwner();
 }
 
 void DateTimeEditElement::focusFieldAt(size_t newFocusFieldIndex)
@@ -418,6 +425,12 @@ void DateTimeEditElement::defaultEventHandler(Event* event)
     if (!focusField)
         return;
 
+    if (m_spinButton) {
+        m_spinButton->forwardEvent(event);
+        if (event->defaultHandled())
+            return;
+    }
+
     focusField->defaultEventHandler(event);
 }
 
@@ -431,6 +444,19 @@ void DateTimeEditElement::setEmptyValue(const DateComponents& dateForReadOnlyFie
 {
     for (size_t fieldIndex = 0; fieldIndex < m_fields.size(); ++fieldIndex)
         m_fields[fieldIndex]->setEmptyValue(dateForReadOnlyField, DateTimeFieldElement::DispatchNoEvent);
+}
+
+bool DateTimeEditElement::shouldSpinButtonRespondToMouseEvents()
+{
+    return !isDisabled() && !isReadOnly();
+}
+
+bool DateTimeEditElement::shouldSpinButtonRespondToWheelEvents()
+{
+    if (!shouldSpinButtonRespondToMouseEvents())
+        return false;
+
+    return !m_editControlOwner || m_editControlOwner->isEditControlOwnerFocused();
 }
 
 void DateTimeEditElement::spinButtonStepDown()

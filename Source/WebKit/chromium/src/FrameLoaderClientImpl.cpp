@@ -304,7 +304,7 @@ void FrameLoaderClientImpl::detachedFromParent3()
     // will cause a crash.  If you remove/modify this, just ensure that you can
     // go to a page and then navigate to a new page without getting any asserts
     // or crashes.
-    m_webFrame->frame()->script()->proxy()->clearForClose();
+    m_webFrame->frame()->script()->clearForClose();
 
     // Alert the client that the frame is being detached. This is the last
     // chance we have to communicate with the client.
@@ -1490,9 +1490,8 @@ PassRefPtr<Widget> FrameLoaderClientImpl::createPlugin(
 // (e.g., acrobat reader).
 void FrameLoaderClientImpl::redirectDataToPlugin(Widget* pluginWidget)
 {
-    if (pluginWidget->isPluginContainer())
-        m_pluginWidget = static_cast<WebPluginContainerImpl*>(pluginWidget);
-    ASSERT(m_pluginWidget);
+    ASSERT(!pluginWidget || pluginWidget->isPluginContainer());
+    m_pluginWidget = static_cast<WebPluginContainerImpl*>(pluginWidget);
 }
 
 PassRefPtr<Widget> FrameLoaderClientImpl::createJavaAppletWidget(

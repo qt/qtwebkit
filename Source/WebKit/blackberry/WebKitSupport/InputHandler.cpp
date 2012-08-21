@@ -50,27 +50,31 @@
 #include "RenderText.h"
 #include "RenderTextControl.h"
 #include "RenderWidget.h"
+#include "RenderedDocumentMarker.h"
 #include "ScopePointer.h"
 #include "SelectPopupClient.h"
 #include "SelectionHandler.h"
 #include "SpellChecker.h"
 #include "TextCheckerClient.h"
 #include "TextIterator.h"
+#include "VisiblePosition.h"
 #include "WebPageClient.h"
 #include "WebPage_p.h"
 #include "WebSettings.h"
+#include "visible_units.h"
 
 #include <BlackBerryPlatformKeyboardEvent.h>
 #include <BlackBerryPlatformLog.h>
 #include <BlackBerryPlatformMisc.h>
 #include <BlackBerryPlatformSettings.h>
-#include <imf/events.h>
 #include <sys/keycodes.h>
 
 #define ENABLE_INPUT_LOG 0
 #define ENABLE_FOCUS_LOG 0
+#define ENABLE_SPELLING_LOG 0
 
 static const unsigned MaxLearnTextDataSize = 500;
+static const unsigned MaxSpellCheckingStringLength = 250;
 
 using namespace BlackBerry::Platform;
 using namespace WebCore;
@@ -86,6 +90,12 @@ using namespace WebCore;
 #else
 #define FocusLog(severity, format, ...)
 #endif // ENABLE_FOCUS_LOG
+
+#if ENABLE_SPELLING_LOG
+#define SpellingLog(severity, format, ...) logAlways(severity, format, ## __VA_ARGS__)
+#else
+#define SpellingLog(severity, format, ...)
+#endif // ENABLE_SPELLING_LOG
 
 namespace BlackBerry {
 namespace WebKit {
@@ -450,7 +460,7 @@ static bool convertStringToWcharVector(const String& string, WTF::Vector<wchar_t
         return true;
 
     if (!wcharString.tryReserveCapacity(length + 1)) {
-        logAlways(LogLevelCritical, "InputHandler::convertStringToWcharVector Cannot allocate memory for string.\n");
+        logAlways(LogLevelCritical, "InputHandler::convertStringToWcharVector Cannot allocate memory for string.");
         return false;
     }
 
@@ -470,7 +480,7 @@ static String convertSpannableStringToString(spannable_string_t* src)
     WTF::Vector<UChar> dest;
     int destCapacity = (src->length * 2) + 1;
     if (!dest.tryReserveCapacity(destCapacity)) {
-        logAlways(LogLevelCritical, "InputHandler::convertSpannableStringToString Cannot allocate memory for string.\n");
+        logAlways(LogLevelCritical, "InputHandler::convertSpannableStringToString Cannot allocate memory for string.");
         return String();
     }
 
@@ -524,28 +534,54 @@ void InputHandler::requestCheckingOfString(PassRefPtr<WebCore::TextCheckingReque
     RefPtr<WebCore::TextCheckingRequest> request = textCheckingRequest;
 
     int32_t sequenceId = request->sequence();
-    int requestLength = request->text().length();
-    if (!requestLength /* || requestLength > maxSpellCheckStringLength */) {
+
+    if (!isActiveTextEdit()) {
         spellCheckingRequestCancelled(sequenceId, true /* isSequenceId */);
+        return;
+    }
+
+    // Check if field explicitly asked for spellchecking.
+    if (DOMSupport::elementSupportsSpellCheck(m_currentFocusElement.get()) != DOMSupport::On) {
+        spellCheckingRequestCancelled(sequenceId, true /* isSequenceId */);
+        return;
+    }
+
+    unsigned requestLength = request->text().length();
+
+    if (requestLength < 2) {
+        spellCheckingRequestCancelled(sequenceId, true /* isSequenceId */);
+        return;
+    }
+
+    if (requestLength > MaxSpellCheckingStringLength) {
+        // Cancel this request and send it off in newly created chunks.
+        spellCheckingRequestCancelled(sequenceId, true /* isSequenceId */);
+        if (m_currentFocusElement && m_currentFocusElement->document() && m_currentFocusElement->document()->frame() && m_currentFocusElement->document()->frame()->selection()) {
+            // Convert from position back to selection so we can expand the range to include the previous line. This should handle cases when the user hits
+            // enter to finish composing a word and create a new line.
+            VisiblePosition caretPosition = m_currentFocusElement->document()->frame()->selection()->start();
+            VisibleSelection visibleSelection = VisibleSelection(previousLinePosition(caretPosition, caretPosition.lineDirectionPointForBlockDirectionNavigation()), caretPosition);
+            spellCheckBlock(visibleSelection, TextCheckingProcessIncremental);
+        }
         return;
     }
 
     wchar_t* checkingString = (wchar_t*)malloc(sizeof(wchar_t) * (requestLength + 1));
     if (!checkingString) {
-        BlackBerry::Platform::logAlways(BlackBerry::Platform::LogLevelCritical, "InputHandler::requestCheckingOfString Cannot allocate memory for string.");
+        logAlways(LogLevelCritical, "InputHandler::requestCheckingOfString Cannot allocate memory for string.");
         spellCheckingRequestCancelled(sequenceId, true /* isSequenceId */);
         return;
     }
 
-    int stringLength = 0;
-    if (!convertStringToWchar(request->text(), checkingString, requestLength + 1, &stringLength)) {
-        BlackBerry::Platform::logAlways(BlackBerry::Platform::LogLevelCritical, "InputHandler::requestCheckingOfString Failed to convert String to wchar type.");
+    int paragraphLength = 0;
+    if (!convertStringToWchar(request->text(), checkingString, requestLength + 1, &paragraphLength)) {
+        logAlways(LogLevelCritical, "InputHandler::requestCheckingOfString Failed to convert String to wchar type.");
         free(checkingString);
         spellCheckingRequestCancelled(sequenceId, true /* isSequenceId */);
         return;
     }
 
-    int32_t transactionId = m_webPage->m_client->checkSpellingOfStringAsync(checkingString, stringLength);
+    int32_t transactionId = m_webPage->m_client->checkSpellingOfStringAsync(checkingString, paragraphLength);
     free(checkingString);
 
     // If the call to the input service did not go through, then cancel the request so we don't block endlessly.
@@ -613,13 +649,20 @@ void InputHandler::spellCheckingRequestProcessed(int32_t transactionId, spannabl
     // transactionId here is for use with the input service. We need to translate this to sequenceId used with SpellChecker.
     int32_t sequenceId = convertTransactionIdToSequenceId(transactionId);
 
-    SpellChecker* sp = getSpellChecker();
-    if (!sp || !sequenceId) {
-        InputLog(LogLevelWarn, "InputHandler::spellCheckingRequestProcessed failed to process the request with sequenceId %d", sequenceId);
+    SpellChecker* spellChecker = getSpellChecker();
+    if (!spellChecker || !sequenceId) {
+        SpellingLog(LogLevelWarn, "InputHandler::spellCheckingRequestProcessed Failed to process the request with sequenceId %d", sequenceId);
         spellCheckingRequestCancelled(sequenceId, true /* isSequenceId */);
         return;
     }
-    sp->didCheckSucceeded(sequenceId, results);
+    spellChecker->didCheckSucceeded(sequenceId, results);
+}
+
+void InputHandler::cancelAllSpellCheckingRequests()
+{
+    for (std::map<int32_t, int32_t>::iterator it = m_sequenceMap.begin(); it != m_sequenceMap.end(); ++it)
+        spellCheckingRequestCancelled(it->second, true /* isSequenceId */);
+    m_sequenceMap.clear();
 }
 
 void InputHandler::spellCheckingRequestCancelled(int32_t id, bool isSequenceId)
@@ -628,12 +671,12 @@ void InputHandler::spellCheckingRequestCancelled(int32_t id, bool isSequenceId)
         return;
 
     int32_t sequenceId = isSequenceId ? id : convertTransactionIdToSequenceId(id);
-    SpellChecker* sp = getSpellChecker();
-    if (!sp) {
-        InputLog(LogLevelWarn, "InputHandler::spellCheckingRequestCancelled failed to cancel the request with sequenceId %d", sequenceId);
+    SpellChecker* spellChecker = getSpellChecker();
+    if (!spellChecker) {
+        SpellingLog(LogLevelWarn, "InputHandler::spellCheckingRequestCancelled failed to cancel the request with sequenceId %d", sequenceId);
         return;
     }
-    sp->didCheckCanceled(sequenceId);
+    spellChecker->didCheckCanceled(sequenceId);
 }
 
 SpellChecker* InputHandler::getSpellChecker()
@@ -646,6 +689,50 @@ SpellChecker* InputHandler::getSpellChecker()
             return editor->spellChecker();
 
     return 0;
+}
+
+bool InputHandler::shouldRequestSpellCheckingOptionsForPoint(Platform::IntPoint& point, const Element* touchedElement, imf_sp_text_t& spellCheckingOptionRequest)
+{
+    if (!isActiveTextEdit() || touchedElement != m_currentFocusElement)
+        return false;
+
+    LayoutPoint contentPos(m_webPage->mapFromViewportToContents(point));
+    contentPos = DOMSupport::convertPointToFrame(m_webPage->mainFrame(), m_webPage->focusedOrMainFrame(), roundedIntPoint(contentPos));
+
+    Document* document = m_currentFocusElement->document();
+    ASSERT(document);
+
+    RenderedDocumentMarker* marker = document->markers()->renderedMarkerContainingPoint(contentPos, DocumentMarker::Spelling);
+    if (!marker)
+        return false;
+
+    SpellingLog(LogLevelInfo, "InputHandler::shouldRequestSpellCheckingOptionsForPoint Found spelling marker at point %d, %d", point.x(), point.y());
+
+    // imf_sp_text_t should be generated in pixel viewport coordinates.
+    WebCore::IntRect rect = m_webPage->mapToTransformed(m_webPage->focusedOrMainFrame()->view()->contentsToWindow(enclosingIntRect(marker->renderedRect())));
+    m_webPage->clipToTransformedContentsRect(rect);
+
+    // TODO use the actual caret position after it is placed.
+    spellCheckingOptionRequest.caret_rect.caret_top_x = point.x();
+    spellCheckingOptionRequest.caret_rect.caret_top_y = rect.y();
+    spellCheckingOptionRequest.caret_rect.caret_bottom_x = point.x();
+    spellCheckingOptionRequest.caret_rect.caret_bottom_y = rect.y() + rect.height();
+    spellCheckingOptionRequest.startTextPosition = marker->startOffset();
+    spellCheckingOptionRequest.endTextPosition = marker->endOffset();
+
+    return true;
+}
+
+void InputHandler::requestSpellingCheckingOptions(imf_sp_text_t& spellCheckingOptionRequest)
+{
+    SpellingLog(LogLevelInfo, "InputHandler::requestSpellingCheckingOptions Sending request:\ncaret_rect.caret_top_x = %d\ncaret_rect.caret_top_y = %d" \
+                              "\ncaret_rect.caret_bottom_x = %d\ncaret_rect.caret_bottom_y = %d\nstartTextPosition = %d\nendTextPosition = %d",
+                              spellCheckingOptionRequest.caret_rect.caret_top_x, spellCheckingOptionRequest.caret_rect.caret_top_y,
+                              spellCheckingOptionRequest.caret_rect.caret_bottom_x, spellCheckingOptionRequest.caret_rect.caret_bottom_y,
+                              spellCheckingOptionRequest.startTextPosition, spellCheckingOptionRequest.endTextPosition);
+
+    if (spellCheckingOptionRequest.startTextPosition || spellCheckingOptionRequest.endTextPosition)
+        m_webPage->m_client->requestSpellingCheckingOptions(spellCheckingOptionRequest);
 }
 
 void InputHandler::setElementUnfocused(bool refocusOccuring)
@@ -668,6 +755,9 @@ void InputHandler::setElementUnfocused(bool refocusOccuring)
         // If the frame selection isn't focused, focus it.
         if (!m_currentFocusElement->document()->frame()->selection()->isFocused())
             m_currentFocusElement->document()->frame()->selection()->setFocused(true);
+
+        // Cancel any spellcheck requests that might be ongoing.
+        cancelAllSpellCheckingRequests();
     }
 
     // Clear the node details.
@@ -697,10 +787,22 @@ void InputHandler::setInputModeEnabled(bool active)
 void InputHandler::setElementFocused(Element* element)
 {
     ASSERT(DOMSupport::isTextBasedContentEditableElement(element));
-    ASSERT(element->document() && element->document()->frame());
+    ASSERT(element && element->document() && element->document()->frame());
 
-    if (element->document()->frame()->selection()->isFocused() != isInputModeEnabled())
-        element->document()->frame()->selection()->setFocused(isInputModeEnabled());
+#ifdef ENABLE_SPELLING_LOG
+    BlackBerry::Platform::StopWatch timer;
+    timer.start();
+#endif
+
+    if (!element || !(element->document()))
+        return;
+
+    Frame* frame = element->document()->frame();
+    if (!frame)
+        return;
+
+    if (frame->selection()->isFocused() != isInputModeEnabled())
+        frame->selection()->setFocused(isInputModeEnabled());
 
     // Clear the existing focus node details.
     setElementUnfocused(true /*refocusOccuring*/);
@@ -716,6 +818,14 @@ void InputHandler::setElementFocused(Element* element)
     VirtualKeyboardType keyboardType = keyboardTypeAttribute(element);
     VirtualKeyboardEnterKeyType enterKeyType = keyboardEnterKeyTypeAttribute(element);
 
+    if (enterKeyType == VKBEnterKeyNotSet && type != InputTypeTextArea) {
+        if (element->isFormControlElement()) {
+            const HTMLFormControlElement* formElement = static_cast<const HTMLFormControlElement*>(element);
+            if (formElement->form() && formElement->form()->defaultButton())
+                enterKeyType = VKBEnterKeySubmit;
+        }
+    }
+
     FocusLog(LogLevelInfo, "InputHandler::setElementFocused, Type=%d, Style=%d, Keyboard Type=%d, Enter Key=%d", type, m_currentFocusElementTextEditMask, keyboardType, enterKeyType);
     m_webPage->m_client->inputFocusGained(type, m_currentFocusElementTextEditMask, keyboardType, enterKeyType);
 
@@ -723,6 +833,91 @@ void InputHandler::setElementFocused(Element* element)
 
     if (!m_delayKeyboardVisibilityChange)
         notifyClientOfKeyboardVisibilityChange(true);
+
+#ifdef ENABLE_SPELLING_LOG
+    SpellingLog(LogLevelInfo, "InputHandler::setElementFocused Focusing the field took %f seconds.", timer.elapsed());
+#endif
+
+    // Check if the field explicitly asks for spellchecking.
+    if (DOMSupport::elementSupportsSpellCheck(element) != DOMSupport::On)
+        return;
+
+    // Spellcheck the field in its entirety.
+    VisibleSelection focusedBlock = DOMSupport::visibleSelectionForInputElement(element);
+    spellCheckBlock(focusedBlock, TextCheckingProcessBatch);
+
+#ifdef ENABLE_SPELLING_LOG
+    SpellingLog(LogLevelInfo, "InputHandler::setElementFocused Spellchecking the field increased the total time to focus to %f seconds.", timer.elapsed());
+#endif
+}
+
+void InputHandler::spellCheckBlock(VisibleSelection& visibleSelection, TextCheckingProcessType textCheckingProcessType)
+{
+    if (!isActiveTextEdit())
+        return;
+
+    SpellChecker* spellChecker = getSpellChecker();
+    if (!spellChecker) {
+        SpellingLog(LogLevelInfo, "InputHandler::spellCheckBlock Failed to spellcheck the current focused element.");
+        return;
+    }
+
+    RefPtr<Range> rangeForSpellChecking = visibleSelection.toNormalizedRange();
+
+    // If we have a batch request, try to send off the entire block.
+    if (textCheckingProcessType == TextCheckingProcessBatch) {
+        // If total block text is under the limited amount, send the entire chunk.
+        if (rangeForSpellChecking->text().length() < MaxSpellCheckingStringLength) {
+            spellChecker->requestCheckingFor(SpellCheckRequest::create(TextCheckingTypeSpelling, TextCheckingProcessBatch, rangeForSpellChecking, rangeForSpellChecking));
+            return;
+        }
+    }
+
+    // Since we couldn't check the entire block at once, set up starting and ending markers to fire incrementally.
+    VisiblePosition startPos = visibleSelection.visibleStart();
+    VisiblePosition startOfCurrentLine = startOfLine(startPos);
+    VisiblePosition endOfCurrentLine = endOfLine(startPos);
+
+    while (startOfCurrentLine != endOfCurrentLine) {
+        // Create a selection with the start and end points of the line, and convert to Range to create a SpellCheckRequest.
+        rangeForSpellChecking = VisibleSelection(startOfCurrentLine, endOfCurrentLine).toNormalizedRange();
+
+        if (rangeForSpellChecking->text().length() >= MaxSpellCheckingStringLength) {
+            // Iterate through words from the start of the line to the end.
+            rangeForSpellChecking = getRangeForSpellCheckWithFineGranularity(startOfCurrentLine, endOfCurrentLine);
+            if (!rangeForSpellChecking) {
+                SpellingLog(LogLevelWarn, "InputHandler::spellCheckBlock Failed to set text range for spellchecking");
+                return;
+            }
+            startOfCurrentLine = VisiblePosition(rangeForSpellChecking->endPosition());
+        } else {
+            startOfCurrentLine = nextLinePosition(startOfCurrentLine, startOfCurrentLine.lineDirectionPointForBlockDirectionNavigation());
+            endOfCurrentLine = endOfLine(startOfCurrentLine);
+            // If we are at the last line, nextLinePosition will return the position at the end of the line. If we're not at the end, wrap with a call to startOfLine to be safe.
+            if (startOfCurrentLine != endOfCurrentLine)
+                startOfCurrentLine = startOfLine(startOfCurrentLine);
+        }
+
+        SpellingLog(LogLevelInfo, "InputHandler::spellCheckBlock Substring text is '%s', of size %d", rangeForSpellChecking->text().latin1().data(), rangeForSpellChecking->text().length());
+
+        // Call spellcheck with substring.
+        spellChecker->requestCheckingFor(SpellCheckRequest::create(TextCheckingTypeSpelling, TextCheckingProcessBatch, rangeForSpellChecking, rangeForSpellChecking));
+    }
+}
+
+PassRefPtr<Range> InputHandler::getRangeForSpellCheckWithFineGranularity(VisiblePosition startPosition, VisiblePosition endPosition)
+{
+    VisiblePosition endOfCurrentWord = endOfWord(startPosition);
+    RefPtr<Range> rangeForSpellChecking;
+    while (endOfCurrentWord != endPosition) {
+        rangeForSpellChecking = VisibleSelection(startPosition, endOfCurrentWord).toNormalizedRange();
+        // If we exceed the MaxSpellCheckingStringLength limit, then go back one word and return this range.
+        if (rangeForSpellChecking->text().length() >= MaxSpellCheckingStringLength)
+            return VisibleSelection(startPosition, endOfWord(previousWordPosition(endOfCurrentWord))).toNormalizedRange();
+
+        endOfCurrentWord = endOfWord(nextWordPosition(endOfCurrentWord));
+    }
+    return 0;
 }
 
 bool InputHandler::openDatePopup(HTMLInputElement* element, BlackBerryInputType type)
@@ -1601,14 +1796,14 @@ spannable_string_t* InputHandler::spannableTextInRange(int start, int end, int32
     // crash immediately on failure.
     pst->str = (wchar_t*)malloc(sizeof(wchar_t) * (length + 1));
     if (!pst->str) {
-        logAlways(LogLevelCritical, "InputHandler::spannableTextInRange Cannot allocate memory for string.\n");
+        logAlways(LogLevelCritical, "InputHandler::spannableTextInRange Cannot allocate memory for string.");
         free(pst);
         return 0;
     }
 
     int stringLength = 0;
     if (!convertStringToWchar(textString, pst->str, length + 1, &stringLength)) {
-        logAlways(LogLevelCritical, "InputHandler::spannableTextInRange failed to convert string.\n");
+        logAlways(LogLevelCritical, "InputHandler::spannableTextInRange failed to convert string.");
         free(pst->str);
         free(pst);
         return 0;
@@ -1817,7 +2012,7 @@ bool InputHandler::setText(spannable_string_t* spannableString)
     String textToInsert = convertSpannableStringToString(spannableString);
     int textLength = textToInsert.length();
 
-    InputLog(LogLevelInfo, "InputHandler::setText spannableString is '%s', of length %d \n", textToInsert.latin1().data(), textLength);
+    InputLog(LogLevelInfo, "InputHandler::setText spannableString is '%s', of length %d", textToInsert.latin1().data(), textLength);
 
     span_t* changedSpan = firstSpanInString(spannableString, CHANGED_ATTRIB);
     int composingTextStart = m_composingTextStart;
@@ -1826,12 +2021,13 @@ bool InputHandler::setText(spannable_string_t* spannableString)
     removeAttributedTextMarker();
 
     if (isTrailingSingleCharacter(changedSpan, textLength, composingTextLength)) {
-        // Handle the case where text is being composed.
-        if (firstSpanInString(spannableString, COMPOSED_TEXT_ATTRIB)) {
-            InputLog(LogLevelInfo, "InputHandler::setText Single trailing character detected.  Text is being composed. \n");
+        // If the text is unconverted, do not allow JS processing as it is not a "real"
+        // character in the field.
+        if (firstSpanInString(spannableString, UNCONVERTED_TEXT_ATTRIB)) {
+            InputLog(LogLevelInfo, "InputHandler::setText Single trailing character detected.  Text is unconverted.");
             return editor->command("InsertText").execute(textToInsert.right(1));
         }
-        InputLog(LogLevelInfo, "InputHandler::setText Single trailing character detected. Text is not being composed. \n");
+        InputLog(LogLevelInfo, "InputHandler::setText Single trailing character detected.");
         return handleKeyboardInput(Platform::KeyboardEvent(textToInsert[textLength - 1], Platform::KeyboardEvent::KeyChar, 0), false /* changeIsPartOfComposition */);
     }
 
@@ -1839,12 +2035,12 @@ bool InputHandler::setText(spannable_string_t* spannableString)
     if (!changedSpan) {
         // If the composition length is the same as our string length, then we don't need to do anything.
         if (composingTextLength == textLength) {
-            InputLog(LogLevelInfo, "InputHandler::setText No spans have changed. New text is the same length as the old. Nothing to do. \n");
+            InputLog(LogLevelInfo, "InputHandler::setText No spans have changed. New text is the same length as the old. Nothing to do.");
             return true;
         }
 
         if (composingTextLength - textLength == 1) {
-            InputLog(LogLevelInfo, "InputHandler::setText No spans have changed. New text is one character shorter than the old. Treating as 'delete'. \n");
+            InputLog(LogLevelInfo, "InputHandler::setText No spans have changed. New text is one character shorter than the old. Treating as 'delete'.");
             return editor->command("DeleteBackward").execute();
         }
     }
@@ -1877,7 +2073,7 @@ bool InputHandler::setText(spannable_string_t* spannableString)
     if (textLength == 1 && !spannableString->spans_count) {
         // Handle single key non-attributed entry as key press rather than insert to allow
         // triggering of javascript events.
-        InputLog(LogLevelInfo, "InputHandler::setText Single character entry treated as key-press in the absense of spans. \n");
+        InputLog(LogLevelInfo, "InputHandler::setText Single character entry treated as key-press in the absense of spans.");
         return handleKeyboardInput(Platform::KeyboardEvent(textToInsert[0], Platform::KeyboardEvent::KeyChar, 0), true /* changeIsPartOfComposition */);
     }
 
@@ -1959,7 +2155,7 @@ bool InputHandler::setRelativeCursorPosition(int insertionPoint, int relativeCur
 
 bool InputHandler::setSpannableTextAndRelativeCursor(spannable_string_t* spannableString, int relativeCursorPosition, bool markTextAsComposing)
 {
-    InputLog(LogLevelInfo, "InputHandler::setSpannableTextAndRelativeCursor(%d, %d, %d)\n", spannableString->length, relativeCursorPosition, markTextAsComposing);
+    InputLog(LogLevelInfo, "InputHandler::setSpannableTextAndRelativeCursor(%d, %d, %d)", spannableString->length, relativeCursorPosition, markTextAsComposing);
     int insertionPoint = compositionActive() ? m_composingTextStart : selectionStart();
 
     ProcessingChangeGuard guard(this);

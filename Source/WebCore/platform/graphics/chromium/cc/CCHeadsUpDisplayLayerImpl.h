@@ -26,9 +26,9 @@
 #ifndef CCHeadsUpDisplayLayerImpl_h
 #define CCHeadsUpDisplayLayerImpl_h
 
-#include "cc/CCFontAtlas.h"
-#include "cc/CCLayerImpl.h"
-#include "cc/CCScopedTexture.h"
+#include "CCFontAtlas.h"
+#include "CCLayerImpl.h"
+#include "CCScopedTexture.h"
 
 class SkCanvas;
 
@@ -50,6 +50,7 @@ public:
 
     virtual void willDraw(CCResourceProvider*) OVERRIDE;
     virtual void appendQuads(CCQuadSink&, const CCSharedQuadState*, bool& hadMissingTiles) OVERRIDE;
+    void updateHudTexture(CCResourceProvider*);
     virtual void didDraw(CCResourceProvider*) OVERRIDE;
 
     virtual void didLoseContext() OVERRIDE;
@@ -68,6 +69,7 @@ private:
 
     OwnPtr<CCFontAtlas> m_fontAtlas;
     OwnPtr<CCScopedTexture> m_hudTexture;
+    OwnPtr<SkCanvas> m_hudCanvas;
 };
 
 }

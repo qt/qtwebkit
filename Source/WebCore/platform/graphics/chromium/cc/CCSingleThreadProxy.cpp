@@ -24,14 +24,14 @@
 
 #include "config.h"
 
-#include "cc/CCSingleThreadProxy.h"
+#include "CCSingleThreadProxy.h"
 
+#include "CCDrawQuad.h"
+#include "CCGraphicsContext.h"
+#include "CCLayerTreeHost.h"
+#include "CCTextureUpdateController.h"
+#include "CCTimer.h"
 #include "TraceEvent.h"
-#include "cc/CCDrawQuad.h"
-#include "cc/CCGraphicsContext.h"
-#include "cc/CCLayerTreeHost.h"
-#include "cc/CCTextureUpdateController.h"
-#include "cc/CCTimer.h"
 #include <wtf/CurrentTime.h>
 
 using namespace WTF;
@@ -260,7 +260,7 @@ void CCSingleThreadProxy::stop()
         DebugScopedSetMainThreadBlocked mainThreadBlocked;
         DebugScopedSetImplThread impl;
 
-        if (!m_layerTreeHostImpl->contentsTexturesWerePurgedSinceLastCommit())
+        if (!m_layerTreeHostImpl->contentsTexturesPurged())
             m_layerTreeHost->deleteContentsTexturesOnImplThread(m_layerTreeHostImpl->resourceProvider());
         m_layerTreeHostImpl.clear();
     }
@@ -300,11 +300,12 @@ bool CCSingleThreadProxy::commitAndComposite()
     if (!m_layerTreeHost->initializeLayerRendererIfNeeded())
         return false;
 
-    if (m_layerTreeHostImpl->contentsTexturesWerePurgedSinceLastCommit())
+    if (m_layerTreeHostImpl->contentsTexturesPurged())
         m_layerTreeHost->evictAllContentTextures();
 
     CCTextureUpdateQueue queue;
     m_layerTreeHost->updateLayers(queue, m_layerTreeHostImpl->memoryAllocationLimitBytes());
+    m_layerTreeHostImpl->resetContentsTexturesPurged();
 
     m_layerTreeHost->willCommit();
     doCommit(queue);

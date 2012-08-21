@@ -27,7 +27,7 @@
 
 #if USE(ACCELERATED_COMPOSITING)
 
-#include "cc/CCTextureUpdateQueue.h"
+#include "CCTextureUpdateQueue.h"
 
 namespace WebCore {
 
@@ -52,6 +52,12 @@ void CCTextureUpdateQueue::appendPartialUpload(TextureUploader::Parameters uploa
 void CCTextureUpdateQueue::appendCopy(TextureCopier::Parameters copy)
 {
     m_copyEntries.append(copy);
+}
+
+void CCTextureUpdateQueue::clearUploads()
+{
+    m_fullEntries.clear();
+    m_partialEntries.clear();
 }
 
 TextureUploader::Parameters CCTextureUpdateQueue::takeFirstFullUpload()

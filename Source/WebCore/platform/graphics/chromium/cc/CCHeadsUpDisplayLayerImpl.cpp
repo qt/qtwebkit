@@ -25,20 +25,20 @@
 
 #include "config.h"
 
-#include "cc/CCHeadsUpDisplayLayerImpl.h"
+#include "CCHeadsUpDisplayLayerImpl.h"
 
+#include "CCDebugRectHistory.h"
+#include "CCFontAtlas.h"
+#include "CCFrameRateCounter.h"
+#include "CCLayerTreeHostImpl.h"
+#include "CCQuadSink.h"
+#include "CCTextureDrawQuad.h"
 #include "Extensions3DChromium.h"
 #include "GraphicsContext3D.h"
 #include "LayerRendererChromium.h"
 #include "SkBitmap.h"
 #include "SkColorMatrixFilter.h"
 #include "SkPaint.h"
-#include "cc/CCDebugRectHistory.h"
-#include "cc/CCFontAtlas.h"
-#include "cc/CCFrameRateCounter.h"
-#include "cc/CCLayerTreeHostImpl.h"
-#include "cc/CCQuadSink.h"
-#include "cc/CCTextureDrawQuad.h"
 #include "skia/ext/platform_canvas.h"
 #include <wtf/text/WTFString.h>
 
@@ -87,19 +87,8 @@ void CCHeadsUpDisplayLayerImpl::willDraw(CCResourceProvider* resourceProvider)
     if (m_hudTexture->size() != bounds())
         m_hudTexture->free();
 
-    if (!m_hudTexture->id() && !m_hudTexture->allocate(CCRenderer::ImplPool, bounds(), GraphicsContext3D::RGBA, CCResourceProvider::TextureUsageAny))
-        return;
-
-    // Render pixels into the texture.
-    OwnPtr<SkCanvas> canvas = adoptPtr(skia::CreateBitmapCanvas(bounds().width(), bounds().height(), false /* opaque */));
-    drawHudContents(canvas.get());
-
-    const SkBitmap* bitmap = &canvas->getDevice()->accessBitmap(false);
-    SkAutoLockPixels locker(*bitmap);
-
-    IntRect layerRect(IntPoint(), bounds());
-    ASSERT(bitmap->config() == SkBitmap::kARGB_8888_Config);
-    resourceProvider->upload(m_hudTexture->id(), static_cast<const uint8_t*>(bitmap->getPixels()), layerRect, layerRect, layerRect);
+    if (!m_hudTexture->id())
+        m_hudTexture->allocate(CCRenderer::ImplPool, bounds(), GraphicsContext3D::RGBA, CCResourceProvider::TextureUsageAny);
 }
 
 void CCHeadsUpDisplayLayerImpl::appendQuads(CCQuadSink& quadList, const CCSharedQuadState* sharedQuadState, bool&)
@@ -112,6 +101,31 @@ void CCHeadsUpDisplayLayerImpl::appendQuads(CCQuadSink& quadList, const CCShared
     FloatRect uvRect(0, 0, 1, 1);
     bool flipped = false;
     quadList.append(CCTextureDrawQuad::create(sharedQuadState, quadRect, m_hudTexture->id(), premultipliedAlpha, uvRect, flipped));
+}
+
+void CCHeadsUpDisplayLayerImpl::updateHudTexture(CCResourceProvider* resourceProvider)
+{
+    if (!m_hudTexture->id())
+        return;
+
+    SkISize canvasSize;
+    if (m_hudCanvas)
+        canvasSize = m_hudCanvas->getDeviceSize();
+    else
+        canvasSize.set(0, 0);
+
+    if (canvasSize.fWidth != bounds().width() || canvasSize.fHeight != bounds().height() || !m_hudCanvas)
+        m_hudCanvas = adoptPtr(skia::CreateBitmapCanvas(bounds().width(), bounds().height(), false /* opaque */));
+
+    m_hudCanvas->clear(SkColorSetARGB(0, 0, 0, 0));
+    drawHudContents(m_hudCanvas.get());
+
+    const SkBitmap* bitmap = &m_hudCanvas->getDevice()->accessBitmap(false);
+    SkAutoLockPixels locker(*bitmap);
+
+    IntRect layerRect(IntPoint(), bounds());
+    ASSERT(bitmap->config() == SkBitmap::kARGB_8888_Config);
+    resourceProvider->upload(m_hudTexture->id(), static_cast<const uint8_t*>(bitmap->getPixels()), layerRect, layerRect, IntSize());
 }
 
 void CCHeadsUpDisplayLayerImpl::didDraw(CCResourceProvider* resourceProvider)

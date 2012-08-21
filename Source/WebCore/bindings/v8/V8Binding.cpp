@@ -34,12 +34,15 @@
 #include "BindingVisitors.h"
 #include "DOMStringList.h"
 #include "Element.h"
+#include "Frame.h"
 #include "MemoryInstrumentation.h"
 #include "PlatformString.h"
 #include "QualifiedName.h"
+#include "Settings.h"
 #include "V8DOMStringList.h"
+#include "V8DOMWindow.h"
 #include "V8Element.h"
-#include "V8Proxy.h"
+#include "V8ObjectConstructor.h"
 
 #include <wtf/MathExtras.h>
 #include <wtf/MainThread.h>
@@ -52,26 +55,30 @@
 
 namespace WebCore {
 
-#if ENABLE(INSPECTOR)
-void V8PerIsolateData::visitExternalStrings(ExternalStringVisitor* visitor)
+v8::Handle<v8::Value> setDOMException(int exceptionCode, v8::Isolate* isolate)
 {
-    v8::HandleScope handleScope;
-    class VisitorImpl : public v8::ExternalResourceVisitor {
-    public:
-        VisitorImpl(ExternalStringVisitor* visitor) : m_visitor(visitor) { }
-        virtual ~VisitorImpl() { }
-        virtual void VisitExternalString(v8::Handle<v8::String> string)
-        {
-            WebCoreStringResource* resource = static_cast<WebCoreStringResource*>(string->GetExternalStringResource());
-            if (resource)
-                resource->visitStrings(m_visitor);
-        }
-    private:
-        ExternalStringVisitor* m_visitor;
-    } v8Visitor(visitor);
-    v8::V8::VisitExternalResources(&v8Visitor);
+    return V8ThrowException::setDOMException(exceptionCode, isolate);
 }
-#endif
+
+v8::Handle<v8::Value> throwError(ErrorType errorType, const char* message, v8::Isolate* isolate)
+{
+    return V8ThrowException::throwError(errorType, message, isolate);
+}
+
+v8::Handle<v8::Value> throwError(v8::Local<v8::Value> exception, v8::Isolate* isolate)
+{
+    return V8ThrowException::throwError(exception, isolate);
+}
+
+v8::Handle<v8::Value> throwTypeError(const char* message, v8::Isolate* isolate)
+{
+    return V8ThrowException::throwTypeError(message, isolate);
+}
+
+v8::Handle<v8::Value> throwNotEnoughArgumentsError(v8::Isolate* isolate)
+{
+    return V8ThrowException::throwNotEnoughArgumentsError(isolate);
+}
 
 static String v8NonStringValueToWebCoreString(v8::Handle<v8::Value> object)
 {
@@ -102,14 +109,14 @@ static AtomicString v8NonStringValueToAtomicWebCoreString(v8::Handle<v8::Value> 
     return AtomicString(v8NonStringValueToWebCoreString(object));
 }
 
-String v8ValueToWebCoreString(v8::Handle<v8::Value> value)
+String toWebCoreString(v8::Handle<v8::Value> value)
 {
     if (value->IsString())
         return v8StringToWebCoreString<String>(v8::Handle<v8::String>::Cast(value), Externalize);
     return v8NonStringValueToWebCoreString(value);
 }
 
-AtomicString v8ValueToAtomicWebCoreString(v8::Handle<v8::Value> value)
+AtomicString toWebCoreAtomicString(v8::Handle<v8::Value> value)
 {
     if (value->IsString())
         return v8StringToWebCoreString<AtomicString>(v8::Handle<v8::String>::Cast(value), Externalize);
@@ -312,7 +319,7 @@ String int32ToWebCoreString(int value)
 v8::Persistent<v8::FunctionTemplate> createRawTemplate()
 {
     v8::HandleScope scope;
-    v8::Local<v8::FunctionTemplate> result = v8::FunctionTemplate::New(V8Proxy::checkNewLegal);
+    v8::Local<v8::FunctionTemplate> result = v8::FunctionTemplate::New(V8ObjectConstructor::isValidConstructorMode);
     return v8::Persistent<v8::FunctionTemplate>::New(result);
 }        
 
@@ -355,7 +362,7 @@ void StringCache::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addHashMap(m_stringCache);
 }
     
-PassRefPtr<DOMStringList> v8ValueToWebCoreDOMStringList(v8::Handle<v8::Value> value)
+PassRefPtr<DOMStringList> toDOMStringList(v8::Handle<v8::Value> value)
 {
     v8::Local<v8::Value> v8Value(v8::Local<v8::Value>::New(value));
 
@@ -371,9 +378,71 @@ PassRefPtr<DOMStringList> v8ValueToWebCoreDOMStringList(v8::Handle<v8::Value> va
     v8::Local<v8::Array> v8Array = v8::Local<v8::Array>::Cast(v8Value);
     for (size_t i = 0; i < v8Array->Length(); ++i) {
         v8::Local<v8::Value> indexedValue = v8Array->Get(v8Integer(i));
-        ret->append(v8ValueToWebCoreString(indexedValue));
+        ret->append(toWebCoreString(indexedValue));
     }
     return ret.release();
+}
+
+DOMWindow* toDOMWindow(v8::Handle<v8::Context> context)
+{
+    v8::Handle<v8::Object> global = context->Global();
+    ASSERT(!global.IsEmpty());
+    global = V8DOMWrapper::lookupDOMWrapper(V8DOMWindow::GetTemplate(), global);
+    ASSERT(!global.IsEmpty());
+    return V8DOMWindow::toNative(global);
+}
+
+Frame* toFrameIfNotDetached(v8::Handle<v8::Context> context)
+{
+    DOMWindow* window = toDOMWindow(context);
+    if (window->isCurrentlyDisplayedInFrame())
+        return window->frame();
+    // We return 0 here because |context| is detached from the Frame. If we
+    // did return |frame| we could get in trouble because the frame could be
+    // navigated to another security origin.
+    return 0;
+}
+
+V8PerContextData* perContextDataForCurrentWorld(Frame* frame)
+{
+    V8IsolatedContext* isolatedContext;
+    if (UNLIKELY(!!(isolatedContext = V8IsolatedContext::getEntered())))
+        return isolatedContext->perContextData();
+    return frame->script()->windowShell()->perContextData();
+}
+
+bool handleOutOfMemory()
+{
+    v8::Local<v8::Context> context = v8::Context::GetCurrent();
+
+    if (!context->HasOutOfMemoryException())
+        return false;
+
+    // Warning, error, disable JS for this frame?
+    Frame* frame = toFrameIfNotDetached(context);
+    if (!frame)
+        return true;
+
+    frame->script()->clearForClose();
+    frame->script()->windowShell()->destroyGlobal();
+
+#if PLATFORM(CHROMIUM)
+    PlatformSupport::notifyJSOutOfMemory(frame);
+#endif
+
+    if (Settings* settings = frame->settings())
+        settings->setScriptEnabled(false);
+
+    return true;
+}
+
+void crashIfV8IsDead()
+{
+    if (v8::V8::IsDead()) {
+        // FIXME: We temporarily deal with V8 internal error situations
+        // such as out-of-memory by crashing the renderer.
+        CRASH();
+    }
 }
 
 } // namespace WebCore

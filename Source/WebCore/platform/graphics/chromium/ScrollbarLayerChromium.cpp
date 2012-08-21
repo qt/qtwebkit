@@ -29,10 +29,10 @@
 #include "ScrollbarLayerChromium.h"
 
 #include "BitmapCanvasLayerTextureUpdater.h"
+#include "CCLayerTreeHost.h"
+#include "CCScrollbarLayerImpl.h"
+#include "CCTextureUpdateQueue.h"
 #include "LayerPainterChromium.h"
-#include "cc/CCLayerTreeHost.h"
-#include "cc/CCScrollbarLayerImpl.h"
-#include "cc/CCTextureUpdateQueue.h"
 #include <public/WebRect.h>
 
 using WebKit::WebRect;
@@ -228,8 +228,8 @@ void ScrollbarLayerChromium::updatePart(LayerTextureUpdater* painter, LayerTextu
     painter->prepareToUpdate(rect, rect.size(), 1, 1, paintedOpaqueRect, stats);
     texture->prepareRect(rect, stats);
 
-    IntRect destRect(IntPoint(), rect.size());
-    TextureUploader::Parameters upload = { texture, rect, destRect };
+    IntSize destOffset(0, 0);
+    TextureUploader::Parameters upload = { texture, rect, destOffset };
     queue.appendFullUpload(upload);
 }
 

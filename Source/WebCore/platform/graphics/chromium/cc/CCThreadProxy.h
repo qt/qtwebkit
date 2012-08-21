@@ -25,11 +25,11 @@
 #ifndef CCThreadProxy_h
 #define CCThreadProxy_h
 
-#include "cc/CCAnimationEvents.h"
-#include "cc/CCCompletionEvent.h"
-#include "cc/CCLayerTreeHostImpl.h"
-#include "cc/CCProxy.h"
-#include "cc/CCScheduler.h"
+#include "CCAnimationEvents.h"
+#include "CCCompletionEvent.h"
+#include "CCLayerTreeHostImpl.h"
+#include "CCProxy.h"
+#include "CCScheduler.h"
 #include <wtf/OwnPtr.h>
 
 namespace WebCore {
@@ -88,7 +88,7 @@ public:
     virtual void scheduledActionBeginFrame() OVERRIDE;
     virtual CCScheduledActionDrawAndSwapResult scheduledActionDrawAndSwapIfPossible() OVERRIDE;
     virtual CCScheduledActionDrawAndSwapResult scheduledActionDrawAndSwapForced() OVERRIDE;
-    virtual void scheduledActionUpdateMoreResources() OVERRIDE;
+    virtual void scheduledActionUpdateMoreResources(double monotonicTimeLimit) OVERRIDE;
     virtual void scheduledActionCommit() OVERRIDE;
     virtual void scheduledActionBeginContextRecreation() OVERRIDE;
     virtual void scheduledActionAcquireLayerTexturesForMainThread() OVERRIDE;
@@ -127,7 +127,7 @@ private:
         IntRect rect;
     };
     void forceBeginFrameOnImplThread(CCCompletionEvent*);
-    void beginFrameCompleteOnImplThread(CCCompletionEvent*, PassOwnPtr<CCTextureUpdateQueue>);
+    void beginFrameCompleteOnImplThread(CCCompletionEvent*, PassOwnPtr<CCTextureUpdateQueue>, bool contentsTexturesWereDeleted);
     void beginFrameAbortedOnImplThread();
     void requestReadbackOnImplThread(ReadbackRequest*);
     void requestStartPageScaleAnimationOnImplThread(IntSize targetPosition, bool useAnchor, float scale, double durationSec);
@@ -184,6 +184,10 @@ private:
     CCCompletionEvent* m_textureAcquisitionCompletionEventOnImplThread;
 
     OwnPtr<CCTextureUpdateController> m_currentTextureUpdateControllerOnImplThread;
+
+    // Set when we need to reset the contentsTexturesPurged flag after the
+    // commit.
+    bool m_resetContentsTexturesPurgedAfterCommitOnImplThread;
 
     // Set when the next draw should post didCommitAndDrawFrame to the main thread.
     bool m_nextFrameIsNewlyCommittedFrameOnImplThread;

@@ -25,12 +25,12 @@
 #ifndef CCLayerTreeHostImpl_h
 #define CCLayerTreeHostImpl_h
 
+#include "CCAnimationEvents.h"
+#include "CCInputHandler.h"
+#include "CCLayerSorter.h"
+#include "CCRenderPass.h"
+#include "CCRenderer.h"
 #include "SkColor.h"
-#include "cc/CCAnimationEvents.h"
-#include "cc/CCInputHandler.h"
-#include "cc/CCLayerSorter.h"
-#include "cc/CCRenderPass.h"
-#include "cc/CCRenderer.h"
 #include <public/WebCompositorOutputSurfaceClient.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefPtr.h>
@@ -41,6 +41,7 @@ class CCActiveGestureAnimation;
 class CCCompletionEvent;
 class CCDebugRectHistory;
 class CCFrameRateCounter;
+class CCHeadsUpDisplayLayerImpl;
 class CCLayerImpl;
 class CCLayerTreeHostImplTimeSourceAdapter;
 class CCPageScaleAnimation;
@@ -74,7 +75,7 @@ public:
 
     // CCInputHandlerClient implementation
     virtual CCInputHandlerClient::ScrollStatus scrollBegin(const IntPoint&, CCInputHandlerClient::ScrollInputType) OVERRIDE;
-    virtual void scrollBy(const IntSize&) OVERRIDE;
+    virtual void scrollBy(const IntPoint&, const IntSize&) OVERRIDE;
     virtual void scrollEnd() OVERRIDE;
     virtual void pinchGestureBegin() OVERRIDE;
     virtual void pinchGestureUpdate(float, const IntPoint&) OVERRIDE;
@@ -140,6 +141,9 @@ public:
     void setRootLayer(PassOwnPtr<CCLayerImpl>);
     CCLayerImpl* rootLayer() { return m_rootLayerImpl.get(); }
 
+    void setHudLayer(CCHeadsUpDisplayLayerImpl* layerImpl) { m_hudLayerImpl = layerImpl; }
+    CCHeadsUpDisplayLayerImpl* hudLayer() { return m_hudLayerImpl; }
+
     // Release ownership of the current layer tree and replace it with an empty
     // tree. Returns the root layer of the detached tree.
     PassOwnPtr<CCLayerImpl> detachLayerTree();
@@ -152,7 +156,8 @@ public:
     int sourceFrameNumber() const { return m_sourceFrameNumber; }
     void setSourceFrameNumber(int frameNumber) { m_sourceFrameNumber = frameNumber; }
 
-    bool contentsTexturesWerePurgedSinceLastCommit() const { return m_contentsTexturesWerePurgedSinceLastCommit; }
+    bool contentsTexturesPurged() const { return m_contentsTexturesPurged; }
+    void resetContentsTexturesPurged() { m_contentsTexturesPurged = false; }
     size_t memoryAllocationLimitBytes() const { return m_memoryAllocationLimitBytes; }
 
     void setViewportSize(const IntSize& layoutViewportSize, const IntSize& deviceViewportSize);
@@ -266,13 +271,15 @@ private:
     OwnPtr<CCLayerImpl> m_rootLayerImpl;
     CCLayerImpl* m_rootScrollLayerImpl;
     CCLayerImpl* m_currentlyScrollingLayerImpl;
+    CCHeadsUpDisplayLayerImpl* m_hudLayerImpl;
     int m_scrollingLayerIdFromPreviousTree;
+    bool m_scrollDeltaIsInScreenSpace;
     CCLayerTreeSettings m_settings;
     IntSize m_layoutViewportSize;
     IntSize m_deviceViewportSize;
     float m_deviceScaleFactor;
     bool m_visible;
-    bool m_contentsTexturesWerePurgedSinceLastCommit;
+    bool m_contentsTexturesPurged;
     size_t m_memoryAllocationLimitBytes;
 
     float m_pageScale;

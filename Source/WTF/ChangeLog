@@ -1,3 +1,158 @@
+2012-08-20  Dominik Röttsches  <dominik.rottsches@intel.com>
+
+        The 2d.imageData.object.round canvas test is failing
+        https://bugs.webkit.org/show_bug.cgi?id=40272
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        According to the Uint8ClampedArray spec (http://www.khronos.org/registry/typedarray/specs/latest/#7.1)
+        which references WebIDL's clamping rules, with implications defined in http://www.w3.org/TR/WebIDL/#es-octet
+        we need to round to nearest integer, and to the even one if exactly halfway in between.
+        As a solution: applying C99's lrint which, in default rounding mode, does that.
+
+        The updated version of test 2d.imageData.object.round.html test passes now.
+
+        * wtf/MathExtras.h:
+        (lrint): Assembly based implementation for MSVC under X86, otherwise falling back to casting.
+        * wtf/Uint8ClampedArray.h:
+        (WTF::Uint8ClampedArray::set): lrint instead of simple rounding.
+
+2012-08-17  Michael Saboff  <msaboff@apple.com>
+
+        Add ability to create AtomicString using LChar* buffer and length
+        https://bugs.webkit.org/show_bug.cgi?id=94381
+
+        Reviewed by Geoffrey Garen.
+
+        Allows the use of 8 bit string data directly without converting to 16 bits first.
+
+        * wtf/text/AtomicString.cpp:
+        (WTF::LCharBufferTranslator::hash):
+        (LCharBufferTranslator):
+        (WTF::LCharBufferTranslator::equal):
+        (WTF::LCharBufferTranslator::translate):
+        (WTF::AtomicString::add):
+        * wtf/text/AtomicString.h:
+        (WTF::AtomicString::AtomicString):
+        (AtomicString):
+        * wtf/text/StringImpl.h:
+        (StringImpl):
+
+2012-08-17  Benjamin Poulain  <bpoulain@apple.com>
+
+        Make it easier to append a literal to StringBuilder
+        https://bugs.webkit.org/show_bug.cgi?id=94273
+
+        Reviewed by Kentaro Hara.
+
+        * wtf/text/StringBuilder.h:
+        (WTF::StringBuilder::appendLiteral): Add the method StringBuilder::appendLiteral() for efficiently
+        adding a string literal to the StringBuilder.
+
+2012-08-17  Yong Li  <yoli@rim.com>
+
+        [BlackBerry] Turn on a few macros for jpeg decoding and image interpolation
+        https://bugs.webkit.org/show_bug.cgi?id=94244
+
+        Reviewed by Antonio Gomes.
+
+        Turn on these macros to get better performance.
+
+        * wtf/Platform.h:
+
+2012-08-17  Milian Wolff  <milian.wolff@kdab.com>
+
+        [Qt] QNX build fails due to ctype usage in system headers
+        https://bugs.webkit.org/show_bug.cgi?id=93849
+
+        Reviewed by Simon Hausmann.
+
+        Move the check for whether DisallowCType should be active or not
+        to the DisallowCType.h header. This way, we can update the list
+        of platforms or OSes which do not work with this header in a
+        central place. All users can now safely include the header
+        and do not need to place custom guards around it.
+
+        * config.h:
+        * wtf/DisallowCType.h:
+
+2012-08-17  Milian Wolff  <milian.wolff@kdab.com>
+
+        [Qt] QNX build fails due to missing timegm declaration
+        https://bugs.webkit.org/show_bug.cgi?id=93842
+
+        Reviewed by Simon Hausmann.
+
+        On QNX, timegm is declared in nbutils.h and one must link against
+        nbutils to use it.
+
+        * WTF.pri:
+        * wtf/DateMath.cpp:
+
+2012-08-16  Kent Tamura  <tkent@chromium.org>
+
+        Build fix for Chromium-mac.
+
+        * wtf/text/WTFString.cpp: Remove unnecessary includes.
+
+2012-08-16  Michael Saboff  <msaboff@apple.com>
+
+        HTML Parser should produce 8bit substrings for inline style and script elements
+        https://bugs.webkit.org/show_bug.cgi?id=93742
+
+        Reviewed by Benjamin Poulain.
+
+        Added 8 bit path to String::isAllSpecialCharacters(). Added new String creator
+        that takes a pointer to a UChar array that is known to contain only 8 bit
+        characters (LChar's). Added new helper method to copy contents of a
+        UChar buffer to a LChar buffer. The helper method includes X86-64 intrinsics
+        of SSE family instructions for performance.
+
+        * wtf/Alignment.h:
+        (WTF::isAlignedTo):
+        * wtf/text/ASCIIFastPath.h:
+        (WTF::copyLCharsFromUCharSource):
+        * wtf/text/WTFString.cpp:
+        (WTF::String::make8BitFrom16BitSource):
+        * wtf/text/WTFString.h:
+        (String):
+        (WTF::isAllSpecialCharacters):
+        (WTF::String::isAllSpecialCharacters):
+
+2012-08-16  Benjamin Poulain  <bpoulain@apple.com>
+
+        Use initialization from literals for StringStatics
+        https://bugs.webkit.org/show_bug.cgi?id=94185
+
+        Reviewed by Geoffrey Garen.
+
+        * wtf/text/StringStatics.cpp:
+        Remove the arguments for DEFINE_GLOBAL. They are no longer used by the macro.
+        (WTF::AtomicString::init):
+        Use ConstructFromLiteral to initialize the strings faster and to save memory.
+
+2012-08-14  Milian Wolff  <milian.wolff@kdab.com>
+
+        [Qt] QNX build fails due to reference to MADV_FREE_REUSE and MADV_FREE_REUSABLE
+        https://bugs.webkit.org/show_bug.cgi?id=93843
+
+        Reviewed by Simon Hausmann.
+
+        QNX does not implement MADV_FREE_REUSE nor MADV_FREE_REUSABLE.
+        The Blackberry port already sets the define to use the system
+        malloc, which is now also done for QNX in general.
+
+        * wtf/Platform.h:
+
+2012-08-13  Raphael Kubo da Costa  <rakuco@webkit.org>
+
+        [CMake] Remove glib-related Find modules and write single new one instead.
+        https://bugs.webkit.org/show_bug.cgi?id=93786
+
+        Reviewed by Rob Buis.
+
+        * wtf/PlatformEfl.cmake: Use GLIB_* instead of Glib_*, and link directly to GIO, as wtf/gobject uses functions from it.
+
 2012-08-11  Sam Weinig  <sam@webkit.org>
 
         Enable XPC Service based WebProcess with runtime flag

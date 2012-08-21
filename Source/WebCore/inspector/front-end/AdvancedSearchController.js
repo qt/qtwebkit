@@ -56,7 +56,7 @@ WebInspector.AdvancedSearchController.prototype = {
     {
         if (WebInspector.KeyboardShortcut.makeKeyFromEvent(event) === this._shortcut.key) {
             if (!this._searchView || !this._searchView.isShowing() || this._searchView._search !== document.activeElement) {
-                WebInspector.inspectorView.setCurrentPanel(WebInspector.panels.scripts);
+                WebInspector.showPanel("scripts");
                 this.show();
             } else
                 this.close();
@@ -222,6 +222,8 @@ WebInspector.SearchView = function(controller)
 WebInspector.SearchView.maxQueriesCount = 20;
 
 WebInspector.SearchView.prototype = {
+    __proto__: WebInspector.View.prototype,
+
     /**
      * @return {Array.<Element>}
      */
@@ -388,7 +390,7 @@ WebInspector.SearchView.prototype = {
     }
 }
 
-WebInspector.SearchView.prototype.__proto__ = WebInspector.View.prototype;
+//WebInspector.SearchView.prototype.__proto__ = WebInspector.View.prototype;
 
 /**
  * @constructor

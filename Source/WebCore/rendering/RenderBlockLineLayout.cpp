@@ -997,7 +997,7 @@ static inline void constructBidiRuns(InlineBidiResolver& topResolver, BidiRunLis
         if (unicodeBidi == Plaintext)
             determineDirectionality(direction, InlineIterator(isolatedInline, isolatedRun->object(), 0));
         else {
-            ASSERT(unicodeBidi == Isolate || unicodeBidi == OverrideIsolate);
+            ASSERT(unicodeBidi == Isolate || unicodeBidi == IsolateOverride);
             direction = isolatedInline->style()->direction();
         }
         isolatedResolver.setStatus(statusWithDirection(direction, isOverride(unicodeBidi)));
@@ -1496,8 +1496,13 @@ void RenderBlock::layoutInlineChildren(bool relayoutChildren, LayoutUnit& repain
          deleteEllipsisLineBoxes();
 
     if (firstChild()) {
-        // layout replaced elements
+        // In full layout mode, clear the line boxes of children upfront. Otherwise,
+        // siblings can run into stale root lineboxes during layout. Then layout
+        // the replaced elements later. In partial layout mode, line boxes are not
+        // deleted and only dirtied. In that case, we can layout the replaced
+        // elements at the same time.
         bool hasInlineChild = false;
+        Vector<RenderBox*> replacedChildren;
         for (InlineWalker walker(this); !walker.atEnd(); walker.advance()) {
             RenderObject* o = walker.current();
             if (!hasInlineChild && o->isInline())
@@ -1517,9 +1522,13 @@ void RenderBlock::layoutInlineChildren(bool relayoutChildren, LayoutUnit& repain
                     o->containingBlock()->insertPositionedObject(box);
                 else if (o->isFloating())
                     layoutState.floats().append(FloatWithRect(box));
-                else if (layoutState.isFullLayout() || o->needsLayout()) {
-                    // Replaced elements
-                    toRenderBox(o)->dirtyLineBoxes(layoutState.isFullLayout());
+                else if (isFullLayout || o->needsLayout()) {
+                    // Replaced element.
+                    box->dirtyLineBoxes(isFullLayout);
+                    if (isFullLayout)
+                        replacedChildren.append(box);
+                    else
+                        o->layoutIfNeeded();
                 }
             } else if (o->isText() || (o->isRenderInline() && !walker.atEndOfInline())) {
                 if (!o->isText())
@@ -1529,6 +1538,9 @@ void RenderBlock::layoutInlineChildren(bool relayoutChildren, LayoutUnit& repain
                 o->setNeedsLayout(false);
             }
         }
+
+        for (size_t i = 0; i < replacedChildren.size(); i++)
+             replacedChildren[i]->layoutIfNeeded();
 
         layoutRunsAndFloats(layoutState, hasInlineChild);
     }
@@ -2289,7 +2301,6 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
             width.addUncommittedWidth(borderPaddingMarginStart(flowBox) + borderPaddingMarginEnd(flowBox));
         } else if (current.m_obj->isReplaced()) {
             RenderBox* replacedBox = toRenderBox(current.m_obj);
-            replacedBox->layoutIfNeeded();
 
             // Break on replaced elements if either has normal white-space.
             if ((autoWrap || RenderStyle::autoWrap(lastWS)) && (!current.m_obj->isImage() || allowImagesToBreak)) {
@@ -2333,10 +2344,10 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
             bool isSVGText = t->isSVGInlineText();
 #endif
 
-            RenderStyle* style = t->style(lineInfo.isFirstLine());
-            if (style->hasTextCombine() && current.m_obj->isCombineText() && !toRenderCombineText(current.m_obj)->isCombined())
+            if (t->style()->hasTextCombine() && current.m_obj->isCombineText() && !toRenderCombineText(current.m_obj)->isCombined())
                 toRenderCombineText(current.m_obj)->combineText();
 
+            RenderStyle* style = t->style(lineInfo.isFirstLine());
             const Font& f = style->font();
             bool isFixedPitch = f.isFixedPitch();
             bool canHyphenate = style->hyphens() == HyphensAuto && WebCore::canHyphenate(style->locale());
@@ -2426,7 +2437,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
                         appliedStartWidth = true;
                     }
 
-                    applyWordSpacing =  wordSpacing && currentCharacterIsSpace && !previousCharacterIsSpace;
+                    applyWordSpacing =  wordSpacing && currentCharacterIsSpace;
 
                     if (!width.committedWidth() && autoWrap && !width.fitsOnLine())
                         width.fitBelowFloats();

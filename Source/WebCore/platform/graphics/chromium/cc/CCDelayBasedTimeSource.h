@@ -25,9 +25,8 @@
 #ifndef CCDelayBasedTimeSource_h
 #define CCDelayBasedTimeSource_h
 
-#include "cc/CCTimeSource.h"
-#include "cc/CCTimer.h"
-
+#include "CCTimeSource.h"
+#include "CCTimer.h"
 #include <wtf/PassRefPtr.h>
 
 namespace WebCore {
@@ -59,7 +58,7 @@ public:
     virtual void onTimerFired() OVERRIDE;
 
     // Virtual for testing.
-    virtual double monotonicallyIncreasingTime() const;
+    virtual double monotonicTimeNow() const;
 
 protected:
     CCDelayBasedTimeSource(double interval, CCThread*);

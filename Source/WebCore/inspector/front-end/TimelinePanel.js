@@ -28,6 +28,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+importScript("MemoryStatistics.js");
+importScript("TimelineModel.js");
+importScript("TimelineOverviewPane.js");
+importScript("TimelinePresentationModel.js");
+importScript("TimelineFrameController.js");
+
 /**
  * @constructor
  * @extends {WebInspector.Panel}
@@ -193,11 +199,6 @@ WebInspector.TimelinePanel.prototype = {
     get calculator()
     {
         return this._calculator;
-    },
-
-    get toolbarItemLabel()
-    {
-        return WebInspector.UIString("Timeline");
     },
 
     get statusBarItems()
@@ -572,8 +573,6 @@ WebInspector.TimelinePanel.prototype = {
         this._sidebarBackgroundElement.style.width = width + "px";
         this.onResize();
         this._overviewPane.sidebarResized(width);
-        // Min width = <number of buttons on the left> * 31
-        this._miscStatusBarItems.style.left = Math.max((this._statusBarButtons.length + 3) * 31, width) + "px";
         this._memoryStatistics.setSidebarWidth(width);
         this._timelineGrid.gridHeaderElement.style.left = width + "px";
     },
@@ -585,6 +584,8 @@ WebInspector.TimelinePanel.prototype = {
         this._graphRowsElementWidth = this._graphRowsElement.offsetWidth;
         this._timelineGrid.gridHeaderElement.style.width = this._itemsGraphsElement.offsetWidth + "px";
         this._containerElementHeight = this._containerElement.clientHeight;
+        var minFloatingStatusBarItemsOffset = document.getElementById("panel-status-bar").totalOffsetLeft() + this._statusBarButtons.length * WebInspector.StatusBarButton.width;
+        this._miscStatusBarItems.style.left = Math.max(minFloatingStatusBarItemsOffset, this.splitView.sidebarWidth()) + "px";
     },
 
     _clearPanel: function()
@@ -944,7 +945,12 @@ WebInspector.TimelinePanel.prototype = {
             popover.show(WebInspector.TimelinePresentationModel.generatePopupContentForFrame(frame), anchor);
         } else {
             if (anchor.row && anchor.row._record)
-                popover.show(anchor.row._record.generatePopupContent(), anchor);
+                anchor.row._record.generatePopupContent(showCallback);
+        }
+
+        function showCallback(popupContent)
+        {
+            popover.show(popupContent, anchor);
         }
     },
 

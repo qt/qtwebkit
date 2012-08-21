@@ -554,6 +554,7 @@ RenderBlock* RenderBlock::clone() const
         // generated content added yet.
         cloneBlock->setChildrenInline(cloneBlock->firstChild() ? cloneBlock->firstChild()->isInline() : childrenInline());
     }
+    cloneBlock->setInRenderFlowThread(inRenderFlowThread());
     return cloneBlock;
 }
 
@@ -1212,12 +1213,12 @@ void RenderBlock::removeChild(RenderObject* oldChild)
     RenderBox::removeChild(oldChild);
 
     RenderObject* child = prev ? prev : next;
-    if (canMergeAnonymousBlocks && child && !child->previousSibling() && !child->nextSibling() && !isFlexibleBoxIncludingDeprecated()) {
+    if (canMergeAnonymousBlocks && child && !child->previousSibling() && !child->nextSibling() && canCollapseAnonymousBlockChild()) {
         // The removal has knocked us down to containing only a single anonymous
         // box.  We can go ahead and pull the content right back up into our
         // box.
         collapseAnonymousBoxChild(this, child);
-    } else if (((prev && prev->isAnonymousBlock()) || (next && next->isAnonymousBlock())) && !isFlexibleBoxIncludingDeprecated()) {
+    } else if (((prev && prev->isAnonymousBlock()) || (next && next->isAnonymousBlock())) && canCollapseAnonymousBlockChild()) {
         // It's possible that the removal has knocked us down to a single anonymous
         // block with pseudo-style element siblings (e.g. first-letter). If these
         // are floating, then we need to pull the content up also.
@@ -3825,7 +3826,8 @@ LayoutPoint RenderBlock::computeLogicalLocationForFloat(const FloatingObject* fl
         LayoutUnit heightRemainingLeft = 1;
         LayoutUnit heightRemainingRight = 1;
         floatLogicalLeft = logicalLeftOffsetForLine(logicalTopOffset, logicalLeftOffset, false, &heightRemainingLeft);
-        while (logicalRightOffsetForLine(logicalTopOffset, logicalRightOffset, false, &heightRemainingRight) - floatLogicalLeft < floatLogicalWidth) {
+        // FIXME: LayoutUnit::epsilon is probably only necessary here due to lost precision elsewhere https://bugs.webkit.org/show_bug.cgi?id=94000
+        while (logicalRightOffsetForLine(logicalTopOffset, logicalRightOffset, false, &heightRemainingRight) - floatLogicalLeft + LayoutUnit::epsilon() < floatLogicalWidth) {
             logicalTopOffset += min(heightRemainingLeft, heightRemainingRight);
             floatLogicalLeft = logicalLeftOffsetForLine(logicalTopOffset, logicalLeftOffset, false, &heightRemainingLeft);
             if (inRenderFlowThread()) {
@@ -3840,7 +3842,8 @@ LayoutPoint RenderBlock::computeLogicalLocationForFloat(const FloatingObject* fl
         LayoutUnit heightRemainingLeft = 1;
         LayoutUnit heightRemainingRight = 1;
         floatLogicalLeft = logicalRightOffsetForLine(logicalTopOffset, logicalRightOffset, false, &heightRemainingRight);
-        while (floatLogicalLeft - logicalLeftOffsetForLine(logicalTopOffset, logicalLeftOffset, false, &heightRemainingLeft) < floatLogicalWidth) {
+        // FIXME: LayoutUnit::epsilon is probably only necessary here due to lost precision elsewhere https://bugs.webkit.org/show_bug.cgi?id=94000
+        while (floatLogicalLeft - logicalLeftOffsetForLine(logicalTopOffset, logicalLeftOffset, false, &heightRemainingLeft) + LayoutUnit::epsilon() < floatLogicalWidth) {
             logicalTopOffset += min(heightRemainingLeft, heightRemainingRight);
             floatLogicalLeft = logicalRightOffsetForLine(logicalTopOffset, logicalRightOffset, false, &heightRemainingRight);
             if (inRenderFlowThread()) {
@@ -5661,6 +5664,25 @@ static inline void updatePreferredWidth(LayoutUnit& preferredWidth, float& resul
     preferredWidth = max(snappedResult, preferredWidth);
 }
 
+// With sub-pixel enabled: When converting between floating point and LayoutUnits
+// we risk losing precision with each conversion. When this occurs while
+// accumulating our preferred widths, we can wind up with a line width that's
+// larger than our maxPreferredWidth due to pure float accumulation.
+//
+// With sub-pixel disabled: values from Lengths or the render tree aren't subject
+// to the same loss of precision, as they're always truncated and stored as
+// integers. We mirror that behavior here to prevent over-allocating our preferred
+// width.
+static inline LayoutUnit adjustFloatForSubPixelLayout(float value)
+{
+#if ENABLE(SUBPIXEL_LAYOUT)
+    return ceiledLayoutUnit(value);
+#else
+    return static_cast<int>(value);
+#endif
+}
+
+
 void RenderBlock::computeInlinePreferredLogicalWidths()
 {
     float inlineMax = 0;
@@ -5750,11 +5772,11 @@ void RenderBlock::computeInlinePreferredLogicalWidths()
                     Length startMargin = childStyle->marginStart();
                     Length endMargin = childStyle->marginEnd();
                     if (startMargin.isFixed())
-                        margins += startMargin.value();
+                        margins += adjustFloatForSubPixelLayout(startMargin.value());
                     if (endMargin.isFixed())
-                        margins += endMargin.value();
-                    childMin += margins;
-                    childMax += margins;
+                        margins += adjustFloatForSubPixelLayout(endMargin.value());
+                    childMin += margins.ceilToFloat();
+                    childMax += margins.ceilToFloat();
                 }
             }
 
@@ -5762,8 +5784,8 @@ void RenderBlock::computeInlinePreferredLogicalWidths()
                 // Case (2). Inline replaced elements and floats.
                 // Go ahead and terminate the current line as far as
                 // minwidth is concerned.
-                childMin += child->minPreferredLogicalWidth();
-                childMax += child->maxPreferredLogicalWidth();
+                childMin += child->minPreferredLogicalWidth().ceilToFloat();
+                childMax += child->maxPreferredLogicalWidth().ceilToFloat();
 
                 bool clearPreviousFloat;
                 if (child->isFloating()) {
@@ -5790,11 +5812,11 @@ void RenderBlock::computeInlinePreferredLogicalWidths()
                 LayoutUnit ti = 0;
                 if (!addedTextIndent) {
                     ti = textIndent;
-                    childMin += ti;
-                    childMax += ti;
+                    childMin += ti.ceilToFloat();
+                    childMax += ti.ceilToFloat();
 
                     if (childMin < 0)
-                        textIndent = childMin;
+                        textIndent = adjustFloatForSubPixelLayout(childMin);
                     else
                         addedTextIndent = true;
                 }
@@ -5862,11 +5884,14 @@ void RenderBlock::computeInlinePreferredLogicalWidths()
                     trailingSpaceChild = 0;
 
                 // Add in text-indent.  This is added in only once.
-                LayoutUnit ti = 0;
+                float ti = 0;
                 if (!addedTextIndent) {
-                    ti = textIndent;
-                    childMin+=ti; beginMin += ti;
-                    childMax+=ti; beginMax += ti;
+                    ti = textIndent.ceilToFloat();
+                    
+                    childMin += ti;
+                    childMax += ti;
+                    beginMin += ti;
+                    beginMax += ti;
                     
                     if (childMin < 0)
                         textIndent = childMin;

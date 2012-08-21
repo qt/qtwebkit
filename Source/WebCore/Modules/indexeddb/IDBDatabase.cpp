@@ -41,8 +41,10 @@
 #include "IDBObjectStore.h"
 #include "IDBTracing.h"
 #include "IDBTransaction.h"
+#include "IDBUpgradeNeededEvent.h"
 #include "IDBVersionChangeEvent.h"
 #include "IDBVersionChangeRequest.h"
+#include "ScriptCallStack.h"
 #include "ScriptExecutionContext.h"
 #include <limits>
 
@@ -208,6 +210,7 @@ PassRefPtr<IDBVersionChangeRequest> IDBDatabase::setVersion(ScriptExecutionConte
     }
 
     RefPtr<IDBVersionChangeRequest> request = IDBVersionChangeRequest::create(context, IDBAny::create(this), version);
+    ASSERT(m_backend);
     m_backend->setVersion(version, request, m_databaseCallbacks, ec);
     return request;
 }
@@ -301,6 +304,17 @@ void IDBDatabase::closeConnection()
     }
 }
 
+void IDBDatabase::onVersionChange(int64_t oldVersion, int64_t newVersion)
+{
+    if (m_contextStopped || !scriptExecutionContext())
+        return;
+
+    if (m_closePending)
+        return;
+
+    enqueueEvent(IDBUpgradeNeededEvent::create(oldVersion, newVersion, eventNames().versionchangeEvent));
+}
+
 void IDBDatabase::onVersionChange(const String& version)
 {
     if (m_contextStopped || !scriptExecutionContext())
@@ -314,6 +328,7 @@ void IDBDatabase::onVersionChange(const String& version)
 
 void IDBDatabase::registerFrontendCallbacks()
 {
+    ASSERT(m_backend);
     m_backend->registerFrontendCallbacks(m_databaseCallbacks);
 }
 

@@ -88,14 +88,15 @@ modules = [
             "Linkifier.js",
             "NetworkLog.js",
             "Placard.js",
+            "PresentationConsoleMessageHelper.js",
             "SASSSourceMapping.js",
             "Script.js",
             "ScriptFormatter.js",
             "ScriptSnippetModel.js",
             "SnippetStorage.js",
             "SourceMapping.js",
+            "StyleSource.js",
             "TimelineManager.js",
-            "TimelineModel.js",
             "RawSourceCode.js",
             "RemoteObject.js",
             "Resource.js",
@@ -159,32 +160,30 @@ modules = [
         "dependencies": ["sdk", "ui"],
         "sources": [
             "ConsoleMessage.js",
-            "BreakpointsSidebarPane.js",
             "DOMBreakpointsSidebarPane.js",
             "DOMPresentationUtils.js",
             "ElementsTreeOutline.js",
-            "EventListenersSidebarPane.js",
-            "FilteredItemSelectionDialog.js",
             "GoToLineDialog.js",
+            "NativeBreakpointsSidebarPane.js",
             "NavigatorOverlayController.js",
             "NavigatorView.js",
             "JavaScriptContextManager.js",
             "JavaScriptSource.js",
             "ObjectPopoverHelper.js",
             "ObjectPropertiesSection.js",
-            "PropertiesSidebarPane.js",
             "SourceFrame.js",
             "TimelineGrid.js",
-            "UISourceCodeFrame.js",
         ]
     },
     {
         "target_name": "elements",
         "dependencies": ["components"],
         "sources": [
-            "StylesSidebarPane.js",
-            "MetricsSidebarPane.js",
             "ElementsPanel.js",
+            "EventListenersSidebarPane.js",
+            "MetricsSidebarPane.js",
+            "PropertiesSidebarPane.js",
+            "StylesSidebarPane.js",
         ]
     },
     {
@@ -227,17 +226,20 @@ modules = [
         "target_name": "scripts",
         "dependencies": ["components"],
         "sources": [
+            "BreakpointsSidebarPane.js",
             "CallStackSidebarPane.js",
-            "ScopeChainSidebarPane.js",
+            "FilteredItemSelectionDialog.js",
             "JavaScriptSourceFrame.js",
-            "PresentationConsoleMessageHelper.js",
             "RevisionHistoryView.js",
+            "ScopeChainSidebarPane.js",
             "ScriptsNavigator.js",
             "ScriptsPanel.js",
             "ScriptsSearchScope.js",
+            "SnippetJavaScriptSourceFrame.js",
+            "StyleSheetOutlineDialog.js",
             "TabbedEditorContainer.js",
+            "UISourceCodeFrame.js",
             "WatchExpressionsSidebarPane.js",
-            "WorkerManager.js",
             "WorkersSidebarPane.js",
         ]
     },
@@ -254,6 +256,7 @@ modules = [
         "dependencies": ["components"],
         "sources": [
             "MemoryStatistics.js",
+            "TimelineModel.js",
             "TimelineOverviewPane.js",
             "TimelinePanel.js",
             "TimelinePresentationModel.js",
@@ -273,13 +276,6 @@ modules = [
         ]
     },
     {
-        "target_name": "styles",
-        "dependencies": ["components"],
-        "sources": [
-            "StylesPanel.js",
-        ]
-    },
-    {
         "target_name": "extensions",
         "dependencies": ["components"],
         "sources": [
@@ -296,6 +292,7 @@ modules = [
         "dependencies": ["components", "extensions"],
         "sources": [
             "SettingsScreen.js",
+            "WorkerManager.js",
         ]
     },
     {

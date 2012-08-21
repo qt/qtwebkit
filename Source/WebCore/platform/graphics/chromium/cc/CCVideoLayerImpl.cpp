@@ -27,20 +27,20 @@
 
 #if USE(ACCELERATED_COMPOSITING)
 
-#include "cc/CCVideoLayerImpl.h"
+#include "CCVideoLayerImpl.h"
 
+#include "CCIOSurfaceDrawQuad.h"
+#include "CCLayerTreeHostImpl.h"
+#include "CCProxy.h"
+#include "CCQuadSink.h"
+#include "CCResourceProvider.h"
+#include "CCStreamVideoDrawQuad.h"
+#include "CCTextureDrawQuad.h"
+#include "CCYUVVideoDrawQuad.h"
 #include "Extensions3DChromium.h"
 #include "GraphicsContext3D.h"
 #include "NotImplemented.h"
 #include "TextStream.h"
-#include "cc/CCIOSurfaceDrawQuad.h"
-#include "cc/CCLayerTreeHostImpl.h"
-#include "cc/CCProxy.h"
-#include "cc/CCQuadSink.h"
-#include "cc/CCResourceProvider.h"
-#include "cc/CCStreamVideoDrawQuad.h"
-#include "cc/CCTextureDrawQuad.h"
-#include "cc/CCYUVVideoDrawQuad.h"
 #include <public/WebVideoFrame.h>
 #include <wtf/text/WTFString.h>
 
@@ -215,13 +215,7 @@ void CCVideoLayerImpl::appendQuads(CCQuadSink& quadList, const CCSharedQuadState
         // NativeTexture hardware decoder.
         bool premultipliedAlpha = true;
         FloatRect uvRect(0, 0, 1, 1);
-#if defined(OS_CHROMEOS) && defined(__ARMEL__)
-        bool flipped = true; // Under the covers, implemented by OpenMAX IL.
-#elif OS(WINDOWS)
-        bool flipped = false; // Under the covers, implemented by DXVA.
-#else
-        bool flipped = false; // LibVA (cros/intel), MacOS.
-#endif
+        bool flipped = false;
         OwnPtr<CCTextureDrawQuad> textureQuad = CCTextureDrawQuad::create(sharedQuadState, quadRect, m_externalTextureResource, premultipliedAlpha, uvRect, flipped);
         quadList.append(textureQuad.release());
         break;
@@ -357,7 +351,7 @@ bool CCVideoLayerImpl::copyPlaneData(CCResourceProvider* resourceProvider)
         CCVideoLayerImpl::FramePlane& plane = m_framePlanes[softwarePlaneIndex];
         const uint8_t* softwarePlanePixels = static_cast<const uint8_t*>(m_frame->data(softwarePlaneIndex));
         IntRect planeRect(IntPoint(), plane.size);
-        resourceProvider->upload(plane.resourceId, softwarePlanePixels, planeRect, planeRect, planeRect);
+        resourceProvider->upload(plane.resourceId, softwarePlanePixels, planeRect, planeRect, IntSize());
     }
     return true;
 }

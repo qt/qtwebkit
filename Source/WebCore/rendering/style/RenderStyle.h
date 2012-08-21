@@ -594,18 +594,27 @@ public:
     EClear clear() const { return static_cast<EClear>(noninherited_flags._clear); }
     ETableLayout tableLayout() const { return static_cast<ETableLayout>(noninherited_flags._table_layout); }
 
-    const Font& font() const { return inherited->font; }
-    const FontMetrics& fontMetrics() const { return inherited->font.fontMetrics(); }
-    const FontDescription& fontDescription() const { return inherited->font.fontDescription(); }
-    int fontSize() const { return inherited->font.pixelSize(); }
+    const Font& font() const;
+    const FontMetrics& fontMetrics() const;
+    const FontDescription& fontDescription() const;
+    float specifiedFontSize() const;
+    float computedFontSize() const;
+    int fontSize() const;
+
+#if ENABLE(TEXT_AUTOSIZING)
+    float textAutosizingMultiplier() const { return visual->m_textAutosizingMultiplier; }
+#endif
 
     Length textIndent() const { return rareInheritedData->indent; }
     ETextAlign textAlign() const { return static_cast<ETextAlign>(inherited_flags._text_align); }
     ETextTransform textTransform() const { return static_cast<ETextTransform>(inherited_flags._text_transform); }
     ETextDecoration textDecorationsInEffect() const { return static_cast<ETextDecoration>(inherited_flags._text_decorations); }
     ETextDecoration textDecoration() const { return static_cast<ETextDecoration>(visual->textDecoration); }
-    int wordSpacing() const { return inherited->font.wordSpacing(); }
-    int letterSpacing() const { return inherited->font.letterSpacing(); }
+#if ENABLE(CSS3_TEXT_DECORATION)
+    TextDecorationStyle textDecorationStyle() const { return static_cast<TextDecorationStyle>(rareNonInheritedData->m_textDecorationStyle); }
+#endif // CSS3_TEXT_DECORATION
+    int wordSpacing() const;
+    int letterSpacing() const;
 
     float zoom() const { return visual->m_zoom; }
     float effectiveZoom() const { return rareInheritedData->m_effectiveZoom; }
@@ -613,23 +622,9 @@ public:
     TextDirection direction() const { return static_cast<TextDirection>(inherited_flags._direction); }
     bool isLeftToRightDirection() const { return direction() == LTR; }
 
-    Length lineHeight() const { return inherited->line_height; }
-    int computedLineHeight(RenderView* renderView = 0) const
-    {
-        const Length& lh = inherited->line_height;
-
-        // Negative value means the line height is not set.  Use the font's built-in spacing.
-        if (lh.isNegative())
-            return fontMetrics().lineSpacing();
-
-        if (lh.isPercent())
-            return minimumValueForLength(lh, fontSize());
-
-        if (lh.isViewportPercentage())
-            return valueForLength(lh, 0, renderView);
-
-        return lh.value();
-    }
+    Length specifiedLineHeight() const;
+    Length lineHeight() const;
+    int computedLineHeight(RenderView* = 0) const;
 
     EWhiteSpace whiteSpace() const { return static_cast<EWhiteSpace>(inherited_flags._white_space); }
     static bool autoWrap(EWhiteSpace ws)
@@ -717,16 +712,13 @@ public:
     StyleImage* maskBoxImageSource() const { return rareNonInheritedData->m_maskBoxImage.image(); }
  
     EBorderCollapse borderCollapse() const { return static_cast<EBorderCollapse>(inherited_flags._border_collapse); }
-    short horizontalBorderSpacing() const { return inherited->horizontal_border_spacing; }
-    short verticalBorderSpacing() const { return inherited->vertical_border_spacing; }
+    short horizontalBorderSpacing() const;
+    short verticalBorderSpacing() const;
     EEmptyCell emptyCells() const { return static_cast<EEmptyCell>(inherited_flags._empty_cells); }
     ECaptionSide captionSide() const { return static_cast<ECaptionSide>(inherited_flags._caption_side); }
 
-    short counterIncrement() const { return rareNonInheritedData->m_counterIncrement; }
-    short counterReset() const { return rareNonInheritedData->m_counterReset; }
-
     EListStyleType listStyleType() const { return static_cast<EListStyleType>(inherited_flags._list_style_type); }
-    StyleImage* listStyleImage() const { return inherited->list_style_image.get(); }
+    StyleImage* listStyleImage() const;
     EListStylePosition listStylePosition() const { return static_cast<EListStylePosition>(inherited_flags._list_style_position); }
 
     Length marginTop() const { return surround->margin.top(); }
@@ -986,6 +978,14 @@ public:
     bool hasFilter() const { return false; }
 #endif
 
+#if ENABLE(CSS_COMPOSITING)
+    BlendMode blendMode() const { return static_cast<BlendMode>(rareNonInheritedData->m_effectiveBlendMode); }
+    void setBlendMode(BlendMode v) { rareNonInheritedData.access()->m_effectiveBlendMode = v; }
+    bool hasBlendMode() const { return static_cast<BlendMode>(rareNonInheritedData->m_effectiveBlendMode) == BlendModeNormal; }
+#else
+    bool hasBlendMode() const { return false; }
+#endif
+ 
 #if USE(RTL_SCROLLBAR)
     bool shouldPlaceBlockDirectionScrollbarOnLogicalLeft() const { return !isLeftToRightDirection() && isHorizontalWritingMode(); }
 #else
@@ -1116,27 +1116,30 @@ public:
     void setClear(EClear v) { noninherited_flags._clear = v; }
     void setTableLayout(ETableLayout v) { noninherited_flags._table_layout = v; }
 
-    bool setFontDescription(const FontDescription& v)
+    bool setFontDescription(const FontDescription&);
+    // Only used for blending font sizes when animating, for MathML anonymous blocks, and for text autosizing.
+    void setFontSize(float);
+
+#if ENABLE(TEXT_AUTOSIZING)
+    void setTextAutosizingMultiplier(float v)
     {
-        if (inherited->font.fontDescription() != v) {
-            inherited.access()->font = Font(v, inherited->font.letterSpacing(), inherited->font.wordSpacing());
-            return true;
-        }
-        return false;
+        SET_VAR(visual, m_textAutosizingMultiplier, v)
+        setFontSize(fontDescription().specifiedSize());
     }
+#endif
 
-    // Only used for blending font sizes when animating, or MathML anonymous blocks.
-    void setBlendedFontSize(int);
-
-    void setColor(const Color& v) { SET_VAR(inherited, color, v) }
+    void setColor(const Color&);
     void setTextIndent(Length v) { SET_VAR(rareInheritedData, indent, v) }
     void setTextAlign(ETextAlign v) { inherited_flags._text_align = v; }
     void setTextTransform(ETextTransform v) { inherited_flags._text_transform = v; }
     void addToTextDecorationsInEffect(ETextDecoration v) { inherited_flags._text_decorations |= v; }
     void setTextDecorationsInEffect(ETextDecoration v) { inherited_flags._text_decorations = v; }
     void setTextDecoration(ETextDecoration v) { SET_VAR(visual, textDecoration, v); }
+#if ENABLE(CSS3_TEXT_DECORATION)
+    void setTextDecorationStyle(TextDecorationStyle v) { SET_VAR(rareNonInheritedData, m_textDecorationStyle, v); }
+#endif // CSS3_TEXT_DECORATION
     void setDirection(TextDirection v) { inherited_flags._direction = v; }
-    void setLineHeight(Length v) { SET_VAR(inherited, line_height, v) }
+    void setLineHeight(Length specifiedLineHeight);
     bool setZoom(float);
     void setZoomWithoutReturnValue(float f) { setZoom(f); }
     bool setEffectiveZoom(float);
@@ -1155,8 +1158,8 @@ public:
 
     void setWhiteSpace(EWhiteSpace v) { inherited_flags._white_space = v; }
 
-    void setWordSpacing(int v) { inherited.access()->font.setWordSpacing(v); }
-    void setLetterSpacing(int v) { inherited.access()->font.setLetterSpacing(v); }
+    void setWordSpacing(int);
+    void setLetterSpacing(int);
 
     void clearBackgroundLayers() { m_background.access()->m_background = FillLayer(BackgroundFillLayer); }
     void inheritBackgroundLayers(const FillLayer& parent) { m_background.access()->m_background = parent; }
@@ -1189,19 +1192,17 @@ public:
     void setMaskSize(LengthSize l) { SET_VAR(rareNonInheritedData, m_mask.m_sizeLength, l) }
 
     void setBorderCollapse(EBorderCollapse collapse) { inherited_flags._border_collapse = collapse; }
-    void setHorizontalBorderSpacing(short v) { SET_VAR(inherited, horizontal_border_spacing, v) }
-    void setVerticalBorderSpacing(short v) { SET_VAR(inherited, vertical_border_spacing, v) }
+    void setHorizontalBorderSpacing(short);
+    void setVerticalBorderSpacing(short);
     void setEmptyCells(EEmptyCell v) { inherited_flags._empty_cells = v; }
     void setCaptionSide(ECaptionSide v) { inherited_flags._caption_side = v; }
 
     void setHasAspectRatio(bool b) { SET_VAR(rareNonInheritedData, m_hasAspectRatio, b); }
     void setAspectRatioDenominator(float v) { SET_VAR(rareNonInheritedData, m_aspectRatioDenominator, v); }
     void setAspectRatioNumerator(float v) { SET_VAR(rareNonInheritedData, m_aspectRatioNumerator, v); }
-    void setCounterIncrement(short v) { SET_VAR(rareNonInheritedData, m_counterIncrement, v) }
-    void setCounterReset(short v) { SET_VAR(rareNonInheritedData, m_counterReset, v) }
 
     void setListStyleType(EListStyleType v) { inherited_flags._list_style_type = v; }
-    void setListStyleImage(PassRefPtr<StyleImage> v) { if (inherited->list_style_image != v) inherited.access()->list_style_image = v; }
+    void setListStyleImage(PassRefPtr<StyleImage>);
     void setListStylePosition(EListStylePosition v) { inherited_flags._list_style_position = v; }
 
     void resetMargin() { SET_VAR(surround, margin, LengthBox(Fixed)) }
@@ -1583,6 +1584,9 @@ public:
     static Length initialLineHeight() { return Length(-100.0, Percent); }
     static ETextAlign initialTextAlign() { return TASTART; }
     static ETextDecoration initialTextDecoration() { return TDNONE; }
+#if ENABLE(CSS3_TEXT_DECORATION)
+    static TextDecorationStyle initialTextDecorationStyle() { return TextDecorationStyleSolid; }
+#endif // CSS3_TEXT_DECORATION
     static float initialZoom() { return 1.0f; }
     static int initialOutlineOffset() { return 0; }
     static float initialOpacity() { return 1.0f; }
@@ -1712,8 +1716,11 @@ public:
 #if ENABLE(CSS_FILTERS)
     static const FilterOperations& initialFilter() { DEFINE_STATIC_LOCAL(FilterOperations, ops, ()); return ops; }
 #endif
+#if ENABLE(CSS_COMPOSITING)
+    static BlendMode initialBlendMode() { return BlendModeNormal; }
+#endif
 private:
-    void setVisitedLinkColor(const Color& v) { SET_VAR(inherited, visitedLinkColor, v) }
+    void setVisitedLinkColor(const Color&);
     void setVisitedLinkBackgroundColor(const Color& v) { SET_VAR(rareNonInheritedData, m_visitedLinkBackgroundColor, v) }
     void setVisitedLinkBorderLeftColor(const Color& v) { SET_VAR(rareNonInheritedData, m_visitedLinkBorderLeftColor, v) }
     void setVisitedLinkBorderRightColor(const Color& v) { SET_VAR(rareNonInheritedData, m_visitedLinkBorderRightColor, v) }
@@ -1759,13 +1766,13 @@ private:
     Color borderTopColor() const { return surround->border.top().color(); }
     Color borderBottomColor() const { return surround->border.bottom().color(); }
     Color backgroundColor() const { return m_background->color(); }
-    Color color() const { return inherited->color; }
+    Color color() const;
     Color columnRuleColor() const { return rareNonInheritedData->m_multiCol->m_rule.color(); }
     Color outlineColor() const { return m_background->outline().color(); }
     Color textEmphasisColor() const { return rareInheritedData->textEmphasisColor; }
     Color textFillColor() const { return rareInheritedData->textFillColor; }
     Color textStrokeColor() const { return rareInheritedData->textStrokeColor; }
-    Color visitedLinkColor() const { return inherited->visitedLinkColor; }
+    Color visitedLinkColor() const;
     Color visitedLinkBackgroundColor() const { return rareNonInheritedData->m_visitedLinkBackgroundColor; }
     Color visitedLinkBorderLeftColor() const { return rareNonInheritedData->m_visitedLinkBorderLeftColor; }
     Color visitedLinkBorderRightColor() const { return rareNonInheritedData->m_visitedLinkBorderRightColor; }

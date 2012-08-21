@@ -54,6 +54,10 @@
         # stored as is. Otherwise, a concatenated file is stored.
         'debug_devtools%': 0,
 
+        # If set to 1, links against the compositor bindings from the chromium repository
+        # instead of the compositor-implementation binding files in WebKit/chromium/src.
+        'use_libcc_for_compositor%': 0,
+
         # List of DevTools source files, ordered by dependencies. It is used both
         # for copying them to resource dir, and for generating 'devtools.html' file.
         'devtools_files': [
@@ -386,6 +390,8 @@
                 'src/EventListenerWrapper.h',
                 'src/ExternalPopupMenu.cpp',
                 'src/ExternalPopupMenu.h',
+                'src/FindInPageCoordinates.cpp',
+                'src/FindInPageCoordinates.h',
                 'src/FrameLoaderClientImpl.cpp',
                 'src/FrameLoaderClientImpl.h',
                 'src/FrameNetworkingContextImpl.h',
@@ -468,11 +474,8 @@
                 'src/WebTextCheckingCompletionImpl.cpp',
                 'src/WebTextCheckingResult.cpp',
                 'src/WebAccessibilityObject.cpp',
-                'src/WebAnimation.cpp',
                 'src/WebAnimationControllerImpl.cpp',
                 'src/WebAnimationControllerImpl.h',
-                'src/WebAnimationCurveCommon.cpp',
-                'src/WebAnimationCurveCommon.h',
                 'src/WebArrayBuffer.cpp',
                 'src/WebArrayBufferView.cpp',
                 'src/WebBindings.cpp',
@@ -481,11 +484,6 @@
                 'src/WebCache.cpp',
                 'src/WebColorName.cpp',
                 'src/WebCommon.cpp',
-                'src/WebCompositorInputHandlerImpl.cpp',
-                'src/WebCompositorInputHandlerImpl.h',
-                'src/WebContentLayer.cpp',
-                'src/WebContentLayerImpl.cpp',
-                'src/WebContentLayerImpl.h',
                 'src/WebCrossOriginPreflightResultCache.cpp',
                 'src/WebCursorInfo.cpp',
                 'src/WebDOMEvent.cpp',
@@ -512,12 +510,10 @@
                 'src/WebElement.cpp',
                 'src/WebEntities.cpp',
                 'src/WebEntities.h',
-                'src/WebExternalTextureLayer.cpp',
                 'src/WebFileChooserCompletionImpl.cpp',
                 'src/WebFileChooserCompletionImpl.h',
                 'src/WebFileSystemCallbacksImpl.cpp',
                 'src/WebFileSystemCallbacksImpl.h',
-                'src/WebFloatAnimationCurve.cpp',
                 'src/WebFontCache.cpp',
                 'src/WebFontDescription.cpp',
                 'src/WebFontImpl.cpp',
@@ -561,9 +557,7 @@
                 'src/WebIDBTransactionImpl.h',
                 'src/WebIDBTransactionCallbacksImpl.cpp',
                 'src/WebIDBTransactionCallbacksImpl.h',
-                'src/WebIOSurfaceLayer.cpp',
                 'src/WebImageDecoder.cpp',
-                'src/WebImageLayer.cpp',
                 'src/WebImageSkia.cpp',
                 'src/WebInputElement.cpp',
                 'src/WebInputEvent.cpp',
@@ -574,12 +568,6 @@
                 'src/WebIntentServiceInfo.cpp',
                 'src/WebKit.cpp',
                 'src/WebLabelElement.cpp',
-                'src/WebLayer.cpp',
-                'src/WebLayerImpl.cpp',
-                'src/WebLayerImpl.h',
-                'src/WebLayerTreeView.cpp',
-                'src/WebLayerTreeViewImpl.cpp',
-                'src/WebLayerTreeViewImpl.h',
                 'src/WebMediaPlayerClientImpl.cpp',
                 'src/WebMediaPlayerClientImpl.h',
                 'src/WebMediaStreamRegistry.cpp',
@@ -615,8 +603,6 @@
                 'src/WebScopedMicrotaskSuppression.cpp',
                 'src/WebScopedUserGesture.cpp',
                 'src/WebScriptController.cpp',
-                'src/WebScrollbarLayer.cpp',
-                'src/WebScrollableLayer.cpp',
                 'src/WebScrollbarImpl.cpp',
                 'src/WebScrollbarImpl.h',
                 'src/WebScrollbarThemeClientImpl.cpp',
@@ -635,8 +621,6 @@
                 'src/WebSocket.cpp',
                 'src/WebSocketImpl.cpp',
                 'src/WebSocketImpl.h',
-                'src/WebSolidColorLayer.cpp',
-                'src/WebSolidColorLayerImpl.cpp',
                 'src/WebSpeechGrammar.cpp',
                 'src/WebSpeechInputResult.cpp',
                 'src/WebSpeechRecognitionHandle.cpp',
@@ -647,12 +631,10 @@
                 'src/WebSurroundingText.cpp',
                 'src/WebTextInputInfo.cpp',
                 'src/WebTextRun.cpp',
-                'src/WebTransformAnimationCurve.cpp',
                 'src/WebURLLoadTiming.cpp',
                 'src/WebScopedUserGesture.cpp',
                 'src/WebTextFieldDecoratorClient.cpp',
                 'src/WebUserMediaRequest.cpp',
-                'src/WebVideoLayer.cpp',
                 'src/WebViewBenchmarkSupportImpl.cpp',
                 'src/WebViewBenchmarkSupportImpl.h',
                 'src/WebViewImpl.cpp',
@@ -850,6 +832,15 @@
                         'WARNING_CFLAGS': ['-Wglobal-constructors'],
                     },
                 }],
+                ['use_libcc_for_compositor==1', {
+                    'dependencies': [
+                        '<(chromium_src_dir)/webkit/compositor/compositor.gyp:webkit_compositor',
+                    ],
+                }, { # else: use_libcc_for_compositor==0
+                    'sources': [
+                        '<@(webkit_compositor_bindings_files)',
+                    ]
+                }],
             ],
             'target_conditions': [
                 ['OS=="android"', {
@@ -870,6 +861,14 @@
             'conditions': [
                 ['debug_devtools==0', {
                     'dependencies': ['concatenated_devtools_js',
+                                     'concatenated_devtools_elements_js',
+                                     'concatenated_devtools_resources_js',
+                                     'concatenated_devtools_network_js',
+                                     'concatenated_devtools_scripts_js',
+                                     'concatenated_devtools_timeline_js',
+                                     'concatenated_devtools_profiles_js',
+                                     'concatenated_devtools_audits_js',
+                                     'concatenated_devtools_codemirror_js',
                                      'concatenated_heap_snapshot_worker_js',
                                      'concatenated_script_formatter_worker_js',
                                      'concatenated_devtools_css'],
@@ -950,6 +949,14 @@
             'conditions': [
                 ['debug_devtools==0', {
                     'dependencies': ['concatenated_devtools_js',
+                                     'concatenated_devtools_elements_js',
+                                     'concatenated_devtools_resources_js',
+                                     'concatenated_devtools_network_js',
+                                     'concatenated_devtools_scripts_js',
+                                     'concatenated_devtools_timeline_js',
+                                     'concatenated_devtools_profiles_js',
+                                     'concatenated_devtools_audits_js',
+                                     'concatenated_devtools_codemirror_js',
                                      'concatenated_heap_snapshot_worker_js',
                                      'concatenated_script_formatter_worker_js',
                                      'concatenated_devtools_css'],
@@ -966,11 +973,18 @@
                 'input_pages': [
                     '<(PRODUCT_DIR)/resources/inspector/devtools.html',
                     '<(PRODUCT_DIR)/resources/inspector/DevTools.js',
+                    '<(PRODUCT_DIR)/resources/inspector/ElementsPanel.js',
+                    '<(PRODUCT_DIR)/resources/inspector/ResourcesPanel.js',
+                    '<(PRODUCT_DIR)/resources/inspector/NetworkPanel.js',
+                    '<(PRODUCT_DIR)/resources/inspector/ScriptsPanel.js',
+                    '<(PRODUCT_DIR)/resources/inspector/TimelinePanel.js',
+                    '<(PRODUCT_DIR)/resources/inspector/ProfilesPanel.js',
+                    '<(PRODUCT_DIR)/resources/inspector/AuditsPanel.js',
+                    '<(PRODUCT_DIR)/resources/inspector/CodeMirrorTextEditor.js',
                     '<(PRODUCT_DIR)/resources/inspector/HeapSnapshotWorker.js',
                     '<(PRODUCT_DIR)/resources/inspector/ScriptFormatterWorker.js',
                     '<(PRODUCT_DIR)/resources/inspector/devTools.css',
                     '<(PRODUCT_DIR)/resources/inspector/devtools_extension_api.js',
-                    '<@(webinspector_standalone_js_files)',
                     '<@(webinspector_standalone_css_files)',
                 ],
                 'images': [
@@ -1086,11 +1100,133 @@
                         'outputs': ['<(PRODUCT_DIR)/resources/inspector/DevTools.js'],
                         'action': ['python', '<@(_script_name)', '<@(_input_page)', '<@(_search_path)', '<@(_outputs)'],
                     }],
-                    'copies': [{
-                        'destination': '<(PRODUCT_DIR)/resources/inspector',
-                        'files': [
-                            '<@(webinspector_standalone_js_files)',
+                },
+                {
+                    'target_name': 'concatenated_devtools_elements_js',
+                    'type': 'none',
+                    'actions': [{
+                        'action_name': 'concatenate_devtools_elements_js',
+                        'script_name': 'scripts/inline_js_imports.py',
+                        'input_file': '../../WebCore/inspector/front-end/ElementsPanel.js',
+                        'inputs': [
+                            '<@(_script_name)',
+                            '<@(webinspector_elements_js_files)',
                         ],
+                        'search_path': '../../WebCore/inspector/front-end',
+                        'outputs': ['<(PRODUCT_DIR)/resources/inspector/ElementsPanel.js'],
+                        'action': ['python', '<@(_script_name)', '<@(_input_file)', '<@(_search_path)', '<@(_outputs)'],
+                    }],
+                },
+                {
+                    'target_name': 'concatenated_devtools_resources_js',
+                    'type': 'none',
+                    'actions': [{
+                        'action_name': 'concatenate_devtools_resources_js',
+                        'script_name': 'scripts/inline_js_imports.py',
+                        'input_file': '../../WebCore/inspector/front-end/ResourcesPanel.js',
+                        'inputs': [
+                            '<@(_script_name)',
+                            '<@(webinspector_resources_js_files)',
+                        ],
+                        'search_path': '../../WebCore/inspector/front-end',
+                        'outputs': ['<(PRODUCT_DIR)/resources/inspector/ResourcesPanel.js'],
+                        'action': ['python', '<@(_script_name)', '<@(_input_file)', '<@(_search_path)', '<@(_outputs)'],
+                    }],
+                },
+                {
+                    'target_name': 'concatenated_devtools_network_js',
+                    'type': 'none',
+                    'actions': [{
+                        'action_name': 'concatenate_devtools_network_js',
+                        'script_name': 'scripts/inline_js_imports.py',
+                        'input_file': '../../WebCore/inspector/front-end/NetworkPanel.js',
+                        'inputs': [
+                            '<@(_script_name)',
+                            '<@(webinspector_network_js_files)',
+                        ],
+                        'search_path': '../../WebCore/inspector/front-end',
+                        'outputs': ['<(PRODUCT_DIR)/resources/inspector/NetworkPanel.js'],
+                        'action': ['python', '<@(_script_name)', '<@(_input_file)', '<@(_search_path)', '<@(_outputs)'],
+                    }],
+                },
+                {
+                    'target_name': 'concatenated_devtools_scripts_js',
+                    'type': 'none',
+                    'actions': [{
+                        'action_name': 'concatenate_devtools_scripts_js',
+                        'script_name': 'scripts/inline_js_imports.py',
+                        'input_file': '../../WebCore/inspector/front-end/ScriptsPanel.js',
+                        'inputs': [
+                            '<@(_script_name)',
+                            '<@(webinspector_scripts_js_files)',
+                        ],
+                        'search_path': '../../WebCore/inspector/front-end',
+                        'outputs': ['<(PRODUCT_DIR)/resources/inspector/ScriptsPanel.js'],
+                        'action': ['python', '<@(_script_name)', '<@(_input_file)', '<@(_search_path)', '<@(_outputs)'],
+                    }],
+                },
+                {
+                    'target_name': 'concatenated_devtools_timeline_js',
+                    'type': 'none',
+                    'actions': [{
+                        'action_name': 'concatenate_devtools_timeline_js',
+                        'script_name': 'scripts/inline_js_imports.py',
+                        'input_file': '../../WebCore/inspector/front-end/TimelinePanel.js',
+                        'inputs': [
+                            '<@(_script_name)',
+                            '<@(webinspector_resources_js_files)',
+                        ],
+                        'search_path': '../../WebCore/inspector/front-end',
+                        'outputs': ['<(PRODUCT_DIR)/resources/inspector/TimelinePanel.js'],
+                        'action': ['python', '<@(_script_name)', '<@(_input_file)', '<@(_search_path)', '<@(_outputs)'],
+                    }],
+                },
+                {
+                    'target_name': 'concatenated_devtools_profiles_js',
+                    'type': 'none',
+                    'actions': [{
+                        'action_name': 'concatenate_devtools_profiles_js',
+                        'script_name': 'scripts/inline_js_imports.py',
+                        'input_file': '../../WebCore/inspector/front-end/ProfilesPanel.js',
+                        'inputs': [
+                            '<@(_script_name)',
+                            '<@(webinspector_profiles_js_files)',
+                        ],
+                        'search_path': '../../WebCore/inspector/front-end',
+                        'outputs': ['<(PRODUCT_DIR)/resources/inspector/ProfilesPanel.js'],
+                        'action': ['python', '<@(_script_name)', '<@(_input_file)', '<@(_search_path)', '<@(_outputs)'],
+                    }],
+                },
+                {
+                    'target_name': 'concatenated_devtools_audits_js',
+                    'type': 'none',
+                    'actions': [{
+                        'action_name': 'concatenate_devtools_audits_js',
+                        'script_name': 'scripts/inline_js_imports.py',
+                        'input_file': '../../WebCore/inspector/front-end/AuditsPanel.js',
+                        'inputs': [
+                            '<@(_script_name)',
+                            '<@(webinspector_audits_js_files)',
+                        ],
+                        'search_path': '../../WebCore/inspector/front-end',
+                        'outputs': ['<(PRODUCT_DIR)/resources/inspector/AuditsPanel.js'],
+                        'action': ['python', '<@(_script_name)', '<@(_input_file)', '<@(_search_path)', '<@(_outputs)'],
+                    }],
+                },
+                {
+                    'target_name': 'concatenated_devtools_codemirror_js',
+                    'type': 'none',
+                    'actions': [{
+                        'action_name': 'concatenate_devtools_codemirror_js',
+                        'script_name': 'scripts/inline_js_imports.py',
+                        'input_file': '../../WebCore/inspector/front-end/CodeMirrorTextEditor.js',
+                        'inputs': [
+                            '<@(_script_name)',
+                            '<@(webinspector_codemirror_js_files)',
+                        ],
+                        'search_path': '../../WebCore/inspector/front-end',
+                        'outputs': ['<(PRODUCT_DIR)/resources/inspector/CodeMirrorTextEditor.js'],
+                        'action': ['python', '<@(_script_name)', '<@(_input_file)', '<@(_search_path)', '<@(_outputs)', 'true'],
                     }],
                 },
                 {

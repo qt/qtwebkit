@@ -35,7 +35,7 @@ static const char* contentsWithNewlines = "<html><body><p>This is a test. \n\nTh
 
 static const char* contentsWithPreformattedText = "<html><body><pre>\n\t\n\tfirst line\n\tsecond line\n</pre></body></html>";
 
-static const char* contentsWithSpecialChars = "<html><body><p>&laquo;&nbsp;This is a paragraph with &ldquo;special&rdquo; characters inside.&nbsp;&raquo;</p><ul><li style='max-width:100px;'>List item with some text that wraps across different lines.</li></ul></body></html>";
+static const char* contentsWithSpecialChars = "<html><body><p>&laquo;&nbsp;This is a paragraph with &ldquo;special&rdquo; characters inside.&nbsp;&raquo;</p><ul><li style='max-width:100px;'>List item with some text that wraps across different lines.</li><li style='max-width:100px;'><p>List item with some text that wraps across different lines.</p></li></ul></body></html>";
 
 static const char* contentsInTextarea = "<html><body><textarea cols='80'>This is a test. This is the second sentence. And this the third.</textarea></body></html>";
 
@@ -65,7 +65,7 @@ static const char* linksWithInlineImages = "<html><head><style>a.http:before {co
 
 static const char* listsOfItems = "<html><body><ul><li>text only</li><li><a href='foo'>link only</a></li><li>text and a <a href='bar'>link</a></li></ul><ol><li>text only</li><li><a href='foo'>link only</a></li><li>text and a <a href='bar'>link</a></li></ol></body></html>";
 
-static const char* textForCaretBrowsing = "<html><body><h1>A text header</h1><p>A paragraph <a href='http://foo.bar.baz/'>with a link</a> in the middle</p><ol><li>A list item</li></ol><select><option selected value='foo'>An option in a combo box</option></select><input type='text'' name='foo'' value='foo bar baz' /></body></html>";
+static const char* textForCaretBrowsing = "<html><body><h1>A text header</h1><p>A paragraph <a href='http://foo.bar.baz/'>with a link</a> in the middle</p><ol><li>A list item</li></ol><select><option selected value='foo'>An option in a combo box</option></select><input type='text'' name='foo'' value='foo bar baz' /><table><tr><td>a table cell</td></tr></table></body></html>";
 
 static const char* textForSelections = "<html><body><p>A paragraph with plain text</p><p>A paragraph with <a href='http://webkit.org'>a link</a> in the middle</p><ol><li>A list item</li></ol><select></body></html>";
 
@@ -389,6 +389,23 @@ static void testWebkitAtkCaretOffsets()
     offset = atk_text_get_caret_offset(ATK_TEXT(textEntry));
     g_assert_cmpint(offset, ==, 5);
 
+    AtkObject* table = atk_object_ref_accessible_child(object, 4);
+    g_assert(ATK_IS_OBJECT(table));
+    g_assert(atk_object_get_role(table) == ATK_ROLE_TABLE);
+    g_assert_cmpint(atk_object_get_n_accessible_children(table), ==, 1);
+
+    AtkObject* tableCell = atk_object_ref_accessible_child(table, 0);
+    g_assert(ATK_IS_TEXT(tableCell));
+    g_assert(atk_object_get_role(tableCell) == ATK_ROLE_TABLE_CELL);
+    text = atk_text_get_text(ATK_TEXT(tableCell), 0, -1);
+    g_assert_cmpstr(text, ==, "a table cell");
+    g_free(text);
+
+    result = atk_text_set_caret_offset(ATK_TEXT(tableCell), 2);
+    g_assert_cmpint(result, ==, TRUE);
+    offset = atk_text_get_caret_offset(ATK_TEXT(tableCell));
+    g_assert_cmpint(offset, ==, 2);
+
     g_free(textCaretMovedResult);
 
     g_object_unref(header);
@@ -401,6 +418,8 @@ static void testWebkitAtkCaretOffsets()
     g_object_unref(menuPopup);
     g_object_unref(comboBoxOption);
     g_object_unref(textEntry);
+    g_object_unref(table);
+    g_object_unref(tableCell);
     g_object_unref(webView);
 }
 
@@ -840,6 +859,21 @@ static void testWebkitAtkGetTextAtOffsetWithSpecialCharacters()
        and ATK_TEXT_BOUNDARY_LINE_END for line items with bullets
        (special character) and wrapped text always return the right
        piece of text for each line. */
+    testGetTextFunction(ATK_TEXT(listItem), atk_text_get_text_at_offset, ATK_TEXT_BOUNDARY_LINE_START, 3, "\342\200\242 List item ", 0, 12);
+    testGetTextFunction(ATK_TEXT(listItem), atk_text_get_text_at_offset, ATK_TEXT_BOUNDARY_LINE_START, 13, "with some ", 12, 22);
+    testGetTextFunction(ATK_TEXT(listItem), atk_text_get_text_at_offset, ATK_TEXT_BOUNDARY_LINE_END, 0, "\342\200\242 List item", 0, 11);
+    testGetTextFunction(ATK_TEXT(listItem), atk_text_get_text_at_offset, ATK_TEXT_BOUNDARY_LINE_END, 12, " with some", 11, 21);
+
+    g_object_unref(listItem);
+
+    listItem = ATK_TEXT(atk_object_ref_accessible_child(list, 1));
+    g_assert(ATK_IS_TEXT(listItem));
+
+    /* Check that placing the same text in a paragraph doesn't break things. */
+    text = atk_text_get_text(ATK_TEXT(listItem), 0, -1);
+    g_assert_cmpstr(text, ==, "\342\200\242 List item with some text that wraps across different lines.");
+    g_free(text);
+
     testGetTextFunction(ATK_TEXT(listItem), atk_text_get_text_at_offset, ATK_TEXT_BOUNDARY_LINE_START, 3, "\342\200\242 List item ", 0, 12);
     testGetTextFunction(ATK_TEXT(listItem), atk_text_get_text_at_offset, ATK_TEXT_BOUNDARY_LINE_START, 13, "with some ", 12, 22);
     testGetTextFunction(ATK_TEXT(listItem), atk_text_get_text_at_offset, ATK_TEXT_BOUNDARY_LINE_END, 0, "\342\200\242 List item", 0, 11);
@@ -1761,7 +1795,7 @@ static void testWebkitAtkTextChangedNotifications()
     g_free(text);
 
     pos = 4;
-    atk_editable_text_insert_text(ATK_EDITABLE_TEXT(textEntry), "qux quux", 8, &pos);
+    atk_editable_text_insert_text(ATK_EDITABLE_TEXT(textEntry), "qux quux tobeignored", 8, &pos);
     text = atk_text_get_text(ATK_TEXT(textEntry), 0, -1);
     g_assert_cmpstr(text, ==, "foo qux quux baz");
     g_assert_cmpstr(textChangedResult, ==, "|1|4|8|'qux quux'|");
@@ -1794,7 +1828,7 @@ static void testWebkitAtkTextChangedNotifications()
     g_free(text);
 
     pos = 3;
-    atk_editable_text_insert_text(ATK_EDITABLE_TEXT(passwordEntry), "qux", 3, &pos);
+    atk_editable_text_insert_text(ATK_EDITABLE_TEXT(passwordEntry), "qux tobeignored", 3, &pos);
     g_assert_cmpstr(textChangedResult, ==, "|1|3|3|'\342\200\242\342\200\242\342\200\242'|");
 
     text = atk_text_get_text(ATK_TEXT(passwordEntry), 0, -1);

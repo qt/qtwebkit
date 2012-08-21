@@ -32,9 +32,11 @@
 
 #include "WebFrame.h"
 
+#include "FloatRect.h"
 #include "Frame.h"
 #include "FrameTestHelpers.h"
 #include "FrameView.h"
+#include "Range.h"
 #include "ResourceError.h"
 #include "URLTestHelpers.h"
 #include "WebDataSource.h"
@@ -51,11 +53,14 @@
 #include "WebSettings.h"
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
+#include "platform/WebFloatRect.h"
 #include "v8.h"
 #include <gtest/gtest.h>
 #include <webkit/support/webkit_support.h>
 
 using namespace WebKit;
+using WebCore::FloatRect;
+using WebCore::Range;
 using WebKit::URLTestHelpers::toKURL;
 
 namespace {
@@ -852,6 +857,195 @@ TEST_F(WebFrameTest, DidCreateFrame)
 
     EXPECT_EQ(webFrameClient.m_frameCount, 3); 
     EXPECT_EQ(webFrameClient.m_parent, webView->mainFrame());
+}
+
+class FindUpdateWebFrameClient : public WebFrameClient {
+public:
+    FindUpdateWebFrameClient()
+        : m_findResultsAreReady(false)
+    {
+    }
+
+    virtual void reportFindInPageMatchCount(int, int, bool finalUpdate) OVERRIDE
+    {
+        if (finalUpdate)
+            m_findResultsAreReady = true;
+    }
+
+    bool findResultsAreReady() const { return m_findResultsAreReady; }
+
+private:
+    bool m_findResultsAreReady;
+};
+
+TEST_F(WebFrameTest, FindInPageMatchRects)
+{
+    registerMockedHttpURLLoad("find_in_page.html");
+    registerMockedHttpURLLoad("find_in_page_frame.html");
+
+    FindUpdateWebFrameClient client;
+    WebView* webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "find_in_page.html", true, &client);
+    webView->resize(WebSize(640, 480));
+    webView->layout();
+    webkit_support::RunAllPendingMessages();
+
+    static const char* kFindString = "result";
+    static const int kFindIdentifier = 12345;
+    static const int kNumResults = 10;
+
+    WebFindOptions options;
+    WebString searchText = WebString::fromUTF8(kFindString);
+    WebFrameImpl* mainFrame = static_cast<WebFrameImpl*>(webView->mainFrame());
+    EXPECT_TRUE(mainFrame->find(kFindIdentifier, searchText, options, false, 0));
+
+    for (WebFrame* frame = mainFrame; frame; frame = frame->traverseNext(false))
+        frame->scopeStringMatches(kFindIdentifier, searchText, options, true);
+
+    webkit_support::RunAllPendingMessages();
+    EXPECT_TRUE(client.findResultsAreReady());
+
+    WebVector<WebFloatRect> webMatchRects;
+    mainFrame->findMatchRects(webMatchRects);
+    ASSERT_EQ(webMatchRects.size(), static_cast<size_t>(kNumResults));
+    int rectsVersion = mainFrame->findMatchMarkersVersion();
+
+    for (int resultIndex = 0; resultIndex < kNumResults; ++resultIndex) {
+        FloatRect resultRect = static_cast<FloatRect>(webMatchRects[resultIndex]);
+
+        // Select the match by the center of its rect.
+        EXPECT_EQ(mainFrame->selectNearestFindMatch(resultRect.center(), 0), resultIndex + 1);
+
+        // Check that the find result ordering matches with our expectations.
+        Range* result = mainFrame->activeMatchFrame()->activeMatch();
+        ASSERT_TRUE(result);
+        result->setEnd(result->endContainer(), result->endOffset() + 2);
+        EXPECT_EQ(result->text(), String::format("%s %d", kFindString, resultIndex));
+
+        // Verify that the expected match rect also matches the currently active match.
+        // Compare the enclosing rects to prevent precision issues caused by CSS transforms.
+        FloatRect activeMatch = mainFrame->activeFindMatchRect();
+        EXPECT_EQ(enclosingIntRect(activeMatch), enclosingIntRect(resultRect));
+
+        // The rects version should not have changed.
+        EXPECT_EQ(mainFrame->findMatchMarkersVersion(), rectsVersion);
+    }
+
+    // All results after the first two ones should be below between them in find-in-page coordinates.
+    // This is because results 2 to 9 are inside an iframe located between results 0 and 1. This applies to the fixed div too.
+    EXPECT_TRUE(webMatchRects[0].y < webMatchRects[1].y);
+    for (int resultIndex = 2; resultIndex < kNumResults; ++resultIndex) {
+        EXPECT_TRUE(webMatchRects[0].y < webMatchRects[resultIndex].y);
+        EXPECT_TRUE(webMatchRects[1].y > webMatchRects[resultIndex].y);
+    }
+
+    // Result 3 should be below both 2 and 4. This is caused by the CSS transform in the containing div.
+    // If the transform doesn't work then 3 will be between 2 and 4.
+    EXPECT_TRUE(webMatchRects[3].y > webMatchRects[2].y);
+    EXPECT_TRUE(webMatchRects[3].y > webMatchRects[4].y);
+
+    // Results 6, 7, 8 and 9 should be one below the other in that same order.
+    // If overflow:scroll is not properly handled then result 8 would be below result 9 or
+    // result 7 above result 6 depending on the scroll.
+    EXPECT_TRUE(webMatchRects[6].y < webMatchRects[7].y);
+    EXPECT_TRUE(webMatchRects[7].y < webMatchRects[8].y);
+    EXPECT_TRUE(webMatchRects[8].y < webMatchRects[9].y);
+
+    // Resizing should update the rects version.
+    webView->resize(WebSize(800, 600));
+    webkit_support::RunAllPendingMessages();
+    EXPECT_TRUE(mainFrame->findMatchMarkersVersion() != rectsVersion);
+
+    webView->close();
+}
+
+static WebView* selectRangeTestCreateWebView(const std::string& url)
+{
+    WebView* webView = FrameTestHelpers::createWebViewAndLoad(url, true);
+    webView->settings()->setDefaultFontSize(12);
+    webView->resize(WebSize(640, 480));
+    return webView;
+}
+
+static WebPoint topLeft(const WebRect& rect)
+{
+    return WebPoint(rect.x, rect.y);
+}
+
+static WebPoint bottomRightMinusOne(const WebRect& rect)
+{
+    // FIXME: If we don't subtract 1 from the x- and y-coordinates of the
+    // selection bounds, selectRange() will select the *next* element. That's
+    // strictly correct, as hit-testing checks the pixel to the lower-right of
+    // the input coordinate, but it's a wart on the API.
+    return WebPoint(rect.x + rect.width - 1, rect.y + rect.height - 1);
+}
+
+static std::string selectionAsString(WebFrame* frame)
+{
+    return std::string(frame->selectionAsText().utf8().data());
+}
+
+TEST_F(WebFrameTest, SelectRange)
+{
+    WebView* webView;
+    WebFrame* frame;
+    WebRect startWebRect;
+    WebRect endWebRect;
+
+    registerMockedHttpURLLoad("select_range_basic.html");
+    registerMockedHttpURLLoad("select_range_scroll.html");
+    registerMockedHttpURLLoad("select_range_iframe.html");
+    registerMockedHttpURLLoad("select_range_editable.html");
+
+    webView = selectRangeTestCreateWebView(m_baseURL + "select_range_basic.html");
+    frame = webView->mainFrame();
+    EXPECT_EQ("Some test text for testing.", selectionAsString(frame));
+    webView->selectionBounds(startWebRect, endWebRect);
+    frame->executeCommand(WebString::fromUTF8("Unselect"));
+    EXPECT_EQ("", selectionAsString(frame));
+    frame->selectRange(topLeft(startWebRect), bottomRightMinusOne(endWebRect));
+    EXPECT_EQ("Some test text for testing.", selectionAsString(frame));
+    webView->close();
+
+    webView = selectRangeTestCreateWebView(m_baseURL + "select_range_scroll.html");
+    frame = webView->mainFrame();
+    EXPECT_EQ("Some offscreen test text for testing.", selectionAsString(frame));
+    webView->selectionBounds(startWebRect, endWebRect);
+    frame->executeCommand(WebString::fromUTF8("Unselect"));
+    EXPECT_EQ("", selectionAsString(frame));
+    frame->selectRange(topLeft(startWebRect), bottomRightMinusOne(endWebRect));
+    EXPECT_EQ("Some offscreen test text for testing.", selectionAsString(frame));
+    webView->close();
+
+    webView = selectRangeTestCreateWebView(m_baseURL + "select_range_iframe.html");
+    frame = webView->mainFrame();
+    WebFrame* subframe = frame->findChildByExpression(WebString::fromUTF8("/html/body/iframe"));
+    EXPECT_EQ("Some test text for testing.", selectionAsString(subframe));
+    webView->selectionBounds(startWebRect, endWebRect);
+    subframe->executeCommand(WebString::fromUTF8("Unselect"));
+    EXPECT_EQ("", selectionAsString(subframe));
+    subframe->selectRange(topLeft(startWebRect), bottomRightMinusOne(endWebRect));
+    EXPECT_EQ("Some test text for testing.", selectionAsString(subframe));
+    webView->close();
+
+    // Select the middle of an editable element, then try to extend the selection to the top of the document.
+    // The selection range should be clipped to the bounds of the editable element.
+    webView = selectRangeTestCreateWebView(m_baseURL + "select_range_editable.html");
+    frame = webView->mainFrame();
+    EXPECT_EQ("This text is initially selected.", selectionAsString(frame));
+    webView->selectionBounds(startWebRect, endWebRect);
+    frame->selectRange(WebPoint(0, 0), bottomRightMinusOne(endWebRect));
+    EXPECT_EQ("16-char header. This text is initially selected.", selectionAsString(frame));
+    webView->close();
+
+    // As above, but extending the selection to the bottom of the document.
+    webView = selectRangeTestCreateWebView(m_baseURL + "select_range_editable.html");
+    frame = webView->mainFrame();
+    EXPECT_EQ("This text is initially selected.", selectionAsString(frame));
+    webView->selectionBounds(startWebRect, endWebRect);
+    frame->selectRange(topLeft(startWebRect), WebPoint(640, 480));
+    EXPECT_EQ("This text is initially selected. 16-char footer.", selectionAsString(frame));
+    webView->close();
 }
 
 } // namespace

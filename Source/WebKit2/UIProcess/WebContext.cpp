@@ -62,10 +62,6 @@
 #include <wtf/CurrentTime.h>
 #include <wtf/MainThread.h>
 
-#if PLATFORM(MAC)
-#include "BuiltInPDFView.h"
-#endif
-
 #if ENABLE(BATTERY_STATUS)
 #include "WebBatteryManagerProxy.h"
 #endif
@@ -85,8 +81,6 @@
 #ifndef NDEBUG
 #include <wtf/RefCountedLeakCounter.h>
 #endif
-
-#define MESSAGE_CHECK_URL(url) MESSAGE_CHECK_BASE(m_process->checkURLReceivedFromWebProcess(url), m_process->connection())
 
 using namespace WebCore;
 
@@ -153,7 +147,6 @@ WebContext::WebContext(ProcessModel processModel, const String& injectedBundlePa
     , m_initialHTTPCookieAcceptPolicy(HTTPCookieAcceptPolicyAlways)
 #endif
     , m_processTerminationEnabled(true)
-    , m_pluginWorkQueue("com.apple.CoreIPC.PluginQueue")
 {
 #if !LOG_DISABLED
     WebKit::initializeLogChannelsIfNecessary();
@@ -174,11 +167,6 @@ WebContext::WebContext(ProcessModel processModel, const String& injectedBundlePa
 
 WebContext::~WebContext()
 {
-    m_pluginWorkQueue.invalidate();
-
-    if (m_process && m_process->isValid())
-        m_process->connection()->removeQueueClient(this);
-
     ASSERT(contexts().find(this) != notFound);
     contexts().remove(contexts().find(this));
 
@@ -266,7 +254,15 @@ void WebContext::initializeDownloadClient(const WKContextDownloadClient* client)
 {
     m_downloadClient.initialize(client);
 }
-    
+
+WebProcessProxy* WebContext::deprecatedSharedProcess()
+{
+    ASSERT(m_processModel == ProcessModelSharedSecondaryProcess);
+    if (m_processes.isEmpty())
+        return 0;
+    return m_processes[0].get();
+}
+
 void WebContext::languageChanged(void* context)
 {
     static_cast<WebContext*>(context)->languageChanged();
@@ -282,12 +278,20 @@ void WebContext::fullKeyboardAccessModeChanged(bool fullKeyboardAccessEnabled)
     sendToAllProcesses(Messages::WebProcess::FullKeyboardAccessModeChanged(fullKeyboardAccessEnabled));
 }
 
-void WebContext::ensureWebProcess()
+void WebContext::textCheckerStateChanged()
 {
-    if (m_process)
-        return;
+    sendToAllProcesses(Messages::WebProcess::SetTextCheckerState(TextChecker::state()));
+}
 
-    m_process = WebProcessProxy::create(this);
+void WebContext::ensureSharedWebProcess()
+{
+    if (m_processes.isEmpty())
+        m_processes.append(createNewWebProcess());
+}
+
+PassRefPtr<WebProcessProxy> WebContext::createNewWebProcess()
+{
+    RefPtr<WebProcessProxy> process = WebProcessProxy::create(this);
 
     WebProcessCreationParameters parameters;
 
@@ -332,31 +336,37 @@ void WebContext::ensureWebProcess()
     RefPtr<APIObject> injectedBundleInitializationUserData = m_injectedBundleClient.getInjectedBundleInitializationUserData(this);
     if (!injectedBundleInitializationUserData)
         injectedBundleInitializationUserData = m_injectedBundleInitializationUserData;
-    m_process->send(Messages::WebProcess::InitializeWebProcess(parameters, WebContextUserMessageEncoder(injectedBundleInitializationUserData.get())), 0);
+    process->send(Messages::WebProcess::InitializeWebProcess(parameters, WebContextUserMessageEncoder(injectedBundleInitializationUserData.get())), 0);
 
     for (size_t i = 0; i != m_pendingMessagesToPostToInjectedBundle.size(); ++i) {
         pair<String, RefPtr<APIObject> >& message = m_pendingMessagesToPostToInjectedBundle[i];
-        m_process->deprecatedSend(InjectedBundleMessage::PostMessage, 0, CoreIPC::In(message.first, WebContextUserMessageEncoder(message.second.get())));
+        process->deprecatedSend(InjectedBundleMessage::PostMessage, 0, CoreIPC::In(message.first, WebContextUserMessageEncoder(message.second.get())));
     }
+    // FIXME (Multi-WebProcess): What does this mean in the brave new world?
     m_pendingMessagesToPostToInjectedBundle.clear();
+
+    return process.release();
 }
 
 void WebContext::warmInitialProcess()  
 {
-    ensureWebProcess();
+    ASSERT(m_processes.isEmpty());
+    m_processes.append(createNewWebProcess());
 }
 
 void WebContext::enableProcessTermination()
 {
     m_processTerminationEnabled = true;
-    if (shouldTerminate(m_process.get()))
-        m_process->terminate();
+    Vector<RefPtr<WebProcessProxy> > processes = m_processes;
+    for (size_t i = 0; i < processes.size(); ++i) {
+        if (shouldTerminate(processes[i].get()))
+            processes[i]->terminate();
+    }
 }
 
 bool WebContext::shouldTerminate(WebProcessProxy* process)
 {
-    // FIXME: Once we support multiple processes per context, this assertion won't hold.
-    ASSERT(process == m_process);
+    ASSERT(m_processes.contains(process));
 
     if (!m_processTerminationEnabled)
         return false;
@@ -386,13 +396,10 @@ bool WebContext::shouldTerminate(WebProcessProxy* process)
 
 void WebContext::processDidFinishLaunching(WebProcessProxy* process)
 {
-    // FIXME: Once we support multiple processes per context, this assertion won't hold.
-    ASSERT_UNUSED(process, process == m_process);
+    ASSERT(m_processes.contains(process));
 
     m_visitedLinkProvider.processDidFinishLaunching();
 
-    m_process->connection()->addQueueClient(this);
-    
     // Sometimes the memorySampler gets initialized after process initialization has happened but before the process has finished launching
     // so check if it needs to be started here
     if (m_memorySamplerEnabled) {
@@ -401,7 +408,7 @@ void WebContext::processDidFinishLaunching(WebProcessProxy* process)
         String sampleLogFilePath = String::format("WebProcess%llu", static_cast<unsigned long long>(now));
         sampleLogFilePath = SandboxExtension::createHandleForTemporaryFile(sampleLogFilePath, SandboxExtension::WriteOnly, sampleLogSandboxHandle);
         
-        m_process->send(Messages::WebProcess::StartMemorySampler(sampleLogSandboxHandle, sampleLogFilePath, m_memorySamplerInterval), 0);
+        process->send(Messages::WebProcess::StartMemorySampler(sampleLogSandboxHandle, sampleLogFilePath, m_memorySamplerInterval), 0);
     }
 
     m_connectionClient.didCreateConnection(this, process->webConnection());
@@ -409,8 +416,7 @@ void WebContext::processDidFinishLaunching(WebProcessProxy* process)
 
 void WebContext::disconnectProcess(WebProcessProxy* process)
 {
-    // FIXME: Once we support multiple processes per context, this assertion won't hold.
-    ASSERT_UNUSED(process, process == m_process);
+    ASSERT(m_processes.contains(process));
 
     m_visitedLinkProvider.processDidClose();
 
@@ -452,53 +458,74 @@ void WebContext::disconnectProcess(WebProcessProxy* process)
 #endif
 
     // This can cause the web context to be destroyed.
-    m_process = 0;
+    m_processes.remove(m_processes.find(process));
 }
 
 PassRefPtr<WebPageProxy> WebContext::createWebPage(PageClient* pageClient, WebPageGroup* pageGroup)
 {
-    ensureWebProcess();
+    RefPtr<WebProcessProxy> process;
+    if (m_processModel == ProcessModelSharedSecondaryProcess) {
+        ensureSharedWebProcess();
+        process = m_processes[0];
+    } else {
+        // FIXME (Multi-WebProcess): Add logic for sharing a process.
+        process = createNewWebProcess();
+        m_processes.append(process);
+    }
 
     if (!pageGroup)
         pageGroup = m_defaultPageGroup.get();
 
-    return m_process->createWebPage(pageClient, this, pageGroup);
+    return process->createWebPage(pageClient, this, pageGroup);
 }
 
 WebProcessProxy* WebContext::relaunchProcessIfNecessary()
 {
-    ensureWebProcess();
-
-    ASSERT(m_process);
-    return m_process.get();
+    if (m_processModel == ProcessModelSharedSecondaryProcess) {
+        ensureSharedWebProcess();
+        return m_processes[0].get();
+    } else {
+        // FIXME (Multi-WebProcess): What should this do in this model?
+        return 0;
+    }
 }
 
 DownloadProxy* WebContext::download(WebPageProxy* initiatingPage, const ResourceRequest& request)
 {
-    ensureWebProcess();
+    if (m_processModel == ProcessModelSharedSecondaryProcess) {
+        ensureSharedWebProcess();
 
-    DownloadProxy* download = createDownloadProxy();
-    uint64_t initiatingPageID = initiatingPage ? initiatingPage->pageID() : 0;
+        DownloadProxy* download = createDownloadProxy();
+        uint64_t initiatingPageID = initiatingPage ? initiatingPage->pageID() : 0;
 
 #if PLATFORM(QT)
-    ASSERT(initiatingPage); // Our design does not suppport downloads without a WebPage.
-    initiatingPage->handleDownloadRequest(download);
+        ASSERT(initiatingPage); // Our design does not suppport downloads without a WebPage.
+        initiatingPage->handleDownloadRequest(download);
 #endif
 
-    process()->send(Messages::WebProcess::DownloadRequest(download->downloadID(), initiatingPageID, request), 0);
-    return download;
+        m_processes[0]->send(Messages::WebProcess::DownloadRequest(download->downloadID(), initiatingPageID, request), 0);
+        return download;
+
+    } else {
+        // FIXME: (Multi-WebProcess): Implement.
+        return 0;
+    }
 }
 
 void WebContext::postMessageToInjectedBundle(const String& messageName, APIObject* messageBody)
 {
-    if (!m_process || !m_process->canSendMessage()) {
-        m_pendingMessagesToPostToInjectedBundle.append(std::make_pair(messageName, messageBody));
-        return;
-    }
+    if (m_processModel == ProcessModelSharedSecondaryProcess) {
+        if (m_processes.isEmpty() || !m_processes[0]->canSendMessage()) {
+            m_pendingMessagesToPostToInjectedBundle.append(std::make_pair(messageName, messageBody));
+            return;
+        }
 
-    // FIXME: We should consider returning false from this function if the messageBody cannot
-    // be encoded.
-    m_process->deprecatedSend(InjectedBundleMessage::PostMessage, 0, CoreIPC::In(messageName, WebContextUserMessageEncoder(messageBody)));
+        // FIXME: We should consider returning false from this function if the messageBody cannot
+        // be encoded.
+        m_processes[0]->deprecatedSend(InjectedBundleMessage::PostMessage, 0, CoreIPC::In(messageName, WebContextUserMessageEncoder(messageBody)));
+    } else {
+        // FIXME (Multi-WebProcess): Implement.
+    }
 }
 
 // InjectedBundle client
@@ -587,74 +614,6 @@ void WebContext::addVisitedLinkHash(LinkHash linkHash)
 {
     m_visitedLinkProvider.addVisitedLink(linkHash);
 }
-
-void WebContext::sendDidGetPlugins(uint64_t requestID, PassOwnPtr<Vector<PluginInfo> > pluginInfos)
-{
-    ASSERT(isMainThread());
-
-    OwnPtr<Vector<PluginInfo> > plugins(pluginInfos);
-
-#if PLATFORM(MAC)
-    // Add built-in PDF last, so that it's not used when a real plug-in is installed.
-    // NOTE: This has to be done on the main thread as it calls localizedString().
-    if (!omitPDFSupport())
-        plugins->append(BuiltInPDFView::pluginInfo());
-#endif
-
-    process()->send(Messages::WebProcess::DidGetPlugins(requestID, *plugins), 0);
-}
-
-void WebContext::handleGetPlugins(uint64_t requestID, bool refresh)
-{
-    if (refresh)
-        m_pluginInfoStore.refresh();
-
-    OwnPtr<Vector<PluginInfo> > pluginInfos = adoptPtr(new Vector<PluginInfo>);
-
-    Vector<PluginModuleInfo> plugins = m_pluginInfoStore.plugins();
-    for (size_t i = 0; i < plugins.size(); ++i)
-        pluginInfos->append(plugins[i].info);
-
-    // NOTE: We have to pass the PluginInfo vector to the secondary thread via a pointer as otherwise
-    //       we'd end up with a deref() race on all the WTF::Strings it contains.
-    RunLoop::main()->dispatch(bind(&WebContext::sendDidGetPlugins, this, requestID, pluginInfos.release()));
-}
-
-void WebContext::getPlugins(CoreIPC::Connection*, uint64_t requestID, bool refresh)
-{
-    m_pluginWorkQueue.dispatch(bind(&WebContext::handleGetPlugins, this, requestID, refresh));
-}
-
-void WebContext::getPluginPath(const String& mimeType, const String& urlString, String& pluginPath, bool& blocked)
-{
-    MESSAGE_CHECK_URL(urlString);
-
-    String newMimeType = mimeType.lower();
-
-    blocked = false;
-    PluginModuleInfo plugin = pluginInfoStore().findPlugin(newMimeType, KURL(KURL(), urlString));
-    if (!plugin.path)
-        return;
-
-    if (pluginInfoStore().shouldBlockPlugin(plugin)) {
-        blocked = true;
-        return;
-    }
-
-    pluginPath = plugin.path;
-}
-
-#if !ENABLE(PLUGIN_PROCESS)
-void WebContext::didGetSitesWithPluginData(const Vector<String>& sites, uint64_t callbackID)
-{
-    m_pluginSiteDataManager->didGetSitesWithData(sites, callbackID);
-}
-
-void WebContext::didClearPluginSiteData(uint64_t callbackID)
-{
-    m_pluginSiteDataManager->didClearSiteData(callbackID);
-}
-#endif
 
 DownloadProxy* WebContext::createDownloadProxy()
 {
@@ -802,7 +761,7 @@ void WebContext::didReceiveSyncMessage(WebProcessProxy* process, CoreIPC::Messag
             downloadProxy->didReceiveSyncDownloadProxyMessage(process->connection(), messageID, arguments, reply);
         return;
     }
-    
+
     if (messageID.is<CoreIPC::MessageClassWebIconDatabase>()) {
         m_iconDatabase->didReceiveSyncMessage(process->connection(), messageID, arguments, reply);
         return;
@@ -921,14 +880,20 @@ bool WebContext::httpPipeliningEnabled() const
 
 void WebContext::getWebCoreStatistics(PassRefPtr<DictionaryCallback> callback)
 {
-    if (!m_process) {
+    if (m_processModel == ProcessModelSharedSecondaryProcess) {
+        if (m_processes.isEmpty()) {
+            callback->invalidate();
+            return;
+        }
+        
+        uint64_t callbackID = callback->callbackID();
+        m_dictionaryCallbacks.set(callbackID, callback.get());
+        m_processes[0]->send(Messages::WebProcess::GetWebCoreStatistics(callbackID), 0);
+
+    } else {
+        // FIXME (Multi-WebProcess): Implement.
         callback->invalidate();
-        return;
     }
-    
-    uint64_t callbackID = callback->callbackID();
-    m_dictionaryCallbacks.set(callbackID, callback.get());
-    process()->send(Messages::WebProcess::GetWebCoreStatistics(callbackID), 0);
 }
 
 static PassRefPtr<MutableDictionary> createDictionaryFromHashMap(const HashMap<String, uint64_t>& map)
@@ -940,6 +905,12 @@ static PassRefPtr<MutableDictionary> createDictionaryFromHashMap(const HashMap<S
     
     return result;
 }
+
+#if !PLATFORM(MAC)
+void WebContext::dummy(bool&)
+{
+}
+#endif
 
 void WebContext::didGetWebCoreStatistics(const StatisticsData& statisticsData, uint64_t callbackID)
 {
@@ -970,14 +941,6 @@ void WebContext::garbageCollectJavaScriptObjects()
 void WebContext::setJavaScriptGarbageCollectorTimerEnabled(bool flag)
 {
     sendToAllProcesses(Messages::WebProcess::SetJavaScriptGarbageCollectorTimerEnabled(flag));
-}
-
-void WebContext::didReceiveMessageOnConnectionWorkQueue(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments, bool& didHandleMessage)
-{
-    if (messageID.is<CoreIPC::MessageClassWebContext>()) {
-        didReceiveWebContextMessageOnConnectionWorkQueue(connection, messageID, arguments, didHandleMessage);
-        return;
-    }
 }
 
 } // namespace WebKit
