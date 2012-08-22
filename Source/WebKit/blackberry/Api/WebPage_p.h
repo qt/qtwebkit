@@ -150,7 +150,7 @@ public:
     bool scrollBy(int deltaX, int deltaY, bool scrollMainFrame = true);
 
     void enqueueRenderingOfClippedContentOfScrollableNodeAfterInRegionScrolling(WebCore::Node*);
-    void notifyInRegionScrollStatusChanged(bool status);
+    void notifyInRegionScrollStopped();
     void setScrollOriginPoint(const Platform::IntPoint&);
     void setHasInRegionScrollableAreas(bool);
 
@@ -614,6 +614,8 @@ public:
     WebString m_cachedColorInput;
     WebCore::KURL m_cachedManualScript;
     bool m_cachedFocused;
+
+    bool m_enableQnxJavaScriptObject;
 
     class DeferredTaskBase {
     public:

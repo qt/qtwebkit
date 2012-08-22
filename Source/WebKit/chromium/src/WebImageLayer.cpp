@@ -24,37 +24,25 @@
  */
 
 #include "config.h"
-#include "WebImageLayerImpl.h"
+#include <public/WebImageLayer.h>
 
 #include "ImageLayerChromium.h"
-#include "WebLayerImpl.h"
-
-using WebCore::ImageLayerChromium;
 
 namespace WebKit {
 
-WebImageLayer* WebImageLayer::create()
+WebImageLayer WebImageLayer::create()
 {
-    return new WebImageLayerImpl(WebCore::ImageLayerChromium::create());
+    return WebImageLayer(WebCore::ImageLayerChromium::create());
 }
 
-WebImageLayerImpl::WebImageLayerImpl(PassRefPtr<WebCore::ImageLayerChromium> layer)
-    : m_layer(adoptPtr(new WebLayerImpl(layer)))
-{
-}
-
-WebImageLayerImpl::~WebImageLayerImpl()
+WebImageLayer::WebImageLayer(PassRefPtr<WebCore::ImageLayerChromium> layer)
+    : WebLayer(layer)
 {
 }
 
-WebLayer* WebImageLayerImpl::layer()
+void WebImageLayer::setBitmap(SkBitmap bitmap)
 {
-    return m_layer.get();
-}
-
-void WebImageLayerImpl::setBitmap(SkBitmap bitmap)
-{
-    static_cast<ImageLayerChromium*>(m_layer->layer())->setBitmap(bitmap);
+    unwrap<WebCore::ImageLayerChromium>()->setBitmap(bitmap);
 }
 
 } // namespace WebKit

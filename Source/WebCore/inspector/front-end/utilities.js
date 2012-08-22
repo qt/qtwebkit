@@ -690,42 +690,91 @@ Map.prototype = {
             objectIdentifier = ++Map._lastObjectIdentifier;
             key.__identifier = objectIdentifier;
         }
-        this._map[objectIdentifier] = value;
+        this._map[objectIdentifier] = [key, value];
     },
     
     /**
      * @param {Object} key
-     * @return {Object} value
      */
     remove: function(key)
     {
         var result = this._map[key.__identifier];
         delete this._map[key.__identifier];
-        return result;
+        return result ? result[1] : undefined;
     },
-    
+
+    /**
+     * @return {Array.<Object>}
+     */
+    keys: function()
+    {
+        return this._list(0);
+    },
+
     values: function()
+    {
+        return this._list(1);
+    },
+
+    /**
+     * @param {number} index
+     */
+    _list: function(index)
     {
         var result = [];
         for (var objectIdentifier in this._map)
-            result.push(this._map[objectIdentifier]);
+            result.push(this._map[objectIdentifier][index]);
         return result;
     },
-    
+
     /**
      * @param {Object} key
      */
     get: function(key)
     {
-        return this._map[key.__identifier];
+        var entry = this._map[key.__identifier];
+        return entry ? entry[1] : undefined;
     },
     
     clear: function()
     {
         this._map = {};
     }
-};
+}
+/**
+ * @param {string} url
+ * @param {boolean=} async
+ * @param {function(?string)=} callback
+ * @return {?string}
+ */
+function loadXHR(url, async, callback) 
+{
+    function onReadyStateChanged() 
+    {
+        if (xhr.readyState !== XMLHttpRequest.DONE)
+            return;
 
+        if (xhr.status === 200) {
+            callback(xhr.responseText);
+            return;
+        }
+
+        callback(null); 
+   }
+
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", url, async);
+    if (async)
+        xhr.onreadystatechange = onReadyStateChanged;        
+    xhr.send(null);
+
+    if (!async) {
+        if (xhr.status === 200) 
+            return xhr.responseText;
+        return null;
+    }
+    return null;
+}
 
 /**
  * @constructor

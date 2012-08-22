@@ -33,6 +33,7 @@
 #include "NodeRenderingContext.h"
 #include "RenderText.h"
 #include "TextBreakIterator.h"
+#include "UndoManager.h"
 
 using namespace std;
 
@@ -96,7 +97,7 @@ void CharacterData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::DOM);
     Node::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_data);
+    info.addInstrumentedMember(m_data);
 }
 
 void CharacterData::appendData(const String& data, ExceptionCode&)
@@ -183,6 +184,13 @@ void CharacterData::setNodeValue(const String& nodeValue, ExceptionCode& ec)
 
 void CharacterData::setDataAndUpdate(const String& newData, unsigned offsetOfReplacedData, unsigned oldLength, unsigned newLength)
 {
+#if ENABLE(UNDO_MANAGER)
+    if (UndoManager::isRecordingAutomaticTransaction(this)) {
+        const String& replacingData = newData.substring(offsetOfReplacedData, newLength);
+        const String& replacedData = m_data.substring(offsetOfReplacedData, oldLength);
+        UndoManager::addTransactionStep(DataReplacingDOMTransactionStep::create(this, offsetOfReplacedData, oldLength, replacingData, replacedData));
+    }
+#endif
     String oldData = m_data;
     m_data = newData;
 

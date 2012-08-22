@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2011 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,39 +24,59 @@
  */
 
 #include "config.h"
-#include "WebIOSurfaceLayerImpl.h"
+#include <public/WebContentLayer.h>
 
-#include "IOSurfaceLayerChromium.h"
-#include "WebLayerImpl.h"
+#include "ContentLayerChromium.h"
+#include "WebContentLayerImpl.h"
 
-using WebCore::IOSurfaceLayerChromium;
+using namespace WebCore;
 
 namespace WebKit {
 
-WebIOSurfaceLayer* WebIOSurfaceLayer::create()
+WebContentLayer WebContentLayer::create(WebContentLayerClient* contentClient)
 {
-    RefPtr<IOSurfaceLayerChromium> layer = IOSurfaceLayerChromium::create();
-    layer->setIsDrawable(true);
-    return new WebIOSurfaceLayerImpl(layer.release());
+    return WebContentLayer(WebContentLayerImpl::create(contentClient));
 }
 
-WebIOSurfaceLayerImpl::WebIOSurfaceLayerImpl(PassRefPtr<IOSurfaceLayerChromium> layer)
-    : m_layer(adoptPtr(new WebLayerImpl(layer)))
+void WebContentLayer::clearClient()
+{
+    unwrap<ContentLayerChromium>()->clearDelegate();
+}
+
+void WebContentLayer::setDoubleSided(bool doubleSided)
+{
+    m_private->setDoubleSided(doubleSided);
+}
+
+void WebContentLayer::setContentsScale(float scale)
+{
+    m_private->setContentsScale(scale);
+}
+
+void WebContentLayer::setUseLCDText(bool enable)
+{
+    m_private->setUseLCDText(enable);
+}
+
+void WebContentLayer::setDrawCheckerboardForMissingTiles(bool enable)
+{
+    m_private->setDrawCheckerboardForMissingTiles(enable);
+}
+
+WebContentLayer::WebContentLayer(const PassRefPtr<ContentLayerChromium>& node)
+    : WebScrollableLayer(node)
 {
 }
 
-WebIOSurfaceLayerImpl::~WebIOSurfaceLayerImpl()
+WebContentLayer& WebContentLayer::operator=(const PassRefPtr<ContentLayerChromium>& node)
 {
+    m_private = node;
+    return *this;
 }
 
-void WebIOSurfaceLayerImpl::setIOSurfaceProperties(unsigned ioSurfaceId, WebSize size)
+WebContentLayer::operator PassRefPtr<ContentLayerChromium>() const
 {
-    static_cast<IOSurfaceLayerChromium*>(m_layer->layer())->setIOSurfaceProperties(ioSurfaceId, size);
-}
-
-WebLayer* WebIOSurfaceLayerImpl::layer()
-{
-    return m_layer.get();
+    return static_cast<ContentLayerChromium*>(m_private.get());
 }
 
 } // namespace WebKit

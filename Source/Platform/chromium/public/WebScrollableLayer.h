@@ -23,32 +23,42 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WebImageLayerImpl_h
-#define WebImageLayerImpl_h
+#ifndef WebScrollableLayer_h
+#define WebScrollableLayer_h
 
-#include <public/WebImageLayer.h>
-#include <wtf/OwnPtr.h>
-
-namespace WebCore {
-class ImageLayerChromium;
-}
+#include "WebCommon.h"
+#include "WebLayer.h"
+#include "WebPoint.h"
+#include "WebRect.h"
+#include "WebVector.h"
 
 namespace WebKit {
-class WebLayerImpl;
 
-class WebImageLayerImpl : public WebImageLayer {
+class WebScrollableLayer : public WebLayer {
 public:
-    explicit WebImageLayerImpl(PassRefPtr<WebCore::ImageLayerChromium>);
-    virtual ~WebImageLayerImpl();
+    WebScrollableLayer() { }
+    WebScrollableLayer(const WebScrollableLayer& layer) : WebLayer(layer) { }
+    virtual ~WebScrollableLayer() { }
+    WebScrollableLayer& operator=(const WebScrollableLayer& layer)
+    {
+        WebLayer::assign(layer);
+        return *this;
+    }
 
-    // WebImageLayer implementation.
-    WebLayer* layer() OVERRIDE;
-    virtual void setBitmap(SkBitmap) OVERRIDE;
+    WEBKIT_EXPORT void setScrollPosition(WebPoint);
+    WEBKIT_EXPORT void setScrollable(bool);
+    WEBKIT_EXPORT void setHaveWheelEventHandlers(bool);
+    WEBKIT_EXPORT void setShouldScrollOnMainThread(bool);
+    WEBKIT_EXPORT void setNonFastScrollableRegion(const WebVector<WebRect>&);
+    WEBKIT_EXPORT void setIsContainerForFixedPositionLayers(bool);
+    WEBKIT_EXPORT void setFixedToContainerLayer(bool);
 
-private:
-    OwnPtr<WebLayerImpl> m_layer;
+
+#if WEBKIT_IMPLEMENTATION
+    WebScrollableLayer(const WTF::PassRefPtr<WebCore::LayerChromium>& layer) : WebLayer(layer) { }
+#endif
 };
 
-}
+} // namespace WebKit
 
-#endif // WebImageLayerImpl_h
+#endif // WebScrollableLayer_h

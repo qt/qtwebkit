@@ -176,7 +176,7 @@ public:
     // Scroll position provided should be in transformed coordinates.
     void setScrollPosition(const Platform::IntPoint&);
     bool scrollBy(const Platform::IntSize&, bool scrollMainFrame = true);
-    void notifyInRegionScrollStatusChanged(bool status);
+    void notifyInRegionScrollStopped();
     void setScrollOriginPoint(const Platform::IntPoint&);
 
     BackingStore* backingStore() const;
@@ -379,6 +379,8 @@ public:
     WebCore::PagePopupBlackBerry* popup();
 
     void autofillTextField(const std::string&);
+
+    void enableQnxJavaScriptObject(bool);
 
 private:
     virtual ~WebPage();

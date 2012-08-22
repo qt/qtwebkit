@@ -1,3 +1,131 @@
+2012-08-21  Benjamin C Meyer  <bmeyer@rim.com>
+
+        [BlackBerry] Add option to only add JavaScript object 'qnx' to private webviews
+        https://bugs.webkit.org/show_bug.cgi?id=94621
+
+        Reviewed by Yong Li.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPage::enableQnxJavaScriptObject):
+        (WebKit):
+        (BlackBerry::WebKit::WebPagePrivate::WebPagePrivate):
+        * Api/WebPage.h:
+        * Api/WebPage_p.h:
+        (WebPagePrivate):
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::dispatchDidClearWindowObjectInWorld):
+
+2012-08-21  Robin Cao  <robin.cao@torchmobile.com.cn>
+
+        [BlackBerry] Add support for getUserMedia
+        https://bugs.webkit.org/show_bug.cgi?id=94591
+
+        Reviewed by George Staikos.
+
+        Implement getUserMedia feature using the platform API.
+
+        PR #153571
+
+        Reviewed internally by George Staikos.
+
+        * WebCoreSupport/UserMediaClientImpl.cpp:
+        (WebCore):
+        (WebCore::userMediaRequestsMap):
+        (WebCore::toMediaStreamSource):
+        (WebCore::toMediaStreamDescriptor):
+        (WebUserMediaRequestClientImpl):
+        (WebCore::WebUserMediaRequestClientImpl::WebUserMediaRequestClientImpl):
+        (WebCore::WebUserMediaRequestClientImpl::requestSucceeded):
+        (WebCore::WebUserMediaRequestClientImpl::requestFailed):
+        (WebCore::UserMediaClientImpl::UserMediaClientImpl):
+        (WebCore::UserMediaClientImpl::~UserMediaClientImpl):
+        (WebCore::UserMediaClientImpl::requestUserMedia):
+        (WebCore::UserMediaClientImpl::cancelUserMediaRequest):
+        (WebCore::UserMediaClientImpl::webUserMedia):
+        * WebCoreSupport/UserMediaClientImpl.h:
+        (BlackBerry):
+        (Platform):
+        (UserMediaClientImpl):
+
+2012-08-21  Kihong Kwon  <kihong.kwon@samsung.com>
+
+        [EFL][GTK][BlackBerry] Fix build error in the DeviceOrientationClient
+        https://bugs.webkit.org/show_bug.cgi?id=94586
+
+        Reviewed by Kentaro Hara.
+
+        Fix build error in the DeviceOrientationClientBlackBerry.cpp.
+        It is occured because DeviceOrientation is changed to DeviceOrientationData in the WebCore.
+
+        * WebCoreSupport/DeviceOrientationClientBlackBerry.cpp:
+        (DeviceOrientationClientBlackBerry::lastOrientation):
+
+2012-08-21  Jacky Jiang  <zhajiang@rim.com>
+
+        [BlackBerry] about:memory and about:memory-live should show numbers for the chrome process
+        https://bugs.webkit.org/show_bug.cgi?id=94531
+
+        Reviewed by Rob Buis.
+        Patch by Jacky Jiang  <zhajiang@rim.com>
+
+        PR: 190504
+        Add total committed memory of chrome process into about:memory and add
+        its peak into about:memory-live.
+
+        Internally reviewed by Yong Li and George Staikos.
+
+        * WebKitSupport/AboutData.cpp:
+        (BlackBerry::WebKit::memoryPage):
+        (BlackBerry::WebKit::MemoryTracker::clear):
+        (MemoryTracker):
+        (BlackBerry::WebKit::MemoryTracker::peakTotalCommittedMemoryOfCurrentProcess):
+        (BlackBerry::WebKit::MemoryTracker::peakTotalCommittedMemoryOfChromeProcess):
+        (BlackBerry::WebKit::MemoryTracker::MemoryTracker):
+        (BlackBerry::WebKit::MemoryTracker::updateMemoryPeaks):
+        (BlackBerry::WebKit::memoryPeaksToHtmlTable):
+
+2012-08-21  Antonio Gomes  <agomes@rim.com>
+
+        [BlackBerry] Accelerated In-Region Scrolling does not render correctly on rotation
+        https://bugs.webkit.org/show_bug.cgi?id=94608
+        PR #194754
+
+        Reviewed by Goerge Staikos.
+
+        When one translates/scrolls a HW accelerated scrollable layer, it makes use of
+        the OVERRIDE mechanism. Suppose the following scenario:
+
+        - In landscape, the overflow menu is scrollable. Then the user scrolls it so
+        that is has scroll position of 0, -100.
+        - when he rotates to portrait, the menus fit well to the available space but it
+        still has the OVERRIDE set, so it keeps the layer translated at 0, -100.
+
+        Fix is simple: clear the override when we stop scrolling a HW accelerated layer,
+        when we destroy the objects.
+
+        * WebKitSupport/InRegionScrollableArea.cpp:
+        (BlackBerry::WebKit::InRegionScrollableArea::~InRegionScrollableArea):
+
+2012-08-21  Antonio Gomes  <agomes@rim.com>
+
+        [BlackBerry] Properly notify WebKit when Client stops in-region scrolling
+        https://bugs.webkit.org/show_bug.cgi?id=94603
+        PR #195813
+
+        Reviewed by Goerge Staikos.
+
+        Simplify the API to get a notification of when a in-region
+        scrolling has finished.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::notifyInRegionScrollStopped):
+        Removed an unneeded parameter.
+        (BlackBerry::WebKit::WebPage::notifyInRegionScrollStopped):
+        Ditto.
+        * Api/WebPage.h:
+        * Api/WebPage_p.h:
+        (WebPagePrivate):
+
 2012-08-20  Sean Wang  <Xuewen.Wang@torchmobile.com.cn>
 
         [BlackBerry] Select popup shows blank content when its option tags contain '\' characters

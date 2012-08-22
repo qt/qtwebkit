@@ -1,3 +1,60 @@
+2012-08-21  Mark Lam  <mark.lam@apple.com>
+
+        Introducing the VMInspector for VM debugging use.
+        https://bugs.webkit.org/show_bug.cgi?id=94613.
+
+        Reviewed by Filip Pizlo.
+
+        Adding some utility functions for debugging the VM. This code is
+        presently #ifdef'd out by default.
+
+        * CMakeLists.txt:
+        * GNUmakefile.list.am:
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.vcproj:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * interpreter/CallFrame.h:
+        (ExecState):
+        * interpreter/VMInspector.cpp: Added.
+        (JSC):
+        (JSC::VMInspector::getTypeName):
+        (JSC::VMInspector::dumpFrame0):
+        (JSC::VMInspector::dumpFrame):
+        (JSC::VMInspector::countFrames):
+        * interpreter/VMInspector.h: Added.
+        (JSC):
+        (VMInspector):
+
+2012-08-21  Filip Pizlo  <fpizlo@apple.com>
+
+        A patchable GetById right after a watchpoint should have the appropriate nop padding
+        https://bugs.webkit.org/show_bug.cgi?id=94635
+
+        Reviewed by Mark Hahnenberg.
+
+        * assembler/AbstractMacroAssembler.h:
+        (JSC::AbstractMacroAssembler::padBeforePatch):
+        (AbstractMacroAssembler):
+        * assembler/MacroAssemblerARMv7.h:
+        (JSC::MacroAssemblerARMv7::load32WithCompactAddressOffsetPatch):
+        (JSC::MacroAssemblerARMv7::moveWithPatch):
+        (JSC::MacroAssemblerARMv7::patchableJump):
+        * assembler/MacroAssemblerX86.h:
+        (JSC::MacroAssemblerX86::moveWithPatch):
+        (JSC::MacroAssemblerX86::branchPtrWithPatch):
+        (JSC::MacroAssemblerX86::storePtrWithPatch):
+        * assembler/MacroAssemblerX86Common.h:
+        (JSC::MacroAssemblerX86Common::load32WithAddressOffsetPatch):
+        (JSC::MacroAssemblerX86Common::load32WithCompactAddressOffsetPatch):
+        (JSC::MacroAssemblerX86Common::loadCompactWithAddressOffsetPatch):
+        (JSC::MacroAssemblerX86Common::store32WithAddressOffsetPatch):
+        * assembler/MacroAssemblerX86_64.h:
+        (JSC::MacroAssemblerX86_64::loadPtrWithAddressOffsetPatch):
+        (JSC::MacroAssemblerX86_64::loadPtrWithCompactAddressOffsetPatch):
+        (JSC::MacroAssemblerX86_64::storePtrWithAddressOffsetPatch):
+        (JSC::MacroAssemblerX86_64::moveWithPatch):
+        * jit/JumpReplacementWatchpoint.cpp:
+        (JSC::JumpReplacementWatchpoint::fireInternal):
+
 2012-08-20  Mark Lam  <mark.lam@apple.com>
 
         Fix broken non-JIT build.

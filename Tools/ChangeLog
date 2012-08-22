@@ -1,3 +1,229 @@
+2012-08-22  Dominik Röttsches  <dominik.rottsches@intel.com>
+
+        Unreviewed, adding myself to committers.py.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-08-21  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [GTK] contextClick and getMenuItemTitle callbacks are leaky in DRT's EventSender
+        https://bugs.webkit.org/show_bug.cgi?id=94669
+
+        Reviewed by Carlos Garcia Campos.
+
+        Fix memory leaks in DRT's EventSender code.
+
+        * DumpRenderTree/gtk/EventSender.cpp:
+        (getMenuItemTitleCallback): Use JSRetainPtr and don't leak.
+        (contextClickCallback): Use GOwnPtr to manage memory of a
+        newly-allocated list automatically.
+
+2012-08-21  Dirk Pranke  <dpranke@chromium.org>
+
+        Add mountain lion to perf-tests, layout tests
+        https://bugs.webkit.org/show_bug.cgi?id=94553
+
+        Reviewed by Adam Barth.
+
+        This patch adds support for the 'mac-mountainlion' platform and
+        stamps out the last references to 'mac-leopard' as a supported
+        name.
+        
+        This patch does a small amount of refactoring to try and make
+        things a little clearer how we treat the "most recent version"
+        specially for baselines and skipped files, and so you only
+        should have to touch the VERSION_FALLBACK_ORDER constants on the
+        ports, but unfortunately changing this list changes a bunch of
+        the unit tests which are doing exact matches for correctness, so
+        you have to touch more than a couple files :(. There's probably
+        still more refactoring that can be done so that we don't have to
+        do all of this functional testing to feel completely correct.
+
+        * Scripts/webkitpy/common/system/platforminfo.py:
+        (PlatformInfo._determine_mac_version):
+        * Scripts/webkitpy/common/system/platforminfo_unittest.py:
+        (TestPlatformInfo.test_os_version):
+        * Scripts/webkitpy/layout_tests/port/apple.py:
+        (ApplePort.__init__):
+        (ApplePort):
+        (ApplePort._skipped_file_search_paths):
+        (ApplePort._generate_all_test_configurations):
+        * Scripts/webkitpy/layout_tests/port/chromium_mac.py:
+        (ChromiumMacPort):
+        * Scripts/webkitpy/layout_tests/port/factory_unittest.py:
+        (FactoryTest.test_mac):
+        * Scripts/webkitpy/layout_tests/port/mac.py:
+        (MacPort):
+        (MacPort._build_driver_flags):
+        (MacPort.should_retry_crashes):
+        (MacPort.default_baseline_search_path):
+        (MacPort.operating_system):
+        (MacPort.default_child_processes):
+        * Scripts/webkitpy/layout_tests/port/mac_unittest.py:
+        (MacTest):
+        (MacTest.test_skipped_file_search_paths):
+        (test_versions):
+        (test_baseline_search_path):
+        * Scripts/webkitpy/layout_tests/port/win.py:
+        (WinPort):
+        (WinPort.default_baseline_search_path):
+
+2012-08-21  Zan Dobersek  <zandobersek@gmail.com>
+
+        [GTK] fast/xmlhttprequest/xmlhttprequest-nonexistent-file.html is failing
+        https://bugs.webkit.org/show_bug.cgi?id=94617
+
+        Reviewed by Martin Robinson.
+
+        Set the 'enable-file-access-from-file-uris' setting to true when
+        resetting default values. The other ports do this as well, giving
+        documents with local security origin permission to load other
+        local resources.
+
+        * DumpRenderTree/gtk/DumpRenderTree.cpp:
+        (resetDefaultsToConsistentValues):
+
+2012-08-21  Kent Tamura  <tkent@chromium.org>
+
+        [Chromium] DRT produces wrong back-forward list
+        https://bugs.webkit.org/show_bug.cgi?id=94575
+
+        Reviewed by Adam Barth.
+
+        DRT clears its history state before running every tests. However
+        HistoryController in WebCore isn't reset. So, it is possible that
+        'isNewNavigation' flag is false even though the navigation should be
+        handled as "new" for DRT.
+
+        This change might fix a problem of
+        fast/forms/select/select-state-restore.html (Bug 90207).
+
+        * DumpRenderTree/chromium/WebViewHost.cpp:
+        (WebViewHost::updateForCommittedLoad):
+        Treat the first page load (m_pageID == -1) as new navigation except for about:blank.
+        Without this change, a navigation entry for this loading won't be recorded.
+
+2012-08-21  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [EFL] Enable CSS Text Decoration by default
+        https://bugs.webkit.org/show_bug.cgi?id=94483
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * Scripts/webkitperl/FeatureList.pm:
+
+2012-08-21  Benjamin Poulain  <bpoulain@apple.com>
+
+        Store CString data in the CStringBuffer to avoid the double indirection
+        https://bugs.webkit.org/show_bug.cgi?id=94562
+
+        Reviewed by Darin Adler.
+
+        Add test coverage for WTF::CString.
+
+        * TestWebKitAPI/CMakeLists.txt:
+        * TestWebKitAPI/GNUmakefile.am:
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        * TestWebKitAPI/Tests/WTF/CString.cpp:
+
+2012-08-21  Dirk Pranke  <dpranke@chromium.org>
+
+        Text Autosizing: ::first-letter pseudo-element is incorrectly sized
+        https://bugs.webkit.org/show_bug.cgi?id=94540
+
+        Reviewed by Ojan Vafai.
+
+        Revert the changes in bugs 94517 and 94396 so that we are
+        actually looking for stderr output from ImageDiff and doing
+        image compares on ref tests on the wk2 ports again.
+
+        Also, do an actual diff_image() call if the hash checks fail on
+        reftests, and only fail the test if we get real diffs (or don't,
+        for mismatches).
+
+        Lastly, clean up the log messages to be more helpful.
+
+        * Scripts/webkitpy/layout_tests/controllers/single_test_runner.py:
+        (SingleTestRunner._compare_image):
+        (SingleTestRunner._compare_output_with_reference):
+        * Scripts/webkitpy/layout_tests/controllers/test_result_writer.py:
+        (write_test_result):
+
+2012-08-21  Dirk Pranke  <dpranke@chromium.org>
+
+        _compare_image() swaps actual and expected images by mistake
+        https://bugs.webkit.org/show_bug.cgi?id=94567
+
+        Reviewed by Ojan Vafai.
+
+        Re-work the code so that we consistently pass (expected, actual)
+        across all of the compare/diff routines.
+
+        * Scripts/webkitpy/layout_tests/controllers/single_test_runner.py:
+        (SingleTestRunner._run_compare_test):
+        (SingleTestRunner._compare_output):
+        (SingleTestRunner._compare_text):
+        (SingleTestRunner._compare_audio):
+        (SingleTestRunner._compare_image):
+        (SingleTestRunner._run_reftest):
+        (SingleTestRunner._compare_output_with_reference):
+        * Scripts/webkitpy/layout_tests/controllers/test_result_writer.py:
+        (write_test_result):
+
+2012-08-21  Adam Barth  <abarth@webkit.org>
+
+        Unreviewed. Move the commit-queue to building release only. Previously,
+        we built debug too, but for some reason the debug build doesn't work on
+        the bots. We can re-enable debug builds once we fix the underlying
+        problem.
+
+        * Scripts/webkitpy/tool/commands/queues.py:
+        (CommitQueue.build_style):
+        * Scripts/webkitpy/tool/commands/queues_unittest.py:
+
+2012-08-21  Ryosuke Niwa  <rniwa@webkit.org>
+
+        TestExpectationsParser doesn't warn about test files that don't exist.
+        https://bugs.webkit.org/show_bug.cgi?id=94632
+
+        Reviewed by Dirk Pranke.
+
+        Exit early and warn when the test file doesn't exist as well when a test directory doesn't exist.
+
+        * Scripts/webkitpy/layout_tests/models/test_expectations.py:
+        (TestExpectationParser._parse_line):
+        (TestExpectationParser._check_test_exists):
+        * Scripts/webkitpy/layout_tests/models/test_expectations_unittest.py:
+        (test_parse_warning):
+
+2012-08-20  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Move free functions in test_expectations to TestExpectations class
+        https://bugs.webkit.org/show_bug.cgi?id=94557
+
+        Reviewed by Dirk Pranke.
+
+        Moved test_result_was_expected, test_remove_pixel_failures, and test_suffixes_for_expectations into TestExpectations
+        to allow further refactoring.
+
+        * Scripts/webkitpy/common/net/resultsjsonparser.py:
+        (JSONTestResult.did_run_as_expected):
+        (JSONTestResult._tokenize):
+        * Scripts/webkitpy/layout_tests/models/test_expectations.py:
+        (TestExpectations):
+        (TestExpectations.result_was_expected):
+        (TestExpectations.remove_pixel_failures):
+        (TestExpectations.has_pixel_failures):
+        (TestExpectations.suffixes_for_expectations):
+        (TestExpectations.matches_an_expected_result):
+        * Scripts/webkitpy/layout_tests/models/test_expectations_unittest.py:
+        (MockBugManager.create_bug):
+        (test_result_was_expected):
+        (test_remove_pixel_failures):
+        (test_suffixes_for_expectations):
+        * Scripts/webkitpy/tool/commands/rebaseline.py:
+        (RebaselineExpectations._tests_to_rebaseline):
+
 2012-08-21  Simon Hausmann  <simon.hausmann@nokia.com>
 
         Unreviewed build fix for newer Qt 5: The meaning of private_includes changed to be fully

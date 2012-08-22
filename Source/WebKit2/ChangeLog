@@ -1,3 +1,95 @@
+2012-08-22  Luiz Agostini  <luiz.agostini@nokia.com>
+
+        [Qt] Avoid using WebKit macros in qrawwebview_p.h
+        https://bugs.webkit.org/show_bug.cgi?id=94648
+
+        Reviewed by Noam Rosenthal.
+
+        ENABLE(FEATURE) should not be used in qrawwebview_p.h because it is an API header file.
+
+        * UIProcess/API/qt/raw/qrawwebview.cpp:
+        (QRawWebView::sendTouchEvent):
+        * UIProcess/API/qt/raw/qrawwebview_p.h:
+
+2012-08-21  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r126216.
+        http://trac.webkit.org/changeset/126216
+        https://bugs.webkit.org/show_bug.cgi?id=94661
+
+        "Broke many Mac-WK2 tests" (Requested by bradee-oh on
+        #webkit).
+
+        * WebProcess/com.apple.WebProcess.sb.in:
+
+2012-08-21  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [GTK] [WK2] Memory leaks in TestWebKitFindController
+        https://bugs.webkit.org/show_bug.cgi?id=94627
+
+        Reviewed by Martin Robinson.
+
+        Fix memory leaks in TestWebKitFindController by using adoptGRef
+        instead of just getting new reference of GdkPixbuf.
+
+        * UIProcess/API/gtk/tests/TestWebKitFindController.cpp:
+        (testFindControllerHide):
+
+2012-08-21  Alexey Proskuryakov  <ap@apple.com>
+
+        <rdar://problem/11241850> Block access to xpcd in WebProcess.sb
+
+        Reviewed by Sam Weinig and Jon Honeycutt.
+
+        * WebProcess/com.apple.WebProcess.sb.in:
+
+2012-08-21  Alexey Proskuryakov  <ap@apple.com>
+
+        <rdar://problem/8900275> Remove PubSub access from WebProcess, since it is no longer necessary
+
+        Reviewed by Mark Rowe.
+
+        * WebProcess/com.apple.WebProcess.sb.in:
+
+2012-08-21  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [EFL] Some public API functions don't have their symbols exported
+        https://bugs.webkit.org/show_bug.cgi?id=94589
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Added missing export symbol macro to these public API functions.
+
+        * UIProcess/API/efl/ewk_view.h:
+
+2012-08-21  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Using a native window for the WebView breaks GtkOverlay
+        https://bugs.webkit.org/show_bug.cgi?id=90085
+
+        Reviewed by Alejandro G. Castro.
+
+        Add XComposite libraries to the linker list for WebKit2.
+
+        * GNUmakefile.am: Add XComposite
+
+2012-08-21  Jesse van den Kieboom  <jessevdk@gnome.org> and Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Add destroy notify for register_uri_scheme
+        https://bugs.webkit.org/show_bug.cgi?id=94315
+
+        Reviewed by Philippe Normand.
+
+        For introspection to work correctly, a destroy notify needs to be
+        added to register_uri_scheme so that bindings know when to
+        finalize the user_data.
+
+        * UIProcess/API/gtk/WebKitWebContext.cpp:
+        (webkit_web_context_register_uri_scheme):
+        (webkitWebContextReceivedURIRequest):
+        * UIProcess/API/gtk/WebKitWebContext.h:
+        * UIProcess/API/gtk/tests/TestWebKitWebContext.cpp:
+
 2012-08-21  Simon Hausmann  <simon.hausmann@nokia.com>
 
         Unreviewed build fix for newer Qt 5: QT += qmltest does not imply QT += testlib anymore, but

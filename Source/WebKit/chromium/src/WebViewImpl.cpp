@@ -408,7 +408,6 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     , m_isCancelingFullScreen(false)
     , m_benchmarkSupport(this)
 #if USE(ACCELERATED_COMPOSITING)
-    , m_rootLayer(0)
     , m_rootGraphicsLayer(0)
     , m_isAcceleratedCompositingActive(false)
     , m_compositorCreationFailed(false)
@@ -2215,6 +2214,58 @@ bool WebViewImpl::setEditableSelectionOffsets(int start, int end)
     return editor->setSelectionOffsets(start, end);
 }
 
+bool WebViewImpl::setCompositionFromExistingText(int compositionStart, int compositionEnd, const WebVector<WebCompositionUnderline>& underlines)
+{
+    const Frame* focused = focusedWebCoreFrame();
+    if (!focused)
+        return false;
+
+    Editor* editor = focused->editor();
+    if (!editor || !editor->canEdit())
+        return false;
+
+    editor->cancelComposition();
+
+    if (compositionStart == compositionEnd)
+        return true;
+
+    size_t location;
+    size_t length;
+    caretOrSelectionRange(&location, &length);
+    editor->setIgnoreCompositionSelectionChange(true);
+    editor->setSelectionOffsets(compositionStart, compositionEnd);
+    String text = editor->selectedText();
+    focused->document()->execCommand("delete", true);
+    editor->setComposition(text, CompositionUnderlineVectorBuilder(underlines), 0, 0);
+    editor->setSelectionOffsets(location, location + length);
+    editor->setIgnoreCompositionSelectionChange(false);
+
+    return true;
+}
+
+void WebViewImpl::extendSelectionAndDelete(int before, int after)
+{
+    const Frame* focused = focusedWebCoreFrame();
+    if (!focused)
+        return;
+
+    Editor* editor = focused->editor();
+    if (!editor || !editor->canEdit())
+        return;
+
+    FrameSelection* selection = focused->selection();
+    if (!selection)
+        return;
+
+    size_t location;
+    size_t length;
+    RefPtr<Range> range = selection->selection().firstRange();
+    if (range && TextIterator::getLocationAndLengthFromRange(selection->rootEditableElement(), range.get(), location, length)) {
+        editor->setSelectionOffsets(max(static_cast<int>(location) - before, 0), location + length + after);
+        focused->document()->execCommand("delete", true);
+    }
+}
+
 bool WebViewImpl::isSelectionEditable() const
 {
     const Frame* frame = focusedWebCoreFrame();
@@ -3513,7 +3564,6 @@ bool WebViewImpl::allowsAcceleratedCompositing()
 void WebViewImpl::setRootGraphicsLayer(GraphicsLayer* layer)
 {
     m_rootGraphicsLayer = layer;
-    m_rootLayer = layer ? layer->platformLayer() : 0;
 
     setIsAcceleratedCompositingActive(layer);
     if (m_nonCompositedContentHost) {
@@ -3527,8 +3577,11 @@ void WebViewImpl::setRootGraphicsLayer(GraphicsLayer* layer)
         m_nonCompositedContentHost->setScrollLayer(scrollLayer);
     }
 
+    if (layer)
+        m_rootLayer = *layer->platformLayer();
+
     if (!m_layerTreeView.isNull())
-        m_layerTreeView.setRootLayer(m_rootLayer);
+        m_layerTreeView.setRootLayer(layer ? &m_rootLayer : 0);
 
     IntRect damagedRect(0, 0, m_size.width, m_size.height);
     if (!m_isAcceleratedCompositingActive)
@@ -3641,7 +3694,7 @@ void WebViewImpl::setIsAcceleratedCompositingActive(bool active)
         m_nonCompositedContentHost->setShowDebugBorders(page()->settings()->showDebugBorders());
         m_nonCompositedContentHost->setOpaque(!isTransparent());
 
-        m_layerTreeView.initialize(this, *m_rootLayer, layerTreeViewSettings);
+        m_layerTreeView.initialize(this, m_rootLayer, layerTreeViewSettings);
         if (!m_layerTreeView.isNull()) {
             if (m_webSettings->applyDefaultDeviceScaleFactorInCompositor() && page()->deviceScaleFactor() != 1) {
                 ASSERT(page()->deviceScaleFactor());

@@ -29,25 +29,27 @@
  */
 
 #include "config.h"
-#include "UndoManager.h"
 
 #if ENABLE(UNDO_MANAGER)
 
-#include "DOMTransaction.h"
-#include "Element.h"
+#include "UndoManager.h"
+
+#include "ExceptionCode.h"
 
 namespace WebCore {
 
-PassRefPtr<UndoManager> UndoManager::create(ScriptExecutionContext* context, Node* host)
+DOMTransaction* UndoManager::s_recordingDOMTransaction = 0;
+
+PassRefPtr<UndoManager> UndoManager::create(Document* document)
 {
-    RefPtr<UndoManager> undoManager = adoptRef(new UndoManager(context, host));
+    RefPtr<UndoManager> undoManager = adoptRef(new UndoManager(document));
     undoManager->suspendIfNeeded();
     return undoManager.release();
 }
 
-UndoManager::UndoManager(ScriptExecutionContext* context, Node* host)
-    : ActiveDOMObject(context, this)
-    , m_undoScopeHost(host)
+UndoManager::UndoManager(Document* document)
+    : ActiveDOMObject(document, this)
+    , m_document(document)
     , m_isInProgress(false)
 {
 }
@@ -67,7 +69,7 @@ static void clearStack(UndoManagerStack& stack)
 
 void UndoManager::disconnect()
 {
-    m_undoScopeHost = 0;
+    m_document = 0;
     clearStack(m_undoStack);
     clearStack(m_redoStack);
 }
@@ -89,7 +91,7 @@ static inline PassOwnPtr<UndoManagerEntry> createUndoManagerEntry()
 
 void UndoManager::transact(PassRefPtr<DOMTransaction> transaction, bool merge, ExceptionCode& ec)
 {
-    if (m_isInProgress || !isConnected()) {
+    if (m_isInProgress || !m_document) {
         ec = INVALID_ACCESS_ERR;
         return;
     }
@@ -101,7 +103,7 @@ void UndoManager::transact(PassRefPtr<DOMTransaction> transaction, bool merge, E
     transaction->apply();
     m_isInProgress = false;
 
-    if (!m_undoScopeHost)
+    if (!m_document)
         return;
     if (!merge || m_undoStack.isEmpty())
         m_undoStack.append(createUndoManagerEntry());
@@ -110,7 +112,7 @@ void UndoManager::transact(PassRefPtr<DOMTransaction> transaction, bool merge, E
 
 void UndoManager::undo(ExceptionCode& ec)
 {
-    if (m_isInProgress || !isConnected()) {
+    if (m_isInProgress || !m_document) {
         ec = INVALID_ACCESS_ERR;
         return;
     }
@@ -125,7 +127,7 @@ void UndoManager::undo(ExceptionCode& ec)
         entry[i - 1]->unapply();
     m_isInProgress = false;
 
-    if (!m_undoScopeHost) {
+    if (!m_document) {
         m_inProgressEntry.clear();
         return;
     }
@@ -135,7 +137,7 @@ void UndoManager::undo(ExceptionCode& ec)
 
 void UndoManager::redo(ExceptionCode& ec)
 {
-    if (m_isInProgress || !isConnected()) {
+    if (m_isInProgress || !m_document) {
         ec = INVALID_ACCESS_ERR;
         return;
     }
@@ -150,7 +152,7 @@ void UndoManager::redo(ExceptionCode& ec)
         entry[i - 1]->reapply();
     m_isInProgress = false;
 
-    if (!m_undoScopeHost) {
+    if (!m_document) {
         m_inProgressEntry.clear();
         return;
     }
@@ -182,7 +184,7 @@ void UndoManager::registerRedoStep(PassRefPtr<UndoStep> step)
 
 void UndoManager::clearUndo(ExceptionCode& ec)
 {
-    if (m_isInProgress || !isConnected()) {
+    if (m_isInProgress || !m_document) {
         ec = INVALID_ACCESS_ERR;
         return;
     }
@@ -191,26 +193,27 @@ void UndoManager::clearUndo(ExceptionCode& ec)
 
 void UndoManager::clearRedo(ExceptionCode& ec)
 {
-    if (m_isInProgress || !isConnected()) {
+    if (m_isInProgress || !m_document) {
         ec = INVALID_ACCESS_ERR;
         return;
     }
     clearStack(m_redoStack);
 }
 
-bool UndoManager::isConnected()
+bool UndoManager::isRecordingAutomaticTransaction(Node* node)
 {
-    if (!m_undoScopeHost)
+    // We need to check that transaction still has its undomanager because
+    // transaction can disconnect its undomanager, which will clear the undo/redo stacks.
+    if (!s_recordingDOMTransaction || !s_recordingDOMTransaction->undoManager())
         return false;
-    if (!m_undoScopeHost->isElementNode())
-        return true;
-    Element* element = toElement(m_undoScopeHost);
-    ASSERT(element->undoScope());
-    if (element->isContentEditable() && !element->isRootEditableElement()) {
-        element->disconnectUndoManager();
-        return false;
-    }
-    return true;
+    Document* document = s_recordingDOMTransaction->undoManager()->document();
+    return document && node->document() == document;
+}
+
+void UndoManager::addTransactionStep(PassRefPtr<DOMTransactionStep> step)
+{
+    ASSERT(s_recordingDOMTransaction);
+    s_recordingDOMTransaction->addTransactionStep(step);
 }
 
 }

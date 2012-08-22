@@ -331,6 +331,11 @@ void WebPage::autofillTextField(const string& item)
     d->m_autofillManager->autofillTextField(item.c_str());
 }
 
+void WebPage::enableQnxJavaScriptObject(bool enabled)
+{
+    d->m_enableQnxJavaScriptObject = enabled;
+}
+
 WebPagePrivate::WebPagePrivate(WebPage* webPage, WebPageClient* client, const IntRect& rect)
     : m_webPage(webPage)
     , m_client(client)
@@ -404,6 +409,7 @@ WebPagePrivate::WebPagePrivate(WebPage* webPage, WebPageClient* client, const In
     , m_fullscreenVideoNode(0)
     , m_hasInRegionScrollableAreas(false)
     , m_updateDelegatedOverlaysDispatched(false)
+    , m_enableQnxJavaScriptObject(true)
     , m_deferredTasksTimer(this, &WebPagePrivate::deferredTasksTimerFired)
     , m_selectPopup(0)
     , m_autofillManager(AutofillManager::create(this))
@@ -1497,17 +1503,17 @@ bool WebPage::scrollBy(const Platform::IntSize& delta, bool scrollMainFrame)
     return b;
 }
 
-void WebPagePrivate::notifyInRegionScrollStatusChanged(bool status)
+void WebPagePrivate::notifyInRegionScrollStopped()
 {
-    if (!status && m_inRegionScroller->d->hasNode()) {
+    if (m_inRegionScroller->d->hasNode()) {
         enqueueRenderingOfClippedContentOfScrollableNodeAfterInRegionScrolling(m_inRegionScroller->d->node());
         m_inRegionScroller->d->reset();
     }
 }
 
-void WebPage::notifyInRegionScrollStatusChanged(bool status)
+void WebPage::notifyInRegionScrollStopped()
 {
-    d->notifyInRegionScrollStatusChanged(status);
+    d->notifyInRegionScrollStopped();
 }
 
 void WebPagePrivate::enqueueRenderingOfClippedContentOfScrollableNodeAfterInRegionScrolling(Node* scrolledNode)

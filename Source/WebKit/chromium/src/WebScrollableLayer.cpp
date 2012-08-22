@@ -23,33 +23,53 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WebScrollbarLayerImpl_h
-#define WebScrollbarLayerImpl_h
+#include "config.h"
+#include <public/WebScrollableLayer.h>
 
-#include <public/WebScrollbarLayer.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassRefPtr.h>
-
-namespace WebCore {
-class ScrollbarLayerChromium;
-}
+#include "LayerChromium.h"
+#include "Region.h"
 
 namespace WebKit {
-class WebLayerImpl;
 
-class WebScrollbarLayerImpl : public WebScrollbarLayer {
-public:
-    explicit WebScrollbarLayerImpl(PassRefPtr<WebCore::ScrollbarLayerChromium>);
-    virtual ~WebScrollbarLayerImpl();
+void WebScrollableLayer::setScrollPosition(WebPoint position)
+{
+    m_private->setScrollPosition(position);
+}
 
-    // WebScrollbarLayer implementation.
-    virtual WebLayer* layer() OVERRIDE;
-    virtual void setScrollLayer(WebLayer*) OVERRIDE;
+void WebScrollableLayer::setScrollable(bool scrollable)
+{
+    m_private->setScrollable(scrollable);
+}
 
-private:
-    OwnPtr<WebLayerImpl> m_layer;
-};
+void WebScrollableLayer::setHaveWheelEventHandlers(bool haveWheelEventHandlers)
+{
+    m_private->setHaveWheelEventHandlers(haveWheelEventHandlers);
+}
+
+void WebScrollableLayer::setShouldScrollOnMainThread(bool shouldScrollOnMainThread)
+{
+    m_private->setShouldScrollOnMainThread(shouldScrollOnMainThread);
+}
+
+void WebScrollableLayer::setNonFastScrollableRegion(const WebVector<WebRect>& rects)
+{
+    WebCore::Region region;
+    for (size_t i = 0; i < rects.size(); ++i) {
+        WebCore::IntRect rect = rects[i];
+        region.unite(rect);
+    }
+    m_private->setNonFastScrollableRegion(region);
 
 }
 
-#endif // WebScrollbarLayerImpl_h
+void WebScrollableLayer::setIsContainerForFixedPositionLayers(bool enable)
+{
+    m_private->setIsContainerForFixedPositionLayers(enable);
+}
+
+void WebScrollableLayer::setFixedToContainerLayer(bool enable)
+{
+    m_private->setFixedToContainerLayer(enable);
+}
+
+} // namespace WebKit

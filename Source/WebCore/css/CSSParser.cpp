@@ -62,6 +62,7 @@
 #include "FontValue.h"
 #include "HTMLParserIdioms.h"
 #include "HashTools.h"
+#include "HistogramSupport.h"
 #include "MediaList.h"
 #include "MediaQueryExp.h"
 #include "Page.h"
@@ -5335,7 +5336,7 @@ static inline bool parseAlphaValue(const UChar*& string, const UChar* end, const
     if (length < 2)
         return false;
 
-    if (string[length - 1] != terminator)
+    if (string[length - 1] != terminator || !isASCIIDigit(string[length - 2]))
         return false;
 
     if (string[0] != '0' && string[0] != '1' && string[0] != '.') {
@@ -10124,7 +10125,16 @@ static CSSPropertyID cssPropertyID(const UChar* propertyName, unsigned length)
     }
 
     const Property* hashTableEntry = findProperty(name, length);
-    return hashTableEntry ? static_cast<CSSPropertyID>(hashTableEntry->id) : CSSPropertyInvalid;
+    const CSSPropertyID propertyID = hashTableEntry ? static_cast<CSSPropertyID>(hashTableEntry->id) : CSSPropertyInvalid;
+
+    // 600 is comfortably larger than numCSSProperties to allow for growth
+    static const int CSSPropertyHistogramSize = 600;
+    COMPILE_ASSERT(CSSPropertyHistogramSize > numCSSProperties, number_of_css_properties_exceed_CSSPropertyHistogramSize);
+
+    if (hasPrefix(buffer, length, "-webkit-") && propertyID != CSSPropertyInvalid)
+        HistogramSupport::histogramEnumeration("CSS.PrefixUsage", max(1, propertyID - firstCSSProperty), CSSPropertyHistogramSize);
+
+    return propertyID;
 }
 
 CSSPropertyID cssPropertyID(const String& string)

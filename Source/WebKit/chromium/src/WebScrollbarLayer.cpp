@@ -23,32 +23,40 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WebIOSurfaceLayerImpl_h
-#define WebIOSurfaceLayerImpl_h
+#include "config.h"
+#include <public/WebScrollbarLayer.h>
 
-#include <public/WebIOSurfaceLayer.h>
-#include <wtf/OwnPtr.h>
+#include "ScrollbarLayerChromium.h"
 
-namespace WebCore {
-class IOSurfaceLayerChromium;
-}
+using namespace WebCore;
 
 namespace WebKit {
 
-class WebIOSurfaceLayerImpl : public WebIOSurfaceLayer {
-public:
-    explicit WebIOSurfaceLayerImpl(PassRefPtr<WebCore::IOSurfaceLayerChromium>);
-    virtual ~WebIOSurfaceLayerImpl();
-
-    // WebIOSurfaceLayer implementation.
-    virtual WebLayer* layer() OVERRIDE;
-    virtual void setIOSurfaceProperties(unsigned ioSurfaceId, WebSize) OVERRIDE;
-
-private:
-    OwnPtr<WebLayerImpl> m_layer;
-};
-
+void WebScrollbarLayer::setScrollLayer(const WebLayer layer)
+{
+    int id = layer.isNull() ? 0 : layer.constUnwrap<LayerChromium>()->id();
+    unwrap<ScrollbarLayerChromium>()->setScrollLayerId(id);
 }
 
-#endif // WebIOSurfaceLayerImpl_h
+WebScrollbarLayer WebScrollbarLayer::create(WebCore::Scrollbar* scrollbar, WebScrollbarThemePainter painter, PassOwnPtr<WebScrollbarThemeGeometry> geometry)
+{
+    return WebScrollbarLayer(ScrollbarLayerChromium::create(WebScrollbar::create(scrollbar), painter, geometry, 0));
+}
 
+WebScrollbarLayer::WebScrollbarLayer(const WTF::PassRefPtr<WebCore::ScrollbarLayerChromium>& layer)
+    : WebLayer(layer)
+{
+}
+
+WebScrollbarLayer& WebScrollbarLayer::operator=(const WTF::PassRefPtr<WebCore::ScrollbarLayerChromium>& layer)
+{
+    m_private = layer;
+    return *this;
+}
+
+WebScrollbarLayer::operator PassRefPtr<ScrollbarLayerChromium>() const
+{
+    return unwrap<ScrollbarLayerChromium>();
+}
+
+} // namespace WebKit

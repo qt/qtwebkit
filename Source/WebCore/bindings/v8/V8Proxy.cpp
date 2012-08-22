@@ -77,33 +77,6 @@
 
 namespace WebCore {
 
-void V8Proxy::reportUnsafeAccessTo(Document* targetDocument)
-{
-    if (!targetDocument)
-        return;
-
-    // FIXME: We should pass both the active and target documents in as arguments.
-    Frame* source = firstFrame(BindingState::instance());
-    if (!source)
-        return;
-
-    Document* sourceDocument = source->document();
-    if (!sourceDocument)
-        return; // Ignore error if the source document is gone.
-
-    // FIXME: This error message should contain more specifics of why the same
-    // origin check has failed.
-    String str = "Unsafe JavaScript attempt to access frame with URL " + targetDocument->url().string() +
-                 " from frame with URL " + sourceDocument->url().string() + ". Domains, protocols and ports must match.\n";
-
-    RefPtr<ScriptCallStack> stackTrace = createScriptCallStack(ScriptCallStack::maxCallStackSizeToCapture, true);
-
-    // NOTE: Safari prints the message in the target page, but it seems like
-    // it should be in the source page. Even for delayed messages, we put it in
-    // the source page.
-    sourceDocument->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, str, stackTrace.release());
-}
-
 // FIXME: This will be soon removed when we move runScript() to ScriptController.
 static v8::Local<v8::Value> handleMaxRecursionDepthExceeded()
 {
@@ -119,17 +92,6 @@ V8Proxy::V8Proxy(Frame* frame)
 V8Proxy::~V8Proxy()
 {
     windowShell()->destroyGlobal();
-}
-
-v8::Handle<v8::Script> V8Proxy::compileScript(v8::Handle<v8::String> code, const String& fileName, const TextPosition& scriptStartPosition, v8::ScriptData* scriptData)
-{
-    const uint16_t* fileNameString = fromWebCoreString(fileName);
-    v8::Handle<v8::String> name = v8::String::New(fileNameString, fileName.length());
-    v8::Handle<v8::Integer> line = v8Integer(scriptStartPosition.m_line.zeroBasedInt());
-    v8::Handle<v8::Integer> column = v8Integer(scriptStartPosition.m_column.zeroBasedInt());
-    v8::ScriptOrigin origin(name, line, column);
-    v8::Handle<v8::Script> script = v8::Script::Compile(code, &origin, scriptData);
-    return script;
 }
 
 PassOwnPtr<v8::ScriptData> V8Proxy::precompileScript(v8::Handle<v8::String> code, CachedScript* cachedScript)
@@ -180,7 +142,7 @@ v8::Local<v8::Value> V8Proxy::evaluate(const ScriptSourceCode& source, Node* nod
 
         // NOTE: For compatibility with WebCore, ScriptSourceCode's line starts at
         // 1, whereas v8 starts at 0.
-        v8::Handle<v8::Script> script = compileScript(code, source.url(), source.startPosition(), scriptData.get());
+        v8::Handle<v8::Script> script = ScriptSourceCode::compileScript(code, source.url(), source.startPosition(), scriptData.get());
 #if PLATFORM(CHROMIUM)
         TRACE_EVENT_END0("v8", "v8.compile");
         TRACE_EVENT0("v8", "v8.run");
@@ -284,20 +246,6 @@ bool V8Proxy::matchesCurrentContext()
         context = windowShell()->context();
     }
     return context == context->GetCurrent();
-}
-
-v8::Local<v8::Context> toV8Context(ScriptExecutionContext* context, const WorldContextHandle& worldContext)
-{
-    if (context->isDocument()) {
-        if (Frame* frame = static_cast<Document*>(context)->frame())
-            return worldContext.adjustedContext(frame->script());
-#if ENABLE(WORKERS)
-    } else if (context->isWorkerContext()) {
-        if (WorkerContextExecutionProxy* proxy = static_cast<WorkerContext*>(context)->script()->proxy())
-            return proxy->context();
-#endif
-    }
-    return v8::Local<v8::Context>();
 }
 
 }  // namespace WebCore

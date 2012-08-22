@@ -45,55 +45,8 @@ _log = logging.getLogger(__name__)
 (PASS, FAIL, TEXT, IMAGE, IMAGE_PLUS_TEXT, AUDIO, TIMEOUT, CRASH, SKIP, WONTFIX,
  SLOW, REBASELINE, MISSING, FLAKY, NOW, NONE) = range(16)
 
-
-def result_was_expected(result, expected_results, test_needs_rebaselining, test_is_skipped):
-    """Returns whether we got a result we were expecting.
-    Args:
-        result: actual result of a test execution
-        expected_results: set of results listed in test_expectations
-        test_needs_rebaselining: whether test was marked as REBASELINE
-        test_is_skipped: whether test was marked as SKIP"""
-    if result in expected_results:
-        return True
-    if result == MISSING and test_needs_rebaselining:
-        return True
-    if result == SKIP and test_is_skipped:
-        return True
-    return False
-
-
-def remove_pixel_failures(expected_results):
-    """Returns a copy of the expected results for a test, except that we
-    drop any pixel failures and return the remaining expectations. For example,
-    if we're not running pixel tests, then tests expected to fail as IMAGE
-    will PASS."""
-    expected_results = expected_results.copy()
-    if IMAGE in expected_results:
-        expected_results.remove(IMAGE)
-        expected_results.add(PASS)
-    if IMAGE_PLUS_TEXT in expected_results:
-        expected_results.remove(IMAGE_PLUS_TEXT)
-        expected_results.add(TEXT)
-    return expected_results
-
-
-def has_pixel_failures(actual_results):
-    return IMAGE in actual_results or IMAGE_PLUS_TEXT in actual_results
-
-
 # FIXME: Perhas these two routines should be part of the Port instead?
 BASELINE_SUFFIX_LIST = ('png', 'wav', 'txt')
-
-
-def suffixes_for_expectations(expectations):
-    suffixes = set()
-    if expectations.intersection(set([TEXT, IMAGE_PLUS_TEXT])):
-        suffixes.add('txt')
-    if expectations.intersection(set([IMAGE, IMAGE_PLUS_TEXT])):
-        suffixes.add('png')
-    if AUDIO in expectations:
-        suffixes.add('wav')
-    return set(suffixes)
 
 
 class ParseError(Exception):
@@ -235,10 +188,10 @@ class TestExpectationParser(object):
         if not expectation_line.name:
             return
 
-        expectation_line.is_file = self._port.test_isfile(expectation_line.name)
-        if not expectation_line.is_file and self._check_path_does_not_exist(expectation_line):
+        if not self._check_test_exists(expectation_line):
             return
 
+        expectation_line.is_file = self._port.test_isfile(expectation_line.name)
         if expectation_line.is_file:
             expectation_line.path = expectation_line.name
         else:
@@ -292,18 +245,17 @@ class TestExpectationParser(object):
             result.add(expectation)
         expectation_line.parsed_expectations = result
 
-    def _check_path_does_not_exist(self, expectation_line):
+    def _check_test_exists(self, expectation_line):
         # WebKit's way of skipping tests is to add a -disabled suffix.
         # So we should consider the path existing if the path or the
         # -disabled version exists.
-        if (not self._port.test_exists(expectation_line.name)
-            and not self._port.test_exists(expectation_line.name + '-disabled')):
+        if not self._port.test_exists(expectation_line.name) and not self._port.test_exists(expectation_line.name + '-disabled'):
             # Log a warning here since you hit this case any
             # time you update TestExpectations without syncing
             # the LayoutTests directory
             expectation_line.warnings.append('Path does not exist.')
-            return True
-        return False
+            return False
+        return True
 
     def _collect_matching_tests(self, expectation_line):
         """Convert the test specification to an absolute, normalized
@@ -718,6 +670,52 @@ class TestExpectations(object):
         assert(' ' not in string)  # This only handles one expectation at a time.
         return cls.EXPECTATIONS.get(string.lower())
 
+    @staticmethod
+    def result_was_expected(result, expected_results, test_needs_rebaselining, test_is_skipped):
+        """Returns whether we got a result we were expecting.
+        Args:
+            result: actual result of a test execution
+            expected_results: set of results listed in test_expectations
+            test_needs_rebaselining: whether test was marked as REBASELINE
+            test_is_skipped: whether test was marked as SKIP"""
+        if result in expected_results:
+            return True
+        if result == MISSING and test_needs_rebaselining:
+            return True
+        if result == SKIP and test_is_skipped:
+            return True
+        return False
+
+    @staticmethod
+    def remove_pixel_failures(expected_results):
+        """Returns a copy of the expected results for a test, except that we
+        drop any pixel failures and return the remaining expectations. For example,
+        if we're not running pixel tests, then tests expected to fail as IMAGE
+        will PASS."""
+        expected_results = expected_results.copy()
+        if IMAGE in expected_results:
+            expected_results.remove(IMAGE)
+            expected_results.add(PASS)
+        if IMAGE_PLUS_TEXT in expected_results:
+            expected_results.remove(IMAGE_PLUS_TEXT)
+            expected_results.add(TEXT)
+        return expected_results
+
+    @staticmethod
+    def has_pixel_failures(actual_results):
+        return IMAGE in actual_results or IMAGE_PLUS_TEXT in actual_results
+
+    @staticmethod
+    def suffixes_for_expectations(expectations):
+        suffixes = set()
+        if expectations.intersection(set([TEXT, IMAGE_PLUS_TEXT])):
+            suffixes.add('txt')
+        if expectations.intersection(set([IMAGE, IMAGE_PLUS_TEXT])):
+            suffixes.add('png')
+        if AUDIO in expectations:
+            suffixes.add('wav')
+        return set(suffixes)
+
     def __init__(self, port, tests=None, is_lint_mode=False, include_overrides=True):
         self._full_test_list = tests
         self._test_config = port.test_configuration()
@@ -788,8 +786,8 @@ class TestExpectations(object):
     def matches_an_expected_result(self, test, result, pixel_tests_are_enabled):
         expected_results = self._model.get_expectations(test)
         if not pixel_tests_are_enabled:
-            expected_results = remove_pixel_failures(expected_results)
-        return result_was_expected(result,
+            expected_results = self.remove_pixel_failures(expected_results)
+        return self.result_was_expected(result,
                                    expected_results,
                                    self.is_rebaselining(test),
                                    self._model.has_modifier(test, SKIP))

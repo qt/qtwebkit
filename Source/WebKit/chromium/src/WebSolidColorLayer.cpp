@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2012 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,35 +24,26 @@
  */
 
 #include "config.h"
-#include "WebVideoLayerImpl.h"
+#include <public/WebSolidColorLayer.h>
 
-#include "VideoLayerChromium.h"
-#include "WebLayerImpl.h"
+#include "WebSolidColorLayerImpl.h"
+#include <public/WebFloatRect.h>
 
 namespace WebKit {
 
-WebVideoLayer* WebVideoLayer::create(WebVideoFrameProvider* provider)
+WebSolidColorLayer WebSolidColorLayer::create()
 {
-    return new WebVideoLayerImpl(WebCore::VideoLayerChromium::create(provider));
+    return WebSolidColorLayer(WebSolidColorLayerImpl::create());
 }
 
-WebVideoLayerImpl::WebVideoLayerImpl(PassRefPtr<WebCore::VideoLayerChromium> layer)
-    : m_layer(adoptPtr(new WebLayerImpl(layer)))
-{
-}
-
-WebVideoLayerImpl::~WebVideoLayerImpl()
+WebSolidColorLayer::WebSolidColorLayer(const PassRefPtr<WebSolidColorLayerImpl>& node)
+    : WebLayer(node)
 {
 }
 
-WebLayer* WebVideoLayerImpl::layer()
+void WebSolidColorLayer::setBackgroundColor(const WebColor& color)
 {
-    return m_layer.get();
-}
-
-bool WebVideoLayerImpl::active() const
-{
-    return m_layer->layer()->layerTreeHost();
+    m_private->setBackgroundColor(color);
 }
 
 } // namespace WebKit

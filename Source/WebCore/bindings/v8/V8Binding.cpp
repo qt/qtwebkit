@@ -43,6 +43,8 @@
 #include "V8DOMWindow.h"
 #include "V8Element.h"
 #include "V8ObjectConstructor.h"
+#include "WorkerContext.h"
+#include "WorkerContextExecutionProxy.h"
 
 #include <wtf/MathExtras.h>
 #include <wtf/MainThread.h>
@@ -204,157 +206,12 @@ uint32_t toUInt32(v8::Handle<v8::Value> value, bool& ok)
     return uintValue->Value();
 }
 
-template <class S> struct StringTraits
-{
-    static S fromStringResource(WebCoreStringResource* resource);
-
-    static S fromV8String(v8::Handle<v8::String> v8String, int length);
-};
-
-template<>
-struct StringTraits<String>
-{
-    static String fromStringResource(WebCoreStringResource* resource)
-    {
-        return resource->webcoreString();
-    }
-
-    static String fromV8String(v8::Handle<v8::String> v8String, int length)
-    {
-        ASSERT(v8String->Length() == length);
-        // NOTE: as of now, String(const UChar*, int) performs String::createUninitialized
-        // anyway, so no need to optimize like we do for AtomicString below.
-        UChar* buffer;
-        String result = String::createUninitialized(length, buffer);
-        v8String->Write(reinterpret_cast<uint16_t*>(buffer), 0, length);
-        return result;
-    }
-};
-
-template<>
-struct StringTraits<AtomicString>
-{
-    static AtomicString fromStringResource(WebCoreStringResource* resource)
-    {
-        return resource->atomicString();
-    }
-
-    static AtomicString fromV8String(v8::Handle<v8::String> v8String, int length)
-    {
-        ASSERT(v8String->Length() == length);
-        static const int inlineBufferSize = 16;
-        if (length <= inlineBufferSize) {
-            UChar inlineBuffer[inlineBufferSize];
-            v8String->Write(reinterpret_cast<uint16_t*>(inlineBuffer), 0, length);
-            return AtomicString(inlineBuffer, length);
-        }
-        UChar* buffer;
-        String tmp = String::createUninitialized(length, buffer);
-        v8String->Write(reinterpret_cast<uint16_t*>(buffer), 0, length);
-        return AtomicString(tmp);
-    }
-};
-
-template <typename StringType>
-StringType v8StringToWebCoreString(v8::Handle<v8::String> v8String, ExternalMode external)
-{
-    WebCoreStringResource* stringResource = WebCoreStringResource::toStringResource(v8String);
-    if (stringResource)
-        return StringTraits<StringType>::fromStringResource(stringResource);
-
-    int length = v8String->Length();
-    if (!length) {
-        // Avoid trying to morph empty strings, as they do not have enough room to contain the external reference.
-        return StringImpl::empty();
-    }
-
-    StringType result(StringTraits<StringType>::fromV8String(v8String, length));
-
-    if (external == Externalize && v8String->CanMakeExternal()) {
-        stringResource = new WebCoreStringResource(result);
-        if (!v8String->MakeExternal(stringResource)) {
-            // In case of a failure delete the external resource as it was not used.
-            delete stringResource;
-        }
-    }
-    return result;
-}
-    
-// Explicitly instantiate the above template with the expected parameterizations,
-// to ensure the compiler generates the code; otherwise link errors can result in GCC 4.4.
-template String v8StringToWebCoreString<String>(v8::Handle<v8::String>, ExternalMode);
-template AtomicString v8StringToWebCoreString<AtomicString>(v8::Handle<v8::String>, ExternalMode);
-
-// Fast but non thread-safe version.
-String int32ToWebCoreStringFast(int value)
-{
-    // Caching of small strings below is not thread safe: newly constructed AtomicString
-    // are not safely published.
-    ASSERT(isMainThread());
-
-    // Most numbers used are <= 100. Even if they aren't used there's very little cost in using the space.
-    const int kLowNumbers = 100;
-    DEFINE_STATIC_LOCAL(Vector<AtomicString>, lowNumbers, (kLowNumbers + 1));
-    String webCoreString;
-    if (0 <= value && value <= kLowNumbers) {
-        webCoreString = lowNumbers[value];
-        if (!webCoreString) {
-            AtomicString valueString = AtomicString(String::number(value));
-            lowNumbers[value] = valueString;
-            webCoreString = valueString;
-        }
-    } else
-        webCoreString = String::number(value);
-    return webCoreString;
-}
-
-String int32ToWebCoreString(int value)
-{
-    // If we are on the main thread (this should always true for non-workers), call the faster one.
-    if (isMainThread())
-        return int32ToWebCoreStringFast(value);
-    return String::number(value);
-}
-
 v8::Persistent<v8::FunctionTemplate> createRawTemplate()
 {
     v8::HandleScope scope;
     v8::Local<v8::FunctionTemplate> result = v8::FunctionTemplate::New(V8ObjectConstructor::isValidConstructorMode);
     return v8::Persistent<v8::FunctionTemplate>::New(result);
 }        
-
-v8::Persistent<v8::String> getToStringName()
-{
-    v8::Persistent<v8::String>& toStringName = V8PerIsolateData::current()->toStringName();
-    if (toStringName.IsEmpty())
-        toStringName = v8::Persistent<v8::String>::New(v8::String::New("toString"));
-    return *toStringName;
-
-}
-
-static v8::Handle<v8::Value> constructorToString(const v8::Arguments& args)
-{
-    // The DOM constructors' toString functions grab the current toString
-    // for Functions by taking the toString function of itself and then
-    // calling it with the constructor as its receiver. This means that
-    // changes to the Function prototype chain or toString function are
-    // reflected when printing DOM constructors. The only wart is that
-    // changes to a DOM constructor's toString's toString will cause the
-    // toString of the DOM constructor itself to change. This is extremely
-    // obscure and unlikely to be a problem.
-    v8::Handle<v8::Value> value = args.Callee()->Get(getToStringName());
-    if (!value->IsFunction()) 
-        return v8::String::New("");
-    return v8::Handle<v8::Function>::Cast(value)->Call(args.This(), 0, 0);
-}
-
-v8::Persistent<v8::FunctionTemplate> getToStringTemplate()
-{
-    v8::Persistent<v8::FunctionTemplate>& toStringTemplate = V8PerIsolateData::current()->toStringTemplate();
-    if (toStringTemplate.IsEmpty())
-        toStringTemplate = v8::Persistent<v8::FunctionTemplate>::New(v8::FunctionTemplate::New(constructorToString));
-    return toStringTemplate;
-}
 
 void StringCache::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
@@ -401,6 +258,20 @@ Frame* toFrameIfNotDetached(v8::Handle<v8::Context> context)
     // did return |frame| we could get in trouble because the frame could be
     // navigated to another security origin.
     return 0;
+}
+
+v8::Local<v8::Context> toV8Context(ScriptExecutionContext* context, const WorldContextHandle& worldContext)
+{
+    if (context->isDocument()) {
+        if (Frame* frame = static_cast<Document*>(context)->frame())
+            return worldContext.adjustedContext(frame->script());
+#if ENABLE(WORKERS)
+    } else if (context->isWorkerContext()) {
+        if (WorkerContextExecutionProxy* proxy = static_cast<WorkerContext*>(context)->script()->proxy())
+            return proxy->context();
+#endif
+    }
+    return v8::Local<v8::Context>();
 }
 
 V8PerContextData* perContextDataForCurrentWorld(Frame* frame)
