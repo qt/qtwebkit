@@ -902,6 +902,10 @@ void WebPage::setResizesToContentsUsingLayoutSize(const IntSize& targetLayoutSiz
     m_page->settings()->setAcceleratedCompositingForFixedPositionEnabled(true);
     m_page->settings()->setFixedElementsLayoutRelativeToFrame(true);
     m_page->settings()->setFixedPositionCreatesStackingContext(true);
+#if ENABLE(SMOOTH_SCROLLING)
+    // Ensure we don't do animated scrolling in the WebProcess when scrolling is delegated.
+    m_page->settings()->setEnableScrollAnimator(false);
+#endif
 
     // Always reset even when empty. This also takes care of the relayout.
     setFixedLayoutSize(targetLayoutSize);
@@ -1122,28 +1126,28 @@ void WebPage::setFixedLayoutSize(const IntSize& size)
 
 void WebPage::setPaginationMode(uint32_t mode)
 {
-    Page::Pagination pagination = m_page->pagination();
-    pagination.mode = static_cast<Page::Pagination::Mode>(mode);
+    Pagination pagination = m_page->pagination();
+    pagination.mode = static_cast<Pagination::Mode>(mode);
     m_page->setPagination(pagination);
 }
 
 void WebPage::setPaginationBehavesLikeColumns(bool behavesLikeColumns)
 {
-    Page::Pagination pagination = m_page->pagination();
+    Pagination pagination = m_page->pagination();
     pagination.behavesLikeColumns = behavesLikeColumns;
     m_page->setPagination(pagination);
 }
 
 void WebPage::setPageLength(double pageLength)
 {
-    Page::Pagination pagination = m_page->pagination();
+    Pagination pagination = m_page->pagination();
     pagination.pageLength = pageLength;
     m_page->setPagination(pagination);
 }
 
 void WebPage::setGapBetweenPages(double gap)
 {
-    Page::Pagination pagination = m_page->pagination();
+    Pagination pagination = m_page->pagination();
     pagination.gap = gap;
     m_page->setPagination(pagination);
 }
@@ -2059,6 +2063,9 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings->setMockScrollbarsEnabled(store.getBoolValueForKey(WebPreferencesKey::mockScrollbarsEnabledKey()));
     settings->setHyperlinkAuditingEnabled(store.getBoolValueForKey(WebPreferencesKey::hyperlinkAuditingEnabledKey()));
     settings->setRequestAnimationFrameEnabled(store.getBoolValueForKey(WebPreferencesKey::requestAnimationFrameEnabledKey()));
+#if ENABLE(SMOOTH_SCROLLING)
+    settings->setEnableScrollAnimator(store.getBoolValueForKey(WebPreferencesKey::scrollAnimatorEnabledKey()));
+#endif
 
     // <rdar://problem/10697417>: It is necessary to force compositing when accelerate drawing
     // is enabled on Mac so that scrollbars are always in their own layers.

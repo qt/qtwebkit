@@ -23,25 +23,32 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
-#include "VideoLayerChromium.h"
+#ifndef WebVideoLayerImpl_h
+#define WebVideoLayerImpl_h
+
 #include <public/WebVideoLayer.h>
 
+namespace WebCore {
+class VideoLayerChromium;
+}
+
 namespace WebKit {
+class WebLayerImpl;
 
-WebVideoLayer WebVideoLayer::create(WebVideoFrameProvider* provider)
-{
-    return WebVideoLayer(WebCore::VideoLayerChromium::create(provider));
+class WebVideoLayerImpl : public WebVideoLayer {
+public:
+    explicit WebVideoLayerImpl(PassRefPtr<WebCore::VideoLayerChromium>);
+    virtual ~WebVideoLayerImpl();
+
+    // WebVideoLayer implementation.
+    virtual WebLayer* layer() OVERRIDE;
+    virtual bool active() const OVERRIDE;
+
+private:
+    OwnPtr<WebLayerImpl> m_layer;
+};
+
 }
 
-WebVideoLayer::WebVideoLayer(PassRefPtr<WebCore::VideoLayerChromium> layer)
-    : WebLayer(layer)
-{
-}
+#endif // WebVideoLayerImpl_h
 
-bool WebVideoLayer::active() const
-{
-    return m_private->layerTreeHost();
-}
-
-} // namespace WebKit

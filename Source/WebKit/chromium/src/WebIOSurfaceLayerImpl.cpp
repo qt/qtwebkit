@@ -23,42 +23,40 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WebScrollableLayer_h
-#define WebScrollableLayer_h
+#include "config.h"
+#include "WebIOSurfaceLayerImpl.h"
 
-#include "WebCommon.h"
-#include "WebLayer.h"
-#include "WebPoint.h"
-#include "WebRect.h"
-#include "WebVector.h"
+#include "IOSurfaceLayerChromium.h"
+#include "WebLayerImpl.h"
+
+using WebCore::IOSurfaceLayerChromium;
 
 namespace WebKit {
 
-class WebScrollableLayer : public WebLayer {
-public:
-    WebScrollableLayer() { }
-    WebScrollableLayer(const WebScrollableLayer& layer) : WebLayer(layer) { }
-    virtual ~WebScrollableLayer() { }
-    WebScrollableLayer& operator=(const WebScrollableLayer& layer)
-    {
-        WebLayer::assign(layer);
-        return *this;
-    }
+WebIOSurfaceLayer* WebIOSurfaceLayer::create()
+{
+    RefPtr<IOSurfaceLayerChromium> layer = IOSurfaceLayerChromium::create();
+    layer->setIsDrawable(true);
+    return new WebIOSurfaceLayerImpl(layer.release());
+}
 
-    WEBKIT_EXPORT void setScrollPosition(WebPoint);
-    WEBKIT_EXPORT void setScrollable(bool);
-    WEBKIT_EXPORT void setHaveWheelEventHandlers(bool);
-    WEBKIT_EXPORT void setShouldScrollOnMainThread(bool);
-    WEBKIT_EXPORT void setNonFastScrollableRegion(const WebVector<WebRect>&);
-    WEBKIT_EXPORT void setIsContainerForFixedPositionLayers(bool);
-    WEBKIT_EXPORT void setFixedToContainerLayer(bool);
+WebIOSurfaceLayerImpl::WebIOSurfaceLayerImpl(PassRefPtr<IOSurfaceLayerChromium> layer)
+    : m_layer(adoptPtr(new WebLayerImpl(layer)))
+{
+}
 
+WebIOSurfaceLayerImpl::~WebIOSurfaceLayerImpl()
+{
+}
 
-#if WEBKIT_IMPLEMENTATION
-    WebScrollableLayer(const WTF::PassRefPtr<WebCore::LayerChromium>& layer) : WebLayer(layer) { }
-#endif
-};
+void WebIOSurfaceLayerImpl::setIOSurfaceProperties(unsigned ioSurfaceId, WebSize size)
+{
+    static_cast<IOSurfaceLayerChromium*>(m_layer->layer())->setIOSurfaceProperties(ioSurfaceId, size);
+}
+
+WebLayer* WebIOSurfaceLayerImpl::layer()
+{
+    return m_layer.get();
+}
 
 } // namespace WebKit
-
-#endif // WebScrollableLayer_h

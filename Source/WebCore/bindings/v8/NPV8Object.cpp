@@ -39,7 +39,6 @@
 #include "V8Binding.h"
 #include "V8GCController.h"
 #include "V8NPUtils.h"
-#include "V8Proxy.h"
 #include "WrapperTypeInfo.h"
 #include "npruntime_impl.h"
 #include "npruntime_priv.h"
@@ -67,15 +66,6 @@ static v8::Local<v8::Context> toV8Context(NPP npp, NPObject* npObject)
     if (!window || !window->isCurrentlyDisplayedInFrame())
         return v8::Local<v8::Context>();
     return ScriptController::mainWorldContext(object->rootObject->frame());
-}
-
-static V8Proxy* toV8Proxy(NPObject* npObject)
-{
-    V8NPObject* object = reinterpret_cast<V8NPObject*>(npObject);
-    Frame* frame = object->rootObject->frame();
-    if (!frame)
-        return 0;
-    return frame->script()->proxy();
 }
 
 static V8NPObjectMap* staticV8NPObjectMap()
@@ -335,9 +325,6 @@ bool _NPN_EvaluateHelper(NPP npp, bool popupsAllowed, NPObject* npObject, NPStri
     if (context.IsEmpty())
         return false;
 
-    V8Proxy* proxy = toV8Proxy(npObject);
-    ASSERT(proxy);
-
     v8::Context::Scope scope(context);
     ExceptionCatcher exceptionCatcher;
 
@@ -346,10 +333,14 @@ bool _NPN_EvaluateHelper(NPP npp, bool popupsAllowed, NPObject* npObject, NPStri
     if (!popupsAllowed)
         filename = "npscript";
 
+    V8NPObject* v8NpObject = reinterpret_cast<V8NPObject*>(npObject);
+    Frame* frame = v8NpObject->rootObject->frame();
+    ASSERT(frame);
+
     String script = String::fromUTF8(npScript->UTF8Characters, npScript->UTF8Length);
 
     UserGestureIndicator gestureIndicator(popupsAllowed ? DefinitelyProcessingUserGesture : PossiblyProcessingUserGesture);
-    v8::Local<v8::Value> v8result = proxy->evaluate(ScriptSourceCode(script, KURL(ParsedURLString, filename)), 0);
+    v8::Local<v8::Value> v8result = frame->script()->compileAndRunScript(ScriptSourceCode(script, KURL(ParsedURLString, filename)));
 
     if (v8result.IsEmpty())
         return false;

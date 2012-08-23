@@ -46,12 +46,6 @@
 #include <wtf/Vector.h>
 #include <wtf/text/TextPosition.h>
 
-#if defined(ENABLE_DOM_STATS_COUNTERS) && PLATFORM(CHROMIUM)
-#define INC_STATS(name) StatsCounter::incrementStatsCounter(name)
-#else
-#define INC_STATS(name)
-#endif
-
 namespace WebCore {
 
     class CachedScript;
@@ -66,8 +60,6 @@ namespace WebCore {
     class V8IsolatedContext;
     class V8PerContextData;
     class WorldContextHandle;
-
-    const int kMaxRecursionDepth = 22;
 
     // Note: although the pointer is raw, the instance is kept alive by a strong
     // reference to the v8 context it contains, which is not made weak until we
@@ -87,46 +79,12 @@ namespace WebCore {
 
         Frame* frame() const { return m_frame; }
 
-        void finishedWithEvent(Event*) { }
-
-        // Evaluate a script file in the current execution environment.
-        // The caller must hold an execution context.
-        // If cannot evalute the script, it returns an error.
-        v8::Local<v8::Value> evaluate(const ScriptSourceCode&, Node*);
-
-        // Run an already compiled script.
-        v8::Local<v8::Value> runScript(v8::Handle<v8::Script>);
-
-        // Returns V8 Context of a frame. If none exists, creates
-        // a new context. It is potentially slow and consumes memory.
-        static v8::Local<v8::Context> context(Frame*);
-
-        v8::Local<v8::Context> context();
-        v8::Local<v8::Context> isolatedWorldContext(int worldId);
-        bool matchesCurrentContext();
-
         // FIXME: This should eventually take DOMWrapperWorld argument!
         // FIXME: This method will be soon removed, as all methods that access windowShell()
         // will be moved to ScriptController.
         V8DOMWindowShell* windowShell() const;
-
-        // FIXME: Move m_isolatedWorlds to ScriptController and remove this getter.
-        IsolatedWorldMap& isolatedWorlds() { return m_isolatedWorlds; }
-
-        // FIXME: Move m_isolatedWorldSecurityOrigins to ScriptController and remove this getter.
-        IsolatedWorldSecurityOriginMap& isolatedWorldSecurityOrigins() { return m_isolatedWorldSecurityOrigins; }
-
     private:
-        PassOwnPtr<v8::ScriptData> precompileScript(v8::Handle<v8::String>, CachedScript*);
-
         Frame* m_frame;
-
-        // The isolated worlds we are tracking for this frame. We hold them alive
-        // here so that they can be used again by future calls to
-        // evaluateInIsolatedWorld().
-        IsolatedWorldMap m_isolatedWorlds;
-        
-        IsolatedWorldSecurityOriginMap m_isolatedWorldSecurityOrigins;
     };
 }
 

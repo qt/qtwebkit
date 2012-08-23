@@ -66,6 +66,7 @@ SET(JavaScriptCore_SOURCES
 
     dfg/DFGAbstractState.cpp
     dfg/DFGArgumentsSimplificationPhase.cpp
+    dfg/DFGArrayMode.cpp
     dfg/DFGAssemblyHelpers.cpp
     dfg/DFGByteCodeParser.cpp
     dfg/DFGCapabilities.cpp
@@ -107,6 +108,7 @@ SET(JavaScriptCore_SOURCES
     heap/CopiedSpace.cpp
     heap/ConservativeRoots.cpp
     heap/DFGCodeBlocks.cpp
+    heap/GCThreadSharedData.cpp
     heap/HandleSet.cpp
     heap/HandleStack.cpp
     heap/Heap.cpp

@@ -52,15 +52,12 @@
 #include "V8NodeList.h"
 #include "V8ObjectConstructor.h"
 #include "V8PerContextData.h"
-#include "V8Proxy.h"
 #include "V8StyleSheet.h"
 #include "V8WorkerContextEventListener.h"
-#include "V8XPathNSResolver.h"
 #include "WebGLContextAttributes.h"
 #include "WebGLUniformLocation.h"
 #include "WorkerContextExecutionProxy.h"
 #include "WrapperTypeInfo.h"
-#include "XPathNSResolver.h"
 #include <algorithm>
 #include <utility>
 #include <v8-debug.h>
@@ -110,12 +107,6 @@ v8::Local<v8::Function> V8DOMWrapper::constructorForType(WrapperTypeInfo* type, 
 }
 #endif
 
-V8PerContextData* V8DOMWrapper::perContextData(V8Proxy* proxy)
-{
-    V8DOMWindowShell* shell = proxy->windowShell();
-    return shell ? shell->perContextData() : 0;
-}
-
 #if ENABLE(WORKERS)
 V8PerContextData* V8DOMWrapper::perContextData(WorkerContext*)
 {
@@ -135,7 +126,7 @@ void V8DOMWrapper::setNamedHiddenWindowReference(Frame* frame, const char* name,
     // Get DOMWindow
     if (!frame)
         return; // Object might be detached from window
-    v8::Handle<v8::Context> context = V8Proxy::context(frame);
+    v8::Handle<v8::Context> context = frame->script()->currentWorldContext();
     if (context.IsEmpty())
         return;
 
@@ -166,23 +157,19 @@ PassRefPtr<NodeFilter> V8DOMWrapper::wrapNativeNodeFilter(v8::Handle<v8::Value> 
     return NodeFilter::create(V8NodeFilterCondition::create(filter));
 }
 
-v8::Local<v8::Object> V8DOMWrapper::instantiateV8Object(V8Proxy* proxy, WrapperTypeInfo* type, void* impl)
+v8::Local<v8::Object> V8DOMWrapper::instantiateV8Object(Frame* frame, WrapperTypeInfo* type, void* impl)
 {
 #if ENABLE(WORKERS)
     WorkerContext* workerContext = 0;
 #endif
-    V8PerContextData* contextData = 0;
-    V8IsolatedContext* isolatedContext;
-    if (UNLIKELY(!!(isolatedContext = V8IsolatedContext::getEntered()))) {
-        contextData = isolatedContext->perContextData();
-    } else if (!proxy) {
+    if (!frame) {
         v8::Handle<v8::Context> context = v8::Context::GetCurrent();
         if (!context.IsEmpty()) {
             v8::Handle<v8::Object> globalPrototype = v8::Handle<v8::Object>::Cast(context->Global()->GetPrototype());
             if (isWrapperOfType(globalPrototype, &V8DOMWindow::info)) {
-                Frame* frame = V8DOMWindow::toNative(globalPrototype)->frame();
-                if (frame && frame->script()->canExecuteScripts(NotAboutToExecuteScript))
-                    proxy = frame->script()->proxy();
+                Frame* globalFrame = V8DOMWindow::toNative(globalPrototype)->frame();
+                if (globalFrame && globalFrame->script()->canExecuteScripts(NotAboutToExecuteScript))
+                    frame = globalFrame;
             }
 #if ENABLE(WORKERS)
             else if (isWrapperOfType(globalPrototype, &V8WorkerContext::info))
@@ -191,23 +178,21 @@ v8::Local<v8::Object> V8DOMWrapper::instantiateV8Object(V8Proxy* proxy, WrapperT
         }
     }
 
-    v8::Local<v8::Object> instance;
-    if (!contextData) {
-        if (proxy)
-            contextData = perContextData(proxy);
+    V8PerContextData* contextData = 0;
+    if (frame)
+        contextData = perContextDataForCurrentWorld(frame);
 #if ENABLE(WORKERS)
-        else if (workerContext)
-            contextData = perContextData(workerContext);
+    else if (workerContext)
+        contextData = perContextData(workerContext);
 #endif
-    }
 
+    v8::Local<v8::Object> instance;
     if (contextData)
         instance = contextData->createWrapperFromCache(type);
     else {
         v8::Local<v8::Function> function = type->getTemplate()->GetFunction();
         instance = V8ObjectConstructor::newInstance(function);
     }
-
     if (!instance.IsEmpty()) {
         // Avoid setting the DOM wrapper for failed allocations.
         setDOMWrapper(instance, type, impl);
@@ -292,17 +277,5 @@ PassRefPtr<EventListener> V8DOMWrapper::getEventListener(v8::Local<v8::Value> va
     return 0;
 #endif
 }
-
-// XPath-related utilities
-RefPtr<XPathNSResolver> V8DOMWrapper::getXPathNSResolver(v8::Handle<v8::Value> value, V8Proxy* proxy)
-{
-    RefPtr<XPathNSResolver> resolver;
-    if (V8XPathNSResolver::HasInstance(value))
-        resolver = V8XPathNSResolver::toNative(v8::Handle<v8::Object>::Cast(value));
-    else if (value->IsObject())
-        resolver = V8CustomXPathNSResolver::create(value->ToObject());
-    return resolver;
-}
-
 
 }  // namespace WebCore

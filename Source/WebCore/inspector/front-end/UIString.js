@@ -1,5 +1,8 @@
 /*
- * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2011 Google Inc.  All rights reserved.
+ * Copyright (C) 2006, 2007, 2008 Apple Inc.  All rights reserved.
+ * Copyright (C) 2007 Matt Lilek (pewtermoose@gmail.com).
+ * Copyright (C) 2009 Joseph Pecoraro
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -10,6 +13,9 @@
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
  *     documentation and/or other materials provided with the distribution.
+ * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
+ *     its contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY APPLE AND ITS CONTRIBUTORS "AS IS" AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -22,27 +28,26 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#include "config.h"
-#include <public/WebImageLayer.h>
-
-#include "ImageLayerChromium.h"
-
-namespace WebKit {
-
-WebImageLayer WebImageLayer::create()
+ /**
+ * @param {string} string
+ * @param {...*} vararg
+ */
+WebInspector.UIString = function(string, vararg)
 {
-    return WebImageLayer(WebCore::ImageLayerChromium::create());
+    if (Preferences.localizeUI) {
+        if (window.localizedStrings && string in window.localizedStrings)
+            string = window.localizedStrings[string];
+        else {
+            if (!(string in WebInspector._missingLocalizedStrings)) {
+                console.warn("Localized string \"" + string + "\" not found.");
+                WebInspector._missingLocalizedStrings[string] = true;
+            }
+    
+            if (Preferences.showMissingLocalizedStrings)
+                string += " (not localized)";
+        }
+    }
+    return String.vsprintf(string, Array.prototype.slice.call(arguments, 1));
 }
 
-WebImageLayer::WebImageLayer(PassRefPtr<WebCore::ImageLayerChromium> layer)
-    : WebLayer(layer)
-{
-}
-
-void WebImageLayer::setBitmap(SkBitmap bitmap)
-{
-    unwrap<WebCore::ImageLayerChromium>()->setBitmap(bitmap);
-}
-
-} // namespace WebKit
+WebInspector._missingLocalizedStrings = {};

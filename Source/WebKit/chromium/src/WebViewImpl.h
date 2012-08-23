@@ -94,6 +94,7 @@ class ContextMenuClientImpl;
 class DeviceOrientationClientProxy;
 class DragScrollTimer;
 class GeolocationClientProxy;
+class LinkHighlight;
 class WebHelperPluginImpl;
 class NonCompositedContentHost;
 class PrerendererClientImpl;
@@ -143,7 +144,7 @@ public:
     virtual void setCompositorSurfaceReady();
     virtual void animate(double);
     virtual void layout(); // Also implements WebLayerTreeViewClient::layout()
-    virtual void paint(WebCanvas*, const WebRect&);
+    virtual void paint(WebCanvas*, const WebRect&, PaintOptions = ReadbackFromCompositorIfAvailable);
     virtual void themeChanged();
     virtual void composite(bool finish);
     virtual void setNeedsRedraw();
@@ -563,6 +564,8 @@ public:
 
 #if ENABLE(GESTURE_EVENTS)
     void computeScaleAndScrollForHitRect(const WebRect& hitRect, AutoZoomType, float& scale, WebPoint& scroll);
+    WebCore::Node* bestTouchLinkNode(WebCore::IntPoint touchEventLocation);
+    void enableTouchHighlight(WebCore::IntPoint touchEventLocation);
 #endif
     void animateZoomAroundPoint(const WebCore::IntPoint&, AutoZoomType);
 
@@ -585,6 +588,12 @@ public:
     virtual void requestPointerUnlock();
     virtual bool isPointerLocked();
 #endif
+
+#if ENABLE(GESTURE_EVENTS)
+    // Exposed for tests.
+    LinkHighlight* linkHighlight() { return m_linkHighlight.get(); }
+#endif
+
 
 private:
     bool computePageScaleFactorLimits();
@@ -816,7 +825,7 @@ private:
     WebCore::IntRect m_rootLayerScrollDamage;
     OwnPtr<NonCompositedContentHost> m_nonCompositedContentHost;
     WebLayerTreeView m_layerTreeView;
-    WebLayer m_rootLayer;
+    WebLayer* m_rootLayer;
     WebCore::GraphicsLayer* m_rootGraphicsLayer;
     bool m_isAcceleratedCompositingActive;
     bool m_compositorCreationFailed;
@@ -852,6 +861,9 @@ private:
     WebPoint m_lastWheelPosition;
     WebPoint m_lastWheelGlobalPosition;
     int m_flingModifier;
+#if ENABLE(GESTURE_EVENTS)
+    OwnPtr<LinkHighlight> m_linkHighlight;
+#endif
 };
 
 } // namespace WebKit

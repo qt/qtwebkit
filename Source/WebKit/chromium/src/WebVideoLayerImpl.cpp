@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2011 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,30 +24,35 @@
  */
 
 #include "config.h"
-#include <public/WebIOSurfaceLayer.h>
+#include "WebVideoLayerImpl.h"
 
-#include "IOSurfaceLayerChromium.h"
-#include <public/WebSize.h>
-
-using namespace WebCore;
+#include "VideoLayerChromium.h"
+#include "WebLayerImpl.h"
 
 namespace WebKit {
 
-WebIOSurfaceLayer WebIOSurfaceLayer::create()
+WebVideoLayer* WebVideoLayer::create(WebVideoFrameProvider* provider)
 {
-    RefPtr<IOSurfaceLayerChromium> layer = IOSurfaceLayerChromium::create();
-    layer->setIsDrawable(true);
-    return WebIOSurfaceLayer(layer.release());
+    return new WebVideoLayerImpl(WebCore::VideoLayerChromium::create(provider));
 }
 
-void WebIOSurfaceLayer::setIOSurfaceProperties(unsigned ioSurfaceId, WebSize size)
+WebVideoLayerImpl::WebVideoLayerImpl(PassRefPtr<WebCore::VideoLayerChromium> layer)
+    : m_layer(adoptPtr(new WebLayerImpl(layer)))
 {
-    unwrap<IOSurfaceLayerChromium>()->setIOSurfaceProperties(ioSurfaceId, size);
 }
 
-WebIOSurfaceLayer::WebIOSurfaceLayer(PassRefPtr<IOSurfaceLayerChromium> layer)
-    : WebLayer(layer)
+WebVideoLayerImpl::~WebVideoLayerImpl()
 {
+}
+
+WebLayer* WebVideoLayerImpl::layer()
+{
+    return m_layer.get();
+}
+
+bool WebVideoLayerImpl::active() const
+{
+    return m_layer->layer()->layerTreeHost();
 }
 
 } // namespace WebKit

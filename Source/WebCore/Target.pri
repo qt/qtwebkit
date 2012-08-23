@@ -1118,6 +1118,7 @@ SOURCES += \
     rendering/RenderFileUploadControl.cpp \
     rendering/RenderFlexibleBox.cpp \
     rendering/RenderFlowThread.cpp \
+    rendering/RenderFlowThreadContainer.cpp \
     rendering/RenderFrame.cpp \
     rendering/RenderFrameBase.cpp \
     rendering/RenderFrameSet.cpp \
@@ -1173,6 +1174,7 @@ SOURCES += \
     rendering/RenderTextControlMultiLine.cpp \
     rendering/RenderTextControlSingleLine.cpp \
     rendering/RenderTextFragment.cpp \
+    rendering/RenderTextTrackCue.cpp \
     rendering/RenderTheme.cpp \
     rendering/RenderTreeAsText.cpp \
     rendering/RenderView.cpp \
@@ -2284,6 +2286,7 @@ HEADERS += \
     rendering/mathml/RenderMathMLSquareRoot.h \
     rendering/mathml/RenderMathMLSubSup.h \
     rendering/mathml/RenderMathMLUnderOver.h \
+    rendering/Pagination.h \
     rendering/PaintInfo.h \
     rendering/PaintPhase.h \
     rendering/PointerEventsHitRules.h \
@@ -2794,10 +2797,8 @@ contains(DEFINES, WTF_USE_LIBXML2=1) {
 }
 
 contains(DEFINES, ENABLE_SMOOTH_SCROLLING=1) {
-    win32-*|wince* {
-        HEADERS += platform/ScrollAnimatorNone.h
-        SOURCES += platform/ScrollAnimatorNone.cpp
-    }
+    HEADERS += platform/ScrollAnimatorNone.h
+    SOURCES += platform/ScrollAnimatorNone.cpp
 }
 
 win32-*|wince* {

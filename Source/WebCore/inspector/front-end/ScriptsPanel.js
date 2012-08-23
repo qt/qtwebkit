@@ -28,6 +28,8 @@ importScript("BreakpointsSidebarPane.js");
 importScript("CallStackSidebarPane.js");
 importScript("FilteredItemSelectionDialog.js");
 importScript("JavaScriptSourceFrame.js");
+importScript("NavigatorOverlayController.js");
+importScript("NavigatorView.js");
 importScript("RevisionHistoryView.js");
 importScript("ScopeChainSidebarPane.js");
 importScript("ScriptsNavigator.js");
@@ -390,7 +392,7 @@ WebInspector.ScriptsPanel.prototype = {
 
     showFunctionDefinition: function(functionLocation)
     {
-        WebInspector.showPanelForAnchorNavigation(this);
+        WebInspector.inspectorView.showPanelForAnchorNavigation(this);
         var uiLocation = WebInspector.debuggerModel.rawLocationToUILocation(functionLocation);
         this._showSourceLine(uiLocation.uiSourceCode, uiLocation.lineNumber);
     },

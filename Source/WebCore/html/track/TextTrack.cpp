@@ -199,7 +199,7 @@ void TextTrack::addCue(PassRefPtr<TextTrackCue> prpCue, ExceptionCode& ec)
     RefPtr<TextTrackCue> cue = prpCue;
 
     // TODO(93143): Add spec-compliant behavior for negative time values.
-    if (cue->startTime() < 0 || cue->endTime() < 0)
+    if (isnan(cue->startTime()) || isnan(cue->endTime()) || cue->startTime() < 0 || cue->endTime() < 0)
         return;
 
     // 4.8.10.12.4 Text track API
@@ -292,6 +292,17 @@ int TextTrack::trackIndex()
 void TextTrack::invalidateTrackIndex()
 {
     m_trackIndex = invalidTrackIndex;
+}
+
+bool TextTrack::isRendered()
+{
+    if (m_kind != captionsKeyword() && m_kind != subtitlesKeyword())
+        return false;
+
+    if (m_mode != SHOWING && !m_showingByDefault)
+        return false;
+
+    return true;
 }
 
 TextTrackCueList* TextTrack::ensureTextTrackCueList()

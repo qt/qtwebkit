@@ -34,6 +34,7 @@
 #include "DrawingAreaProxy.h"
 #include "EventDispatcherMessages.h"
 #include "FindIndicator.h"
+#include "InjectedBundleMessageKinds.h"
 #include "Logging.h"
 #include "MessageID.h"
 #include "NativeWebKeyboardEvent.h"
@@ -182,7 +183,7 @@ WebPageProxy::WebPageProxy(PageClient* pageClient, PassRefPtr<WebProcessProxy> p
     , m_drawsTransparentBackground(false)
     , m_areMemoryCacheClientCallsEnabled(true)
     , m_useFixedLayout(false)
-    , m_paginationMode(Page::Pagination::Unpaginated)
+    , m_paginationMode(Pagination::Unpaginated)
     , m_paginationBehavesLikeColumns(false)
     , m_pageLength(0)
     , m_gapBetweenPages(0)
@@ -1501,7 +1502,7 @@ void WebPageProxy::setFixedLayoutSize(const IntSize& size)
     m_process->send(Messages::WebPage::SetFixedLayoutSize(size), m_pageID);
 }
 
-void WebPageProxy::setPaginationMode(WebCore::Page::Pagination::Mode mode)
+void WebPageProxy::setPaginationMode(WebCore::Pagination::Mode mode)
 {
     if (mode == m_paginationMode)
         return;
@@ -2885,6 +2886,12 @@ void WebPageProxy::setTextFromItemForPopupMenu(WebPopupMenuProxy*, int32_t index
 NativeWebMouseEvent* WebPageProxy::currentlyProcessedMouseDownEvent()
 {
     return m_currentlyProcessedMouseDownEvent.get();
+}
+
+void WebPageProxy::postMessageToInjectedBundle(const String& messageName, APIObject* messageBody)
+{
+    // FIXME: We should consider returning false from this function if the messageBody cannot be encoded.
+    process()->deprecatedSend(InjectedBundleMessage::PostMessageToPage, m_pageID, CoreIPC::In(messageName, WebContextUserMessageEncoder(messageBody)));
 }
 
 #if PLATFORM(GTK)

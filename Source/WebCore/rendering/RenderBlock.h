@@ -266,6 +266,8 @@ public:
 
     ColumnInfo* columnInfo() const;
     int columnGap() const;
+
+    void updateColumnInfoFromStyle(RenderStyle*);
     
     // These two functions take the ColumnInfo* to avoid repeated lookups of the info in the global HashMap.
     unsigned columnCount(ColumnInfo*) const;
@@ -743,7 +745,6 @@ private:
     void paintContents(PaintInfo&, const LayoutPoint&);
     void paintColumnContents(PaintInfo&, const LayoutPoint&, bool paintFloats = false);
     void paintColumnRules(PaintInfo&, const LayoutPoint&);
-    void paintEllipsisBoxes(PaintInfo&, const LayoutPoint&);
     void paintSelection(PaintInfo&, const LayoutPoint&);
     void paintCaret(PaintInfo&, const LayoutPoint&, CaretType);
 

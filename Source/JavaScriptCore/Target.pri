@@ -79,6 +79,7 @@ SOURCES += \
     heap/HandleSet.cpp \
     heap/HandleStack.cpp \
     heap/BlockAllocator.cpp \
+    heap/GCThreadSharedData.cpp \
     heap/Heap.cpp \
     heap/HeapTimer.cpp \
     heap/IncrementalSweeper.cpp \
@@ -95,6 +96,7 @@ SOURCES += \
     debugger/Debugger.cpp \
     dfg/DFGAbstractState.cpp \
     dfg/DFGArgumentsSimplificationPhase.cpp \
+    dfg/DFGArrayMode.cpp \
     dfg/DFGAssemblyHelpers.cpp \
     dfg/DFGByteCodeParser.cpp \
     dfg/DFGCapabilities.cpp \

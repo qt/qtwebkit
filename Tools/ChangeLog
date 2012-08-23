@@ -1,3 +1,378 @@
+2012-08-23  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Add url bar to EWebLauncher and MiniBrowser/Efl.
+        https://bugs.webkit.org/show_bug.cgi?id=63966
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        EWebLauncher and MiniBrowser/Efl did not have functionality that users
+        navigates the site which they want.
+        This patch adds the urlbar and functionality to load url which users want.
+
+        * CMakeLists.txt:
+        Added to share urlbar theme for both EWebLauncher and MiniBrowser/Efl.
+        * EWebLauncher/CMakeLists.txt:
+        Added urlbar.c and dependency of urlbar theme.
+        In addition, changed macro name to THEME_DIR to share the code easily.
+        * EWebLauncher/ControlTheme/CMakeLists.txt: Added for urlbar theme.
+        * EWebLauncher/ControlTheme/entry.edc: Implemented urlbar theme.
+        * EWebLauncher/main.c:
+        Implemented to use the urlbar.
+        In addition, remove unnecessary border of webview to control webview and urlbar easily.
+        (_ELauncher):
+        (on_url_changed):
+        (browserCreate):
+        (closeWindow):
+        (findThemePath):
+        * EWebLauncher/url_bar.c: Implemented functionality of the urlbar.
+        (_url_bar_url_get_with_protocol):
+        (on_urlbar_key_down):
+        (on_urlbar_mouse_down):
+        (on_urlbar_focus_out):
+        (url_bar_add):
+        (url_bar_del):
+        (url_bar_url_set):
+        * EWebLauncher/url_bar.h: Added.
+        * MiniBrowser/efl/CMakeLists.txt:
+        * MiniBrowser/efl/main.c: Implemented to use the urlbar.
+        (_MiniBrowser):
+        (on_url_changed):
+        (browserCreate):
+
+2012-08-23  Balazs Kelemen  <kbalazs@webkit.org>
+
+        [nrwt, WTR] Remove workaround for timeout handing from r126062
+        https://bugs.webkit.org/show_bug.cgi?id=94609
+
+        Reviewed by Dirk Pranke.
+
+        Don't try to reset state if a timeout occured but inform
+        the harness that the web process is no longer reliable.
+
+        * Scripts/webkitpy/layout_tests/port/driver.py:
+        (Driver.run_test): Remove the workaround. Furthermore, handle the case when
+        the pid is unknown.
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::run):
+        * WebKitTestRunner/TestInvocation.cpp:
+        (WTR::TestInvocation::invoke):
+        (WTR::TestInvocation::dumpWebProcessUnresponsiveness):
+        * WebKitTestRunner/TestInvocation.h:
+        (TestInvocation):
+
+2012-08-23  Ádám Kallai  <kadam@inf.u-szeged.hu>
+
+        Unreviewed. Adding myself to committers list.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-08-22  Alexis Menard  <alexis@webkit.org>
+
+        Unreviewed update of my email.
+
+        * Scripts/webkitpy/common/config/committers.py:
+        * Scripts/webkitpy/common/config/watchlist:
+
+2012-08-22  Dirk Pranke  <dpranke@chromium.org>
+
+        Fix typos in r126374
+        https://bugs.webkit.org/show_bug.cgi?id=94665
+        Unreviewed, build fix.
+
+        Fix two issues that snuck in, one that caused a crash if there
+        were no baselines to optimize and one that occurred as a result
+        of failing to rename a variable when I changed the recursion to
+        a loop in the previous patch.
+
+        * Scripts/webkitpy/common/checkout/baselineoptimizer.py:
+        (BaselineOptimizer._optimize_by_pushing_results_up):
+
+2012-08-22  Dirk Pranke  <dpranke@chromium.org>
+
+        Baseline optimizer should try to optimize per-port if global optimization fails
+        https://bugs.webkit.org/show_bug.cgi?id=94665
+
+        Reviewed by Adam Barth.
+
+        Add a fallback strategy for optimizing baselines if the default
+        one fails; this one simply attempts to shift baselines up in the
+        tree and consolidates them if a parent and child in the fallback
+        path have the same result. This strategy is somewhat flawed in
+        that we will always put something in a parent dir even if we
+        "shouldn't"; for example, if chromium-mac produces a different
+        result from chromium-win and chromium-linux, then the new
+        algorithm will move the mac result into platform/chromium,
+        leaving chromium-mac empty. This result is still correct, but
+        perhaps confusing.
+
+        I haven't done much testing of this algorithm yet, so it's not
+        clear how many cases where this does a better job than the
+        default algorithm and how many it'll do a worse job.
+
+        * Scripts/webkitpy/common/checkout/baselineoptimizer.py:
+        (BaselineOptimizer._find_optimal_result_placement):
+        (BaselineOptimizer._optimize_by_most_specific_common_directory):
+        (BaselineOptimizer):
+        (BaselineOptimizer._optimize_by_pushing_results_up):
+        (BaselineOptimizer._find_in_fallbackpath):
+        * Scripts/webkitpy/common/checkout/baselineoptimizer_unittest.py:
+        (BaselineOptimizerTest.test_platform_mac_different):
+
+2012-08-22  Dirk Pranke  <dpranke@chromium.org>
+
+        add debug info, another test to webkit-patch optimize-baselines
+        https://bugs.webkit.org/show_bug.cgi?id=94762
+
+        Reviewed by Adam Barth.
+
+        This patch adds more debug logging for optimize-baselines so
+        that you can tell the before and after states and figure out
+        what the command is actually deciding to do.
+
+        Also, this command adds a (disabled) test for the problem in bug
+        94665. It's disabled because we don't have the fix yet (that
+        will be posted in a patch to that bug).
+
+        There should be no functional changes in this patch apart from
+        the additional logging.
+
+        Note that adding the debug logging exposed a bug in
+        filesystem_mock.relpath() (that would return None if the path
+        wasn't a subpath of the start); the real relpath computes a
+        relpath with parent dirs. Fixing this revealed a bad check in
+        the style checker's change_directory() call which was checking
+        for None.
+
+        * Scripts/webkitpy/common/checkout/baselineoptimizer.py:
+        (BaselineOptimizer._find_optimal_result_placement):
+        (BaselineOptimizer):
+        (BaselineOptimizer._optimize_by_most_specific_common_directory):
+        (BaselineOptimizer._move_baselines):
+        (BaselineOptimizer.optimize):
+        * Scripts/webkitpy/common/checkout/baselineoptimizer_unittest.py:
+        (BaselineOptimizerTest.disabled_test_platform_mac_different):
+        * Scripts/webkitpy/common/system/filesystem.py:
+        (FileSystem):
+        * Scripts/webkitpy/common/system/filesystem_mock.py:
+        (MockFileSystem):
+        (MockFileSystem.__init__):
+        (MockFileSystem.relpath):
+        * Scripts/webkitpy/common/system/filesystem_unittest.py:
+        (RealFileSystemTest.test_sep):
+        * Scripts/webkitpy/style/main.py:
+        (change_directory):
+
+2012-08-22  Alejandro Piñeiro  <apinheiro@igalia.com>
+
+        Dojo toggle buttons should expose ROLE_TOGGLE_BUTTON not ROLE_PUSH_BUTTON
+        https://bugs.webkit.org/show_bug.cgi?id=73819
+
+        Reviewed by Chris Fleizach.
+
+        Added a new role, Toggle Button, based on whether aria-pressed is present.
+        http://www.w3.org/TR/wai-aria/states_and_properties#aria-pressed
+
+        * DumpRenderTree/chromium/TestRunner/AccessibilityUIElementChromium.cpp:
+        (roleToString): added "ToggleButton" string for WebAccessibilityRoleToggleButton
+
+2012-08-23  Victor Carbune  <victor@rosedu.org>
+
+        Add myself to the committer list
+        https://bugs.webkit.org/show_bug.cgi?id=94659
+
+        Reviewed by James Robinson.
+
+        Added my email and IRC handle.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-08-22  Scott Graham  <scottmg@chromium.org>
+
+        Don't unconditionally define NOMINMAX on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=94742
+
+        Reviewed by Adrienne Walker.
+
+        Avoids a warning when building on Windows when NOMINMAX is defined
+        elsewhere or on the command line.
+
+        * TestWebKitAPI/config.h:
+
+2012-08-22  Zan Dobersek  <zandobersek@gmail.com>
+
+        REGRESSION(r126189): Reftest mismatches are (again) run through ImageDiff with 0.1 tolerance
+        https://bugs.webkit.org/show_bug.cgi?id=94704
+
+        Reviewed by Dirk Pranke.
+
+        Use tolerance=0 when acquiring diff image of reftest output.
+
+        * Scripts/webkitpy/layout_tests/controllers/single_test_runner.py:
+        (SingleTestRunner._compare_output_with_reference):
+
+2012-08-22  Tommy Widenflycht  <tommyw@google.com>
+
+        [chromium] MediaStream API: Add MockWebRTCPeerConnectionHandler
+        https://bugs.webkit.org/show_bug.cgi?id=93091
+
+        Reviewed by Adam Barth.
+
+        Add a skeleton MockWebRTCPeerConnectionHandler to DumpRenderTree,
+        to complete the infrastructure for RTCPeerConnection.
+
+        * DumpRenderTree/DumpRenderTree.gypi:
+        * DumpRenderTree/chromium/MockWebKitPlatformSupport.cpp:
+        (MockWebKitPlatformSupport::createRTCPeerConnectionHandler):
+        * DumpRenderTree/chromium/MockWebKitPlatformSupport.h:
+        (MockWebKitPlatformSupport):
+        * DumpRenderTree/chromium/MockWebMediaStreamCenter.cpp:
+        * DumpRenderTree/chromium/MockWebMediaStreamCenter.h:
+        * DumpRenderTree/chromium/MockWebRTCPeerConnectionHandler.cpp: Copied from Tools/DumpRenderTree/chromium/MockWebKitPlatformSupport.h.
+        (MockWebRTCPeerConnectionHandler::MockWebRTCPeerConnectionHandler):
+        (MockWebRTCPeerConnectionHandler::initialize):
+        * DumpRenderTree/chromium/MockWebRTCPeerConnectionHandler.h: Copied from Tools/DumpRenderTree/chromium/MockWebKitPlatformSupport.h.
+        (WebKit):
+        (MockWebRTCPeerConnectionHandler):
+        (MockWebRTCPeerConnectionHandler::MockWebRTCPeerConnectionHandler):
+
+2012-08-21  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Merge TestExpectationSerializer into TestExpectationLine
+        https://bugs.webkit.org/show_bug.cgi?id=94638
+
+        Reviewed by Dimitri Glazkov.
+
+        Moved all methods except, list_to_string which was moved to TestExpectations
+        from TestExpectationSerializer to TestExpectationLine and removed TestExpectationSerializer.
+
+        * Scripts/webkitpy/layout_tests/controllers/test_expectations_editor_unittest.py:
+        (TestExpectationEditorTests.assert_remove_roundtrip):
+        (TestExpectationEditorTests.assert_update_roundtrip):
+        * Scripts/webkitpy/layout_tests/models/test_expectations.py:
+        (ParseError.__repr__):
+        (TestExpectationLine):
+        (TestExpectationLine.create_passing_expectation):
+        (TestExpectationLine.to_string): Moved from TestExpectationSerializer.
+        (TestExpectationLine.to_csv): Ditto.
+        (TestExpectationLine._serialize_parsed_expectations): Ditto.
+        (TestExpectationLine._serialize_parsed_modifiers): Ditto.
+        (TestExpectationLine._format_line):
+        (TestExpectations.remove_configuration_from_test):
+        (TestExpectations.remove_rebaselined_tests):
+        (TestExpectations.add_skipped_tests):
+        (TestExpectations):
+        (TestExpectations.list_to_string): Moved from TestExpectationSerializer.
+        (TestExpectations.list_to_string.serialize):
+        (TestExpectations.list_to_string.nones_out):
+        * Scripts/webkitpy/layout_tests/models/test_expectations_unittest.py:
+        (TestExpectationSerializationTests): Renamed from TestExpectationSerializerTests.
+        (TestExpectationSerializationTests.__init__):
+        (TestExpectationSerializationTests.assert_round_trip):
+        (TestExpectationSerializationTests.assert_list_round_trip):
+        (TestExpectationSerializationTests.test_unparsed_to_string):
+        (TestExpectationSerializationTests.test_unparsed_list_to_string):
+        (TestExpectationSerializationTests.test_parsed_to_string):
+        (TestExpectationSerializationTests.test_serialize_parsed_expectations):
+        (TestExpectationSerializationTests.test_serialize_parsed_modifier_string):
+        (TestExpectationSerializationTests.test_format_line):
+        (TestExpectationSerializationTests.test_reconstitute_only_these):
+        * Scripts/webkitpy/tool/commands/expectations.py:
+        (OptimizeExpectations.execute):
+        * Scripts/webkitpy/tool/commands/queries.py:
+        (PrintExpectations.execute):
+        (PrintExpectations._format_lines):
+        * Scripts/webkitpy/tool/servers/gardeningserver.py:
+        (GardeningExpectationsUpdater.update_expectations):
+
+2012-08-22  Alexandre Elias  <aelias@chromium.org>
+
+        Unreviewed, add aelias@chromium.org to committers
+
+        I (aelias@chromium.org) have been approved for commit access and Apple
+        has confirmed receipt of my committer agreement.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-08-22  Alexey Proskuryakov  <ap@apple.com>
+
+        [WK2] Support posting injected bundle messages to a page
+        https://bugs.webkit.org/show_bug.cgi?id=94630
+
+        Reviewed by Sam Weinig.
+
+        * MiniBrowser/mac/WebBundle/WebBundleMain.m:
+        * TestWebKitAPI/InjectedBundleController.cpp:
+        (TestWebKitAPI::InjectedBundleController::initialize):
+        (TestWebKitAPI::InjectedBundleController::didReceiveMessageToPage):
+        * TestWebKitAPI/InjectedBundleController.h:
+        * TestWebKitAPI/InjectedBundleTest.h:
+        (TestWebKitAPI::InjectedBundleTest::didReceiveMessageToPage):
+        * WebKitTestRunner/InjectedBundle/InjectedBundle.cpp:
+        (WTR::InjectedBundle::didReceiveMessage):
+        (WTR::InjectedBundle::didReceiveMessageToPage):
+        (WTR::InjectedBundle::initialize):
+        * WebKitTestRunner/InjectedBundle/InjectedBundle.h:
+        Updated for new client API call.
+
+2012-08-22  Dominic Mazzoni  <dmazzoni@google.com>
+
+        REGRESSION (r125710): accessibility/accessibility-node-reparent.html, accessibility/accessibility-node-memory-management.html failing on GTK Linux
+        https://bugs.webkit.org/show_bug.cgi?id=94200
+
+        Reviewed by Chris Fleizach.
+
+        Adds reference counting for AtkObjects referenced by
+        AccessibilityUIElementGtk. This prevents bogus results and
+        assertion failures on AccessibilityUIElements whose underlying
+        object has been deleted (as opposed to just made defunct).
+
+        This fixes two tests that were previously failing because of this bug.
+
+        * DumpRenderTree/gtk/AccessibilityUIElementGtk.cpp:
+        (AccessibilityUIElement::AccessibilityUIElement):
+        (AccessibilityUIElement::~AccessibilityUIElement):
+
+2012-08-22  Gustavo Noronha Silva  <gns@gnome.org>
+
+        [GTK] Split WebCore/platform into a separate library
+        https://bugs.webkit.org/show_bug.cgi?id=94435
+
+        Reviewed by Martin Robinson.
+
+        More people have been reporting problems when linking WebCore because
+        the command line limit is being exceeded. Splitting WebCore a bit more
+        is in order.
+
+        * GNUmakefile.am: link libWebCorePlatform into DRT
+
+2012-08-22  Allan Sandfeld Jensen  <allan.jensen@nokia.com>
+
+        Unreviewed buildfix for Qt-minimal after r126291
+
+        Disable smooth scrolling when request-animation-frame has been disabled either
+        explicitly or as part of --minimal.
+
+        * qmake/mkspecs/features/features.prf:
+
+2012-08-22  Allan Sandfeld Jensen  <allan.jensen@nokia.com>
+
+        [Qt] Optionally support smooth-scrolling on all platforms
+        https://bugs.webkit.org/show_bug.cgi?id=74926
+
+        Reviewed by Simon Hausmann.
+
+        Enabled SMOOTH_SCROLLING on Qt, and expose the enable scroll animator
+        setting in QtTestBrowser so it can be tested.
+
+        * QtTestBrowser/launcherwindow.cpp:
+        (LauncherWindow::createChrome):
+        (LauncherWindow::toggleScrollAnimator):
+        * QtTestBrowser/launcherwindow.h:
+        (WindowOptions::WindowOptions):
+        (WindowOptions):
+        (LauncherWindow):
+        * qmake/mkspecs/features/features.pri:
+
 2012-08-22  Dominik Röttsches  <dominik.rottsches@intel.com>
 
         Unreviewed, adding myself to committers.py.

@@ -45,6 +45,7 @@
 #import "Chrome.h"
 #import "ColorMac.h"
 #import "ContextMenuController.h"
+#import "Font.h"
 #import "Frame.h"
 #import "FrameLoaderClient.h"
 #import "FrameSelection.h"
@@ -1576,7 +1577,8 @@ static const AccessibilityRoleMap& createAccessibilityRoleMap()
         { DivRole, NSAccessibilityGroupRole },
         { FormRole, NSAccessibilityGroupRole },
         { SpinButtonRole, NSAccessibilityIncrementorRole },
-        { FooterRole, NSAccessibilityGroupRole }
+        { FooterRole, NSAccessibilityGroupRole },
+        { ToggleButtonRole, NSAccessibilityButtonRole }
     };
     AccessibilityRoleMap& roleMap = *new AccessibilityRoleMap;
     

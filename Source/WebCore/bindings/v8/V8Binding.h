@@ -40,7 +40,6 @@
 #include "V8HiddenPropertyName.h"
 #include "V8ObjectConstructor.h"
 #include "V8PerIsolateData.h"
-#include "V8Proxy.h"
 #include "V8StringResource.h"
 #include "V8ThrowException.h"
 #include "V8ValueCache.h"
@@ -51,6 +50,10 @@
 namespace WebCore {
 
     class DOMStringList;
+    class ScriptExecutionContext;
+    class WorldContextHandle;
+
+    const int kMaxRecursionDepth = 22;
 
     // Schedule a DOM exception to be thrown, if the exception code is different
     // from zero.
@@ -348,6 +351,7 @@ namespace WebCore {
     v8::Persistent<v8::FunctionTemplate> createRawTemplate();
 
     PassRefPtr<DOMStringList> toDOMStringList(v8::Handle<v8::Value>);
+    PassRefPtr<XPathNSResolver> toXPathNSResolver(v8::Handle<v8::Value>);
 
     // Returns the window object associated with a context.
     DOMWindow* toDOMWindow(v8::Handle<v8::Context>);
@@ -365,6 +369,7 @@ namespace WebCore {
     // If the current context causes out of memory, JavaScript setting
     // is disabled and it returns true.
     bool handleOutOfMemory();
+    v8::Local<v8::Value> handleMaxRecursionDepthExceeded();
 
     void crashIfV8IsDead();
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2011 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,44 +23,42 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef LinkHighlight_h
-#define LinkHighlight_h
+#ifndef WebExternalTextureLayerImpl_h
+#define WebExternalTextureLayerImpl_h
 
-#include "ContentLayerChromium.h"
-#include "Path.h"
-#include <public/WebAnimationDelegate.h>
-#include <wtf/RefPtr.h>
+#include "TextureLayerChromium.h"
+#include <public/WebExternalTextureLayer.h>
 
-#if USE(ACCELERATED_COMPOSITING)
+namespace WebKit {
 
-namespace WebCore {
+class WebLayerImpl;
 
-class GraphicsLayerChromium;
-
-class LinkHighlight : public RefCounted<LinkHighlight>, public ContentLayerDelegate, public WebKit::WebAnimationDelegate {
+class WebExternalTextureLayerImpl : public WebExternalTextureLayer,
+                                    public WebCore::TextureLayerChromiumClient {
 public:
-    static PassRefPtr<LinkHighlight> create(GraphicsLayerChromium* parent, const Path&, int animationId, int groupId);
-    virtual ~LinkHighlight();
+    explicit WebExternalTextureLayerImpl(WebExternalTextureLayerClient*);
+    virtual ~WebExternalTextureLayerImpl();
 
-    ContentLayerChromium* contentLayer();
+    // WebExternalTextureLayer implementation.
+    virtual WebLayer* layer() OVERRIDE;
+    virtual void setTextureId(unsigned) OVERRIDE;
+    virtual void setFlipped(bool) OVERRIDE;
+    virtual void setUVRect(const WebFloatRect&) OVERRIDE;
+    virtual void setOpaque(bool) OVERRIDE;
+    virtual void setPremultipliedAlpha(bool) OVERRIDE;
+    virtual void willModifyTexture() OVERRIDE;
+    virtual void setRateLimitContext(bool) OVERRIDE;
 
-    // ContentLayerDelegate implementation.
-    virtual void paintContents(SkCanvas*, const IntRect& clipRect, FloatRect& opaque) OVERRIDE;
-
-    // WebAnimationDelegate implementation.
-    virtual void notifyAnimationStarted(double time) OVERRIDE;
-    virtual void notifyAnimationFinished(double time) OVERRIDE;
+    // TextureLayerChromiumClient implementation.
+    virtual unsigned prepareTexture(WebCore::CCTextureUpdateQueue&) OVERRIDE;
+    virtual WebGraphicsContext3D* context() OVERRIDE;
 
 private:
-    LinkHighlight(GraphicsLayerChromium* parent, const Path&, int animationId, int groupId);
-
-    RefPtr<ContentLayerChromium> m_contentLayer;
-    GraphicsLayerChromium* m_parent;
-    Path m_path;
+    WebExternalTextureLayerClient* m_client;
+    OwnPtr<WebLayerImpl> m_layer;
 };
 
-} // namespace WebCore
+}
 
-#endif // USE(ACCELERATED_COMPOSITING)
+#endif // WebExternalTextureLayerImpl_h
 
-#endif

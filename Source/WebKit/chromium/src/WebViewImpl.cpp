@@ -83,6 +83,7 @@
 #include "KeyboardCodes.h"
 #include "KeyboardEvent.h"
 #include "LayerPainterChromium.h"
+#include "LinkHighlight.h"
 #include "MIMETypeRegistry.h"
 #include "NodeRenderStyle.h"
 #include "NonCompositedContentHost.h"
@@ -408,6 +409,7 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     , m_isCancelingFullScreen(false)
     , m_benchmarkSupport(this)
 #if USE(ACCELERATED_COMPOSITING)
+    , m_rootLayer(0)
     , m_rootGraphicsLayer(0)
     , m_isAcceleratedCompositingActive(false)
     , m_compositorCreationFailed(false)
@@ -728,10 +730,17 @@ bool WebViewImpl::handleGestureEvent(const WebGestureEvent& event)
         m_contextMenuAllowed = false;
         return handled;
     }
+    case WebInputEvent::GestureTapDown: {
+        // Queue a highlight animation, then hand off to regular handler.
+#if OS(LINUX)
+        enableTouchHighlight(IntPoint(event.x, event.y));
+#endif
+        PlatformGestureEventBuilder platformEvent(mainFrameImpl()->frameView(), event);
+        return mainFrameImpl()->frame()->eventHandler()->handleGestureEvent(platformEvent);
+    }
     case WebInputEvent::GestureScrollBegin:
     case WebInputEvent::GestureScrollEnd:
     case WebInputEvent::GestureScrollUpdate:
-    case WebInputEvent::GestureTapDown:
     case WebInputEvent::GestureDoubleTap:
     case WebInputEvent::GesturePinchBegin:
     case WebInputEvent::GesturePinchEnd:
@@ -1116,6 +1125,53 @@ void WebViewImpl::computeScaleAndScrollForHitRect(const WebRect& hitRect, AutoZo
     scroll.x = rect.x;
     scroll.y = rect.y;
 }
+
+static bool highlightConditions(Node* node)
+{
+    return node->isLink()
+           || node->supportsFocus()
+           || node->hasEventListeners(eventNames().clickEvent)
+           || node->hasEventListeners(eventNames().mousedownEvent)
+           || node->hasEventListeners(eventNames().mouseupEvent);
+}
+
+Node* WebViewImpl::bestTouchLinkNode(IntPoint touchEventLocation)
+{
+    if (!m_page || !m_page->mainFrame())
+        return 0;
+
+    Node* bestTouchNode = 0;
+
+    // FIXME: Should accept a search region from the caller instead of hard-coding the size.
+    IntSize touchEventSearchRegionSize(4, 2);
+    m_page->mainFrame()->eventHandler()->bestClickableNodeForTouchPoint(touchEventLocation, touchEventSearchRegionSize, touchEventLocation, bestTouchNode);
+    // bestClickableNodeForTouchPoint() doesn't always return a node that is a link, so let's try and find
+    // a link to highlight.
+    while (bestTouchNode && !highlightConditions(bestTouchNode))
+        bestTouchNode = bestTouchNode->parentNode();
+
+    return bestTouchNode;
+}
+
+void WebViewImpl::enableTouchHighlight(IntPoint touchEventLocation)
+{
+    Node* touchNode = bestTouchLinkNode(touchEventLocation);
+
+    if (!touchNode || !touchNode->renderer() || !touchNode->renderer()->enclosingLayer())
+        return;
+
+    Color highlightColor = touchNode->renderer()->style()->tapHighlightColor();
+    // Safari documentation for -webkit-tap-highlight-color says if the specified color has 0 alpha,
+    // then tap highlighting is disabled.
+    // http://developer.apple.com/library/safari/#documentation/appleapplications/reference/safaricssref/articles/standardcssproperties.html
+    if (!highlightColor.alpha())
+        return;
+
+    // This will clear any highlight currently being displayed.
+    m_linkHighlight = LinkHighlight::create(touchNode, this);
+    m_linkHighlight->startHighlightAnimation();
+}
+
 #endif
 
 void WebViewImpl::animateZoomAroundPoint(const IntPoint& point, AutoZoomType zoomType)
@@ -1653,6 +1709,9 @@ void WebViewImpl::layout()
 {
     TRACE_EVENT0("webkit", "WebViewImpl::layout");
     PageWidgetDelegate::layout(m_page.get());
+
+    if (m_linkHighlight)
+        m_linkHighlight->updateGeometry();
 }
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -1685,9 +1744,15 @@ void WebViewImpl::doPixelReadbackToCanvas(WebCanvas* canvas, const IntRect& rect
 }
 #endif
 
-void WebViewImpl::paint(WebCanvas* canvas, const WebRect& rect)
+void WebViewImpl::paint(WebCanvas* canvas, const WebRect& rect, PaintOptions option)
 {
-    if (isAcceleratedCompositingActive()) {
+#if !OS(ANDROID)
+    // ReadbackFromCompositorIfAvailable is the only option available on non-Android.
+    // Ideally, Android would always use ReadbackFromCompositorIfAvailable as well.
+    ASSERT(option == ReadbackFromCompositorIfAvailable);
+#endif
+
+    if (option == ReadbackFromCompositorIfAvailable && isAcceleratedCompositingActive()) {
 #if USE(ACCELERATED_COMPOSITING)
         // If a canvas was passed in, we use it to grab a copy of the
         // freshly-rendered pixels.
@@ -1699,12 +1764,24 @@ void WebViewImpl::paint(WebCanvas* canvas, const WebRect& rect)
         }
 #endif
     } else {
+        FrameView* view = page()->mainFrame()->view();
+        PaintBehavior oldPaintBehavior = view->paintBehavior();
+        if (isAcceleratedCompositingActive()) {
+            ASSERT(option == ForceSoftwareRenderingAndIgnoreGPUResidentContent);            
+            view->setPaintBehavior(oldPaintBehavior | PaintBehaviorFlattenCompositingLayers);
+        }
+
         double paintStart = currentTime();
         PageWidgetDelegate::paint(m_page.get(), pageOverlays(), canvas, rect, isTransparent() ? PageWidgetDelegate::Translucent : PageWidgetDelegate::Opaque);
         double paintEnd = currentTime();
         double pixelsPerSec = (rect.width * rect.height) / (paintEnd - paintStart);
         WebKit::Platform::current()->histogramCustomCounts("Renderer4.SoftwarePaintDurationMS", (paintEnd - paintStart) * 1000, 0, 120, 30);
         WebKit::Platform::current()->histogramCustomCounts("Renderer4.SoftwarePaintMegapixPerSecond", pixelsPerSec / 1000000, 10, 210, 30);
+
+        if (isAcceleratedCompositingActive()) {
+            ASSERT(option == ForceSoftwareRenderingAndIgnoreGPUResidentContent);            
+            view->setPaintBehavior(oldPaintBehavior);
+        }
     }
 }
 
@@ -3564,6 +3641,7 @@ bool WebViewImpl::allowsAcceleratedCompositing()
 void WebViewImpl::setRootGraphicsLayer(GraphicsLayer* layer)
 {
     m_rootGraphicsLayer = layer;
+    m_rootLayer = layer ? layer->platformLayer() : 0;
 
     setIsAcceleratedCompositingActive(layer);
     if (m_nonCompositedContentHost) {
@@ -3577,11 +3655,8 @@ void WebViewImpl::setRootGraphicsLayer(GraphicsLayer* layer)
         m_nonCompositedContentHost->setScrollLayer(scrollLayer);
     }
 
-    if (layer)
-        m_rootLayer = *layer->platformLayer();
-
     if (!m_layerTreeView.isNull())
-        m_layerTreeView.setRootLayer(layer ? &m_rootLayer : 0);
+        m_layerTreeView.setRootLayer(m_rootLayer);
 
     IntRect damagedRect(0, 0, m_size.width, m_size.height);
     if (!m_isAcceleratedCompositingActive)
@@ -3694,7 +3769,7 @@ void WebViewImpl::setIsAcceleratedCompositingActive(bool active)
         m_nonCompositedContentHost->setShowDebugBorders(page()->settings()->showDebugBorders());
         m_nonCompositedContentHost->setOpaque(!isTransparent());
 
-        m_layerTreeView.initialize(this, m_rootLayer, layerTreeViewSettings);
+        m_layerTreeView.initialize(this, *m_rootLayer, layerTreeViewSettings);
         if (!m_layerTreeView.isNull()) {
             if (m_webSettings->applyDefaultDeviceScaleFactorInCompositor() && page()->deviceScaleFactor() != 1) {
                 ASSERT(page()->deviceScaleFactor());

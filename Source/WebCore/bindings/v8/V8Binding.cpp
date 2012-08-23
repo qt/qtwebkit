@@ -43,8 +43,10 @@
 #include "V8DOMWindow.h"
 #include "V8Element.h"
 #include "V8ObjectConstructor.h"
+#include "V8XPathNSResolver.h"
 #include "WorkerContext.h"
 #include "WorkerContextExecutionProxy.h"
+#include "XPathNSResolver.h"
 
 #include <wtf/MathExtras.h>
 #include <wtf/MainThread.h>
@@ -240,6 +242,16 @@ PassRefPtr<DOMStringList> toDOMStringList(v8::Handle<v8::Value> value)
     return ret.release();
 }
 
+PassRefPtr<XPathNSResolver> toXPathNSResolver(v8::Handle<v8::Value> value)
+{
+    RefPtr<XPathNSResolver> resolver;
+    if (V8XPathNSResolver::HasInstance(value))
+        resolver = V8XPathNSResolver::toNative(v8::Handle<v8::Object>::Cast(value));
+    else if (value->IsObject())
+        resolver = V8CustomXPathNSResolver::create(value->ToObject());
+    return resolver;
+}
+
 DOMWindow* toDOMWindow(v8::Handle<v8::Context> context)
 {
     v8::Handle<v8::Object> global = context->Global();
@@ -305,6 +317,12 @@ bool handleOutOfMemory()
         settings->setScriptEnabled(false);
 
     return true;
+}
+
+v8::Local<v8::Value> handleMaxRecursionDepthExceeded()
+{
+    throwError(RangeError, "Maximum call stack size exceeded.");
+    return v8::Local<v8::Value>();
 }
 
 void crashIfV8IsDead()

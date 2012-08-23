@@ -27,6 +27,7 @@
 #include "RenderThemeEfl.h"
 
 #include "CSSValueKeywords.h"
+#include "FontDescription.h"
 #include "GraphicsContext.h"
 #include "HTMLInputElement.h"
 #include "InputType.h"
@@ -766,13 +767,18 @@ void RenderThemeEfl::adjustSliderTrackStyle(StyleResolver* styleResolver, Render
         return;
     }
 
-    adjustSizeConstraints(style, SliderHorizontal);
+    const ThemePartDesc* desc;
+    if (style->appearance() == SliderHorizontalPart) {
+        adjustSizeConstraints(style, SliderHorizontal);
+        desc = m_partDescs + static_cast<size_t>(SliderHorizontal);
+    } else {
+        adjustSizeConstraints(style, SliderVertical);
+        desc = m_partDescs + static_cast<size_t>(SliderVertical);
+    }
     style->resetBorder();
-
-    const struct ThemePartDesc *desc = m_partDescs + (size_t)SliderHorizontal;
-    if (style->width().value() < desc->min.width().value())
+    if (style->width().value() > 0 && style->width().value() < desc->min.width().value())
         style->setWidth(desc->min.width());
-    if (style->height().value() < desc->min.height().value())
+    if (style->height().value() > 0 && style->height().value() < desc->min.height().value())
         style->setHeight(desc->min.height());
 }
 
@@ -808,6 +814,12 @@ int RenderThemeEfl::sliderTickOffsetFromTrackCenter() const
     static const int sliderTickOffset = -12;
 
     return sliderTickOffset;
+}
+
+LayoutUnit RenderThemeEfl::sliderTickSnappingThreshold() const
+{
+    // The same threshold value as the Chromium port.
+    return 5;
 }
 #endif
 

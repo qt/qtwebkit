@@ -107,10 +107,8 @@ watchers_who_are_not_contributors = [
 
 
 contributors_who_are_not_committers = [
-    Contributor("Adam Kallai", "kadam@inf.u-szeged.hu", 'kadam'),
     Contributor("Aharon Lanin", "aharon@google.com"),
     Contributor("Alan Stearns", "stearns@adobe.com", 'astearns'),
-    Contributor("Alexandre Elias", "aelias@chromium.org"),
     Contributor("Alexey Marinichev", ["amarinichev@chromium.org", "amarinichev@google.com"], "amarinichev"),
     Contributor("Andras Piroska", "pandras@inf.u-szeged.hu", "andris88"),
     Contributor("Andrei Bucur", "abucur@adobe.com", "abucur"),
@@ -181,6 +179,7 @@ contributors_who_are_not_committers = [
 committers_unable_to_review = [
     Committer("Aaron Boodman", "aa@chromium.org", "aboodman"),
     Committer("Adam Bergkvist", "adam.bergkvist@ericsson.com", "adambe"),
+    Committer("Adam Kallai", "kadam@inf.u-szeged.hu", 'kadam'),
     Committer("Adam Klein", "adamk@chromium.org", "aklein"),
     Committer("Adam Langley", "agl@chromium.org", "agl"),
     Committer("Ademar de Souza Reis Jr", ["ademar.reis@gmail.com", "ademar@webkit.org"], "ademar"),
@@ -188,6 +187,7 @@ committers_unable_to_review = [
     Committer("Alec Flett", ["alecflett@chromium.org", "alecflett@google.com"], "alecf"),
     Committer(u"Alexander F\u00e6r\u00f8y", ["ahf@0x90.dk", "alexander.faeroy@nokia.com"], "ahf"),
     Committer("Alexander Kellett", ["lypanov@mac.com", "a-lists001@lypanov.net", "lypanov@kde.org"], "lypanov"),
+    Committer("Alexandre Elias", ["aelias@chromium.org", "aelias@google.com"], "aelias"),
     Committer("Alexandru Chiculita", "achicu@adobe.com", "achicu"),
     Committer("Alice Boxhall", "aboxhall@chromium.org", "aboxhall"),
     Committer("Allan Sandfeld Jensen", ["allan.jensen@nokia.com", "kde@carewolf.com", "sandfeld@kde.org"], "carewolf"),
@@ -384,6 +384,7 @@ committers_unable_to_review = [
     Committer("Tristan O'Tierney", ["tristan@otierney.net", "tristan@apple.com"]),
     Committer("Vangelis Kokkevis", "vangelis@chromium.org", "vangelis"),
     Committer("Viatcheslav Ostapenko", "ostapenko.viatcheslav@nokia.com", "ostap"),
+    Committer("Victor Carbune", "victor@rosedu.org", "vcarbune"),
     Committer("Victor Wang", "victorw@chromium.org", "victorw"),
     Committer("Victoria Kirst", ["vrk@chromium.org", "vrk@google.com"], "vrk"),
     Committer("Vincent Scheib", "scheib@chromium.org", "scheib"),
@@ -424,7 +425,7 @@ reviewers_list = [
     Reviewer("Alejandro G. Castro", ["alex@igalia.com", "alex@webkit.org"], "alexg__"),
     Reviewer("Alexander Pavlov", ["apavlov@chromium.org", "pavlov81@gmail.com"], "apavlov"),
     Reviewer("Alexey Proskuryakov", ["ap@webkit.org", "ap@apple.com"], "ap"),
-    Reviewer("Alexis Menard", ["alexis.menard@openbossa.org", "menard@kde.org"], "darktears"),
+    Reviewer("Alexis Menard", ["alexis@webkit.org", "menard@kde.org"], "darktears"),
     Reviewer("Alice Liu", "alice.liu@apple.com", "aliu"),
     Reviewer("Alp Toker", ["alp@nuanti.com", "alp@atoker.com", "alp@webkit.org"], "alp"),
     Reviewer("Anders Carlsson", ["andersca@apple.com", "acarlsson@apple.com"], "andersca"),

@@ -23,27 +23,33 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
-#include <public/WebSolidColorLayer.h>
+#ifndef WebScrollbarLayerImpl_h
+#define WebScrollbarLayerImpl_h
 
-#include "WebSolidColorLayerImpl.h"
-#include <public/WebFloatRect.h>
+#include <public/WebScrollbarLayer.h>
+#include <wtf/OwnPtr.h>
+#include <wtf/PassRefPtr.h>
+
+namespace WebCore {
+class ScrollbarLayerChromium;
+}
 
 namespace WebKit {
+class WebLayerImpl;
 
-WebSolidColorLayer WebSolidColorLayer::create()
-{
-    return WebSolidColorLayer(WebSolidColorLayerImpl::create());
+class WebScrollbarLayerImpl : public WebScrollbarLayer {
+public:
+    explicit WebScrollbarLayerImpl(PassRefPtr<WebCore::ScrollbarLayerChromium>);
+    virtual ~WebScrollbarLayerImpl();
+
+    // WebScrollbarLayer implementation.
+    virtual WebLayer* layer() OVERRIDE;
+    virtual void setScrollLayer(WebLayer*) OVERRIDE;
+
+private:
+    OwnPtr<WebLayerImpl> m_layer;
+};
+
 }
 
-WebSolidColorLayer::WebSolidColorLayer(const PassRefPtr<WebSolidColorLayerImpl>& node)
-    : WebLayer(node)
-{
-}
-
-void WebSolidColorLayer::setBackgroundColor(const WebColor& color)
-{
-    m_private->setBackgroundColor(color);
-}
-
-} // namespace WebKit
+#endif // WebScrollbarLayerImpl_h

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2012 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,59 +24,37 @@
  */
 
 #include "config.h"
-#include <public/WebContentLayer.h>
+#include "WebImageLayerImpl.h"
 
-#include "ContentLayerChromium.h"
-#include "WebContentLayerImpl.h"
+#include "ImageLayerChromium.h"
+#include "WebLayerImpl.h"
 
-using namespace WebCore;
+using WebCore::ImageLayerChromium;
 
 namespace WebKit {
 
-WebContentLayer WebContentLayer::create(WebContentLayerClient* contentClient)
+WebImageLayer* WebImageLayer::create()
 {
-    return WebContentLayer(WebContentLayerImpl::create(contentClient));
+    return new WebImageLayerImpl(WebCore::ImageLayerChromium::create());
 }
 
-void WebContentLayer::clearClient()
-{
-    unwrap<ContentLayerChromium>()->clearDelegate();
-}
-
-void WebContentLayer::setDoubleSided(bool doubleSided)
-{
-    m_private->setDoubleSided(doubleSided);
-}
-
-void WebContentLayer::setContentsScale(float scale)
-{
-    m_private->setContentsScale(scale);
-}
-
-void WebContentLayer::setUseLCDText(bool enable)
-{
-    m_private->setUseLCDText(enable);
-}
-
-void WebContentLayer::setDrawCheckerboardForMissingTiles(bool enable)
-{
-    m_private->setDrawCheckerboardForMissingTiles(enable);
-}
-
-WebContentLayer::WebContentLayer(const PassRefPtr<ContentLayerChromium>& node)
-    : WebScrollableLayer(node)
+WebImageLayerImpl::WebImageLayerImpl(PassRefPtr<WebCore::ImageLayerChromium> layer)
+    : m_layer(adoptPtr(new WebLayerImpl(layer)))
 {
 }
 
-WebContentLayer& WebContentLayer::operator=(const PassRefPtr<ContentLayerChromium>& node)
+WebImageLayerImpl::~WebImageLayerImpl()
 {
-    m_private = node;
-    return *this;
 }
 
-WebContentLayer::operator PassRefPtr<ContentLayerChromium>() const
+WebLayer* WebImageLayerImpl::layer()
 {
-    return static_cast<ContentLayerChromium*>(m_private.get());
+    return m_layer.get();
+}
+
+void WebImageLayerImpl::setBitmap(SkBitmap bitmap)
+{
+    static_cast<ImageLayerChromium*>(m_layer->layer())->setBitmap(bitmap);
 }
 
 } // namespace WebKit

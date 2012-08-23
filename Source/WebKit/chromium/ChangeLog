@@ -1,3 +1,525 @@
+2012-08-22  Alec Flett  <alecflett@chromium.org>
+
+        IndexedDB: tests for injection/extraction of idb keys
+        https://bugs.webkit.org/show_bug.cgi?id=94653
+
+        Reviewed by Tony Chang.
+
+        Added unit tests for key injection/extraction using
+        SerializedScriptValue. These were moved from chromium, now
+        that all uses of the API are through WebKit.
+
+        * tests/IDBKeyPathTest.cpp:
+        (WebCore):
+        (WebCore::TEST):
+
+2012-08-22  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Change WebLayer from a concrete type to a pure virtual interface
+        https://bugs.webkit.org/show_bug.cgi?id=94174
+
+        Reviewed by Adrienne Walker.
+
+        This updates the implementation of the Web*Layer family to the new design and updates callers in WebViewImpl /
+        NonCompositedContentHost / LinkHighlight.
+
+        * WebKit.gypi:
+        * src/LinkHighlight.cpp:
+        (WebKit::LinkHighlight::LinkHighlight):
+        (WebKit::LinkHighlight::contentLayer):
+        (WebKit::LinkHighlight::clipLayer):
+        (WebKit::LinkHighlight::releaseResources):
+        (WebKit::LinkHighlight::computeHighlightLayerPathAndPosition):
+        (WebKit::LinkHighlight::startHighlightAnimation):
+        (WebKit::LinkHighlight::updateGeometry):
+        * src/LinkHighlight.h:
+        (LinkHighlight):
+        * src/NonCompositedContentHost.cpp:
+        (WebKit::NonCompositedContentHost::NonCompositedContentHost):
+        (WebKit::NonCompositedContentHost::setScrollLayer):
+        (WebKit::NonCompositedContentHost::setViewport):
+        (WebKit::NonCompositedContentHost::scrollLayer):
+        * src/NonCompositedContentHost.h:
+        * src/WebContentLayer.cpp: Removed.
+        * src/WebContentLayerImpl.cpp:
+        (WebKit::WebContentLayer::create):
+        (WebKit::WebContentLayerImpl::WebContentLayerImpl):
+        (WebKit::WebContentLayerImpl::~WebContentLayerImpl):
+        (WebKit::WebContentLayerImpl::layer):
+        (WebKit):
+        (WebKit::WebContentLayerImpl::setDoubleSided):
+        (WebKit::WebContentLayerImpl::setContentsScale):
+        (WebKit::WebContentLayerImpl::setUseLCDText):
+        (WebKit::WebContentLayerImpl::setDrawCheckerboardForMissingTiles):
+        (WebKit::WebContentLayerImpl::paintContents):
+        * src/WebContentLayerImpl.h:
+        (WebContentLayerImpl):
+        * src/WebExternalTextureLayerImpl.cpp: Renamed from Source/WebKit/chromium/src/WebExternalTextureLayer.cpp.
+        (WebKit):
+        (WebKit::WebExternalTextureLayer::create):
+        (WebKit::WebExternalTextureLayerImpl::WebExternalTextureLayerImpl):
+        (WebKit::WebExternalTextureLayerImpl::~WebExternalTextureLayerImpl):
+        (WebKit::WebExternalTextureLayerImpl::layer):
+        (WebKit::WebExternalTextureLayerImpl::setTextureId):
+        (WebKit::WebExternalTextureLayerImpl::setFlipped):
+        (WebKit::WebExternalTextureLayerImpl::setUVRect):
+        (WebKit::WebExternalTextureLayerImpl::setOpaque):
+        (WebKit::WebExternalTextureLayerImpl::setPremultipliedAlpha):
+        (WebKit::WebExternalTextureLayerImpl::willModifyTexture):
+        (WebKit::WebExternalTextureLayerImpl::setRateLimitContext):
+        (WebTextureUpdaterImpl):
+        (WebKit::WebTextureUpdaterImpl::WebTextureUpdaterImpl):
+        (WebKit::WebExternalTextureLayerImpl::prepareTexture):
+        (WebKit::WebExternalTextureLayerImpl::context):
+        * src/WebExternalTextureLayerImpl.h: Copied from Source/Platform/chromium/public/WebVideoLayer.h.
+        (WebKit):
+        (WebExternalTextureLayerImpl):
+        * src/WebIOSurfaceLayerImpl.cpp: Renamed from Source/WebKit/chromium/src/WebIOSurfaceLayer.cpp.
+        (WebKit):
+        (WebKit::WebIOSurfaceLayer::create):
+        (WebKit::WebIOSurfaceLayerImpl::WebIOSurfaceLayerImpl):
+        (WebKit::WebIOSurfaceLayerImpl::~WebIOSurfaceLayerImpl):
+        (WebKit::WebIOSurfaceLayerImpl::setIOSurfaceProperties):
+        (WebKit::WebIOSurfaceLayerImpl::layer):
+        * src/WebIOSurfaceLayerImpl.h: Copied from Source/Platform/chromium/public/WebImageLayer.h.
+        (WebCore):
+        (WebKit):
+        (WebIOSurfaceLayerImpl):
+        * src/WebImageLayerImpl.cpp: Renamed from Source/WebKit/chromium/src/WebSolidColorLayer.cpp.
+        (WebKit):
+        (WebKit::WebImageLayer::create):
+        (WebKit::WebImageLayerImpl::WebImageLayerImpl):
+        (WebKit::WebImageLayerImpl::~WebImageLayerImpl):
+        (WebKit::WebImageLayerImpl::layer):
+        (WebKit::WebImageLayerImpl::setBitmap):
+        * src/WebImageLayerImpl.h: Renamed from Source/WebKit/chromium/src/WebImageLayer.cpp.
+        (WebCore):
+        (WebKit):
+        (WebImageLayerImpl):
+        * src/WebLayer.cpp: Removed.
+        * src/WebLayerImpl.cpp:
+        (WebKit::WebLayer::create):
+        (WebKit::WebLayerImpl::WebLayerImpl):
+        (WebKit::WebLayerImpl::~WebLayerImpl):
+        (WebKit):
+        (WebKit::WebLayerImpl::id):
+        (WebKit::WebLayerImpl::invalidateRect):
+        (WebKit::WebLayerImpl::invalidate):
+        (WebKit::WebLayerImpl::addChild):
+        (WebKit::WebLayerImpl::insertChild):
+        (WebKit::WebLayerImpl::replaceChild):
+        (WebKit::WebLayerImpl::setChildren):
+        (WebKit::WebLayerImpl::removeFromParent):
+        (WebKit::WebLayerImpl::removeAllChildren):
+        (WebKit::WebLayerImpl::setAnchorPoint):
+        (WebKit::WebLayerImpl::anchorPoint):
+        (WebKit::WebLayerImpl::setAnchorPointZ):
+        (WebKit::WebLayerImpl::anchorPointZ):
+        (WebKit::WebLayerImpl::setBounds):
+        (WebKit::WebLayerImpl::bounds):
+        (WebKit::WebLayerImpl::setMasksToBounds):
+        (WebKit::WebLayerImpl::masksToBounds):
+        (WebKit::WebLayerImpl::setMaskLayer):
+        (WebKit::WebLayerImpl::setReplicaLayer):
+        (WebKit::WebLayerImpl::setOpacity):
+        (WebKit::WebLayerImpl::opacity):
+        (WebKit::WebLayerImpl::setOpaque):
+        (WebKit::WebLayerImpl::opaque):
+        (WebKit::WebLayerImpl::setPosition):
+        (WebKit::WebLayerImpl::position):
+        (WebKit::WebLayerImpl::setSublayerTransform):
+        (WebKit::WebLayerImpl::sublayerTransform):
+        (WebKit::WebLayerImpl::setTransform):
+        (WebKit::WebLayerImpl::transform):
+        (WebKit::WebLayerImpl::setDrawsContent):
+        (WebKit::WebLayerImpl::drawsContent):
+        (WebKit::WebLayerImpl::setPreserves3D):
+        (WebKit::WebLayerImpl::setUseParentBackfaceVisibility):
+        (WebKit::WebLayerImpl::setBackgroundColor):
+        (WebKit::WebLayerImpl::setFilters):
+        (WebKit::WebLayerImpl::setBackgroundFilters):
+        (WebKit::WebLayerImpl::setDebugBorderColor):
+        (WebKit::WebLayerImpl::setDebugBorderWidth):
+        (WebKit::WebLayerImpl::setDebugName):
+        (WebKit::WebLayerImpl::setAnimationDelegate):
+        (WebKit::WebLayerImpl::addAnimation):
+        (WebKit::WebLayerImpl::removeAnimation):
+        (WebKit::WebLayerImpl::pauseAnimation):
+        (WebKit::WebLayerImpl::suspendAnimations):
+        (WebKit::WebLayerImpl::resumeAnimations):
+        (WebKit::WebLayerImpl::hasActiveAnimation):
+        (WebKit::WebLayerImpl::transferAnimationsTo):
+        (WebKit::WebLayerImpl::setForceRenderSurface):
+        (WebKit::WebLayerImpl::setScrollPosition):
+        (WebKit::WebLayerImpl::setScrollable):
+        (WebKit::WebLayerImpl::setHaveWheelEventHandlers):
+        (WebKit::WebLayerImpl::setShouldScrollOnMainThread):
+        (WebKit::WebLayerImpl::setNonFastScrollableRegion):
+        (WebKit::WebLayerImpl::setIsContainerForFixedPositionLayers):
+        (WebKit::WebLayerImpl::setFixedToContainerLayer):
+        (WebKit::WebLayerImpl::layer):
+        * src/WebLayerImpl.h:
+        (WebCore):
+        (WebLayerImpl):
+        * src/WebLayerTreeView.cpp:
+        (WebKit::WebLayerTreeView::setRootLayer):
+        * src/WebLayerTreeViewImpl.cpp:
+        (WebKit::WebLayerTreeViewImpl::create):
+        * src/WebMediaPlayerClientImpl.cpp:
+        (WebKit::WebMediaPlayerClientImpl::readyStateChanged):
+        (WebKit::WebMediaPlayerClientImpl::repaint):
+        (WebKit::WebMediaPlayerClientImpl::setOpaque):
+        (WebKit::WebMediaPlayerClientImpl::platformLayer):
+        (WebKit::WebMediaPlayerClientImpl::acceleratedRenderingInUse):
+        * src/WebMediaPlayerClientImpl.h:
+        (WebMediaPlayerClientImpl):
+        * src/WebPluginContainerImpl.cpp:
+        (WebKit::WebPluginContainerImpl::setBackingTextureId):
+        (WebKit::WebPluginContainerImpl::setBackingIOSurfaceId):
+        (WebKit::WebPluginContainerImpl::commitBackingTexture):
+        (WebKit::WebPluginContainerImpl::setOpaque):
+        (WebKit::WebPluginContainerImpl::platformLayer):
+        * src/WebPluginContainerImpl.h:
+        (WebPluginContainerImpl):
+        * src/WebScrollableLayer.cpp: Removed.
+        * src/WebScrollbarLayerImpl.cpp: Renamed from Source/WebKit/chromium/src/WebScrollbarLayer.cpp.
+        (WebKit):
+        (WebKit::WebScrollbarLayer::create):
+        (WebKit::WebScrollbarLayerImpl::WebScrollbarLayerImpl):
+        (WebKit::WebScrollbarLayerImpl::~WebScrollbarLayerImpl):
+        (WebKit::WebScrollbarLayerImpl::layer):
+        (WebKit::WebScrollbarLayerImpl::setScrollLayer):
+        * src/WebScrollbarLayerImpl.h: Copied from Source/WebKit/chromium/src/WebSolidColorLayerImpl.h.
+        (WebCore):
+        (WebKit):
+        (WebScrollbarLayerImpl):
+        * src/WebSolidColorLayerImpl.cpp:
+        (WebKit::WebSolidColorLayer::create):
+        (WebKit::WebSolidColorLayerImpl::WebSolidColorLayerImpl):
+        (WebKit::WebSolidColorLayerImpl::layer):
+        (WebKit):
+        (WebKit::WebSolidColorLayerImpl::setBackgroundColor):
+        * src/WebSolidColorLayerImpl.h:
+        (WebCore):
+        (WebKit):
+        (WebSolidColorLayerImpl):
+        * src/WebVideoLayerImpl.cpp: Copied from Source/WebKit/chromium/src/WebVideoLayer.cpp.
+        (WebKit):
+        (WebKit::WebVideoLayer::create):
+        (WebKit::WebVideoLayerImpl::WebVideoLayerImpl):
+        (WebKit::WebVideoLayerImpl::~WebVideoLayerImpl):
+        (WebKit::WebVideoLayerImpl::layer):
+        (WebKit::WebVideoLayerImpl::active):
+        * src/WebVideoLayerImpl.h: Renamed from Source/WebKit/chromium/src/WebVideoLayer.cpp.
+        (WebCore):
+        (WebKit):
+        (WebVideoLayerImpl):
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::WebViewImpl):
+        (WebKit::WebViewImpl::setRootGraphicsLayer):
+        (WebKit::WebViewImpl::setIsAcceleratedCompositingActive):
+        (WebKit):
+        * src/WebViewImpl.h:
+        * tests/ImageLayerChromiumTest.cpp:
+        (WebCore::TEST):
+        * tests/WebLayerTest.cpp:
+        * tests/WebLayerTreeViewTest.cpp:
+
+2012-08-22  Alejandro Piñeiro  <apinheiro@igalia.com>
+
+        Dojo toggle buttons should expose ROLE_TOGGLE_BUTTON not ROLE_PUSH_BUTTON
+        https://bugs.webkit.org/show_bug.cgi?id=73819
+
+        Reviewed by Chris Fleizach.
+
+        Added a new role, Toggle Button, based on whether aria-pressed is present.
+        http://www.w3.org/TR/wai-aria/states_and_properties#aria-pressed
+
+        * public/WebAccessibilityRole.h: added WebAccessibilityRoleToggleButton that
+        matchs with WebCore ToggleButtonRole
+        * src/AssertMatchingEnums.cpp: added the assert matching rule for
+        WebAccessibilityRoleToggleButton and ToggleButtonRole
+
+2012-08-17  Jeffrey Pfau  <jpfau@apple.com>
+
+        Allow blocking of Web SQL databases in third-party web workers
+        https://bugs.webkit.org/show_bug.cgi?id=94170
+
+        Reviewed by Adam Barth.
+
+        Web workers did not previously know anything about the document that
+        spawned them. This is undefined for shared workers, but for dedicated
+        workers, we now pipe the information through.
+
+
+        * src/WebWorkerClientImpl.cpp:
+        (WebKit::WebWorkerClientImpl::startWorkerContext): Pass top document's origin
+
+2012-08-22  Kentaro Hara  <haraken@chromium.org>
+
+        [V8] Move context() from V8Proxy to ScriptController
+        https://bugs.webkit.org/show_bug.cgi?id=94593
+
+        Reviewed by Adam Barth.
+
+        To kill V8Proxy, we can move context() from V8Proxy to ScriptController.
+
+        No tests. No change in behavior.
+
+        * src/InspectorFrontendClientImpl.cpp:
+        (WebKit::InspectorFrontendClientImpl::windowObjectCleared):
+        * src/WebDevToolsFrontendImpl.cpp:
+        (WebKit::WebDevToolsFrontendImpl::dispatchOnInspectorFrontend):
+
+2012-08-22  Nikhil Bhargava  <nbhargava@google.com>
+
+        Reduce Font.h includes across project -- improves RenderObject.h compile time
+        https://bugs.webkit.org/show_bug.cgi?id=93629
+
+        Reviewed by Eric Seidel.
+
+        Adds includes due to change in RenderStyle.h
+
+        * src/WebFrameImpl.cpp:
+        * src/mac/WebSubstringUtil.mm:
+
+2012-08-22  Nikhil Bhargava  <nbhargava@google.com>
+
+        Speed up compilation of tests involving WebTransformationMatrix
+        https://bugs.webkit.org/show_bug.cgi?id=94639
+
+        Reviewed by James Robinson.
+
+        EXPECT_TRANSFORMATION_MATRIX_EQ was changed to become mainly a function.
+        As a macro that expanded into 16 other macros, it caused an unneeded
+        slow down of close to 45s in the compile time of CCLayerTreeHostCommonTest
+        Bugs have been filed to clang and gcc noting the errant behavior:
+        http://llvm.org/bugs/show_bug.cgi?id=13651 and http://gcc.gnu.org/bugzilla/show_bug.cgi?id=54337
+
+        * tests/CCLayerTreeHostCommonTest.cpp:
+        * tests/CCLayerTreeTestCommon.h:
+        (WebKitTests):
+        (WebKitTests::ExpectTransformationMatrixEq):
+        * tests/WebTransformOperationsTest.cpp:
+        (TEST):
+        (checkProgress):
+        * tests/WebTransformationMatrixTest.cpp:
+        (WebKit::TEST):
+
+2012-08-22  Alexandre Elias  <aelias@google.com>
+
+        [chromium] Add software bitmap resources to CCResourceProvider
+        https://bugs.webkit.org/show_bug.cgi?id=93677
+
+        Reviewed by Adrienne Walker.
+
+        Second commit after revert.
+
+        This adds the ability to CCResourceProvider to use software bitmaps.
+        They are allocated as plain-old-memory, and exposed as Skia objects.
+
+        We want the ResourceProvider to be able to handle different resource
+        types at the same time.  In practice, a default resource type is
+        desired for most uses within a single compositor instance, which is
+        specified by the default resource type.  Default resource types are
+        expected to be mostly 1-to-1 with CCRenderer types.
+
+        New tests added by parametrizing existing CCResourceProvider tests.
+
+        * tests/CCResourceProviderTest.cpp:
+        (WebKit::CCResourceProviderTest::getResourcePixels):
+
+2012-08-22  W. James MacLean  <wjmaclean@chromium.org>
+
+        [chromium] Add touch link highlight animation layers.
+        https://bugs.webkit.org/show_bug.cgi?id=84487
+
+        Reviewed by James Robinson.
+
+        Adds support for creating composited touch link highlights in renderer thread. Clipping not yet
+        implemented for non-composited frames/overflow divs, but scrolling and layout changes are supported.
+        Transform support currently limited to translation.
+
+        Unit tests for LinkHighlight revised.
+
+        * WebKit.gyp:
+        * src/LinkHighlight.cpp: Added.
+        (WebKit):
+        (WebKit::LinkHighlight::create):
+        (WebKit::LinkHighlight::LinkHighlight):
+        (WebKit::LinkHighlight::~LinkHighlight):
+        (WebKit::LinkHighlight::contentLayer): Accessor for layer containing highlight.
+        (WebKit::LinkHighlight::clipLayer): Accessor for layer that provides clipping for highlight.
+        (WebKit::LinkHighlight::releaseResources): Releases Node* for highlight target, clears client/delegate pointers.
+        (WebKit::LinkHighlight::computeEnclosingCompositingLayer): Determines which GraphicsLayerChromium to attach highlight to.
+        (WebKit::LinkHighlight::computeHighlightLayerPathAndPosition): Determines coordinates of highlight in owning GraphicsLayerChromium's coordinates.
+        (WebKit::LinkHighlight::paintContents): If highlight active, paints highlight.
+        (WebKit::LinkHighlight::startHighlightAnimation): Called to start highlight animation.
+        (WebKit::LinkHighlight::clearGraphicsLayerLinkHighlightPointer): Removes this LinkHighlight's pointer from owning GraphicsLayerChromium.
+        (WebKit::LinkHighlight::notifyAnimationStarted): Implements WebAnimationDelegate.
+        (WebKit::LinkHighlight::notifyAnimationFinished): Implements WebAnimationDelegate, releases resources when animation completes.
+        (WebKit::LinkHighlight::updateGeometry): Invokes computation of which GraphicsLayerChromium to attach to, and highlight shape & position.
+            Computations proceed only if preceded by call to invalidate().
+        (WebKit::LinkHighlight::clearCurrentGraphicsLayer): Handles notification that current GraphicsLayerChromium* is no longer valid.
+        (WebKit::LinkHighlight::invalidate): Sets flag to allow geometry update on next call from WebViewImpl::layout().
+        (WebKit::LinkHighlight::layer): Exports WebLayer* for use in GraphicsLayerChromium.
+        * src/LinkHighlight.h: Renamed from Source/WebCore/platform/graphics/chromium/LinkHighlight.h.
+        (WebCore):
+        (WebKit):
+        (LinkHighlight):
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::handleGestureEvent):
+        (WebKit):
+        (WebKit::highlightConditions):
+        (WebKit::WebViewImpl::bestTouchLinkNode): Find highlight target node for touch event location.
+        (WebKit::WebViewImpl::enableTouchHighlight): Invokes highlight for node at current touch event location.
+        (WebKit::WebViewImpl::layout): Adds call to LinkHighlight::updateGeometry().
+        * src/WebViewImpl.h:
+        (WebKit):
+        (WebViewImpl):
+        (WebKit::WebViewImpl::linkHighlight):
+        * tests/LinkHighlightTest.cpp:
+        (WebCore):
+        (WebCore::TEST):
+        * tests/data/test_touch_link_highlight.html: Added.
+
+2012-08-22  Adam Barth  <abarth@webkit.org>
+
+        WebWidget should be able to paint into a zoomed canvas without aliasing
+        https://bugs.webkit.org/show_bug.cgi?id=92043
+
+        Reviewed by James Robinson.
+
+        If accelerated compositing is enabled, WebWidget::paint reads back from
+        the compositor rather than re-painting the widget. That approach works
+        well if the canvas we're rendering into is at a similar resolution to
+        the pixels in the compositor, but if the canvas has been scaled (e.g.,
+        to help the user disambiguate links), then reading back from the
+        compositor will cause aliasing artifacts.
+
+        This patch adds an option to paint to let the embedder request a
+        software re-rendering of the widget to avoid these aliasing artifacts.
+
+        * public/WebWidget.h:
+        (WebKit::WebWidget::paint):
+        * src/WebPagePopupImpl.cpp:
+        (WebKit::WebPagePopupImpl::paint):
+        * src/WebPagePopupImpl.h:
+        (WebPagePopupImpl):
+        * src/WebPopupMenuImpl.cpp:
+        (WebKit::WebPopupMenuImpl::paint):
+        * src/WebPopupMenuImpl.h:
+        * src/WebViewImpl.cpp:
+        (WebKit::canvasBackgroundForTransparencey):
+        (WebKit):
+        (WebKit::WebViewImpl::paint):
+        * src/WebViewImpl.h:
+        (WebViewImpl):
+
+2012-08-22  Eric Penner  <epenner@google.com>
+
+        [chromium] Simplify updateContentRect, removing rect parameter, refactor unit tests.
+        https://bugs.webkit.org/show_bug.cgi?id=94165
+
+        Reviewed by Adrienne Walker.
+
+        Refactored tests to remove lots of boilerplate code.
+
+        * tests/CCTiledLayerTestCommon.cpp:
+        * tests/CCTiledLayerTestCommon.h:
+        (FakeTiledLayerChromium):
+        * tests/TiledLayerChromiumTest.cpp:
+
+2012-08-22  Iain Merrick  <husky@chromium.org>
+
+        [chromium] Remove WebFrame::setSelectionToRange
+        https://bugs.webkit.org/show_bug.cgi?id=94685
+
+        Reviewed by Adam Barth.
+
+        It has basically the same functionality as WebFrame::selectRange.
+        The calling code was removed in Chromium patch 152608.
+
+        * public/WebFrame.h:
+        (WebFrame):
+        * src/WebFrameImpl.cpp:
+        * src/WebFrameImpl.h:
+        (WebFrameImpl):
+
+2012-08-22  Kenneth Russell  <kbr@google.com>
+
+        Unreviewed, rolling out r126319.
+        http://trac.webkit.org/changeset/126319
+        https://bugs.webkit.org/show_bug.cgi?id=84487
+
+        Broke Chromium Mac build
+
+        * WebKit.gyp:
+        * src/LinkHighlight.cpp: Removed.
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::handleGestureEvent):
+        (WebKit::WebViewImpl::computeScaleAndScrollForHitRect):
+        (WebKit::WebViewImpl::layout):
+        * src/WebViewImpl.h:
+        (WebKit):
+        (WebViewImpl):
+        * tests/LinkHighlightTest.cpp:
+        * tests/data/test_touch_link_highlight.html: Removed.
+
+2012-08-22  W. James MacLean  <wjmaclean@chromium.org>
+
+        [chromium] Add touch link highlight animation layers.
+        https://bugs.webkit.org/show_bug.cgi?id=84487
+
+        Reviewed by James Robinson.
+
+        Adds support for creating composited touch link highlights in renderer thread. Clipping not yet
+        implemented for non-composited frames/overflow divs, but scrolling and layout changes are supported.
+        Transform support currently limited to translation.
+
+        Unit tests for LinkHighlight revised.
+
+        * WebKit.gyp:
+        * src/LinkHighlight.cpp: Added.
+        (WebKit):
+        (WebKit::LinkHighlight::create):
+        (WebKit::LinkHighlight::LinkHighlight):
+        (WebKit::LinkHighlight::~LinkHighlight):
+        (WebKit::LinkHighlight::contentLayer): Accessor for layer containing highlight.
+        (WebKit::LinkHighlight::clipLayer): Accessor for layer that provides clipping for highlight.
+        (WebKit::LinkHighlight::releaseResources): Releases Node* for highlight target, clears client/delegate pointers.
+        (WebKit::LinkHighlight::computeEnclosingCompositingLayer): Determines which GraphicsLayerChromium to attach highlight to.
+        (WebKit::LinkHighlight::computeHighlightLayerPathAndPosition): Determines coordinates of highlight in owning GraphicsLayerChromium's coordinates.
+        (WebKit::LinkHighlight::paintContents): If highlight active, paints highlight.
+        (WebKit::LinkHighlight::startHighlightAnimation): Called to start highlight animation.
+        (WebKit::LinkHighlight::clearGraphicsLayerLinkHighlightPointer): Removes this LinkHighlight's pointer from owning GraphicsLayerChromium.
+        (WebKit::LinkHighlight::notifyAnimationStarted): Implements WebAnimationDelegate.
+        (WebKit::LinkHighlight::notifyAnimationFinished): Implements WebAnimationDelegate, releases resources when animation completes.
+        (WebKit::LinkHighlight::updateGeometry): Invokes computation of which GraphicsLayerChromium to attach to, and highlight shape & position.
+            Computations proceed only if preceded by call to invalidate().
+        (WebKit::LinkHighlight::clearCurrentGraphicsLayer): Handles notification that current GraphicsLayerChromium* is no longer valid.
+        (WebKit::LinkHighlight::invalidate): Sets flag to allow geometry update on next call from WebViewImpl::layout().
+        (WebKit::LinkHighlight::layer): Exports WebLayer* for use in GraphicsLayerChromium.
+        * src/LinkHighlight.h: Renamed from Source/WebCore/platform/graphics/chromium/LinkHighlight.h.
+        (WebCore):
+        (WebKit):
+        (LinkHighlight):
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::handleGestureEvent):
+        (WebKit):
+        (WebKit::highlightConditions):
+        (WebKit::WebViewImpl::bestTouchLinkNode): Find highlight target node for touch event location.
+        (WebKit::WebViewImpl::enableTouchHighlight): Invokes highlight for node at current touch event location.
+        (WebKit::WebViewImpl::layout): Adds call to LinkHighlight::updateGeometry().
+        * src/WebViewImpl.h:
+        (WebKit):
+        (WebViewImpl):
+        (WebKit::WebViewImpl::linkHighlight):
+        * tests/LinkHighlightTest.cpp:
+        (WebCore):
+        (WebCore::TEST):
+        * tests/data/test_touch_link_highlight.html: Added.
+
 2012-08-22  Sheriff Bot  <webkit.review.bot@gmail.com>
 
         Unreviewed.  Rolled DEPS.

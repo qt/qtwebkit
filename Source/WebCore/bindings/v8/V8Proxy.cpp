@@ -45,6 +45,7 @@
 #include "PlatformSupport.h"
 #include "ScriptCallStack.h"
 #include "ScriptCallStackFactory.h"
+#include "ScriptRunner.h"
 #include "ScriptSourceCode.h"
 #include "SecurityOrigin.h"
 #include "Settings.h"
@@ -77,13 +78,6 @@
 
 namespace WebCore {
 
-// FIXME: This will be soon removed when we move runScript() to ScriptController.
-static v8::Local<v8::Value> handleMaxRecursionDepthExceeded()
-{
-    throwError(RangeError, "Maximum call stack size exceeded.");
-    return v8::Local<v8::Value>();
-}
-
 V8Proxy::V8Proxy(Frame* frame)
     : m_frame(frame)
 {
@@ -94,158 +88,9 @@ V8Proxy::~V8Proxy()
     windowShell()->destroyGlobal();
 }
 
-PassOwnPtr<v8::ScriptData> V8Proxy::precompileScript(v8::Handle<v8::String> code, CachedScript* cachedScript)
-{
-    // A pseudo-randomly chosen ID used to store and retrieve V8 ScriptData from
-    // the CachedScript. If the format changes, this ID should be changed too.
-    static const unsigned dataTypeID = 0xECC13BD7;
-
-    // Very small scripts are not worth the effort to preparse.
-    static const int minPreparseLength = 1024;
-
-    if (!cachedScript || code->Length() < minPreparseLength)
-        return nullptr;
-
-    CachedMetadata* cachedMetadata = cachedScript->cachedMetadata(dataTypeID);
-    if (cachedMetadata)
-        return adoptPtr(v8::ScriptData::New(cachedMetadata->data(), cachedMetadata->size()));
-
-    OwnPtr<v8::ScriptData> scriptData = adoptPtr(v8::ScriptData::PreCompile(code));
-    cachedScript->setCachedMetadata(dataTypeID, scriptData->Data(), scriptData->Length());
-
-    return scriptData.release();
-}
-
-v8::Local<v8::Value> V8Proxy::evaluate(const ScriptSourceCode& source, Node* node)
-{
-    ASSERT(v8::Context::InContext());
-
-    V8GCController::checkMemoryUsage();
-
-    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willEvaluateScript(m_frame, source.url().isNull() ? String() : source.url().string(), source.startLine());
-
-    v8::Local<v8::Value> result;
-    {
-        // Isolate exceptions that occur when compiling and executing
-        // the code. These exceptions should not interfere with
-        // javascript code we might evaluate from C++ when returning
-        // from here.
-        v8::TryCatch tryCatch;
-        tryCatch.SetVerbose(true);
-
-        // Compile the script.
-        v8::Local<v8::String> code = v8ExternalString(source.source());
-#if PLATFORM(CHROMIUM)
-        TRACE_EVENT_BEGIN0("v8", "v8.compile");
-#endif
-        OwnPtr<v8::ScriptData> scriptData = precompileScript(code, source.cachedScript());
-
-        // NOTE: For compatibility with WebCore, ScriptSourceCode's line starts at
-        // 1, whereas v8 starts at 0.
-        v8::Handle<v8::Script> script = ScriptSourceCode::compileScript(code, source.url(), source.startPosition(), scriptData.get());
-#if PLATFORM(CHROMIUM)
-        TRACE_EVENT_END0("v8", "v8.compile");
-        TRACE_EVENT0("v8", "v8.run");
-#endif
-        result = runScript(script);
-    }
-
-    InspectorInstrumentation::didEvaluateScript(cookie);
-
-    return result;
-}
-
-v8::Local<v8::Value> V8Proxy::runScript(v8::Handle<v8::Script> script)
-{
-    if (script.IsEmpty())
-        return v8::Local<v8::Value>();
-
-    V8GCController::checkMemoryUsage();
-    if (V8RecursionScope::recursionLevel() >= kMaxRecursionDepth)
-        return handleMaxRecursionDepthExceeded();
-
-    if (handleOutOfMemory())
-        ASSERT(script.IsEmpty());
-
-    // Keep Frame (and therefore ScriptController and V8Proxy) alive.
-    RefPtr<Frame> protect(frame());
-
-    // Run the script and keep track of the current recursion depth.
-    v8::Local<v8::Value> result;
-    v8::TryCatch tryCatch;
-    tryCatch.SetVerbose(true);
-    {
-        V8RecursionScope recursionScope(frame()->document());
-        result = script->Run();
-    }
-
-    if (handleOutOfMemory())
-        ASSERT(result.IsEmpty());
-
-    // Handle V8 internal error situation (Out-of-memory).
-    if (tryCatch.HasCaught()) {
-        ASSERT(result.IsEmpty());
-        return v8::Local<v8::Value>();
-    }
-
-    if (result.IsEmpty())
-        return v8::Local<v8::Value>();
-
-    crashIfV8IsDead();
-    return result;
-}
-
 V8DOMWindowShell* V8Proxy::windowShell() const
 {
     return frame()->script()->windowShell();
-}
-
-v8::Local<v8::Context> V8Proxy::context(Frame* frame)
-{
-    v8::Local<v8::Context> context = ScriptController::mainWorldContext(frame);
-    if (context.IsEmpty())
-        return v8::Local<v8::Context>();
-
-    if (V8IsolatedContext* isolatedContext = V8IsolatedContext::getEntered()) {
-        context = v8::Local<v8::Context>::New(isolatedContext->context());
-        if (frame != toFrameIfNotDetached(context))
-            return v8::Local<v8::Context>();
-    }
-
-    return context;
-}
-
-v8::Local<v8::Context> V8Proxy::context()
-{
-    if (V8IsolatedContext* isolatedContext = V8IsolatedContext::getEntered()) {
-        RefPtr<SharedPersistent<v8::Context> > context = isolatedContext->sharedContext();
-        if (m_frame != toFrameIfNotDetached(context->get()))
-            return v8::Local<v8::Context>();
-        return v8::Local<v8::Context>::New(context->get());
-    }
-    return frame()->script()->mainWorldContext();
-}
-
-v8::Local<v8::Context> V8Proxy::isolatedWorldContext(int worldId)
-{
-    IsolatedWorldMap::iterator iter = m_isolatedWorlds.find(worldId);
-    if (iter == m_isolatedWorlds.end())
-        return v8::Local<v8::Context>();
-    return v8::Local<v8::Context>::New(iter->second->context());
-}
-
-bool V8Proxy::matchesCurrentContext()
-{
-    v8::Handle<v8::Context> context;
-    if (V8IsolatedContext* isolatedContext = V8IsolatedContext::getEntered()) {
-        context = isolatedContext->sharedContext()->get();
-        if (m_frame != toFrameIfNotDetached(context))
-            return false;
-    } else {
-        windowShell()->initContextIfNeeded();
-        context = windowShell()->context();
-    }
-    return context == context->GetCurrent();
 }
 
 }  // namespace WebCore

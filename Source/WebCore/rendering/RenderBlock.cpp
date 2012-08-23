@@ -3080,31 +3080,6 @@ void RenderBlock::paintFloats(PaintInfo& paintInfo, const LayoutPoint& paintOffs
     }
 }
 
-void RenderBlock::paintEllipsisBoxes(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
-{
-    if (!paintInfo.shouldPaintWithinRoot(this) || !firstLineBox())
-        return;
-
-    if (style()->visibility() == VISIBLE && paintInfo.phase == PaintPhaseForeground) {
-        // We can check the first box and last box and avoid painting if we don't
-        // intersect.
-        LayoutUnit yPos = paintOffset.y() + firstLineBox()->y();
-        LayoutUnit h = lastLineBox()->y() + lastLineBox()->logicalHeight() - firstLineBox()->y();
-        if (yPos >= paintInfo.rect.maxY() || yPos + h <= paintInfo.rect.y())
-            return;
-
-        // See if our boxes intersect with the dirty rect.  If so, then we paint
-        // them.  Note that boxes can easily overlap, so we can't make any assumptions
-        // based off positions of our first line box or our last line box.
-        for (RootInlineBox* curr = firstRootBox(); curr; curr = curr->nextRootBox()) {
-            yPos = paintOffset.y() + curr->y();
-            h = curr->logicalHeight();
-            if (curr->ellipsisBox() && yPos < paintInfo.rect.maxY() && yPos + h > paintInfo.rect.y())
-                curr->paintEllipsisBox(paintInfo, paintOffset, curr->lineTop(), curr->lineBottom());
-        }
-    }
-}
-
 RenderInline* RenderBlock::inlineElementContinuation() const
 { 
     RenderBoxModelObject* continuation = this->continuation();
@@ -5139,8 +5114,12 @@ void RenderBlock::calcColumnWidth()
 
 bool RenderBlock::requiresColumns(int desiredColumnCount) const
 {
+    // If overflow-y is set to paged-x or paged-y on the body or html element, we'll handle the paginating
+    // in the RenderView instead.
+    bool isPaginated = (style()->overflowY() == OPAGEDX || style()->overflowY() == OPAGEDY) && !(isRoot() || isBody());
+
     return firstChild()
-        && (desiredColumnCount != 1 || !style()->hasAutoColumnWidth() || !style()->hasInlineColumnAxis())
+        && (desiredColumnCount != 1 || !style()->hasAutoColumnWidth() || !style()->hasInlineColumnAxis() || isPaginated)
         && !firstChild()->isAnonymousColumnsBlock()
         && !firstChild()->isAnonymousColumnSpanBlock();
 }
@@ -5169,6 +5148,32 @@ void RenderBlock::setDesiredColumnCountAndWidth(int count, LayoutUnit width)
         info->setProgressionAxis(style()->hasInlineColumnAxis() ? ColumnInfo::InlineAxis : ColumnInfo::BlockAxis);
         info->setProgressionIsReversed(style()->columnProgression() == ReverseColumnProgression);
     }
+}
+
+void RenderBlock::updateColumnInfoFromStyle(RenderStyle* style)
+{
+    if (!hasColumns())
+        return;
+
+    ColumnInfo* info = gColumnInfoMap->get(this);
+
+    bool needsLayout = false;
+    ColumnInfo::Axis oldAxis = info->progressionAxis();
+    ColumnInfo::Axis newAxis = style->hasInlineColumnAxis() ? ColumnInfo::InlineAxis : ColumnInfo::BlockAxis;
+    if (oldAxis != newAxis) {
+        info->setProgressionAxis(newAxis);
+        needsLayout = true;
+    }
+
+    bool oldProgressionIsReversed = info->progressionIsReversed();
+    bool newProgressionIsReversed = style->columnProgression() == ReverseColumnProgression;
+    if (oldProgressionIsReversed != newProgressionIsReversed) {
+        info->setProgressionIsReversed(newProgressionIsReversed);
+        needsLayout = true;
+    }
+
+    if (needsLayout)
+        setNeedsLayoutAndPrefWidthsRecalc();
 }
 
 LayoutUnit RenderBlock::desiredColumnWidth() const

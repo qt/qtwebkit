@@ -88,7 +88,10 @@ public:
     // This function must be called from the main thread. It is safe to call it repeatedly.
     static void initializeThreading();
 
-    // Evaluate a script file in the environment of this proxy.
+    v8::Local<v8::Value> compileAndRunScript(const ScriptSourceCode&);
+
+    // Evaluate JavaScript in the main world.
+    // The caller must hold an execution context.
     ScriptValue evaluate(const ScriptSourceCode&);
 
     // Evaluate JavaScript in a new isolated world. The script gets its own
@@ -154,10 +157,13 @@ public:
     // V8Proxy::retrieveFrameForEnteredContext() for more information.
     static Frame* retrieveFrameForCurrentContext();
 
-    // Returns V8 Context of a frame. If none exists, creates
-    // a new context. It is potentially slow and consumes memory.
+    // Returns V8 Context. If none exists, creates a new context.
+    // It is potentially slow and consumes memory.
     static v8::Local<v8::Context> mainWorldContext(Frame*);
     v8::Local<v8::Context> mainWorldContext();
+    v8::Local<v8::Context> currentWorldContext();
+
+    bool matchesCurrentContext();
 
     // Pass command-line flags to the JS engine.
     static void setFlags(const char* string, int length);
@@ -211,6 +217,13 @@ private:
 
     // For the moment, we have one of these. Soon we will have one per DOMWrapperWorld.
     RefPtr<V8DOMWindowShell> m_windowShell;
+
+    // The isolated worlds we are tracking for this frame. We hold them alive
+    // here so that they can be used again by future calls to
+    // evaluateInIsolatedWorld().
+    IsolatedWorldMap m_isolatedWorlds;
+
+    IsolatedWorldSecurityOriginMap m_isolatedWorldSecurityOrigins;
 
     bool m_paused;
 

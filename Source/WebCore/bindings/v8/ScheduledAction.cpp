@@ -42,7 +42,6 @@
 
 #include "ScriptController.h"
 #include "V8Binding.h"
-#include "V8Proxy.h"
 #include "V8RecursionScope.h"
 #include "WorkerContext.h"
 #include "WorkerContextExecutionProxy.h"
@@ -132,7 +131,7 @@ void ScheduledAction::execute(ScriptController* script)
     if (!m_function.IsEmpty() && m_function->IsFunction())
         script->callFunction(v8::Persistent<v8::Function>::Cast(m_function), v8Context->Global(), m_argc, m_argv);
     else
-        script->proxy()->evaluate(m_code, 0);
+        script->compileAndRunScript(m_code);
 
     // The 'proxy' may be invalid at this point since JS could have released the owning Frame.
 }

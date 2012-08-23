@@ -1,3 +1,43 @@
+2012-08-22  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Crash when finalizing WebKitWebView
+        https://bugs.webkit.org/show_bug.cgi?id=94699
+
+        Reviewed by Martin Robinson.
+
+        Create the offscreen window the first time accelerated compositing
+        is enabled, so that if it's never enabled the window won't be
+        created.
+
+        * WebCoreSupport/AcceleratedCompositingContextGL.cpp:
+        (WebKit::AcceleratedCompositingContext::AcceleratedCompositingContext):
+        (WebKit::AcceleratedCompositingContext::initialize):
+        (WebKit::AcceleratedCompositingContext::setRootCompositingLayer):
+
+2012-08-22  Gustavo Noronha Silva  <gns@gnome.org>
+
+        [GTK] Split WebCore/platform into a separate library
+        https://bugs.webkit.org/show_bug.cgi?id=94435
+
+        Reviewed by Martin Robinson.
+
+        More people have been reporting problems when linking WebCore because
+        the command line limit is being exceeded. Splitting WebCore a bit more
+        is in order.
+
+        * GNUmakefile.am: link libWebCorePlatform into libwebkitgtk
+
+2012-08-22  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Preferred languages and spellchecker APIs are not consistent in WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=94683
+
+        Reviewed by Alejandro G. Castro.
+
+        * webkit/webkitspellcheckerenchant.cpp:
+        (updateSpellCheckingLanguages): Split the languages string to pass a
+        Vector to updateSpellCheckingLanguages().
+
 2012-08-21  Joanmarie Diggs  <jdiggs@igalia.com>
         [Gtk] No accessible caret-moved events found in certain content
         https://bugs.webkit.org/show_bug.cgi?id=72811

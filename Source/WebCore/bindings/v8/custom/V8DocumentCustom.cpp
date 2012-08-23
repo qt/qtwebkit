@@ -48,7 +48,6 @@
 #include "V8HTMLDocument.h"
 #include "V8IsolatedContext.h"
 #include "V8Node.h"
-#include "V8Proxy.h"
 #include "V8Touch.h"
 #include "V8TouchList.h"
 #if ENABLE(WEBGL)
@@ -76,7 +75,7 @@ v8::Handle<v8::Value> V8Document::evaluateCallback(const v8::Arguments& args)
     if (V8Node::HasInstance(args[1]))
         contextNode = V8Node::toNative(v8::Handle<v8::Object>::Cast(args[1]));
 
-    RefPtr<XPathNSResolver> resolver = V8DOMWrapper::getXPathNSResolver(args[2]);
+    RefPtr<XPathNSResolver> resolver = toXPathNSResolver(args[2]);
     if (!resolver && !args[2]->IsNull() && !args[2]->IsUndefined())
         return setDOMException(TYPE_MISMATCH_ERR, args.GetIsolate());
 

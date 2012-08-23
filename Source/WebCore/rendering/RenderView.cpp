@@ -38,6 +38,7 @@
 #include "RenderSelectionInfo.h"
 #include "RenderWidget.h"
 #include "RenderWidgetProtector.h"
+#include "StyleInheritedData.h"
 #include "TransformState.h"
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -217,12 +218,9 @@ void RenderView::mapAbsoluteToLocalPoint(bool fixed, bool useTransforms, Transfo
 
 bool RenderView::requiresColumns(int desiredColumnCount) const
 {
-    if (m_frameView) {
-        if (Frame* frame = m_frameView->frame()) {
-            if (Page* page = frame->page())
-                return frame == page->mainFrame() && page->pagination().mode != Page::Pagination::Unpaginated;
-        }
-    }
+    if (m_frameView)
+        return m_frameView->pagination().mode != Pagination::Unpaginated;
+
     return RenderBlock::requiresColumns(desiredColumnCount);
 }
 
@@ -230,24 +228,17 @@ void RenderView::calcColumnWidth()
 {
     int columnWidth = contentLogicalWidth();
     if (m_frameView && style()->hasInlineColumnAxis()) {
-        if (Frame* frame = m_frameView->frame()) {
-            if (Page* page = frame->page()) {
-                if (int pageLength = page->pagination().pageLength)
-                    columnWidth = pageLength;
-            }
-        }
+        if (int pageLength = m_frameView->pagination().pageLength)
+            columnWidth = pageLength;
     }
     setDesiredColumnCountAndWidth(1, columnWidth);
 }
 
 ColumnInfo::PaginationUnit RenderView::paginationUnit() const
 {
-    if (m_frameView) {
-        if (Frame* frame = m_frameView->frame()) {
-            if (Page* page = frame->page())
-                return (frame == page->mainFrame() && page->pagination().behavesLikeColumns) ? ColumnInfo::Column : ColumnInfo::Page;
-        }
-    }
+    if (m_frameView)
+        return m_frameView->pagination().behavesLikeColumns ? ColumnInfo::Column : ColumnInfo::Page;
+
     return ColumnInfo::Page;
 }
 
@@ -799,14 +790,8 @@ int RenderView::viewLogicalHeight() const
     int height = style()->isHorizontalWritingMode() ? viewHeight() : viewWidth();
 
     if (hasColumns() && !style()->hasInlineColumnAxis()) {
-        if (Frame* frame = m_frameView->frame()) {
-            if (Page* page = frame->page()) {
-                if (frame == page->mainFrame()) {
-                    if (int pageLength = page->pagination().pageLength)
-                        height = pageLength;
-                }
-            }
-        }
+        if (int pageLength = m_frameView->pagination().pageLength)
+            height = pageLength;
     }
 
     return height;
@@ -928,13 +913,8 @@ CustomFilterGlobalContext* RenderView::customFilterGlobalContext()
 void RenderView::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
 {
     RenderBlock::styleDidChange(diff, oldStyle);
-    
-    for (RenderObject* renderer = firstChild(); renderer; renderer = renderer->nextSibling()) {
-        if (renderer->isRenderNamedFlowThread()) {
-            RenderNamedFlowThread* flowRenderer = toRenderNamedFlowThread(renderer);
-            flowRenderer->setStyle(RenderFlowThread::createFlowThreadStyle(style()));
-        }
-    }
+    if (hasRenderNamedFlowThreads())
+        flowThreadController()->styleDidChange();
 }
 
 bool RenderView::hasRenderNamedFlowThreads() const

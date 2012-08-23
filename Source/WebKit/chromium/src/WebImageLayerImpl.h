@@ -23,53 +23,32 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
-#include <public/WebScrollableLayer.h>
+#ifndef WebImageLayerImpl_h
+#define WebImageLayerImpl_h
 
-#include "LayerChromium.h"
-#include "Region.h"
+#include <public/WebImageLayer.h>
+#include <wtf/OwnPtr.h>
+
+namespace WebCore {
+class ImageLayerChromium;
+}
 
 namespace WebKit {
+class WebLayerImpl;
 
-void WebScrollableLayer::setScrollPosition(WebPoint position)
-{
-    m_private->setScrollPosition(position);
-}
+class WebImageLayerImpl : public WebImageLayer {
+public:
+    explicit WebImageLayerImpl(PassRefPtr<WebCore::ImageLayerChromium>);
+    virtual ~WebImageLayerImpl();
 
-void WebScrollableLayer::setScrollable(bool scrollable)
-{
-    m_private->setScrollable(scrollable);
-}
+    // WebImageLayer implementation.
+    WebLayer* layer() OVERRIDE;
+    virtual void setBitmap(SkBitmap) OVERRIDE;
 
-void WebScrollableLayer::setHaveWheelEventHandlers(bool haveWheelEventHandlers)
-{
-    m_private->setHaveWheelEventHandlers(haveWheelEventHandlers);
-}
-
-void WebScrollableLayer::setShouldScrollOnMainThread(bool shouldScrollOnMainThread)
-{
-    m_private->setShouldScrollOnMainThread(shouldScrollOnMainThread);
-}
-
-void WebScrollableLayer::setNonFastScrollableRegion(const WebVector<WebRect>& rects)
-{
-    WebCore::Region region;
-    for (size_t i = 0; i < rects.size(); ++i) {
-        WebCore::IntRect rect = rects[i];
-        region.unite(rect);
-    }
-    m_private->setNonFastScrollableRegion(region);
+private:
+    OwnPtr<WebLayerImpl> m_layer;
+};
 
 }
 
-void WebScrollableLayer::setIsContainerForFixedPositionLayers(bool enable)
-{
-    m_private->setIsContainerForFixedPositionLayers(enable);
-}
-
-void WebScrollableLayer::setFixedToContainerLayer(bool enable)
-{
-    m_private->setFixedToContainerLayer(enable);
-}
-
-} // namespace WebKit
+#endif // WebImageLayerImpl_h
