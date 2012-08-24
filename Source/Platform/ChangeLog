@@ -1,3 +1,36 @@
+2012-08-23  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Convert WebAnimationCurve subtypes into pure virtual
+        https://bugs.webkit.org/show_bug.cgi?id=94068
+
+        Reviewed by Adrienne Walker.
+
+        This makes the Web*AnimationCurve interfaces pure virtual to provide better insulation from the implementation
+        details of the classes.
+
+        * chromium/public/WebAnimation.h:
+        (WebKit::WebAnimation::WebAnimation):
+        (WebAnimation):
+        * chromium/public/WebAnimationCurve.h:
+        * chromium/public/WebFloatAnimationCurve.h:
+        (WebFloatAnimationCurve):
+        (WebKit::WebFloatAnimationCurve::~WebFloatAnimationCurve):
+        * chromium/public/WebTransformAnimationCurve.h:
+        (WebTransformAnimationCurve):
+        (WebKit::WebTransformAnimationCurve::~WebTransformAnimationCurve):
+
+2012-08-22  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Remove WebLayer::setChildren API
+        https://bugs.webkit.org/show_bug.cgi?id=94749
+
+        Reviewed by Adrienne Walker.
+
+        This is redundant with removeAllChildren() / addChild() and less efficient.
+
+        * chromium/public/WebLayer.h:
+        (WebLayer):
+
 2012-08-22  James Robinson  <jamesr@chromium.org>
 
         [chromium] Change WebLayer from a concrete type to a pure virtual interface

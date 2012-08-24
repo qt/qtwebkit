@@ -1467,40 +1467,17 @@ void WebPagePrivate::deferredTasksTimerFired(WebCore::Timer<WebPagePrivate>*)
     task->perform(this);
 }
 
-bool WebPagePrivate::scrollBy(int deltaX, int deltaY, bool scrollMainFrame)
+void WebPagePrivate::scrollBy(int deltaX, int deltaY)
 {
     IntSize delta(deltaX, deltaY);
-    if (!scrollMainFrame) {
-        // We need to work around the fact that ::map{To,From}Transformed do not
-        // work well with negative values, like a negative width or height of an IntSize.
-        IntSize copiedDelta(IntSize(abs(delta.width()), abs(delta.height())));
-        IntSize untransformedCopiedDelta = mapFromTransformed(copiedDelta);
-        delta = IntSize(
-            delta.width() < 0 ? -untransformedCopiedDelta.width() : untransformedCopiedDelta.width(),
-            delta.height() < 0 ? -untransformedCopiedDelta.height(): untransformedCopiedDelta.height());
-
-        if (m_inRegionScroller->d->scrollBy(delta)) {
-            m_selectionHandler->selectionPositionChanged();
-            // FIXME: We have code in place to handle scrolling and clipping tap highlight
-            // on in-region scrolling. As soon as it is fast enough (i.e. we have it backed by
-            // a backing store), we can reliably make use of it in the real world.
-            // m_touchEventHandler->drawTapHighlight();
-            return true;
-        }
-
-        return false;
-    }
-
     setScrollPosition(scrollPosition() + delta);
-    return true;
 }
 
-bool WebPage::scrollBy(const Platform::IntSize& delta, bool scrollMainFrame)
+void WebPage::scrollBy(const Platform::IntSize& delta)
 {
     d->m_backingStoreClient->setIsClientGeneratedScroll(true);
-    bool b = d->scrollBy(delta.width(), delta.height(), scrollMainFrame);
+    d->scrollBy(delta.width(), delta.height());
     d->m_backingStoreClient->setIsClientGeneratedScroll(false);
-    return b;
 }
 
 void WebPagePrivate::notifyInRegionScrollStopped()
@@ -2488,8 +2465,8 @@ IntSize WebPagePrivate::fixedLayoutSize(bool snapToIncrement) const
     const int defaultLayoutHeight = m_defaultLayoutSize.height();
 
     int minWidth = defaultLayoutWidth;
-    int maxWidth = defaultMaxLayoutSize().width();
-    int maxHeight = defaultMaxLayoutSize().height();
+    int maxWidth = DEFAULT_MAX_LAYOUT_WIDTH;
+    int maxHeight = DEFAULT_MAX_LAYOUT_HEIGHT;
 
     // If the load state is none then we haven't actually got anything yet, but we need to layout
     // the entire page so that the user sees the entire page (unrendered) instead of just part of it.
@@ -3500,7 +3477,7 @@ IntSize WebPagePrivate::recomputeVirtualViewportFromViewportArguments()
     if (m_viewportArguments == defaultViewportArguments)
         return IntSize();
 
-    int desktopWidth = defaultMaxLayoutSize().width();
+    int desktopWidth = DEFAULT_MAX_LAYOUT_WIDTH;
     int deviceWidth = Platform::Graphics::Screen::primaryScreen()->width();
     int deviceHeight = Platform::Graphics::Screen::primaryScreen()->height();
     ViewportAttributes result = computeViewportAttributes(m_viewportArguments, desktopWidth, deviceWidth, deviceHeight, m_webSettings->devicePixelRatio(), m_defaultLayoutSize);
@@ -5292,14 +5269,6 @@ bool WebPage::defersLoading() const
     return d->m_page->defersLoading();
 }
 
-bool WebPage::willFireTimer()
-{
-    if (d->isLoading())
-        return true;
-
-    return d->m_backingStore->d->willFireTimer();
-}
-
 void WebPage::notifyPagePause()
 {
     FOR_EACH_PLUGINVIEW(d->m_pluginViews)
@@ -6201,16 +6170,6 @@ void WebPagePrivate::didChangeSettings(WebSettings* webSettings)
         Platform::userInterfaceThreadMessageClient()->dispatchMessage(
             createMethodCallMessage(&WebPagePrivate::setCompositorBackgroundColor, this, backgroundColor));
     }
-}
-
-IntSize WebPagePrivate::defaultMaxLayoutSize()
-{
-    static IntSize size;
-    if (size.isEmpty())
-        size = IntSize(std::max(1024, Platform::Graphics::Screen::primaryScreen()->landscapeWidth()),
-                       std::max(768, Platform::Graphics::Screen::primaryScreen()->landscapeHeight()));
-
-    return size;
 }
 
 WebString WebPage::textHasAttribute(const WebString& query) const

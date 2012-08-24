@@ -1,3 +1,332 @@
+2012-08-23  Antoine Labour  <piman@chromium.org>
+
+        [chromium] Fix lost context when textures are evicted
+        https://bugs.webkit.org/show_bug.cgi?id=94892
+
+        Reviewed by James Robinson.
+
+        After eviction, the CCPrioritizedTextureManager is in a limbo state
+        where all its resources are invalid. If we try to release them we will
+        double-destroy them.
+
+        New test: CCLayerTreeHostTestLostContextAfterEvictTextures.
+
+        * tests/CCLayerTreeHostTest.cpp:
+        (CCLayerTreeHostTestLostContextAfterEvictTextures):
+        (WTF::CCLayerTreeHostTestLostContextAfterEvictTextures::CCLayerTreeHostTestLostContextAfterEvictTextures):
+        (WTF::CCLayerTreeHostTestLostContextAfterEvictTextures::beginTest):
+        (EvictTexturesAndLoseContextTask):
+        (WTF::CCLayerTreeHostTestLostContextAfterEvictTextures::EvictTexturesAndLoseContextTask::EvictTexturesAndLoseContextTask):
+        (WTF::CCLayerTreeHostTestLostContextAfterEvictTextures::EvictTexturesAndLoseContextTask::~EvictTexturesAndLoseContextTask):
+        (WTF::CCLayerTreeHostTestLostContextAfterEvictTextures::EvictTexturesAndLoseContextTask::run):
+        (WTF::CCLayerTreeHostTestLostContextAfterEvictTextures::postEvictTexturesAndLoseContext):
+        (WTF::CCLayerTreeHostTestLostContextAfterEvictTextures::didCommitAndDrawFrame):
+        (WTF::CCLayerTreeHostTestLostContextAfterEvictTextures::commitCompleteOnCCThread):
+        (WTF::CCLayerTreeHostTestLostContextAfterEvictTextures::didRecreateOutputSurface):
+        (WTF::CCLayerTreeHostTestLostContextAfterEvictTextures::afterTest):
+        (WTF):
+        (WTF::TEST_F):
+
+2012-08-23  Antoine Labour  <piman@chromium.org>
+
+        [chromium] Add OVERRIDEs in test code
+        https://bugs.webkit.org/show_bug.cgi?id=94894
+
+        Reviewed by James Robinson.
+
+        * tests/CCLayerTreeHostTest.cpp:
+
+2012-08-23  Joshua Bell  <jsbell@chromium.org>
+
+        IndexedDB: Expose mechanism for database to force a connection to close
+        https://bugs.webkit.org/show_bug.cgi?id=91010
+
+        Reviewed by Tony Chang.
+
+        In Chromium, the browsing data deleter has a WebIDBDatabase handle which
+        it can use to terminate a connection. This handles forcefully closing
+        the front end connections and the back end, to unblock disk cleanup.
+
+        * public/WebIDBDatabase.h:
+        (WebKit::WebIDBDatabase::forceClose): Entry point.
+        * public/WebIDBDatabaseCallbacks.h:
+        (WebKit::WebIDBDatabaseCallbacks::onForcedClose): Plumbing back to front.
+        * src/IDBDatabaseCallbacksProxy.cpp:
+        (WebKit::IDBDatabaseCallbacksProxy::onForcedClose): Plumbing back to front.
+        (WebKit):
+        * src/IDBDatabaseCallbacksProxy.h:
+        (IDBDatabaseCallbacksProxy): Plumbing.
+        * src/WebIDBDatabaseCallbacksImpl.cpp:
+        (WebKit::WebIDBDatabaseCallbacksImpl::onForcedClose): Plumbing back to front.
+        (WebKit):
+        * src/WebIDBDatabaseCallbacksImpl.h:
+        (WebIDBDatabaseCallbacksImpl): Plumbing back to front.
+        * src/WebIDBDatabaseImpl.cpp:
+        (WebKit::WebIDBDatabaseImpl::close): Tidy up dropping the callback reference.
+        (WebKit):
+        (WebKit::WebIDBDatabaseImpl::forceClose): Terminate the connection by notifying
+        the back end and the front end, while avoid re-entrant badness.
+        * src/WebIDBDatabaseImpl.h: Header tweak for unit test.
+        (WebIDBDatabaseImpl):
+        * tests/IDBDatabaseBackendTest.cpp: Added unit test to exercise connections.
+
+2012-08-23  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Convert WebAnimationCurve subtypes into pure virtual
+        https://bugs.webkit.org/show_bug.cgi?id=94068
+
+        Reviewed by Adrienne Walker.
+
+        Updates the implementations, some callers and tests of Web*AnimationCurve to its new interface.
+
+        * WebKit.gyp:
+        * src/WebAnimation.cpp:
+        (WebKit::WebAnimation::initialize):
+        * src/WebFloatAnimationCurveImpl.cpp: Renamed from Source/WebKit/chromium/src/WebFloatAnimationCurve.cpp.
+        (WebKit):
+        (WebKit::WebFloatAnimationCurve::create):
+        (WebKit::WebFloatAnimationCurveImpl::WebFloatAnimationCurveImpl):
+        (WebKit::WebFloatAnimationCurveImpl::~WebFloatAnimationCurveImpl):
+        (WebKit::WebFloatAnimationCurveImpl::type):
+        (WebKit::WebFloatAnimationCurveImpl::add):
+        (WebKit::WebFloatAnimationCurveImpl::getValue):
+        (WebKit::WebFloatAnimationCurveImpl::cloneToCCAnimationCurve):
+        * src/WebTransformAnimationCurve.cpp: Removed.
+        * tests/WebAnimationTest.cpp:
+        (WebKit::TEST):
+        * tests/WebFloatAnimationCurveTest.cpp:
+        (WebKit::TEST):
+        * tests/WebTransformAnimationCurveTest.cpp:
+        (WebKit::TEST):
+
+2012-08-23  Kentaro Hara  <haraken@chromium.org>
+
+        [V8] Remove V8Proxy.{h,cpp}
+        https://bugs.webkit.org/show_bug.cgi?id=94794
+
+        Reviewed by Dimitri Glazkov.
+
+        Now V8Proxy is no longer used. We can completely remove V8Proxy from the codebase.
+
+        No tests. No change in behavior.
+
+        * src/ChromeClientImpl.cpp:
+        * src/WebBindings.cpp:
+        * src/WebDOMMessageEvent.cpp:
+        * src/WebDevToolsAgentImpl.cpp:
+        * src/WebMediaPlayerClientImpl.cpp:
+
+2012-08-23  Dana Jansens  <danakj@chromium.org>
+
+        [chromium] Don't require a RenderSurface* in order to create a RenderPass
+        https://bugs.webkit.org/show_bug.cgi?id=94862
+
+        Reviewed by Adrienne Walker.
+
+        * tests/CCLayerTreeHostImplTest.cpp:
+        * tests/CCRendererGLTest.cpp:
+        (FakeCCRendererClient::FakeCCRendererClient):
+
+2012-08-22  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Remove WebLayer::setChildren API
+        https://bugs.webkit.org/show_bug.cgi?id=94749
+
+        Reviewed by Adrienne Walker.
+
+        * src/WebLayer.cpp:
+
+2012-08-23  Dana Jansens  <danakj@chromium.org>
+
+        [chromium] Create sharedQuadState at same time as creating quads and give them to the quadSink
+        https://bugs.webkit.org/show_bug.cgi?id=94752
+
+        Reviewed by Adrienne Walker.
+
+        * tests/CCLayerTreeHostImplTest.cpp:
+        * tests/CCLayerTreeHostTest.cpp:
+        (WTF::EvictionTestLayerImpl::appendQuads):
+        * tests/CCQuadCullerTest.cpp:
+        * tests/CCRenderSurfaceTest.cpp:
+        * tests/CCSolidColorLayerImplTest.cpp:
+        (CCLayerTestCommon::TEST):
+        * tests/CCTiledLayerImplTest.cpp:
+        (CCLayerTestCommon::TEST):
+        (CCLayerTestCommon::getQuads):
+        (CCLayerTestCommon::coverageVisibleRectOnTileBoundaries):
+        (CCLayerTestCommon::coverageVisibleRectIntersectsTiles):
+        (CCLayerTestCommon::coverageVisibleRectIntersectsBounds):
+        * tests/MockCCQuadCuller.h:
+        (WebCore::MockCCQuadCuller::MockCCQuadCuller):
+        (MockCCQuadCuller):
+        (WebCore::MockCCQuadCuller::quadList):
+        (WebCore::MockCCQuadCuller::sharedQuadStateList):
+
+2012-08-23  Pavel Feldman  <pfeldman@chromium.org>
+
+        Not reviewed - fixing input list for timeline inspector module.
+        https://bugs.webkit.org/show_bug.cgi?id=94829
+
+        * WebKit.gyp:
+
+2012-08-23  Alexandre Elias  <aelias@chromium.org>
+
+        [chromium] Rename LayerRendererChromium to GL-specific name
+        https://bugs.webkit.org/show_bug.cgi?id=94835
+
+        Reviewed by James Robinson.
+
+        Over time, LayerRendererChromium has evolved to be a GL-specific
+        subclass of CCRenderer that has no awareness of layers (as it operates
+        only with drawQuads).
+
+        This patch renames LayerRendererChromium to CCRendererGL, replaces all
+        instances of "layerRenderer" with just "renderer", and removes a
+        few unnecessary includes of LayerRendererChromium.h.
+
+        * WebKit.gypi:
+        * tests/CCLayerTreeHostImplTest.cpp:
+        * tests/CCLayerTreeHostTest.cpp:
+        (WTF::CCLayerTreeHostTestLayerOcclusion::beginTest):
+        (WTF::CCLayerTreeHostTestLayerOcclusionWithFilters::beginTest):
+        (WTF::CCLayerTreeHostTestManySurfaces::beginTest):
+        (WTF::CCLayerTreeHostTestSurfaceNotAllocatedForLayersOutsideMemoryLimit::drawLayersOnCCThread):
+        * tests/CCRendererGLTest.cpp: Renamed from Source/WebKit/chromium/tests/LayerRendererChromiumTest.cpp.
+        (FrameCountingMemoryAllocationSettingContext):
+        (FrameCountingMemoryAllocationSettingContext::FrameCountingMemoryAllocationSettingContext):
+        (FrameCountingMemoryAllocationSettingContext::prepareTexture):
+        (FrameCountingMemoryAllocationSettingContext::setMemoryAllocationChangedCallbackCHROMIUM):
+        (FrameCountingMemoryAllocationSettingContext::getString):
+        (FrameCountingMemoryAllocationSettingContext::frameCount):
+        (FrameCountingMemoryAllocationSettingContext::setMemoryAllocation):
+        (FakeCCRendererClient):
+        (FakeCCRendererClient::FakeCCRendererClient):
+        (FakeCCRendererClient::setFullRootLayerDamageCount):
+        (FakeCCRendererClient::rootRenderPass):
+        (FakeCCRendererClient::renderPassesInDrawOrder):
+        (FakeCCRendererClient::renderPasses):
+        (FakeCCRendererClient::memoryAllocationLimitBytes):
+        (FakeCCRendererGL):
+        (FakeCCRendererGL::FakeCCRendererGL):
+        (CCRendererGLTest):
+        (CCRendererGLTest::CCRendererGLTest):
+        (CCRendererGLTest::SetUp):
+        (CCRendererGLTest::TearDown):
+        (CCRendererGLTest::swapBuffers):
+        (CCRendererGLTest::context):
+        (TEST_F):
+        (ForbidSynchronousCallContext):
+        (ForbidSynchronousCallContext::ForbidSynchronousCallContext):
+        (ForbidSynchronousCallContext::getActiveAttrib):
+        (ForbidSynchronousCallContext::getActiveUniform):
+        (ForbidSynchronousCallContext::getAttachedShaders):
+        (ForbidSynchronousCallContext::getAttribLocation):
+        (ForbidSynchronousCallContext::getBooleanv):
+        (ForbidSynchronousCallContext::getBufferParameteriv):
+        (ForbidSynchronousCallContext::getContextAttributes):
+        (ForbidSynchronousCallContext::getError):
+        (ForbidSynchronousCallContext::getFloatv):
+        (ForbidSynchronousCallContext::getFramebufferAttachmentParameteriv):
+        (ForbidSynchronousCallContext::getIntegerv):
+        (ForbidSynchronousCallContext::getProgramiv):
+        (ForbidSynchronousCallContext::getShaderiv):
+        (ForbidSynchronousCallContext::getString):
+        (ForbidSynchronousCallContext::getProgramInfoLog):
+        (ForbidSynchronousCallContext::getRenderbufferParameteriv):
+        (ForbidSynchronousCallContext::getShaderInfoLog):
+        (ForbidSynchronousCallContext::getShaderPrecisionFormat):
+        (ForbidSynchronousCallContext::getShaderSource):
+        (ForbidSynchronousCallContext::getTexParameterfv):
+        (ForbidSynchronousCallContext::getTexParameteriv):
+        (ForbidSynchronousCallContext::getUniformfv):
+        (ForbidSynchronousCallContext::getUniformiv):
+        (ForbidSynchronousCallContext::getUniformLocation):
+        (ForbidSynchronousCallContext::getVertexAttribfv):
+        (ForbidSynchronousCallContext::getVertexAttribiv):
+        (ForbidSynchronousCallContext::getVertexAttribOffset):
+        (TEST):
+        (LoseContextOnFirstGetContext):
+        (LoseContextOnFirstGetContext::LoseContextOnFirstGetContext):
+        (ContextThatDoesNotSupportMemoryManagmentExtensions):
+        (ContextThatDoesNotSupportMemoryManagmentExtensions::ContextThatDoesNotSupportMemoryManagmentExtensions):
+        (ContextThatDoesNotSupportMemoryManagmentExtensions::prepareTexture):
+        (ContextThatDoesNotSupportMemoryManagmentExtensions::setMemoryAllocationChangedCallbackCHROMIUM):
+        (ContextThatDoesNotSupportMemoryManagmentExtensions::getString):
+        (ClearCountingContext):
+        (ClearCountingContext::ClearCountingContext):
+        (ClearCountingContext::clear):
+        (ClearCountingContext::clearCount):
+        * tests/TiledLayerChromiumTest.cpp:
+
+2012-08-23  Stephen White  <senorblanco@chromium.org>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
+2012-08-23  Wei Jia  <wjia@chromium.org>
+
+        create different WebKit::WebMediaPlayer based on URL
+        https://bugs.webkit.org/show_bug.cgi?id=91301
+
+        Reviewed by Adam Barth.
+
+        Pass URL to WebFrameClient::createMediaPlayer(). This allows creation
+        of different WebMediaPlayer implementations based on the URL.
+
+        * public/WebFrameClient.h:
+        (WebKit::WebFrameClient::createMediaPlayer): add URL as additional argument.
+        * src/WebMediaPlayerClientImpl.cpp:
+        (WebKit::createWebMediaPlayer): add URL as additional argument.
+        (WebKit::WebMediaPlayerClientImpl::loadInternal):
+
+2012-08-23  Joshua Bell  <jsbell@chromium.org>
+
+        IndexedDB: Move onSuccess(IDBDatabaseBackendInterface) to IDBOpenDBRequest
+        https://bugs.webkit.org/show_bug.cgi?id=94757
+
+        Reviewed by Tony Chang.
+
+        Drop onSuccess(IDBDatabaseBackendImpl) overload from test, as it is no longer
+        implemented by IDBRequest.
+
+        * tests/IDBRequestTest.cpp:
+        (WebCore::TEST):
+
+2012-08-23  Kenneth Russell  <kbr@google.com>
+
+        Convert ScrollableArea ASSERT_NOT_REACHED virtuals into pure virtuals
+        https://bugs.webkit.org/show_bug.cgi?id=93306
+
+        Unreviewed build fix.
+
+        * src/ScrollbarGroup.h:
+
+2012-08-23  Adrienne Walker  <enne@google.com>
+
+        Convert ScrollableArea ASSERT_NOT_REACHED virtuals
+        https://bugs.webkit.org/show_bug.cgi?id=93306
+
+        Reviewed by Darin Adler.
+
+        Add implementations where necessary to make derived classes concrete.
+        Add OVERRIDE for ScrollableArea functions.
+
+        * src/ScrollbarGroup.h:
+        (ScrollbarGroup):
+        (WebKit::ScrollbarGroup::scrollCornerRect):
+        * tests/ScrollAnimatorNoneTest.cpp:
+        (MockScrollableArea):
+
+2012-08-23  David Reveman  <reveman@chromium.org>
+
+        [Chromium] Unnecessary delay when starting to update resources with an inactive vsync timer.
+        https://bugs.webkit.org/show_bug.cgi?id=94719
+
+        Reviewed by James Robinson.
+
+        * tests/CCSchedulerTestCommon.h:
+
 2012-08-23  Peter Beverloo  <peter@chromium.org>
 
         Unreviewed.  Rolled DEPS.

@@ -1,3 +1,90 @@
+2012-08-23  Julien Chaffraix  <jchaffraix@webkit.org>
+
+        [Chromium] Enable AtomicString && CString && WTFString && StringImpl unit tests
+        https://bugs.webkit.org/show_bug.cgi?id=94871
+
+        Reviewed by Benjamin Poulain.
+
+        * wtf/PassRefPtr.h:
+        We need to include Assertions.h due to the COMPILE_ASSERT added in r89283.
+        This matches other files in WTF though I am not sure why Chromium is the only
+        platform complaining about that.
+
+2012-08-23  Mark Rowe  <mrowe@apple.com>
+
+        Build fix for old, old versions of Clang.
+
+        * wtf/FastMalloc.cpp:
+        (WTF): Rejigger things so that they parse correctly if __has_warning isn't defined.
+
+2012-08-23  Emil A Eklund  <eae@chromium.org>
+
+        Add saturation arithmetic support to FractionalLayoutUnit
+        https://bugs.webkit.org/show_bug.cgi?id=94364
+
+        Reviewed by Benjamin Poulain.
+
+        Add support functions for saturated addition and subtraction.
+
+        Test: TestWebKitAPI/Tests/WTF/SaturatedArithmeticOperations.cpp
+
+        * GNUmakefile.list.am:
+        * WTF.gypi:
+        * WTF.pro:
+        * WTF.vcproj/WTF.vcproj:
+        * WTF.xcodeproj/project.pbxproj:
+        * WTF/wtf/CMakeLists.txt:
+        Add SaturatedArithmetic.h to build files.
+
+        * wtf/SaturatedArithmetic.h: Added.
+        (saturatedAddition):
+        (saturatedSubtraction):
+        Support functions for saturated addition/subtraction. Compares the signed
+        bit of the values instead of using range checks to reduce branching.
+
+        * wtf/Platform.h:
+        Add ENABLE_SATURATED_LAYOUT_ARITHMETIC flag.
+
+2012-08-23  Mark Rowe  <mrowe@apple.com>
+
+        Roll back in the part of r126475 that I had rolled out.
+
+        * wtf/FastMalloc.cpp:
+        (WTF): Disable the -Wunused-private-field warning around the declaration of
+        TCMalloc_Central_FreeListPadded since the padding is intentionally unused.
+        Only disable the warning if we detect it is enabled, since the warning may not
+        be supported by the version of Clang that is being used.
+
+2012-08-23  Mark Rowe  <mrowe@apple.com>
+
+        Roll out part of r126475 that breaks the build with older versions of Clang.
+
+        * wtf/FastMalloc.cpp:
+
+2012-08-23  Mark Rowe  <mrowe@apple.com>
+
+        Make WTF build with the latest version of clang.
+
+        Reviewed by Dan Bernstein.
+
+        * wtf/FastMalloc.cpp:
+        (WTF): Disable the -Wunused-private-field warning around the declaration of
+        TCMalloc_Central_FreeListPadded since the padding is intentionally unused.
+        (WTF::AdminRegionRecorder): Remove the unused m_reader member.
+        (WTF::FastMallocZone::enumerate): Don't pass in the RemoteMemoryReader since
+        it is no longer needed.
+
+2012-08-22  Geoffrey Garen  <ggaren@apple.com>
+
+        Fixed a fastMallocForbid/Allow compile error for some compilers
+        https://bugs.webkit.org/show_bug.cgi?id=94775
+
+        Reviewed by Gavin Barraclough.
+
+        * wtf/FastMalloc.h:
+        (WTF::fastMallocForbid()):
+        (WTF::fastMallocAllow()): Export, since these are called by JavaScriptCore.
+
 2012-08-22  Geoffrey Garen  <ggaren@apple.com>
 
         ThreadRestrictionVerifier should be opt-in, not opt-out

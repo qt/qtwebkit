@@ -1,3 +1,114 @@
+2012-08-23  Frederik Gladhorn  <gladhorn@kde.org>
+
+        Make it possible to build WebKit with Python 3 (and 2)
+        https://bugs.webkit.org/show_bug.cgi?id=94814
+
+        Reviewed by Ryosuke Niwa.
+
+        Exceptions need a hack to work with both.
+        string.join was already deprecated in Python 2.
+        Relative imports are no longer supported, use package name instead.
+
+        * Scripts/webkit2/messages.py:
+        * Scripts/webkit2/parser.py:
+
+2012-08-23  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Change behavior of MasqueradesAsUndefined to better accommodate DFG changes
+        https://bugs.webkit.org/show_bug.cgi?id=93884
+
+        Reviewed by Filip Pizlo.
+
+        With some upcoming changes to the DFG to remove uses of ClassInfo, we will be changing the behavior of  
+        MasqueradesAsUndefined. In order to make this change consistent across all of our execution engines,  
+        we will make this change to MasqueradesAsUndefined as a separate patch. After this patch, MasqueradesAsUndefined  
+        objects will only masquerade as undefined in their original context (i.e. their original JSGlobalObject).  
+        For example, if an object that masquerades as undefined in frame A is passed to frame B, it will not  
+        masquerade as undefined within frame B, but it will continue to masquerade in frame A.
+
+        * WebProcess/Plugins/Netscape/NPRuntimeObjectMap.cpp:
+        (WebKit::NPRuntimeObjectMap::convertJSValueToNPVariant): Passing ExecState to toBoolean call.
+
+2012-08-23  Brady Eidson  <beidson@apple.com>
+
+        REGRESSION (r124815): PDF in frame does not display any more
+        <rdar://problem/12063306> and https://bugs.webkit.org/show_bug.cgi?id=94869
+
+        Reviewed by Alexey Proskuryakov.
+
+        * WebProcess/Plugins/PDF/BuiltInPDFView.mm:
+        (WebKit::BuiltInPDFView::initialize): Tell the controller that initialization was successful.
+
+2012-08-23  Mark Rowe  <mrowe@apple.com>
+
+        Make WebKit2 build with the latest version of clang.
+
+        Reviewed by Dan Bernstein.
+
+        * Configurations/Base.xcconfig: Ensure that operator new isn't exported as a weak external symbol.
+
+2012-08-22  Jesus Sanchez-Palencia  <jesus.palencia@openbossa.org>
+
+        [EFL] Use WTF_USE_SOUP instead BUILDING_SOUP__
+        https://bugs.webkit.org/show_bug.cgi?id=94744
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Use #if defined(WTF_USE_SOUP) instead of #if defined(BUILDING_SOUP__)
+        since the former is used everywhere.
+
+        * Shared/API/c/WKBase.h:
+
+2012-08-23  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Free ewk context data on program exit.
+        https://bugs.webkit.org/show_bug.cgi?id=94808
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Make sure the default Ewk_Context gets freed
+        on program exit.
+
+        The patch also fixes leaking of WKContextRef
+        inside Ewk_Context which should have been
+        adopted.
+
+        * UIProcess/API/efl/ewk_context.cpp:
+        (_Ewk_Context::_Ewk_Context):
+        (ewk_context_default_get):
+
+2012-08-23  Adrienne Walker  <enne@google.com>
+
+        Convert ScrollableArea ASSERT_NOT_REACHED virtuals
+        https://bugs.webkit.org/show_bug.cgi?id=93306
+
+        Reviewed by Darin Adler.
+
+        Add implementations where necessary to make derived classes concrete.
+        Add OVERRIDE for ScrollableArea functions.
+
+        * UIProcess/win/WebPopupMenuProxyWin.cpp:
+        (WebKit::WebPopupMenuProxyWin::visibleHeight):
+        (WebKit):
+        (WebKit::WebPopupMenuProxyWin::visibleWidth):
+        (WebKit::WebPopupMenuProxyWin::contentsSize):
+        (WebKit::WebPopupMenuProxyWin::scrollableAreaBoundingBox):
+        * UIProcess/win/WebPopupMenuProxyWin.h:
+        (WebPopupMenuProxyWin):
+        * WebProcess/Plugins/PDF/BuiltInPDFView.h:
+
+2012-08-23  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL][WK2] ewk_intent_request API test does not free Eina_List
+        https://bugs.webkit.org/show_bug.cgi?id=94809
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        The used Eina_List should be freed due to ewk_intent_suggestions_get() documentation.
+
+        * UIProcess/API/efl/tests/test_ewk2_intents.cpp:
+        (onIntentReceived):
+
 2012-08-23  Andras Becsi  <andras.becsi@nokia.com>
 
         [Qt][WK2] Helper functions used by the raw webview tests should not be guarded by HAVE_QTQUICK

@@ -33,8 +33,8 @@
 #include "CCIOSurfaceDrawQuad.h"
 #include "CCLayerTreeHostImpl.h"
 #include "CCQuadSink.h"
+#include "CCRendererGL.h" // For the GLC() macro.
 #include "Extensions3D.h"
-#include "LayerRendererChromium.h"
 #include "TextStream.h"
 #include <public/WebGraphicsContext3D.h>
 
@@ -96,10 +96,13 @@ void CCIOSurfaceLayerImpl::willDraw(CCResourceProvider* resourceProvider)
     }
 }
 
-void CCIOSurfaceLayerImpl::appendQuads(CCQuadSink& quadList, const CCSharedQuadState* sharedQuadState, bool&)
+void CCIOSurfaceLayerImpl::appendQuads(CCQuadSink& quadSink, bool&)
 {
+    CCSharedQuadState* sharedQuadState = quadSink.useSharedQuadState(createSharedQuadState());
+    appendDebugBorderQuad(quadSink, sharedQuadState);
+
     IntRect quadRect(IntPoint(), contentBounds());
-    quadList.append(CCIOSurfaceDrawQuad::create(sharedQuadState, quadRect, m_ioSurfaceSize, m_ioSurfaceTextureId, CCIOSurfaceDrawQuad::Flipped));
+    quadSink.append(CCIOSurfaceDrawQuad::create(sharedQuadState, quadRect, m_ioSurfaceSize, m_ioSurfaceTextureId, CCIOSurfaceDrawQuad::Flipped));
 }
 
 void CCIOSurfaceLayerImpl::dumpLayerProperties(TextStream& ts, int indent) const

@@ -1233,10 +1233,10 @@ void RenderFlexibleBox::alignChildren(OrderIterator& iterator, const WTF::Vector
 void RenderFlexibleBox::applyStretchAlignmentToChild(RenderBox* child, LayoutUnit lineCrossAxisExtent)
 {
     if (!isColumnFlow() && child->style()->logicalHeight().isAuto()) {
-        // FIXME: If the child has orthogonal flow, then it already has an override height set. How do we stretch?
+        // FIXME: If the child has orthogonal flow, then it already has an override height set, so use it.
         if (!hasOrthogonalFlow(child)) {
             LayoutUnit stretchedLogicalHeight = child->logicalHeight() + availableAlignmentSpaceForChild(lineCrossAxisExtent, child);
-            LayoutUnit desiredLogicalHeight = child->logicalHeightConstrainedByMinMax(stretchedLogicalHeight);
+            LayoutUnit desiredLogicalHeight = child->constrainLogicalHeightByMinMax(stretchedLogicalHeight);
 
             // FIXME: Can avoid laying out here in some cases. See https://webkit.org/b/87905.
             if (desiredLogicalHeight != child->logicalHeight()) {
@@ -1246,14 +1246,18 @@ void RenderFlexibleBox::applyStretchAlignmentToChild(RenderBox* child, LayoutUni
                 child->layoutIfNeeded();
             }
         }
-    } else if (isColumnFlow() && child->style()->logicalWidth().isAuto() && isMultiline()) {
-        // FIXME: Handle min-width and max-width.
-        // FIXME: We only need to relayout here if the width changes.
-        // FIXME: The isMultiline check above may not be necessary if the width has not changed. See https://webkit.org/b/94237
-        LayoutUnit childWidth = lineCrossAxisExtent - crossAxisMarginExtentForChild(child);
-        child->setOverrideLogicalContentWidth(std::max(ZERO_LAYOUT_UNIT, childWidth));
-        child->setChildNeedsLayout(true, MarkOnlyThis);
-        child->layoutIfNeeded();
+    } else if (isColumnFlow() && child->style()->logicalWidth().isAuto()) {
+        // FIXME: If the child doesn't have orthogonal flow, then it already has an override width set, so use it.
+        if (hasOrthogonalFlow(child)) {
+            LayoutUnit childWidth = std::max(ZERO_LAYOUT_UNIT, lineCrossAxisExtent - crossAxisMarginExtentForChild(child));
+            childWidth = child->constrainLogicalWidthInRegionByMinMax(childWidth, childWidth, this);
+
+            if (childWidth != child->logicalWidth()) {
+                child->setOverrideLogicalContentWidth(childWidth);
+                child->setChildNeedsLayout(true, MarkOnlyThis);
+                child->layoutIfNeeded();
+            }
+        }
     }
 }
 

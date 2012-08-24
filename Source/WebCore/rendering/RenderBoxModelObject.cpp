@@ -459,16 +459,16 @@ void RenderBoxModelObject::updateBoxModelInfoFromStyle()
     setHorizontalWritingMode(styleToUse->isHorizontalWritingMode());
 }
 
-static LayoutSize accumulateRelativePositionOffsets(const RenderObject* child)
+static LayoutSize accumulateInFlowPositionOffsets(const RenderObject* child)
 {
-    if (!child->isAnonymousBlock() || !child->isRelPositioned())
+    if (!child->isAnonymousBlock() || !child->isInFlowPositioned())
         return LayoutSize();
     LayoutSize offset;
     RenderObject* p = toRenderBlock(child)->inlineElementContinuation();
     while (p && p->isRenderInline()) {
-        if (p->isRelPositioned()) {
+        if (p->isInFlowPositioned()) {
             RenderInline* renderInline = toRenderInline(p);
-            offset += renderInline->relativePositionOffset();
+            offset += renderInline->offsetForInFlowPosition();
         }
         p = p->parent();
     }
@@ -477,7 +477,7 @@ static LayoutSize accumulateRelativePositionOffsets(const RenderObject* child)
 
 LayoutSize RenderBoxModelObject::relativePositionOffset() const
 {
-    LayoutSize offset = accumulateRelativePositionOffsets(this);
+    LayoutSize offset = accumulateInFlowPositionOffsets(this);
 
     RenderBlock* containingBlock = this->containingBlock();
 
@@ -548,6 +548,14 @@ LayoutPoint RenderBoxModelObject::adjustedPositionRelativeToOffsetParent(const L
     }
 
     return referencePoint;
+}
+
+LayoutSize RenderBoxModelObject::offsetForInFlowPosition() const
+{
+    if (isRelPositioned())
+        return relativePositionOffset();
+
+    return LayoutSize();
 }
 
 LayoutUnit RenderBoxModelObject::offsetLeft() const
@@ -745,14 +753,14 @@ void RenderBoxModelObject::paintFillLayerExtended(const PaintInfo& paintInfo, co
     // while rendering.)
     if (forceBackgroundToWhite) {
         // Note that we can't reuse this variable below because the bgColor might be changed
-        bool shouldPaintBackgroundColor = !bgLayer->next() && bgColor.isValid() && bgColor.alpha() > 0;
+        bool shouldPaintBackgroundColor = !bgLayer->next() && bgColor.isValid() && bgColor.alpha();
         if (shouldPaintBackgroundImage || shouldPaintBackgroundColor) {
             bgColor = Color::white;
             shouldPaintBackgroundImage = false;
         }
     }
 
-    bool colorVisible = bgColor.isValid() && bgColor.alpha() > 0;
+    bool colorVisible = bgColor.isValid() && bgColor.alpha();
     
     // Fast path for drawing simple color backgrounds.
     if (!isRoot && !clippedWithLocalScrolling && !shouldPaintBackgroundImage && isBorderFill && !bgLayer->next()) {
@@ -2420,7 +2428,7 @@ bool RenderBoxModelObject::boxShadowShouldBeAppliedToBackground(BackgroundBleedA
         return false;
 
     Color backgroundColor = style()->visitedDependentColor(CSSPropertyBackgroundColor);
-    if (!backgroundColor.isValid() || backgroundColor.alpha() < 255)
+    if (!backgroundColor.isValid() || backgroundColor.hasAlpha())
         return false;
 
     const FillLayer* lastBackgroundLayer = style()->backgroundLayers();
@@ -2733,7 +2741,7 @@ void RenderBoxModelObject::mapAbsoluteToLocalPoint(bool fixed, bool useTransform
 
     LayoutSize containerOffset = offsetFromContainer(o, LayoutPoint());
 
-    if (!style()->isOutOfFlowPositioned() && o->hasColumns()) {
+    if (!style()->hasOutOfFlowPosition() && o->hasColumns()) {
         RenderBlock* block = static_cast<RenderBlock*>(o);
         LayoutPoint point(roundedLayoutPoint(transformState.mappedPoint()));
         point -= containerOffset;

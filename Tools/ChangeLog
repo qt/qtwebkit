@@ -1,3 +1,115 @@
+2012-08-23  Dirk Pranke  <dpranke@chromium.org>
+
+        leak detection broken after r126247 on mac
+        https://bugs.webkit.org/show_bug.cgi?id=94893
+
+        Unreviewed, build fix.
+
+        Adds is_snowleopard(), is_lion back() in for the mac port. We'll
+        probably need an is_mountainlion() or equivalent at some point,
+        I'm guessing (but I've deleted the leopard code).
+
+        * Scripts/webkitpy/layout_tests/port/leakdetector.py:
+        (LeakDetector._callstacks_to_exclude_from_leaks):
+        * Scripts/webkitpy/layout_tests/port/mac.py:
+        (MacPort):
+        (MacPort.is_snowleopard):
+        (MacPort.is_lion):
+
+2012-08-23  Julien Chaffraix  <jchaffraix@webkit.org>
+
+        [Chromium] Enable AtomicString && CString && WTFString && StringImpl unit tests
+        https://bugs.webkit.org/show_bug.cgi?id=94871
+
+        Reviewed by Benjamin Poulain.
+
+        * TestWebKitAPI/TestWebKitAPI.gypi:
+        Added the missing files to Chromium's build system.
+
+2012-08-23  Raphael Kubo da Costa  <rakuco@webkit.org>
+
+        [watchlist] Unreviewed, subscribe to WebKit2-EFL bugs.
+
+        * Scripts/webkitpy/common/config/watchlist:
+
+2012-08-23  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Replay tests take forever to load
+        https://bugs.webkit.org/show_bug.cgi?id=94764
+
+        Reviewed by Adam Barth.
+
+        Don't load about:blank at the beginning. This appears to clog the DRT.
+
+        * Scripts/webkitpy/performance_tests/perftest.py:
+        (ReplayPerfTest.run_single):
+        * Scripts/webkitpy/performance_tests/perftest_unittest.py:
+        (TestReplayPerfTest.test_run_single):
+        (TestReplayPerfTest.test_run_single_fails_when_output_has_error):
+
+2012-08-23  Kenneth Russell  <kbr@google.com>
+
+        Unreviewed, rolling out r126497.
+        http://trac.webkit.org/changeset/126497
+        https://bugs.webkit.org/show_bug.cgi?id=94764
+
+        Caused webkitpy-test step to start failing.
+
+        * Scripts/webkitpy/performance_tests/perftest.py:
+        (ReplayPerfTest.run_single):
+
+2012-08-23  Emil A Eklund  <eae@chromium.org>
+
+        Add saturation arithmetic support to FractionalLayoutUnit
+        https://bugs.webkit.org/show_bug.cgi?id=94364
+
+        Reviewed by Benjamin Poulain.
+
+        Add test for new saturatedArithmetic functions.
+
+        * TestWebKitAPI/CMakeLists.txt:
+        * TestWebKitAPI/GNUmakefile.am:
+        * TestWebKitAPI/TestWebKitAPI.gypi:
+        * TestWebKitAPI/TestWebKitAPI.xcodeproj/project.pbxproj:
+        * TestWebKitAPI/Tests/WTF/SaturatedArithmeticOperations.cpp: Added.
+        (TestWebKitAPI):
+        (TestWebKitAPI::TEST):
+        * TestWebKitAPI/win/TestWebKitAPI.vcproj:
+
+2012-08-23  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Replay tests take forever to load
+        https://bugs.webkit.org/show_bug.cgi?id=94764
+
+        Reviewed by Adam Barth.
+
+        Don't load about:blank at the beginning. This appears to clog the DRT.
+
+        * Scripts/webkitpy/performance_tests/perftest.py:
+        (ReplayPerfTest.run_single):
+
+2012-08-23  Wei Jia  <wjia@chromium.org>
+
+        create different WebKit::WebMediaPlayer based on URL
+        https://bugs.webkit.org/show_bug.cgi?id=91301
+
+        Reviewed by Adam Barth.
+
+        Pass URL to createMediaPlayer. This corresponds to change in base
+        class WebKit::WebFrameClient.
+
+        * DumpRenderTree/chromium/WebViewHost.cpp:
+        (WebViewHost::createMediaPlayer): add URL as additional argument.
+        * DumpRenderTree/chromium/WebViewHost.h:
+        (WebViewHost):
+
+2012-08-23  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Unreviewed, upgrade gyuyoung to reviewer.
+        http://lists.webkit.org/pipermail/webkit-dev/2012-August/022004.html
+
+        * Scripts/webkitpy/common/config/committers.py:
+
 2012-08-23  Carlos Garcia Campos  <cgarcia@igalia.com>
 
         REGRESSION(r126306): it broke the plugin process

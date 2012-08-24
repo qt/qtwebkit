@@ -439,7 +439,7 @@ public:
     bool hasBackground() const
     {
         Color color = visitedDependentColor(CSSPropertyBackgroundColor);
-        if (color.isValid() && color.alpha() > 0)
+        if (color.isValid() && color.alpha())
             return true;
         return hasBackgroundImage();
     }
@@ -496,10 +496,10 @@ public:
     Length bottom() const { return surround->offset.bottom(); }
 
     // Accessors for positioned object edges that take into account writing mode.
-    Length logicalLeft() const { return surround->offset.logicalLeft(this); }
-    Length logicalRight() const { return surround->offset.logicalRight(this); }
-    Length logicalTop() const { return surround->offset.before(this); }
-    Length logicalBottom() const { return surround->offset.after(this); }
+    Length logicalLeft() const { return surround->offset.logicalLeft(writingMode()); }
+    Length logicalRight() const { return surround->offset.logicalRight(writingMode()); }
+    Length logicalTop() const { return surround->offset.before(writingMode()); }
+    Length logicalBottom() const { return surround->offset.after(writingMode()); }
 
     // Whether or not a positioned element requires normal flow x/y to be computed
     // to determine its position.
@@ -509,7 +509,8 @@ public:
     bool hasStaticBlockPosition(bool horizontal) const { return horizontal ? hasAutoTopAndBottom() : hasAutoLeftAndRight(); }
 
     EPosition position() const { return static_cast<EPosition>(noninherited_flags._position); }
-    bool isOutOfFlowPositioned() const { return position() == AbsolutePosition || position() == FixedPosition; }
+    bool hasOutOfFlowPosition() const { return position() == AbsolutePosition || position() == FixedPosition; }
+    bool hasInFlowPosition() const { return position() == RelativePosition || position() == StickyPosition; }
     EFloat floating() const { return static_cast<EFloat>(noninherited_flags._floating); }
 
     Length width() const { return m_box->width(); }
@@ -728,24 +729,24 @@ public:
     Length marginBottom() const { return surround->margin.bottom(); }
     Length marginLeft() const { return surround->margin.left(); }
     Length marginRight() const { return surround->margin.right(); }
-    Length marginBefore() const { return surround->margin.before(this); }
-    Length marginAfter() const { return surround->margin.after(this); }
-    Length marginStart() const { return surround->margin.start(this); }
-    Length marginEnd() const { return surround->margin.end(this); }
-    Length marginStartUsing(const RenderStyle* otherStyle) const { return surround->margin.start(otherStyle); }
-    Length marginEndUsing(const RenderStyle* otherStyle) const { return surround->margin.end(otherStyle); }
-    Length marginBeforeUsing(const RenderStyle* otherStyle) const { return surround->margin.before(otherStyle); }
-    Length marginAfterUsing(const RenderStyle* otherStyle) const { return surround->margin.after(otherStyle); }
+    Length marginBefore() const { return surround->margin.before(writingMode()); }
+    Length marginAfter() const { return surround->margin.after(writingMode()); }
+    Length marginStart() const { return surround->margin.start(writingMode(), direction()); }
+    Length marginEnd() const { return surround->margin.end(writingMode(), direction()); }
+    Length marginStartUsing(const RenderStyle* otherStyle) const { return surround->margin.start(otherStyle->writingMode(), otherStyle->direction()); }
+    Length marginEndUsing(const RenderStyle* otherStyle) const { return surround->margin.end(otherStyle->writingMode(), otherStyle->direction()); }
+    Length marginBeforeUsing(const RenderStyle* otherStyle) const { return surround->margin.before(otherStyle->writingMode()); }
+    Length marginAfterUsing(const RenderStyle* otherStyle) const { return surround->margin.after(otherStyle->writingMode()); }
 
     LengthBox paddingBox() const { return surround->padding; }
     Length paddingTop() const { return surround->padding.top(); }
     Length paddingBottom() const { return surround->padding.bottom(); }
     Length paddingLeft() const { return surround->padding.left(); }
     Length paddingRight() const { return surround->padding.right(); }
-    Length paddingBefore() const { return surround->padding.before(this); }
-    Length paddingAfter() const { return surround->padding.after(this); }
-    Length paddingStart() const { return surround->padding.start(this); }
-    Length paddingEnd() const { return surround->padding.end(this); }
+    Length paddingBefore() const { return surround->padding.before(writingMode()); }
+    Length paddingAfter() const { return surround->padding.after(writingMode()); }
+    Length paddingStart() const { return surround->padding.start(writingMode(), direction()); }
+    Length paddingEnd() const { return surround->padding.end(writingMode(), direction()); }
 
     ECursor cursor() const { return static_cast<ECursor>(inherited_flags._cursor_style); }
 
@@ -955,8 +956,11 @@ public:
     ETextSecurity textSecurity() const { return static_cast<ETextSecurity>(rareInheritedData->textSecurity); }
 
     WritingMode writingMode() const { return static_cast<WritingMode>(inherited_flags.m_writingMode); }
+    // Lines have horizontal orientation; modes horizontal-tb or horizontal-bt.
     bool isHorizontalWritingMode() const { return writingMode() == TopToBottomWritingMode || writingMode() == BottomToTopWritingMode; }
+    // Bottom of the line occurs earlier in the block; modes vertical-rl or horizontal-bt.
     bool isFlippedLinesWritingMode() const { return writingMode() == LeftToRightWritingMode || writingMode() == BottomToTopWritingMode; }
+    // Block progression increases in the opposite direction to normal; modes vertical-rl or horizontal-bt.
     bool isFlippedBlocksWritingMode() const { return writingMode() == RightToLeftWritingMode || writingMode() == BottomToTopWritingMode; }
 
 #if ENABLE(CSS_IMAGE_ORIENTATION)

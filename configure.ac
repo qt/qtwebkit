@@ -1,8 +1,8 @@
 AC_PREREQ(2.60)
 
 m4_define([webkit_major_version], [1])
-m4_define([webkit_minor_version], [9])
-m4_define([webkit_micro_version], [6])
+m4_define([webkit_minor_version], [11])
+m4_define([webkit_micro_version], [0])
 
 # This is the version we'll be using as part of our User-Agent string
 # e.g., AppleWebKit/$(webkit_user_agent_version) ...
@@ -11,7 +11,7 @@ m4_define([webkit_micro_version], [6])
 m4_define([webkit_user_agent_major_version], [537])
 m4_define([webkit_user_agent_minor_version], [4])
 
-AC_INIT([WebKit],[webkit_major_version.webkit_minor_version.webkit_micro_version],[http://bugs.webkit.org/])
+AC_INIT([WebKitGTK],[webkit_major_version.webkit_minor_version.webkit_micro_version],[http://bugs.webkit.org/])
 
 AC_CONFIG_MACRO_DIR([Source/autotools])
 AC_CONFIG_AUX_DIR([Source/autotools])
