@@ -32,6 +32,7 @@
 
 #import "EditingDelegate.h"
 #import "MockGeolocationProvider.h"
+#import "MockWebNotificationProvider.h"
 #import "PolicyDelegate.h"
 #import "StorageTrackerDelegate.h"
 #import "UIDelegate.h"
@@ -282,23 +283,6 @@ JSRetainPtr<JSStringRef> TestRunner::markerTextForListItem(JSContextRef context,
 
     JSRetainPtr<JSStringRef> markerText(Adopt, JSStringCreateWithCFString((CFStringRef)[element _markerTextForListItem]));
     return markerText;
-}
-
-JSRetainPtr<JSStringRef> TestRunner::pageProperty(const char* propertyName, int pageNumber) const
-{
-    JSRetainPtr<JSStringRef> propertyValue(Adopt, JSStringCreateWithCFString((CFStringRef)[mainFrame pageProperty:propertyName:pageNumber]));
-    return propertyValue;
-}
-
-JSRetainPtr<JSStringRef> TestRunner::pageSizeAndMarginsInPixels(int pageNumber, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft) const
-{
-    JSRetainPtr<JSStringRef> propertyValue(Adopt, JSStringCreateWithCFString((CFStringRef)[mainFrame pageSizeAndMarginsInPixels:pageNumber:width:height:marginTop:marginRight:marginBottom:marginLeft]));
-    return propertyValue;
-}
-
-int TestRunner::numberOfPages(float pageWidthInPixels, float pageHeightInPixels)
-{
-    return [mainFrame numberOfPages:pageWidthInPixels:pageHeightInPixels];
 }
 
 int TestRunner::numberOfPendingGeolocationPermissionRequests()
@@ -1163,11 +1147,6 @@ void TestRunner::setBackingScaleFactor(double backingScaleFactor)
     [[mainFrame webView] _setCustomBackingScaleFactor:backingScaleFactor];
 }
 
-void TestRunner::simulateDesktopNotificationClick(JSStringRef title)
-{
-    // FIXME: Implement.
-}
-
 void TestRunner::resetPageVisibility()
 {
     // FIXME: Implement.
@@ -1187,3 +1166,40 @@ void TestRunner::deliverWebIntent(JSStringRef, JSStringRef, JSStringRef)
 {
     // FIXME: Implement.
 }
+
+void TestRunner::grantWebNotificationPermission(JSStringRef jsOrigin)
+{
+    RetainPtr<CFStringRef> cfOrigin(AdoptCF, JSStringCopyCFString(kCFAllocatorDefault, jsOrigin));
+    ASSERT([[mainFrame webView] _notificationProvider] == [MockWebNotificationProvider shared]);
+    [[MockWebNotificationProvider shared] setWebNotificationOrigin:(NSString *)cfOrigin.get() permission:TRUE];
+}
+
+void TestRunner::denyWebNotificationPermission(JSStringRef jsOrigin)
+{
+    RetainPtr<CFStringRef> cfOrigin(AdoptCF, JSStringCopyCFString(kCFAllocatorDefault, jsOrigin));
+    ASSERT([[mainFrame webView] _notificationProvider] == [MockWebNotificationProvider shared]);
+    [[MockWebNotificationProvider shared] setWebNotificationOrigin:(NSString *)cfOrigin.get() permission:FALSE];
+}
+
+void TestRunner::removeAllWebNotificationPermissions()
+{
+    [[MockWebNotificationProvider shared] removeAllWebNotificationPermissions];
+}
+
+void TestRunner::simulateWebNotificationClick(JSValueRef jsNotification)
+{
+    uint64_t notificationID = [[mainFrame webView] _notificationIDForTesting:jsNotification];
+    m_hasPendingWebNotificationClick = true;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (!m_hasPendingWebNotificationClick)
+            return;
+
+        [[MockWebNotificationProvider shared] simulateWebNotificationClick:notificationID];
+        m_hasPendingWebNotificationClick = false;
+    });
+}
+
+void TestRunner::simulateLegacyWebNotificationClick(JSStringRef jsTitle)
+{
+}
+

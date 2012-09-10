@@ -38,7 +38,6 @@
 #import "JSMainThreadExecState.h"
 #import "JSPluginElementFunctions.h"
 #import "ObjCRuntimeObject.h"
-#import "PlatformString.h"
 #import "StringSourceProvider.h"
 #import "WebCoreObjCExtras.h"
 #import "objc_instance.h"
@@ -53,7 +52,7 @@
 #import <runtime/Completion.h>
 #import <wtf/TCSpinLock.h>
 #import <wtf/Threading.h>
-
+#include <wtf/text/WTFString.h>
 
 using namespace JSC;
 using namespace JSC::Bindings;
@@ -317,7 +316,7 @@ static void getListFromNSArray(ExecState *exec, NSArray *array, RootObject* root
     JSLockHolder lock(exec);
     ASSERT(!exec->hadException());
 
-    JSValue function = [self _imp]->get(exec, Identifier(exec, stringToUString(String(name))));
+    JSValue function = [self _imp]->get(exec, Identifier(exec, String(name)));
     CallData callData;
     CallType callType = getCallData(function, callData);
     if (callType == CallTypeNone)
@@ -358,7 +357,7 @@ static void getListFromNSArray(ExecState *exec, NSArray *array, RootObject* root
     JSLockHolder lock(exec);
     
     [self _rootObject]->globalObject()->globalData().timeoutChecker.start();
-    JSValue returnValue = JSMainThreadExecState::evaluate(exec, [self _rootObject]->globalObject()->globalScopeChain(), makeSource(String(script)), JSC::JSValue(), 0);
+    JSValue returnValue = JSMainThreadExecState::evaluate(exec, makeSource(String(script)), JSC::JSValue(), 0);
     [self _rootObject]->globalObject()->globalData().timeoutChecker.stop();
 
     id resultObj = [WebScriptObject _convertValueToObjcValue:returnValue originRootObject:[self _originRootObject] rootObject:[self _rootObject]];
@@ -379,7 +378,7 @@ static void getListFromNSArray(ExecState *exec, NSArray *array, RootObject* root
     JSLockHolder lock(exec);
 
     PutPropertySlot slot;
-    [self _imp]->methodTable()->put([self _imp], exec, Identifier(exec, stringToUString(String(key))), convertObjcValueToValue(exec, &value, ObjcObjectType, [self _rootObject]), slot);
+    [self _imp]->methodTable()->put([self _imp], exec, Identifier(exec, String(key)), convertObjcValueToValue(exec, &value, ObjcObjectType, [self _rootObject]), slot);
 
     if (exec->hadException()) {
         addExceptionToConsole(exec);
@@ -404,7 +403,7 @@ static void getListFromNSArray(ExecState *exec, NSArray *array, RootObject* root
         // leaving the lock permanently held
         JSLockHolder lock(exec);
         
-        JSValue result = [self _imp]->get(exec, Identifier(exec, stringToUString(String(key))));
+        JSValue result = [self _imp]->get(exec, Identifier(exec, String(key)));
         
         if (exec->hadException()) {
             addExceptionToConsole(exec);
@@ -433,7 +432,7 @@ static void getListFromNSArray(ExecState *exec, NSArray *array, RootObject* root
     ASSERT(!exec->hadException());
 
     JSLockHolder lock(exec);
-    [self _imp]->methodTable()->deleteProperty([self _imp], exec, Identifier(exec, stringToUString(String(key))));
+    [self _imp]->methodTable()->deleteProperty([self _imp], exec, Identifier(exec, String(key)));
 
     if (exec->hadException()) {
         addExceptionToConsole(exec);
@@ -452,7 +451,7 @@ static void getListFromNSArray(ExecState *exec, NSArray *array, RootObject* root
     ASSERT(!exec->hadException());
 
     JSLockHolder lock(exec);
-    BOOL result = [self _imp]->hasProperty(exec, Identifier(exec, stringToUString(String(key))));
+    BOOL result = [self _imp]->hasProperty(exec, Identifier(exec, String(key)));
 
     if (exec->hadException()) {
         addExceptionToConsole(exec);
@@ -569,7 +568,7 @@ static void getListFromNSArray(ExecState *exec, NSArray *array, RootObject* root
 
     if (value.isString()) {
         ExecState* exec = rootObject->globalObject()->globalExec();
-        const UString& u = asString(value)->value(exec);
+        const String& u = asString(value)->value(exec);
         return [NSString stringWithCharacters:u.characters() length:u.length()];
     }
 

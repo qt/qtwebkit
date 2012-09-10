@@ -53,7 +53,6 @@
 #include "KURL.h"
 #include "MediaError.h"
 #include "Page.h"
-#include "PlatformString.h"
 #include "RenderWidget.h"
 #include "Settings.h"
 #include "TextBreakIterator.h"
@@ -75,6 +74,7 @@
 #include "platform/WebVector.h"
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
+#include <wtf/text/WTFString.h>
 
 using namespace WebCore;
 
@@ -122,7 +122,7 @@ static String selectMisspelledWord(const ContextMenu* defaultMenu, Frame* select
 
     // Selection is empty, so change the selection to the word under the cursor.
     HitTestResult hitTestResult = selectedFrame->eventHandler()->
-        hitTestResultAtPoint(selectedFrame->page()->contextMenuController()->hitTestResult().point(), true);
+        hitTestResultAtPoint(selectedFrame->page()->contextMenuController()->hitTestResult().point(), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::AllowShadowContent);
     Node* innerNode = hitTestResult.innerNode();
     VisiblePosition pos(innerNode->renderer()->positionForPoint(
         hitTestResult.localPoint()));

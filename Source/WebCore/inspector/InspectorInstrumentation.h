@@ -33,7 +33,6 @@
 
 #include "CSSSelector.h"
 #include "ConsoleTypes.h"
-#include "Document.h"
 #include "Element.h"
 #include "Frame.h"
 #include "Page.h"
@@ -53,6 +52,7 @@ class CharacterData;
 class DOMWindow;
 class DOMWrapperWorld;
 class Database;
+class Document;
 class Element;
 class EventContext;
 class DocumentLoader;
@@ -142,8 +142,10 @@ public:
     static void didFireTimer(const InspectorInstrumentationCookie&);
     static void didBeginFrame(Page*);
     static void didCancelFrame(Page*);
+    static void didInvalidateLayout(Frame*);
     static InspectorInstrumentationCookie willLayout(Frame*);
     static void didLayout(const InspectorInstrumentationCookie&);
+    static void didScroll(Page*);
     static InspectorInstrumentationCookie willLoadXHR(ScriptExecutionContext*, XMLHttpRequest*);
     static void didLoadXHR(const InspectorInstrumentationCookie&);
     static InspectorInstrumentationCookie willPaint(Frame*, GraphicsContext*, const LayoutRect&);
@@ -317,8 +319,10 @@ private:
     static void didFireTimerImpl(const InspectorInstrumentationCookie&);
     static void didBeginFrameImpl(InstrumentingAgents*);
     static void didCancelFrameImpl(InstrumentingAgents*);
+    static void didInvalidateLayoutImpl(InstrumentingAgents*, Frame*);
     static InspectorInstrumentationCookie willLayoutImpl(InstrumentingAgents*, Frame*);
     static void didLayoutImpl(const InspectorInstrumentationCookie&);
+    static void didScrollImpl(InstrumentingAgents*);
     static InspectorInstrumentationCookie willLoadXHRImpl(InstrumentingAgents*, XMLHttpRequest*, ScriptExecutionContext*);
     static void didLoadXHRImpl(const InspectorInstrumentationCookie&);
     static InspectorInstrumentationCookie willPaintImpl(InstrumentingAgents*, GraphicsContext*, const LayoutRect&, Frame*);
@@ -810,6 +814,15 @@ inline void InspectorInstrumentation::didCancelFrame(Page* page)
 #endif
 }
 
+inline void InspectorInstrumentation::didInvalidateLayout(Frame* frame)
+{
+#if ENABLE(INSPECTOR)
+    FAST_RETURN_IF_NO_FRONTENDS(void());
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForFrame(frame))
+        didInvalidateLayoutImpl(instrumentingAgents, frame);
+#endif
+}
+
 inline InspectorInstrumentationCookie InspectorInstrumentation::willLayout(Frame* frame)
 {
 #if ENABLE(INSPECTOR)
@@ -826,6 +839,15 @@ inline void InspectorInstrumentation::didLayout(const InspectorInstrumentationCo
     FAST_RETURN_IF_NO_FRONTENDS(void());
     if (cookie.first)
         didLayoutImpl(cookie);
+#endif
+}
+
+inline void InspectorInstrumentation::didScroll(Page* page)
+{
+#if ENABLE(INSPECTOR)
+    FAST_RETURN_IF_NO_FRONTENDS(void());
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForPage(page))
+        didScrollImpl(instrumentingAgents);
 #endif
 }
 

@@ -41,7 +41,9 @@
 #include "WebFrameImpl.h"
 #include "WebKit.h"
 #include "WebViewImpl.h"
+#include <public/Platform.h>
 #include <public/WebAnimationCurve.h>
+#include <public/WebCompositorSupport.h>
 #include <public/WebFloatAnimationCurve.h>
 #include <public/WebFloatPoint.h>
 #include <public/WebRect.h>
@@ -59,16 +61,16 @@ PassOwnPtr<LinkHighlight> LinkHighlight::create(Node* node, WebViewImpl* owningW
 }
 
 LinkHighlight::LinkHighlight(Node* node, WebViewImpl* owningWebViewImpl)
-    : m_contentLayer(adoptPtr(WebContentLayer::create(this)))
-    , m_clipLayer(adoptPtr(WebLayer::create()))
-    , m_node(node)
+    : m_node(node)
     , m_owningWebViewImpl(owningWebViewImpl)
     , m_currentGraphicsLayer(0)
     , m_geometryNeedsUpdate(false)
 {
     ASSERT(m_node);
     ASSERT(owningWebViewImpl);
-
+    WebCompositorSupport* compositorSupport = Platform::current()->compositorSupport();
+    m_contentLayer = adoptPtr(compositorSupport->createContentLayer(this));
+    m_clipLayer = adoptPtr(compositorSupport->createLayer());
     m_clipLayer->setAnchorPoint(WebFloatPoint());
     m_clipLayer->addChild(m_contentLayer->layer());
     m_contentLayer->layer()->setDrawsContent(false);
@@ -147,7 +149,7 @@ bool LinkHighlight::computeHighlightLayerPathAndPosition(RenderLayer* compositin
         return false;
 
     bool pathHasChanged = false;
-    FloatRect boundingRect = m_node->getPixelSnappedRect();
+    FloatRect boundingRect = m_node->pixelSnappedBoundingBox();
 
     // FIXME: If we ever use a more sophisticated highlight path, we'll need
     // to devise a way of detecting when it changes.
@@ -196,17 +198,21 @@ void LinkHighlight::startHighlightAnimation()
 {
     const float startOpacity = 1;
     // FIXME: Should duration be configurable?
-    const float duration = 2;
+    const float duration = 0.1f;
 
     m_contentLayer->layer()->setOpacity(startOpacity);
 
-    OwnPtr<WebFloatAnimationCurve> curve = adoptPtr(WebFloatAnimationCurve::create());
+    WebCompositorSupport* compositorSupport = Platform::current()->compositorSupport();
+
+    OwnPtr<WebFloatAnimationCurve> curve = adoptPtr(compositorSupport->createFloatAnimationCurve());
+
     curve->add(WebFloatKeyframe(0, startOpacity));
     curve->add(WebFloatKeyframe(duration / 2, startOpacity));
     // For layout tests we don't fade out.
     curve->add(WebFloatKeyframe(duration, WebKit::layoutTestMode() ? startOpacity : 0));
 
-    m_animation = adoptPtr(WebAnimation::create(*curve, WebAnimation::TargetPropertyOpacity));
+    m_animation = adoptPtr(compositorSupport->createAnimation(*curve, WebAnimation::TargetPropertyOpacity));
+
     m_contentLayer->layer()->setDrawsContent(true);
     m_contentLayer->layer()->addAnimation(m_animation.get());
 

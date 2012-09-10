@@ -93,11 +93,13 @@ public:
     ShadowRootType type() const { return m_type; }
 #endif
 
+    PassRefPtr<Node> cloneNode(bool, ExceptionCode&);
+
 private:
     explicit ShadowRoot(Document*);
     virtual ~ShadowRoot();
     virtual String nodeName() const;
-    virtual PassRefPtr<Node> cloneNode(bool deep, ExceptionCode&);
+    virtual PassRefPtr<Node> cloneNode(bool deep);
     virtual bool childTypeAllowed(NodeType) const;
     virtual void childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta) OVERRIDE;
 

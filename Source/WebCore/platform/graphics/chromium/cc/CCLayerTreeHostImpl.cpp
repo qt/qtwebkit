@@ -26,7 +26,7 @@
 
 #include "CCLayerTreeHostImpl.h"
 
-#include "CCActiveGestureAnimation.h"
+#include "CCAppendQuadsData.h"
 #include "CCDamageTracker.h"
 #include "CCDebugRectHistory.h"
 #include "CCDelayBasedTimeSource.h"
@@ -167,6 +167,10 @@ void CCLayerTreeHostImpl::commitComplete()
 
 bool CCLayerTreeHostImpl::canDraw()
 {
+    // Note: If you are changing this function or any other function that might
+    // affect the result of canDraw, make sure to call m_client->onCanDrawStateChanged
+    // in the proper places and update the notifyIfCanDrawChanged test.
+
     if (!m_rootLayerImpl) {
         TRACE_EVENT_INSTANT0("cc", "CCLayerTreeHostImpl::canDraw no root layer");
         return false;
@@ -195,7 +199,6 @@ void CCLayerTreeHostImpl::animate(double monotonicTime, double wallClockTime)
 {
     animatePageScale(monotonicTime);
     animateLayers(monotonicTime, wallClockTime);
-    animateGestures(monotonicTime);
     animateScrollbars(monotonicTime);
 }
 
@@ -222,14 +225,6 @@ void CCLayerTreeHostImpl::startPageScaleAnimation(const IntSize& targetPosition,
 
     m_client->setNeedsRedrawOnImplThread();
     m_client->setNeedsCommitOnImplThread();
-}
-
-void CCLayerTreeHostImpl::setActiveGestureAnimation(PassOwnPtr<CCActiveGestureAnimation> gestureAnimation)
-{
-    m_activeGestureAnimation = gestureAnimation;
-
-    if (m_activeGestureAnimation)
-        m_client->setNeedsRedrawOnImplThread();
 }
 
 void CCLayerTreeHostImpl::scheduleAnimation()
@@ -266,6 +261,13 @@ void CCLayerTreeHostImpl::calculateRenderSurfaceLayerList(CCLayerList& renderSur
     }
 }
 
+void CCLayerTreeHostImpl::FrameData::appendRenderPass(PassOwnPtr<CCRenderPass> renderPass)
+{
+    CCRenderPass* pass = renderPass.get();
+    renderPasses.append(pass);
+    renderPassesById.set(pass->id(), renderPass);
+}
+
 bool CCLayerTreeHostImpl::calculateRenderPasses(FrameData& frame)
 {
     ASSERT(frame.renderPasses.isEmpty());
@@ -275,22 +277,9 @@ bool CCLayerTreeHostImpl::calculateRenderPasses(FrameData& frame)
     TRACE_EVENT1("cc", "CCLayerTreeHostImpl::calculateRenderPasses", "renderSurfaceLayerList.size()", static_cast<long long unsigned>(frame.renderSurfaceLayerList->size()));
 
     // Create the render passes in dependency order.
-    HashMap<CCRenderSurface*, CCRenderPass*> surfacePassMap;
     for (int surfaceIndex = frame.renderSurfaceLayerList->size() - 1; surfaceIndex >= 0 ; --surfaceIndex) {
         CCLayerImpl* renderSurfaceLayer = (*frame.renderSurfaceLayerList)[surfaceIndex];
-        CCRenderSurface* renderSurface = renderSurfaceLayer->renderSurface();
-
-        int renderPassId = renderSurfaceLayer->id();
-        IntRect outputRect = renderSurface->contentRect();
-        const WebTransformationMatrix& transformToRootTarget = renderSurface->screenSpaceTransform();
-        OwnPtr<CCRenderPass> pass = CCRenderPass::create(renderPassId, outputRect, transformToRootTarget);
-        pass->setDamageRect(renderSurface->damageTracker()->currentDamageRect());
-        pass->setFilters(renderSurfaceLayer->filters());
-        pass->setBackgroundFilters(renderSurfaceLayer->backgroundFilters());
-
-        surfacePassMap.add(renderSurface, pass.get());
-        frame.renderPasses.append(pass.get());
-        frame.renderPassesById.add(renderPassId, pass.release());
+        renderSurfaceLayer->renderSurface()->appendRenderPasses(frame);
     }
 
     bool recordMetricsForFrame = true; // FIXME: In the future, disable this when about:tracing is off.
@@ -310,28 +299,32 @@ bool CCLayerTreeHostImpl::calculateRenderPasses(FrameData& frame)
 
     CCLayerIteratorType end = CCLayerIteratorType::end(frame.renderSurfaceLayerList);
     for (CCLayerIteratorType it = CCLayerIteratorType::begin(frame.renderSurfaceLayerList); it != end; ++it) {
-        CCRenderSurface* renderSurface = it.targetRenderSurfaceLayer()->renderSurface();
-        CCRenderPass* pass = surfacePassMap.get(renderSurface);
-        bool hadMissingTiles = false;
+        CCRenderPass::Id targetRenderPassId = it.targetRenderSurfaceLayer()->renderSurface()->renderPassId();
+        CCRenderPass* targetRenderPass = frame.renderPassesById.get(targetRenderPassId);
 
         occlusionTracker.enterLayer(it);
 
+        CCAppendQuadsData appendQuadsData;
+
         if (it.representsContributingRenderSurface()) {
-            CCRenderPass* contributingRenderPass = surfacePassMap.get(it->renderSurface());
-            pass->appendQuadsForRenderSurfaceLayer(*it, contributingRenderPass, &occlusionTracker);
+            CCRenderPass::Id contributingRenderPassId = it->renderSurface()->renderPassId();
+            CCRenderPass* contributingRenderPass = frame.renderPassesById.get(contributingRenderPassId);
+            targetRenderPass->appendQuadsForRenderSurfaceLayer(*it, contributingRenderPass, &occlusionTracker, appendQuadsData);
         } else if (it.representsItself() && !it->visibleContentRect().isEmpty()) {
             bool hasOcclusionFromOutsideTargetSurface;
-            if (occlusionTracker.occluded(*it, it->visibleContentRect(), &hasOcclusionFromOutsideTargetSurface)) {
-                if (hasOcclusionFromOutsideTargetSurface)
-                    pass->setHasOcclusionFromOutsideTargetSurface(hasOcclusionFromOutsideTargetSurface);
-            } else {
+            if (occlusionTracker.occluded(*it, it->visibleContentRect(), &hasOcclusionFromOutsideTargetSurface))
+                appendQuadsData.hadOcclusionFromOutsideTargetSurface |= hasOcclusionFromOutsideTargetSurface;
+            else {
                 it->willDraw(m_resourceProvider.get());
                 frame.willDrawLayers.append(*it);
-                pass->appendQuadsForLayer(*it, &occlusionTracker, hadMissingTiles);
+                targetRenderPass->appendQuadsForLayer(*it, &occlusionTracker, appendQuadsData);
             }
         }
 
-        if (hadMissingTiles) {
+        if (appendQuadsData.hadOcclusionFromOutsideTargetSurface)
+            targetRenderPass->setHasOcclusionFromOutsideTargetSurface(true);
+
+        if (appendQuadsData.hadMissingTiles) {
             bool layerHasAnimatingTransform = it->screenSpaceTransformIsAnimating() || it->drawTransformIsAnimating();
             if (layerHasAnimatingTransform)
                 drawFrame = false;
@@ -344,6 +337,7 @@ bool CCLayerTreeHostImpl::calculateRenderPasses(FrameData& frame)
     for (size_t i = 0; i < frame.renderPasses.size(); ++i) {
         for (size_t j = 0; j < frame.renderPasses[i]->quadList().size(); ++j)
             ASSERT(frame.renderPasses[i]->quadList()[j]->sharedQuadStateId() >= 0);
+        ASSERT(frame.renderPassesById.contains(frame.renderPasses[i]->id()));
     }
 #endif
 
@@ -408,14 +402,14 @@ IntSize CCLayerTreeHostImpl::contentSize() const
     return m_rootScrollLayerImpl->children()[0]->contentBounds();
 }
 
-static inline CCRenderPass* findRenderPassById(int renderPassId, const CCLayerTreeHostImpl::FrameData& frame)
+static inline CCRenderPass* findRenderPassById(CCRenderPass::Id renderPassId, const CCLayerTreeHostImpl::FrameData& frame)
 {
     CCRenderPassIdHashMap::const_iterator it = frame.renderPassesById.find(renderPassId);
     ASSERT(it != frame.renderPassesById.end());
     return it->second.get();
 }
 
-static void removeRenderPassesRecursive(int removeRenderPassId, CCLayerTreeHostImpl::FrameData& frame)
+static void removeRenderPassesRecursive(CCRenderPass::Id removeRenderPassId, CCLayerTreeHostImpl::FrameData& frame)
 {
     CCRenderPass* removeRenderPass = findRenderPassById(removeRenderPassId, frame);
     size_t removeIndex = frame.renderPasses.find(removeRenderPass);
@@ -435,7 +429,7 @@ static void removeRenderPassesRecursive(int removeRenderPassId, CCLayerTreeHostI
         if (currentQuad->material() != CCDrawQuad::RenderPass)
             continue;
 
-        int nextRemoveRenderPassId = CCRenderPassDrawQuad::materialCast(currentQuad)->renderPassId();
+        CCRenderPass::Id nextRemoveRenderPassId = CCRenderPassDrawQuad::materialCast(currentQuad)->renderPassId();
         removeRenderPassesRecursive(nextRemoveRenderPassId, frame);
     }
 }
@@ -530,6 +524,7 @@ void CCLayerTreeHostImpl::releaseContentsTextures()
     m_resourceProvider->deleteOwnedResources(CCRenderer::ContentPool);
     m_contentsTexturesPurged = true;
     m_client->setNeedsCommitOnImplThread();
+    m_client->onCanDrawStateChanged(canDraw());
 }
 
 void CCLayerTreeHostImpl::setMemoryAllocationLimitBytes(size_t bytes)
@@ -669,6 +664,8 @@ void CCLayerTreeHostImpl::setRootLayer(PassOwnPtr<CCLayerImpl> layer)
         m_currentlyScrollingLayerImpl = CCLayerTreeHostCommon::findLayerInSubtree(m_rootLayerImpl.get(), m_scrollingLayerIdFromPreviousTree);
 
     m_scrollingLayerIdFromPreviousTree = -1;
+
+    m_client->onCanDrawStateChanged(canDraw());
 }
 
 PassOwnPtr<CCLayerImpl> CCLayerTreeHostImpl::detachLayerTree()
@@ -731,7 +728,15 @@ bool CCLayerTreeHostImpl::initializeRenderer(PassOwnPtr<CCGraphicsContext> conte
     if (!m_visible && m_renderer)
          m_renderer->setVisible(m_visible);
 
+    m_client->onCanDrawStateChanged(canDraw());
+
     return m_renderer;
+}
+
+void CCLayerTreeHostImpl::resetContentsTexturesPurged()
+{
+    m_contentsTexturesPurged = false;
+    m_client->onCanDrawStateChanged(canDraw());
 }
 
 void CCLayerTreeHostImpl::setViewportSize(const IntSize& layoutViewportSize, const IntSize& deviceViewportSize)
@@ -746,6 +751,8 @@ void CCLayerTreeHostImpl::setViewportSize(const IntSize& layoutViewportSize, con
 
     if (m_renderer)
         m_renderer->viewportChanged();
+
+    m_client->onCanDrawStateChanged(canDraw());
 }
 
 static void adjustScrollsForPageScaleChange(CCLayerImpl* layerImpl, float pageScaleChange)
@@ -769,6 +776,8 @@ void CCLayerTreeHostImpl::setDeviceScaleFactor(float deviceScaleFactor)
     if (deviceScaleFactor == m_deviceScaleFactor)
         return;
     m_deviceScaleFactor = deviceScaleFactor;
+
+    updateMaxScrollPosition();
 }
 
 
@@ -962,6 +971,9 @@ void CCLayerTreeHostImpl::scrollBy(const IntPoint& viewportPoint, const IntSize&
         return;
 
     FloatSize pendingDelta(scrollDelta);
+
+    pendingDelta.scale(m_deviceScaleFactor);
+
     for (CCLayerImpl* layerImpl = m_currentlyScrollingLayerImpl; layerImpl; layerImpl = layerImpl->parent()) {
         if (!layerImpl->scrollable())
             continue;
@@ -973,7 +985,7 @@ void CCLayerTreeHostImpl::scrollBy(const IntPoint& viewportPoint, const IntSize&
             appliedDelta = scrollLayerWithLocalDelta(*layerImpl, pendingDelta);
 
         // If the layer wasn't able to move, try the next one in the hierarchy.
-        float moveThresholdSquared = 0.1 * 0.1;
+        float moveThresholdSquared = 0.1f * 0.1f;
         if (appliedDelta.diagonalLengthSquared() < moveThresholdSquared)
             continue;
 
@@ -1075,7 +1087,7 @@ void CCLayerTreeHostImpl::computePinchZoomDeltas(CCScrollAndScaleSet* scrollInfo
     // Only send fake scroll/zoom deltas if we're pinch zooming out by a
     // significant amount. This also ensures only one fake delta set will be
     // sent.
-    const float pinchZoomOutSensitivity = 0.95;
+    const float pinchZoomOutSensitivity = 0.95f;
     if (m_pageScaleDelta > pinchZoomOutSensitivity)
         return;
 
@@ -1247,19 +1259,6 @@ void CCLayerTreeHostImpl::dumpRenderSurfaces(TextStream& ts, int indent, const C
 
     for (size_t i = 0; i < layer->children().size(); ++i)
         dumpRenderSurfaces(ts, indent, layer->children()[i].get());
-}
-
-
-void CCLayerTreeHostImpl::animateGestures(double monotonicTime)
-{
-    if (!m_activeGestureAnimation)
-        return;
-
-    bool isContinuing = m_activeGestureAnimation->animate(monotonicTime);
-    if (isContinuing)
-        m_client->setNeedsRedrawOnImplThread();
-    else
-        m_activeGestureAnimation.clear();
 }
 
 int CCLayerTreeHostImpl::sourceAnimationFrameNumber() const

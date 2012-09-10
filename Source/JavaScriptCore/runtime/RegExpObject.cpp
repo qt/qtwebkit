@@ -31,9 +31,8 @@
 #include "RegExpConstructor.h"
 #include "RegExpMatchesArray.h"
 #include "RegExpPrototype.h"
-#include "UStringBuilder.h"
-#include "UStringConcatenate.h"
 #include <wtf/PassOwnPtr.h>
+#include <wtf/text/StringBuilder.h>
 
 namespace JSC {
 
@@ -81,11 +80,10 @@ void RegExpObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
     ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
     COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
     ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
+
     Base::visitChildren(thisObject, visitor);
-    if (thisObject->m_regExp)
-        visitor.append(&thisObject->m_regExp);
-    if (UNLIKELY(!thisObject->m_lastIndex.get().isInt32()))
-        visitor.append(&thisObject->m_lastIndex);
+    visitor.append(&thisObject->m_regExp);
+    visitor.append(&thisObject->m_lastIndex);
 }
 
 bool RegExpObject::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot& slot)
@@ -132,7 +130,7 @@ void RegExpObject::getPropertyNames(JSObject* object, ExecState* exec, PropertyN
 static bool reject(ExecState* exec, bool throwException, const char* message)
 {
     if (throwException)
-        throwTypeError(exec, message);
+        throwTypeError(exec, ASCIILiteral(message));
     return false;
 }
 
@@ -180,7 +178,7 @@ JSValue regExpObjectMultiline(ExecState*, JSValue slotBase, PropertyName)
 
 JSValue regExpObjectSource(ExecState* exec, JSValue slotBase, PropertyName)
 {
-    UString pattern = asRegExpObject(slotBase)->regExp()->pattern();
+    String pattern = asRegExpObject(slotBase)->regExp()->pattern();
     unsigned length = pattern.length();
     const UChar* characters = pattern.characters();
     bool previousCharacterWasBackslash = false;
@@ -193,7 +191,7 @@ JSValue regExpObjectSource(ExecState* exec, JSValue slotBase, PropertyName)
     // source cannot ever validly be "". If the source is empty, return a different Pattern
     // that would match the same thing.
     if (!length)
-        return jsString(exec, "(?:)");
+        return jsNontrivialString(exec, ASCIILiteral("(?:)"));
 
     // early return for strings that don't contain a forwards slash and LineTerminator
     for (unsigned i = 0; i < length; ++i) {
@@ -228,7 +226,7 @@ JSValue regExpObjectSource(ExecState* exec, JSValue slotBase, PropertyName)
 
     previousCharacterWasBackslash = false;
     inBrackets = false;
-    UStringBuilder result;
+    StringBuilder result;
     for (unsigned i = 0; i < length; ++i) {
         UChar ch = characters[i];
         if (!previousCharacterWasBackslash) {
@@ -253,9 +251,9 @@ JSValue regExpObjectSource(ExecState* exec, JSValue slotBase, PropertyName)
             else if (ch == '\r')
                 result.append('r');
             else if (ch == 0x2028)
-                result.append("u2028");
+                result.appendLiteral("u2028");
             else
-                result.append("u2029");
+                result.appendLiteral("u2029");
         } else
             result.append(ch);
 
@@ -265,7 +263,7 @@ JSValue regExpObjectSource(ExecState* exec, JSValue slotBase, PropertyName)
             previousCharacterWasBackslash = ch == '\\';
     }
 
-    return jsString(exec, result.toUString());
+    return jsString(exec, result.toString());
 }
 
 void RegExpObject::put(JSCell* cell, ExecState* exec, PropertyName propertyName, JSValue value, PutPropertySlot& slot)
@@ -289,7 +287,7 @@ MatchResult RegExpObject::match(ExecState* exec, JSString* string)
 {
     RegExp* regExp = this->regExp();
     RegExpConstructor* regExpConstructor = exec->lexicalGlobalObject()->regExpConstructor();
-    UString input = string->value(exec);
+    String input = string->value(exec);
     JSGlobalData& globalData = exec->globalData();
     if (!regExp->global())
         return regExpConstructor->performMatch(globalData, regExp, string, input, 0);

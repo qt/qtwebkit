@@ -57,6 +57,7 @@
     <file>DOMSyntaxHighlighter.js</file>
     <file>Drawer.js</file>
     <file>ElementsPanel.js</file>
+    <file>ElementsPanelDescriptor.js</file>
     <file>ElementsTreeOutline.js</file>
     <file>EmptyView.js</file>
     <file>EventListenersSidebarPane.js</file>
@@ -93,7 +94,6 @@
     <file>InspectorFrontendAPI.js</file>
     <file>InspectorFrontendHostStub.js</file>
     <file>InspectorView.js</file>
-    <file>JavaScriptContextManager.js</file>
     <file>JavaScriptFormatter.js</file>
     <file>JavaScriptSource.js</file>
     <file>JavaScriptSourceFrame.js</file>
@@ -108,6 +108,7 @@
     <file>NavigatorView.js</file>
     <file>NetworkItemView.js</file>
     <file>NetworkLog.js</file>
+    <file>NetworkUISourceCodeProvider.js</file>
     <file>NetworkManager.js</file>
     <file>NetworkPanel.js</file>
     <file>NetworkPanelDescriptor.js</file>
@@ -127,7 +128,6 @@
     <file>ProgressBar.js</file>
     <file>PropertiesSection.js</file>
     <file>PropertiesSidebarPane.js</file>
-    <file>RawSourceCode.js</file>
     <file>RemoteObject.js</file>
     <file>Resource.js</file>
     <file>RequestCookiesView.js</file>
@@ -146,6 +146,7 @@
     <file>ResourceWebSocketFrameView.js</file>
     <file>ResourcesPanel.js</file>
     <file>RevisionHistoryView.js</file>
+    <file>RuntimeModel.js</file>
     <file>SASSSourceMapping.js</file>
     <file>ScopeChainSidebarPane.js</file>
     <file>Script.js</file>
@@ -179,6 +180,7 @@
     <file>StatusBarButton.js</file>
     <file>StyleSheetOutlineDialog.js</file>
     <file>StyleSource.js</file>
+    <file>StylesSourceMapping.js</file>
     <file>StylesSidebarPane.js</file>
     <file>TabbedEditorContainer.js</file>
     <file>TabbedPane.js</file>
@@ -206,6 +208,7 @@
     <file>utilities.js</file>
     <file>View.js</file>
     <file>WatchExpressionsSidebarPane.js</file>
+    <file>WebGLProfileView.js</file>
     <file>WorkerManager.js</file>
     <file>WorkersSidebarPane.js</file>
     <file>Workspace.js</file>
@@ -239,6 +242,7 @@
     <file>textEditor.css</file>
     <file>textPrompt.css</file>
     <file>timelinePanel.css</file>
+    <file>webGLProfiler.css</file>
     <file>Images/applicationCache.png</file>
     <file>Images/back.png</file>
     <file>Images/breakpointBorder.png</file>
@@ -330,6 +334,7 @@
     <file>Images/splitviewDimple.png</file>
     <file>Images/splitviewDividerBackground.png</file>
     <file>Images/statusbarButtonGlyphs.png</file>
+    <file>Images/statusbarButtonGlyphs2x.png</file>
     <file>Images/statusbarResizerHorizontal.png</file>
     <file>Images/statusbarResizerVertical.png</file>
     <file>Images/successGreenDot.png</file>

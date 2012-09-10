@@ -37,6 +37,7 @@
 #include "RenderInline.h"
 #include "RenderLayer.h"
 #include "RenderView.h"
+#include "ScrollingConstraints.h"
 #include "Settings.h"
 #include "TransformState.h"
 #include <wtf/CurrentTime.h>
@@ -348,6 +349,15 @@ void RenderBoxModelObject::willBeDestroyed()
     // A continuation of this RenderObject should be destroyed at subclasses.
     ASSERT(!continuation());
 
+    if (isPositioned()) {
+        if (RenderView* view = this->view()) {
+            if (FrameView* frameView = view->frameView()) {
+                if (style()->hasViewportConstrainedPosition())
+                    frameView->removeViewportConstrainedObject(this);
+            }
+        }
+    }
+
     // If this is a first-letter object with a remaining text fragment then the
     // entry needs to be cleared from the map.
     if (firstLetterRemainingText())
@@ -446,6 +456,17 @@ void RenderBoxModelObject::styleDidChange(StyleDifference diff, const RenderStyl
         if (s_hadLayer && layer()->isSelfPaintingLayer() != s_layerWasSelfPainting)
             setChildNeedsLayout(true);
     }
+
+    if (FrameView *frameView = view()->frameView()) {
+        bool newStyleIsViewportConstained = style()->hasViewportConstrainedPosition();
+        bool oldStyleIsViewportConstrained = oldStyle && oldStyle->hasViewportConstrainedPosition();
+        if (newStyleIsViewportConstained != oldStyleIsViewportConstrained) {
+            if (newStyleIsViewportConstained && layer())
+                frameView->addViewportConstrainedObject(this);
+            else
+                frameView->removeViewportConstrainedObject(this);
+        }
+    }
 }
 
 void RenderBoxModelObject::updateBoxModelInfoFromStyle()
@@ -456,6 +477,7 @@ void RenderBoxModelObject::updateBoxModelInfoFromStyle()
     setHasBoxDecorations(hasBackground() || styleToUse->hasBorder() || styleToUse->hasAppearance() || styleToUse->boxShadow());
     setInline(styleToUse->isDisplayInlineType());
     setRelPositioned(styleToUse->position() == RelativePosition);
+    setStickyPositioned(styleToUse->position() == StickyPosition);
     setHorizontalWritingMode(styleToUse->isHorizontalWritingMode());
 }
 
@@ -534,6 +556,8 @@ LayoutPoint RenderBoxModelObject::adjustedPositionRelativeToOffsetParent(const L
         if (!isOutOfFlowPositioned()) {
             if (isRelPositioned())
                 referencePoint.move(relativePositionOffset());
+            else if (isStickyPositioned())
+                referencePoint.move(stickyPositionOffset());
             const RenderObject* curr = parent();
             while (curr != offsetParent) {
                 // FIXME: What are we supposed to do inside SVG content?
@@ -542,7 +566,7 @@ LayoutPoint RenderBoxModelObject::adjustedPositionRelativeToOffsetParent(const L
                 referencePoint.move(curr->parent()->offsetForColumns(referencePoint));
                 curr = curr->parent();
             }
-            if (offsetParent->isBox() && offsetParent->isBody() && !offsetParent->isRelPositioned() && !offsetParent->isOutOfFlowPositioned())
+            if (offsetParent->isBox() && offsetParent->isBody() && !offsetParent->isPositioned())
                 referencePoint.moveBy(toRenderBox(offsetParent)->topLeftLocation());
         }
     }
@@ -550,10 +574,72 @@ LayoutPoint RenderBoxModelObject::adjustedPositionRelativeToOffsetParent(const L
     return referencePoint;
 }
 
+void RenderBoxModelObject::computeStickyPositionConstraints(StickyPositionViewportConstraints& constraints, const FloatRect& viewportRect) const
+{
+    RenderBlock* containingBlock = this->containingBlock();
+
+    LayoutRect containerContentRect = containingBlock->contentBoxRect();
+
+    LayoutUnit minLeftMargin = minimumValueForLength(style()->marginLeft(), containingBlock->availableLogicalWidth(), view());
+    LayoutUnit minTopMargin = minimumValueForLength(style()->marginTop(), containingBlock->availableLogicalWidth(), view());
+    LayoutUnit minRightMargin = minimumValueForLength(style()->marginRight(), containingBlock->availableLogicalWidth(), view());
+    LayoutUnit minBottomMargin = minimumValueForLength(style()->marginBottom(), containingBlock->availableLogicalWidth(), view());
+
+    // Compute the container-relative area within which the sticky element is allowed to move.
+    containerContentRect.move(minLeftMargin, minTopMargin);
+    containerContentRect.contract(minLeftMargin + minRightMargin, minTopMargin + minBottomMargin);
+    constraints.setAbsoluteContainingBlockRect(containingBlock->localToAbsoluteQuad(FloatRect(containerContentRect)).boundingBox());
+
+    LayoutRect stickyBoxRect = frameRectForStickyPositioning();
+    LayoutRect flippedStickyBoxRect = stickyBoxRect;
+    containingBlock->flipForWritingMode(flippedStickyBoxRect);
+    LayoutPoint stickyLocation = flippedStickyBoxRect.location();
+
+    // FIXME: sucks to call localToAbsolute again, but we can't just offset from the previously computed rect if there are transforms.
+    FloatRect absContainerFrame = containingBlock->localToAbsoluteQuad(FloatRect(FloatPoint(), containingBlock->size())).boundingBox();
+    // We can't call localToAbsolute on |this| because that will recur. FIXME: For now, assume that |this| is not transformed.
+    FloatRect absoluteStickyBoxRect(absContainerFrame.location() + stickyLocation, flippedStickyBoxRect.size());
+    constraints.setAbsoluteStickyBoxRect(absoluteStickyBoxRect);
+
+    if (!style()->left().isAuto()) {
+        constraints.setLeftOffset(valueForLength(style()->left(), viewportRect.width(), view()));
+        constraints.addAnchorEdge(ViewportConstraints::AnchorEdgeLeft);
+    }
+
+    if (!style()->right().isAuto()) {
+        constraints.setRightOffset(valueForLength(style()->right(), viewportRect.width(), view()));
+        constraints.addAnchorEdge(ViewportConstraints::AnchorEdgeRight);
+    }
+
+    if (!style()->top().isAuto()) {
+        constraints.setTopOffset(valueForLength(style()->top(), viewportRect.height(), view()));
+        constraints.addAnchorEdge(ViewportConstraints::AnchorEdgeTop);
+    }
+
+    if (!style()->bottom().isAuto()) {
+        constraints.setBottomOffset(valueForLength(style()->bottom(), viewportRect.height(), view()));
+        constraints.addAnchorEdge(ViewportConstraints::AnchorEdgeBottom);
+    }
+}
+
+LayoutSize RenderBoxModelObject::stickyPositionOffset() const
+{
+    LayoutRect viewportRect = view()->frameView()->visibleContentRect();
+
+    StickyPositionViewportConstraints constraints;
+    computeStickyPositionConstraints(constraints, viewportRect);
+    
+    // The sticky offset is physical, so we can just return the delta computed in absolute coords (though it may be wrong with transforms).
+    return LayoutSize(constraints.computeStickyOffset(viewportRect));
+}
+
 LayoutSize RenderBoxModelObject::offsetForInFlowPosition() const
 {
     if (isRelPositioned())
         return relativePositionOffset();
+
+    if (isStickyPositioned())
+        return stickyPositionOffset();
 
     return LayoutSize();
 }
@@ -2730,9 +2816,6 @@ bool RenderBoxModelObject::shouldAntialiasLines(GraphicsContext* context)
 
 void RenderBoxModelObject::mapAbsoluteToLocalPoint(bool fixed, bool useTransforms, TransformState& transformState) const
 {
-    // We don't expect absoluteToLocal() to be called during layout (yet)
-    ASSERT(!view() || !view()->layoutStateEnabled());
-
     RenderObject* o = container();
     if (!o)
         return;

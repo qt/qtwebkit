@@ -202,8 +202,8 @@ enum EWordBreak {
     NormalWordBreak, BreakAllWordBreak, BreakWordBreak
 };
 
-enum EWordWrap {
-    NormalWordWrap, BreakWordWrap
+enum EOverflowWrap {
+    NormalOverflowWrap, BreakOverflowWrap
 };
 
 enum ENBSPMode {
@@ -415,9 +415,7 @@ enum EDisplay {
     TABLE_HEADER_GROUP, TABLE_FOOTER_GROUP, TABLE_ROW,
     TABLE_COLUMN_GROUP, TABLE_COLUMN, TABLE_CELL,
     TABLE_CAPTION, BOX, INLINE_BOX,
-#if ENABLE(CSS3_FLEXBOX)
     FLEX, INLINE_FLEX,
-#endif
     GRID, INLINE_GRID,
     NONE
 };

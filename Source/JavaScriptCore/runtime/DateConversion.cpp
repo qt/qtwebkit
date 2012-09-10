@@ -25,10 +25,10 @@
 #include "config.h"
 #include "DateConversion.h"
 
-#include "UString.h"
 #include <wtf/Assertions.h>
 #include <wtf/DateMath.h>
 #include <wtf/text/StringBuilder.h>
+#include <wtf/text/WTFString.h>
 
 #if OS(WINDOWS)
 #include <windows.h>
@@ -62,7 +62,7 @@ void appendNumber<2>(StringBuilder& builder, int value)
     builder.append(static_cast<char>('0' + value % 10));
 }
 
-UString formatDateTime(const GregorianDateTime& t, DateTimeFormat format, bool asUTCVariant)
+String formatDateTime(const GregorianDateTime& t, DateTimeFormat format, bool asUTCVariant)
 {
     bool appendDate = format & DateTimeFormatDate;
     bool appendTime = format & DateTimeFormatTime;
@@ -73,7 +73,7 @@ UString formatDateTime(const GregorianDateTime& t, DateTimeFormat format, bool a
         builder.append(weekdayName[(t.weekDay() + 6) % 7]);
 
         if (asUTCVariant) {
-            builder.append(", ");
+            builder.appendLiteral(", ");
             appendNumber<2>(builder, t.monthDay());
             builder.append(' ');
             builder.append(monthName[t.month()]);
@@ -96,7 +96,7 @@ UString formatDateTime(const GregorianDateTime& t, DateTimeFormat format, bool a
         appendNumber<2>(builder, t.minute());
         builder.append(':');
         appendNumber<2>(builder, t.second());
-        builder.append(" GMT");
+        builder.appendLiteral(" GMT");
 
         if (!asUTCVariant) {
             int offset = abs(t.utcOffset()) / 60;
@@ -114,7 +114,7 @@ UString formatDateTime(const GregorianDateTime& t, DateTimeFormat format, bool a
             strftime(timeZoneName, sizeof(timeZoneName), "%Z", &gtm);
 #endif
             if (timeZoneName[0]) {
-                builder.append(" (");
+                builder.appendLiteral(" (");
                 builder.append(timeZoneName);
                 builder.append(')');
             }

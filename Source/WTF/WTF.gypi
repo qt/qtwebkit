@@ -113,6 +113,7 @@
             'wtf/text/AtomicStringImpl.h',
             'wtf/text/Base64.h',
             'wtf/text/CString.h',
+            'wtf/text/IntegerToStringConversion.h',
             'wtf/text/StringBuffer.h',
             'wtf/text/StringBuilder.h',
             'wtf/text/StringConcatenate.h',

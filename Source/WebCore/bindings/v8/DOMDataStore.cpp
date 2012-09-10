@@ -32,8 +32,8 @@
 #include "DOMDataStore.h"
 
 #include "DOMData.h"
-#include "MemoryInstrumentation.h"
 #include "V8Binding.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/MainThread.h>
 
 namespace WebCore {
@@ -121,7 +121,7 @@ void* DOMDataStore::getDOMWrapperMap(DOMWrapperMapType type)
 
 void DOMDataStore::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::Binding);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Binding);
     info.addInstrumentedMember(m_domNodeMap);
     info.addInstrumentedMember(m_activeDomNodeMap);
     info.addInstrumentedMember(m_domObjectMap);

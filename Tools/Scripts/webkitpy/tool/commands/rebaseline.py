@@ -324,7 +324,7 @@ class RebaselineExpectations(AbstractParallelRebaselineCommand):
     def _update_expectations_files(self, port_name):
         port = self._tool.port_factory.get(port_name)
 
-        expectations = TestExpectations(port, include_overrides=False)
+        expectations = TestExpectations(port)
         for path in port.expectations_dict():
             if self._tool.filesystem.exists(path):
                 self._tool.filesystem.write_text_file(path, expectations.remove_rebaselined_tests(expectations.get_rebaselining_failures(), path))
@@ -355,6 +355,10 @@ class RebaselineExpectations(AbstractParallelRebaselineCommand):
         self._test_list = {}
         for port_name in tool.port_factory.all_port_names():
             self._add_tests_to_rebaseline_for_port(port_name)
+        if not self._test_list:
+            _log.warning("Did not find any tests marked REBASELINE.")
+            return
+
         self._rebaseline(options, self._test_list)
 
         for port_name in tool.port_factory.all_port_names():

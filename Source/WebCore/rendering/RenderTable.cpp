@@ -117,10 +117,9 @@ void RenderTable::addChild(RenderObject* child, RenderObject* beforeChild)
 
     bool wrapInAnonymousSection = !child->isOutOfFlowPositioned();
 
-    if (child->isTableCaption()) {
-        m_captions.append(toRenderTableCaption(child));
+    if (child->isTableCaption())
         wrapInAnonymousSection = false;
-    } else if (child->isRenderTableCol()) {
+    else if (child->isRenderTableCol()) {
         m_hasColElements = true;
         wrapInAnonymousSection = false;
     } else if (child->isTableSection()) {
@@ -197,26 +196,34 @@ void RenderTable::addChild(RenderObject* child, RenderObject* beforeChild)
     section->addChild(child);
 }
 
+void RenderTable::addCaption(const RenderTableCaption* caption)
+{
+    ASSERT(m_captions.find(caption) == notFound);
+    m_captions.append(const_cast<RenderTableCaption*>(caption));
+}
+
 void RenderTable::removeCaption(const RenderTableCaption* oldCaption)
 {
     size_t index = m_captions.find(oldCaption);
     ASSERT(index != notFound);
+    if (index == notFound)
+        return;
+
     m_captions.remove(index);
-
-    // FIXME: The rest of this function is probably not needed since we have 
-    // implemented proper multiple captions support (see bug 58249).
-    if (node())
-        node()->setNeedsStyleRecalc();
-
-    setNeedsSectionRecalc();
 }
 
 void RenderTable::computeLogicalWidth()
 {
     recalcSectionsIfNeeded();
 
-    if (isOutOfFlowPositioned())
-        computePositionedLogicalWidth();
+    if (isOutOfFlowPositioned()) {
+        LogicalExtentComputedValues computedValues;
+        computePositionedLogicalWidth(computedValues);
+        setLogicalWidth(computedValues.m_extent);
+        setLogicalLeft(computedValues.m_position);
+        setMarginStart(computedValues.m_margins.m_start);
+        setMarginEnd(computedValues.m_margins.m_end);
+    }
 
     RenderBlock* cb = containingBlock();
     RenderView* renderView = view();
@@ -260,7 +267,13 @@ void RenderTable::computeLogicalWidth()
         LayoutUnit containerLogicalWidthForAutoMargins = availableLogicalWidth;
         if (avoidsFloats() && cb->containsFloats())
             containerLogicalWidthForAutoMargins = containingBlockAvailableLineWidthInRegion(0, 0); // FIXME: Work with regions someday.
-        computeInlineDirectionMargins(cb, containerLogicalWidthForAutoMargins, logicalWidth());
+        ComputedMarginValues marginValues;
+        bool hasInvertedDirection =  cb->style()->isLeftToRightDirection() == style()->isLeftToRightDirection();
+        computeInlineDirectionMargins(cb, containerLogicalWidthForAutoMargins, logicalWidth(),
+            hasInvertedDirection ? marginValues.m_start : marginValues.m_end,
+            hasInvertedDirection ? marginValues.m_end : marginValues.m_start);
+        setMarginStart(marginValues.m_start);
+        setMarginEnd(marginValues.m_end);
     } else {
         setMarginStart(minimumValueForLength(style()->marginStart(), availableLogicalWidth, renderView));
         setMarginEnd(minimumValueForLength(style()->marginEnd(), availableLogicalWidth, renderView));
@@ -776,17 +789,12 @@ void RenderTable::recalcSections() const
     m_foot = 0;
     m_firstBody = 0;
     m_hasColElements = false;
-    m_captions.clear();
 
     // We need to get valid pointers to caption, head, foot and first body again
     RenderObject* nextSibling;
     for (RenderObject* child = firstChild(); child; child = nextSibling) {
         nextSibling = child->nextSibling();
         switch (child->style()->display()) {
-        case TABLE_CAPTION:
-            if (child->isTableCaption())
-                m_captions.append(toRenderTableCaption(child));
-            break;
         case TABLE_COLUMN:
         case TABLE_COLUMN_GROUP:
             m_hasColElements = true;
@@ -1269,17 +1277,17 @@ LayoutRect RenderTable::overflowClipRect(const LayoutPoint& location, RenderRegi
     return rect;
 }
 
-bool RenderTable::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction action)
+bool RenderTable::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction action)
 {
     LayoutPoint adjustedLocation = accumulatedOffset + location();
 
     // Check kids first.
-    if (!hasOverflowClip() || pointInContainer.intersects(overflowClipRect(adjustedLocation, pointInContainer.region()))) {
+    if (!hasOverflowClip() || locationInContainer.intersects(overflowClipRect(adjustedLocation, locationInContainer.region()))) {
         for (RenderObject* child = lastChild(); child; child = child->previousSibling()) {
             if (child->isBox() && !toRenderBox(child)->hasSelfPaintingLayer() && (child->isTableSection() || child->isTableCaption())) {
                 LayoutPoint childPoint = flipForWritingModeForChild(toRenderBox(child), adjustedLocation);
-                if (child->nodeAtPoint(request, result, pointInContainer, childPoint, action)) {
-                    updateHitTestResult(result, toLayoutPoint(pointInContainer.point() - childPoint));
+                if (child->nodeAtPoint(request, result, locationInContainer, childPoint, action)) {
+                    updateHitTestResult(result, toLayoutPoint(locationInContainer.point() - childPoint));
                     return true;
                 }
             }
@@ -1288,9 +1296,9 @@ bool RenderTable::nodeAtPoint(const HitTestRequest& request, HitTestResult& resu
 
     // Check our bounds next.
     LayoutRect boundsRect(adjustedLocation, size());
-    if (visibleToHitTesting() && (action == HitTestBlockBackground || action == HitTestChildBlockBackground) && pointInContainer.intersects(boundsRect)) {
-        updateHitTestResult(result, flipForWritingMode(pointInContainer.point() - toLayoutSize(adjustedLocation)));
-        if (!result.addNodeToRectBasedTestResult(node(), pointInContainer, boundsRect))
+    if (visibleToHitTesting() && (action == HitTestBlockBackground || action == HitTestChildBlockBackground) && locationInContainer.intersects(boundsRect)) {
+        updateHitTestResult(result, flipForWritingMode(locationInContainer.point() - toLayoutSize(adjustedLocation)));
+        if (!result.addNodeToRectBasedTestResult(node(), request, locationInContainer, boundsRect))
             return true;
     }
 

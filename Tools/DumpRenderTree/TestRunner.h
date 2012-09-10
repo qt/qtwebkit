@@ -70,11 +70,8 @@ public:
     void keepWebHistory();
     JSValueRef computedStyleIncludingVisitedInfo(JSContextRef, JSValueRef);
     void notifyDone();
-    int numberOfPages(float pageWidthInPixels, float pageHeightInPixels);
     int numberOfPendingGeolocationPermissionRequests();
     void overridePreference(JSStringRef key, JSStringRef value);
-    JSRetainPtr<JSStringRef> pageProperty(const char* propertyName, int pageNumber) const;
-    JSRetainPtr<JSStringRef> pageSizeAndMarginsInPixels(int pageNumber, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft) const;
     JSStringRef pathToLocalResource(JSContextRef, JSStringRef url);
     void queueBackNavigation(int howFarBackward);
     void queueForwardNavigation(int howFarForward);
@@ -136,11 +133,14 @@ public:
     JSRetainPtr<JSStringRef> platformName() const;
 #endif
 
-    void grantDesktopNotificationPermission(JSStringRef origin);
-    bool checkDesktopNotificationPermission(JSStringRef origin);
-    void ignoreDesktopNotificationPermissionRequests();
-    bool areDesktopNotificationPermissionRequestsIgnored() const { return m_areDesktopNotificationPermissionRequestsIgnored; }
-    void simulateDesktopNotificationClick(JSStringRef title);
+    // Legacy here refers to the old TestRunner API for handling web notifications, not the legacy web notification API.
+    void ignoreLegacyWebNotificationPermissionRequests();
+    // Legacy here refers to the old TestRunner API for handling web notifications, not the legacy web notification API.
+    void simulateLegacyWebNotificationClick(JSStringRef title);
+    void grantWebNotificationPermission(JSStringRef origin);
+    void denyWebNotificationPermission(JSStringRef origin);
+    void removeAllWebNotificationPermissions();
+    void simulateWebNotificationClick(JSValueRef notification);
 
     bool elementDoesAutoCompleteForElementWithId(JSStringRef id);
 
@@ -365,6 +365,8 @@ public:
 
     void setStorageDatabaseIdleInterval(double);
 
+    bool hasPendingWebNotificationClick() const { return m_hasPendingWebNotificationClick; }
+
 private:
     TestRunner(const std::string& testPathOrURL, const std::string& expectedPixelHash);
 
@@ -417,8 +419,10 @@ private:
     bool m_useDeferredFrameLoading;
     bool m_shouldPaintBrokenImage;
     bool m_shouldStayOnPageAfterHandlingBeforeUnload;
-    bool m_areDesktopNotificationPermissionRequestsIgnored;
+    // FIXME 81697: This variable most likely will be removed once we have migrated the tests from fast/notifications to http/tests/notifications.
+    bool m_areLegacyWebNotificationPermissionRequestsIgnored;
     bool m_customFullScreenBehavior;
+    bool m_hasPendingWebNotificationClick;
 
     std::string m_authenticationUsername;
     std::string m_authenticationPassword; 
@@ -430,9 +434,6 @@ private:
     
     // base64 encoded WAV audio data is stored here.
     std::string m_encodedAudioData;
-    
-    // origins which have been granted desktop notification access
-    std::vector<JSStringRef> m_desktopNotificationAllowedOrigins;
 
     std::map<std::string, std::string> m_URLsToRedirect;
     

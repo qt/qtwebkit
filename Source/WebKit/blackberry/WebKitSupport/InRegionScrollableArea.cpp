@@ -46,17 +46,6 @@ InRegionScrollableArea::~InRegionScrollableArea()
         m_cachedCompositedScrollableLayer->clearOverride();
 }
 
-// FIXME: Make RenderLayer::enclosingElement public so this one can be removed.
-static Node* enclosingLayerNode(RenderLayer* layer)
-{
-    for (RenderObject* r = layer->renderer(); r; r = r->parent()) {
-        if (Node* e = r->node())
-            return e;
-    }
-    ASSERT_NOT_REACHED();
-    return 0;
-}
-
 InRegionScrollableArea::InRegionScrollableArea(WebPagePrivate* webPage, RenderLayer* layer)
     : m_webPage(webPage)
     , m_layer(layer)
@@ -86,8 +75,8 @@ InRegionScrollableArea::InRegionScrollableArea(WebPagePrivate* webPage, RenderLa
         m_scrollsHorizontally = view->contentsWidth() > view->visibleWidth();
         m_scrollsVertically = view->contentsHeight() > view->visibleHeight();
 
-        m_overscrollLimitFactor = 0.0; // FIXME eventually support overscroll
-        m_cachedCompositedScrollableLayer = 0; // FIXME: Needs composited layer for inner frames.
+        m_camouflagedCompositedScrollableLayer = reinterpret_cast<unsigned>(m_layer->enclosingElement()); // FIXME: Needs composited layer for inner frames.
+        m_cachedNonCompositedScrollableNode = m_layer->enclosingElement();
 
     } else { // RenderBox-based elements case (scrollable boxes (div's, p's, textarea's, etc)).
 
@@ -107,16 +96,14 @@ InRegionScrollableArea::InRegionScrollableArea(WebPagePrivate* webPage, RenderLa
         if (m_layer->usesCompositedScrolling()) {
             m_supportsCompositedScrolling = true;
             ASSERT(m_layer->backing()->hasScrollingLayer());
-            m_camouflagedCompositedScrollableLayer = reinterpret_cast<unsigned>(m_layer->backing()->scrollingLayer()->platformLayer());
-            m_cachedCompositedScrollableLayer = m_layer->backing()->scrollingLayer()->platformLayer();
+            m_camouflagedCompositedScrollableLayer = reinterpret_cast<unsigned>(m_layer->backing()->scrollingContentsLayer()->platformLayer());
+            m_cachedCompositedScrollableLayer = m_layer->backing()->scrollingContentsLayer()->platformLayer();
             ASSERT(!m_cachedNonCompositedScrollableNode);
         } else {
-            m_camouflagedCompositedScrollableLayer = reinterpret_cast<unsigned>(enclosingLayerNode(m_layer));
-            m_cachedNonCompositedScrollableNode = enclosingLayerNode(m_layer);
+            m_camouflagedCompositedScrollableLayer = reinterpret_cast<unsigned>(m_layer->enclosingElement());
+            m_cachedNonCompositedScrollableNode = m_layer->enclosingElement();
             ASSERT(!m_cachedCompositedScrollableLayer);
         }
-
-        m_overscrollLimitFactor = 0.0;
     }
 }
 

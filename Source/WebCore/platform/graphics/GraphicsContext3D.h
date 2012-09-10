@@ -29,11 +29,11 @@
 #include "IntRect.h"
 #include "GraphicsLayer.h"
 #include "GraphicsTypes3D.h"
-#include "PlatformString.h"
 #include <wtf/HashMap.h>
 #include <wtf/ListHashSet.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/RefCounted.h>
+#include <wtf/text/WTFString.h>
 
 // FIXME: Find a better way to avoid the name confliction for NO_ERROR.
 #if ((PLATFORM(CHROMIUM) && OS(WINDOWS)) || PLATFORM(WIN) || (PLATFORM(QT) && OS(WINDOWS)))
@@ -250,6 +250,7 @@ public:
         ALPHA = 0x1906,
         RGB = 0x1907,
         RGBA = 0x1908,
+        BGRA = 0x80E1,
         LUMINANCE = 0x1909,
         LUMINANCE_ALPHA = 0x190A,
         UNSIGNED_SHORT_4_4_4_4 = 0x8033,
@@ -458,7 +459,8 @@ public:
 
     enum RenderStyle {
         RenderOffscreen,
-        RenderDirectlyToHostWindow
+        RenderDirectlyToHostWindow,
+        RenderToCurrentGLContext
     };
 
     class ContextLostCallback {
@@ -477,6 +479,7 @@ public:
     void setErrorMessageCallback(PassOwnPtr<ErrorMessageCallback>);
 
     static PassRefPtr<GraphicsContext3D> create(Attributes, HostWindow*, RenderStyle = RenderOffscreen);
+    static PassRefPtr<GraphicsContext3D> createForCurrentGLContext();
     ~GraphicsContext3D();
 
 #if PLATFORM(MAC)
@@ -523,6 +526,9 @@ public:
     // With multisampling on, blit from multisampleFBO to regular FBO.
     void prepareTexture();
 #endif
+
+    // Equivalent to ::glTexImage2D(). Allows pixels==0 with no allocation.
+    void texImage2DDirect(GC3Denum target, GC3Dint level, GC3Denum internalformat, GC3Dsizei width, GC3Dsizei height, GC3Dint border, GC3Denum format, GC3Denum type, const void* pixels);
 
     // Helper to texImage2D with pixel==0 case: pixels are initialized to 0.
     // Return true if no GL error is synthesized.
@@ -867,7 +873,7 @@ public:
     static unsigned getChannelBitsByFormat(GC3Denum);
 
   private:
-    GraphicsContext3D(Attributes attrs, HostWindow* hostWindow, bool renderDirectlyToHostWindow);
+    GraphicsContext3D(Attributes, HostWindow*, RenderStyle = RenderOffscreen);
 
     // Each platform must provide an implementation of this method.
     //
@@ -982,6 +988,7 @@ public:
     friend class Extensions3DOpenGLCommon;
 
     Attributes m_attrs;
+    RenderStyle m_renderStyle;
     Vector<Vector<float> > m_vertexArray;
 
     GC3Duint m_texture;

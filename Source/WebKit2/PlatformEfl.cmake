@@ -28,6 +28,8 @@ LIST(APPEND WebKit2_SOURCES
     Shared/efl/ProcessExecutablePathEfl.cpp
     Shared/efl/WebEventFactory.cpp
 
+    Shared/linux/WebMemorySamplerLinux.cpp
+
     Shared/soup/PlatformCertificateInfo.cpp
     Shared/soup/WebCoreArgumentCodersSoup.cpp
 
@@ -55,6 +57,8 @@ LIST(APPEND WebKit2_SOURCES
     UIProcess/API/efl/ewk_intent_service.cpp
     UIProcess/API/efl/ewk_main.cpp
     UIProcess/API/efl/ewk_navigation_policy_decision.cpp
+    UIProcess/API/efl/ewk_popup_menu_item.cpp
+    UIProcess/API/efl/ewk_settings.cpp
     UIProcess/API/efl/ewk_url_request.cpp
     UIProcess/API/efl/ewk_url_response.cpp
     UIProcess/API/efl/ewk_url_scheme_request.cpp
@@ -75,6 +79,7 @@ LIST(APPEND WebKit2_SOURCES
     UIProcess/efl/WebFullScreenManagerProxyEfl.cpp
     UIProcess/efl/WebInspectorProxyEfl.cpp
     UIProcess/efl/WebPageProxyEfl.cpp
+    UIProcess/efl/WebPopupMenuProxyEfl.cpp
     UIProcess/efl/WebPreferencesEfl.cpp
 
     UIProcess/soup/WebCookieManagerProxySoup.cpp
@@ -91,9 +96,6 @@ LIST(APPEND WebKit2_SOURCES
     WebProcess/Downloads/efl/DownloadSoupErrorsEfl.cpp
     WebProcess/Downloads/soup/DownloadSoup.cpp
 
-    WebProcess/efl/WebProcessEfl.cpp
-    WebProcess/efl/WebProcessMainEfl.cpp
-
     WebProcess/InjectedBundle/efl/InjectedBundleEfl.cpp
 
     WebProcess/WebCoreSupport/efl/WebContextMenuClientEfl.cpp
@@ -101,9 +103,14 @@ LIST(APPEND WebKit2_SOURCES
     WebProcess/WebCoreSupport/efl/WebErrorsEfl.cpp
     WebProcess/WebCoreSupport/efl/WebPopupMenuEfl.cpp
 
+    WebProcess/WebCoreSupport/soup/WebFrameNetworkingContext.cpp
+
     WebProcess/WebPage/efl/WebInspectorEfl.cpp
     WebProcess/WebPage/efl/WebPageEfl.cpp
 
+    WebProcess/efl/WebProcessMainEfl.cpp
+
+    WebProcess/soup/WebProcessSoup.cpp
     WebProcess/soup/WebSoupRequestManager.cpp
     WebProcess/soup/WebKitSoupRequestGeneric.cpp
     WebProcess/soup/WebKitSoupRequestInputStream.cpp
@@ -126,11 +133,13 @@ LIST(APPEND WebKit2_INCLUDE_DIRECTORIES
     "${WEBKIT2_DIR}/UIProcess/API/C/soup"
     "${WEBKIT2_DIR}/UIProcess/API/cpp/efl"
     "${WEBKIT2_DIR}/UIProcess/API/efl"
+    "${WEBKIT2_DIR}/UIProcess/efl"
     "${WEBKIT2_DIR}/UIProcess/soup"
     "${WEBKIT2_DIR}/WebProcess/Downloads/soup"
     "${WEBKIT2_DIR}/WebProcess/efl"
     "${WEBKIT2_DIR}/WebProcess/soup"
     "${WEBKIT2_DIR}/WebProcess/WebCoreSupport/efl"
+    "${WEBKIT2_DIR}/WebProcess/WebCoreSupport/soup"
     "${WTF_DIR}/wtf/gobject"
     ${CAIRO_INCLUDE_DIRS}
     ${ECORE_X_INCLUDE_DIRS}
@@ -138,6 +147,7 @@ LIST(APPEND WebKit2_INCLUDE_DIRECTORIES
     ${EFLDEPS_INCLUDE_DIRS}
     ${EFREET_INCLUDE_DIRS}
     ${EVAS_INCLUDE_DIRS}
+    ${LIBSOUP_INCLUDE_DIRS}
     ${LIBXML2_INCLUDE_DIR}
     ${LIBXSLT_INCLUDE_DIRS}
     ${SQLITE_INCLUDE_DIRS}
@@ -181,8 +191,6 @@ LIST (APPEND WebProcess_LIBRARIES
     ${SQLITE_LIBRARIES}
 )
 
-ADD_DEFINITIONS(-DDEFAULT_THEME_PATH=\"${CMAKE_INSTALL_PREFIX}/${DATA_INSTALL_DIR}/themes\")
-
 ADD_CUSTOM_TARGET(forwarding-headerEfl
     COMMAND ${PERL_EXECUTABLE} ${WEBKIT2_DIR}/Scripts/generate-forwarding-headers.pl ${WEBKIT2_DIR} ${DERIVED_SOURCES_WEBKIT2_DIR}/include efl
 )
@@ -206,6 +214,8 @@ SET (EWebKit2_HEADERS
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_intent_service.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_main.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_navigation_policy_decision.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_popup_menu_item.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_settings.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_url_request.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_url_response.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_url_scheme_request.h"
@@ -271,6 +281,7 @@ SET(EWK2UnitTests_BINARIES
     test_ewk2_download_job
     test_ewk2_eina_shared_string
     test_ewk2_intents
+    test_ewk2_settings
     test_ewk2_view
 )
 

@@ -236,6 +236,7 @@ BINDING_IDLS = \
     $(WebCore)/dom/MutationEvent.idl \
     $(WebCore)/dom/MutationObserver.idl \
     $(WebCore)/dom/MutationRecord.idl \
+    $(WebCore)/dom/DOMNamedFlowCollection.idl \
     $(WebCore)/dom/NamedNodeMap.idl \
     $(WebCore)/dom/Node.idl \
     $(WebCore)/dom/NodeFilter.idl \
@@ -1028,6 +1029,11 @@ INSPECTOR_GENERATOR_SCRIPTS = inspector/CodeGeneratorInspector.py
 
 InspectorFrontend.h : Inspector.json $(INSPECTOR_GENERATOR_SCRIPTS)
 	python $(WebCore)/inspector/CodeGeneratorInspector.py $(WebCore)/inspector/Inspector.json --output_h_dir . --output_cpp_dir .
+
+all : InspectorOverlayPage.h
+
+InspectorOverlayPage.h : InspectorOverlayPage.html
+	perl $(WebCore)/inspector/xxd.pl InspectorOverlayPage_html $(WebCore)/inspector/InspectorOverlayPage.html InspectorOverlayPage.h
 
 all : InjectedScriptSource.h
 

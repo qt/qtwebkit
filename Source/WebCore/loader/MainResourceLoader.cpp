@@ -371,7 +371,7 @@ void MainResourceLoader::didReceiveResponse(const ResourceResponse& r)
         String content = it->second;
         if (m_frame->loader()->shouldInterruptLoadForXFrameOptions(content, r.url())) {
             InspectorInstrumentation::continueAfterXFrameOptionsDenied(m_frame.get(), documentLoader(), identifier(), r);
-            DEFINE_STATIC_LOCAL(String, consoleMessage, ("Refused to display document because display forbidden by X-Frame-Options.\n"));
+            DEFINE_STATIC_LOCAL(String, consoleMessage, (ASCIILiteral("Refused to display document because display forbidden by X-Frame-Options.\n")));
             m_frame->document()->domWindow()->console()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, consoleMessage);
 
             cancel();
@@ -551,7 +551,7 @@ void MainResourceLoader::didFail(const ResourceError& error)
 
 void MainResourceLoader::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::Loader);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Loader);
     ResourceLoader::reportMemoryUsage(memoryObjectInfo);
     info.addMember(m_initialRequest);
     info.addInstrumentedMember(m_substituteData);

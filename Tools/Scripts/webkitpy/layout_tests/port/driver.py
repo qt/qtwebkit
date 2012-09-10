@@ -66,9 +66,13 @@ class DriverOutput(object):
     strip_patterns.append((re.compile(' *" *\n +" *'), ' '))
     strip_patterns.append((re.compile('" +$'), '"'))
     strip_patterns.append((re.compile('- '), '-'))
+    strip_patterns.append((re.compile('\n( *)"\s+'), '\n\g<1>"'))
     strip_patterns.append((re.compile('\s+"\n'), '"\n'))
     strip_patterns.append((re.compile('scrollWidth [0-9]+'), 'scrollWidth'))
     strip_patterns.append((re.compile('scrollHeight [0-9]+'), 'scrollHeight'))
+    strip_patterns.append((re.compile('scrollX [0-9]+'), 'scrollX'))
+    strip_patterns.append((re.compile('scrollY [0-9]+'), 'scrollY'))
+    strip_patterns.append((re.compile('scrolled to [0-9]+,[0-9]+'), 'scrolled'))
 
     def __init__(self, text, image, image_hash, audio, crash=False,
             test_time=0, timeout=False, error='', crashed_process_name='??',
@@ -165,8 +169,10 @@ class Driver(object):
             # We call stop() even if we crashed or timed out in order to get any remaining stdout/stderr output.
             # In the timeout case, we kill the hung process as well.
             out, err = self._server_process.stop(self._port.driver_stop_timeout() if stop_when_done else 0.0)
-            text += out
-            self.error_from_test += err
+            if out:
+                text += out
+            if err:
+                self.error_from_test += err
             self._server_process = None
 
         crash_log = None
@@ -176,10 +182,14 @@ class Driver(object):
             # If we don't find a crash log use a placeholder error message instead.
             if not crash_log:
                 pid_str = str(self._crashed_pid) if self._crashed_pid else "unknown pid"
-                crash_log = 'no crash log found for %s:%s.' % (self._crashed_process_name, pid_str)
+                crash_log = 'No crash log found for %s:%s.\n' % (self._crashed_process_name, pid_str)
                 # If we were unresponsive append a message informing there may not have been a crash.
                 if self._subprocess_was_unresponsive:
-                    crash_log += '  Process failed to become responsive before timing out.'
+                    crash_log += 'Process failed to become responsive before timing out.\n'
+
+                # Print stdout and stderr to the placeholder crash log; we want as much context as possible.
+                if self.error_from_test:
+                    crash_log += '\nstdout:\n%s\nstderr:\n%s\n' % (text, self.error_from_test)
 
         return DriverOutput(text, image, actual_image_hash, audio,
             crash=crashed, test_time=time.time() - test_begin_time,
@@ -307,18 +317,17 @@ class Driver(object):
             # See http://trac.webkit.org/changeset/65537.
             self._crashed_process_name = self._server_process.name()
             self._crashed_pid = self._server_process.pid()
-        elif (error_line.startswith("#CRASHED - WebProcess")
-            or error_line.startswith("#PROCESS UNRESPONSIVE - WebProcess")):
+        elif (error_line.startswith("#CRASHED - ")
+            or error_line.startswith("#PROCESS UNRESPONSIVE - ")):
             # WebKitTestRunner uses this to report that the WebProcess subprocess crashed.
-            pid = None
-            m = re.search('pid (\d+)', error_line)
-            if m:
-                pid = int(m.group(1))
-            self._crashed_process_name = 'WebProcess'
+            match = re.match('#(?:CRASHED|PROCESS UNRESPONSIVE) - (\S+)', error_line)
+            self._crashed_process_name = match.group(1) if match else 'WebProcess'
+            match = re.search('pid (\d+)', error_line)
+            pid = int(match.group(1)) if match else None
             self._crashed_pid = pid
             # FIXME: delete this after we're sure this code is working :)
-            _log.debug('WebProcess crash, pid = %s, error_line = %s' % (str(pid), error_line))
-            if error_line.startswith("#PROCESS UNRESPONSIVE - WebProcess"):
+            _log.debug('%s crash, pid = %s, error_line = %s' % (self._crashed_process_name, str(pid), error_line))
+            if error_line.startswith("#PROCESS UNRESPONSIVE - "):
                 self._subprocess_was_unresponsive = True
                 # We want to show this since it's not a regular crash and probably we don't have a crash log.
                 self.error_from_test += error_line

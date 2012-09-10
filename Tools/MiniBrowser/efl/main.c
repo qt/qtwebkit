@@ -19,6 +19,7 @@
 
 #include "EWebKit2.h"
 #include "url_bar.h"
+#include "url_utils.h"
 #include <Ecore.h>
 #include <Ecore_Evas.h>
 #include <Eina.h>
@@ -44,6 +45,8 @@ typedef struct _MiniBrowser {
     Evas_Object *browser;
     Url_Bar *url_bar;
 } MiniBrowser;
+
+MiniBrowser *browser;
 
 static const Ecore_Getopt options = {
     "MiniBrowser",
@@ -87,13 +90,16 @@ static void on_ecore_evas_resize(Ecore_Evas *ee)
 
     ecore_evas_geometry_get(ee, NULL, NULL, &w, &h);
 
+    /* Resize URL bar */
+    url_bar_width_set(browser->url_bar, w);
+
     bg = evas_object_name_find(ecore_evas_get(ee), "bg");
     evas_object_move(bg, 0, 0);
     evas_object_resize(bg, w, h);
 
     webview = evas_object_name_find(ecore_evas_get(ee), "browser");
-    evas_object_move(webview, 0, 0);
-    evas_object_resize(webview, w, h);
+    evas_object_move(webview, 0, URL_BAR_HEIGHT);
+    evas_object_resize(webview, w, h - URL_BAR_HEIGHT);
 }
 
 static void
@@ -125,6 +131,17 @@ on_key_down(void *data, Evas *e, Evas_Object *obj, void *event_info)
             info("Stop (F6) was pressed, stop loading.\n");
             ewk_view_stop(obj);
     }
+}
+
+static void
+on_mouse_down(void *data, Evas *e, Evas_Object *webview, void *event_info)
+{
+    Evas_Event_Mouse_Down *ev = (Evas_Event_Mouse_Down *)event_info;
+
+    if (ev->button == 1)
+        evas_object_focus_set(webview, EINA_TRUE);
+    else if (ev->button == 2)
+        evas_object_focus_set(webview, !evas_object_focus_get(webview));
 }
 
 static void
@@ -236,6 +253,7 @@ static MiniBrowser *browserCreate(const char *url, const char *engine)
     evas_object_smart_callback_add(app->browser, "uri,changed", on_url_changed, app);
 
     evas_object_event_callback_add(app->browser, EVAS_CALLBACK_KEY_DOWN, on_key_down, app);
+    evas_object_event_callback_add(app->browser, EVAS_CALLBACK_MOUSE_DOWN, on_mouse_down, app);
 
     evas_object_size_hint_weight_set(app->browser, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
     evas_object_move(app->browser, 0, URL_BAR_HEIGHT);
@@ -252,7 +270,6 @@ static MiniBrowser *browserCreate(const char *url, const char *engine)
 
 int main(int argc, char *argv[])
 {
-    const char *url;
     int args = 1;
     char *engine = NULL;
     unsigned char quitOption = 0;
@@ -278,12 +295,13 @@ int main(int argc, char *argv[])
     if (quitOption)
         return quit(EINA_TRUE, NULL);
 
-    if (args < argc)
-        url = argv[args];
-    else
-        url = DEFAULT_URL;
+    if (args < argc) {
+        char *url = url_from_user_input(argv[args]);
+        browser = browserCreate(url, engine);
+        free(url);
+    } else
+        browser = browserCreate(DEFAULT_URL, engine);
 
-    MiniBrowser *browser = browserCreate(url, engine);
     if (!browser)
         return quit(EINA_FALSE, "ERROR: could not create browser.\n");
 
@@ -291,6 +309,7 @@ int main(int argc, char *argv[])
 
     ecore_main_loop_begin();
 
+    url_bar_del(browser->url_bar);
     ecore_event_handler_del(handle);
     ecore_evas_free(browser->ee);
     free(browser);

@@ -45,7 +45,6 @@
 
 #include "GraphicsLayerChromium.h"
 
-#include "AnimationIdVendor.h"
 #include "AnimationTranslationUtil.h"
 #include "ContentLayerChromium.h"
 #include "FloatConversion.h"
@@ -54,11 +53,12 @@
 #include "Image.h"
 #include "NativeImageSkia.h"
 #include "PlatformContextSkia.h"
-#include "PlatformString.h"
+#include "ScrollableArea.h"
 #include "SkMatrix44.h"
 #include "SystemTime.h"
-
+#include <public/Platform.h>
 #include <public/WebAnimation.h>
+#include <public/WebCompositorSupport.h>
 #include <public/WebFilterOperation.h>
 #include <public/WebFilterOperations.h>
 #include <public/WebFloatPoint.h>
@@ -67,8 +67,10 @@
 #include <public/WebSize.h>
 #include <public/WebTransformationMatrix.h>
 #include <wtf/CurrentTime.h>
+#include <wtf/HashSet.h>
 #include <wtf/StringExtras.h>
 #include <wtf/text/CString.h>
+#include <wtf/text/WTFString.h>
 
 using namespace std;
 using namespace WebKit;
@@ -88,13 +90,12 @@ GraphicsLayerChromium::GraphicsLayerChromium(GraphicsLayerClient* client)
     , m_contentsLayerPurpose(NoContentsLayer)
     , m_contentsLayerHasBackgroundColor(false)
     , m_inSetChildren(false)
-    , m_pageScaleChanged(false)
+    , m_scrollableArea(0)
 {
     m_opaqueRectTrackingContentLayerDelegate = adoptPtr(new OpaqueRectTrackingContentLayerDelegate(this));
-    m_layer = adoptPtr(WebContentLayer::create(m_opaqueRectTrackingContentLayerDelegate.get()));
+    m_layer = adoptPtr(Platform::current()->compositorSupport()->createContentLayer(m_opaqueRectTrackingContentLayerDelegate.get()));
     m_layer->layer()->setDrawsContent(m_drawsContent && m_contentsVisible);
-    if (client)
-        deviceOrPageScaleFactorChanged();
+    m_layer->layer()->setScrollClient(this);
     updateDebugIndicators();
 }
 
@@ -130,9 +131,9 @@ void GraphicsLayerChromium::updateNames()
         String debugName = "TransformLayer for " + m_nameBase;
         m_transformLayer->setDebugName(debugName);
     }
-    if (m_contentsLayer) {
+    if (WebLayer* contentsLayer = contentsLayerIfRegistered()) {
         String debugName = "ContentsLayer for " + m_nameBase;
-        m_contentsLayer->setDebugName(debugName);
+        contentsLayer->setDebugName(debugName);
     }
     if (m_linkHighlight) {
         String debugName = "LinkHighlight for " + m_nameBase;
@@ -218,20 +219,10 @@ void GraphicsLayerChromium::setSize(const FloatSize& size)
 
     GraphicsLayer::setSize(clampedSize);
     updateLayerSize();
-
-    if (m_pageScaleChanged) {
-        m_layer->layer()->invalidate();
-        if (m_linkHighlight)
-            m_linkHighlight->invalidate();
-    }
-    m_pageScaleChanged = false;
 }
 
 void GraphicsLayerChromium::setTransform(const TransformationMatrix& transform)
 {
-    // Call this method first to assign contents scale to our layer so the painter can apply the scale transform.
-    updateContentsScale();
-
     GraphicsLayer::setTransform(transform);
     updateTransform();
 }
@@ -290,7 +281,9 @@ void GraphicsLayerChromium::setBackgroundColor(const Color& color)
 void GraphicsLayerChromium::clearBackgroundColor()
 {
     GraphicsLayer::clearBackgroundColor();
-    m_contentsLayer->setBackgroundColor(static_cast<RGBA32>(0));
+
+    if (WebLayer* contentsLayer = contentsLayerIfRegistered())
+        contentsLayer->setBackgroundColor(static_cast<RGBA32>(0));
 }
 
 void GraphicsLayerChromium::setContentsOpaque(bool opaque)
@@ -432,8 +425,8 @@ void GraphicsLayerChromium::setReplicatedByLayer(GraphicsLayer* layer)
 
 void GraphicsLayerChromium::setContentsNeedsDisplay()
 {
-    if (m_contentsLayer)
-        m_contentsLayer->invalidate();
+    if (WebLayer* contentsLayer = contentsLayerIfRegistered())
+        contentsLayer->invalidate();
 }
 
 void GraphicsLayerChromium::setNeedsDisplay()
@@ -468,7 +461,9 @@ void GraphicsLayerChromium::setContentsToImage(Image* image)
     bool childrenChanged = false;
     if (image) {
         if (m_contentsLayerPurpose != ContentsLayerForImage) {
-            m_imageLayer = adoptPtr(WebImageLayer::create());
+            m_imageLayer = adoptPtr(Platform::current()->compositorSupport()->createImageLayer());
+            registerContentsLayer(m_imageLayer->layer());
+
             setupContentsLayer(m_imageLayer->layer());
             m_contentsLayerPurpose = ContentsLayerForImage;
             childrenChanged = true;
@@ -481,6 +476,7 @@ void GraphicsLayerChromium::setContentsToImage(Image* image)
         if (m_imageLayer) {
             childrenChanged = true;
 
+            unregisterContentsLayer(m_imageLayer->layer());
             m_imageLayer.clear();
         }
         // The old contents layer will be removed via updateChildList.
@@ -489,6 +485,40 @@ void GraphicsLayerChromium::setContentsToImage(Image* image)
 
     if (childrenChanged)
         updateChildList();
+}
+
+static HashSet<int>* s_registeredLayerSet;
+
+void GraphicsLayerChromium::registerContentsLayer(WebLayer* layer)
+{
+    if (!s_registeredLayerSet)
+        s_registeredLayerSet = new HashSet<int>;
+    if (s_registeredLayerSet->contains(layer->id()))
+        CRASH();
+    s_registeredLayerSet->add(layer->id());
+}
+
+void GraphicsLayerChromium::unregisterContentsLayer(WebLayer* layer)
+{
+    ASSERT(s_registeredLayerSet);
+    if (!s_registeredLayerSet->contains(layer->id()))
+        CRASH();
+    s_registeredLayerSet->remove(layer->id());
+}
+
+void GraphicsLayerChromium::clearContentsLayerIfUnregistered()
+{
+    if (!m_contentsLayerId || s_registeredLayerSet->contains(m_contentsLayerId))
+        return;
+
+    m_contentsLayer = 0;
+    m_contentsLayerId = 0;
+}
+
+WebLayer* GraphicsLayerChromium::contentsLayerIfRegistered()
+{
+    clearContentsLayerIfUnregistered();
+    return m_contentsLayer;
 }
 
 void GraphicsLayerChromium::setContentsToCanvas(PlatformLayer* layer)
@@ -501,10 +531,13 @@ void GraphicsLayerChromium::setContentsToMedia(PlatformLayer* layer)
     setContentsTo(ContentsLayerForVideo, layer);
 }
 
-void GraphicsLayerChromium::setContentsTo(ContentsLayerPurpose purpose, WebKit::WebLayer* layer)
+void GraphicsLayerChromium::setContentsTo(ContentsLayerPurpose purpose, WebLayer* layer)
 {
     bool childrenChanged = false;
     if (layer) {
+        ASSERT(s_registeredLayerSet);
+        if (!s_registeredLayerSet->contains(layer->id()))
+            CRASH();
         if (m_contentsLayerId != layer->id()) {
             setupContentsLayer(layer);
             m_contentsLayerPurpose = purpose;
@@ -528,12 +561,17 @@ bool GraphicsLayerChromium::addAnimation(const KeyframeValueList& values, const 
 {
     platformLayer()->setAnimationDelegate(this);
 
-    int animationId = mapAnimationNameToId(animationName);
-    int groupId = AnimationIdVendor::getNextGroupId();
+    int animationId = 0;
 
-    OwnPtr<WebKit::WebAnimation> toAdd(createWebAnimation(values, animation, animationId, groupId, timeOffset, boxSize));
+    if (m_animationIdMap.contains(animationName))
+        animationId = m_animationIdMap.get(animationName);
+
+    OwnPtr<WebAnimation> toAdd(createWebAnimation(values, animation, animationId, timeOffset, boxSize));
 
     if (toAdd) {
+        animationId = toAdd->id();
+        m_animationIdMap.set(animationName, animationId);
+
         // Remove any existing animations with the same animation id and target property.
         platformLayer()->removeAnimation(animationId, toAdd->targetProperty());
         return platformLayer()->addAnimation(toAdd.get());
@@ -544,12 +582,14 @@ bool GraphicsLayerChromium::addAnimation(const KeyframeValueList& values, const 
 
 void GraphicsLayerChromium::pauseAnimation(const String& animationName, double timeOffset)
 {
-    platformLayer()->pauseAnimation(mapAnimationNameToId(animationName), timeOffset);
+    if (m_animationIdMap.contains(animationName))
+        platformLayer()->pauseAnimation(m_animationIdMap.get(animationName), timeOffset);
 }
 
 void GraphicsLayerChromium::removeAnimation(const String& animationName)
 {
-    platformLayer()->removeAnimation(mapAnimationNameToId(animationName));
+    if (m_animationIdMap.contains(animationName))
+        platformLayer()->removeAnimation(m_animationIdMap.get(animationName));
 }
 
 void GraphicsLayerChromium::suspendAnimations(double wallClockTime)
@@ -599,6 +639,8 @@ void GraphicsLayerChromium::updateChildList()
 {
     WebLayer* childHost = m_transformLayer ? m_transformLayer.get() : m_layer->layer();
     childHost->removeAllChildren();
+
+    clearContentsLayerIfUnregistered();
 
     if (m_transformLayer) {
         // Add the primary layer first. Even if we have negative z-order children, the primary layer always comes behind.
@@ -672,8 +714,7 @@ void GraphicsLayerChromium::updateMasksToBounds()
 void GraphicsLayerChromium::updateLayerPreserves3D()
 {
     if (m_preserves3D && !m_transformLayer) {
-        // Create the transform layer.
-        m_transformLayer = adoptPtr(WebLayer::create());
+        m_transformLayer = adoptPtr(Platform::current()->compositorSupport()->createLayer());
         m_transformLayer->setPreserves3D(true);
         m_transformLayer->setAnimationDelegate(this);
         m_layer->layer()->transferAnimationsTo(m_transformLayer.get());
@@ -693,16 +734,14 @@ void GraphicsLayerChromium::updateLayerPreserves3D()
         // Set the old layer to opacity of 1. Further down we will set the opacity on the transform layer.
         m_layer->layer()->setOpacity(1);
 
-        m_layer->setContentsScale(contentsScale());
-
         // Move this layer to be a child of the transform layer.
         if (parent())
             parent()->platformLayer()->replaceChild(m_layer->layer(), m_transformLayer.get());
         m_transformLayer->addChild(m_layer->layer());
 
         updateChildList();
-    } else if (m_preserves3D && !m_transformLayer) {
-        // Relace the transformLayer in the parent with this layer.
+    } else if (!m_preserves3D && m_transformLayer) {
+        // Replace the transformLayer in the parent with this layer.
         m_layer->layer()->removeFromParent();
         if (parent())
             parent()->platformLayer()->replaceChild(m_transformLayer.get(), m_layer->layer());
@@ -736,9 +775,8 @@ void GraphicsLayerChromium::updateLayerIsDrawable()
     // so it is only given contentsVisible.
 
     m_layer->layer()->setDrawsContent(m_drawsContent && m_contentsVisible);
-
-    if (m_contentsLayer)
-        m_contentsLayer->setDrawsContent(m_contentsVisible);
+    if (WebLayer* contentsLayer = contentsLayerIfRegistered())
+        contentsLayer->setDrawsContent(m_contentsVisible);
 
     if (m_drawsContent) {
         m_layer->layer()->invalidate();
@@ -751,14 +789,15 @@ void GraphicsLayerChromium::updateLayerIsDrawable()
 
 void GraphicsLayerChromium::updateLayerBackgroundColor()
 {
-    if (!m_contentsLayer)
+    WebLayer* contentsLayer = contentsLayerIfRegistered();
+    if (!contentsLayer)
         return;
 
     // We never create the contents layer just for background color yet.
     if (m_backgroundColorSet)
-        m_contentsLayer->setBackgroundColor(m_backgroundColor.rgb());
+        contentsLayer->setBackgroundColor(m_backgroundColor.rgb());
     else
-        m_contentsLayer->setBackgroundColor(static_cast<RGBA32>(0));
+        contentsLayer->setBackgroundColor(static_cast<RGBA32>(0));
 }
 
 void GraphicsLayerChromium::updateContentsVideo()
@@ -768,20 +807,12 @@ void GraphicsLayerChromium::updateContentsVideo()
 
 void GraphicsLayerChromium::updateContentsRect()
 {
-    if (!m_contentsLayer)
+    WebLayer* contentsLayer = contentsLayerIfRegistered();
+    if (!contentsLayer)
         return;
 
-    m_contentsLayer->setPosition(FloatPoint(m_contentsRect.x(), m_contentsRect.y()));
-    m_contentsLayer->setBounds(IntSize(m_contentsRect.width(), m_contentsRect.height()));
-}
-
-void GraphicsLayerChromium::updateContentsScale()
-{
-    // If page scale is already applied then there's no need to apply it again.
-    if (appliesPageScale())
-        return;
-
-    m_layer->setContentsScale(contentsScale());
+    contentsLayer->setPosition(FloatPoint(m_contentsRect.x(), m_contentsRect.y()));
+    contentsLayer->setBounds(IntSize(m_contentsRect.width(), m_contentsRect.height()));
 }
 
 void GraphicsLayerChromium::setupContentsLayer(WebLayer* contentsLayer)
@@ -810,37 +841,20 @@ void GraphicsLayerChromium::setupContentsLayer(WebLayer* contentsLayer)
     updateNames();
 }
 
-float GraphicsLayerChromium::contentsScale() const
+void GraphicsLayerChromium::setAppliesPageScale(bool appliesScale)
 {
-    if (!appliesPageScale())
-        return pageScaleFactor() * deviceScaleFactor();
-    return 1;
+    m_layer->setBoundsContainPageScale(appliesScale);
 }
 
-void GraphicsLayerChromium::deviceOrPageScaleFactorChanged()
+bool GraphicsLayerChromium::appliesPageScale() const
 {
-    updateContentsScale();
-    // Invalidations are clamped to the layer's bounds but we receive the scale changed notification before receiving
-    // the new layer bounds. When the scale changes, we really want to invalidate the post-scale layer bounds, so we
-    // remember that the scale has changed and then invalidate the full layer bounds when we receive the new size.
-    m_pageScaleChanged = true;
+    return m_layer->boundsContainPageScale();
 }
 
 void GraphicsLayerChromium::paint(GraphicsContext& context, const IntRect& clip)
 {
     context.platformContext()->setDrawingToImageBuffer(true);
     paintGraphicsLayerContents(context, clip);
-}
-
-int GraphicsLayerChromium::mapAnimationNameToId(const String& animationName)
-{
-    if (animationName.isEmpty())
-        return 0;
-
-    if (!m_animationIdMap.contains(animationName))
-        m_animationIdMap.add(animationName, AnimationIdVendor::getNextAnimationId());
-
-    return m_animationIdMap.find(animationName)->second;
 }
 
 void GraphicsLayerChromium::notifyAnimationStarted(double startTime)
@@ -852,6 +866,12 @@ void GraphicsLayerChromium::notifyAnimationStarted(double startTime)
 void GraphicsLayerChromium::notifyAnimationFinished(double)
 {
     // Do nothing.
+}
+
+void GraphicsLayerChromium::didScroll()
+{
+    if (m_scrollableArea)
+        m_scrollableArea->scrollToOffsetWithoutAnimation(IntPoint(m_layer->layer()->scrollPosition()));
 }
 
 } // namespace WebCore

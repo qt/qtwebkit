@@ -70,6 +70,12 @@
 
 namespace WebCore {
 
+PassRefPtr<GraphicsContext3D> GraphicsContext3D::createForCurrentGLContext()
+{
+    RefPtr<GraphicsContext3D> context = adoptRef(new GraphicsContext3D(Attributes(), 0, GraphicsContext3D::RenderToCurrentGLContext));
+    return context->m_private ? context.release() : 0;
+}
+
 void GraphicsContext3D::validateDepthStencil(const char* packedDepthStencilExtension)
 {
     Extensions3D* extensions = getExtensions();
@@ -623,14 +629,14 @@ bool GraphicsContext3D::getActiveAttrib(Platform3DObject program, GC3Duint index
     makeContextCurrent();
     GLint maxAttributeSize = 0;
     ::glGetProgramiv(program, GL_ACTIVE_ATTRIBUTE_MAX_LENGTH, &maxAttributeSize);
-    GLchar name[maxAttributeSize]; // GL_ACTIVE_ATTRIBUTE_MAX_LENGTH includes null termination.
+    OwnArrayPtr<GLchar> name = adoptArrayPtr(new GLchar[maxAttributeSize]); // GL_ACTIVE_ATTRIBUTE_MAX_LENGTH includes null termination.
     GLsizei nameLength = 0;
     GLint size = 0;
     GLenum type = 0;
-    ::glGetActiveAttrib(program, index, maxAttributeSize, &nameLength, &size, &type, name);
+    ::glGetActiveAttrib(program, index, maxAttributeSize, &nameLength, &size, &type, name.get());
     if (!nameLength)
         return false;
-    info.name = String(name, nameLength);
+    info.name = String(name.get(), nameLength);
     info.type = type;
     info.size = size;
     return true;
@@ -1372,6 +1378,12 @@ void GraphicsContext3D::markLayerComposited()
 bool GraphicsContext3D::layerComposited() const
 {
     return m_layerComposited;
+}
+
+void GraphicsContext3D::texImage2DDirect(GC3Denum target, GC3Dint level, GC3Denum internalformat, GC3Dsizei width, GC3Dsizei height, GC3Dint border, GC3Denum format, GC3Denum type, const void* pixels)
+{
+    makeContextCurrent();
+    ::glTexImage2D(target, level, internalformat, width, height, border, format, type, pixels);
 }
 
 }

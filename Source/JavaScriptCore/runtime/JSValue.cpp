@@ -143,7 +143,7 @@ void JSValue::putToPrimitive(ExecState* exec, PropertyName propertyName, JSValue
                 JSObject* setterFunc = asGetterSetter(gs)->setter();        
                 if (!setterFunc) {
                     if (slot.isStrictMode())
-                        throwError(exec, createTypeError(exec, "setting a property that has only a getter"));
+                        throwError(exec, createTypeError(exec, ASCIILiteral("setting a property that has only a getter")));
                     return;
                 }
                 
@@ -283,9 +283,9 @@ JSString* JSValue::toStringSlowCase(ExecState* exec) const
     return value.toString(exec);
 }
 
-UString JSValue::toUStringSlowCase(ExecState* exec) const
+String JSValue::toWTFStringSlowCase(ExecState* exec) const
 {
-    return inlineJSValueNotStringtoUString(*this, exec);
+    return inlineJSValueNotStringtoString(*this, exec);
 }
 
 } // namespace JSC

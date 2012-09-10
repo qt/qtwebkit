@@ -42,6 +42,7 @@
 #import "JavaScriptThreading.h"
 #import "TestRunner.h"
 #import "MockGeolocationProvider.h"
+#import "MockWebNotificationProvider.h"
 #import "NavigationController.h"
 #import "ObjCPlugin.h"
 #import "ObjCPluginFunction.h"
@@ -88,6 +89,7 @@
 #import <wtf/Assertions.h>
 #import <wtf/RetainPtr.h>
 #import <wtf/Threading.h>
+#import <wtf/ObjcRuntimeExtras.h>
 #import <wtf/OwnPtr.h>
 
 extern "C" {
@@ -353,7 +355,7 @@ static NSArray *drt_NSFontManager_availableFontFamilies(id self, SEL _cmd)
     if (availableFontFamilies)
         return availableFontFamilies;
     
-    NSArray *availableFamilies = appKitAvailableFontFamiliesIMP(self, _cmd);
+    NSArray *availableFamilies = wtfCallIMP<id>(appKitAvailableFontFamiliesIMP, self, _cmd);
 
     NSMutableSet *prunedFamiliesSet = [NSMutableSet setWithArray:availableFamilies];
     [prunedFamiliesSet intersectSet:allowedFontFamilySet()];
@@ -519,6 +521,7 @@ WebView *createWebViewAndOffscreenWindow()
     [webView setResourceLoadDelegate:resourceLoadDelegate];
     [webView _setGeolocationProvider:[MockGeolocationProvider shared]];
     [webView _setDeviceOrientationProvider:[WebDeviceOrientationProviderMock shared]];
+    [webView _setNotificationProvider:[MockWebNotificationProvider shared]];
 
     // Register the same schemes that Safari does
     [WebView registerURLSchemeAsLocal:@"feed"];
@@ -1136,6 +1139,7 @@ bool shouldSetWaitToDumpWatchdog()
 void dump()
 {
     invalidateAnyPreviousWaitToDumpWatchdog();
+    ASSERT(!gTestRunner->hasPendingWebNotificationClick());
 
     if (dumpTree) {
         NSString *resultString = nil;
@@ -1269,6 +1273,7 @@ static void resetWebViewToConsistentStateBeforeTesting()
     [WebView _setAllowsRoundingHacks:NO];
 
     [[MockGeolocationProvider shared] stopTimer];
+    [[MockWebNotificationProvider shared] reset];
     
     // Clear the contents of the general pasteboard
     [[NSPasteboard generalPasteboard] declareTypes:[NSArray arrayWithObject:NSStringPboardType] owner:nil];

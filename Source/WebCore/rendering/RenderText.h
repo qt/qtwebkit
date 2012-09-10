@@ -45,6 +45,12 @@ public:
 
     virtual PassRefPtr<StringImpl> originalText() const;
 
+    void updateTextIfNeeded()
+    {
+        if (preferredLogicalWidthsDirty())
+            updateText();
+    }
+
     void extractTextBox(InlineTextBox*);
     void attachTextBox(InlineTextBox*);
     void removeTextBox(InlineTextBox*);
@@ -139,6 +145,7 @@ protected:
     virtual void styleWillChange(StyleDifference, const RenderStyle*) { }
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
 
+    virtual void updateText() { }
     virtual void setTextInternal(PassRefPtr<StringImpl>);
     virtual UChar previousCharacter() const;
     
@@ -156,7 +163,7 @@ private:
 
     virtual void paint(PaintInfo&, const LayoutPoint&) { ASSERT_NOT_REACHED(); }
     virtual void layout() { ASSERT_NOT_REACHED(); }
-    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestPoint&, const LayoutPoint&, HitTestAction) OVERRIDE { ASSERT_NOT_REACHED(); return false; }
+    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation&, const LayoutPoint&, HitTestAction) OVERRIDE { ASSERT_NOT_REACHED(); return false; }
 
     void deleteTextBoxes();
     bool containsOnlyWhitespace(unsigned from, unsigned len) const;

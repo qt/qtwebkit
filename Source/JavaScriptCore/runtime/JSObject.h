@@ -30,7 +30,7 @@
 #include "JSCell.h"
 #include "PropertySlot.h"
 #include "PutPropertySlot.h"
-#include "ScopeChain.h"
+
 #include "StorageBarrier.h"
 #include "Structure.h"
 #include "JSGlobalData.h"
@@ -65,7 +65,7 @@ namespace JSC {
     class Structure;
     struct HashTable;
 
-    JS_EXPORT_PRIVATE JSObject* throwTypeError(ExecState*, const UString&);
+    JS_EXPORT_PRIVATE JSObject* throwTypeError(ExecState*, const String&);
     extern JS_EXPORTDATA const char* StrictModeReadonlyPropertyWriteError;
 
     // ECMA 262-3 8.6.1
@@ -99,7 +99,7 @@ namespace JSC {
 
         JS_EXPORT_PRIVATE static void visitChildren(JSCell*, SlotVisitor&);
 
-        JS_EXPORT_PRIVATE static UString className(const JSObject*);
+        JS_EXPORT_PRIVATE static String className(const JSObject*);
 
         JSValue prototype() const;
         void setPrototype(JSGlobalData&, JSValue prototype);
@@ -254,7 +254,7 @@ namespace JSC {
 
         bool isGlobalObject() const;
         bool isVariableObject() const;
-        bool isStaticScopeObject() const;
+        bool isNameScopeObject() const;
         bool isActivationObject() const;
         bool isErrorInstance() const;
         bool isGlobalThis() const;
@@ -313,8 +313,6 @@ namespace JSC {
         {
             return Structure::create(globalData, globalObject, prototype, TypeInfo(ObjectType, StructureFlags), &s_info);
         }
-
-        static const unsigned StructureFlags = 0;
 
         // To instantiate objects you likely want JSFinalObject, below.
         // To create derived types you likely want JSNonFinalObject, below.
@@ -473,9 +471,9 @@ inline bool JSObject::isVariableObject() const
     return structure()->typeInfo().type() >= VariableObjectType;
 }
 
-inline bool JSObject::isStaticScopeObject() const
+inline bool JSObject::isNameScopeObject() const
 {
-    return structure()->typeInfo().type() == StaticScopeObjectType;
+    return structure()->typeInfo().type() == NameScopeObjectType;
 }
 
 inline bool JSObject::isActivationObject() const
@@ -622,7 +620,7 @@ ALWAYS_INLINE bool JSCell::fastGetOwnPropertySlot(ExecState* exec, PropertyName 
 // identifier. The first time we perform a property access with a given string, try
 // performing the property map lookup without forming an identifier. We detect this
 // case by checking whether the hash has yet been set for this string.
-ALWAYS_INLINE JSValue JSCell::fastGetOwnProperty(ExecState* exec, const UString& name)
+ALWAYS_INLINE JSValue JSCell::fastGetOwnProperty(ExecState* exec, const String& name)
 {
     if (!structure()->typeInfo().overridesGetOwnPropertySlot() && !structure()->hasGetterSetterProperties()) {
         PropertyOffset offset = name.impl()->hasHash()

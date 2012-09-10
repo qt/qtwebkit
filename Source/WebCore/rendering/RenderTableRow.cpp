@@ -46,14 +46,11 @@ RenderTableRow::RenderTableRow(Node* node)
     setInline(false);   // our object is not Inline
 }
 
-void RenderTableRow::willBeDestroyed()
+void RenderTableRow::willBeRemovedFromTree()
 {
-    RenderTableSection* recalcSection = section();
-    
-    RenderBox::willBeDestroyed();
-    
-    if (recalcSection)
-        recalcSection->setNeedsCellRecalc();
+    RenderBox::willBeRemovedFromTree();
+
+    section()->setNeedsCellRecalc();
 }
 
 void RenderTableRow::updateBeforeAndAfterContent()
@@ -154,7 +151,7 @@ void RenderTableRow::layout()
                 cell->setChildNeedsLayout(true, MarkOnlyThis);
 
             if (child->needsLayout()) {
-                cell->computeBlockDirectionMargins(table());
+                cell->computeAndSetBlockDirectionMargins(table());
                 cell->layout();
             }
         }
@@ -195,7 +192,7 @@ LayoutRect RenderTableRow::clippedOverflowRectForRepaint(RenderBoxModelObject* r
 }
 
 // Hit Testing
-bool RenderTableRow::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction action)
+bool RenderTableRow::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction action)
 {
     // Table rows cannot ever be hit tested.  Effectively they do not exist.
     // Just forward to our children always.
@@ -206,8 +203,8 @@ bool RenderTableRow::nodeAtPoint(const HitTestRequest& request, HitTestResult& r
         // then we can remove this check.
         if (child->isTableCell() && !toRenderBox(child)->hasSelfPaintingLayer()) {
             LayoutPoint cellPoint = flipForWritingModeForChild(toRenderTableCell(child), accumulatedOffset);
-            if (child->nodeAtPoint(request, result, pointInContainer, cellPoint, action)) {
-                updateHitTestResult(result, pointInContainer.point() - toLayoutSize(cellPoint));
+            if (child->nodeAtPoint(request, result, locationInContainer, cellPoint, action)) {
+                updateHitTestResult(result, locationInContainer.point() - toLayoutSize(cellPoint));
                 return true;
             }
         }

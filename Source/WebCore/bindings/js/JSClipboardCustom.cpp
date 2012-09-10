@@ -36,11 +36,11 @@
 #include "IntPoint.h"
 #include "JSNode.h"
 #include "Node.h"
-#include "PlatformString.h"
 #include <runtime/ArrayPrototype.h>
 #include <runtime/Error.h>
 #include <wtf/HashSet.h>
 #include <wtf/text/StringHash.h>
+#include <wtf/text/WTFString.h>
 
 using namespace JSC;
 
@@ -59,7 +59,7 @@ JSValue JSClipboard::types(ExecState* exec) const
     MarkedArgumentBuffer list;
     HashSet<String>::const_iterator end = types.end();
     for (HashSet<String>::const_iterator it = types.begin(); it != end; ++it)
-        list.append(jsString(exec, stringToUString(*it)));
+        list.append(jsStringWithCache(exec, *it));
     return constructArray(exec, globalObject(), list);
 }
 
@@ -73,7 +73,7 @@ JSValue JSClipboard::clearData(ExecState* exec)
     }
 
     if (exec->argumentCount() == 1) {
-        clipboard->clearData(ustringToString(exec->argument(0).toString(exec)->value(exec)));
+        clipboard->clearData(exec->argument(0).toString(exec)->value(exec));
         return jsUndefined();
     }
 

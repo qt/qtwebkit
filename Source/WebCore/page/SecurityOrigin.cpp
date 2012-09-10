@@ -53,18 +53,7 @@ static bool schemeRequiresAuthority(const KURL& url)
     return url.protocolIsInHTTPFamily() || url.protocolIs("ftp");
 }
 
-// Some URL schemes use nested URLs for their security context. For example,
-// filesystem URLs look like the following:
-//
-//   filesystem:http://example.com/temporary/path/to/file.png
-//
-// We're supposed to use "http://example.com" as the origin.
-//
-// Generally, we add URL schemes to this list when WebKit support them. For
-// example, we don't include the "jar" scheme, even though Firefox understands
-// that jar uses an inner URL for it's security origin.
-//
-static bool shouldUseInnerURL(const KURL& url)
+bool SecurityOrigin::shouldUseInnerURL(const KURL& url)
 {
 #if ENABLE(BLOB)
     if (url.protocolIs("blob"))
@@ -81,7 +70,7 @@ static bool shouldUseInnerURL(const KURL& url)
 // In general, extracting the inner URL varies by scheme. It just so happens
 // that all the URL schemes we currently support that use inner URLs for their
 // security origin can be parsed using this algorithm.
-static KURL extractInnerURL(const KURL& url)
+KURL SecurityOrigin::extractInnerURL(const KURL& url)
 {
     if (url.innerURL())
         return *url.innerURL();
@@ -105,7 +94,7 @@ static bool shouldTreatAsUniqueOrigin(const KURL& url)
         return true;
 
     // FIXME: Do we need to unwrap the URL further?
-    KURL innerURL = shouldUseInnerURL(url) ? extractInnerURL(url) : url;
+    KURL innerURL = SecurityOrigin::shouldUseInnerURL(url) ? SecurityOrigin::extractInnerURL(url) : url;
 
     // FIXME: Check whether innerURL is valid.
 
@@ -133,7 +122,7 @@ SecurityOrigin::SecurityOrigin(const KURL& url)
     , m_isUnique(false)
     , m_universalAccess(false)
     , m_domainWasSetInDOM(false)
-    , m_blockThirdPartyStorage(false)
+    , m_storageBlockingPolicy(AllowAllStorage)
     , m_enforceFilePathSeparation(false)
     , m_needsDatabaseIdentifierQuirkForFiles(false)
 {
@@ -159,7 +148,7 @@ SecurityOrigin::SecurityOrigin()
     , m_universalAccess(false)
     , m_domainWasSetInDOM(false)
     , m_canLoadLocalResources(false)
-    , m_blockThirdPartyStorage(false)
+    , m_storageBlockingPolicy(AllowAllStorage)
     , m_enforceFilePathSeparation(false)
     , m_needsDatabaseIdentifierQuirkForFiles(false)
 {
@@ -176,7 +165,7 @@ SecurityOrigin::SecurityOrigin(const SecurityOrigin* other)
     , m_universalAccess(other->m_universalAccess)
     , m_domainWasSetInDOM(other->m_domainWasSetInDOM)
     , m_canLoadLocalResources(other->m_canLoadLocalResources)
-    , m_blockThirdPartyStorage(other->m_blockThirdPartyStorage)
+    , m_storageBlockingPolicy(other->m_storageBlockingPolicy)
     , m_enforceFilePathSeparation(other->m_enforceFilePathSeparation)
     , m_needsDatabaseIdentifierQuirkForFiles(other->m_needsDatabaseIdentifierQuirkForFiles)
 {
@@ -400,7 +389,10 @@ bool SecurityOrigin::canAccessStorage(const SecurityOrigin* topOrigin) const
     if (!topOrigin)
         return true;
 
-    if ((m_blockThirdPartyStorage || topOrigin->m_blockThirdPartyStorage) && topOrigin->isThirdParty(this))
+    if (m_storageBlockingPolicy == BlockAllStorage || topOrigin->m_storageBlockingPolicy == BlockAllStorage)
+        return false;
+
+    if ((m_storageBlockingPolicy == BlockThirdPartyStorage || topOrigin->m_storageBlockingPolicy == BlockThirdPartyStorage) && topOrigin->isThirdParty(this))
         return false;
 
     return true;
@@ -480,8 +472,8 @@ String SecurityOrigin::toRawString() const
     result.append(m_host);
 
     if (m_port) {
-        result.append(":");
-        result.append(String::number(m_port));
+        result.append(':');
+        result.appendNumber(m_port);
     }
 
     return result.toString();

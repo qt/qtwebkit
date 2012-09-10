@@ -149,6 +149,7 @@ void StyleElement::createSheet(Element* e, WTF::OrdinalNumber startLineNumber, c
 {
     ASSERT(e);
     ASSERT(e->inDocument());
+
     Document* document = e->document();
     if (m_sheet) {
         if (m_sheet->isLoading())
@@ -181,7 +182,7 @@ void StyleElement::createSheet(Element* e, WTF::OrdinalNumber startLineNumber, c
     }
 
     if (m_sheet)
-        m_sheet->contents()->checkLoaded();
+        m_sheet->contents()->checkLoadCompleted();
 }
 
 bool StyleElement::isLoading() const

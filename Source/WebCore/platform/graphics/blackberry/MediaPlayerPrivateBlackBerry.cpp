@@ -38,7 +38,8 @@
 #include "TimeRanges.h"
 #include "WebPageClient.h"
 
-#include <BlackBerryPlatformClient.h>
+#include <BlackBerryPlatformSettings.h>
+#include <FrameLoaderClientBlackBerry.h>
 #include <set>
 #include <string>
 #include <wtf/text/CString.h>
@@ -139,7 +140,7 @@ void MediaPlayerPrivate::load(const String& url)
     if (modifiedUrl.startsWith("local://")) {
         KURL kurl = KURL(KURL(), modifiedUrl);
         kurl.setProtocol("file");
-        String tempPath(BlackBerry::Platform::Client::get()->getApplicationLocalDirectory().c_str());
+        String tempPath(BlackBerry::Platform::Settings::instance()->applicationLocalDirectory().c_str());
         tempPath.append(kurl.path());
         kurl.setPath(tempPath);
         modifiedUrl = kurl.string();
@@ -695,25 +696,31 @@ static ProtectionSpace generateProtectionSpaceFromMMRAuthChallenge(const MMRAuth
                            static_cast<ProtectionSpaceAuthenticationScheme>(authChallenge.authScheme()));
 }
 
-bool MediaPlayerPrivate::onAuthenticationNeeded(MMRAuthChallenge& authChallenge)
+void MediaPlayerPrivate::onAuthenticationNeeded(MMRAuthChallenge& authChallenge)
 {
     KURL url(ParsedURLString, String(authChallenge.url().c_str()));
     if (!url.isValid())
-        return false;
+        return;
 
     ProtectionSpace protectionSpace = generateProtectionSpaceFromMMRAuthChallenge(authChallenge);
     Credential credential = CredentialStorage::get(protectionSpace);
-    bool isConfirmed = false;
-    if (credential.isEmpty()) {
-        isConfirmed = m_webCorePlayer->mediaPlayerClient()->mediaPlayerHostWindow()->platformPageClient()->authenticationChallenge(url, protectionSpace, credential);
+    if (!credential.isEmpty()) {
+        notifyChallengeResult(url, protectionSpace, AuthenticationChallengeSuccess, credential);
+        return;
+    }
 
-    } else
-        isConfirmed = true;
+    if (frameView() && frameView()->hostWindow())
+        frameView()->hostWindow()->platformPageClient()->authenticationChallenge(url, protectionSpace, credential, this);
+}
 
-    if (isConfirmed)
-        authChallenge.setCredential(credential.user().utf8().data(), credential.password().utf8().data(), static_cast<MMRAuthChallenge::CredentialPersistence>(credential.persistence()));
+void MediaPlayerPrivate::notifyChallengeResult(const KURL& url, const ProtectionSpace& protectionSpace, AuthenticationChallengeResult result, const Credential& credential)
+{
+    if (result != AuthenticationChallengeSuccess || !url.isValid())
+        return;
 
-    return isConfirmed;
+    m_platformPlayer->reloadWithCredential(credential.user().utf8(true).data(),
+                                           credential.password().utf8(true).data(),
+                                           static_cast<MMRAuthChallenge::CredentialPersistence>(credential.persistence()));
 }
 
 void MediaPlayerPrivate::onAuthenticationAccepted(const MMRAuthChallenge& authChallenge) const

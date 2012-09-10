@@ -28,10 +28,8 @@
 #include "PlatformGestureCurve.h"
 
 #include "ActivePlatformGestureAnimation.h"
-#include "CCActiveGestureAnimation.h"
-#include "CCGestureCurve.h"
 #include "PlatformGestureCurveTarget.h"
-#include "TouchpadFlingPlatformGestureCurve.h"
+#include "TouchFlingPlatformGestureCurve.h"
 #include "WheelFlingPlatformGestureCurve.h"
 #include <gtest/gtest.h>
 #include <wtf/OwnPtr.h>
@@ -101,7 +99,7 @@ TEST(PlatformGestureCurve, flingCurveTouch)
 {
     double initialVelocity = 5000;
     MockPlatformGestureCurveTarget target;
-    OwnPtr<ActivePlatformGestureAnimation> animation = ActivePlatformGestureAnimation::create(TouchpadFlingPlatformGestureCurve::create(FloatPoint(initialVelocity, 0)), &target);
+    OwnPtr<ActivePlatformGestureAnimation> animation = ActivePlatformGestureAnimation::create(TouchFlingPlatformGestureCurve::createForTouchPad(FloatPoint(initialVelocity, 0)), &target);
 
     // Note: the expectations below are dependent on the value of sigma hard-coded in the curve parameters.
     //       If the parameters change, then the tests values/expectations will need to be updated.

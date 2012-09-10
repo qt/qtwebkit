@@ -50,6 +50,7 @@
 #include "platform/WebRect.h"
 #include "platform/WebString.h"
 #include "platform/WebURL.h"
+#include <wtf/text/StringBuilder.h>
 
 using namespace WebCore;
 
@@ -95,8 +96,14 @@ int WebAccessibilityObject::axID() const
     if (isDetached())
         return -1;
 
-    m_private->updateBackingStore();
     return m_private->axObjectID();
+}
+
+bool WebAccessibilityObject::updateBackingStoreAndCheckValidity()
+{
+    if (!isDetached())
+        m_private->updateBackingStore();
+    return !isDetached();
 }
 
 WebString WebAccessibilityObject::accessibilityDescription() const
@@ -104,7 +111,6 @@ WebString WebAccessibilityObject::accessibilityDescription() const
     if (isDetached())
         return WebString();
 
-    m_private->updateBackingStore();
     return m_private->accessibilityDescription();
 }
 
@@ -113,7 +119,6 @@ WebString WebAccessibilityObject::actionVerb() const
     if (isDetached())
         return WebString();
 
-    m_private->updateBackingStore();
     return m_private->actionVerb();
 }
 
@@ -122,7 +127,6 @@ bool WebAccessibilityObject::canSetFocusAttribute() const
     if (isDetached())
         return false;
 
-    m_private->updateBackingStore();
     return m_private->canSetFocusAttribute();
 }
 
@@ -131,17 +135,7 @@ bool WebAccessibilityObject::canSetValueAttribute() const
     if (isDetached())
         return false;
 
-    m_private->updateBackingStore();
     return m_private->canSetValueAttribute();
-}
-
-bool WebAccessibilityObject::isValid() const
-{
-    if (isDetached())
-        return false;
-
-    m_private->updateBackingStore();
-    return m_private->axObjectID();
 }
 
 unsigned WebAccessibilityObject::childCount() const
@@ -149,7 +143,6 @@ unsigned WebAccessibilityObject::childCount() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->children().size();
 }
 
@@ -158,7 +151,6 @@ WebAccessibilityObject WebAccessibilityObject::childAt(unsigned index) const
     if (isDetached())
         return WebAccessibilityObject();
 
-    m_private->updateBackingStore();
     if (m_private->children().size() <= index)
         return WebAccessibilityObject();
 
@@ -170,7 +162,6 @@ WebAccessibilityObject WebAccessibilityObject::firstChild() const
     if (isDetached())
         return WebAccessibilityObject();
 
-    m_private->updateBackingStore();
     return WebAccessibilityObject(m_private->firstChild());
 }
 
@@ -179,7 +170,6 @@ WebAccessibilityObject WebAccessibilityObject::focusedChild() const
     if (isDetached())
         return WebAccessibilityObject();
 
-    m_private->updateBackingStore();
     RefPtr<AccessibilityObject> focused = m_private->focusedUIElement();
     if (m_private.get() == focused.get() || m_private.get() == focused->parentObject())
         return WebAccessibilityObject(focused);
@@ -192,7 +182,6 @@ WebAccessibilityObject WebAccessibilityObject::lastChild() const
     if (isDetached())
         return WebAccessibilityObject();
 
-    m_private->updateBackingStore();
     return WebAccessibilityObject(m_private->lastChild());
 }
 
@@ -202,7 +191,6 @@ WebAccessibilityObject WebAccessibilityObject::nextSibling() const
     if (isDetached())
         return WebAccessibilityObject();
 
-    m_private->updateBackingStore();
     return WebAccessibilityObject(m_private->nextSibling());
 }
 
@@ -211,7 +199,6 @@ WebAccessibilityObject WebAccessibilityObject::parentObject() const
     if (isDetached())
         return WebAccessibilityObject();
 
-    m_private->updateBackingStore();
     return WebAccessibilityObject(m_private->parentObject());
 }
 
@@ -221,7 +208,6 @@ WebAccessibilityObject WebAccessibilityObject::previousSibling() const
     if (isDetached())
         return WebAccessibilityObject();
 
-    m_private->updateBackingStore();
     return WebAccessibilityObject(m_private->previousSibling());
 }
 
@@ -230,7 +216,6 @@ bool WebAccessibilityObject::canSetSelectedAttribute() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->canSetSelectedAttribute();
 }
 
@@ -239,7 +224,6 @@ bool WebAccessibilityObject::isAnchor() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->isAnchor();
 }
 
@@ -248,7 +232,6 @@ bool WebAccessibilityObject::isAriaReadOnly() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return equalIgnoringCase(m_private->getAttribute(HTMLNames::aria_readonlyAttr), "true");
 }
 
@@ -257,7 +240,6 @@ bool WebAccessibilityObject::isButtonStateMixed() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->checkboxOrRadioValue() == ButtonStateMixed;
 }
 
@@ -266,7 +248,6 @@ bool WebAccessibilityObject::isChecked() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->isChecked();
 }
 
@@ -275,7 +256,6 @@ bool WebAccessibilityObject::isCollapsed() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->isCollapsed();
 }
 
@@ -284,7 +264,6 @@ bool WebAccessibilityObject::isControl() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->isControl();
 }
 
@@ -293,7 +272,6 @@ bool WebAccessibilityObject::isEnabled() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->isEnabled();
 }
 
@@ -302,7 +280,6 @@ bool WebAccessibilityObject::isFocused() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->isFocused();
 }
 
@@ -311,7 +288,6 @@ bool WebAccessibilityObject::isHovered() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->isHovered();
 }
 
@@ -320,7 +296,6 @@ bool WebAccessibilityObject::isIndeterminate() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->isIndeterminate();
 }
 
@@ -329,7 +304,6 @@ bool WebAccessibilityObject::isLinked() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->isLinked();
 }
 
@@ -338,7 +312,6 @@ bool WebAccessibilityObject::isLoaded() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->isLoaded();
 }
 
@@ -347,7 +320,6 @@ bool WebAccessibilityObject::isMultiSelectable() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->isMultiSelectable();
 }
 
@@ -356,7 +328,6 @@ bool WebAccessibilityObject::isOffScreen() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->isOffScreen();
 }
 
@@ -365,7 +336,6 @@ bool WebAccessibilityObject::isPasswordField() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->isPasswordField();
 }
 
@@ -374,7 +344,6 @@ bool WebAccessibilityObject::isPressed() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->isPressed();
 }
 
@@ -383,7 +352,6 @@ bool WebAccessibilityObject::isReadOnly() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->isReadOnly();
 }
 
@@ -392,7 +360,6 @@ bool WebAccessibilityObject::isRequired() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->isRequired();
 }
 
@@ -401,7 +368,6 @@ bool WebAccessibilityObject::isSelected() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->isSelected();
 }
 
@@ -410,7 +376,6 @@ bool WebAccessibilityObject::isSelectedOptionActive() const
     if (isDetached())
         return false;
 
-    m_private->updateBackingStore();
     return m_private->isSelectedOptionActive();
 }
 
@@ -419,7 +384,6 @@ bool WebAccessibilityObject::isVertical() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->orientation() == AccessibilityOrientationVertical;
 }
 
@@ -428,7 +392,6 @@ bool WebAccessibilityObject::isVisible() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->isVisible();
 }
 
@@ -437,7 +400,6 @@ bool WebAccessibilityObject::isVisited() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->isVisited();
 }
 
@@ -446,7 +408,6 @@ WebString WebAccessibilityObject::accessKey() const
     if (isDetached())
         return WebString();
 
-    m_private->updateBackingStore();
     return WebString(m_private->accessKey());
 }
 
@@ -455,7 +416,6 @@ bool WebAccessibilityObject::ariaHasPopup() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->ariaHasPopup();
 }
 
@@ -464,7 +424,6 @@ bool WebAccessibilityObject::ariaLiveRegionAtomic() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->ariaLiveRegionAtomic();
 }
 
@@ -473,7 +432,6 @@ bool WebAccessibilityObject::ariaLiveRegionBusy() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->ariaLiveRegionBusy();
 }
 
@@ -482,7 +440,6 @@ WebString WebAccessibilityObject::ariaLiveRegionRelevant() const
     if (isDetached())
         return WebString();
 
-    m_private->updateBackingStore();
     return m_private->ariaLiveRegionRelevant();
 }
 
@@ -491,7 +448,6 @@ WebString WebAccessibilityObject::ariaLiveRegionStatus() const
     if (isDetached())
         return WebString();
 
-    m_private->updateBackingStore();
     return m_private->ariaLiveRegionStatus();
 }
 
@@ -500,8 +456,15 @@ WebRect WebAccessibilityObject::boundingBoxRect() const
     if (isDetached())
         return WebRect();
 
-    m_private->updateBackingStore();
     return m_private->pixelSnappedBoundingBoxRect();
+}
+
+bool WebAccessibilityObject::canvasHasFallbackContent() const
+{
+    if (isDetached())
+        return false;
+
+    return m_private->canvasHasFallbackContent();
 }
 
 double WebAccessibilityObject::estimatedLoadingProgress() const
@@ -509,7 +472,6 @@ double WebAccessibilityObject::estimatedLoadingProgress() const
     if (isDetached())
         return 0.0;
 
-    m_private->updateBackingStore();
     return m_private->estimatedLoadingProgress();
 }
 
@@ -518,7 +480,6 @@ WebString WebAccessibilityObject::helpText() const
     if (isDetached())
         return WebString();
 
-    m_private->updateBackingStore();
     return m_private->helpText();
 }
 
@@ -527,7 +488,6 @@ int WebAccessibilityObject::headingLevel() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->headingLevel();
 }
 
@@ -536,7 +496,6 @@ int WebAccessibilityObject::hierarchicalLevel() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->hierarchicalLevel();
 }
 
@@ -545,7 +504,6 @@ WebAccessibilityObject WebAccessibilityObject::hitTest(const WebPoint& point) co
     if (isDetached())
         return WebAccessibilityObject();
 
-    m_private->updateBackingStore();
     IntPoint contentsPoint = m_private->documentFrameView()->windowToContents(point);
     RefPtr<AccessibilityObject> hit = m_private->accessibilityHitTest(contentsPoint);
 
@@ -563,7 +521,6 @@ WebString WebAccessibilityObject::keyboardShortcut() const
     if (isDetached())
         return WebString();
 
-    m_private->updateBackingStore();
     String accessKey = m_private->accessKey();
     if (accessKey.isNull())
         return WebString();
@@ -574,14 +531,16 @@ WebString WebAccessibilityObject::keyboardShortcut() const
         // Follow the same order as Mozilla MSAA implementation:
         // Ctrl+Alt+Shift+Meta+key. MSDN states that keyboard shortcut strings
         // should not be localized and defines the separator as "+".
+        StringBuilder modifierStringBuilder;
         if (modifiers & PlatformEvent::CtrlKey)
-            modifierString += "Ctrl+";
+            modifierStringBuilder.appendLiteral("Ctrl+");
         if (modifiers & PlatformEvent::AltKey)
-            modifierString += "Alt+";
+            modifierStringBuilder.appendLiteral("Alt+");
         if (modifiers & PlatformEvent::ShiftKey)
-            modifierString += "Shift+";
+            modifierStringBuilder.appendLiteral("Shift+");
         if (modifiers & PlatformEvent::MetaKey)
-            modifierString += "Win+";
+            modifierStringBuilder.appendLiteral("Win+");
+        modifierString = modifierStringBuilder.toString();
     }
 
     return String(modifierString + accessKey);
@@ -594,7 +553,6 @@ bool WebAccessibilityObject::performDefaultAction() const
 
     UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
 
-    m_private->updateBackingStore();
     return m_private->performDefaultAction();
 }
 
@@ -603,7 +561,6 @@ WebAccessibilityRole WebAccessibilityObject::roleValue() const
     if (isDetached())
         return WebKit::WebAccessibilityRoleUnknown;
 
-    m_private->updateBackingStore();
     return static_cast<WebAccessibilityRole>(m_private->roleValue());
 }
 
@@ -612,7 +569,6 @@ unsigned WebAccessibilityObject::selectionEnd() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->selectedTextRange().start + m_private->selectedTextRange().length;
 }
 
@@ -621,7 +577,6 @@ unsigned WebAccessibilityObject::selectionStart() const
     if (isDetached())
         return 0;
 
-    m_private->updateBackingStore();
     return m_private->selectedTextRange().start;
 }
 
@@ -636,7 +591,6 @@ WebString WebAccessibilityObject::stringValue() const
     if (isDetached())
         return WebString();
 
-    m_private->updateBackingStore();
     return m_private->stringValue();
 }
 
@@ -645,7 +599,6 @@ WebString WebAccessibilityObject::title() const
     if (isDetached())
         return WebString();
 
-    m_private->updateBackingStore();
     return m_private->title();
 }
 
@@ -654,7 +607,6 @@ WebAccessibilityObject WebAccessibilityObject::titleUIElement() const
     if (isDetached())
         return WebAccessibilityObject();
 
-    m_private->updateBackingStore();
     return WebAccessibilityObject(m_private->titleUIElement());
 }
 
@@ -663,8 +615,15 @@ WebURL WebAccessibilityObject::url() const
     if (isDetached())
         return WebURL();
     
-    m_private->updateBackingStore();
     return m_private->url();
+}
+
+bool WebAccessibilityObject::supportsRangeValue() const
+{
+    if (isDetached())
+        return false;
+
+    return m_private->supportsRangeValue();
 }
 
 WebString WebAccessibilityObject::valueDescription() const
@@ -672,7 +631,6 @@ WebString WebAccessibilityObject::valueDescription() const
     if (isDetached())
         return WebString();
 
-    m_private->updateBackingStore();
     return m_private->valueDescription();
 }
 
@@ -681,7 +639,6 @@ float WebAccessibilityObject::valueForRange() const
     if (isDetached())
         return 0.0;
 
-    m_private->updateBackingStore();
     return m_private->valueForRange();
 }
 
@@ -690,7 +647,6 @@ float WebAccessibilityObject::maxValueForRange() const
     if (isDetached())
         return 0.0;
 
-    m_private->updateBackingStore();
     return m_private->maxValueForRange();
 }
 
@@ -699,7 +655,6 @@ float WebAccessibilityObject::minValueForRange() const
     if (isDetached())
         return 0.0;
 
-    m_private->updateBackingStore();
     return m_private->minValueForRange();
 }
 
@@ -707,8 +662,6 @@ WebNode WebAccessibilityObject::node() const
 {
     if (isDetached())
         return WebNode();
-
-    m_private->updateBackingStore();
 
     Node* node = m_private->node();
     if (!node)
@@ -721,8 +674,6 @@ WebDocument WebAccessibilityObject::document() const
 {
     if (isDetached())
         return WebDocument();
-
-    m_private->updateBackingStore();
 
     Document* document = m_private->document();
     if (!document)
@@ -772,7 +723,6 @@ bool WebAccessibilityObject::accessibilityIsIgnored() const
     if (isDetached())
         return false;
 
-    m_private->updateBackingStore();
     return m_private->accessibilityIsIgnored();
 }
 
@@ -781,7 +731,6 @@ bool WebAccessibilityObject::lineBreaks(WebVector<int>& result) const
     if (isDetached())
         return false;
 
-    m_private->updateBackingStore();
     int textLength = m_private->textLength();
     if (!textLength)
         return false;
@@ -805,7 +754,6 @@ unsigned WebAccessibilityObject::columnCount() const
     if (isDetached())
         return false;
 
-    m_private->updateBackingStore();
     if (!m_private->isAccessibilityTable())
         return 0;
 
@@ -817,7 +765,6 @@ unsigned WebAccessibilityObject::rowCount() const
     if (isDetached())
         return false;
 
-    m_private->updateBackingStore();
     if (!m_private->isAccessibilityTable())
         return 0;
 
@@ -826,7 +773,9 @@ unsigned WebAccessibilityObject::rowCount() const
 
 WebAccessibilityObject WebAccessibilityObject::cellForColumnAndRow(unsigned column, unsigned row) const
 {
-    m_private->updateBackingStore();
+    if (isDetached())
+        return WebAccessibilityObject();
+
     if (!m_private->isAccessibilityTable())
         return WebAccessibilityObject();
 
@@ -836,7 +785,9 @@ WebAccessibilityObject WebAccessibilityObject::cellForColumnAndRow(unsigned colu
 
 unsigned WebAccessibilityObject::cellColumnIndex() const
 {
-    m_private->updateBackingStore();
+    if (isDetached())
+        return 0;
+
     if (!m_private->isTableCell())
        return 0;
 
@@ -847,7 +798,9 @@ unsigned WebAccessibilityObject::cellColumnIndex() const
 
 unsigned WebAccessibilityObject::cellColumnSpan() const
 {
-    m_private->updateBackingStore();
+    if (isDetached())
+        return 0;
+
     if (!m_private->isTableCell())
        return 0;
 
@@ -858,7 +811,9 @@ unsigned WebAccessibilityObject::cellColumnSpan() const
 
 unsigned WebAccessibilityObject::cellRowIndex() const
 {
-    m_private->updateBackingStore();
+    if (isDetached())
+        return 0;
+
     if (!m_private->isTableCell())
        return 0;
 
@@ -869,7 +824,9 @@ unsigned WebAccessibilityObject::cellRowIndex() const
 
 unsigned WebAccessibilityObject::cellRowSpan() const
 {
-    m_private->updateBackingStore();
+    if (isDetached())
+        return 0;
+
     if (!m_private->isTableCell())
        return 0;
 
@@ -880,20 +837,20 @@ unsigned WebAccessibilityObject::cellRowSpan() const
 
 void WebAccessibilityObject::scrollToMakeVisible() const
 {
-    m_private->updateBackingStore();
-    m_private->scrollToMakeVisible();
+    if (!isDetached())
+        m_private->scrollToMakeVisible();
 }
 
 void WebAccessibilityObject::scrollToMakeVisibleWithSubFocus(const WebRect& subfocus) const
 {
-    m_private->updateBackingStore();
-    m_private->scrollToMakeVisibleWithSubFocus(subfocus);
+    if (!isDetached())
+        m_private->scrollToMakeVisibleWithSubFocus(subfocus);
 }
 
 void WebAccessibilityObject::scrollToGlobalPoint(const WebPoint& point) const
 {
-    m_private->updateBackingStore();
-    m_private->scrollToGlobalPoint(point);
+    if (!isDetached())
+        m_private->scrollToGlobalPoint(point);
 }
 
 WebAccessibilityObject::WebAccessibilityObject(const WTF::PassRefPtr<WebCore::AccessibilityObject>& object)

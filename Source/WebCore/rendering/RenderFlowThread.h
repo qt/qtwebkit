@@ -73,11 +73,11 @@ public:
     virtual void removeRegionFromThread(RenderRegion*);
     const RenderRegionList& renderRegionList() const { return m_regionList; }
 
-    void computeLogicalWidth();
-    void computeLogicalHeight();
+    virtual void computeLogicalWidth() OVERRIDE;
+    virtual void computeLogicalHeight() OVERRIDE;
 
-    void paintIntoRegion(PaintInfo&, RenderRegion*, const LayoutPoint& paintOffset);
-    bool hitTestRegion(RenderRegion*, const HitTestRequest&, HitTestResult&, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset);
+    void paintFlowThreadPortionInRegion(PaintInfo&, RenderRegion*, LayoutRect flowThreadPortionRect, LayoutRect flowThreadPortionOverflowRect, const LayoutPoint&) const;
+    bool hitTestFlowThreadPortionInRegion(RenderRegion*, LayoutRect flowThreadPortionRect, LayoutRect flowThreadPortionOverflowRect, const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset) const;
 
     bool hasRegions() const { return m_regionList.size(); }
     bool hasValidRegions() const { ASSERT(!m_regionsInvalidated); return m_hasValidRegions; }
@@ -94,11 +94,11 @@ public:
 
     void repaintRectangleInRegions(const LayoutRect&, bool immediate);
 
-    LayoutUnit regionLogicalTopForLine(LayoutUnit position) const;
-    LayoutUnit regionLogicalWidthForLine(LayoutUnit position) const;
-    LayoutUnit regionLogicalHeightForLine(LayoutUnit position) const;
-    LayoutUnit regionRemainingLogicalHeightForLine(LayoutUnit position, PageBoundaryRule = IncludePageBoundary) const;
-    RenderRegion* renderRegionForLine(LayoutUnit position, bool extendLastRegion = false) const;
+    LayoutUnit pageLogicalTopForOffset(LayoutUnit) const;
+    LayoutUnit pageLogicalWidthForOffset(LayoutUnit) const;
+    LayoutUnit pageLogicalHeightForOffset(LayoutUnit) const;
+    LayoutUnit pageRemainingLogicalHeightForOffset(LayoutUnit, PageBoundaryRule = IncludePageBoundary) const;
+    RenderRegion* regionAtBlockOffset(LayoutUnit, bool extendLastRegion = false) const;
 
     bool regionsHaveUniformLogicalWidth() const { return m_regionsHaveUniformLogicalWidth; }
     bool regionsHaveUniformLogicalHeight() const { return m_regionsHaveUniformLogicalHeight; }
@@ -128,6 +128,8 @@ public:
 
     // Check if the object is in region and the region is part of this flow thread.
     bool objectInFlowRegion(const RenderObject*, const RenderRegion*) const;
+
+    bool pageLogicalHeightChanged() const { return m_pageLogicalHeightChanged; }
 
 protected:
     virtual const char* renderName() const = 0;
@@ -180,6 +182,7 @@ protected:
     bool m_overset;
     bool m_hasRegionsWithStyling;
     bool m_dispatchRegionLayoutUpdateEvent;
+    bool m_pageLogicalHeightChanged;
 };
 
 inline RenderFlowThread* toRenderFlowThread(RenderObject* object)

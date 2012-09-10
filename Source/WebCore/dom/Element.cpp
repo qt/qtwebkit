@@ -170,7 +170,7 @@ DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, error);
 DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, focus);
 DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, load);
 
-PassRefPtr<Node> Element::cloneNode(bool deep, ExceptionCode&)
+PassRefPtr<Node> Element::cloneNode(bool deep)
 {
     return deep ? cloneElementWithChildren() : cloneElementWithoutChildren();
 }
@@ -283,7 +283,7 @@ void Element::scrollIntoView(bool alignToTop)
     if (!renderer())
         return;
 
-    LayoutRect bounds = getRect();
+    LayoutRect bounds = boundingBox();
     // Align to the top / bottom and to the closest edge.
     if (alignToTop)
         renderer()->scrollRectToVisible(bounds, ScrollAlignment::alignToEdgeIfNeeded, ScrollAlignment::alignTopAlways);
@@ -298,7 +298,7 @@ void Element::scrollIntoViewIfNeeded(bool centerIfNeeded)
     if (!renderer())
         return;
 
-    LayoutRect bounds = getRect();
+    LayoutRect bounds = boundingBox();
     if (centerIfNeeded)
         renderer()->scrollRectToVisible(bounds, ScrollAlignment::alignCenterIfNeeded, ScrollAlignment::alignCenterIfNeeded);
     else
@@ -532,7 +532,7 @@ IntRect Element::boundsInRootViewSpace()
         // Get the bounding rectangle from the SVG model.
         SVGElement* svgElement = static_cast<SVGElement*>(this);
         FloatRect localRect;
-        if (svgElement->boundingBox(localRect))
+        if (svgElement->getBoundingBox(localRect))
             quads.append(renderer()->localToAbsoluteQuad(localRect));
     } else
 #endif
@@ -580,7 +580,7 @@ PassRefPtr<ClientRect> Element::getBoundingClientRect()
         // Get the bounding rectangle from the SVG model.
         SVGElement* svgElement = static_cast<SVGElement*>(this);
         FloatRect localRect;
-        if (svgElement->boundingBox(localRect))
+        if (svgElement->getBoundingBox(localRect))
             quads.append(renderer()->localToAbsoluteQuad(localRect));
     } else
 #endif
@@ -823,7 +823,15 @@ void Element::parserSetAttributes(const Vector<Attribute>& attributeVector, Frag
         }
     }
 
-    m_attributeData = ElementAttributeData::createImmutable(filteredAttributes);
+    // When the document is in parsing state, we cache immutable ElementAttributeData objects with the
+    // input attribute vector as key. (This cache is held by Document.)
+    if (!document() || !document()->parsing())
+        m_attributeData = ElementAttributeData::createImmutable(filteredAttributes);
+    else if (!isHTMLElement()) {
+        // FIXME: Support attribute data sharing for non-HTML elements.
+        m_attributeData = ElementAttributeData::createImmutable(filteredAttributes);
+    } else
+        m_attributeData = document()->cachedImmutableAttributeData(this, filteredAttributes);
 
     // Iterate over the set of attributes we already have on the stack in case
     // attributeChanged mutates m_attributeData.
@@ -1389,31 +1397,28 @@ void Element::finishParsingChildren()
 #ifndef NDEBUG
 void Element::formatForDebugger(char* buffer, unsigned length) const
 {
-    String result;
+    StringBuilder result;
     String s;
-    
-    s = nodeName();
-    if (s.length() > 0) {
-        result += s;
-    }
-          
+
+    result.append(nodeName());
+
     s = getIdAttribute();
     if (s.length() > 0) {
         if (result.length() > 0)
-            result += "; ";
-        result += "id=";
-        result += s;
+            result.appendLiteral("; ");
+        result.appendLiteral("id=");
+        result.append(s);
     }
-          
+
     s = getAttribute(classAttr);
     if (s.length() > 0) {
         if (result.length() > 0)
-            result += "; ";
-        result += "class=";
-        result += s;
+            result.appendLiteral("; ");
+        result.appendLiteral("class=");
+        result.append(s);
     }
-          
-    strncpy(buffer, result.utf8().data(), length - 1);
+
+    strncpy(buffer, result.toString().utf8().data(), length - 1);
 }
 #endif
 
@@ -1439,20 +1444,14 @@ PassRefPtr<Attr> Element::setAttributeNode(Attr* attr, ExceptionCode& ec)
     ElementAttributeData* attributeData = mutableAttributeData();
 
     size_t index = attributeData->getAttributeItemIndex(attr->qualifiedName());
-    Attribute* oldAttribute = index != notFound ? attributeData->attributeItem(index) : 0;
-
-    if (!oldAttribute) {
-        attributeData->addAttribute(Attribute(attr->qualifiedName(), attr->value()), this);
-        attributeData->setAttr(this, attr->qualifiedName(), attr);
-        return 0;
+    if (index != notFound) {
+        if (oldAttr)
+            oldAttr->detachFromElementWithValue(attributeData->attributeItem(index)->value());
+        else
+            oldAttr = Attr::create(document(), attr->qualifiedName(), attributeData->attributeItem(index)->value());
     }
 
-    if (oldAttr)
-        oldAttr->detachFromElementWithValue(oldAttribute->value());
-    else
-        oldAttr = Attr::create(document(), oldAttribute->name(), oldAttribute->value());
-
-    attributeData->replaceAttribute(index, Attribute(attr->name(), attr->value()), this);
+    setAttributeInternal(index, attr->qualifiedName(), attr->value(), NotInSynchronizationOfLazyAttribute);
     attributeData->setAttr(this, attr->qualifiedName(), attr);
     return oldAttr.release();
 }
@@ -1640,7 +1639,7 @@ void Element::updateFocusAppearance(bool /*restorePreviousSelection*/)
             frame->selection()->revealSelection();
         }
     } else if (renderer() && !renderer()->isWidget())
-        renderer()->scrollRectToVisible(getRect());
+        renderer()->scrollRectToVisible(boundingBox());
 }
 
 void Element::blur()

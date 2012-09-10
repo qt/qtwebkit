@@ -53,6 +53,8 @@ class FontSelector;
 class GlyphBuffer;
 class GlyphPageTreeNode;
 class GraphicsContext;
+class RenderText;
+class TextLayout;
 class TextRun;
 
 struct GlyphData;
@@ -101,6 +103,10 @@ public:
 
     float width(const TextRun&, HashSet<const SimpleFontData*>* fallbackFonts = 0, GlyphOverflow* = 0) const;
     float width(const TextRun&, int& charsConsumed, String& glyphName) const;
+
+    PassOwnPtr<TextLayout> createLayout(RenderText*, float xPos, bool collapseWhiteSpace) const;
+    static void deleteLayout(TextLayout*);
+    static float width(TextLayout&, unsigned from, unsigned len);
 
     int offsetForPosition(const TextRun&, float position, bool includePartialGlyphs) const;
     FloatRect selectionRectForText(const TextRun&, const FloatPoint&, int h, int from = 0, int to = -1) const;
@@ -177,6 +183,7 @@ public:
     static bool isCJKIdeograph(UChar32);
     static bool isCJKIdeographOrSymbol(UChar32);
 
+    static unsigned expansionOpportunityCount(const LChar*, size_t length, TextDirection, bool& isAfterExpansion);
     static unsigned expansionOpportunityCount(const UChar*, size_t length, TextDirection, bool& isAfterExpansion);
 
 #if PLATFORM(QT)
@@ -189,6 +196,7 @@ public:
 
     enum CodePath { Auto, Simple, Complex, SimpleWithGlyphOverflow };
     CodePath codePath(const TextRun&) const;
+    static CodePath characterRangeCodePath(const LChar*, unsigned) { return Simple; }
     static CodePath characterRangeCodePath(const UChar*, unsigned len);
     
 private:
@@ -250,6 +258,7 @@ public:
         return character;
     }
 
+    static String normalizeSpaces(const LChar*, unsigned length);
     static String normalizeSpaces(const UChar*, unsigned length);
 
     bool needsTranscoding() const { return m_needsTranscoding; }
@@ -307,6 +316,12 @@ inline float Font::tabWidth(const SimpleFontData& fontData, unsigned tabSize, fl
     float tabWidth = tabSize * fontData.spaceWidth() + letterSpacing();
     return tabWidth - fmodf(position, tabWidth);
 }
+
+}
+
+namespace WTF {
+
+template <> void deleteOwnedPtr<WebCore::TextLayout>(WebCore::TextLayout*);
 
 }
 

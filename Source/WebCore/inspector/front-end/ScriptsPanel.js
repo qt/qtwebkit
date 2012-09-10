@@ -196,7 +196,7 @@ WebInspector.ScriptsPanel = function(workspaceForTest)
     this._workspace.addEventListener(WebInspector.UISourceCodeProvider.Events.UISourceCodeAdded, this._uiSourceCodeAdded, this);
     this._workspace.addEventListener(WebInspector.UISourceCodeProvider.Events.UISourceCodeReplaced, this._uiSourceCodeReplaced, this);
     this._workspace.addEventListener(WebInspector.UISourceCodeProvider.Events.UISourceCodeRemoved, this._uiSourceCodeRemoved, this);
-    this._workspace.addEventListener(WebInspector.Workspace.Events.WorkspaceReset, this._reset.bind(this), this);
+    this._workspace.addEventListener(WebInspector.Workspace.Events.ProjectWillReset, this._reset.bind(this), this);
 
     WebInspector.advancedSearchController.registerSearchScope(new WebInspector.ScriptsSearchScope(this._workspace));
 }
@@ -294,9 +294,11 @@ WebInspector.ScriptsPanel.prototype = {
         } else if (details.reason === WebInspector.DebuggerModel.BreakReason.XHR) {
             this.sidebarPanes.xhrBreakpoints.highlightBreakpoint(details.auxData["breakpointURL"]);
             this.sidebarPanes.callstack.setStatus(WebInspector.UIString("Paused on a XMLHttpRequest."));
-        } else if (details.reason === WebInspector.DebuggerModel.BreakReason.Exception) {
+        } else if (details.reason === WebInspector.DebuggerModel.BreakReason.Exception)
             this.sidebarPanes.callstack.setStatus(WebInspector.UIString("Paused on exception: '%s'.", details.auxData.description));
-        } else {
+        else if (details.reason === WebInspector.DebuggerModel.BreakReason.Assert)
+            this.sidebarPanes.callstack.setStatus(WebInspector.UIString("Paused on assertion."));
+        else {
             function didGetUILocation(uiLocation)
             {
                 var breakpoint = WebInspector.breakpointManager.findBreakpoint(uiLocation.uiSourceCode, uiLocation.lineNumber);
@@ -387,13 +389,6 @@ WebInspector.ScriptsPanel.prototype = {
     showAnchorLocation: function(anchor)
     {
         this._showSourceLine(anchor.uiSourceCode, anchor.lineNumber);
-    },
-
-    showFunctionDefinition: function(functionLocation)
-    {
-        WebInspector.inspectorView.showPanelForAnchorNavigation(this);
-        var uiLocation = WebInspector.debuggerModel.rawLocationToUILocation(functionLocation);
-        this._showSourceLine(uiLocation.uiSourceCode, uiLocation.lineNumber);
     },
 
     /**
@@ -995,6 +990,7 @@ WebInspector.ScriptsPanel.prototype = {
         this._toggleDebuggerSidebarButton.state = "shown";
         this._toggleDebuggerSidebarButton.title = WebInspector.UIString("Hide debugger");
         this.splitView.showSidebarElement();
+        this.debugSidebarResizeWidgetElement.removeStyleClass("hidden");
         WebInspector.settings.debuggerSidebarHidden.set(false);
     },
 
@@ -1005,6 +1001,7 @@ WebInspector.ScriptsPanel.prototype = {
         this._toggleDebuggerSidebarButton.state = "hidden";
         this._toggleDebuggerSidebarButton.title = WebInspector.UIString("Show debugger");
         this.splitView.hideSidebarElement();
+        this.debugSidebarResizeWidgetElement.addStyleClass("hidden");
         WebInspector.settings.debuggerSidebarHidden.set(true);
     },
 
@@ -1086,6 +1083,16 @@ WebInspector.ScriptsPanel.prototype = {
      */
     appendApplicableItems: function(contextMenu, target)
     {
+        this._appendUISourceCodeItems(contextMenu, target);
+        this._appendFunctionItems(contextMenu, target);
+    },
+
+    /** 
+     * @param {WebInspector.ContextMenu} contextMenu
+     * @param {Object} target
+     */
+    _appendUISourceCodeItems: function(contextMenu, target)
+    {
         if (!(target instanceof WebInspector.UISourceCode))
             return;
 
@@ -1093,6 +1100,37 @@ WebInspector.ScriptsPanel.prototype = {
         contextMenu.appendItem(WebInspector.UIString("Local modifications..."), this._showLocalHistory.bind(this, uiSourceCode));
         if (uiSourceCode.resource() && uiSourceCode.resource().request)
             contextMenu.appendApplicableItems(uiSourceCode.resource().request);
+    },
+
+    /** 
+     * @param {WebInspector.ContextMenu} contextMenu
+     * @param {Object} target
+     */
+    _appendFunctionItems: function(contextMenu, target)
+    {
+        if (!(target instanceof WebInspector.RemoteObject))
+            return;
+        var remoteObject = /** @type {WebInspector.RemoteObject} */ target;
+        if (remoteObject.type !== "function")
+            return;
+
+        function didGetDetails(error, response)
+        {
+            if (error) {
+                console.error(error);
+                return;
+            }
+            WebInspector.inspectorView.showPanelForAnchorNavigation(this);
+            var uiLocation = WebInspector.debuggerModel.rawLocationToUILocation(response.location);
+            this._showSourceLine(uiLocation.uiSourceCode, uiLocation.lineNumber);
+        }
+
+        function revealFunction()
+        {
+            DebuggerAgent.getFunctionDetails(remoteObject.objectId, didGetDetails.bind(this));
+        }
+
+        contextMenu.appendItem(WebInspector.UIString("Show function definition"), revealFunction.bind(this));
     },
 
     showGoToSourceDialog: function()

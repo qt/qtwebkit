@@ -23,7 +23,6 @@
 #include "StyleRareNonInheritedData.h"
 
 #include "ContentData.h"
-#include "MemoryInstrumentation.h"
 #include "RenderCounter.h"
 #include "RenderStyle.h"
 #include "ShadowData.h"
@@ -31,6 +30,7 @@
 #include "StyleTransformData.h"
 #include "StyleImage.h"
 #include "StyleResolver.h"
+#include "WebCoreMemoryInstrumentation.h"
 
 namespace WebCore {
 
@@ -48,6 +48,7 @@ StyleRareNonInheritedData::StyleRareNonInheritedData()
     , m_wrapShapeOutside(RenderStyle::initialWrapShapeOutside())
     , m_wrapMargin(RenderStyle::initialWrapMargin())
     , m_wrapPadding(RenderStyle::initialWrapPadding())
+    , m_clipPath(RenderStyle::initialClipPath())
     , m_visitedLinkBackgroundColor(RenderStyle::initialBackgroundColor())
     , m_order(RenderStyle::initialOrder())
     , m_flowThread(RenderStyle::initialFlowThread())
@@ -118,6 +119,7 @@ StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonInherited
     , m_wrapShapeOutside(o.m_wrapShapeOutside)
     , m_wrapMargin(o.m_wrapMargin)
     , m_wrapPadding(o.m_wrapPadding)
+    , m_clipPath(o.m_clipPath)
     , m_visitedLinkBackgroundColor(o.m_visitedLinkBackgroundColor)
     , m_visitedLinkOutlineColor(o.m_visitedLinkOutlineColor)
     , m_visitedLinkBorderLeftColor(o.m_visitedLinkBorderLeftColor)
@@ -199,6 +201,7 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
         && m_wrapShapeOutside == o.m_wrapShapeOutside
         && m_wrapMargin == o.m_wrapMargin
         && m_wrapPadding == o.m_wrapPadding
+        && m_clipPath == o.m_clipPath
         && m_visitedLinkBackgroundColor == o.m_visitedLinkBackgroundColor
         && m_visitedLinkOutlineColor == o.m_visitedLinkOutlineColor
         && m_visitedLinkBorderLeftColor == o.m_visitedLinkBorderLeftColor
@@ -301,7 +304,7 @@ bool StyleRareNonInheritedData::transitionDataEquivalent(const StyleRareNonInher
 
 void StyleRareNonInheritedData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
 #if ENABLE(DASHBOARD_SUPPORT)
     info.addVector(m_dashboardRegions);
 #endif
@@ -323,6 +326,7 @@ void StyleRareNonInheritedData::reportMemoryUsage(MemoryObjectInfo* memoryObject
     info.addMember(m_transitions);
     info.addMember(m_wrapShapeInside);
     info.addMember(m_wrapShapeOutside);
+    info.addMember(m_clipPath);
     info.addInstrumentedMember(m_flowThread);
     info.addInstrumentedMember(m_regionThread);
 }

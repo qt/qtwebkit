@@ -92,8 +92,9 @@ TestRunner::TestRunner(const std::string& testPathOrURL, const std::string& expe
     , m_useDeferredFrameLoading(false)
     , m_shouldPaintBrokenImage(true)
     , m_shouldStayOnPageAfterHandlingBeforeUnload(false)
-    , m_areDesktopNotificationPermissionRequestsIgnored(false)
+    , m_areLegacyWebNotificationPermissionRequestsIgnored(false)
     , m_customFullScreenBehavior(false) 
+    , m_hasPendingWebNotificationClick(false)
     , m_testPathOrURL(testPathOrURL)
     , m_expectedPixelHash(expectedPixelHash)
     , m_titleTextDirection("ltr")
@@ -648,19 +649,6 @@ static JSValueRef goBackCallback(JSContextRef context, JSObjectRef function, JSO
     return JSValueMakeUndefined(context);
 }
 
-static JSValueRef grantDesktopNotificationPermissionCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
-{
-    // Has Windows implementation
-    if (argumentCount < 1)
-        return JSValueMakeUndefined(context);
-
-    TestRunner* controller = static_cast<TestRunner*>(JSObjectGetPrivate(thisObject));
-
-    controller->grantDesktopNotificationPermission(JSValueToStringCopy(context, arguments[0], NULL));
-        
-    return JSValueMakeUndefined(context);
-}
-
 static JSValueRef isCommandEnabledCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
     // Has Mac implementation.
@@ -727,141 +715,10 @@ static JSValueRef notifyDoneCallback(JSContextRef context, JSObjectRef function,
     return JSValueMakeUndefined(context);
 }
 
-static bool parsePageParameters(JSContextRef context, int argumentCount, const JSValueRef* arguments, JSValueRef* exception, float& pageWidthInPixels, float& pageHeightInPixels)
-{
-    pageWidthInPixels = TestRunner::maxViewWidth;
-    pageHeightInPixels = TestRunner::maxViewHeight;
-    switch (argumentCount) {
-    case 2:
-        pageWidthInPixels = static_cast<float>(JSValueToNumber(context, arguments[0], exception));
-        if (*exception)
-            return false;
-        pageHeightInPixels = static_cast<float>(JSValueToNumber(context, arguments[1], exception));
-        if (*exception)
-            return false;
-    case 0: // Fall through.
-        break;
-    default:
-        return false;
-    }
-    return true;
-}
-
-// Caller needs to delete[] propertyName.
-static bool parsePagePropertyParameters(JSContextRef context, int argumentCount, const JSValueRef* arguments, JSValueRef* exception, char*& propertyName, int& pageNumber)
-{
-    pageNumber = 0;
-    switch (argumentCount) {
-    case 2:
-        pageNumber = static_cast<float>(JSValueToNumber(context, arguments[1], exception));
-        if (*exception)
-            return false;
-        // Fall through.
-    case 1: {
-        JSRetainPtr<JSStringRef> propertyNameString(Adopt, JSValueToStringCopy(context, arguments[0], exception));
-        if (*exception)
-            return false;
-
-        size_t maxLength = JSStringGetMaximumUTF8CStringSize(propertyNameString.get());
-        propertyName = new char[maxLength + 1];
-        JSStringGetUTF8CString(propertyNameString.get(), propertyName, maxLength + 1);
-        return true;
-    }
-    case 0:
-    default:
-        return false;
-    }
-}
-
-static bool parsePageNumberSizeMarings(JSContextRef context, int argumentCount, const JSValueRef* arguments, JSValueRef* exception, int& pageNumber, int& width, int& height, int& marginTop, int& marginRight, int& marginBottom, int& marginLeft)
-{
-    pageNumber = 0;
-    width = height = 0;
-    marginTop = marginRight = marginBottom = marginLeft = 0;
-
-    switch (argumentCount) {
-    case 7:
-        marginLeft = static_cast<int>(JSValueToNumber(context, arguments[6], exception));
-        if (*exception)
-            return false;
-        // Fall through.
-    case 6:
-        marginBottom = static_cast<int>(JSValueToNumber(context, arguments[5], exception));
-        if (*exception)
-            return false;
-        // Fall through.
-    case 5:
-        marginRight = static_cast<int>(JSValueToNumber(context, arguments[4], exception));
-        if (*exception)
-            return false;
-        // Fall through.
-    case 4:
-        marginTop = static_cast<int>(JSValueToNumber(context, arguments[3], exception));
-        if (*exception)
-            return false;
-        // Fall through.
-    case 3:
-        height = static_cast<int>(JSValueToNumber(context, arguments[2], exception));
-        if (*exception)
-            return false;
-        // Fall through.
-    case 2:
-        width = static_cast<int>(JSValueToNumber(context, arguments[1], exception));
-        if (*exception)
-            return false;
-        // Fall through.
-    case 1:
-        pageNumber = static_cast<int>(JSValueToNumber(context, arguments[0], exception));
-        if (*exception)
-            return false;
-        // Fall through.
-        return true;
-    default:
-        return false;
-    }
-}
-
-static JSValueRef numberOfPagesCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
-{
-    float pageWidthInPixels = 0;
-    float pageHeightInPixels = 0;
-    if (!parsePageParameters(context, argumentCount, arguments, exception, pageWidthInPixels, pageHeightInPixels))
-        return JSValueMakeUndefined(context);
-
-    TestRunner* controller = static_cast<TestRunner*>(JSObjectGetPrivate(thisObject));
-    return JSValueMakeNumber(context, controller->numberOfPages(pageWidthInPixels, pageHeightInPixels));
-}
-
 static JSValueRef numberOfPendingGeolocationPermissionRequestsCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
     TestRunner* controller = static_cast<TestRunner*>(JSObjectGetPrivate(thisObject));
     return JSValueMakeNumber(context, controller->numberOfPendingGeolocationPermissionRequests());
-}
-
-static JSValueRef pagePropertyCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
-{
-    char* propertyName = 0;
-    int pageNumber = 0;
-    if (!parsePagePropertyParameters(context, argumentCount, arguments, exception, propertyName, pageNumber))
-        return JSValueMakeUndefined(context);
-
-    TestRunner* controller = static_cast<TestRunner*>(JSObjectGetPrivate(thisObject));
-    JSValueRef value = JSValueMakeString(context, controller->pageProperty(propertyName, pageNumber).get());
-
-    delete[] propertyName;
-    return value;
-}
-
-static JSValueRef pageSizeAndMarginsInPixelsCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
-{
-    int pageNumber = 0;
-    int width = 0, height = 0;
-    int marginTop = 0, marginRight = 0, marginBottom = 0, marginLeft = 0;
-    if (!parsePageNumberSizeMarings(context, argumentCount, arguments, exception, pageNumber, width, height, marginTop, marginRight, marginBottom, marginLeft))
-        return JSValueMakeUndefined(context);
-
-    TestRunner* controller = static_cast<TestRunner*>(JSObjectGetPrivate(thisObject));
-    return JSValueMakeString(context, controller->pageSizeAndMarginsInPixels(pageNumber, width, height, marginTop, marginRight, marginBottom, marginLeft).get());
 }
 
 static JSValueRef queueBackNavigationCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
@@ -2134,18 +1991,18 @@ static bool setGlobalFlagCallback(JSContextRef context, JSObjectRef thisObject, 
     return true;
 }
 
-static JSValueRef ignoreDesktopNotificationPermissionRequestsCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+static JSValueRef ignoreLegacyWebNotificationPermissionRequestsCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
     TestRunner* controller = static_cast<TestRunner*>(JSObjectGetPrivate(thisObject));
-    controller->ignoreDesktopNotificationPermissionRequests();
+    controller->ignoreLegacyWebNotificationPermissionRequests();
     return JSValueMakeUndefined(context);
 }
 
-static JSValueRef simulateDesktopNotificationClickCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+static JSValueRef simulateLegacyWebNotificationClickCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
     TestRunner* controller = static_cast<TestRunner*>(JSObjectGetPrivate(thisObject)); 
     JSRetainPtr<JSStringRef> title(Adopt, JSValueToStringCopy(context, arguments[0], exception));
-    controller->simulateDesktopNotificationClick(title.get());
+    controller->simulateLegacyWebNotificationClick(title.get());
     return JSValueMakeUndefined(context);
 }
 
@@ -2196,6 +2053,59 @@ static JSValueRef setStorageDatabaseIdleIntervalCallback(JSContextRef context, J
 
     TestRunner* controller = static_cast<TestRunner*>(JSObjectGetPrivate(thisObject));
     controller->setStorageDatabaseIdleInterval(interval);
+
+    return JSValueMakeUndefined(context);
+}
+
+static JSValueRef grantWebNotificationPermissionCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    if (argumentCount < 1)
+        return JSValueMakeUndefined(context);
+
+    TestRunner* controller = static_cast<TestRunner*>(JSObjectGetPrivate(thisObject));
+
+    JSRetainPtr<JSStringRef> origin(Adopt, JSValueToStringCopy(context, arguments[0], exception));
+    ASSERT(!*exception);
+    controller->grantWebNotificationPermission(origin.get());
+
+    return JSValueMakeUndefined(context);
+}
+
+
+static JSValueRef denyWebNotificationPermissionCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    if (argumentCount < 1)
+        return JSValueMakeUndefined(context);
+
+    TestRunner* controller = static_cast<TestRunner*>(JSObjectGetPrivate(thisObject));
+
+    JSRetainPtr<JSStringRef> origin(Adopt, JSValueToStringCopy(context, arguments[0], exception));
+    ASSERT(!*exception);
+    controller->denyWebNotificationPermission(origin.get());
+
+    return JSValueMakeUndefined(context);
+}
+
+
+static JSValueRef removeAllWebNotificationPermissionsCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    TestRunner* controller = static_cast<TestRunner*>(JSObjectGetPrivate(thisObject));
+
+    controller->removeAllWebNotificationPermissions();
+
+    return JSValueMakeUndefined(context);
+}
+
+
+static JSValueRef simulateWebNotificationClickCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
+{
+    // Has Windows implementation
+    if (argumentCount < 1)
+        return JSValueMakeUndefined(context);
+
+    TestRunner* controller = static_cast<TestRunner*>(JSObjectGetPrivate(thisObject));
+
+    controller->simulateWebNotificationClick(arguments[0]);
 
     return JSValueMakeUndefined(context);
 }
@@ -2302,19 +2212,15 @@ JSStaticFunction* TestRunner::staticFunctions()
         { "findString", findStringCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "originsWithApplicationCache", originsWithApplicationCacheCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "goBack", goBackCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete }, 
-        { "grantDesktopNotificationPermission", grantDesktopNotificationPermissionCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete }, 
-        { "ignoreDesktopNotificationPermissionRequests", ignoreDesktopNotificationPermissionRequestsCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "ignoreLegacyWebNotificationPermissionRequests", ignoreLegacyWebNotificationPermissionRequestsCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "isCommandEnabled", isCommandEnabledCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "keepWebHistory", keepWebHistoryCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "layerTreeAsText", layerTreeAsTextCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
-        { "numberOfPages", numberOfPagesCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "numberOfPendingGeolocationPermissionRequests", numberOfPendingGeolocationPermissionRequestsCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "markerTextForListItem", markerTextForListItemCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "notifyDone", notifyDoneCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "numberOfActiveAnimations", numberOfActiveAnimationsCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "overridePreference", overridePreferenceCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
-        { "pageSizeAndMarginsInPixels", pageSizeAndMarginsInPixelsCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
-        { "pageProperty", pagePropertyCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "pathToLocalResource", pathToLocalResourceCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "pauseAnimationAtTimeOnElementWithId", pauseAnimationAtTimeOnElementWithIdCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "pauseTransitionAtTimeOnElementWithId", pauseTransitionAtTimeOnElementWithIdCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
@@ -2392,7 +2298,7 @@ JSStaticFunction* TestRunner::staticFunctions()
         { "setXSSAuditorEnabled", setXSSAuditorEnabledCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setAsynchronousSpellCheckingEnabled", setAsynchronousSpellCheckingEnabledCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "showWebInspector", showWebInspectorCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
-        { "simulateDesktopNotificationClick", simulateDesktopNotificationClickCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "simulateLegacyWebNotificationClick", simulateLegacyWebNotificationClickCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "testOnscreen", testOnscreenCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "testRepaint", testRepaintCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "waitForPolicyDelegate", waitForPolicyDelegateCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
@@ -2417,6 +2323,10 @@ JSStaticFunction* TestRunner::staticFunctions()
         { "preciseTime", preciseTimeCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setHasCustomFullScreenBehavior", setHasCustomFullScreenBehaviorCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { "setStorageDatabaseIdleInterval", setStorageDatabaseIdleIntervalCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "grantWebNotificationPermission", grantWebNotificationPermissionCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "denyWebNotificationPermission", denyWebNotificationPermissionCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "removeAllWebNotificationPermissions", removeAllWebNotificationPermissionsCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
+        { "simulateWebNotificationClick", simulateWebNotificationClickCallback, kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontDelete },
         { 0, 0, 0 }
     };
 
@@ -2458,26 +2368,9 @@ void TestRunner::queueReload()
     WorkQueue::shared()->queue(new ReloadItem);
 }
 
-void TestRunner::grantDesktopNotificationPermission(JSStringRef origin)
+void TestRunner::ignoreLegacyWebNotificationPermissionRequests()
 {
-    m_desktopNotificationAllowedOrigins.push_back(JSStringRetain(origin));
-}
-
-bool TestRunner::checkDesktopNotificationPermission(JSStringRef origin)
-{
-    std::vector<JSStringRef>::iterator i;
-    for (i = m_desktopNotificationAllowedOrigins.begin();
-         i != m_desktopNotificationAllowedOrigins.end();
-         ++i) {
-        if (JSStringIsEqual(*i, origin))
-            return true;
-    }
-    return false;
-}
-
-void TestRunner::ignoreDesktopNotificationPermissionRequests()
-{
-    m_areDesktopNotificationPermissionRequestsIgnored = false;
+    m_areLegacyWebNotificationPermissionRequestsIgnored = false;
 }
 
 void TestRunner::waitToDumpWatchdogTimerFired()

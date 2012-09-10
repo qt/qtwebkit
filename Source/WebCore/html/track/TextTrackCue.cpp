@@ -56,19 +56,19 @@ static const int autoSize = 0;
 
 static const String& startKeyword()
 {
-    DEFINE_STATIC_LOCAL(const String, start, ("start"));
+    DEFINE_STATIC_LOCAL(const String, start, (ASCIILiteral("start")));
     return start;
 }
 
 static const String& middleKeyword()
 {
-    DEFINE_STATIC_LOCAL(const String, middle, ("middle"));
+    DEFINE_STATIC_LOCAL(const String, middle, (ASCIILiteral("middle")));
     return middle;
 }
 
 static const String& endKeyword()
 {
-    DEFINE_STATIC_LOCAL(const String, end, ("end"));
+    DEFINE_STATIC_LOCAL(const String, end, (ASCIILiteral("end")));
     return end;
 }
 
@@ -79,13 +79,13 @@ static const String& horizontalKeyword()
 
 static const String& verticalGrowingLeftKeyword()
 {
-    DEFINE_STATIC_LOCAL(const String, verticalrl, ("rl"));
+    DEFINE_STATIC_LOCAL(const String, verticalrl, (ASCIILiteral("rl")));
     return verticalrl;
 }
 
 static const String& verticalGrowingRightKeyword()
 {
-    DEFINE_STATIC_LOCAL(const String, verticallr, ("lr"));
+    DEFINE_STATIC_LOCAL(const String, verticallr, (ASCIILiteral("lr")));
     return verticallr;
 }
 
@@ -212,10 +212,6 @@ TextTrackCue::TextTrackCue(ScriptExecutionContext* context, double start, double
     m_displayWritingModeMap[Horizontal] = CSSValueHorizontalTb;
     m_displayWritingModeMap[VerticalGrowingLeft] = CSSValueVerticalRl;
     m_displayWritingModeMap[VerticalGrowingRight] = CSSValueVerticalLr;
-
-    // A text track cue has a text track cue computed line position whose value
-    // is defined in terms of the other aspects of the cue.
-    m_computedLinePosition = calculateComputedLinePosition();
 }
 
 TextTrackCue::~TextTrackCue()
@@ -473,6 +469,9 @@ PassRefPtr<DocumentFragment> TextTrackCue::getCueAsHTML()
         m_hasInnerTimestamps = false;
         m_documentFragment = WebVTTParser::create(0, m_scriptExecutionContext)->createDocumentFragmentFromCueText(m_content);
 
+        if (!m_documentFragment)
+          return 0;
+
         for (Node *child = m_documentFragment->firstChild(); !m_hasInnerTimestamps && child; child = child->nextSibling()) {
             if (child->nodeName() == "timestamp")
                 m_hasInnerTimestamps = true;
@@ -490,7 +489,7 @@ PassRefPtr<DocumentFragment> TextTrackCue::getCueAsHTML()
 bool TextTrackCue::dispatchEvent(PassRefPtr<Event> event)
 {
     // When a TextTrack's mode is disabled: no cues are active, no events fired.
-    if (!track() || track()->mode() == TextTrack::DISABLED)
+    if (!track() || track()->mode() == TextTrack::disabledKeyword())
         return false;
 
     return EventTarget::dispatchEvent(event);
@@ -503,7 +502,7 @@ bool TextTrackCue::dispatchEvent(PassRefPtr<Event> event, ExceptionCode &ec)
 
 bool TextTrackCue::isActive()
 {
-    return m_isActive && track() && track()->mode() != TextTrack::DISABLED;
+    return m_isActive && track() && track()->mode() != TextTrack::disabledKeyword();
 }
 
 void TextTrackCue::setIsActive(bool active)
@@ -641,16 +640,23 @@ void TextTrackCue::calculateDisplayParameters()
 
     if (!m_snapToLines && (m_writingDirection == VerticalGrowingLeft || m_writingDirection == VerticalGrowingRight))
         m_displayPosition.first = m_computedLinePosition;
+
+    // A text track cue has a text track cue computed line position whose value
+    // is defined in terms of the other aspects of the cue.
+    m_computedLinePosition = calculateComputedLinePosition();
 }
 
 void TextTrackCue::updateDisplayTree(float movieTime)
 {
     // The display tree may contain WebVTT timestamp objects representing
     // timestamps (processing instructions), along with displayable nodes.
-    DEFINE_STATIC_LOCAL(const String, timestampTag, ("timestamp"));
+    DEFINE_STATIC_LOCAL(const String, timestampTag, (ASCIILiteral("timestamp")));
 
     DEFINE_STATIC_LOCAL(const AtomicString, trackPastNodesShadowPseudoId, ("-webkit-media-text-track-past-nodes"));
     DEFINE_STATIC_LOCAL(const AtomicString, trackFutureNodesShadowPseudoId, ("-webkit-media-text-track-future-nodes"));
+
+    if (!track()->isRendered())
+      return;
 
     bool isPastNode = true;
 
@@ -780,11 +786,11 @@ std::pair<double, double> TextTrackCue::getPositionCoordinates() const
 
 TextTrackCue::CueSetting TextTrackCue::settingName(const String& name)
 {
-    DEFINE_STATIC_LOCAL(const String, verticalKeyword, ("vertical"));
-    DEFINE_STATIC_LOCAL(const String, lineKeyword, ("line"));
-    DEFINE_STATIC_LOCAL(const String, positionKeyword, ("position"));
-    DEFINE_STATIC_LOCAL(const String, sizeKeyword, ("size"));
-    DEFINE_STATIC_LOCAL(const String, alignKeyword, ("align"));
+    DEFINE_STATIC_LOCAL(const String, verticalKeyword, (ASCIILiteral("vertical")));
+    DEFINE_STATIC_LOCAL(const String, lineKeyword, (ASCIILiteral("line")));
+    DEFINE_STATIC_LOCAL(const String, positionKeyword, (ASCIILiteral("position")));
+    DEFINE_STATIC_LOCAL(const String, sizeKeyword, (ASCIILiteral("size")));
+    DEFINE_STATIC_LOCAL(const String, alignKeyword, (ASCIILiteral("align")));
 
     if (name == verticalKeyword)
         return Vertical;

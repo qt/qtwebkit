@@ -1322,7 +1322,7 @@ bool WebView::handleContextMenuEvent(WPARAM wParam, LPARAM lParam)
     m_page->contextMenuController()->clearContextMenu();
 
     IntPoint documentPoint(m_page->mainFrame()->view()->windowToContents(coords));
-    HitTestResult result = m_page->mainFrame()->eventHandler()->hitTestResultAtPoint(documentPoint, false);
+    HitTestResult result = m_page->mainFrame()->eventHandler()->hitTestResultAtPoint(documentPoint);
     Frame* targetFrame = result.innerNonSharedNode() ? result.innerNonSharedNode()->document()->frame() : m_page->focusController()->focusedOrMainFrame();
 
     targetFrame->view()->setCursor(pointerCursor());
@@ -3198,7 +3198,7 @@ HRESULT STDMETHODCALLTYPE WebView::stringByEvaluatingJavaScriptFromString(
     else if (scriptExecutionResult.isString()) {
         JSC::ExecState* exec = coreFrame->script()->globalObject(mainThreadNormalWorld())->globalExec();
         JSC::JSLockHolder lock(exec);
-        *result = BString(ustringToString(scriptExecutionResult.getString(exec)));
+        *result = BString(scriptExecutionResult.getString(exec));
     }
 
     return S_OK;
@@ -3597,7 +3597,7 @@ HRESULT STDMETHODCALLTYPE WebView::elementAtPoint(
     IntPoint webCorePoint = IntPoint(point->x, point->y);
     HitTestResult result = HitTestResult(webCorePoint);
     if (frame->contentRenderer())
-        result = frame->eventHandler()->hitTestResultAtPoint(webCorePoint, false);
+        result = frame->eventHandler()->hitTestResultAtPoint(webCorePoint);
     *elementDictionary = WebElementPropertyBag::createInstance(result);
     return S_OK;
 }
@@ -5546,19 +5546,17 @@ static void compositionToUnderlines(const Vector<DWORD>& clauses, const Vector<B
 #define APPEND_ARGUMENT_NAME(name) \
     if (lparam & name) { \
         if (needsComma) \
-            result += ", "; \
-            result += #name; \
+            result.appendLiteral(", "); \
+        result.appendLiteral(#name); \
         needsComma = true; \
     }
 
 static String imeCompositionArgumentNames(LPARAM lparam)
 {
-    String result;
+    StringBuilder result;
     bool needsComma = false;
-    if (lparam & GCS_COMPATTR) {
-        result = "GCS_COMPATTR";
-        needsComma = true;
-    }
+
+    APPEND_ARGUMENT_NAME(GCS_COMPATTR);
     APPEND_ARGUMENT_NAME(GCS_COMPCLAUSE);
     APPEND_ARGUMENT_NAME(GCS_COMPREADSTR);
     APPEND_ARGUMENT_NAME(GCS_COMPREADATTR);
@@ -5573,7 +5571,7 @@ static String imeCompositionArgumentNames(LPARAM lparam)
     APPEND_ARGUMENT_NAME(CS_INSERTCHAR);
     APPEND_ARGUMENT_NAME(CS_NOMOVECARET);
 
-    return result;
+    return result.toString();
 }
 
 static String imeNotificationName(WPARAM wparam)

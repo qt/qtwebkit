@@ -31,6 +31,7 @@
 #define AccessibilityObject_h
 
 #include "FloatQuad.h"
+#include "FractionalLayoutRect.h"
 #include "LayoutTypes.h"
 #include "VisiblePosition.h"
 #include "VisibleSelection.h"
@@ -103,6 +104,7 @@ enum AccessibilityRole {
     BrowserRole,
     BusyIndicatorRole,
     ButtonRole,
+    CanvasRole,
     CellRole, 
     CheckBoxRole,
     ColorWellRole,
@@ -128,6 +130,7 @@ enum AccessibilityRole {
     GrowAreaRole,
     HeadingRole,
     HelpTagRole,
+    HorizontalRuleRole,
     IgnoredRole,
     ImageRole,
     ImageMapRole,
@@ -364,7 +367,7 @@ public:
     virtual bool isMenuList() const { return false; }
     virtual bool isMenuListPopup() const { return false; }
     virtual bool isMenuListOption() const { return false; }
-    virtual bool isSpinButton() const { return false; }
+    virtual bool isSpinButton() const { return roleValue() == SpinButtonRole; }
     virtual bool isSpinButtonPart() const { return false; }
     virtual bool isMockObject() const { return false; }
     bool isTextControl() const { return roleValue() == TextAreaRole || roleValue() == TextFieldRole; }
@@ -380,6 +383,7 @@ public:
     bool isListItem() const { return roleValue() == ListItemRole; }
     bool isCheckboxOrRadio() const { return isCheckbox() || isRadioButton(); }
     bool isScrollView() const { return roleValue() == ScrollAreaRole; }
+    bool isCanvas() const { return roleValue() == CanvasRole; }
     bool isBlockquote() const;
     bool isLandmark() const;
     
@@ -457,6 +461,8 @@ public:
     virtual const AtomicString& invalidStatus() const;
     bool supportsARIAExpanded() const;
     AccessibilitySortDirection sortDirection() const;
+    virtual bool canvasHasFallbackContent() const { return false; }
+    bool supportsRangeValue() const;
     
     // ARIA drag and drop
     virtual bool supportsARIADropping() const { return false; }
@@ -582,8 +588,10 @@ public:
     virtual void handleAriaExpandedChanged() { }
     bool isDescendantOfObject(const AccessibilityObject*) const;
     bool isAncestorOfObject(const AccessibilityObject*) const;
+    AccessibilityObject* firstAnonymousBlockChild() const;
     
     static AccessibilityRole ariaRoleToWebCoreRole(const String&);
+    bool hasAttribute(const QualifiedName&) const;
     const AtomicString& getAttribute(const QualifiedName&) const;
 
     virtual VisiblePositionRange visiblePositionRange() const { return VisiblePositionRange(); }

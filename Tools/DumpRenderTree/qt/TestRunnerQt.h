@@ -134,10 +134,12 @@ public Q_SLOTS:
     void provisionalLoad();
     void setCloseRemainingWindowsWhenComplete(bool = false) { }
     int windowCount();
-    void grantDesktopNotificationPermission(const QString& origin);
-    void ignoreDesktopNotificationPermissionRequests();
-    bool checkDesktopNotificationPermission(const QString& origin);
-    void simulateDesktopNotificationClick(const QString& title);
+    void ignoreLegacyWebNotificationPermissionRequests();
+    void simulateLegacyWebNotificationClick(const QString& title);
+    void grantWebNotificationPermission(const QString& origin);
+    void denyWebNotificationPermission(const QString& origin);
+    void removeAllWebNotificationPermissions();
+    void simulateWebNotificationClick(const QWebElement&);
     void display();
     void displayInvalidatedRegion();
     void clearBackForwardList();
@@ -212,7 +214,6 @@ public Q_SLOTS:
     void setUserStyleSheetEnabled(bool);
     void setDomainRelaxationForbiddenForURLScheme(bool forbidden, const QString& scheme);
     int workerThreadCount();
-    int numberOfPages(float width = maxViewWidth, float height = maxViewHeight);
     bool callShouldCloseOnWebView();
     // For now, this is a no-op. This may change depending on outcome of
     // https://bugs.webkit.org/show_bug.cgi?id=33333
@@ -259,8 +260,6 @@ public Q_SLOTS:
 
     void evaluateScriptInIsolatedWorldAndReturnValue(int worldID, const QString& script);
     void evaluateScriptInIsolatedWorld(int worldID, const QString& script);
-    QString pageSizeAndMarginsInPixels(int pageIndex, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft);
-    QString pageProperty(const QString& propertyName, int pageNumber);
     void addUserStyleSheet(const QString& sourceCode);
 
     void setMinimumTimerInterval(double);

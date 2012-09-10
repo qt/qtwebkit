@@ -57,6 +57,8 @@ INSPECTOR_JSON = $$PWD/inspector/Inspector.json
 
 INSPECTOR_BACKEND_COMMANDS_QRC = $$PWD/inspector/front-end/InspectorBackendCommands.qrc
 
+INSPECTOR_OVERLAY_PAGE = $$PWD/inspector/InspectorOverlayPage.html
+
 INJECTED_SCRIPT_SOURCE = $$PWD/inspector/InjectedScriptSource.js
 
 INJECTED_SCRIPT_WEBGL_MODULE_SOURCE = $$PWD/inspector/InjectedScriptWebGLModuleSource.js
@@ -139,6 +141,7 @@ IDL_BINDINGS += \
     $$PWD/Modules/quota/StorageInfoQuotaCallback.idl \
     $$PWD/Modules/quota/StorageInfoUsageCallback.idl \
     $$PWD/Modules/webaudio/AudioBuffer.idl \
+    $$PWD/Modules/webaudio/AudioBufferCallback.idl \
     $$PWD/Modules/webaudio/AudioBufferSourceNode.idl \
     $$PWD/Modules/webaudio/AudioChannelMerger.idl \
     $$PWD/Modules/webaudio/AudioChannelSplitter.idl \
@@ -152,11 +155,19 @@ IDL_BINDINGS += \
     $$PWD/Modules/webaudio/AudioParam.idl \
     $$PWD/Modules/webaudio/AudioProcessingEvent.idl \
     $$PWD/Modules/webaudio/AudioSourceNode.idl \
+    $$PWD/Modules/webaudio/BiquadFilterNode.idl \
     $$PWD/Modules/webaudio/ConvolverNode.idl \
     $$PWD/Modules/webaudio/DelayNode.idl \
     $$PWD/Modules/webaudio/DOMWindowWebAudio.idl \
+    $$PWD/Modules/webaudio/DynamicsCompressorNode.idl \
     $$PWD/Modules/webaudio/JavaScriptAudioNode.idl \
+    $$PWD/Modules/webaudio/MediaElementAudioSourceNode.idl \
+    $$PWD/Modules/webaudio/MediaStreamAudioSourceNode.idl \
+    $$PWD/Modules/webaudio/OfflineAudioCompletionEvent.idl \
+    $$PWD/Modules/webaudio/Oscillator.idl \
     $$PWD/Modules/webaudio/RealtimeAnalyserNode.idl \
+    $$PWD/Modules/webaudio/WaveShaperNode.idl \
+    $$PWD/Modules/webaudio/WaveTable.idl \
     $$PWD/Modules/webdatabase/DOMWindowWebDatabase.idl \
     $$PWD/Modules/webdatabase/Database.idl \
     $$PWD/Modules/webdatabase/DatabaseCallback.idl \
@@ -267,6 +278,7 @@ IDL_BINDINGS += \
     $$PWD/dom/UIEvent.idl \
     $$PWD/dom/WebKitAnimationEvent.idl \
     $$PWD/dom/WebKitNamedFlow.idl \
+    $$PWD/dom/DOMNamedFlowCollection.idl \
     $$PWD/dom/WebKitTransitionEvent.idl \
     $$PWD/dom/WheelEvent.idl \
     $$PWD/editing/DOMTransaction.idl \
@@ -693,7 +705,8 @@ win_cmd_shell: preprocessIdls.commands = type nul > $$IDL_FILES_TMP $$EOC
 else: preprocessIdls.commands = cat /dev/null > $$IDL_FILES_TMP $$EOC
 for(binding, IDL_BINDINGS) {
     # We need "$$binding" instead of "$$binding ", because Windows' echo writes trailing whitespaces. (http://wkb.ug/88304)
-    preprocessIdls.commands += echo $$binding>> $$IDL_FILES_TMP $$EOC
+    # A space is omitted between "$$IDL_FILES_TMP" and "$$EOC" to also avoid writing trailing whitespace. (http://wkb.ug/95730)
+    preprocessIdls.commands += echo $$binding>> $$IDL_FILES_TMP$$EOC
 }
 preprocessIdls.commands += perl -I$$PWD/bindings/scripts $$preprocessIdls.script \
                                --defines \"$${FEATURE_DEFINES_JAVASCRIPT}\" \
@@ -706,38 +719,44 @@ preprocessIdls.add_output_to_sources = false
 preprocessIdls.depends = $$PWD/bindings/scripts/IDLParser.pm $$IDL_BINDINGS
 GENERATORS += preprocessIdls
 
+win32 {
+    env_export = set
+} else {
+    env_export = export
+}
+
 # GENERATOR 1: Generate .h and .cpp from IDLs
 generateBindings.input = IDL_BINDINGS
 generateBindings.script = $$PWD/bindings/scripts/generate-bindings.pl
-generateBindings.commands = perl -I$$PWD/bindings/scripts $$generateBindings.script \
+generateBindings.commands = $$env_export \"SOURCE_ROOT=$$toSystemPath($$PWD)\" && perl -I$$PWD/bindings/scripts $$generateBindings.script \
                             --defines \"$${FEATURE_DEFINES_JAVASCRIPT}\" \
                             --generator JS \
-                            --include $$PWD/Modules/filesystem \
-                            --include $$PWD/Modules/geolocation \
-                            --include $$PWD/Modules/indexeddb \
-                            --include $$PWD/Modules/mediasource \
-                            --include $$PWD/Modules/notifications \
-                            --include $$PWD/Modules/quota \
-                            --include $$PWD/Modules/webaudio \
-                            --include $$PWD/Modules/webdatabase \
-                            --include $$PWD/Modules/websockets \
-                            --include $$PWD/css \
-                            --include $$PWD/dom \
-                            --include $$PWD/editing \
-                            --include $$PWD/fileapi \
-                            --include $$PWD/html \
-                            --include $$PWD/html/canvas \
-                            --include $$PWD/html/shadow \
-                            --include $$PWD/html/track \
-                            --include $$PWD/inspector \
-                            --include $$PWD/loader/appcache \
-                            --include $$PWD/page \
-                            --include $$PWD/plugins \
-                            --include $$PWD/storage \
-                            --include $$PWD/svg \
-                            --include $$PWD/testing \
-                            --include $$PWD/workers \
-                            --include $$PWD/xml \
+                            --include Modules/filesystem \
+                            --include Modules/geolocation \
+                            --include Modules/indexeddb \
+                            --include Modules/mediasource \
+                            --include Modules/notifications \
+                            --include Modules/quota \
+                            --include Modules/webaudio \
+                            --include Modules/webdatabase \
+                            --include Modules/websockets \
+                            --include css \
+                            --include dom \
+                            --include editing \
+                            --include fileapi \
+                            --include html \
+                            --include html/canvas \
+                            --include html/shadow \
+                            --include html/track \
+                            --include inspector \
+                            --include loader/appcache \
+                            --include page \
+                            --include plugins \
+                            --include storage \
+                            --include svg \
+                            --include testing \
+                            --include workers \
+                            --include xml \
                             --outputDir ${QMAKE_FUNC_FILE_OUT_PATH} \
                             --supplementalDependencyFile ${QMAKE_FUNC_FILE_OUT_PATH}/$$SUPPLEMENTAL_DEPENDENCY_FILE \
                             --preprocessor \"$${QMAKE_MOC} -E\" ${QMAKE_FILE_NAME}
@@ -772,6 +791,12 @@ inspectorBackendCommands.input = INSPECTOR_BACKEND_COMMANDS_QRC
 inspectorBackendCommands.commands = $$QMAKE_COPY $$toSystemPath($$INSPECTOR_BACKEND_COMMANDS_QRC) ${QMAKE_FUNC_FILE_OUT_PATH}$${QMAKE_DIR_SEP}InspectorBackendCommands.qrc
 inspectorBackendCommands.add_output_to_sources = false
 GENERATORS += inspectorBackendCommands
+
+inspectorOverlayPage.output = InspectorOverlayPage.h
+inspectorOverlayPage.input = INSPECTOR_OVERLAY_PAGE
+inspectorOverlayPage.commands = perl $$PWD/inspector/xxd.pl InspectorOverlayPage_html ${QMAKE_FILE_IN} ${QMAKE_FILE_OUT}
+inspectorOverlayPage.add_output_to_sources = false
+GENERATORS += inspectorOverlayPage
 
 # GENERATOR 2-a: inspector injected script source compiler
 injectedScriptSource.output = InjectedScriptSource.h
@@ -931,35 +956,3 @@ webkitversion.clean = ${QMAKE_FUNC_FILE_OUT_PATH}/WebKitVersion.h
 webkitversion.add_output_to_sources = false
 GENERATORS += webkitversion
 
-# Generator 12: Angle parsers
-contains(DEFINES, WTF_USE_3D_GRAPHICS=1) {
-
-    ANGLE_DIR = $$replace(PWD, "WebCore", "ThirdParty/ANGLE")
-
-    ANGLE_FLEX_SOURCES = \
-        $$ANGLE_DIR/src/compiler/glslang.l \
-        $$ANGLE_DIR/src/compiler/preprocessor/new/Tokenizer.l
-
-    angleflex.output = ${QMAKE_FILE_BASE}_lex.cpp
-    angleflex.input = ANGLE_FLEX_SOURCES
-    angleflex.commands = flex --noline --nounistd --outfile=${QMAKE_FILE_OUT} ${QMAKE_FILE_IN}
-    *g++*: angleflex.variable_out = ANGLE_SOURCES
-    GENERATORS += angleflex
-
-    ANGLE_BISON_SOURCES = \
-        $$ANGLE_DIR/src/compiler/glslang.y \
-        $$ANGLE_DIR/src/compiler/preprocessor/new/ExpressionParser.y
-
-    anglebison_decl.output = ${QMAKE_FILE_BASE}_tab.h
-    anglebison_decl.input = ANGLE_BISON_SOURCES
-    anglebison_decl.commands = bison --no-lines --skeleton=yacc.c --defines=${QMAKE_FILE_OUT} --output=${QMAKE_FUNC_FILE_OUT_PATH}$${QMAKE_DIR_SEP}${QMAKE_FILE_OUT_BASE}.cpp ${QMAKE_FILE_IN}
-    anglebison_decl.variable_out = GENERATED_FILES
-    GENERATORS += anglebison_decl
-
-    anglebison_impl.input = ANGLE_BISON_SOURCES
-    anglebison_impl.commands = $$escape_expand(\\n)
-    anglebison_impl.depends = ${QMAKE_FILE_BASE}_tab.h
-    anglebison_impl.output = ${QMAKE_FILE_BASE}_tab.cpp
-    *g++*: anglebison_impl.variable_out = ANGLE_SOURCES
-    GENERATORS += anglebison_impl
-}

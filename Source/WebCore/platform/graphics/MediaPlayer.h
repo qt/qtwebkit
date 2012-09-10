@@ -32,9 +32,10 @@
 #include "MediaPlayerProxy.h"
 #endif
 
-#include "Document.h"
 #include "IntRect.h"
 #include "KURL.h"
+#include "LayoutTypesInlineMethods.h"
+#include "Timer.h"
 #include <wtf/Forward.h>
 #include <wtf/HashSet.h>
 #include <wtf/OwnPtr.h>
@@ -56,8 +57,10 @@ class QTMovieVisualContext;
 namespace WebCore {
 
 class AudioSourceProvider;
+class Document;
 class GStreamerGWorld;
 class MediaPlayerPrivateInterface;
+class MediaSource;
 
 // Structure that will hold every native
 // types supported by the current media player.
@@ -263,6 +266,7 @@ public:
     bool sourceRemoveId(const String& id);
     PassRefPtr<TimeRanges> sourceBuffered(const String& id);
     bool sourceAppend(const String& id, const unsigned char* data, unsigned length);
+    void sourceSetDuration(double);
     bool sourceAbort(const String& id);
     enum EndOfStreamStatus { EosNoError, EosNetworkError, EosDecodeError };
     void sourceEndOfStream(EndOfStreamStatus);

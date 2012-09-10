@@ -26,6 +26,7 @@
 #ifndef TestController_h
 #define TestController_h
 
+#include "WebNotificationProvider.h"
 #include <WebKit2/WKRetainPtr.h>
 #include <string>
 #include <vector>
@@ -62,6 +63,8 @@ public:
     bool beforeUnloadReturnValue() const { return m_beforeUnloadReturnValue; }
     void setBeforeUnloadReturnValue(bool value) { m_beforeUnloadReturnValue = value; }
 
+    void simulateWebNotificationClick(uint64_t notificationID);
+
     bool resetStateToConsistentValues();
 
 private:
@@ -94,6 +97,9 @@ private:
     static void processDidCrash(WKPageRef, const void* clientInfo);
     void processDidCrash();
 
+    static void decidePolicyForNotificationPermissionRequest(WKPageRef, WKSecurityOriginRef, WKNotificationPermissionRequestRef, const void*);
+    void decidePolicyForNotificationPermissionRequest(WKPageRef, WKSecurityOriginRef, WKNotificationPermissionRequestRef);
+
     static WKPageRef createOtherPage(WKPageRef oldPage, WKURLRequestRef, WKDictionaryRef, WKEventModifiers, WKEventMouseButton, const void*);
 
     static void runModal(WKPageRef, const void* clientInfo);
@@ -111,6 +117,8 @@ private:
     std::vector<std::string> m_paths;
     WKRetainPtr<WKStringRef> m_injectedBundlePath;
     WKRetainPtr<WKStringRef> m_testPluginDirectory;
+
+    WebNotificationProvider m_webNotificationProvider;
 
     OwnPtr<PlatformWebView> m_mainWebView;
     WKRetainPtr<WKContextRef> m_context;

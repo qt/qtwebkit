@@ -1156,8 +1156,7 @@ AccessibilityButtonState AccessibilityRenderObject::checkboxOrRadioValue() const
 
 String AccessibilityRenderObject::valueDescription() const
 {
-    // Only sliders and progress bars support value descriptions currently.
-    if (!isProgressIndicator() && !isSlider())
+    if (!isARIARange())
         return String();
     
     return getAttribute(aria_valuetextAttr).string();
@@ -1167,10 +1166,18 @@ float AccessibilityRenderObject::stepValueForRange() const
 {
     return getAttribute(stepAttr).toFloat();
 }
+
+bool AccessibilityRenderObject::isARIARange() const
+{
+    return m_ariaRole == ProgressIndicatorRole
+        || m_ariaRole == SliderRole
+        || m_ariaRole == ScrollBarRole
+        || m_ariaRole == SpinButtonRole;
+}
     
 float AccessibilityRenderObject::valueForRange() const
 {
-    if (!isProgressIndicator() && !isSlider() && !isScrollbar())
+    if (!isARIARange())
         return 0.0f;
 
     return getAttribute(aria_valuenowAttr).toFloat();
@@ -1178,7 +1185,7 @@ float AccessibilityRenderObject::valueForRange() const
 
 float AccessibilityRenderObject::maxValueForRange() const
 {
-    if (!isProgressIndicator() && !isSlider())
+    if (!isARIARange())
         return 0.0f;
 
     return getAttribute(aria_valuemaxAttr).toFloat();
@@ -1186,7 +1193,7 @@ float AccessibilityRenderObject::maxValueForRange() const
 
 float AccessibilityRenderObject::minValueForRange() const
 {
-    if (!isProgressIndicator() && !isSlider())
+    if (!isARIARange())
         return 0.0f;
 
     return getAttribute(aria_valueminAttr).toFloat();
@@ -1398,10 +1405,15 @@ String AccessibilityRenderObject::title() const
     default:
         break;
     }
-    
+   
     if (isHeading() || isLink())
         return textUnderElement();
-    
+
+    // If it's focusable but it's not content editable or a known control type, then it will appear to
+    // the user as a single atomic object, so we should use its text as the default title.
+    if (isGenericFocusableElement())
+        return textUnderElement();
+
     return String();
 }
 
@@ -1487,7 +1499,7 @@ String AccessibilityRenderObject::accessibilityDescription() const
         return ariaDescription;
     
     Node* node = m_renderer->node();
-    if (isImage() || isInputImage() || isNativeImage()) {
+    if (isImage() || isInputImage() || isNativeImage() || isCanvas()) {
         if (node && node->isHTMLElement()) {
             const AtomicString& alt = toHTMLElement(node)->getAttribute(altAttr);
             if (alt.isEmpty())
@@ -1938,12 +1950,8 @@ bool AccessibilityRenderObject::accessibilityIsIgnored() const
     // Anything that is content editable should not be ignored.
     // However, one cannot just call node->rendererIsEditable() since that will ask if its parents
     // are also editable. Only the top level content editable region should be exposed.
-    if (node && node->isElementNode()) {
-        Element* element = static_cast<Element*>(node);
-        const AtomicString& contentEditable = element->getAttribute(contenteditableAttr);
-        if (equalIgnoringCase(contentEditable, "true"))
-            return false;
-    }
+    if (hasContentEditableAttributeSet())
+        return false;
     
     // List items play an important role in defining the structure of lists. They should not be ignored.
     if (roleValue() == ListItemRole)
@@ -1952,8 +1960,17 @@ bool AccessibilityRenderObject::accessibilityIsIgnored() const
     // if this element has aria attributes on it, it should not be ignored.
     if (supportsARIAAttributes())
         return false;
+
+    // <span> tags are inline tags and not meant to convey information if they have no other aria
+    // information on them. If we don't ignore them, they may emit signals expected to come from
+    // their parent. In addition, because included spans are GroupRole objects, and GroupRole
+    // objects are often containers with meaningful information, the inclusion of a span can have
+    // the side effect of causing the immediate parent accessible to be ignored. This is especially
+    // problematic for platforms which have distinct roles for textual block elements.
+    if (node && node->hasTagName(spanTag))
+        return true;
     
-    if (m_renderer->isBlockFlow() && m_renderer->childrenInline())
+    if (m_renderer->isBlockFlow() && m_renderer->childrenInline() && !canSetFocusAttribute())
         return !toRenderBlock(m_renderer)->firstLineBox() && !mouseButtonListener();
     
     // ignore images seemingly used as spacers
@@ -1974,13 +1991,6 @@ bool AccessibilityRenderObject::accessibilityIsIgnored() const
                 return true;
         }
         
-        if (node && node->hasTagName(canvasTag)) {
-            RenderHTMLCanvas* canvas = toRenderHTMLCanvas(m_renderer);
-            if (canvas->height() <= 1 || canvas->width() <= 1)
-                return true;
-            return false;
-        }
-        
         if (isNativeImage()) {
             // check for one-dimensional image
             RenderImage* image = toRenderImage(m_renderer);
@@ -1995,7 +2005,16 @@ bool AccessibilityRenderObject::accessibilityIsIgnored() const
         }
         return false;
     }
-    
+
+    if (isCanvas()) {
+        if (canvasHasFallbackContent())
+            return false;
+        RenderHTMLCanvas* canvas = toRenderHTMLCanvas(m_renderer);
+        if (canvas->height() <= 1 || canvas->width() <= 1)
+            return true;
+        // Otherwise fall through; use presence of help text, title, or description to decide.
+    }
+
     if (isWebArea() || m_renderer->isListMarker())
         return false;
     
@@ -3118,6 +3137,35 @@ bool AccessibilityRenderObject::isDescendantOfElementType(const QualifiedName& t
     }
     return false;
 }
+
+bool AccessibilityRenderObject::isGenericFocusableElement() const
+{
+    if (!canSetFocusAttribute())
+        return false;
+
+    // If it's a control, it's not generic.
+    if (isControl())
+        return false;
+
+    // If it has an aria role, it's not generic.
+    if (m_ariaRole != UnknownRole)
+        return false;
+
+    // If the content editable attribute is set on this element, that's the reason
+    // it's focusable, and existing logic should handle this case already - so it's not a
+    // generic focusable element.
+    if (hasContentEditableAttributeSet())
+        return false;
+
+    // The web area and body element are both focusable, but existing logic handles these
+    // cases already, so we don't need to include them here.
+    if (roleValue() == WebAreaRole)
+        return false;
+    if (node() && node()->hasTagName(bodyTag))
+        return false;
+
+    return true;
+}
     
 AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
 {
@@ -3152,7 +3200,7 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
         return ImageRole;
     }
     if (node && node->hasTagName(canvasTag))
-        return ImageRole;
+        return CanvasRole;
 
     if (cssBox && cssBox->isRenderView())
         return WebAreaRole;
@@ -3211,10 +3259,9 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
     // Table sections should be ignored.
     if (m_renderer->isTableSection())
         return IgnoredRole;
-    
-#if PLATFORM(GTK)
+
     if (m_renderer->isHR())
-        return SplitterRole;
+        return HorizontalRuleRole;
 
     if (node && node->hasTagName(pTag))
         return ParagraphRole;
@@ -3227,10 +3274,6 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
 
     if (node && node->hasTagName(formTag))
         return FormRole;
-#else
-    if (node && node->hasTagName(labelTag))
-        return GroupRole;
-#endif
 
     if (node && node->hasTagName(articleTag))
         return DocumentArticleRole;
@@ -3339,6 +3382,7 @@ bool AccessibilityRenderObject::ariaRoleHasPresentationalChildren() const
     case SliderRole:
     case ImageRole:
     case ProgressIndicatorRole:
+    case SpinButtonRole:
     // case SeparatorRole:
         return true;
     default:
@@ -3397,10 +3441,6 @@ bool AccessibilityRenderObject::canHaveChildren() const
     if (!m_renderer)
         return false;
     
-    // Canvas is a special case; its role is ImageRole but it is allowed to have children.
-    if (node() && node()->hasTagName(canvasTag))
-        return true;
-
     // Elements that should not have children
     switch (roleValue()) {
     case ImageRole:

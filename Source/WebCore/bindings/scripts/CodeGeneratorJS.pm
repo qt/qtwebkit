@@ -165,7 +165,7 @@ END
     JSValue listener = exec->argument(1);
     if (!listener.isObject())
         return JSValue::encode(jsUndefined());
-    impl->${functionName}EventListener(ustringToAtomicString(exec->argument(0).toString(exec)->value(exec)), JSEventListener::create(asObject(listener), $wrapperObject, false, currentWorld(exec))$passRefPtrHandling, exec->argument(2).toBoolean(exec));
+    impl->${functionName}EventListener(exec->argument(0).toString(exec)->value(exec), JSEventListener::create(asObject(listener), $wrapperObject, false, currentWorld(exec))$passRefPtrHandling, exec->argument(2).toBoolean(exec));
     return JSValue::encode(jsUndefined());
 END
     return @GenerateEventListenerImpl;
@@ -219,7 +219,7 @@ sub AddIncludesForTypeInImpl
     }
 
     if ($type eq "CanvasGradient" or $type eq "XPathNSResolver" or $type eq "MessagePort") {
-        $implIncludes{"PlatformString.h"} = 1;
+        $implIncludes{"<wtf/text/WTFString.h>"} = 1;
     }
 
     if ($type eq "Document") {
@@ -281,7 +281,7 @@ sub AddIncludesForSVGAnimatedType
     if ($type eq "Point" or $type eq "Rect") {
         $implIncludes{"Float$type.h"} = 1;
     } elsif ($type eq "String") {
-        $implIncludes{"PlatformString.h"} = 1;
+        $implIncludes{"<wtf/text/WTFString.h>"} = 1;
     }
 }
 
@@ -841,7 +841,7 @@ sub GenerateHeader
     push(@headerContent, "    }\n\n");
 
     # Custom pushEventHandlerScope function
-    push(@headerContent, "    JSC::ScopeChainNode* pushEventHandlerScope(JSC::ExecState*, JSC::ScopeChainNode*) const;\n\n") if $dataNode->extendedAttributes->{"JSCustomPushEventHandlerScope"};
+    push(@headerContent, "    JSC::JSScope* pushEventHandlerScope(JSC::ExecState*, JSC::JSScope*) const;\n\n") if $dataNode->extendedAttributes->{"JSCustomPushEventHandlerScope"};
 
     # Custom call functions
     push(@headerContent, "    static JSC::CallType getCallData(JSC::JSCell*, JSC::CallData&);\n\n") if $dataNode->extendedAttributes->{"CustomCall"};
@@ -1303,19 +1303,21 @@ sub GenerateFunctionParametersCheck
     my @orExpression = ();
     my $numParameters = 0;
     my @neededArguments = ();
+    my $numMandatoryParams = @{$function->parameters};
 
     foreach my $parameter (@{$function->parameters}) {
         if ($parameter->extendedAttributes->{"Optional"}) {
             my ($expression, @usedArguments) = GenerateParametersCheckExpression($numParameters, $function);
             push(@orExpression, $expression);
             push(@neededArguments, @usedArguments);
+            $numMandatoryParams--;
         }
         $numParameters++;
     }
     my ($expression, @usedArguments) = GenerateParametersCheckExpression($numParameters, $function);
     push(@orExpression, $expression);
     push(@neededArguments, @usedArguments);
-    return (join(" || ", @orExpression), @neededArguments);
+    return ($numMandatoryParams, join(" || ", @orExpression), @neededArguments);
 }
 
 sub GenerateOverloadedFunction
@@ -1340,9 +1342,11 @@ sub GenerateOverloadedFunction
 END
 
     my %fetchedArguments = ();
+    my $leastNumMandatoryParams = 255;
 
     foreach my $overload (@{$function->{overloads}}) {
-        my ($parametersCheck, @neededArguments) = GenerateFunctionParametersCheck($overload);
+        my ($numMandatoryParams, $parametersCheck, @neededArguments) = GenerateFunctionParametersCheck($overload);
+        $leastNumMandatoryParams = $numMandatoryParams if ($numMandatoryParams < $leastNumMandatoryParams);
 
         foreach my $parameterIndex (@neededArguments) {
             next if exists $fetchedArguments{$parameterIndex};
@@ -1352,6 +1356,10 @@ END
 
         push(@implContent, "    if ($parametersCheck)\n");
         push(@implContent, "        return ${functionName}$overload->{overloadIndex}(exec);\n");
+    }
+    if ($leastNumMandatoryParams >= 1) {
+        push(@implContent, "    if (argsCount < $leastNumMandatoryParams)\n");
+        push(@implContent, "        return throwVMError(exec, createNotEnoughArgumentsError(exec));\n");
     }
     push(@implContent, <<END);
     return throwVMTypeError(exec);
@@ -2285,8 +2293,7 @@ sub GenerateImplementation
                 foreach (@{$dataNode->attributes}) {
                     my $attribute = $_;
                     if ($attribute->signature->extendedAttributes->{"CachedAttribute"}) {
-                        push(@implContent, "    if (thisObject->m_" . $attribute->signature->name . ")\n");
-                        push(@implContent, "        visitor.append(&thisObject->m_" . $attribute->signature->name . ");\n");
+                        push(@implContent, "    visitor.append(&thisObject->m_" . $attribute->signature->name . ");\n");
                     }
                 }
             }
@@ -2359,7 +2366,7 @@ sub GenerateImplementation
         }
     }
 
-    if ($interfaceName eq "HTMLPropertiesCollection") {
+    if ($interfaceName eq "HTMLPropertiesCollection" or $interfaceName eq "DOMNamedFlowCollection") {
         if ($dataNode->extendedAttributes->{"NamedGetter"}) {
             push(@implContent, "bool ${className}::canGetItemsForName(ExecState*, $implClassName* collection, PropertyName propertyName)\n");
             push(@implContent, "{\n");
@@ -2838,7 +2845,7 @@ END
             foreach my $param (@params) {
                 my $paramName = $param->name;
                 if ($param->type eq "DOMString") {
-                    push(@implContent, "    args.append(jsString(exec, ${paramName}));\n");
+                    push(@implContent, "    args.append(jsStringWithCache(exec, ${paramName}));\n");
                 } elsif ($param->type eq "boolean") {
                     push(@implContent, "    args.append(jsBoolean(${paramName}));\n");
                 } elsif ($param->type eq "SerializedScriptValue") {
@@ -3044,7 +3051,7 @@ sub JSValueToNative
             return "valueToStringWithNullCheck(exec, $value)"
         }
         # FIXME: Add the case for 'if ($signature->extendedAttributes->{"TreatUndefinedAs"} and $signature->extendedAttributes->{"TreatUndefinedAs"} eq "NullString"))'.
-        return "ustringToString($value.isEmpty() ? UString() : $value.toString(exec)->value(exec))";
+        return "$value.isEmpty() ? String() : $value.toString(exec)->value(exec)";
     }
 
     if ($type eq "DOMObject") {
@@ -3137,7 +3144,7 @@ sub NativeToJSValue
             die "Unknown value for TreatReturnedNullStringAs extended attribute";
         }
         AddToImplIncludes("<runtime/JSString.h>", $conditional);
-        return "jsString(exec, $value)";
+        return "jsStringWithCache(exec, $value)";
     }
 
     my $globalObject;
@@ -3674,7 +3681,7 @@ EncodedJSValue JSC_HOST_CALL ${constructorClassName}::construct${className}(Exec
     if (!executionContext)
         return throwVMError(exec, createReferenceError(exec, "Constructor associated execution context is unavailable"));
 
-    AtomicString eventType = ustringToAtomicString(exec->argument(0).toString(exec)->value(exec));
+    AtomicString eventType = exec->argument(0).toString(exec)->value(exec);
     if (exec->hadException())
         return JSValue::encode(jsUndefined());
 

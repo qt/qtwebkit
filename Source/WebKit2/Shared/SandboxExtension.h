@@ -99,6 +99,8 @@ public:
     bool consume();
     bool consumePermanently();
 
+    static bool consumePermanently(const Handle&);
+
 private:
     explicit SandboxExtension(const Handle&);
                      
@@ -128,6 +130,7 @@ inline SandboxExtension::~SandboxExtension() { }
 inline bool SandboxExtension::invalidate() { return true; }
 inline bool SandboxExtension::consume() { return true; }
 inline bool SandboxExtension::consumePermanently() { return true; }
+inline bool SandboxExtension::consumePermanently(const Handle&) { return true; }
 #endif
 
 } // namespace WebKit

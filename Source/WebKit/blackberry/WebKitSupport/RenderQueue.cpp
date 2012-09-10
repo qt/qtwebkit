@@ -243,7 +243,7 @@ int RenderQueue::splittingFactor(const Platform::IntRect& rect) const
     // rendered in any one pass should stay fixed with regard to the zoom level.
     Platform::IntRect untransformedRect = m_parent->m_webPage->d->mapFromTransformed(rect);
     double rectArea = untransformedRect.width() * untransformedRect.height();
-    double maxArea = DEFAULT_MAX_LAYOUT_WIDTH * DEFAULT_MAX_LAYOUT_HEIGHT; // Defined in WebPage_p.h.
+    double maxArea = m_parent->tileWidth() * m_parent->tileHeight();
 
     const unsigned splitFactor = 1 << 0;
     double renderRectArea = maxArea / splitFactor;
@@ -655,14 +655,8 @@ void RenderQueue::renderAllCurrentRegularRenderJobs()
     m_currentRegularRenderJobsBatchRegion = Platform::IntRectRegion();
     m_currentRegularRenderJobsBatchUnderPressure = false;
 
-    // Update the screen only if we're not scrolling or zooming.
-    if (rendered && !m_parent->isScrollingOrZooming()) {
-        if (!m_parent->shouldDirectRenderingToWindow())
-            m_parent->blitVisibleContents();
-        else
-            m_parent->invalidateWindow();
-        m_parent->m_webPage->client()->notifyContentRendered(renderedRect);
-    }
+    if (rendered)
+        m_parent->didRenderContent(renderedRect);
 
     if (m_parent->shouldSuppressNonVisibleRegularRenderJobs() && !regionNotRendered.isEmpty())
         m_parent->updateTilesForScrollOrNotRenderedRegion(false /*checkLoading*/);
@@ -810,14 +804,7 @@ void RenderQueue::renderRegularRenderJob()
         // Clear the region and the and blit since this batch is now complete.
         m_currentRegularRenderJobsBatchRegion = Platform::IntRectRegion();
         m_currentRegularRenderJobsBatchUnderPressure = false;
-        // Update the screen only if we're not scrolling or zooming.
-        if (!m_parent->isScrollingOrZooming()) {
-            if (!m_parent->shouldDirectRenderingToWindow())
-                m_parent->blitVisibleContents();
-            else
-                m_parent->invalidateWindow();
-            m_parent->m_webPage->client()->notifyContentRendered(renderedRect);
-        }
+        m_parent->didRenderContent(renderedRect);
     }
 
     // Make sure we didn't alter state of the queues that should have been empty
@@ -880,13 +867,8 @@ void RenderQueue::visibleScrollJobsCompleted(bool shouldBlit)
     // Now blit to the screen if we are done and get rid of the completed list!
     ASSERT(m_visibleScrollJobs.empty());
     m_visibleScrollJobsCompleted.clear();
-    if (shouldBlit && !m_parent->isScrollingOrZooming()) {
-        if (!m_parent->shouldDirectRenderingToWindow())
-            m_parent->blitVisibleContents();
-        else
-            m_parent->invalidateWindow();
-        m_parent->m_webPage->client()->notifyContentRendered(m_parent->visibleContentsRect());
-    }
+    if (shouldBlit)
+        m_parent->didRenderContent(m_parent->visibleContentsRect());
 }
 
 void RenderQueue::nonVisibleScrollJobsCompleted()

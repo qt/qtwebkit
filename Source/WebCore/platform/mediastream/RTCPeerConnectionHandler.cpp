@@ -35,6 +35,7 @@
 #include "RTCPeerConnectionHandler.h"
 
 #include "RTCPeerConnectionHandlerClient.h"
+#include "RTCSessionDescriptionDescriptor.h"
 #include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
@@ -46,7 +47,19 @@ public:
     RTCPeerConnectionHandlerDummy(RTCPeerConnectionHandlerClient*);
     virtual ~RTCPeerConnectionHandlerDummy();
 
-    virtual bool initialize() OVERRIDE;
+    virtual bool initialize(PassRefPtr<RTCConfiguration>, PassRefPtr<MediaConstraints>) OVERRIDE;
+
+    virtual void createOffer(PassRefPtr<RTCSessionDescriptionRequest>, PassRefPtr<MediaConstraints>) OVERRIDE;
+    virtual void createAnswer(PassRefPtr<RTCSessionDescriptionRequest>, PassRefPtr<MediaConstraints>) OVERRIDE;
+    virtual void setLocalDescription(PassRefPtr<RTCVoidRequest>, PassRefPtr<RTCSessionDescriptionDescriptor>) OVERRIDE;
+    virtual void setRemoteDescription(PassRefPtr<RTCVoidRequest>, PassRefPtr<RTCSessionDescriptionDescriptor>) OVERRIDE;
+    virtual PassRefPtr<RTCSessionDescriptionDescriptor> localDescription() OVERRIDE;
+    virtual PassRefPtr<RTCSessionDescriptionDescriptor> remoteDescription() OVERRIDE;
+    virtual bool updateIce(PassRefPtr<RTCConfiguration>, PassRefPtr<MediaConstraints>) OVERRIDE;
+    virtual bool addIceCandidate(PassRefPtr<RTCIceCandidateDescriptor>) OVERRIDE;
+    virtual bool addStream(PassRefPtr<MediaStreamDescriptor>, PassRefPtr<MediaConstraints>) OVERRIDE;
+    virtual void removeStream(PassRefPtr<MediaStreamDescriptor>) OVERRIDE;
+    virtual void stop() OVERRIDE;
 
 private:
     RTCPeerConnectionHandlerClient* m_client;
@@ -67,9 +80,58 @@ RTCPeerConnectionHandlerDummy::~RTCPeerConnectionHandlerDummy()
 {
 }
 
-bool RTCPeerConnectionHandlerDummy::initialize()
+bool RTCPeerConnectionHandlerDummy::initialize(PassRefPtr<RTCConfiguration>, PassRefPtr<MediaConstraints>)
 {
     return false;
+}
+
+void RTCPeerConnectionHandlerDummy::createOffer(PassRefPtr<RTCSessionDescriptionRequest>, PassRefPtr<MediaConstraints>)
+{
+}
+
+void RTCPeerConnectionHandlerDummy::createAnswer(PassRefPtr<RTCSessionDescriptionRequest>, PassRefPtr<MediaConstraints>)
+{
+}
+
+void RTCPeerConnectionHandlerDummy::setLocalDescription(PassRefPtr<RTCVoidRequest>, PassRefPtr<RTCSessionDescriptionDescriptor>)
+{
+}
+
+void RTCPeerConnectionHandlerDummy::setRemoteDescription(PassRefPtr<RTCVoidRequest>, PassRefPtr<RTCSessionDescriptionDescriptor>)
+{
+}
+
+PassRefPtr<RTCSessionDescriptionDescriptor> RTCPeerConnectionHandlerDummy::localDescription()
+{
+    return 0;
+}
+
+PassRefPtr<RTCSessionDescriptionDescriptor> RTCPeerConnectionHandlerDummy::remoteDescription()
+{
+    return 0;
+}
+
+bool RTCPeerConnectionHandlerDummy::addStream(PassRefPtr<MediaStreamDescriptor>, PassRefPtr<MediaConstraints>)
+{
+    return false;
+}
+
+void RTCPeerConnectionHandlerDummy::removeStream(PassRefPtr<MediaStreamDescriptor>)
+{
+}
+
+bool RTCPeerConnectionHandlerDummy::updateIce(PassRefPtr<RTCConfiguration>, PassRefPtr<MediaConstraints>)
+{
+    return false;
+}
+
+bool RTCPeerConnectionHandlerDummy::addIceCandidate(PassRefPtr<RTCIceCandidateDescriptor>)
+{
+    return false;
+}
+
+void RTCPeerConnectionHandlerDummy::stop()
+{
 }
 
 } // namespace WebCore

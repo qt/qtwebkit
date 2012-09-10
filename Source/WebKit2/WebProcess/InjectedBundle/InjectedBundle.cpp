@@ -32,6 +32,7 @@
 #include "InjectedBundleScriptWorld.h"
 #include "InjectedBundleUserMessageCoders.h"
 #include "LayerTreeHost.h"
+#include "NotificationPermissionRequestManager.h"
 #include "WKAPICast.h"
 #include "WKBundleAPICast.h"
 #include "WebApplicationCacheManager.h"
@@ -53,6 +54,7 @@
 #include <WebCore/GeolocationController.h>
 #include <WebCore/GeolocationPosition.h>
 #include <WebCore/JSDOMWindow.h>
+#include <WebCore/JSNotification.h>
 #include <WebCore/Page.h>
 #include <WebCore/PageGroup.h>
 #include <WebCore/PageVisibilityState.h>
@@ -129,7 +131,13 @@ void InjectedBundle::overrideBoolPreferenceForTestRunner(WebPageGroupProxy* page
 {
     const HashSet<Page*>& pages = PageGroup::pageGroup(pageGroup->identifier())->pages();
 
-    // FIXME: Need an explicit way to set "WebKitTabToLinksPreferenceKey" directly in WebPage.
+    if (preference == "WebKitTabToLinksPreferenceKey") {
+       WebPreferencesStore::overrideBoolValueForKey(WebPreferencesKey::tabsToLinksKey(), enabled);
+       for (HashSet<Page*>::iterator i = pages.begin(); i != pages.end(); ++i) {
+            WebPage* webPage = static_cast<WebFrameLoaderClient*>((*i)->mainFrame()->loader()->client())->webFrame()->page();
+            webPage->setTabToLinksEnabled(enabled);
+        }
+    }
 
     if (preference == "WebKit2AsynchronousPluginInitializationEnabled") {
         WebPreferencesStore::overrideBoolValueForKey(WebPreferencesKey::asynchronousPluginInitializationEnabledKey(), enabled);
@@ -171,7 +179,8 @@ void InjectedBundle::overrideBoolPreferenceForTestRunner(WebPageGroupProxy* page
     macro(WebKitWebAudioEnabled, WebAudioEnabled, webAudioEnabled) \
     macro(WebKitWebGLEnabled, WebGLEnabled, webGLEnabled) \
     macro(WebKitXSSAuditorEnabled, XSSAuditorEnabled, xssAuditorEnabled) \
-    macro(WebKitShouldRespectImageOrientation, ShouldRespectImageOrientation, shouldRespectImageOrientation)
+    macro(WebKitShouldRespectImageOrientation, ShouldRespectImageOrientation, shouldRespectImageOrientation) \
+    macro(WebKitEnableCaretBrowsing, CaretBrowsingEnabled, caretBrowsingEnabled)
 
     if (preference == "WebKitAcceleratedCompositingEnabled")
         enabled = enabled && LayerTreeHost::supportsAcceleratedCompositing();
@@ -213,6 +222,13 @@ void InjectedBundle::setAllowFileAccessFromFileURLs(WebPageGroupProxy* pageGroup
     const HashSet<Page*>& pages = PageGroup::pageGroup(pageGroup->identifier())->pages();
     for (HashSet<Page*>::iterator iter = pages.begin(); iter != pages.end(); ++iter)
         (*iter)->settings()->setAllowFileAccessFromFileURLs(enabled);
+}
+
+void InjectedBundle::setMinimumLogicalFontSize(WebPageGroupProxy* pageGroup, int size)
+{
+    const HashSet<Page*>& pages = PageGroup::pageGroup(pageGroup->identifier())->pages();
+    for (HashSet<Page*>::iterator iter = pages.begin(); iter != pages.end(); ++iter)
+        (*iter)->settings()->setMinimumLogicalFontSize(size);
 }
 
 void InjectedBundle::setFrameFlatteningEnabled(WebPageGroupProxy* pageGroup, bool enabled)
@@ -532,6 +548,38 @@ void InjectedBundle::setUserStyleSheetLocation(WebPageGroupProxy* pageGroup, con
     const HashSet<Page*>& pages = PageGroup::pageGroup(pageGroup->identifier())->pages();
     for (HashSet<Page*>::iterator iter = pages.begin(); iter != pages.end(); ++iter)
         (*iter)->settings()->setUserStyleSheetLocation(KURL(KURL(), location));
+}
+
+void InjectedBundle::setWebNotificationPermission(WebPage* page, const String& originString, bool allowed)
+{
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+    page->notificationPermissionRequestManager()->setPermissionLevelForTesting(originString, allowed);
+#else
+    UNUSED_PARAM(page);
+    UNUSED_PARAM(originString);
+    UNUSED_PARAM(allowed);
+#endif
+}
+
+void InjectedBundle::removeAllWebNotificationPermissions(WebPage* page)
+{
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+    page->notificationPermissionRequestManager()->removeAllPermissionsForTesting();
+#else
+    UNUSED_PARAM(page);
+#endif
+}
+
+uint64_t InjectedBundle::webNotificationID(JSContextRef jsContext, JSValueRef jsNotification)
+{
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+    WebCore::Notification* notification = toNotification(toJS(toJS(jsContext), jsNotification));
+    if (!notification)
+        return 0;
+    return WebProcess::shared().notificationManager().notificationIDForTesting(notification);
+#else
+    return 0;
+#endif
 }
 
 } // namespace WebKit

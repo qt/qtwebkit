@@ -12,6 +12,7 @@
 #include "AudioSourceProviderClient.h"
 #include "Frame.h"
 #include "GraphicsContext.h"
+#include "GraphicsLayerChromium.h"
 #include "HTMLMediaElement.h"
 #include "IntSize.h"
 #include "KURL.h"
@@ -29,11 +30,13 @@
 #include <public/Platform.h>
 #include <public/WebCString.h>
 #include <public/WebCanvas.h>
+#include <public/WebCompositorSupport.h>
 #include <public/WebMimeRegistry.h>
 #include <public/WebRect.h>
 #include <public/WebSize.h>
 #include <public/WebString.h>
 #include <public/WebURL.h>
+#include <public/WebVideoLayer.h>
 
 #if USE(ACCELERATED_COMPOSITING)
 #include "RenderLayerCompositor.h"
@@ -97,6 +100,10 @@ WebMediaPlayerClientImpl::~WebMediaPlayerClientImpl()
 #endif
     if (m_helperPlugin)
         closeHelperPlugin();
+#if USE(ACCELERATED_COMPOSITING)
+    if (m_videoLayer)
+        GraphicsLayerChromium::unregisterContentsLayer(m_videoLayer->layer());
+#endif
 }
 
 void WebMediaPlayerClientImpl::networkStateChanged()
@@ -111,8 +118,10 @@ void WebMediaPlayerClientImpl::readyStateChanged()
     m_mediaPlayer->readyStateChanged();
 #if USE(ACCELERATED_COMPOSITING)
     if (hasVideo() && supportsAcceleratedRendering() && !m_videoLayer) {
-        m_videoLayer = adoptPtr(WebVideoLayer::create(this));
+        m_videoLayer = adoptPtr(Platform::current()->compositorSupport()->createVideoLayer(this));
+
         m_videoLayer->layer()->setOpaque(m_opaque);
+        GraphicsLayerChromium::registerContentsLayer(m_videoLayer->layer());
     }
 #endif
 }
@@ -429,6 +438,12 @@ bool WebMediaPlayerClientImpl::sourceAbort(const String& id)
         return false;
 
     return m_webMediaPlayer->sourceAbort(id);
+}
+
+void WebMediaPlayerClientImpl::sourceSetDuration(double duration)
+{
+    if (m_webMediaPlayer)
+        m_webMediaPlayer->sourceSetDuration(duration);
 }
 
 void WebMediaPlayerClientImpl::sourceEndOfStream(WebCore::MediaPlayer::EndOfStreamStatus status)

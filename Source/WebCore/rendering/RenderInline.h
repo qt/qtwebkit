@@ -89,7 +89,7 @@ public:
 protected:
     virtual void willBeDestroyed();
 
-    virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
+    virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle) OVERRIDE;
 
 private:
     virtual RenderObjectChildList* virtualChildren() { return children(); }
@@ -122,9 +122,9 @@ private:
 
     virtual void paint(PaintInfo&, const LayoutPoint&);
 
-    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
+    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
 
-    virtual bool requiresLayer() const { return isInFlowPositioned() || isTransparent() || hasMask() || hasFilter(); }
+    virtual bool requiresLayer() const { return isInFlowPositioned() || createsGroup() || hasClipPath(); }
 
     virtual LayoutUnit offsetLeft() const;
     virtual LayoutUnit offsetTop() const;
@@ -139,6 +139,8 @@ private:
     virtual const RenderObject* pushMappingToContainer(const RenderBoxModelObject* ancestorToStopAt, RenderGeometryMap&) const;
 
     virtual VisiblePosition positionForPoint(const LayoutPoint&);
+
+    virtual LayoutRect frameRectForStickyPositioning() const OVERRIDE { return linesBoundingBox(); }
 
     virtual IntRect borderBoundingBox() const
     {

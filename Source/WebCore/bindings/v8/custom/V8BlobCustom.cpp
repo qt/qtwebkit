@@ -43,15 +43,15 @@
 
 namespace WebCore {
 
-v8::Handle<v8::Value> toV8(Blob* impl, v8::Isolate* isolate)
+v8::Handle<v8::Value> toV8(Blob* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     if (!impl)
         return v8NullWithCheck(isolate);
 
     if (impl->isFile())
-        return toV8(toFile(impl), isolate);
+        return toV8(toFile(impl), creationContext, isolate);
 
-    return V8Blob::wrap(impl, isolate);
+    return V8Blob::wrap(impl, creationContext, isolate);
 }
 
 v8::Handle<v8::Value> V8Blob::constructorCallback(const v8::Arguments& args)
@@ -71,7 +71,7 @@ v8::Handle<v8::Value> V8Blob::constructorCallback(const v8::Arguments& args)
 
     if (!args.Length()) {
         RefPtr<Blob> blob = Blob::create();
-        return toV8(blob.get(), args.GetIsolate());
+        return toV8(blob.get(), args.Holder(), args.GetIsolate());
     }
 
     v8::Local<v8::Value> firstArg = args[0];
@@ -79,7 +79,7 @@ v8::Handle<v8::Value> V8Blob::constructorCallback(const v8::Arguments& args)
         return throwTypeError("First argument of the constructor is not of type Array", args.GetIsolate());
 
     String type;
-    String endings = "transparent";
+    String endings = ASCIILiteral("transparent");
 
     if (args.Length() > 1) {
         if (!args[1]->IsObject())
@@ -138,7 +138,7 @@ v8::Handle<v8::Value> V8Blob::constructorCallback(const v8::Arguments& args)
     }
 
     RefPtr<Blob> blob = blobBuilder->getBlob(type, BlobConstructedByConstructor);
-    return toV8(blob.get(), args.GetIsolate());
+    return toV8(blob.get(), args.Holder(), args.GetIsolate());
 }
 
 } // namespace WebCore

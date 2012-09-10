@@ -28,7 +28,7 @@
 
 #include "JSObject.h"
 #include "JSString.h"
-#include "ScopeChain.h"
+
 
 #if ENABLE(DFG_JIT)
 
@@ -41,7 +41,6 @@
 #include "DFGFixupPhase.h"
 #include "DFGJITCompiler.h"
 #include "DFGPredictionPropagationPhase.h"
-#include "DFGRedundantPhiEliminationPhase.h"
 #include "DFGStructureCheckHoistingPhase.h"
 #include "DFGValidate.h"
 #include "DFGVirtualRegisterAllocationPhase.h"
@@ -117,6 +116,7 @@ inline bool compile(CompileMode compileMode, ExecState* exec, CodeBlock* codeBlo
     performFixup(dfg);
     performStructureCheckHoisting(dfg);
     unsigned cnt = 1;
+    dfg.m_fixpointState = FixpointNotConverged;
     for (;; ++cnt) {
 #if DFG_ENABLE(DEBUG_VERBOSE)
         dataLog("DFG beginning optimization fixpoint iteration #%u.\n", cnt);
@@ -126,13 +126,14 @@ inline bool compile(CompileMode compileMode, ExecState* exec, CodeBlock* codeBlo
         changed |= performConstantFolding(dfg);
         changed |= performArgumentsSimplification(dfg);
         changed |= performCFGSimplification(dfg);
-        changed |= performCSE(dfg, FixpointNotConverged);
+        changed |= performCSE(dfg);
         if (!changed)
             break;
         dfg.resetExitStates();
         performFixup(dfg);
     }
-    performCSE(dfg, FixpointConverged);
+    dfg.m_fixpointState = FixpointConverged;
+    performCSE(dfg);
 #if DFG_ENABLE(DEBUG_VERBOSE)
     dataLog("DFG optimization fixpoint converged in %u iterations.\n", cnt);
 #endif

@@ -21,7 +21,7 @@
 #ifndef QualifiedName_h
 #define QualifiedName_h
 
-#include "MemoryInstrumentation.h"
+#include "WebCoreMemoryInstrumentation.h"
 
 #include <wtf/HashTraits.h>
 #include <wtf/RefCounted.h>
@@ -52,7 +52,7 @@ public:
 
         void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
         {
-            MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::DOM);
+            MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
             info.addInstrumentedMember(m_prefix);
             info.addInstrumentedMember(m_localName);
             info.addInstrumentedMember(m_namespace);
@@ -103,7 +103,7 @@ public:
     
     void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     {
-        MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::DOM);
+        MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
         info.addInstrumentedMember(m_impl);
     }
 private:

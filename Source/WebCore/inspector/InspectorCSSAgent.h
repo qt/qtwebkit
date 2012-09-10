@@ -27,18 +27,17 @@
 
 #include "CSSSelector.h"
 #include "ContentSecurityPolicy.h"
-#include "Document.h"
 #include "InspectorBaseAgent.h"
 #include "InspectorDOMAgent.h"
 #include "InspectorStyleSheet.h"
 #include "InspectorValues.h"
-#include "PlatformString.h"
 #include "SecurityContext.h"
 
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -53,7 +52,9 @@ class InspectorFrontend;
 class InstrumentingAgents;
 class NameNodeMap;
 class Node;
+class NodeList;
 class SelectorProfile;
+class StyleResolver;
 
 #if ENABLE(INSPECTOR)
 

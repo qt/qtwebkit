@@ -63,13 +63,19 @@ int DateTimeNumericFieldElement::Range::clampValue(int value) const
     return std::min(std::max(value, minimum), maximum);
 }
 
-DateTimeNumericFieldElement::DateTimeNumericFieldElement(Document* document, FieldEventHandler& fieldEventHandler, int minimum, int maximum)
-    : DateTimeFieldElement(document, fieldEventHandler)
+DateTimeNumericFieldElement::DateTimeNumericFieldElement(Document* document, FieldOwner& fieldOwner, int minimum, int maximum)
+    : DateTimeFieldElement(document, fieldOwner)
     , m_lastDigitCharTime(0)
     , m_range(minimum, maximum)
     , m_value(0)
     , m_hasValue(false)
 {
+}
+
+void DateTimeNumericFieldElement::didBlur()
+{
+    m_lastDigitCharTime = 0;
+    DateTimeFieldElement::didBlur();
 }
 
 void DateTimeNumericFieldElement::handleKeyboardEvent(KeyboardEvent* keyboardEvent)

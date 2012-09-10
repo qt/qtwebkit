@@ -24,7 +24,6 @@
 
 #include "BytecodeGenerator.h"
 #include "Completion.h"
-#include <wtf/CurrentTime.h>
 #include "ExceptionHelpers.h"
 #include "InitializeThreading.h"
 #include "Interpreter.h"
@@ -33,12 +32,14 @@
 #include "JSFunction.h"
 #include "JSLock.h"
 #include "JSString.h"
-#include <wtf/MainThread.h>
 #include "SamplingTool.h"
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <wtf/CurrentTime.h>
+#include <wtf/MainThread.h>
+#include <wtf/text/StringBuilder.h>
 
 #if !OS(WINDOWS)
 #include <unistd.h>
@@ -80,7 +81,7 @@
 using namespace JSC;
 using namespace WTF;
 
-static bool fillBufferWithContentsOfFile(const UString& fileName, Vector<char>& buffer);
+static bool fillBufferWithContentsOfFile(const String& fileName, Vector<char>& buffer);
 
 static EncodedJSValue JSC_HOST_CALL functionPrint(ExecState*);
 static EncodedJSValue JSC_HOST_CALL functionDebug(ExecState*);
@@ -129,7 +130,7 @@ public:
     bool m_dump;
     bool m_exitCode;
     Vector<Script> m_scripts;
-    Vector<UString> m_arguments;
+    Vector<String> m_arguments;
 
     void parseArguments(int, char**);
 };
@@ -169,7 +170,7 @@ private:
 public:
     typedef JSGlobalObject Base;
 
-    static GlobalObject* create(JSGlobalData& globalData, Structure* structure, const Vector<UString>& arguments)
+    static GlobalObject* create(JSGlobalData& globalData, Structure* structure, const Vector<String>& arguments)
     {
         GlobalObject* object = new (NotNull, allocateCell<GlobalObject>(globalData.heap)) GlobalObject(globalData, structure);
         object->finishCreation(globalData, arguments);
@@ -187,7 +188,7 @@ public:
     static bool javaScriptExperimentsEnabled(const JSGlobalObject*) { return true; }
 
 protected:
-    void finishCreation(JSGlobalData& globalData, const Vector<UString>& arguments)
+    void finishCreation(JSGlobalData& globalData, const Vector<String>& arguments)
     {
         Base::finishCreation(globalData);
         
@@ -224,20 +225,20 @@ protected:
 
         JSArray* array = constructEmptyArray(globalExec());
         for (size_t i = 0; i < arguments.size(); ++i)
-            array->putDirectIndex(globalExec(), i, jsString(globalExec(), arguments[i]), false);
+            array->putDirectIndex(globalExec(), i, jsString(globalExec(), arguments[i]));
         putDirect(globalData, Identifier(globalExec(), "arguments"), array);
     }
 
     void addFunction(JSGlobalData& globalData, const char* name, NativeFunction function, unsigned arguments)
     {
         Identifier identifier(globalExec(), name);
-        putDirect(globalData, identifier, JSFunction::create(globalExec(), this, arguments, identifier.ustring(), function));
+        putDirect(globalData, identifier, JSFunction::create(globalExec(), this, arguments, identifier.string(), function));
     }
     
     void addConstructableFunction(JSGlobalData& globalData, const char* name, NativeFunction function, unsigned arguments)
     {
         Identifier identifier(globalExec(), name);
-        putDirect(globalData, identifier, JSFunction::create(globalExec(), this, arguments, identifier.ustring(), function, NoIntrinsic, function));
+        putDirect(globalData, identifier, JSFunction::create(globalExec(), this, arguments, identifier.string(), function, NoIntrinsic, function));
     }
 };
 COMPILE_ASSERT(!IsInteger<GlobalObject>::value, WTF_IsInteger_GlobalObject_false);
@@ -252,7 +253,7 @@ GlobalObject::GlobalObject(JSGlobalData& globalData, Structure* structure)
 {
 }
 
-static inline SourceCode jscSource(const char* utf8, const UString& filename)
+static inline SourceCode jscSource(const char* utf8, const String& filename)
 {
     // Find the the first non-ascii character, or nul.
     const char* pos = utf8;
@@ -262,7 +263,7 @@ static inline SourceCode jscSource(const char* utf8, const UString& filename)
 
     // Fast case - string is all ascii.
     if (!*pos)
-        return makeSource(UString(utf8, asciiLength), filename);
+        return makeSource(String(utf8, asciiLength), filename);
 
     // Slow case - contains non-ascii characters, use fromUTF8WithLatin1Fallback.
     ASSERT(*pos < 0);
@@ -308,17 +309,19 @@ EncodedJSValue JSC_HOST_CALL functionDescribe(ExecState* exec)
 
 EncodedJSValue JSC_HOST_CALL functionJSCStack(ExecState* exec)
 {
-    String trace = "--> Stack trace:\n";
+    StringBuilder trace;
+    trace.appendLiteral("--> Stack trace:\n");
+
     Vector<StackFrame> stackTrace;
     Interpreter::getStackTrace(&exec->globalData(), stackTrace);
     int i = 0;
 
     for (Vector<StackFrame>::iterator iter = stackTrace.begin(); iter < stackTrace.end(); iter++) {
         StackFrame level = *iter;
-        trace += String::format("    %i   %s\n", i, level.toString(exec).utf8().data());
+        trace.append(String::format("    %i   %s\n", i, level.toString(exec).utf8().data()));
         i++;
     }
-    fprintf(stderr, "%s", trace.utf8().data());
+    fprintf(stderr, "%s", trace.toString().utf8().data());
     return JSValue::encode(jsUndefined());
 }
 
@@ -347,17 +350,17 @@ EncodedJSValue JSC_HOST_CALL functionVersion(ExecState*)
 
 EncodedJSValue JSC_HOST_CALL functionRun(ExecState* exec)
 {
-    UString fileName = exec->argument(0).toString(exec)->value(exec);
+    String fileName = exec->argument(0).toString(exec)->value(exec);
     Vector<char> script;
     if (!fillBufferWithContentsOfFile(fileName, script))
         return JSValue::encode(throwError(exec, createError(exec, "Could not open file.")));
 
-    GlobalObject* globalObject = GlobalObject::create(exec->globalData(), GlobalObject::createStructure(exec->globalData(), jsNull()), Vector<UString>());
+    GlobalObject* globalObject = GlobalObject::create(exec->globalData(), GlobalObject::createStructure(exec->globalData(), jsNull()), Vector<String>());
 
     JSValue exception;
     StopWatch stopWatch;
     stopWatch.start();
-    evaluate(globalObject->globalExec(), globalObject->globalScopeChain(), jscSource(script.data(), fileName), JSValue(), &exception);
+    evaluate(globalObject->globalExec(), jscSource(script.data(), fileName), JSValue(), &exception);
     stopWatch.stop();
 
     if (!!exception) {
@@ -370,7 +373,7 @@ EncodedJSValue JSC_HOST_CALL functionRun(ExecState* exec)
 
 EncodedJSValue JSC_HOST_CALL functionLoad(ExecState* exec)
 {
-    UString fileName = exec->argument(0).toString(exec)->value(exec);
+    String fileName = exec->argument(0).toString(exec)->value(exec);
     Vector<char> script;
     if (!fillBufferWithContentsOfFile(fileName, script))
         return JSValue::encode(throwError(exec, createError(exec, "Could not open file.")));
@@ -378,7 +381,7 @@ EncodedJSValue JSC_HOST_CALL functionLoad(ExecState* exec)
     JSGlobalObject* globalObject = exec->lexicalGlobalObject();
     
     JSValue evaluationException;
-    JSValue result = evaluate(globalObject->globalExec(), globalObject->globalScopeChain(), jscSource(script.data(), fileName), JSValue(), &evaluationException);
+    JSValue result = evaluate(globalObject->globalExec(), jscSource(script.data(), fileName), JSValue(), &evaluationException);
     if (evaluationException)
         throwError(exec, evaluationException);
     return JSValue::encode(result);
@@ -386,7 +389,7 @@ EncodedJSValue JSC_HOST_CALL functionLoad(ExecState* exec)
 
 EncodedJSValue JSC_HOST_CALL functionCheckSyntax(ExecState* exec)
 {
-    UString fileName = exec->argument(0).toString(exec)->value(exec);
+    String fileName = exec->argument(0).toString(exec)->value(exec);
     Vector<char> script;
     if (!fillBufferWithContentsOfFile(fileName, script))
         return JSValue::encode(throwError(exec, createError(exec, "Could not open file.")));
@@ -523,7 +526,7 @@ int main(int argc, char** argv)
 static bool runWithScripts(GlobalObject* globalObject, const Vector<Script>& scripts, bool dump)
 {
     const char* script;
-    UString fileName;
+    String fileName;
     Vector<char> scriptBuffer;
 
     if (dump)
@@ -550,7 +553,7 @@ static bool runWithScripts(GlobalObject* globalObject, const Vector<Script>& scr
         globalData.startSampling();
 
         JSValue evaluationException;
-        JSValue returnValue = evaluate(globalObject->globalExec(), globalObject->globalScopeChain(), jscSource(script, fileName), JSValue(), &evaluationException);
+        JSValue returnValue = evaluate(globalObject->globalExec(), jscSource(script, fileName), JSValue(), &evaluationException);
         success = success && !evaluationException;
         if (dump && !evaluationException)
             printf("End: %s\n", returnValue.toString(globalObject->globalExec())->value(globalObject->globalExec()).utf8().data());
@@ -586,7 +589,7 @@ static bool runWithScripts(GlobalObject* globalObject, const Vector<Script>& scr
 
 static void runInteractive(GlobalObject* globalObject)
 {
-    UString interpreterName("Interpreter");
+    String interpreterName("Interpreter");
 
     while (true) {
 #if HAVE(READLINE) && !RUNNING_FROM_XCODE
@@ -596,7 +599,7 @@ static void runInteractive(GlobalObject* globalObject)
         if (line[0])
             add_history(line);
         JSValue evaluationException;
-        JSValue returnValue = evaluate(globalObject->globalExec(), globalObject->globalScopeChain(), jscSource(line, interpreterName), JSValue(), &evaluationException);
+        JSValue returnValue = evaluate(globalObject->globalExec(), jscSource(line, interpreterName), JSValue(), &evaluationException);
         free(line);
 #else
         printf("%s", interactivePrompt);
@@ -613,7 +616,7 @@ static void runInteractive(GlobalObject* globalObject)
         line.append('\0');
 
         JSValue evaluationException;
-        JSValue returnValue = evaluate(globalObject->globalExec(), globalObject->globalScopeChain(), jscSource(line.data(), interpreterName), JSValue(), &evaluationException);
+        JSValue returnValue = evaluate(globalObject->globalExec(), jscSource(line.data(), interpreterName), JSValue(), &evaluationException);
 #endif
         if (evaluationException)
             printf("Exception: %s\n", evaluationException.toString(globalObject->globalExec())->value(globalObject->globalExec()).utf8().data());
@@ -750,7 +753,7 @@ int jscmain(int argc, char** argv)
     return result;
 }
 
-static bool fillBufferWithContentsOfFile(const UString& fileName, Vector<char>& buffer)
+static bool fillBufferWithContentsOfFile(const String& fileName, Vector<char>& buffer)
 {
     FILE* f = fopen(fileName.utf8().data(), "r");
     if (!f) {

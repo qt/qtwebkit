@@ -35,9 +35,9 @@
 #include "CachedResourceLoader.h"
 #include "CSSParser.h"
 #include "Document.h"
-#include "MemoryInstrumentation.h"
 #include "StyleCachedShader.h"
 #include "StylePendingShader.h"
+#include "WebCoreMemoryInstrumentation.h"
 
 namespace WebCore {
 
@@ -82,7 +82,7 @@ String WebKitCSSShaderValue::customCssText() const
 
 void WebKitCSSShaderValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
     info.addInstrumentedMember(m_url);
 }
     

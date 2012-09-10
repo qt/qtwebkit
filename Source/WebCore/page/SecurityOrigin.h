@@ -29,8 +29,8 @@
 #ifndef SecurityOrigin_h
 #define SecurityOrigin_h
 
-#include "PlatformString.h"
 #include <wtf/ThreadSafeRefCounted.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -45,12 +45,31 @@ public:
         Ask
     };
 
+    enum StorageBlockingPolicy {
+        AllowAllStorage = 0,
+        BlockThirdPartyStorage,
+        BlockAllStorage
+    };
+
     static PassRefPtr<SecurityOrigin> create(const KURL&);
     static PassRefPtr<SecurityOrigin> createUnique();
 
     static PassRefPtr<SecurityOrigin> createFromDatabaseIdentifier(const String&);
     static PassRefPtr<SecurityOrigin> createFromString(const String&);
     static PassRefPtr<SecurityOrigin> create(const String& protocol, const String& host, int port);
+
+    // Some URL schemes use nested URLs for their security context. For example,
+    // filesystem URLs look like the following:
+    //
+    //   filesystem:http://example.com/temporary/path/to/file.png
+    //
+    // We're supposed to use "http://example.com" as the origin.
+    //
+    // Generally, we add URL schemes to this list when WebKit support them. For
+    // example, we don't include the "jar" scheme, even though Firefox
+    // understands that "jar" uses an inner URL for it's security origin.
+    static bool shouldUseInnerURL(const KURL&);
+    static KURL extractInnerURL(const KURL&);
 
     // Create a deep copy of this SecurityOrigin. This method is useful
     // when marshalling a SecurityOrigin to another thread.
@@ -121,10 +140,12 @@ public:
     // WARNING: This is an extremely powerful ability. Use with caution!
     void grantUniversalAccess();
 
-    void blockThirdPartyStorage() { m_blockThirdPartyStorage = true; }
+    void setStorageBlockingPolicy(StorageBlockingPolicy policy) { m_storageBlockingPolicy = policy; }
 
     bool canAccessDatabase(const SecurityOrigin* topOrigin = 0) const { return canAccessStorage(topOrigin); };
     bool canAccessLocalStorage(const SecurityOrigin* topOrigin) const { return canAccessStorage(topOrigin); };
+    bool canAccessSharedWorkers(const SecurityOrigin* topOrigin) const { return canAccessStorage(topOrigin); }
+    bool canAccessPluginStorage(const SecurityOrigin* topOrigin) const { return canAccessStorage(topOrigin); }
     bool canAccessCookies() const { return !isUnique(); }
     bool canAccessPasswordManager() const { return !isUnique(); }
     bool canAccessFileSystem() const { return !isUnique(); }
@@ -204,7 +225,7 @@ private:
     bool m_universalAccess;
     bool m_domainWasSetInDOM;
     bool m_canLoadLocalResources;
-    bool m_blockThirdPartyStorage;
+    StorageBlockingPolicy m_storageBlockingPolicy;
     bool m_enforceFilePathSeparation;
     bool m_needsDatabaseIdentifierQuirkForFiles;
 };

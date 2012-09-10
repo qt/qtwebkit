@@ -743,6 +743,9 @@ struct Node {
         case GetByVal:
         case StringCharAt:
         case StringCharCodeAt:
+        case CheckArray:
+        case ArrayPush:
+        case ArrayPop:
             return true;
         default:
             return false;
@@ -755,10 +758,13 @@ struct Node {
         return static_cast<Array::Mode>(m_opInfo);
     }
     
-    void setArrayMode(Array::Mode arrayMode)
+    bool setArrayMode(Array::Mode arrayMode)
     {
         ASSERT(hasArrayMode());
+        if (this->arrayMode() == arrayMode)
+            return false;
         m_opInfo = arrayMode;
+        return true;
     }
     
     bool hasVirtualRegister()
@@ -910,12 +916,27 @@ struct Node {
     {
         return isBooleanSpeculation(prediction());
     }
-    
+   
+    bool shouldSpeculateString()
+    {
+        return isStringSpeculation(prediction());
+    }
+ 
     bool shouldSpeculateFinalObject()
     {
         return isFinalObjectSpeculation(prediction());
     }
     
+    bool shouldSpeculateNonStringCell()
+    {
+        return isNonStringCellSpeculation(prediction());
+    }
+
+    bool shouldSpeculateNonStringCellOrOther()
+    {
+        return isNonStringCellOrOtherSpeculation(prediction());
+    }
+
     bool shouldSpeculateFinalObjectOrOther()
     {
         return isFinalObjectOrOtherSpeculation(prediction());

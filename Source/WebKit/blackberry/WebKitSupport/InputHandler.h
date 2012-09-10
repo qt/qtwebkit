@@ -26,6 +26,7 @@
 #include <imf/events.h>
 #include <imf/input_data.h>
 #include <map>
+#include <pthread.h>
 #include <wtf/RefPtr.h>
 
 namespace WTF {
@@ -198,6 +199,7 @@ private:
     PassRefPtr<WebCore::Range> getRangeForSpellCheckWithFineGranularity(WebCore::VisiblePosition startPosition, WebCore::VisiblePosition endPosition);
     void cancelAllSpellCheckingRequests();
     WebCore::SpellChecker* getSpellChecker();
+    bool shouldSpellCheckElement(const WebCore::Element*) const;
 
     WebPagePrivate* m_webPage;
 
@@ -217,6 +219,7 @@ private:
     bool m_delayKeyboardVisibilityChange;
 
     std::map<int32_t, int32_t> m_sequenceMap;
+    pthread_mutex_t m_sequenceMapMutex;
 };
 
 }

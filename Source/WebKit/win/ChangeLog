@@ -1,3 +1,239 @@
+2012-09-10  Dominic Mazzoni  <dmazzoni@google.com>
+
+        AX: Update Windows port accessible role mappings to fix some tests
+        https://bugs.webkit.org/show_bug.cgi?id=96219
+
+        Reviewed by Chris Fleizach.
+
+        Update a bunch of accessible role mappings to fix tests and improve win
+        accessibility.
+
+        * AccessibleBase.cpp:
+        (MSAARole):
+
+2012-09-07  Allan Sandfeld Jensen  <allan.jensen@nokia.com>
+
+        Simplify hitTestResultAtPoint and nodesFromRect APIs
+        https://bugs.webkit.org/show_bug.cgi?id=95720
+
+        Reviewed by Antonio Gomes.
+
+        Update calls to new API.
+
+        * WebActionPropertyBag.cpp:
+        (WebActionPropertyBag::Read):
+        * WebView.cpp:
+        (WebView::handleContextMenuEvent):
+        (WebView::elementAtPoint):
+
+2012-09-05  Sam Weinig  <sam@webkit.org>
+
+        Part 2 of removing PlatformString.h, remove PlatformString.h
+        https://bugs.webkit.org/show_bug.cgi?id=95931
+
+        Reviewed by Adam Barth.
+
+        Remove PlatformString.h
+
+        * DOMCSSClasses.cpp:
+        * DefaultPolicyDelegate.cpp:
+        * MarshallingHelpers.cpp:
+        * WebCoreSupport/WebInspectorClient.h:
+        * WebDownload.h:
+        * WebFrame.h:
+        * WebHistoryItem.h:
+        * WebIconDatabase.cpp:
+        * WebKitDLL.h:
+        * WebKitGraphics.cpp:
+        * WebKitSystemBits.cpp:
+        * WebLocalizableStrings.cpp:
+        * WebNotificationCenter.cpp:
+        * WebResource.h:
+
+2012-09-06  Patrick Gansterer  <paroga@webkit.org>
+
+        Remove String::operator+=() from windows platform code
+        https://bugs.webkit.org/show_bug.cgi?id=95904
+
+        Reviewed by Benjamin Poulain.
+
+        Use StringBuilder and operator+() to concatenate strings instead of operator+=().
+
+        * AccessibleBase.cpp:
+        (AccessibleBase::get_accKeyboardShortcut):
+        * WebDownload.cpp:
+        (WebDownload::bundlePathForTargetPath):
+        * WebView.cpp:
+        (imeCompositionArgumentNames):
+
+2012-09-05  Kaustubh Atrawalkar  <kaustubh@motorola.com>
+
+        [DRT] LTC:: Move printing related APIs from LayoutTestController to Internals
+        https://bugs.webkit.org/show_bug.cgi?id=92735
+
+        Reviewed by Hajime Morita.
+
+        Move numberOfPages, pageProperty & pageSizeAndMarginsInPixels in Internals and remove duplicated code from DumprenderTree & WebkitTestRunner.
+        Kept the function defination and declaration to keep binary compatibility for IWebFramePrivate.idl
+
+        * WebFrame.cpp:
+        (WebFrame::numberOfPages):
+
+2012-08-30  Benjamin Poulain  <bpoulain@apple.com>
+
+        Replace JSC::UString by WTF::String
+        https://bugs.webkit.org/show_bug.cgi?id=95271
+
+        Reviewed by Geoffrey Garen.
+
+        Replace UString by String.
+
+        * WebFrame.cpp:
+        (WebFrame::stringByEvaluatingJavaScriptInScriptWorld):
+        * WebView.cpp:
+        (WebView::stringByEvaluatingJavaScriptFromString):
+
+2012-08-29  Dominic Mazzoni  <dmazzoni@google.com>
+
+        AX: Canvas should have a distinct role
+        https://bugs.webkit.org/show_bug.cgi?id=95248
+
+        Reviewed by Chris Fleizach.
+
+        Map new CanvasRole to the same as ImageRole.
+
+        * AccessibleBase.cpp:
+        (MSAARole):
+
+2012-08-29  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r126972.
+        http://trac.webkit.org/changeset/126972
+        https://bugs.webkit.org/show_bug.cgi?id=95349
+
+        accessibility/canvas-description-and-role.html has been
+        failing consistently on several bots and Dominic needs some
+        time to investigate why (Requested by jchaffraix on #webkit).
+
+        * AccessibleBase.cpp:
+        (MSAARole):
+
+2012-08-29  Dominic Mazzoni  <dmazzoni@google.com>
+
+        AX: Canvas should have a distinct role
+        https://bugs.webkit.org/show_bug.cgi?id=95248
+
+        Reviewed by Chris Fleizach.
+
+        Map new CanvasRole to the same as ImageRole.
+
+        * AccessibleBase.cpp:
+        (MSAARole):
+
+2012-08-28  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r126914.
+        http://trac.webkit.org/changeset/126914
+        https://bugs.webkit.org/show_bug.cgi?id=95239
+
+        it breaks everything and fixes nothing (Requested by pizlo on
+        #webkit).
+
+        * COMPropertyBag.h:
+        (::Read):
+        (::GetPropertyInfo):
+        * WebCoreStatistics.cpp:
+        (WebCoreStatistics::javaScriptProtectedObjectTypeCounts):
+        * WebCoreSupport/WebPlatformStrategies.cpp:
+        (WebPlatformStrategies::getPluginInfo):
+        * WebHistory.cpp:
+        (WebHistory::removeItemFromDateCaches):
+        * WebKitCOMAPI.cpp:
+        (classFactory):
+        * WebKitStatistics.cpp:
+        (WebKitStatistics::comClassNameCounts):
+        * WebNotificationCenter.cpp:
+        (WebNotificationCenter::postNotificationInternal):
+        (WebNotificationCenter::addObserver):
+        (WebNotificationCenter::removeObserver):
+
+2012-08-28  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        Rename first/second to key/value in HashMap iterators
+        https://bugs.webkit.org/show_bug.cgi?id=82784
+
+        Reviewed by Eric Seidel.
+
+        * COMPropertyBag.h:
+        (::Read):
+        (::GetPropertyInfo):
+        * WebCoreStatistics.cpp:
+        (WebCoreStatistics::javaScriptProtectedObjectTypeCounts):
+        * WebCoreSupport/WebPlatformStrategies.cpp:
+        (WebPlatformStrategies::getPluginInfo):
+        * WebHistory.cpp:
+        (WebHistory::removeItemFromDateCaches):
+        * WebKitCOMAPI.cpp:
+        (classFactory):
+        * WebKitStatistics.cpp:
+        (WebKitStatistics::comClassNameCounts):
+        * WebNotificationCenter.cpp:
+        (WebNotificationCenter::postNotificationInternal):
+        (WebNotificationCenter::addObserver):
+        (WebNotificationCenter::removeObserver):
+
+2012-08-27  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r126836.
+        http://trac.webkit.org/changeset/126836
+        https://bugs.webkit.org/show_bug.cgi?id=95163
+
+        Broke all Apple ports, EFL, and Qt. (Requested by tkent on
+        #webkit).
+
+        * COMPropertyBag.h:
+        (::Read):
+        (::GetPropertyInfo):
+        * WebCoreStatistics.cpp:
+        (WebCoreStatistics::javaScriptProtectedObjectTypeCounts):
+        * WebCoreSupport/WebPlatformStrategies.cpp:
+        (WebPlatformStrategies::getPluginInfo):
+        * WebHistory.cpp:
+        (WebHistory::removeItemFromDateCaches):
+        * WebKitCOMAPI.cpp:
+        (classFactory):
+        * WebKitStatistics.cpp:
+        (WebKitStatistics::comClassNameCounts):
+        * WebNotificationCenter.cpp:
+        (WebNotificationCenter::postNotificationInternal):
+        (WebNotificationCenter::addObserver):
+        (WebNotificationCenter::removeObserver):
+
+2012-08-27  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        Rename first/second to key/value in HashMap iterators
+        https://bugs.webkit.org/show_bug.cgi?id=82784
+
+        Reviewed by Eric Seidel.
+
+        * COMPropertyBag.h:
+        (::Read):
+        (::GetPropertyInfo):
+        * WebCoreStatistics.cpp:
+        (WebCoreStatistics::javaScriptProtectedObjectTypeCounts):
+        * WebCoreSupport/WebPlatformStrategies.cpp:
+        (WebPlatformStrategies::getPluginInfo):
+        * WebHistory.cpp:
+        (WebHistory::removeItemFromDateCaches):
+        * WebKitCOMAPI.cpp:
+        (classFactory):
+        * WebKitStatistics.cpp:
+        (WebKitStatistics::comClassNameCounts):
+        * WebNotificationCenter.cpp:
+        (WebNotificationCenter::postNotificationInternal):
+        (WebNotificationCenter::addObserver):
+        (WebNotificationCenter::removeObserver):
+
 2012-08-23  Adrienne Walker  <enne@google.com>
 
         Convert ScrollableArea ASSERT_NOT_REACHED virtuals

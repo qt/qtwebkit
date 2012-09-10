@@ -234,9 +234,12 @@ public:
 
 #if ENABLE(NOTIFICATIONS)
     // Grants permission for desktop notifications to an origin
-    void grantDesktopNotificationPermission(const CppArgumentList&, CppVariant*);
+    void grantWebNotificationPermission(const CppArgumentList&, CppVariant*);
+    void denyWebNotificationPermission(const CppArgumentList&, CppVariant*);
+    void removeAllWebNotificationPermissions(const CppArgumentList&, CppVariant*);
+    void simulateWebNotificationClick(const CppArgumentList&, CppVariant*);
     // Simulates a click on a desktop notification.
-    void simulateDesktopNotificationClick(const CppArgumentList&, CppVariant*);
+    void simulateLegacyWebNotificationClick(const CppArgumentList&, CppVariant*);
 #endif
 
     void setDomainRelaxationForbiddenForURLScheme(const CppArgumentList&, CppVariant*);
@@ -311,18 +314,9 @@ public:
     // Causes layout to happen as if targetted to printed pages.
     void setPrinting(const CppArgumentList&, CppVariant*);
 
-    // Gets the page size and margins for a printed page.
-    void pageSizeAndMarginsInPixels(const CppArgumentList&, CppVariant*);
-
     // Returns true if the current page box has custom page size style for
     // printing.
     void hasCustomPageSizeStyle(const CppArgumentList&, CppVariant*);
-
-    // Gets the page-related property for printed content
-    void pageProperty(const CppArgumentList&, CppVariant*);
-
-    // Gets the number of pages to be printed.
-    void numberOfPages(const CppArgumentList&, CppVariant*);
 
     // Gets the number of geolocation permissions requests pending.
     void numberOfPendingGeolocationPermissionRequests(const CppArgumentList&, CppVariant*);
@@ -413,9 +407,11 @@ public:
     void setAutomaticLinkDetectionEnabled(bool);
 
 #if ENABLE(POINTER_LOCK)
+    void didAcquirePointerLock(const CppArgumentList&, CppVariant*);
+    void didNotAcquirePointerLock(const CppArgumentList&, CppVariant*);
     void didLosePointerLock(const CppArgumentList&, CppVariant*);
     void setPointerLockWillFailSynchronously(const CppArgumentList&, CppVariant*);
-    void setPointerLockWillFailAsynchronously(const CppArgumentList&, CppVariant*);
+    void setPointerLockWillRespondAsynchronously(const CppArgumentList&, CppVariant*);
 #endif
 
     void workerThreadCount(CppVariant*);

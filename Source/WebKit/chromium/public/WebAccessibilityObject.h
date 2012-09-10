@@ -69,6 +69,7 @@ public:
     WEBKIT_EXPORT bool equals(const WebAccessibilityObject&) const;
 
     bool isNull() const { return m_private.isNull(); }
+    // isDetached also checks for null, so it's safe to just call isDetached.
     WEBKIT_EXPORT bool isDetached() const;
 
     // Static methods for enabling accessibility.
@@ -77,11 +78,17 @@ public:
 
     WEBKIT_EXPORT int axID() const;
 
+    // Update the underlying tree, and return true if this object is
+    // still valid (not detached). Note that calling this method
+    // can cause other WebAccessibilityObjects to become invalid, too,
+    // so always call isDetached if updateBackingStoreAndCheckValidity
+    // has been called on any object, or if any other WebCore code has run.
+    WEBKIT_EXPORT bool updateBackingStoreAndCheckValidity();
+
     WEBKIT_EXPORT WebString accessibilityDescription() const;
     WEBKIT_EXPORT WebString actionVerb() const;
     WEBKIT_EXPORT bool canSetFocusAttribute() const;
     WEBKIT_EXPORT bool canSetValueAttribute() const;
-    WEBKIT_EXPORT bool isValid() const;
 
     WEBKIT_EXPORT unsigned childCount() const;
 
@@ -126,6 +133,7 @@ public:
     WEBKIT_EXPORT WebString ariaLiveRegionRelevant() const;
     WEBKIT_EXPORT WebString ariaLiveRegionStatus() const;
     WEBKIT_EXPORT WebRect boundingBoxRect() const;
+    WEBKIT_EXPORT bool canvasHasFallbackContent() const;
     WEBKIT_EXPORT double estimatedLoadingProgress() const;
     WEBKIT_EXPORT WebString helpText() const;
     WEBKIT_EXPORT int headingLevel() const;
@@ -142,6 +150,7 @@ public:
     WEBKIT_EXPORT WebAccessibilityObject titleUIElement() const;
     WEBKIT_EXPORT WebURL url() const;
 
+    WEBKIT_EXPORT bool supportsRangeValue() const;
     WEBKIT_EXPORT WebString valueDescription() const;
     WEBKIT_EXPORT float valueForRange() const;
     WEBKIT_EXPORT float maxValueForRange() const;

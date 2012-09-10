@@ -193,8 +193,6 @@ public:
 
     IntSize viewportSize() const { return document()->viewportSize(); }
 
-    void setFixedPositionedObjectsNeedLayout();
-
     void setRenderQuoteHead(RenderQuote* head) { m_renderQuoteHead = head; }
     RenderQuote* renderQuoteHead() const { return m_renderQuoteHead; }
 
@@ -351,17 +349,7 @@ public:
         , m_didCreateLayoutState(false)
     {
     }
-    
-    LayoutStateMaintainer(RenderView* view, RenderFlowThread* flowThread, bool regionsChanged)
-        : m_view(view)
-        , m_disabled(false)
-        , m_didStart(false)
-        , m_didEnd(false)
-        , m_didCreateLayoutState(false)
-    {
-        push(flowThread, regionsChanged);
-    }
-    
+
     ~LayoutStateMaintainer()
     {
         ASSERT(m_didStart == m_didEnd);   // if this fires, it means that someone did a push(), but forgot to pop().
@@ -374,14 +362,6 @@ public:
         m_didCreateLayoutState = m_view->pushLayoutState(root, offset, pageHeight, pageHeightChanged, colInfo);
         if (m_disabled && m_didCreateLayoutState)
             m_view->disableLayoutState();
-        m_didStart = true;
-    }
-    
-    void push(RenderFlowThread* flowThread, bool regionsChanged)
-    {
-        ASSERT(!m_didStart);
-        m_view->pushLayoutState(flowThread, regionsChanged);
-        m_didCreateLayoutState = true;
         m_didStart = true;
     }
 

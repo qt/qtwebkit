@@ -129,6 +129,7 @@ public:
     HTMLElement* speechButtonElement() const;
 #endif
     HTMLElement* sliderThumbElement() const;
+    HTMLElement* sliderTrackElement() const;
     virtual HTMLElement* placeholderElement() const;
 
     bool checked() const { return m_isChecked; }
@@ -276,6 +277,11 @@ public:
     void setHeight(unsigned);
     void setWidth(unsigned);
 
+    virtual void blur() OVERRIDE;
+    void defaultBlur();
+    void defaultFocus(bool restorePreviousSelection);
+    virtual void focus(bool restorePreviousSelection = true) OVERRIDE;
+
     virtual const AtomicString& name() const OVERRIDE;
 
     static Vector<FileChooserFileInfo> filesFromFileInputFormControlState(const FormControlState&);
@@ -284,6 +290,9 @@ protected:
     HTMLInputElement(const QualifiedName&, Document*, HTMLFormElement*, bool createdByParser);
     void createShadowSubtree();
     virtual void defaultEventHandler(Event*);
+    // FIXME: Author shadows should be allowed
+    // https://bugs.webkit.org/show_bug.cgi?id=92608
+    virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
 
 private:
     enum AutoCompleteSetting { Uninitialized, On, Off };
@@ -294,6 +303,7 @@ private:
     virtual void removedFrom(ContainerNode*) OVERRIDE;
     virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
 
+    virtual bool hasCustomFocusLogic() const OVERRIDE;
     virtual bool isKeyboardFocusable(KeyboardEvent*) const;
     virtual bool isMouseFocusable() const;
     virtual bool isEnumeratable() const;

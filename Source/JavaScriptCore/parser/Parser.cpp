@@ -40,7 +40,7 @@ using namespace std;
 namespace JSC {
 
 template <typename LexerType>
-Parser<LexerType>::Parser(JSGlobalData* globalData, const SourceCode& source, FunctionParameters* parameters, JSParserStrictness strictness, JSParserMode parserMode)
+Parser<LexerType>::Parser(JSGlobalData* globalData, const SourceCode& source, FunctionParameters* parameters, const Identifier& name, JSParserStrictness strictness, JSParserMode parserMode)
     : m_globalData(globalData)
     , m_source(&source)
     , m_stack(wtfThreadData().stack())
@@ -71,6 +71,8 @@ Parser<LexerType>::Parser(JSGlobalData* globalData, const SourceCode& source, Fu
         for (unsigned i = 0; i < parameters->size(); i++)
             scope->declareParameter(&parameters->at(i));
     }
+    if (!name.isNull())
+        scope->declareCallee(&name);
     next();
     m_lexer->setLastLineNumber(tokenLine());
 }
@@ -81,9 +83,9 @@ Parser<LexerType>::~Parser()
 }
 
 template <typename LexerType>
-UString Parser<LexerType>::parseInner()
+String Parser<LexerType>::parseInner()
 {
-    UString parseError = UString();
+    String parseError = String();
     
     unsigned oldFunctionCacheSize = m_functionCache ? m_functionCache->byteSize() : 0;
     ASTBuilder context(const_cast<JSGlobalData*>(m_globalData), const_cast<SourceCode*>(m_source));
@@ -1507,7 +1509,7 @@ template <class TreeBuilder> TreeExpression Parser<LexerType>::parsePrimaryExpre
         next();
         TreeExpression re = context.createRegExp(location, *pattern, *flags, start);
         if (!re) {
-            const char* yarrErrorMsg = Yarr::checkSyntax(pattern->ustring());
+            const char* yarrErrorMsg = Yarr::checkSyntax(pattern->string());
             ASSERT(!m_errorMessage.isNull());
             failWithMessage(yarrErrorMsg);
         }

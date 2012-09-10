@@ -135,10 +135,16 @@ void TouchEventHandler::touchEventCancel()
 
     // If we cancel a single touch event, we need to also clean up any hover
     // state we get into by synthetically moving the mouse to the m_fingerPoint.
-    Element* elementUnderFatFinger = m_lastFatFingersResult.nodeAsElementIfApplicable();
-    if (elementUnderFatFinger && elementUnderFatFinger->renderer()) {
+    Element* elementUnderFatFinger = m_lastFatFingersResult.positionWasAdjusted() ? m_lastFatFingersResult.nodeAsElementIfApplicable() : 0;
+    do {
+        if (!elementUnderFatFinger || !elementUnderFatFinger->renderer())
+            break;
 
-        HitTestRequest request(HitTestRequest::FingerUp);
+        if (!elementUnderFatFinger->renderer()->style()->affectedByHoverRules()
+            && !elementUnderFatFinger->renderer()->style()->affectedByActiveRules())
+            break;
+
+        HitTestRequest request(HitTestRequest::TouchEvent | HitTestRequest::Release);
         // The HitTestResult point is not actually needed.
         HitTestResult result(IntPoint::zero());
         result.setInnerNode(elementUnderFatFinger);
@@ -147,11 +153,14 @@ void TouchEventHandler::touchEventCancel()
         ASSERT(document);
         document->renderView()->layer()->updateHoverActiveState(request, result);
         document->updateStyleIfNeeded();
+
         // Updating the document style may destroy the renderer.
-        if (elementUnderFatFinger->renderer())
-            elementUnderFatFinger->renderer()->repaint();
+        if (!elementUnderFatFinger->renderer())
+            break;
+
+        elementUnderFatFinger->renderer()->repaint();
         ASSERT(!elementUnderFatFinger->hovered());
-    }
+    } while (0);
 
     m_lastFatFingersResult.reset();
 }
@@ -220,7 +229,9 @@ bool TouchEventHandler::handleTouchPoint(Platform::TouchPoint& point, bool useFa
             bool shouldRequestSpellCheckOptions = false;
 
             if (m_lastFatFingersResult.isTextInput())
-                shouldRequestSpellCheckOptions = m_webPage->m_inputHandler->shouldRequestSpellCheckingOptionsForPoint(point.m_pos, m_lastFatFingersResult.nodeAsElementIfApplicable(), spellCheckOptionRequest);
+                shouldRequestSpellCheckOptions = m_webPage->m_inputHandler->shouldRequestSpellCheckingOptionsForPoint(point.m_pos
+                                                                                                                      , m_lastFatFingersResult.nodeAsElementIfApplicable(FatFingersResult::ShadowContentNotAllowed)
+                                                                                                                      , spellCheckOptionRequest);
 
             // Apply any suppressed changes. This does not eliminate the need
             // for the show after the handling of fat finger pressed as it may
@@ -343,7 +354,7 @@ void TouchEventHandler::drawTapHighlight()
     // On the client side, this info is being used to hide the tap highlight window on scroll.
     RenderLayer* layer = m_webPage->enclosingFixedPositionedAncestorOrSelfIfFixedPositioned(renderer->enclosingLayer());
     bool shouldHideTapHighlightRightAfterScrolling = !layer->renderer()->isRenderView();
-    shouldHideTapHighlightRightAfterScrolling |= !!m_webPage->m_inRegionScroller->d->node();
+    shouldHideTapHighlightRightAfterScrolling |= !!m_webPage->m_inRegionScroller->d->isActive();
 
     IntPoint framePos(m_webPage->frameOffset(elementFrame));
 

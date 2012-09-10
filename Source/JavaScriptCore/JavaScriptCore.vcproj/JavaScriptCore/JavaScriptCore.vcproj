@@ -882,11 +882,27 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\runtime\JSStaticScopeObject.cpp"
+				RelativePath="..\..\runtime\JSWithScope.cpp"
 				>
 			</File>
 			<File
-				RelativePath="..\..\runtime\JSStaticScopeObject.h"
+				RelativePath="..\..\runtime\JSWithScope.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\runtime\JSNameScope.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\runtime\JSNameScope.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\runtime\JSScope.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\runtime\JSScope.h"
 				>
 			</File>
 			<File
@@ -1178,18 +1194,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\runtime\ScopeChain.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\runtime\ScopeChain.h"
-				>
-			</File>
-			<File
-				RelativePath="..\..\runtime\ScopeChainMark.h"
-				>
-			</File>
-			<File
 				RelativePath="..\..\runtime\SmallStrings.cpp"
 				>
 			</File>
@@ -1275,26 +1279,6 @@
 			</File>
 			<File
 				RelativePath="..\..\runtime\TimeoutChecker.h"
-				>
-			</File>
-			<File
-				RelativePath="..\..\runtime\UString.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\runtime\UString.h"
-				>
-			</File>
-			<File
-				RelativePath="..\..\runtime\UStringBuilder.h"
-				>
-			</File>
-			<File
-				RelativePath="..\..\runtime\UStringConcatenate.h"
-				>
-			</File>
-			<File
-				RelativePath="..\..\runtime\UStringImpl.h"
 				>
 			</File>
 			<File

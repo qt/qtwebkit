@@ -52,7 +52,6 @@
 #include "WebViewBenchmarkSupportImpl.h"
 #include <public/WebFloatQuad.h>
 #include <public/WebLayer.h>
-#include <public/WebLayerTreeView.h>
 #include <public/WebLayerTreeViewClient.h>
 #include <public/WebPoint.h>
 #include <public/WebRect.h>
@@ -95,7 +94,6 @@ class DeviceOrientationClientProxy;
 class DragScrollTimer;
 class GeolocationClientProxy;
 class LinkHighlight;
-class WebHelperPluginImpl;
 class NonCompositedContentHost;
 class PrerendererClientImpl;
 class SpeechInputClientImpl;
@@ -107,15 +105,17 @@ class WebDevToolsAgentClient;
 class WebDevToolsAgentPrivate;
 class WebFrameImpl;
 class WebGestureEvent;
-class WebPagePopupImpl;
-class WebPrerendererClient;
-class WebViewBenchmarkSupport;
+class WebHelperPluginImpl;
 class WebImage;
 class WebKeyboardEvent;
+class WebLayerTreeView;
 class WebMouseEvent;
 class WebMouseWheelEvent;
+class WebPagePopupImpl;
+class WebPrerendererClient;
 class WebSettingsImpl;
 class WebTouchEvent;
+class WebViewBenchmarkSupport;
 
 class WebViewImpl : public WebView
                   , public WebLayerTreeViewClient
@@ -305,11 +305,6 @@ public:
     virtual void transferActiveWheelFlingAnimation(const WebActiveWheelFlingParameters&);
     virtual WebViewBenchmarkSupport* benchmarkSupport();
 
-    virtual WebVector<WebFloatQuad> getTouchHighlightQuads(const WebPoint&,
-                                                           int padding,
-                                                           WebTouchCandidatesInfo& outTouchInfo,
-                                                           WebColor& outTapHighlightColor);
-
     // WebLayerTreeViewClient
     virtual void willBeginFrame();
     virtual void didBeginFrame();
@@ -319,6 +314,7 @@ public:
     virtual void didRebindGraphicsContext(bool success) OVERRIDE;
     virtual WebCompositorOutputSurface* createOutputSurface() OVERRIDE;
     virtual void didRecreateOutputSurface(bool success) OVERRIDE;
+    virtual WebInputHandler* createInputHandler() OVERRIDE;
     virtual void willCommit();
     virtual void didCommit();
     virtual void didCommitAndDrawFrame();
@@ -824,7 +820,7 @@ private:
 #if USE(ACCELERATED_COMPOSITING)
     WebCore::IntRect m_rootLayerScrollDamage;
     OwnPtr<NonCompositedContentHost> m_nonCompositedContentHost;
-    WebLayerTreeView m_layerTreeView;
+    OwnPtr<WebLayerTreeView> m_layerTreeView;
     WebLayer* m_rootLayer;
     WebCore::GraphicsLayer* m_rootGraphicsLayer;
     bool m_isAcceleratedCompositingActive;
@@ -833,6 +829,7 @@ private:
     bool m_recreatingGraphicsContext;
     bool m_compositorSurfaceReady;
     float m_deviceScaleInCompositor;
+    int m_inputHandlerIdentifier;
 #endif
     static const WebInputEvent* m_currentInputEvent;
 
@@ -854,8 +851,8 @@ private:
 #if ENABLE(MEDIA_STREAM)
     UserMediaClientImpl m_userMediaClientImpl;
 #endif
-#if ENABLE(REGISTER_PROTOCOL_HANDLER)
-    OwnPtr<RegisterProtocolHandlerClientImpl> m_registerProtocolHandlerClient;
+#if ENABLE(NAVIGATOR_CONTENT_UTILS)
+    OwnPtr<NavigatorContentUtilsClientImpl> m_navigatorContentUtilsClient;
 #endif
     OwnPtr<WebCore::ActivePlatformGestureAnimation> m_gestureAnimation;
     WebPoint m_lastWheelPosition;

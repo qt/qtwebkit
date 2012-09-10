@@ -897,7 +897,7 @@ void WebPageProxy::executeEditCommand(const String& commandName)
     if (!isValid())
         return;
 
-    DEFINE_STATIC_LOCAL(String, ignoreSpellingCommandName, ("ignoreSpelling"));
+    DEFINE_STATIC_LOCAL(String, ignoreSpellingCommandName, (ASCIILiteral("ignoreSpelling")));
     if (commandName == ignoreSpellingCommandName)
         ++m_pendingLearnOrIgnoreWordMessageCount;
 
@@ -2707,11 +2707,11 @@ void WebPageProxy::needTouchEvents(bool needTouchEvents)
 #endif
 
 #if ENABLE(INPUT_TYPE_COLOR)
-void WebPageProxy::showColorChooser(const WebCore::Color& initialColor)
+void WebPageProxy::showColorChooser(const WebCore::Color& initialColor, const IntRect& elementRect)
 {
     ASSERT(!m_colorChooser);
 
-    m_colorChooser = m_pageClient->createColorChooserProxy(this, initialColor);
+    m_colorChooser = m_pageClient->createColorChooserProxy(this, initialColor, elementRect);
 }
 
 void WebPageProxy::setColorChooserColor(const WebCore::Color& color)
@@ -2911,6 +2911,9 @@ void WebPageProxy::showPopupMenu(const IntRect& rect, uint64_t textDirection, co
 
     m_activePopupMenu = m_pageClient->createPopupMenuProxy(this);
 
+    if (!m_activePopupMenu)
+        return;
+
     // Since showPopupMenu() can spin a nested run loop we need to turn off the responsiveness timer.
     m_process->responsivenessTimer()->stop();
 
@@ -2918,8 +2921,8 @@ void WebPageProxy::showPopupMenu(const IntRect& rect, uint64_t textDirection, co
 
     protectedActivePopupMenu->showPopupMenu(rect, static_cast<TextDirection>(textDirection), m_pageScaleFactor, items, data, selectedIndex);
 
-    // Since Qt doesn't use a nested mainloop the show the popup and get the answer, we need to keep the client pointer valid.
-#if !PLATFORM(QT)
+    // Since Qt and Efl doesn't use a nested mainloop to show the popup and get the answer, we need to keep the client pointer valid.
+#if !PLATFORM(QT) && !PLATFORM(EFL)
     protectedActivePopupMenu->invalidate();
 #endif
     protectedActivePopupMenu = 0;
@@ -2959,6 +2962,8 @@ void WebPageProxy::internalShowContextMenu(const IntPoint& menuLocation, const W
     }
 
     m_activeContextMenu = m_pageClient->createContextMenuProxy(this);
+    if (!m_activeContextMenu)
+        return;
 
     // Since showContextMenu() can spin a nested run loop we need to turn off the responsiveness timer.
     m_process->responsivenessTimer()->stop();

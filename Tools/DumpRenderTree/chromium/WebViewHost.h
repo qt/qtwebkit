@@ -98,6 +98,7 @@ class WebViewHost : public WebKit::WebViewClient, public WebKit::WebFrameClient,
     virtual void setEditCommand(const std::string& name, const std::string& value) OVERRIDE;
     virtual void clearEditCommand() OVERRIDE;
     void setPendingExtraData(PassOwnPtr<TestShellExtraData>);
+    void setDeviceScaleFactor(float);
 
     virtual void setGamepadData(const WebKit::WebGamepads&);
 
@@ -127,8 +128,10 @@ class WebViewHost : public WebKit::WebViewClient, public WebKit::WebFrameClient,
 #endif
 
 #if ENABLE(POINTER_LOCK)
+    void didAcquirePointerLock();
+    void didNotAcquirePointerLock();
     void didLosePointerLock();
-    void setPointerLockWillFailAsynchronously() { m_pointerLockPlannedResult = PointerLockWillFailAsync; }
+    void setPointerLockWillRespondAsynchronously() { m_pointerLockPlannedResult = PointerLockWillRespondAsync; }
     void setPointerLockWillFailSynchronously() { m_pointerLockPlannedResult = PointerLockWillFailSync; }
 #endif
 
@@ -149,7 +152,7 @@ class WebViewHost : public WebKit::WebViewClient, public WebKit::WebFrameClient,
     virtual WebKit::WebWidget* createPopupMenu(WebKit::WebPopupType);
     virtual WebKit::WebWidget* createPopupMenu(const WebKit::WebPopupMenuInfo&);
     virtual WebKit::WebStorageNamespace* createSessionStorageNamespace(unsigned quota);
-    virtual WebKit::WebGraphicsContext3D* createGraphicsContext3D(const WebKit::WebGraphicsContext3D::Attributes&);
+    virtual WebKit::WebCompositorOutputSurface* createOutputSurface();
     virtual void didAddMessageToConsole(const WebKit::WebConsoleMessage&, const WebKit::WebString& sourceName, unsigned sourceLine);
     virtual void didStartLoading();
     virtual void didStopLoading();
@@ -339,11 +342,6 @@ private:
     void resetScrollRect();
     void discardBackingStore();
 
-#if ENABLE(POINTER_LOCK)
-    void didAcquirePointerLock();
-    void didNotAcquirePointerLock();
-#endif
-
 #if ENABLE(MEDIA_STREAM)
     WebKit::WebUserMediaClientMock* userMediaClientMock();
     webkit_support::TestMediaStreamClient* testMediaStreamClient();
@@ -448,7 +446,7 @@ private:
     bool m_pointerLocked;
     enum {
         PointerLockWillSucceed,
-        PointerLockWillFailAsync,
+        PointerLockWillRespondAsync,
         PointerLockWillFailSync
     } m_pointerLockPlannedResult;
 #endif

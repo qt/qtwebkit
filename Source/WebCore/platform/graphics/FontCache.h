@@ -41,8 +41,7 @@
 #include <mlang.h>
 #endif
 
-namespace WebCore
-{
+namespace WebCore {
 
 class Font;
 class FontPlatformData;
@@ -106,7 +105,11 @@ public:
 #endif
 
 #if ENABLE(OPENTYPE_VERTICAL)
+#if USE(SKIA)
+    typedef uint32_t FontFileKey;
+#else
     typedef AtomicString FontFileKey;
+#endif
     OpenTypeVerticalData* getVerticalData(const FontFileKey&, const FontPlatformData&);
 #endif
 

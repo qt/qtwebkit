@@ -476,7 +476,7 @@ static AtkRole atkRole(AccessibilityRole role)
     case SplitGroupRole:
         return ATK_ROLE_SPLIT_PANE;
     case SplitterRole:
-        return ATK_ROLE_SEPARATOR;
+        return ATK_ROLE_UNKNOWN;
     case ColorWellRole:
         return ATK_ROLE_COLOR_CHOOSER;
     case ListRole:
@@ -524,6 +524,10 @@ static AtkRole atkRole(AccessibilityRole role)
         return ATK_ROLE_SECTION;
     case FormRole:
         return ATK_ROLE_FORM;
+    case CanvasRole:
+        return ATK_ROLE_CANVAS;
+    case HorizontalRuleRole:
+        return ATK_ROLE_SEPARATOR;
     default:
         return ATK_ROLE_UNKNOWN;
     }
@@ -819,7 +823,7 @@ static GType GetAtkInterfaceTypeFromWAIType(WAIType type)
 
 static bool roleIsTextType(AccessibilityRole role)
 {
-    return role == ParagraphRole || role == HeadingRole || role == DivRole || role == CellRole;
+    return role == ParagraphRole || role == HeadingRole || role == DivRole || role == CellRole || role == ListItemRole;
 }
 
 static guint16 getInterfaceMaskFromObject(AccessibilityObject* coreObject)

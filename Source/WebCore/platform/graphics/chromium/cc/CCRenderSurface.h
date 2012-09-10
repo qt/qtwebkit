@@ -29,6 +29,7 @@
 
 #if USE(ACCELERATED_COMPOSITING)
 
+#include "CCRenderPass.h"
 #include "CCSharedQuadState.h"
 #include "FloatRect.h"
 #include "IntRect.h"
@@ -40,9 +41,11 @@ namespace WebCore {
 
 class CCDamageTracker;
 class CCQuadSink;
-class CCRenderPass;
+class CCRenderPassSink;
 class CCLayerImpl;
 class TextStream;
+
+struct CCAppendQuadsData;
 
 class CCRenderSurface {
     WTF_MAKE_NONCOPYABLE(CCRenderSurface);
@@ -103,7 +106,10 @@ public:
 
     CCDamageTracker* damageTracker() const { return m_damageTracker.get(); }
 
-    void appendQuads(CCQuadSink&, bool forReplica, int renderPassId);
+    CCRenderPass::Id renderPassId();
+
+    void appendRenderPasses(CCRenderPassSink&);
+    void appendQuads(CCQuadSink&, CCAppendQuadsData&, bool forReplica, CCRenderPass::Id renderPassId);
 
 private:
     CCLayerImpl* m_owningLayer;

@@ -108,6 +108,7 @@ public:
     void overrideXSSAuditorEnabledForTestRunner(WebPageGroupProxy* pageGroup, bool enabled);
     void setAllowUniversalAccessFromFileURLs(WebPageGroupProxy*, bool);
     void setAllowFileAccessFromFileURLs(WebPageGroupProxy*, bool);
+    void setMinimumLogicalFontSize(WebPageGroupProxy*, int size);
     void setFrameFlatteningEnabled(WebPageGroupProxy*, bool);
     void setPluginsEnabled(WebPageGroupProxy*, bool);
     void setGeoLocationPermission(WebPageGroupProxy*, bool);
@@ -124,6 +125,9 @@ public:
     String pageSizeAndMarginsInPixels(WebFrame*, int, int, int, int, int, int, int);
     bool isPageBoxVisible(WebFrame*, int);
     void setUserStyleSheetLocation(WebPageGroupProxy*, const String&);
+    void setWebNotificationPermission(WebPage*, const String& originString, bool allowed);
+    void removeAllWebNotificationPermissions(WebPage*);
+    uint64_t webNotificationID(JSContextRef, JSValueRef);
 
     // UserContent API
     void addUserScript(WebPageGroupProxy*, InjectedBundleScriptWorld*, const String& source, const String& url, ImmutableArray* whitelist, ImmutableArray* blacklist, WebCore::UserScriptInjectionTime, WebCore::UserContentInjectedFrames);
@@ -163,7 +167,7 @@ public:
     void setPageVisibilityState(WebPage*, int state, bool isInitialState);
 
 private:
-    InjectedBundle(const String&);
+    explicit InjectedBundle(const String&);
 
     virtual Type type() const { return APIType; }
 

@@ -31,7 +31,7 @@
 #ifndef V8DOMMap_h
 #define V8DOMMap_h
 
-#include "MemoryInstrumentation.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/HashMap.h>
 #include <wtf/OwnPtr.h>
 #include <v8.h>
@@ -136,7 +136,7 @@ namespace WebCore {
 
         virtual void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const OVERRIDE
         {
-            MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::Binding);
+            MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Binding);
             info.addHashMap(m_map);
         }
 
@@ -152,7 +152,7 @@ namespace WebCore {
     // A utility class to manage the lifetime of set of DOM wrappers.
     class DOMDataStoreHandle {
     public:
-        DOMDataStoreHandle();
+        DOMDataStoreHandle(bool initialize);
         ~DOMDataStoreHandle();
 
         DOMDataStore* getStore() const { return m_store.get(); }

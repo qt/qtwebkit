@@ -734,11 +734,12 @@ Could be worth adding to the API.
 @interface WebView (WebViewNotification)
 - (void)_setNotificationProvider:(id<WebNotificationProvider>)notificationProvider;
 - (id<WebNotificationProvider>)_notificationProvider;
-- (void)_notificationControllerDestroyed;
 
 - (void)_notificationDidShow:(uint64_t)notificationID;
 - (void)_notificationDidClick:(uint64_t)notificationID;
 - (void)_notificationsDidClose:(NSArray *)notificationIDs;
+
+- (uint64_t)_notificationIDForTesting:(JSValueRef)jsNotification;
 @end
 
 @interface WebView (WebViewPrivateStyleInfo)

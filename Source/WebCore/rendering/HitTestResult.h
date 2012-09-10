@@ -25,7 +25,7 @@
 #include "FloatQuad.h"
 #include "FloatRect.h"
 #include "HitTestRequest.h"
-#include "LayoutTypes.h"
+#include "LayoutTypesInlineMethods.h"
 #include "TextDirection.h"
 #include <wtf/Forward.h>
 #include <wtf/ListHashSet.h>
@@ -45,22 +45,20 @@ class Node;
 class RenderRegion;
 class Scrollbar;
 
-enum ShadowContentFilterPolicy { DoNotAllowShadowContent, AllowShadowContent };
-
-class HitTestPoint {
+class HitTestLocation {
 public:
 
-    HitTestPoint();
-    HitTestPoint(const LayoutPoint&);
-    HitTestPoint(const FloatPoint&);
-    HitTestPoint(const FloatPoint&, const FloatQuad&);
+    HitTestLocation();
+    HitTestLocation(const LayoutPoint&);
+    HitTestLocation(const FloatPoint&);
+    HitTestLocation(const FloatPoint&, const FloatQuad&);
     // Pass non-zero padding values to perform a rect-based hit test.
-    HitTestPoint(const LayoutPoint& centerPoint, unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding);
-    // Make a copy the HitTestPoint in a new region by applying given offset to internal point and area.
-    HitTestPoint(const HitTestPoint&, const LayoutSize& offset, RenderRegion*);
-    HitTestPoint(const HitTestPoint&);
-    ~HitTestPoint();
-    HitTestPoint& operator=(const HitTestPoint&);
+    HitTestLocation(const LayoutPoint& centerPoint, unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding);
+    // Make a copy the HitTestLocation in a new region by applying given offset to internal point and area.
+    HitTestLocation(const HitTestLocation&, const LayoutSize& offset, RenderRegion* = 0);
+    HitTestLocation(const HitTestLocation&);
+    ~HitTestLocation();
+    HitTestLocation& operator=(const HitTestLocation&);
 
     LayoutPoint point() const { return m_point; }
     IntPoint roundedPoint() const { return roundedIntPoint(m_point); }
@@ -102,15 +100,15 @@ private:
     bool m_isRectilinear;
 };
 
-class HitTestResult : public HitTestPoint {
+class HitTestResult : public HitTestLocation {
 public:
     typedef ListHashSet<RefPtr<Node> > NodeSet;
 
     HitTestResult();
     HitTestResult(const LayoutPoint&);
     // Pass non-negative padding values to perform a rect-based hit test.
-    HitTestResult(const LayoutPoint& centerPoint, unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding, ShadowContentFilterPolicy);
-    HitTestResult(const HitTestPoint&, ShadowContentFilterPolicy);
+    HitTestResult(const LayoutPoint& centerPoint, unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding);
+    HitTestResult(const HitTestLocation&);
     HitTestResult(const HitTestResult&);
     ~HitTestResult();
     HitTestResult& operator=(const HitTestResult&);
@@ -124,8 +122,7 @@ public:
 
     void setToNonShadowAncestor();
 
-    const HitTestPoint& hitTestPoint() const { return *this; }
-    ShadowContentFilterPolicy shadowContentFilterPolicy() const { return m_shadowContentFilterPolicy; }
+    const HitTestLocation& hitTestLocation() const { return *this; }
 
     void setInnerNode(Node*);
     void setInnerNonSharedNode(Node*);
@@ -166,8 +163,8 @@ public:
 
     // Returns true if it is rect-based hit test and needs to continue until the rect is fully
     // enclosed by the boundaries of a node.
-    bool addNodeToRectBasedTestResult(Node*, const HitTestPoint& pointInContainer, const LayoutRect& = LayoutRect());
-    bool addNodeToRectBasedTestResult(Node*, const HitTestPoint& pointInContainer, const FloatRect&);
+    bool addNodeToRectBasedTestResult(Node*, const HitTestRequest&, const HitTestLocation& pointInContainer, const LayoutRect& = LayoutRect());
+    bool addNodeToRectBasedTestResult(Node*, const HitTestRequest&, const HitTestLocation& pointInContainer, const FloatRect&);
     void append(const HitTestResult&);
 
     // If m_rectBasedTestResult is 0 then set it to a new NodeSet. Return *m_rectBasedTestResult. Lazy allocation makes
@@ -193,8 +190,6 @@ private:
     RefPtr<Element> m_innerURLElement;
     RefPtr<Scrollbar> m_scrollbar;
     bool m_isOverWidget; // Returns true if we are over a widget (and not in the border/padding area of a RenderWidget for example).
-
-    ShadowContentFilterPolicy m_shadowContentFilterPolicy;
 
     mutable OwnPtr<NodeSet> m_rectBasedTestResult;
 };

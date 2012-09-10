@@ -40,12 +40,11 @@
 #include "JITStubs.h"
 #include "JSActivation.h"
 #include "JSFunction.h"
-#include "JSStaticScopeObject.h"
+#include "JSNameScope.h"
 #include "JSValue.h"
 #include "LowLevelInterpreter.h"
 #include "MethodCallLinkStatus.h"
 #include "RepatchBuffer.h"
-#include "UStringConcatenate.h"
 #include <stdio.h>
 #include <wtf/StringExtras.h>
 #include <wtf/UnusedParam.h>
@@ -62,36 +61,36 @@ namespace JSC {
 using namespace DFG;
 #endif
 
-static UString escapeQuotes(const UString& str)
+static String escapeQuotes(const String& str)
 {
-    UString result = str;
+    String result = str;
     size_t pos = 0;
     while ((pos = result.find('\"', pos)) != notFound) {
-        result = makeUString(result.substringSharingImpl(0, pos), "\"\\\"\"", result.substringSharingImpl(pos + 1));
+        result = makeString(result.substringSharingImpl(0, pos), "\"\\\"\"", result.substringSharingImpl(pos + 1));
         pos += 4;
     }
     return result;
 }
 
-static UString valueToSourceString(ExecState* exec, JSValue val)
+static String valueToSourceString(ExecState* exec, JSValue val)
 {
     if (!val)
-        return "0";
+        return ASCIILiteral("0");
 
     if (val.isString())
-        return makeUString("\"", escapeQuotes(val.toString(exec)->value(exec)), "\"");
+        return makeString("\"", escapeQuotes(val.toString(exec)->value(exec)), "\"");
 
     return val.description();
 }
 
 static CString constantName(ExecState* exec, int k, JSValue value)
 {
-    return makeUString(valueToSourceString(exec, value), "(@k", UString::number(k - FirstConstantRegisterIndex), ")").utf8();
+    return makeString(valueToSourceString(exec, value), "(@k", String::number(k - FirstConstantRegisterIndex), ")").utf8();
 }
 
 static CString idName(int id0, const Identifier& ident)
 {
-    return makeUString(ident.ustring(), "(@id", UString::number(id0), ")").utf8();
+    return makeString(ident.string(), "(@id", String::number(id0), ")").utf8();
 }
 
 void CodeBlock::dumpBytecodeCommentAndNewLine(int location)
@@ -114,10 +113,10 @@ CString CodeBlock::registerName(ExecState* exec, int r) const
     if (isConstantRegisterIndex(r))
         return constantName(exec, r, getConstant(r));
 
-    return makeUString("r", UString::number(r)).utf8();
+    return makeString("r", String::number(r)).utf8();
 }
 
-static UString regexpToSourceString(RegExp* regExp)
+static String regexpToSourceString(RegExp* regExp)
 {
     char postfix[5] = { '/', 0, 0, 0, 0 };
     int index = 1;
@@ -128,15 +127,15 @@ static UString regexpToSourceString(RegExp* regExp)
     if (regExp->multiline())
         postfix[index] = 'm';
 
-    return makeUString("/", regExp->pattern(), postfix);
+    return makeString("/", regExp->pattern(), postfix);
 }
 
 static CString regexpName(int re, RegExp* regexp)
 {
-    return makeUString(regexpToSourceString(regexp), "(@re", UString::number(re), ")").utf8();
+    return makeString(regexpToSourceString(regexp), "(@re", String::number(re), ")").utf8();
 }
 
-static UString pointerToSourceString(void* p)
+static String pointerToSourceString(void* p)
 {
     char buffer[2 + 2 * sizeof(void*) + 1]; // 0x [two characters per byte] \0
     snprintf(buffer, sizeof(buffer), "%p", p);
@@ -549,7 +548,7 @@ void CodeBlock::dump(ExecState* exec)
         dataLog("\nIdentifiers:\n");
         size_t i = 0;
         do {
-            dataLog("  id%u = %s\n", static_cast<unsigned>(i), m_identifiers[i].ustring().utf8().data());
+            dataLog("  id%u = %s\n", static_cast<unsigned>(i), m_identifiers[i].string().utf8().data());
             ++i;
         } while (i != m_identifiers.size());
     }
@@ -642,7 +641,7 @@ void CodeBlock::dump(ExecState* exec)
                     continue;
                 ASSERT(!((i + m_rareData->m_characterSwitchJumpTables[i].min) & ~0xFFFF));
                 UChar ch = static_cast<UChar>(entry + m_rareData->m_characterSwitchJumpTables[i].min);
-                dataLog("\t\t\"%s\" => %04d\n", UString(&ch, 1).utf8().data(), *iter);
+                dataLog("\t\t\"%s\" => %04d\n", String(&ch, 1).utf8().data(), *iter);
         }
             dataLog("      }\n");
             ++i;
@@ -656,7 +655,7 @@ void CodeBlock::dump(ExecState* exec)
             dataLog("  %1d = {\n", i);
             StringJumpTable::StringOffsetTable::const_iterator end = m_rareData->m_stringSwitchJumpTables[i].offsetTable.end();
             for (StringJumpTable::StringOffsetTable::const_iterator iter = m_rareData->m_stringSwitchJumpTables[i].offsetTable.begin(); iter != end; ++iter)
-                dataLog("\t\t\"%s\" => %04d\n", UString(iter->first).utf8().data(), iter->second.branchOffset);
+                dataLog("\t\t\"%s\" => %04d\n", String(iter->first).utf8().data(), iter->second.branchOffset);
             dataLog("      }\n");
             ++i;
         } while (i < m_rareData->m_stringSwitchJumpTables.size());
@@ -1480,9 +1479,9 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             it += OPCODE_LENGTH(op_next_pname) - 1;
             break;
         }
-        case op_push_scope: {
+        case op_push_with_scope: {
             int r0 = (++it)->u.operand;
-            dataLog("[%4d] push_scope\t %s", location, registerName(exec, r0).data());
+            dataLog("[%4d] push_with_scope\t %s", location, registerName(exec, r0).data());
             dumpBytecodeCommentAndNewLine(location);
             break;
         }
@@ -1491,11 +1490,11 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             dumpBytecodeCommentAndNewLine(location);
             break;
         }
-        case op_push_new_scope: {
-            int r0 = (++it)->u.operand;
+        case op_push_name_scope: {
             int id0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
-            dataLog("[%4d] push_new_scope \t%s, %s, %s", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data(), registerName(exec, r1).data());
+            unsigned attributes = (++it)->u.operand;
+            dataLog("[%4d] push_name_scope \t%s, %s, %u", location, idName(id0, m_identifiers[id0]).data(), registerName(exec, r1).data(), attributes);
             dumpBytecodeCommentAndNewLine(location);
             break;
         }
@@ -1551,6 +1550,10 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             dumpBytecodeCommentAndNewLine(location);
             break;
         }
+#if ENABLE(LLINT_C_LOOP)
+        default:
+            ASSERT(false); // We should never get here.
+#endif
     }
 }
 
@@ -1678,7 +1681,7 @@ void CodeBlock::dumpStatistics()
 #endif
 }
 
-CodeBlock::CodeBlock(CopyParsedBlockTag, CodeBlock& other, SymbolTable* symTab)
+CodeBlock::CodeBlock(CopyParsedBlockTag, CodeBlock& other)
     : m_globalObject(other.m_globalObject)
     , m_heap(other.m_heap)
     , m_numCalleeRegisters(other.m_numCalleeRegisters)
@@ -1710,7 +1713,7 @@ CodeBlock::CodeBlock(CopyParsedBlockTag, CodeBlock& other, SymbolTable* symTab)
     , m_constantRegisters(other.m_constantRegisters)
     , m_functionDecls(other.m_functionDecls)
     , m_functionExprs(other.m_functionExprs)
-    , m_symbolTable(symTab)
+    , m_symbolTable(*other.m_globalData, other.m_ownerExecutable.get(), other.symbolTable())
     , m_osrExitCounter(0)
     , m_optimizationDelayCounter(0)
     , m_reoptimizationRetryCounter(0)
@@ -1744,11 +1747,12 @@ CodeBlock::CodeBlock(CopyParsedBlockTag, CodeBlock& other, SymbolTable* symTab)
     }
 }
 
-CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, CodeType codeType, JSGlobalObject *globalObject, PassRefPtr<SourceProvider> sourceProvider, unsigned sourceOffset, SymbolTable* symTab, bool isConstructor, PassOwnPtr<CodeBlock> alternative)
+CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, CodeType codeType, JSGlobalObject *globalObject, PassRefPtr<SourceProvider> sourceProvider, unsigned sourceOffset, bool isConstructor, PassOwnPtr<CodeBlock> alternative)
     : m_globalObject(globalObject->globalData(), ownerExecutable, globalObject)
     , m_heap(&m_globalObject->globalData().heap)
     , m_numCalleeRegisters(0)
     , m_numVars(0)
+    , m_numCapturedVars(0)
     , m_isConstructor(isConstructor)
     , m_numParameters(0)
     , m_ownerExecutable(globalObject->globalData(), ownerExecutable, ownerExecutable)
@@ -1764,7 +1768,7 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, CodeType codeType, JSGlo
 #if ENABLE(VALUE_PROFILER)
     , m_executionEntryCount(0)
 #endif
-    , m_symbolTable(symTab)
+    , m_symbolTable(globalObject->globalData(), ownerExecutable, SharedSymbolTable::create(globalObject->globalData()))
     , m_alternative(alternative)
     , m_osrExitCounter(0)
     , m_optimizationDelayCounter(0)
@@ -2030,13 +2034,11 @@ void CodeBlock::visitWeakReferences(SlotVisitor& visitor)
     performTracingFixpointIteration(visitor);
 }
 
-#if ENABLE(JIT)
 #if ENABLE(JIT_VERBOSE_OSR)
 static const bool verboseUnlinking = true;
 #else
 static const bool verboseUnlinking = false;
 #endif
-#endif // ENABLE(JIT)
     
 void CodeBlock::finalizeUnconditionally()
 {
@@ -2222,6 +2224,7 @@ void CodeBlock::stronglyVisitStrongReferences(SlotVisitor& visitor)
 {
     visitor.append(&m_globalObject);
     visitor.append(&m_ownerExecutable);
+    visitor.append(&m_symbolTable);
     if (m_rareData) {
         m_rareData->m_evalCodeCache.visitAggregate(visitor);
         size_t regExpCount = m_rareData->m_regexps.size();
@@ -2531,7 +2534,7 @@ void CodeBlock::createActivation(CallFrame* callFrame)
     ASSERT(!callFrame->uncheckedR(activationRegister()).jsValue());
     JSActivation* activation = JSActivation::create(callFrame->globalData(), callFrame, static_cast<FunctionExecutable*>(ownerExecutable()));
     callFrame->uncheckedR(activationRegister()) = JSValue(activation);
-    callFrame->setScopeChain(callFrame->scopeChain()->push(activation));
+    callFrame->setScope(activation);
 }
 
 unsigned CodeBlock::addOrFindConstant(JSValue v)
@@ -2579,6 +2582,7 @@ void CodeBlock::unlinkIncomingCalls()
     while (m_incomingCalls.begin() != m_incomingCalls.end())
         m_incomingCalls.begin()->unlink(*m_globalData, repatchBuffer);
 }
+#endif // ENABLE(JIT)
 
 #if ENABLE(LLINT)
 Instruction* CodeBlock::adjustPCIfAtCallSite(Instruction* potentialReturnPC)
@@ -2615,7 +2619,7 @@ Instruction* CodeBlock::adjustPCIfAtCallSite(Instruction* potentialReturnPC)
     opcodeLength = OPCODE_LENGTH(op_call_varargs);
     adjustedPC = potentialReturnPC - opcodeLength;
     if ((returnPCOffset >= opcodeLength)
-        && (adjustedPC->u.pointer == bitwise_cast<void*>(llint_op_call_varargs))) {
+        && (adjustedPC->u.pointer == LLInt::getCodePtr(llint_op_call_varargs))) {
         return adjustedPC;
     }
 
@@ -2623,22 +2627,37 @@ Instruction* CodeBlock::adjustPCIfAtCallSite(Instruction* potentialReturnPC)
     opcodeLength = OPCODE_LENGTH(op_call);
     adjustedPC = potentialReturnPC - opcodeLength;
     if ((returnPCOffset >= opcodeLength)
-        && (adjustedPC->u.pointer == bitwise_cast<void*>(llint_op_call)
-            || adjustedPC->u.pointer == bitwise_cast<void*>(llint_op_construct)
-            || adjustedPC->u.pointer == bitwise_cast<void*>(llint_op_call_eval))) {
+        && (adjustedPC->u.pointer == LLInt::getCodePtr(llint_op_call)
+            || adjustedPC->u.pointer == LLInt::getCodePtr(llint_op_construct)
+            || adjustedPC->u.pointer == LLInt::getCodePtr(llint_op_call_eval))) {
         return adjustedPC;
     }
 
     // Not a call site. No need to adjust PC. Just return the original.
     return potentialReturnPC;
 }
-#endif
+#endif // ENABLE(LLINT)
 
 unsigned CodeBlock::bytecodeOffset(ExecState* exec, ReturnAddressPtr returnAddress)
 {
+    UNUSED_PARAM(exec);
+    UNUSED_PARAM(returnAddress);
 #if ENABLE(LLINT)
-    if (returnAddress.value() >= bitwise_cast<void*>(&llint_begin)
-        && returnAddress.value() <= bitwise_cast<void*>(&llint_end)) {
+#if !ENABLE(LLINT_C_LOOP)
+    // When using the JIT, we could have addresses that are not bytecode
+    // addresses. We check if the return address is in the LLint glue and
+    // opcode handlers range here to ensure that we are looking at bytecode
+    // before attempting to convert the return address into a bytecode offset.
+    //
+    // In the case of the C Loop LLInt, the JIT is disabled, and the only
+    // valid return addresses should be bytecode PCs. So, we can and need to
+    // forego this check because when we do not ENABLE(COMPUTED_GOTO_OPCODES),
+    // then the bytecode "PC"s are actually the opcodeIDs and are not bounded
+    // by llint_begin and llint_end.
+    if (returnAddress.value() >= LLInt::getCodePtr(llint_begin)
+        && returnAddress.value() <= LLInt::getCodePtr(llint_end))
+#endif
+    {
         ASSERT(exec->codeBlock());
         ASSERT(exec->codeBlock() == this);
         ASSERT(JITCode::isBaselineCode(getJITType()));
@@ -2646,20 +2665,23 @@ unsigned CodeBlock::bytecodeOffset(ExecState* exec, ReturnAddressPtr returnAddre
         ASSERT(instruction);
 
         instruction = adjustPCIfAtCallSite(instruction);
-        
         return bytecodeOffset(instruction);
     }
-#else
-    UNUSED_PARAM(exec);
-#endif
+#endif // !ENABLE(LLINT)
+
+#if ENABLE(JIT)
     if (!m_rareData)
         return 1;
     Vector<CallReturnOffsetToBytecodeOffset>& callIndices = m_rareData->m_callReturnIndexVector;
     if (!callIndices.size())
         return 1;
     return binarySearch<CallReturnOffsetToBytecodeOffset, unsigned, getCallReturnOffset>(callIndices.begin(), callIndices.size(), getJITCode().offsetOf(returnAddress.value()))->bytecodeOffset;
-}
+#endif // ENABLE(JIT)
+
+#if !ENABLE(LLINT) && !ENABLE(JIT)
+    return 1;
 #endif
+}
 
 void CodeBlock::clearEvalCache()
 {
@@ -2721,27 +2743,27 @@ CodeBlock* FunctionCodeBlock::replacement()
     return &static_cast<FunctionExecutable*>(ownerExecutable())->generatedBytecodeFor(m_isConstructor ? CodeForConstruct : CodeForCall);
 }
 
-JSObject* ProgramCodeBlock::compileOptimized(ExecState* exec, ScopeChainNode* scopeChainNode, unsigned bytecodeIndex)
+JSObject* ProgramCodeBlock::compileOptimized(ExecState* exec, JSScope* scope, unsigned bytecodeIndex)
 {
     if (replacement()->getJITType() == JITCode::nextTierJIT(getJITType()))
         return 0;
-    JSObject* error = static_cast<ProgramExecutable*>(ownerExecutable())->compileOptimized(exec, scopeChainNode, bytecodeIndex);
+    JSObject* error = static_cast<ProgramExecutable*>(ownerExecutable())->compileOptimized(exec, scope, bytecodeIndex);
     return error;
 }
 
-JSObject* EvalCodeBlock::compileOptimized(ExecState* exec, ScopeChainNode* scopeChainNode, unsigned bytecodeIndex)
+JSObject* EvalCodeBlock::compileOptimized(ExecState* exec, JSScope* scope, unsigned bytecodeIndex)
 {
     if (replacement()->getJITType() == JITCode::nextTierJIT(getJITType()))
         return 0;
-    JSObject* error = static_cast<EvalExecutable*>(ownerExecutable())->compileOptimized(exec, scopeChainNode, bytecodeIndex);
+    JSObject* error = static_cast<EvalExecutable*>(ownerExecutable())->compileOptimized(exec, scope, bytecodeIndex);
     return error;
 }
 
-JSObject* FunctionCodeBlock::compileOptimized(ExecState* exec, ScopeChainNode* scopeChainNode, unsigned bytecodeIndex)
+JSObject* FunctionCodeBlock::compileOptimized(ExecState* exec, JSScope* scope, unsigned bytecodeIndex)
 {
     if (replacement()->getJITType() == JITCode::nextTierJIT(getJITType()))
         return 0;
-    JSObject* error = static_cast<FunctionExecutable*>(ownerExecutable())->compileOptimizedFor(exec, scopeChainNode, bytecodeIndex, m_isConstructor ? CodeForConstruct : CodeForCall);
+    JSObject* error = static_cast<FunctionExecutable*>(ownerExecutable())->compileOptimizedFor(exec, scope, bytecodeIndex, m_isConstructor ? CodeForConstruct : CodeForCall);
     return error;
 }
 
@@ -3003,22 +3025,22 @@ bool CodeBlock::usesOpcode(OpcodeID opcodeID)
     return false;
 }
 
-UString CodeBlock::nameForRegister(int registerNumber)
+String CodeBlock::nameForRegister(int registerNumber)
 {
     SymbolTable::iterator end = m_symbolTable->end();
     for (SymbolTable::iterator ptr = m_symbolTable->begin(); ptr != end; ++ptr) {
         if (ptr->second.getIndex() == registerNumber)
-            return UString(ptr->first);
+            return String(ptr->first);
     }
     if (needsActivation() && registerNumber == activationRegister())
-        return "activation";
+        return ASCIILiteral("activation");
     if (registerNumber == thisRegister())
-        return "this";
+        return ASCIILiteral("this");
     if (usesArguments()) {
         if (registerNumber == argumentsRegister())
-            return "arguments";
+            return ASCIILiteral("arguments");
         if (unmodifiedArgumentsRegister(argumentsRegister()) == registerNumber)
-            return "real arguments";
+            return ASCIILiteral("real arguments");
     }
     if (registerNumber < 0) {
         int argumentPosition = -registerNumber;

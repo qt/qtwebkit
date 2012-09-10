@@ -130,7 +130,10 @@ void JSRopeString::resolveRope(ExecState* exec) const
     for (size_t i = 0; i < s_maxInternalRopeLength && m_fibers[i]; ++i) {
         StringImpl* string = m_fibers[i]->m_value.impl();
         unsigned length = string->length();
-        StringImpl::copyChars(position, string->characters(), length);
+        if (string->is8Bit())
+            StringImpl::copyChars(position, string->characters8(), length);
+        else
+            StringImpl::copyChars(position, string->characters16(), length);
         position += length;
         m_fibers[i].clear();
     }
@@ -139,7 +142,7 @@ void JSRopeString::resolveRope(ExecState* exec) const
 }
 
 // Overview: These functions convert a JSString from holding a string in rope form
-// down to a simple UString representation.  It does so by building up the string
+// down to a simple String representation. It does so by building up the string
 // backwards, since we want to avoid recursion, we expect that the tree structure
 // representing the rope is likely imbalanced with more nodes down the left side
 // (since appending to the string is likely more common) - and as such resolving
@@ -202,7 +205,10 @@ void JSRopeString::resolveRopeSlowCase(UChar* buffer) const
         StringImpl* string = static_cast<StringImpl*>(currentFiber->m_value.impl());
         unsigned length = string->length();
         position -= length;
-        StringImpl::copyChars(position, string->characters(), length);
+        if (string->is8Bit())
+            StringImpl::copyChars(position, string->characters8(), length);
+        else
+            StringImpl::copyChars(position, string->characters16(), length);
     }
 
     ASSERT(buffer == position);
@@ -214,7 +220,7 @@ void JSRopeString::outOfMemory(ExecState* exec) const
     for (size_t i = 0; i < s_maxInternalRopeLength && m_fibers[i]; ++i)
         m_fibers[i].clear();
     ASSERT(isRope());
-    ASSERT(m_value == UString());
+    ASSERT(m_value.isNull());
     if (exec)
         throwOutOfMemoryError(exec);
 }
@@ -225,7 +231,7 @@ JSString* JSRopeString::getIndexSlowCase(ExecState* exec, unsigned i)
     resolveRope(exec);
     // Return a safe no-value result, this should never be used, since the excetion will be thrown.
     if (exec->exception())
-        return jsString(exec, "");
+        return jsEmptyString(exec);
     ASSERT(!isRope());
     ASSERT(i < m_value.length());
     return jsSingleCharacterSubstring(exec, m_value, i);

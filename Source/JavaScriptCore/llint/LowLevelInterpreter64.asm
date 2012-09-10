@@ -51,18 +51,30 @@ macro dispatchAfterCall()
 end
 
 macro cCall2(function, arg1, arg2)
-    move arg1, t5
-    move arg2, t4
-    call function
+    if X86_64
+        move arg1, t5
+        move arg2, t4
+        call function
+    elsif C_LOOP
+        cloopCallSlowPath function, arg1, arg2
+    else
+        error
+    end
 end
 
 # This barely works. arg3 and arg4 should probably be immediates.
 macro cCall4(function, arg1, arg2, arg3, arg4)
-    move arg1, t5
-    move arg2, t4
-    move arg3, t1
-    move arg4, t2
-    call function
+    if X86_64
+        move arg1, t5
+        move arg2, t4
+        move arg3, t1
+        move arg4, t2
+        call function
+    elsif C_LOOP
+        error
+    else
+        error
+    end
 end
 
 macro prepareStateForCCall()
@@ -857,14 +869,14 @@ macro getScope(deBruijinIndexOperand, scopeCheck)
     # Need to conditionally skip over one scope.
     btpz [cfr, t1, 8], .noActivation
     scopeCheck(t0, t1)
-    loadp ScopeChainNode::next[t0], t0
+    loadp JSScope::m_next[t0], t0
 .noActivation:
     subi 1, t2
     
     btiz t2, .done
 .loop:
     scopeCheck(t0, t1)
-    loadp ScopeChainNode::next[t0], t0
+    loadp JSScope::m_next[t0], t0
     subi 1, t2
     btinz t2, .loop
 
@@ -873,13 +885,13 @@ end
 
 _llint_op_resolve_global_dynamic:
     traceExecution()
-    loadp JITStackFrame::globalData[sp], t3
-    loadp JSGlobalData::activationStructure[t3], t3
+    loadp CodeBlock[cfr], t3
+    loadp CodeBlock::m_globalObject[t3], t3
+    loadp JSGlobalObject::m_activationStructure[t3], t3
     getScope(
         40[PB, PC, 8],
         macro (scope, scratch)
-            loadp ScopeChainNode::object[scope], scratch
-            bpneq JSCell::m_structure[scratch], t3, .opResolveGlobalDynamicSuperSlow
+            bpneq JSCell::m_structure[scope], t3, .opResolveGlobalDynamicSuperSlow
         end)
     resolveGlobal(7, .opResolveGlobalDynamicSlow)
     dispatch(7)
@@ -902,7 +914,6 @@ _llint_op_get_scoped_var:
     getScope(24[PB, PC, 8], macro (scope, scratch) end)
     loadis 8[PB, PC, 8], t1
     loadis 16[PB, PC, 8], t2
-    loadp ScopeChainNode::object[t0], t0
     loadp JSVariableObject::m_registers[t0], t0
     loadp [t0, t2, 8], t3
     storep t3, [cfr, t1, 8]
@@ -918,7 +929,6 @@ _llint_op_put_scoped_var:
     loadConstantOrVariable(t1, t3)
     loadis 8[PB, PC, 8], t1
     writeBarrier(t3)
-    loadp ScopeChainNode::object[t0], t0
     loadp JSVariableObject::m_registers[t0], t0
     storep t3, [t0, t1, 8]
     dispatch(4)
@@ -1234,7 +1244,10 @@ _llint_op_put_by_val:
 
 
 _llint_op_loop:
-    nop
+    traceExecution()
+    dispatchInt(8[PB, PC, 8])
+
+
 _llint_op_jmp:
     traceExecution()
     dispatchInt(8[PB, PC, 8])
@@ -1430,6 +1443,18 @@ _llint_op_new_func:
     dispatch(4)
 
 
+macro arrayProfileForCall()
+    if VALUE_PROFILER
+        loadis 24[PB, PC, 8], t3
+        loadp ThisArgumentOffset[cfr, t3, 8], t0
+        btpnz t0, tagMask, .done
+        loadp JSCell::m_structure[t0], t0
+        loadp 40[PB, PC, 8], t1
+        storep t0, ArrayProfile::m_lastSeenStructure[t1]
+    .done:
+    end
+end
+
 macro doCall(slowPath)
     loadis 8[PB, PC, 8], t0
     loadp 32[PB, PC, 8], t1
@@ -1440,7 +1465,7 @@ macro doCall(slowPath)
     addi 6, PC
     lshifti 3, t3
     addp cfr, t3
-    loadp JSFunction::m_scopeChain[t2], t0
+    loadp JSFunction::m_scope[t2], t0
     storep t2, Callee[t3]
     storep t0, ScopeChain[t3]
     loadis 16 - 48[PB, PC, 8], t2
@@ -1448,8 +1473,7 @@ macro doCall(slowPath)
     storep cfr, CallerFrame[t3]
     storei t2, ArgumentCount + PayloadOffset[t3]
     move t3, cfr
-    call LLIntCallLinkInfo::machineCodeTarget[t1]
-    dispatchAfterCall()
+    callTargetFunction(t1)
 
 .opCallSlow:
     slowPathForCall(6, slowPath)
@@ -1620,21 +1644,46 @@ _llint_throw_during_call_trampoline:
 
 macro nativeCallTrampoline(executableOffsetToFunction)
     storep 0, CodeBlock[cfr]
-    loadp JITStackFrame::globalData + 8[sp], t0
-    storep cfr, JSGlobalData::topCallFrame[t0]
-    loadp CallerFrame[cfr], t0
-    loadp ScopeChain[t0], t1
-    storep t1, ScopeChain[cfr]
-    peek 0, t1
-    storep t1, ReturnPC[cfr]
-    move cfr, t5  # t5 = rdi
-    subp 16 - 8, sp
-    loadp Callee[cfr], t4 # t4 = rsi
-    loadp JSFunction::m_executable[t4], t1
-    move t0, cfr # Restore cfr to avoid loading from stack
-    call executableOffsetToFunction[t1]
-    addp 16 - 8, sp
-    loadp JITStackFrame::globalData + 8[sp], t3
+    if X86_64
+        loadp JITStackFrame::globalData + 8[sp], t0
+        storep cfr, JSGlobalData::topCallFrame[t0]
+        loadp CallerFrame[cfr], t0
+        loadp ScopeChain[t0], t1
+        storep t1, ScopeChain[cfr]
+        peek 0, t1
+        storep t1, ReturnPC[cfr]
+        move cfr, t5  # t5 = rdi
+        subp 16 - 8, sp
+        loadp Callee[cfr], t4 # t4 = rsi
+        loadp JSFunction::m_executable[t4], t1
+        move t0, cfr # Restore cfr to avoid loading from stack
+        call executableOffsetToFunction[t1]
+        addp 16 - 8, sp
+        loadp JITStackFrame::globalData + 8[sp], t3
+
+    elsif C_LOOP
+        loadp CallerFrame[cfr], t0
+        loadp ScopeChain[t0], t1
+        storep t1, ScopeChain[cfr]
+
+        loadp JITStackFrame::globalData[sp], t3
+        storep cfr, JSGlobalData::topCallFrame[t3]
+
+        move t0, t2
+        preserveReturnAddressAfterCall(t3)
+        storep t3, ReturnPC[cfr]
+        move cfr, t0
+        loadp Callee[cfr], t1
+        loadp JSFunction::m_executable[t1], t1
+        move t2, cfr
+        cloopCallNative executableOffsetToFunction[t1]
+
+        restoreReturnAddressBeforeReturn(t3)
+        loadp JITStackFrame::globalData[sp], t3
+    else
+        error
+    end
+
     btpnz JSGlobalData::exception[t3], .exception
     ret
 .exception:

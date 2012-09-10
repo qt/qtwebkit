@@ -38,17 +38,36 @@ RenderNamedFlowThread::RenderNamedFlowThread(Node* node, PassRefPtr<WebKitNamedF
     , m_namedFlow(namedFlow)
     , m_regionLayoutUpdateEventTimer(this, &RenderNamedFlowThread::regionLayoutUpdateEventTimerFired)
 {
-    m_namedFlow->setRenderer(this);
 }
 
 RenderNamedFlowThread::~RenderNamedFlowThread()
 {
-    m_namedFlow->setRenderer(0);
+    // The flow thread can be destroyed without unregistering the content nodes if the document is destroyed.
+    // This can lead to problems because the nodes are still marked as belonging to a flow thread.
+    clearContentNodes();
+
+    // Also leave the NamedFlow object in a consistent state by calling mark for destruction.
+    setMarkForDestruction();
 }
 
 const char* RenderNamedFlowThread::renderName() const
 {    
     return "RenderNamedFlowThread";
+}
+    
+void RenderNamedFlowThread::clearContentNodes()
+{
+    for (NamedFlowContentNodes::iterator it = m_contentNodes.begin(); it != m_contentNodes.end(); ++it) {
+        Node* contentNode = *it;
+        
+        ASSERT(contentNode && contentNode->isElementNode());
+        ASSERT(contentNode->inNamedFlow());
+        ASSERT(contentNode->document() == document());
+        
+        contentNode->clearInNamedFlow();
+    }
+    
+    m_contentNodes.clear();
 }
 
 RenderObject* RenderNamedFlowThread::nextRendererForNode(Node* node) const
@@ -135,12 +154,45 @@ static bool compareRenderRegions(const RenderRegion* firstRegion, const RenderRe
     ASSERT(firstRegion);
     ASSERT(secondRegion);
 
-    // If the regions have the same region-index, compare their position in dom.
-    ASSERT(firstRegion->node());
-    ASSERT(secondRegion->node());
+    ASSERT(firstRegion->generatingNode());
+    ASSERT(secondRegion->generatingNode());
 
-    unsigned short position = firstRegion->node()->compareDocumentPosition(secondRegion->node());
-    return (position & Node::DOCUMENT_POSITION_FOLLOWING);
+    // If the regions belong to different nodes, compare their position in the DOM.
+    if (firstRegion->generatingNode() != secondRegion->generatingNode()) {
+        unsigned short position = firstRegion->generatingNode()->compareDocumentPosition(secondRegion->generatingNode());
+
+        // If the second region is contained in the first one, the first region is "less" if it's :before.
+        if (position & Node::DOCUMENT_POSITION_CONTAINED_BY) {
+            ASSERT(secondRegion->style()->styleType() == NOPSEUDO);
+            return firstRegion->style()->styleType() == BEFORE;
+        }
+
+        // If the second region contains the first region, the first region is "less" if the second is :after.
+        if (position & Node::DOCUMENT_POSITION_CONTAINS) {
+            ASSERT(firstRegion->style()->styleType() == NOPSEUDO);
+            return secondRegion->style()->styleType() == AFTER;
+        }
+
+        return (position & Node::DOCUMENT_POSITION_FOLLOWING);
+    }
+
+    // FIXME: Currently it's not possible for an element to be both a region and have pseudo-children. The case is covered anyway.
+    switch (firstRegion->style()->styleType()) {
+    case BEFORE:
+        // The second region can be the node or the after pseudo-element (before is smaller than any of those).
+        return true;
+    case AFTER:
+        // The second region can be the node or the before pseudo-element (after is greater than any of those).
+        return false;
+    case NOPSEUDO:
+        // The second region can either be the before or the after pseudo-element (the node is only smaller than the after pseudo-element).
+        return firstRegion->style()->styleType() == AFTER;
+    default:
+        break;
+    }
+
+    ASSERT_NOT_REACHED();
+    return true;
 }
 
 void RenderNamedFlowThread::addRegionToThread(RenderRegion* renderRegion)
@@ -155,6 +207,8 @@ void RenderNamedFlowThread::addRegionToThread(RenderRegion* renderRegion)
             ++it;
         m_regionList.insertBefore(it, renderRegion);
     }
+
+    resetMarkForDestruction();
 
     ASSERT(!renderRegion->isValid());
     if (renderRegion->parentNamedFlowThread()) {
@@ -188,10 +242,8 @@ void RenderNamedFlowThread::removeRegionFromThread(RenderRegion* renderRegion)
         removeDependencyOnFlowThread(renderRegion->parentNamedFlowThread());
     }
 
-    if (canBeDestroyed()) {
-        destroy();
-        return;
-    }
+    if (canBeDestroyed())
+        setMarkForDestruction();
 
     // After removing all the regions in the flow the following layout needs to dispatch the regionLayoutUpdate event
     if (m_regionList.isEmpty())
@@ -265,8 +317,11 @@ void RenderNamedFlowThread::pushDependencies(RenderNamedFlowThreadList& list)
 void RenderNamedFlowThread::registerNamedFlowContentNode(Node* contentNode)
 {
     ASSERT(contentNode && contentNode->isElementNode());
+    ASSERT(contentNode->document() == document());
 
     contentNode->setInNamedFlow();
+
+    resetMarkForDestruction();
 
     // Find the first content node following the new content node.
     for (NamedFlowContentNodes::iterator it = m_contentNodes.begin(); it != m_contentNodes.end(); ++it) {
@@ -285,25 +340,18 @@ void RenderNamedFlowThread::unregisterNamedFlowContentNode(Node* contentNode)
     ASSERT(contentNode && contentNode->isElementNode());
     ASSERT(m_contentNodes.contains(contentNode));
     ASSERT(contentNode->inNamedFlow());
+    ASSERT(contentNode->document() == document());
 
     contentNode->clearInNamedFlow();
     m_contentNodes.remove(contentNode);
 
     if (canBeDestroyed())
-        destroy();
+        setMarkForDestruction();
 }
 
 const AtomicString& RenderNamedFlowThread::flowThreadName() const
 {
     return m_namedFlow->name();
-}
-
-void RenderNamedFlowThread::willBeDestroyed()
-{
-    if (!documentBeingDestroyed())
-        view()->flowThreadController()->removeFlowThread(this);
-
-    RenderFlowThread::willBeDestroyed();
 }
 
 void RenderNamedFlowThread::dispatchRegionLayoutUpdateEvent()
@@ -319,6 +367,30 @@ void RenderNamedFlowThread::regionLayoutUpdateEventTimerFired(Timer<RenderNamedF
     ASSERT(m_namedFlow);
 
     m_namedFlow->dispatchRegionLayoutUpdateEvent();
+}
+
+void RenderNamedFlowThread::setMarkForDestruction()
+{
+    if (m_namedFlow->flowState() == WebKitNamedFlow::FlowStateNull)
+        return;
+
+    m_namedFlow->setRenderer(0);
+    // After this call ends, the renderer can be safely destroyed.
+    // The NamedFlow object may outlive its renderer if it's referenced from a script and may be reatached to one if the named flow is recreated in the stylesheet.
+}
+
+void RenderNamedFlowThread::resetMarkForDestruction()
+{
+    if (m_namedFlow->flowState() == WebKitNamedFlow::FlowStateCreated)
+        return;
+
+    m_namedFlow->setRenderer(this);
+}
+
+bool RenderNamedFlowThread::isMarkedForDestruction() const
+{
+    // Flow threads in the "NULL" state can be destroyed.
+    return m_namedFlow->flowState() == WebKitNamedFlow::FlowStateNull;
 }
 
 }

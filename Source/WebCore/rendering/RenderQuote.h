@@ -22,13 +22,14 @@
 #ifndef RenderQuote_h
 #define RenderQuote_h
 
-#include "Document.h"
 #include "QuotesData.h"
 #include "RenderStyle.h"
 #include "RenderStyleConstants.h"
 #include "RenderText.h"
 
 namespace WebCore {
+
+class Document;
 
 class RenderQuote : public RenderText {
 public:
@@ -42,6 +43,8 @@ private:
     virtual const char* renderName() const OVERRIDE { return "RenderQuote"; };
     virtual bool isQuote() const OVERRIDE { return true; };
     virtual PassRefPtr<StringImpl> originalText() const OVERRIDE;
+
+    virtual void updateText() OVERRIDE;
     virtual void computePreferredLogicalWidths(float leadWidth) OVERRIDE;
 
     // We don't override insertedIntoTree to call attachQuote() as it would be attached

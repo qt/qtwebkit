@@ -67,9 +67,11 @@ void ScrollingCoordinator::setWheelEventHandlerCount(unsigned)
 {
 }
 
-void ScrollingCoordinator::setShouldUpdateScrollLayerPositionOnMainThread(bool)
+#if ENABLE(THREADED_SCROLLING)
+void ScrollingCoordinator::setShouldUpdateScrollLayerPositionOnMainThreadReason(ReasonForUpdatingScrollLayerPositionOnMainThreadFlags)
 {
 }
+#endif
 
 bool ScrollingCoordinator::supportsFixedPositionLayers() const
 {
@@ -81,6 +83,10 @@ void ScrollingCoordinator::setLayerIsContainerForFixedPositionLayers(GraphicsLay
 }
 
 void ScrollingCoordinator::setLayerIsFixedToContainerLayer(GraphicsLayer*, bool)
+{
+}
+
+void ScrollingCoordinator::scrollableAreaScrollLayerDidChange(ScrollableArea*, GraphicsLayer*)
 {
 }
 #endif // !ENABLE(THREADED_SCROLLING)

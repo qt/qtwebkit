@@ -31,9 +31,11 @@
 /**
  * @constructor
  * @extends {WebInspector.Object}
+ * @param {WebInspector.Workspace} workspace
  */
-WebInspector.ScriptSnippetModel = function()
+WebInspector.ScriptSnippetModel = function(workspace)
 {
+    this._workspace = workspace;
     this._uiSourceCodeForScriptId = {};
     this._scriptForUISourceCode = new Map();
     this._snippetJavaScriptSourceForSnippetId = {};
@@ -41,6 +43,9 @@ WebInspector.ScriptSnippetModel = function()
     this._snippetStorage = new WebInspector.SnippetStorage("script", "Script snippet #");
     this._lastSnippetEvaluationIndexSetting = WebInspector.settings.createSetting("lastSnippetEvaluationIndex", 0);
     this._snippetScriptMapping = new WebInspector.SnippetScriptMapping(this);
+    this._workspace.addEventListener(WebInspector.Workspace.Events.ProjectWillReset, this._projectWillReset, this);
+    this._workspace.addEventListener(WebInspector.Workspace.Events.ProjectDidReset, this._projectDidReset, this);
+    this._loadSnippets();
 }
 
 WebInspector.ScriptSnippetModel.snippetSourceURLPrefix = "snippets:///";
@@ -77,8 +82,9 @@ WebInspector.ScriptSnippetModel.prototype = {
     _addScriptSnippet: function(snippet)
     {
         var snippetJavaScriptSource = new WebInspector.SnippetJavaScriptSource(snippet.id, snippet.name, new WebInspector.SnippetContentProvider(snippet), this);
+        snippetJavaScriptSource.setSourceMapping(this._snippetScriptMapping); 
         this._snippetJavaScriptSourceForSnippetId[snippet.id] = snippetJavaScriptSource;
-        this._snippetScriptMapping._fireUISourceCodeAdded(snippetJavaScriptSource);
+        this._workspace.project().addUISourceCode(snippetJavaScriptSource);
         return snippetJavaScriptSource;
     },
 
@@ -92,7 +98,7 @@ WebInspector.ScriptSnippetModel.prototype = {
         this._removeBreakpoints(snippetJavaScriptSource);
         this._releaseSnippetScript(snippetJavaScriptSource);
         delete this._snippetJavaScriptSourceForSnippetId[snippet.id];
-        this._snippetScriptMapping._fireUISourceCodeRemoved(snippetJavaScriptSource);
+        this._workspace.project().removeUISourceCode(snippetJavaScriptSource);
     },
 
     /**
@@ -239,17 +245,6 @@ WebInspector.ScriptSnippetModel.prototype = {
     /**
      * @return {Array.<WebInspector.UISourceCode>}
      */
-    _uiSourceCodes: function()
-    {
-        var result = this._releasedUISourceCodes();
-        for (var snippetId in this._snippetJavaScriptSourceForSnippetId)
-            result.push(this._snippetJavaScriptSourceForSnippetId[snippetId]);
-        return result;
-    },
-
-    /**
-     * @return {Array.<WebInspector.UISourceCode>}
-     */
     _releasedUISourceCodes: function()
     {
         var result = [];
@@ -285,7 +280,8 @@ WebInspector.ScriptSnippetModel.prototype = {
      */
     _createUISourceCodeForScript: function(script)
     {
-        var uiSourceCode = new WebInspector.JavaScriptSource(script.sourceURL, null, script, this._snippetScriptMapping, false);
+        var uiSourceCode = new WebInspector.JavaScriptSource(script.sourceURL, null, script, false);
+        uiSourceCode.setSourceMapping(this._snippetScriptMapping); 
         uiSourceCode.isSnippetEvaluation = true;
         this._uiSourceCodeForScriptId[script.scriptId] = uiSourceCode;
         this._scriptForUISourceCode.put(uiSourceCode, script);
@@ -357,13 +353,17 @@ WebInspector.ScriptSnippetModel.prototype = {
         return snippetId;
     },
 
-    _reset: function()
+    _projectWillReset: function()
     {
         var removedUISourceCodes = this._releasedUISourceCodes();
         this._uiSourceCodeForScriptId = {};
         this._scriptForUISourceCode = new Map();
         this._snippetJavaScriptSourceForSnippetId = {};
-        setTimeout(this._loadSnippets.bind(this), 0);
+    },
+
+    _projectDidReset: function()
+    {
+        this._loadSnippets();
     }
 }
 
@@ -379,7 +379,7 @@ WebInspector.ScriptSnippetModel.prototype.__proto__ = WebInspector.Object.protot
  */
 WebInspector.SnippetJavaScriptSource = function(snippetId, snippetName, contentProvider, scriptSnippetModel)
 {
-    WebInspector.JavaScriptSource.call(this, snippetName, null, contentProvider, scriptSnippetModel.scriptMapping, true);
+    WebInspector.JavaScriptSource.call(this, snippetName, null, contentProvider, true);
     this._snippetId = snippetId;
     this._scriptSnippetModel = scriptSnippetModel;
     this.isSnippet = true;
@@ -450,9 +450,7 @@ WebInspector.SnippetJavaScriptSource.prototype.__proto__ = WebInspector.JavaScri
 
 /**
  * @constructor
- * @extends {WebInspector.Object}
  * @implements {WebInspector.SourceMapping}
- * @implements {WebInspector.UISourceCodeProvider}
  * @param {WebInspector.ScriptSnippetModel} scriptSnippetModel
  */
 WebInspector.SnippetScriptMapping = function(scriptSnippetModel)
@@ -483,14 +481,6 @@ WebInspector.SnippetScriptMapping.prototype = {
     },
 
     /**
-     * @return {Array.<WebInspector.UISourceCode>}
-     */
-    uiSourceCodes: function()
-    {
-        return this._scriptSnippetModel._uiSourceCodes();
-    },
-
-    /**
      * @param {string} sourceURL
      * @return {string|null}
      */
@@ -505,31 +495,8 @@ WebInspector.SnippetScriptMapping.prototype = {
     addScript: function(script)
     {
         this._scriptSnippetModel._addScript(script);
-    },
-
-    /**
-     * @param {WebInspector.UISourceCode} uiSourceCode
-     */
-    _fireUISourceCodeAdded: function(uiSourceCode)
-    {
-        this.dispatchEventToListeners(WebInspector.UISourceCodeProvider.Events.UISourceCodeAdded, uiSourceCode);
-    },
-
-    /**
-     * @param {WebInspector.UISourceCode} uiSourceCode
-     */
-    _fireUISourceCodeRemoved: function(uiSourceCode)
-    {
-        this.dispatchEventToListeners(WebInspector.UISourceCodeProvider.Events.UISourceCodeRemoved, uiSourceCode);
-    },
-
-    reset: function()
-    {
-        this._scriptSnippetModel._reset();
     }
 }
-
-WebInspector.SnippetScriptMapping.prototype.__proto__ = WebInspector.Object.prototype;
 
 /**
  * @constructor

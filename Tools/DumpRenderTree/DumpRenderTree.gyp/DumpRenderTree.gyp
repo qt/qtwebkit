@@ -128,7 +128,6 @@
                 '<(chromium_src_dir)/base/base.gyp:test_support_base',
                 '<(chromium_src_dir)/webkit/support/webkit_support.gyp:blob',
                 '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_support',
-                '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_user_agent',
             ],
             'include_dirs': [
                 '<(chromium_src_dir)',
@@ -506,6 +505,8 @@
                         '-DANDROID_SDK_VERSION=<(android_sdk_version)',
                         '--ant-args',
                         '-DANDROID_TOOLCHAIN=<(android_toolchain)',
+                        '--ant-args',
+                        '-DANDROID_GDBSERVER=<(android_gdbserver)',
                         '--ant-args',
                         '-DPRODUCT_DIR=<(ant_build_out)',
                         '--ant-args',

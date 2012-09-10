@@ -21,13 +21,13 @@
 #ifndef qquickwebview_p_p_h
 #define qquickwebview_p_p_h
 
+#include "PageViewportController.h"
+#include "PageViewportControllerClient.h"
 #include "QtPageClient.h"
 #include "QtWebPageUIClient.h"
 #include "QtWebUndoController.h"
-
 #include "qquickwebview_p.h"
 #include "qquickwebpage_p.h"
-
 #include <QtCore/QElapsedTimer>
 #include <QtCore/QObject>
 #include <QtCore/QScopedPointer>
@@ -39,7 +39,7 @@ namespace WebKit {
 class DownloadProxy;
 class DrawingAreaProxy;
 class QtDialogRunner;
-class QtViewportHandler;
+class PageViewportControllerClientQt;
 class QtWebContext;
 class QtWebError;
 class QtWebPageLoadClient;
@@ -87,7 +87,7 @@ public:
     int loadProgress() const { return m_loadProgress; }
     void setNeedsDisplay();
 
-    virtual WebKit::QtViewportHandler* viewportHandler() { return 0; }
+    WebKit::PageViewportController* viewportController() const { return m_pageViewportController.data(); }
     virtual void updateViewportSize() { }
     void updateTouchViewportSize();
 
@@ -128,7 +128,7 @@ public:
     WebCore::IntSize viewSize() const;
     void didReceiveMessageFromNavigatorQtObject(const String& message);
     virtual void pageDidRequestScroll(const QPoint& pos) { }
-    virtual void didChangeContentsSize(const QSize& newSize) { }
+    virtual void didChangeContentsSize(const QSize& newSize);
     void processDidCrash();
     void didRelaunchProcess();
     PassOwnPtr<WebKit::DrawingAreaProxy> createDrawingAreaProxy();
@@ -170,7 +170,9 @@ protected:
     QScopedPointer<QQuickWebPage> pageView;
     QQuickWebView* q_ptr;
 
-    QScopedPointer<WebKit::QtViewportHandler> m_viewportHandler;
+    QScopedPointer<WebKit::PageViewportController> m_pageViewportController;
+    QScopedPointer<WebKit::PageViewportControllerClientQt> m_pageViewportControllerClient;
+
     FlickableAxisLocker axisLocker;
 
     QQmlComponent* alertDialog;
@@ -190,6 +192,7 @@ protected:
     bool m_navigatorQtObjectEnabled;
     bool m_renderToOffscreenBuffer;
     bool m_allowAnyHTTPSCertificateForLocalHost;
+    qreal m_customDevicePixelRatio;
     WTF::String m_iconUrl;
     int m_loadProgress;
     WTF::String m_currentUrl;
@@ -211,13 +214,11 @@ class QQuickWebViewFlickablePrivate : public QQuickWebViewPrivate {
     Q_DECLARE_PUBLIC(QQuickWebView)
 public:
     QQuickWebViewFlickablePrivate(QQuickWebView* viewport);
-    virtual ~QQuickWebViewFlickablePrivate();
     virtual void initialize(WKContextRef contextRef = 0, WKPageGroupRef pageGroupRef = 0);
 
     virtual void onComponentComplete();
 
     virtual void didChangeViewportProperties(const WebCore::ViewportAttributes&);
-    virtual WebKit::QtViewportHandler* viewportHandler() { return m_viewportHandler.data(); }
     virtual void updateViewportSize();
 
     virtual void pageDidRequestScroll(const QPoint& pos);

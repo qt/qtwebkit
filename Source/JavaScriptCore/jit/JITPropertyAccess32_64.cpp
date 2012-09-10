@@ -213,7 +213,7 @@ void JIT::emit_op_get_by_val(Instruction* currentInstruction)
 #if ENABLE(VALUE_PROFILER)
     storePtr(regT1, currentInstruction[4].u.arrayProfile->addressOfLastSeenStructure());
 #endif
-    addSlowCase(branchPtr(NotEqual, Address(regT1, JSCell::classInfoOffset()), TrustedImmPtr(&JSArray::s_info)));
+    addSlowCase(branchPtr(NotEqual, Address(regT1, Structure::classInfoOffset()), TrustedImmPtr(&JSArray::s_info)));
     
     loadPtr(Address(regT0, JSArray::storageOffset()), regT3);
     addSlowCase(branch32(AboveOrEqual, regT2, Address(regT0, JSArray::vectorLengthOffset())));
@@ -1108,13 +1108,12 @@ void JIT::emit_op_get_scoped_var(Instruction* currentInstruction)
         Jump activationNotCreated;
         if (checkTopLevel)
             activationNotCreated = branch32(Equal, tagFor(m_codeBlock->activationRegister()), TrustedImm32(JSValue::EmptyValueTag));
-        loadPtr(Address(regT2, OBJECT_OFFSETOF(ScopeChainNode, next)), regT2);
+        loadPtr(Address(regT2, JSScope::offsetOfNext()), regT2);
         activationNotCreated.link(this);
     }
     while (skip--)
-        loadPtr(Address(regT2, OBJECT_OFFSETOF(ScopeChainNode, next)), regT2);
+        loadPtr(Address(regT2, JSScope::offsetOfNext()), regT2);
 
-    loadPtr(Address(regT2, OBJECT_OFFSETOF(ScopeChainNode, object)), regT2);
     loadPtr(Address(regT2, JSVariableObject::offsetOfRegisters()), regT2);
 
     emitLoad(index, regT1, regT0, regT2);
@@ -1138,12 +1137,11 @@ void JIT::emit_op_put_scoped_var(Instruction* currentInstruction)
         Jump activationNotCreated;
         if (checkTopLevel)
             activationNotCreated = branch32(Equal, tagFor(m_codeBlock->activationRegister()), TrustedImm32(JSValue::EmptyValueTag));
-        loadPtr(Address(regT2, OBJECT_OFFSETOF(ScopeChainNode, next)), regT2);
+        loadPtr(Address(regT2, JSScope::offsetOfNext()), regT2);
         activationNotCreated.link(this);
     }
     while (skip--)
-        loadPtr(Address(regT2, OBJECT_OFFSETOF(ScopeChainNode, next)), regT2);
-    loadPtr(Address(regT2, OBJECT_OFFSETOF(ScopeChainNode, object)), regT2);
+        loadPtr(Address(regT2, JSScope::offsetOfNext()), regT2);
 
     loadPtr(Address(regT2, JSVariableObject::offsetOfRegisters()), regT3);
     emitStore(index, regT1, regT0, regT3);

@@ -31,6 +31,7 @@
 #include "CompositorFakeWebGraphicsContext3D.h"
 #include <gtest/gtest.h>
 #include <public/WebAnimationDelegate.h>
+#include <public/WebThread.h>
 
 namespace WebCore {
 class CCLayerImpl;
@@ -38,10 +39,6 @@ class CCLayerTreeHost;
 class CCLayerTreeHostClient;
 class CCLayerTreeHostImpl;
 class GraphicsContext3D;
-}
-
-namespace WebKit {
-class WebThread;
 }
 
 namespace WebKitTests {
@@ -56,7 +53,7 @@ public:
     virtual void animateLayers(WebCore::CCLayerTreeHostImpl*, double monotonicTime) { }
     virtual void willAnimateLayers(WebCore::CCLayerTreeHostImpl*, double monotonicTime) { }
     virtual void applyScrollAndScale(const WebCore::IntSize&, float) { }
-    virtual void updateAnimations(double monotonicTime) { }
+    virtual void animate(double monotonicTime) { }
     virtual void layout() { }
     virtual void didRecreateOutputSurface(bool succeeded) { }
     virtual void didAddAnimation() { }
@@ -116,6 +113,8 @@ public:
 
 protected:
     CCThreadedTest();
+
+    virtual void initializeSettings(WebCore::CCLayerTreeSettings&) { }
 
     virtual void scheduleComposite();
 

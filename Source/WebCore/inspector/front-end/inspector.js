@@ -37,7 +37,7 @@ var WebInspector = {
         WebInspector.inspectorView.show(parentElement);
         WebInspector.inspectorView.addEventListener(WebInspector.InspectorView.Events.PanelSelected, this._panelSelected, this);
 
-        var elements = new WebInspector.PanelDescriptor("elements", WebInspector.UIString("Elements"), "ElementsPanel", "ElementsPanel.js");
+        var elements = new WebInspector.ElementsPanelDescriptor();
         var resources = new WebInspector.PanelDescriptor("resources", WebInspector.UIString("Resources"), "ResourcesPanel", "ResourcesPanel.js");
         var network = new WebInspector.NetworkPanelDescriptor();
         var scripts = new WebInspector.ScriptsPanelDescriptor();
@@ -58,7 +58,7 @@ var WebInspector = {
         var allDescriptors = [elements, resources, network, scripts, timeline, profiles, audits, console];
         var hiddenPanels = InspectorFrontendHost.hiddenPanels();
         for (var i = 0; i < allDescriptors.length; ++i) {
-            if (hiddenPanels.indexOf(allDescriptors[i].name) === -1)
+            if (hiddenPanels.indexOf(allDescriptors[i].name()) === -1)
                 panelDescriptors.push(allDescriptors[i]);
         }
         return panelDescriptors;
@@ -484,7 +484,6 @@ WebInspector._doLoadedDoneWithCapabilities = function()
     WebInspector.CSSCompletions.requestCSSNameCompletions();
 
     this.drawer = new WebInspector.Drawer();
-    this.consoleView = new WebInspector.ConsoleView(WebInspector.WorkerManager.isWorkerFrontend());
 
     this.networkManager = new WebInspector.NetworkManager();
     this.resourceTreeModel = new WebInspector.ResourceTreeModel(this.networkManager);
@@ -492,9 +491,9 @@ WebInspector._doLoadedDoneWithCapabilities = function()
     this.debuggerModel.addEventListener(WebInspector.DebuggerModel.Events.DebuggerPaused, this._debuggerPaused, this);
     this.networkLog = new WebInspector.NetworkLog();
     this.domAgent = new WebInspector.DOMAgent();
-    this.javaScriptContextManager = new WebInspector.JavaScriptContextManager(this.resourceTreeModel, this.consoleView);
+    this.runtimeModel = new WebInspector.RuntimeModel(this.resourceTreeModel);
 
-    this.scriptSnippetModel = new WebInspector.ScriptSnippetModel();
+    this.consoleView = new WebInspector.ConsoleView(WebInspector.WorkerManager.isWorkerFrontend());
 
     InspectorBackend.registerInspectorDispatcher(this);
 
@@ -518,7 +517,18 @@ WebInspector._doLoadedDoneWithCapabilities = function()
     this.openAnchorLocationRegistry.registerHandler(autoselectPanel, function() { return false; });
 
     this.workspace = new WebInspector.Workspace();
+    this.workspaceController = new WebInspector.WorkspaceController(this.workspace);
+
     this.breakpointManager = new WebInspector.BreakpointManager(WebInspector.settings.breakpoints, this.debuggerModel, this.workspace);
+
+    this.scriptSnippetModel = new WebInspector.ScriptSnippetModel(this.workspace);
+    new WebInspector.DebuggerScriptMapping(this.workspace);
+    new WebInspector.NetworkUISourceCodeProvider(this.workspace);
+    new WebInspector.StylesSourceMapping(this.workspace);
+    if (WebInspector.experimentsSettings.sass.isEnabled())
+        new WebInspector.SASSSourceMapping(this.workspace);
+
+    new WebInspector.PresentationConsoleMessageHelper(this.workspace);
 
     this._createGlobalStatusBarItems();
 
@@ -1082,11 +1092,6 @@ WebInspector.addMainEventListeners = function(doc)
     doc.addEventListener("copy", this.documentCopy.bind(this), true);
     doc.addEventListener("contextmenu", this.contextMenuEventFired.bind(this), true);
     doc.addEventListener("click", this.documentClick.bind(this), true);
-}
-
-WebInspector.frontendReused = function()
-{
-    this.resourceTreeModel.frontendReused();
 }
 
 WebInspector.ProfileURLRegExp = /webkit-profile:\/\/(.+)\/(.+)#([0-9]+)/;

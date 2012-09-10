@@ -1006,7 +1006,8 @@ class Port(object):
         expectations = OrderedDict()
 
         for path in self.expectations_files():
-            expectations[path] = self._filesystem.read_text_file(path)
+            if self._filesystem.exists(path):
+                expectations[path] = self._filesystem.read_text_file(path)
 
         for path in self.get_option('additional_expectations', []):
             expanded_path = self._filesystem.expanduser(path)
@@ -1466,7 +1467,9 @@ class Port(object):
     def _skipped_file_search_paths(self):
         # Unlike baseline_search_path, we only want to search [WK2-PORT, PORT-VERSION, PORT] and any directories
         # included via --additional-platform-directory, not the full casade.
-        # Note order doesn't matter since the Skipped file contents are all combined.
+        # Note order doesn't matter since the Skipped file contents are all combined; however
+        # we use this order explicitly so we can re-use it for TestExpectations files.
+        # FIXME: Update this when we get rid of Skipped files altogether.
 
         search_paths = set([self.port_name])
         if 'future' not in self.name():

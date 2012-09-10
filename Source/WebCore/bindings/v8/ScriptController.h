@@ -172,8 +172,6 @@ public:
     v8::Local<v8::Context> mainWorldContext();
     v8::Local<v8::Context> currentWorldContext();
 
-    bool matchesCurrentContext();
-
     // Pass command-line flags to the JS engine.
     static void setFlags(const char* string, int length);
 
@@ -225,7 +223,7 @@ private:
     const String* m_sourceURL;
 
     // For the moment, we have one of these. Soon we will have one per DOMWrapperWorld.
-    RefPtr<V8DOMWindowShell> m_windowShell;
+    OwnPtr<V8DOMWindowShell> m_windowShell;
 
     // The isolated worlds we are tracking for this frame. We hold them alive
     // here so that they can be used again by future calls to

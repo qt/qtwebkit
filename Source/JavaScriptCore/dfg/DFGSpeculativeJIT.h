@@ -1198,6 +1198,11 @@ public:
         m_jit.setupArgumentsWithExecState(arg1);
         return appendCallWithExceptionCheckSetResult(operation, result);
     }
+    JITCompiler::Call callOperation(J_DFGOperation_EAZ operation, GPRReg result, GPRReg arg1, GPRReg arg2)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2);
+        return appendCallWithExceptionCheckSetResult(operation, result);
+    }
     JITCompiler::Call callOperation(J_DFGOperation_ESt operation, GPRReg result, Structure* structure)
     {
         m_jit.setupArgumentsWithExecState(TrustedImmPtr(structure));
@@ -1479,6 +1484,11 @@ public:
     JITCompiler::Call callOperation(J_DFGOperation_EA operation, GPRReg resultTag, GPRReg resultPayload, GPRReg arg1)
     {
         m_jit.setupArgumentsWithExecState(arg1);
+        return appendCallWithExceptionCheckSetResult(operation, resultPayload, resultTag);
+    }
+    JITCompiler::Call callOperation(J_DFGOperation_EAZ operation, GPRReg resultTag, GPRReg resultPayload, GPRReg arg1, GPRReg arg2)
+    {
+        m_jit.setupArgumentsWithExecState(arg1, arg2);
         return appendCallWithExceptionCheckSetResult(operation, resultPayload, resultTag);
     }
     JITCompiler::Call callOperation(J_DFGOperation_ESt operation, GPRReg resultTag, GPRReg resultPayload, Structure* structure)
@@ -1825,7 +1835,21 @@ public:
         return call;
     }
 #elif CPU(ARM)
+#if CPU(ARM_HARDFP)
     JITCompiler::Call appendCallWithExceptionCheckSetResult(const FunctionPtr& function, FPRReg result)
+    {
+        JITCompiler::Call call = appendCallWithExceptionCheck(function);
+        m_jit.moveDouble(result, FPRInfo::argumentFPR0);
+        return call;
+    }
+    JITCompiler::Call appendCallSetResult(const FunctionPtr& function, FPRReg result)
+    {
+        JITCompiler::Call call = m_jit.appendCall(function);
+        m_jit.moveDouble(result, FPRInfo::argumentFPR0);
+        return call;
+    }
+#else
+        JITCompiler::Call appendCallWithExceptionCheckSetResult(const FunctionPtr& function, FPRReg result)
     {
         JITCompiler::Call call = appendCallWithExceptionCheck(function);
         m_jit.assembler().vmov(result, GPRInfo::returnValueGPR, GPRInfo::returnValueGPR2);
@@ -1837,6 +1861,7 @@ public:
         m_jit.assembler().vmov(result, GPRInfo::returnValueGPR, GPRInfo::returnValueGPR2);
         return call;
     }
+#endif // CPU(ARM_HARDFP)
 #else
     JITCompiler::Call appendCallWithExceptionCheckSetResult(const FunctionPtr& function, FPRReg result)
     {
@@ -2054,16 +2079,14 @@ public:
     bool compilePeepHoleBranch(Node&, MacroAssembler::RelationalCondition, MacroAssembler::DoubleCondition, S_DFGOperation_EJJ);
     void compilePeepHoleIntegerBranch(Node&, NodeIndex branchNodeIndex, JITCompiler::RelationalCondition);
     void compilePeepHoleDoubleBranch(Node&, NodeIndex branchNodeIndex, JITCompiler::DoubleCondition);
-    void compilePeepHoleObjectEquality(Node&, NodeIndex branchNodeIndex, const ClassInfo*, SpeculatedTypeChecker);
-    void compilePeepHoleObjectToObjectOrOtherEquality(
-        Edge leftChild, Edge rightChild, NodeIndex branchNodeIndex, const ClassInfo*, SpeculatedTypeChecker);
-    void compileObjectEquality(Node&, const ClassInfo*, SpeculatedTypeChecker);
-    void compileObjectToObjectOrOtherEquality(
-        Edge leftChild, Edge rightChild, const ClassInfo*, SpeculatedTypeChecker);
+    void compilePeepHoleObjectEquality(Node&, NodeIndex branchNodeIndex);
+    void compilePeepHoleObjectToObjectOrOtherEquality(Edge leftChild, Edge rightChild, NodeIndex branchNodeIndex);
+    void compileObjectEquality(Node&);
+    void compileObjectToObjectOrOtherEquality(Edge leftChild, Edge rightChild);
     void compileValueAdd(Node&);
-    void compileObjectOrOtherLogicalNot(Edge value, const ClassInfo*, bool needSpeculationCheck);
+    void compileNonStringCellOrOtherLogicalNot(Edge value, bool needSpeculationCheck);
     void compileLogicalNot(Node&);
-    void emitObjectOrOtherBranch(Edge value, BlockIndex taken, BlockIndex notTaken, const ClassInfo*, bool needSpeculationCheck);
+    void emitNonStringCellOrOtherBranch(Edge value, BlockIndex taken, BlockIndex notTaken, bool needSpeculationCheck);
     void emitBranch(Node&);
     
     void compileIntegerCompare(Node&, MacroAssembler::RelationalCondition);
@@ -2197,7 +2220,7 @@ public:
     
     const TypedArrayDescriptor* typedArrayDescriptor(Array::Mode);
     
-    const TypedArrayDescriptor* speculateArray(Array::Mode, Edge baseEdge, GPRReg baseReg);
+    void checkArray(Node&);
     
     template<bool strict>
     GPRReg fillSpeculateIntInternal(NodeIndex, DataFormat& returnFormat);

@@ -45,6 +45,7 @@
 #include "InspectorTypeBuilder.h"
 #include "InspectorValues.h"
 #include "InstrumentingAgents.h"
+#include "NamedFlowCollection.h"
 #include "Node.h"
 #include "NodeList.h"
 #include "RenderRegion.h"
@@ -54,7 +55,6 @@
 #include "StyleRule.h"
 #include "StyleSheetList.h"
 #include "WebKitNamedFlow.h"
-#include "WebKitNamedFlowCollection.h"
 
 #include <wtf/CurrentTime.h>
 #include <wtf/HashSet.h>
@@ -133,10 +133,10 @@ private:
 
 static unsigned computePseudoClassMask(InspectorArray* pseudoClassArray)
 {
-    DEFINE_STATIC_LOCAL(String, active, ("active"));
-    DEFINE_STATIC_LOCAL(String, hover, ("hover"));
-    DEFINE_STATIC_LOCAL(String, focus, ("focus"));
-    DEFINE_STATIC_LOCAL(String, visited, ("visited"));
+    DEFINE_STATIC_LOCAL(String, active, (ASCIILiteral("active")));
+    DEFINE_STATIC_LOCAL(String, hover, (ASCIILiteral("hover")));
+    DEFINE_STATIC_LOCAL(String, focus, (ASCIILiteral("focus")));
+    DEFINE_STATIC_LOCAL(String, visited, (ASCIILiteral("visited")));
     if (!pseudoClassArray || !pseudoClassArray->length())
         return PseudoNone;
 
@@ -326,7 +326,7 @@ public:
         m_oldText = oldText.stripWhiteSpace();
         // FIXME: remove this once the model handles this case.
         if (!m_oldText.endsWith(';'))
-            m_oldText += ";";
+            m_oldText.append(';');
         return result;
     }
 

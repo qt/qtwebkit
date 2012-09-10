@@ -27,6 +27,7 @@
 #include "Bridge.h"
 #include "Chrome.h"
 #include "ChromeClientEfl.h"
+#include "ContextMenuClientEfl.h"
 #include "ContextMenuController.h"
 #include "DocumentLoader.h"
 #include "DragClientEfl.h"
@@ -57,6 +58,7 @@
 #include "ResourceHandle.h"
 #include "Settings.h"
 #include "c_instance.h"
+#include "ewk_contextmenu_private.h"
 #include "ewk_frame.h"
 #include "ewk_frame_private.h"
 #include "ewk_history_private.h"
@@ -103,8 +105,8 @@
 #include "ColorChooserClient.h"
 #endif
 
-#if ENABLE(REGISTER_PROTOCOL_HANDLER)
-#include "RegisterProtocolHandlerClientEfl.h"
+#if ENABLE(NAVIGATOR_CONTENT_UTILS)
+#include "NavigatorContentUtilsClientEfl.h"
 #endif
 
 static const float zoomMinimum = 0.05;
@@ -254,8 +256,8 @@ struct _Ewk_View_Private_Data {
 #if ENABLE(INPUT_TYPE_COLOR)
     WebCore::ColorChooserClient* colorChooserClient;
 #endif
-#if ENABLE(REGISTER_PROTOCOL_HANDLER) || ENABLE(CUSTOM_SCHEME_HANDLER)
-    OwnPtr<WebCore::RegisterProtocolHandlerClientEfl> registerProtocolHandlerClient;
+#if ENABLE(NAVIGATOR_CONTENT_UTILS) || ENABLE(CUSTOM_SCHEME_HANDLER)
+    OwnPtr<WebCore::NavigatorContentUtilsClientEfl> navigatorContentUtilsClient;
 #endif
     struct {
         Ewk_Menu menu;
@@ -332,6 +334,8 @@ struct _Ewk_View_Private_Data {
         } zoomRange;
         float devicePixelRatio;
         double domTimerInterval;
+        bool allowUniversalAccessFromFileURLs : 1;
+        bool allowFileAccessFromFileURLs : 1;
     } settings;
     struct {
         struct {
@@ -358,6 +362,7 @@ struct _Ewk_View_Private_Data {
 #ifdef HAVE_ECORE_X
     bool isUsingEcoreX;
 #endif
+    Ewk_Context_Menu* contextMenu;
 };
 
 #ifndef EWK_TYPE_CHECK
@@ -739,6 +744,7 @@ static Ewk_View_Private_Data* _ewk_view_priv_new(Ewk_View_Smart_Data* smartData)
 
     WebCore::Page::PageClients pageClients;
     pageClients.chromeClient = new WebCore::ChromeClientEfl(smartData->self);
+    pageClients.contextMenuClient = new WebCore::ContextMenuClientEfl;
     pageClients.editorClient = new WebCore::EditorClientEfl(smartData->self);
     pageClients.dragClient = new WebCore::DragClientEfl;
 #if ENABLE(INSPECTOR)
@@ -764,9 +770,9 @@ static Ewk_View_Private_Data* _ewk_view_priv_new(Ewk_View_Smart_Data* smartData)
     WebCore::provideBatteryTo(priv->page.get(), new BatteryClientEfl(smartData->self));
 #endif
 
-#if ENABLE(REGISTER_PROTOCOL_HANDLER)
-    priv->registerProtocolHandlerClient = WebCore::RegisterProtocolHandlerClientEfl::create(smartData->self);
-    WebCore::provideRegisterProtocolHandlerTo(priv->page.get(), priv->registerProtocolHandlerClient.get());
+#if ENABLE(NAVIGATOR_CONTENT_UTILS)
+    priv->navigatorContentUtilsClient = WebCore::NavigatorContentUtilsClientEfl::create(smartData->self);
+    WebCore::provideNavigatorContentUtilsTo(priv->page.get(), priv->navigatorContentUtilsClient.get());
 #endif
 
     priv->pageSettings = priv->page->settings();
@@ -874,6 +880,9 @@ static Ewk_View_Private_Data* _ewk_view_priv_new(Ewk_View_Smart_Data* smartData)
 
     priv->settings.domTimerInterval = priv->pageSettings->defaultMinDOMTimerInterval();
 
+    priv->settings.allowUniversalAccessFromFileURLs = priv->pageSettings->allowUniversalAccessFromFileURLs();
+    priv->settings.allowFileAccessFromFileURLs = priv->pageSettings->allowFileAccessFromFileURLs();
+
     priv->mainFrame = _ewk_view_core_frame_new(smartData, priv, 0).get();
 
     priv->history = ewk_history_new(static_cast<WebCore::BackForwardListImpl*>(priv->page->backForwardList()));
@@ -885,6 +894,8 @@ static Ewk_View_Private_Data* _ewk_view_priv_new(Ewk_View_Smart_Data* smartData)
 #ifdef HAVE_ECORE_X
     priv->isUsingEcoreX = WebCore::isUsingEcoreX(smartData->base.evas);
 #endif
+
+    priv->contextMenu = 0;
 
     return priv;
 }
@@ -918,6 +929,9 @@ static void _ewk_view_priv_del(Ewk_View_Private_Data* priv)
 
     if (priv->cursorObject)
         evas_object_del(priv->cursorObject);
+
+    if (priv->contextMenu)
+        ewk_context_menu_free(priv->contextMenu);
 
     delete priv;
 }
@@ -1619,6 +1633,9 @@ Eina_Bool ewk_view_context_menu_forward_event(Evas_Object* ewkView, const Evas_E
     Eina_Bool mouse_press_handled = false;
 
     priv->page->contextMenuController()->clearContextMenu();
+    if (priv->contextMenu)
+        ewk_context_menu_free(priv->contextMenu);
+
     WebCore::Frame* mainFrame = priv->page->mainFrame();
     Evas_Coord x, y;
     evas_object_geometry_get(smartData->self, &x, &y, 0, 0);
@@ -1630,7 +1647,7 @@ Eina_Bool ewk_view_context_menu_forward_event(Evas_Object* ewkView, const Evas_E
             mainFrame->eventHandler()->handleMousePressEvent(event);
     }
 
-    if (mainFrame->eventHandler()->sendContextMenuEvent(event))
+    if (!mainFrame->eventHandler()->sendContextMenuEvent(event))
         return false;
 
     WebCore::ContextMenu* coreMenu =
@@ -1640,6 +1657,12 @@ Eina_Bool ewk_view_context_menu_forward_event(Evas_Object* ewkView, const Evas_E
         // was handled by handleMouseReleaseEvent
         return mouse_press_handled;
     }
+
+    priv->contextMenu = ewk_context_menu_new(ewkView, priv->page->contextMenuController(), coreMenu);
+    if (!priv->contextMenu)
+        return false;
+
+    ewk_context_menu_show(priv->contextMenu);
 
     return true;
 #else
@@ -2675,6 +2698,44 @@ Eina_Bool ewk_view_setting_enable_hyperlink_auditing_set(Evas_Object* ewkView, E
         priv->settings.hyperlinkAuditingEnabled = enable;
     }
     return true;
+}
+
+Eina_Bool ewk_view_setting_allow_universal_access_from_file_urls_set(Evas_Object* ewkView, Eina_Bool enable)
+{
+    EWK_VIEW_SD_GET_OR_RETURN(ewkView, smartData, false);
+    EWK_VIEW_PRIV_GET_OR_RETURN(smartData, priv, false);
+    enable = !!enable;
+    if (priv->settings.allowUniversalAccessFromFileURLs != enable) {
+        priv->pageSettings->setAllowUniversalAccessFromFileURLs(enable);
+        priv->settings.allowUniversalAccessFromFileURLs = enable;
+    }
+    return true;
+}
+
+Eina_Bool ewk_view_setting_allow_universal_access_from_file_urls_get(const Evas_Object* ewkView)
+{
+    EWK_VIEW_SD_GET_OR_RETURN(ewkView, smartData, false);
+    EWK_VIEW_PRIV_GET_OR_RETURN(smartData, priv, false);
+    return priv->settings.allowUniversalAccessFromFileURLs;
+}
+
+Eina_Bool ewk_view_setting_allow_file_access_from_file_urls_set(Evas_Object* ewkView, Eina_Bool enable)
+{
+    EWK_VIEW_SD_GET_OR_RETURN(ewkView, smartData, false);
+    EWK_VIEW_PRIV_GET_OR_RETURN(smartData, priv, false);
+    enable = !!enable;
+    if (priv->settings.allowFileAccessFromFileURLs != enable) {
+        priv->pageSettings->setAllowFileAccessFromFileURLs(enable);
+        priv->settings.allowFileAccessFromFileURLs = enable;
+    }
+    return true;
+}
+
+Eina_Bool ewk_view_setting_allow_file_access_from_file_urls_get(const Evas_Object* ewkView)
+{
+    EWK_VIEW_SD_GET_OR_RETURN(ewkView, smartData, false);
+    EWK_VIEW_PRIV_GET_OR_RETURN(smartData, priv, false);
+    return priv->settings.allowFileAccessFromFileURLs;
 }
 
 Ewk_View_Smart_Data* ewk_view_smart_data_get(const Evas_Object* ewkView)

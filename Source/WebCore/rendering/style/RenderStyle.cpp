@@ -28,7 +28,6 @@
 #include "CSSPropertyNames.h"
 #include "Font.h"
 #include "FontSelector.h"
-#include "MemoryInstrumentation.h"
 #include "QuotesData.h"
 #include "RenderArena.h"
 #include "RenderObject.h"
@@ -40,6 +39,7 @@
 #if ENABLE(TOUCH_EVENTS)
 #include "RenderTheme.h"
 #endif
+#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/StdLibExtras.h>
 #include <algorithm>
 
@@ -455,6 +455,11 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
         if (rareNonInheritedData->m_dashboardRegions != other->rareNonInheritedData->m_dashboardRegions)
             return StyleDifferenceLayout;
 #endif
+
+#if ENABLE(CSS_EXCLUSIONS)
+        if (rareNonInheritedData->m_wrapShapeInside != other->rareNonInheritedData->m_wrapShapeInside)
+            return StyleDifferenceLayout;
+#endif
     }
 
     if (rareInheritedData.get() != other->rareInheritedData.get()) {
@@ -463,7 +468,7 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
             || rareInheritedData->m_effectiveZoom != other->rareInheritedData->m_effectiveZoom
             || rareInheritedData->textSizeAdjust != other->rareInheritedData->textSizeAdjust
             || rareInheritedData->wordBreak != other->rareInheritedData->wordBreak
-            || rareInheritedData->wordWrap != other->rareInheritedData->wordWrap
+            || rareInheritedData->overflowWrap != other->rareInheritedData->overflowWrap
             || rareInheritedData->nbspMode != other->rareInheritedData->nbspMode
             || rareInheritedData->khtmlLineBreak != other->rareInheritedData->khtmlLineBreak
             || rareInheritedData->textSecurity != other->rareInheritedData->textSecurity
@@ -673,9 +678,12 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
         // the parent container. For sure, I will have to revisit this code, but for now I've added this in order 
         // to avoid having diff() == StyleDifferenceEqual where wrap-shapes actually differ.
         // Tracking bug: https://bugs.webkit.org/show_bug.cgi?id=62991
-        if (rareNonInheritedData->m_wrapShapeInside != other->rareNonInheritedData->m_wrapShapeInside
-            || rareNonInheritedData->m_wrapShapeOutside != other->rareNonInheritedData->m_wrapShapeOutside)
+        if (rareNonInheritedData->m_wrapShapeOutside != other->rareNonInheritedData->m_wrapShapeOutside)
             return StyleDifferenceRepaint;
+
+        if (rareNonInheritedData->m_clipPath != other->rareNonInheritedData->m_clipPath)
+            return StyleDifferenceRepaint;
+
 
 #if USE(ACCELERATED_COMPOSITING)
     if (rareNonInheritedData.get() != other->rareNonInheritedData.get()) {
@@ -774,9 +782,7 @@ void RenderStyle::setContent(const String& string, bool add)
             // We attempt to merge with the last ContentData if possible.
             if (lastContent->isText()) {
                 TextContentData* textContent = static_cast<TextContentData*>(lastContent);
-                String text = textContent->text();
-                text += string;
-                textContent->setText(text);
+                textContent->setText(textContent->text() + string);
             } else
                 lastContent->setNext(ContentData::create(string));
 
@@ -1028,6 +1034,13 @@ CounterDirectiveMap& RenderStyle::accessCounterDirectives()
     if (!map)
         map = adoptPtr(new CounterDirectiveMap);
     return *map;
+}
+
+const CounterDirectives RenderStyle::getCounterDirectives(const AtomicString& identifier) const
+{
+    if (const CounterDirectiveMap* directives = counterDirectives())
+        return directives->get(identifier);
+    return CounterDirectives();
 }
 
 const AtomicString& RenderStyle::hyphenString() const
@@ -1329,40 +1342,40 @@ Color RenderStyle::colorIncludingFallback(int colorProperty, bool visitedLink) c
     EBorderStyle borderStyle = BNONE;
     switch (colorProperty) {
     case CSSPropertyBackgroundColor:
-        return visitedLink ? rareNonInheritedData->m_visitedLinkBackgroundColor : backgroundColor(); // Background color doesn't fall back.
+        return visitedLink ? visitedLinkBackgroundColor() : backgroundColor(); // Background color doesn't fall back.
     case CSSPropertyBorderLeftColor:
-        result = visitedLink ? rareNonInheritedData->m_visitedLinkBorderLeftColor : borderLeftColor();
+        result = visitedLink ? visitedLinkBorderLeftColor() : borderLeftColor();
         borderStyle = borderLeftStyle();
         break;
     case CSSPropertyBorderRightColor:
-        result = visitedLink ? rareNonInheritedData->m_visitedLinkBorderRightColor : borderRightColor();
+        result = visitedLink ? visitedLinkBorderRightColor() : borderRightColor();
         borderStyle = borderRightStyle();
         break;
     case CSSPropertyBorderTopColor:
-        result = visitedLink ? rareNonInheritedData->m_visitedLinkBorderTopColor : borderTopColor();
+        result = visitedLink ? visitedLinkBorderTopColor() : borderTopColor();
         borderStyle = borderTopStyle();
         break;
     case CSSPropertyBorderBottomColor:
-        result = visitedLink ? rareNonInheritedData->m_visitedLinkBorderBottomColor : borderBottomColor();
+        result = visitedLink ? visitedLinkBorderBottomColor() : borderBottomColor();
         borderStyle = borderBottomStyle();
         break;
     case CSSPropertyColor:
-        result = visitedLink ? inherited->visitedLinkColor : color();
+        result = visitedLink ? visitedLinkColor() : color();
         break;
     case CSSPropertyOutlineColor:
-        result = visitedLink ? rareNonInheritedData->m_visitedLinkOutlineColor : outlineColor();
+        result = visitedLink ? visitedLinkOutlineColor() : outlineColor();
         break;
     case CSSPropertyWebkitColumnRuleColor:
-        result = visitedLink ? rareNonInheritedData->m_multiCol->m_visitedLinkColumnRuleColor : columnRuleColor();
+        result = visitedLink ? visitedLinkColumnRuleColor() : columnRuleColor();
         break;
     case CSSPropertyWebkitTextEmphasisColor:
-        result = visitedLink ? rareInheritedData->visitedLinkTextEmphasisColor : textEmphasisColor();
+        result = visitedLink ? visitedLinkTextEmphasisColor() : textEmphasisColor();
         break;
     case CSSPropertyWebkitTextFillColor:
-        result = visitedLink ? rareInheritedData->visitedLinkTextFillColor : textFillColor();
+        result = visitedLink ? visitedLinkTextFillColor() : textFillColor();
         break;
     case CSSPropertyWebkitTextStrokeColor:
-        result = visitedLink ? rareInheritedData->visitedLinkTextStrokeColor : textStrokeColor();
+        result = visitedLink ? visitedLinkTextStrokeColor() : textStrokeColor();
         break;
     default:
         ASSERT_NOT_REACHED();
@@ -1373,7 +1386,7 @@ Color RenderStyle::colorIncludingFallback(int colorProperty, bool visitedLink) c
         if (!visitedLink && (borderStyle == INSET || borderStyle == OUTSET || borderStyle == RIDGE || borderStyle == GROOVE))
             result.setRGB(238, 238, 238);
         else
-            result = visitedLink ? inherited->visitedLinkColor : color();
+            result = visitedLink ? visitedLinkColor() : color();
     }
     return result;
 }
@@ -1591,7 +1604,7 @@ LayoutBoxExtent RenderStyle::imageOutsets(const NinePieceImage& image) const
 
 void RenderStyle::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
     info.addMember(m_box);
     info.addMember(visual);
     // FIXME: m_background contains RefPtr<StyleImage> that might need to be instrumented.

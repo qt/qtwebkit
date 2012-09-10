@@ -34,10 +34,10 @@
 #include "ColorSpace.h"
 #include "CounterDirectives.h"
 #include "DataRef.h"
-#include "FillLayer.h"
 #include "FontBaseline.h"
 #include "FontDescription.h"
 #include "GraphicsTypes.h"
+#include "LayoutTypesInlineMethods.h"
 #include "Length.h"
 #include "LengthBox.h"
 #include "LengthFunctions.h"
@@ -74,7 +74,6 @@
 #include <wtf/Vector.h>
 
 #if ENABLE(CSS_FILTERS)
-#include "FilterOperations.h"
 #include "StyleFilterData.h"
 #endif
 
@@ -100,6 +99,10 @@ template<typename T, typename U> inline bool compareEqual(const T& t, const U& u
 namespace WebCore {
 
 using std::max;
+
+#if ENABLE(CSS_FILTERS)
+class FilterOperations;
+#endif
 
 class BorderData;
 class CounterContent;
@@ -511,6 +514,7 @@ public:
     EPosition position() const { return static_cast<EPosition>(noninherited_flags._position); }
     bool hasOutOfFlowPosition() const { return position() == AbsolutePosition || position() == FixedPosition; }
     bool hasInFlowPosition() const { return position() == RelativePosition || position() == StickyPosition; }
+    bool hasViewportConstrainedPosition() const { return position() == FixedPosition || position() == StickyPosition; }
     EFloat floating() const { return static_cast<EFloat>(noninherited_flags._floating); }
 
     Length width() const { return m_box->width(); }
@@ -683,7 +687,7 @@ public:
 
     bool breakWords() const
     {
-        return wordBreak() == BreakWordBreak || wordWrap() == BreakWordWrap;
+        return wordBreak() == BreakWordBreak || overflowWrap() == BreakOverflowWrap;
     }
 
     EFillRepeat backgroundRepeatX() const { return static_cast<EFillRepeat>(m_background->background().repeatX()); }
@@ -838,7 +842,7 @@ public:
     EMarginCollapse marginBeforeCollapse() const { return static_cast<EMarginCollapse>(rareNonInheritedData->marginBeforeCollapse); }
     EMarginCollapse marginAfterCollapse() const { return static_cast<EMarginCollapse>(rareNonInheritedData->marginAfterCollapse); }
     EWordBreak wordBreak() const { return static_cast<EWordBreak>(rareInheritedData->wordBreak); }
-    EWordWrap wordWrap() const { return static_cast<EWordWrap>(rareInheritedData->wordWrap); }
+    EOverflowWrap overflowWrap() const { return static_cast<EOverflowWrap>(rareInheritedData->overflowWrap); }
     ENBSPMode nbspMode() const { return static_cast<ENBSPMode>(rareInheritedData->nbspMode); }
     EKHTMLLineBreak khtmlLineBreak() const { return static_cast<EKHTMLLineBreak>(rareInheritedData->khtmlLineBreak); }
     const AtomicString& highlight() const { return rareInheritedData->highlight; }
@@ -988,7 +992,7 @@ public:
 #if ENABLE(CSS_COMPOSITING)
     BlendMode blendMode() const { return static_cast<BlendMode>(rareNonInheritedData->m_effectiveBlendMode); }
     void setBlendMode(BlendMode v) { rareNonInheritedData.access()->m_effectiveBlendMode = v; }
-    bool hasBlendMode() const { return static_cast<BlendMode>(rareNonInheritedData->m_effectiveBlendMode) == BlendModeNormal; }
+    bool hasBlendMode() const { return static_cast<BlendMode>(rareNonInheritedData->m_effectiveBlendMode) != BlendModeNormal; }
 #else
     bool hasBlendMode() const { return false; }
 #endif
@@ -1301,7 +1305,7 @@ public:
     void setMarginBeforeCollapse(EMarginCollapse c) { SET_VAR(rareNonInheritedData, marginBeforeCollapse, c); }
     void setMarginAfterCollapse(EMarginCollapse c) { SET_VAR(rareNonInheritedData, marginAfterCollapse, c); }
     void setWordBreak(EWordBreak b) { SET_VAR(rareInheritedData, wordBreak, b); }
-    void setWordWrap(EWordWrap b) { SET_VAR(rareInheritedData, wordWrap, b); }
+    void setOverflowWrap(EOverflowWrap b) { SET_VAR(rareInheritedData, overflowWrap, b); }
     void setNBSPMode(ENBSPMode b) { SET_VAR(rareInheritedData, nbspMode, b); }
     void setKHTMLLineBreak(EKHTMLLineBreak b) { SET_VAR(rareInheritedData, khtmlLineBreak, b); }
     void setHighlight(const AtomicString& h) { SET_VAR(rareInheritedData, highlight, h); }
@@ -1445,22 +1449,31 @@ public:
     void setKerning(SVGLength k) { accessSVGStyle()->setKerning(k); }
 #endif
 
-    void setWrapShapeInside(PassRefPtr<WrapShape> shape)
+    void setWrapShapeInside(PassRefPtr<BasicShape> shape)
     {
         if (rareNonInheritedData->m_wrapShapeInside != shape)
             rareNonInheritedData.access()->m_wrapShapeInside = shape;
     }
-    WrapShape* wrapShapeInside() const { return rareNonInheritedData->m_wrapShapeInside.get(); }
+    BasicShape* wrapShapeInside() const { return rareNonInheritedData->m_wrapShapeInside.get(); }
 
-    void setWrapShapeOutside(PassRefPtr<WrapShape> shape)
+    void setWrapShapeOutside(PassRefPtr<BasicShape> shape)
     {
         if (rareNonInheritedData->m_wrapShapeOutside != shape)
             rareNonInheritedData.access()->m_wrapShapeOutside = shape;
     }
-    WrapShape* wrapShapeOutside() const { return rareNonInheritedData->m_wrapShapeOutside.get(); }
+    BasicShape* wrapShapeOutside() const { return rareNonInheritedData->m_wrapShapeOutside.get(); }
 
-    static WrapShape* initialWrapShapeInside() { return 0; }
-    static WrapShape* initialWrapShapeOutside() { return 0; }
+    static BasicShape* initialWrapShapeInside() { return 0; }
+    static BasicShape* initialWrapShapeOutside() { return 0; }
+
+    void setClipPath(PassRefPtr<BasicShape> shape)
+    {
+        if (rareNonInheritedData->m_clipPath != shape)
+            rareNonInheritedData.access()->m_clipPath = shape;
+    }
+    BasicShape* clipPath() const { return rareNonInheritedData->m_clipPath.get(); }
+
+    static BasicShape* initialClipPath() { return 0; }
 
     Length wrapPadding() const { return rareNonInheritedData->m_wrapPadding; }
     void setWrapPadding(Length wrapPadding) { SET_VAR(rareNonInheritedData, m_wrapPadding, wrapPadding); }
@@ -1481,6 +1494,7 @@ public:
 
     const CounterDirectiveMap* counterDirectives() const;
     CounterDirectiveMap& accessCounterDirectives();
+    const CounterDirectives getCounterDirectives(const AtomicString& identifier) const;
 
     QuotesData* quotes() const { return rareInheritedData->quotes.get(); }
     void setQuotes(PassRefPtr<QuotesData>);
@@ -1630,7 +1644,7 @@ public:
     static EMarginCollapse initialMarginBeforeCollapse() { return MCOLLAPSE; }
     static EMarginCollapse initialMarginAfterCollapse() { return MCOLLAPSE; }
     static EWordBreak initialWordBreak() { return NormalWordBreak; }
-    static EWordWrap initialWordWrap() { return NormalWordWrap; }
+    static EOverflowWrap initialOverflowWrap() { return NormalOverflowWrap; }
     static ENBSPMode initialNBSPMode() { return NBNORMAL; }
     static EKHTMLLineBreak initialKHTMLLineBreak() { return LBNORMAL; }
     static const AtomicString& initialHighlight() { return nullAtom; }
@@ -1754,10 +1768,7 @@ private:
 
     bool isDisplayReplacedType(EDisplay display) const
     {
-        return display == INLINE_BLOCK || display == INLINE_BOX
-#if ENABLE(CSS3_FLEXBOX)
-            || display == INLINE_FLEX
-#endif
+        return display == INLINE_BLOCK || display == INLINE_BOX || display == INLINE_FLEX
             || display == INLINE_TABLE || display == INLINE_GRID;
     }
 

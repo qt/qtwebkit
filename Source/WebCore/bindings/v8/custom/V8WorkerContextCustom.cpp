@@ -33,9 +33,12 @@
 #if ENABLE(WORKERS)
 #include "V8WorkerContext.h"
 
+#include "ContentSecurityPolicy.h"
 #include "DOMTimer.h"
 #include "ExceptionCode.h"
 #include "ScheduledAction.h"
+#include "ScriptCallStack.h"
+#include "ScriptCallStackFactory.h"
 #include "V8Binding.h"
 #include "V8Utilities.h"
 #include "V8WorkerContextEventListener.h"
@@ -63,6 +66,11 @@ v8::Handle<v8::Value> SetTimeoutOrInterval(const v8::Arguments& args, bool singl
 
     v8::Handle<v8::Context> v8Context = proxy->context();
     if (function->IsString()) {
+        if (ContentSecurityPolicy* policy = workerContext->contentSecurityPolicy()) {
+            RefPtr<ScriptCallStack> callStack = createScriptCallStackForInspector();
+            if (!policy->allowEval(callStack.release()))
+                return v8Integer(0, args.GetIsolate());
+        }
         WTF::String stringFunction = toWebCoreString(function);
         timerId = DOMTimer::install(workerContext, adoptPtr(new ScheduledAction(v8Context, stringFunction, workerContext->url())), timeout, singleShot);
     } else if (function->IsFunction()) {
@@ -122,8 +130,10 @@ v8::Handle<v8::Value> V8WorkerContext::setIntervalCallback(const v8::Arguments& 
     return SetTimeoutOrInterval(args, false);
 }
 
-v8::Handle<v8::Value> toV8(WorkerContext* impl, v8::Isolate* isolate)
+v8::Handle<v8::Value> toV8(WorkerContext* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
+    // Notice that we explicitly ignore creationContext because the WorkerContext is its own creationContext.
+
     if (!impl)
         return v8NullWithCheck(isolate);
 

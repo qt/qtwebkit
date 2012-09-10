@@ -81,7 +81,7 @@ static const float defaultSearchFieldResultsButtonWidth = 18;
 // sizes (e.g. 15px). So, for now we just use Arial.
 const String& RenderThemeChromiumSkia::defaultGUIFont()
 {
-    DEFINE_STATIC_LOCAL(String, fontFace, ("Arial"));
+    DEFINE_STATIC_LOCAL(String, fontFace, (ASCIILiteral("Arial")));
     return fontFace;
 }
 
@@ -130,6 +130,13 @@ bool RenderThemeChromiumSkia::supportsDataListUI(const AtomicString& type) const
 {
     return RenderThemeChromiumCommon::supportsDataListUI(type);
 }
+
+#if ENABLE(VIDEO_TRACK)
+bool RenderThemeChromiumSkia::supportsClosedCaptioning() const
+{
+    return true;
+}
+#endif
 
 Color RenderThemeChromiumSkia::platformActiveSelectionBackgroundColor() const
 {
@@ -419,6 +426,18 @@ bool RenderThemeChromiumSkia::paintMediaSliderThumb(RenderObject* object, const 
 {
 #if ENABLE(VIDEO)
     return RenderMediaControlsChromium::paintMediaControlsPart(MediaSliderThumb, object, paintInfo, rect);
+#else
+    UNUSED_PARAM(object);
+    UNUSED_PARAM(paintInfo);
+    UNUSED_PARAM(rect);
+    return false;
+#endif
+}
+
+bool RenderThemeChromiumSkia::paintMediaToggleClosedCaptionsButton(RenderObject* o, const PaintInfo& paintInfo, const IntRect& r)
+{
+#if ENABLE(VIDEO_TRACK)
+    return RenderMediaControlsChromium::paintMediaControlsPart(MediaShowClosedCaptionsButton, o, paintInfo, r);
 #else
     UNUSED_PARAM(object);
     UNUSED_PARAM(paintInfo);

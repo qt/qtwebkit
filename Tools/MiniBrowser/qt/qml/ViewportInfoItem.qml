@@ -84,17 +84,12 @@ Item {
 
                 Column {
                     Text {
-                        text: "Initial scale: " + formatScale(test.initialScale)
+                        text: "Minimum scale: " + formatScale(test.viewport.minimumScale)
                         font.family: textBox.fontFamily
                         color: textBox.fontColor
                     }
                     Text {
-                        text: "Minimum scale: " + formatScale(test.minimumScale)
-                        font.family: textBox.fontFamily
-                        color: textBox.fontColor
-                    }
-                    Text {
-                        text: "Maximum scale: " + formatScale(test.maximumScale)
+                        text: "Maximum scale: " + formatScale(test.viewport.maximumScale)
                         font.family: textBox.fontFamily
                         color: textBox.fontColor
                     }
@@ -112,7 +107,7 @@ Item {
                         color: textBox.fontColor
                     }
                     Text {
-                        text: "Viewport layout size: " + formatSize(test.layoutSize)
+                        text: "Viewport layout size: " + formatSize(test.viewport.layoutSize)
                         font.family: textBox.fontFamily
                         color: textBox.fontColor
                     }
@@ -125,7 +120,7 @@ Item {
                         color: textBox.fontColor
                     }
                     Text {
-                        text: "Allows scaling: " + formatBool(test.isScalable)
+                        text: "Allows scaling: " + formatBool(test.viewport.isScalable)
                         font.family: textBox.fontFamily
                         color: textBox.fontColor
                     }

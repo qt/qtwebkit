@@ -173,9 +173,9 @@ private:
 
     virtual bool isTableCell() const { return true; }
 
-    virtual void willBeDestroyed();
+    virtual void willBeRemovedFromTree() OVERRIDE;
 
-    virtual void computeLogicalWidth();
+    virtual void computeLogicalWidth() OVERRIDE;
 
     virtual void paintBoxDecorations(PaintInfo&, const LayoutPoint&);
     virtual void paintMask(PaintInfo&, const LayoutPoint&);

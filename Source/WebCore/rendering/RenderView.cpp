@@ -248,6 +248,11 @@ void RenderView::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
     ASSERT(!needsLayout());
     // RenderViews should never be called to paint with an offset not on device pixels.
     ASSERT(LayoutPoint(IntPoint(paintOffset.x(), paintOffset.y())) == paintOffset);
+
+    // This avoids painting garbage between columns if there is a column gap.
+    if (m_frameView && m_frameView->pagination().mode != Pagination::Unpaginated)
+        paintInfo.context->fillRect(paintInfo.rect, m_frameView->baseBackgroundColor(), ColorSpaceDeviceRGB);
+
     paintObject(paintInfo, paintOffset);
 }
 
@@ -811,11 +816,6 @@ void RenderView::pushLayoutState(RenderObject* root)
     m_layoutState = new (renderArena()) LayoutState(root);
 }
 
-void RenderView::pushLayoutState(RenderFlowThread* flowThread, bool regionsChanged)
-{
-    m_layoutState = new (renderArena()) LayoutState(m_layoutState, flowThread, regionsChanged);
-}
-
 bool RenderView::shouldDisableLayoutStateForSubtree(RenderObject* renderer) const
 {
     RenderObject* o = renderer;
@@ -935,21 +935,6 @@ RenderBlock::IntervalArena* RenderView::intervalArena()
     if (!m_intervalArena)
         m_intervalArena = IntervalArena::create();
     return m_intervalArena.get();
-}
-
-void RenderView::setFixedPositionedObjectsNeedLayout()
-{
-    ASSERT(m_frameView);
-
-    ListHashSet<RenderBox*>* positionedObjects = this->positionedObjects();
-    if (!positionedObjects)
-        return;
-
-    ListHashSet<RenderBox*>::const_iterator end = positionedObjects->end();
-    for (ListHashSet<RenderBox*>::const_iterator it = positionedObjects->begin(); it != end; ++it) {
-        RenderBox* currBox = *it;
-        currBox->setNeedsLayout(true);
-    }
 }
 
 } // namespace WebCore

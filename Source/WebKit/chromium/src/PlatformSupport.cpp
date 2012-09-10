@@ -31,8 +31,6 @@
 #include "config.h"
 #include "PlatformSupport.h"
 
-#include <googleurl/src/url_util.h>
-
 #include "Chrome.h"
 #include "ChromeClientImpl.h"
 #include "FileMetadata.h"
@@ -41,8 +39,6 @@
 #include "WebFileUtilities.h"
 #include "WebFrameClient.h"
 #include "WebFrameImpl.h"
-#include "WebIDBKey.h"
-#include "WebIDBKeyPath.h"
 #include "WebKit.h"
 #include "WebPluginContainerImpl.h"
 #include "WebPluginListBuilderImpl.h"
@@ -257,23 +253,6 @@ void PlatformSupport::getFontFamilyForCharacters(const UChar* characters, size_t
 #endif
 }
 
-void PlatformSupport::getRenderStyleForStrike(const char* font, int sizeAndStyle, FontRenderStyle* result)
-{
-    WebFontRenderStyle style;
-
-#if OS(ANDROID)
-    style.setDefaults();
-#else
-    if (!font || !*font)
-        style.setDefaults(); // It's probably a webfont. Take the system defaults.
-    else if (WebKit::Platform::current()->sandboxSupport())
-        WebKit::Platform::current()->sandboxSupport()->getRenderStyleForStrike(font, sizeAndStyle, &style);
-    else
-        WebFontInfo::renderStyleForStrike(font, sizeAndStyle, &style);
-#endif
-
-    style.toFontRenderStyle(result);
-}
 #endif
 
 // Indexed Database -----------------------------------------------------------
@@ -283,23 +262,6 @@ PassRefPtr<IDBFactoryBackendInterface> PlatformSupport::idbFactory()
     // There's no reason why we need to allocate a new proxy each time, but
     // there's also no strong reason not to.
     return IDBFactoryBackendProxy::create();
-}
-
-void PlatformSupport::createIDBKeysFromSerializedValuesAndKeyPath(const Vector<RefPtr<SerializedScriptValue> >& values, const IDBKeyPath& keyPath, Vector<RefPtr<IDBKey> >& keys)
-{
-    WebVector<WebSerializedScriptValue> webValues = values;
-    WebVector<WebIDBKey> webKeys;
-    webKitPlatformSupport()->createIDBKeysFromSerializedValuesAndKeyPath(webValues, keyPath, webKeys);
-
-    size_t webKeysSize = webKeys.size();
-    keys.reserveCapacity(webKeysSize);
-    for (size_t i = 0; i < webKeysSize; ++i)
-        keys.append(PassRefPtr<IDBKey>(webKeys[i]));
-}
-
-PassRefPtr<SerializedScriptValue> PlatformSupport::injectIDBKeyIntoSerializedValue(PassRefPtr<IDBKey> key, PassRefPtr<SerializedScriptValue> value, const IDBKeyPath& keyPath)
-{
-    return webKitPlatformSupport()->injectIDBKeyIntoSerializedValue(key, value, keyPath);
 }
 
 // Plugin ---------------------------------------------------------------------
@@ -318,20 +280,6 @@ NPObject* PlatformSupport::pluginScriptableObject(Widget* widget)
 
     return static_cast<WebPluginContainerImpl*>(widget)->scriptableObject();
 }
-
-// Resources ------------------------------------------------------------------
-
-#if ENABLE(WEB_AUDIO)
-
-PassOwnPtr<AudioBus> PlatformSupport::decodeAudioFileData(const char* data, size_t size, double sampleRate)
-{
-    WebAudioBus webAudioBus;
-    if (webKitPlatformSupport()->loadAudioResource(&webAudioBus, data, size, sampleRate))
-        return webAudioBus.release();
-    return nullptr;
-}
-
-#endif // ENABLE(WEB_AUDIO)
 
 // Theming --------------------------------------------------------------------
 
@@ -546,51 +494,6 @@ void PlatformSupport::paintThemePart(
 }
 
 #endif
-
-// Visited Links --------------------------------------------------------------
-
-LinkHash PlatformSupport::visitedLinkHash(const UChar* url, unsigned length)
-{
-    url_canon::RawCanonOutput<2048> buffer;
-    url_parse::Parsed parsed;
-    if (!url_util::Canonicalize(url, length, 0, &buffer, &parsed))
-        return 0;  // Invalid URLs are unvisited.
-    return webKitPlatformSupport()->visitedLinkHash(buffer.data(), buffer.length());
-}
-
-LinkHash PlatformSupport::visitedLinkHash(const KURL& base,
-                                         const AtomicString& attributeURL)
-{
-    // Resolve the relative URL using googleurl and pass the absolute URL up to
-    // the embedder. We could create a GURL object from the base and resolve
-    // the relative URL that way, but calling the lower-level functions
-    // directly saves us the string allocation in most cases.
-    url_canon::RawCanonOutput<2048> buffer;
-    url_parse::Parsed parsed;
-
-#if USE(GOOGLEURL)
-    const CString& cstr = base.utf8String();
-    const char* data = cstr.data();
-    int length = cstr.length();
-    const url_parse::Parsed& srcParsed = base.parsed();
-#else
-    // When we're not using GoogleURL, first canonicalize it so we can resolve it
-    // below.
-    url_canon::RawCanonOutput<2048> srcCanon;
-    url_parse::Parsed srcParsed;
-    String str = base.string();
-    if (!url_util::Canonicalize(str.characters(), str.length(), 0, &srcCanon, &srcParsed))
-        return 0;
-    const char* data = srcCanon.data();
-    int length = srcCanon.length();
-#endif
-
-    if (!url_util::ResolveRelative(data, length, srcParsed, attributeURL.characters(),
-                                   attributeURL.length(), 0, &buffer, &parsed))
-        return 0;  // Invalid resolved URL.
-
-    return webKitPlatformSupport()->visitedLinkHash(buffer.data(), buffer.length());
-}
 
 // These are temporary methods that the WebKit layer can use to call to the
 // Glue layer. Once the Glue layer moves entirely into the WebKit layer, these

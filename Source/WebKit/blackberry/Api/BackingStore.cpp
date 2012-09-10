@@ -37,7 +37,6 @@
 #include "WebPage_p.h"
 #include "WebSettings.h"
 
-#include <BlackBerryPlatformClient.h>
 #include <BlackBerryPlatformExecutableMessage.h>
 #include <BlackBerryPlatformGraphics.h>
 #include <BlackBerryPlatformIntRectRegion.h>
@@ -209,7 +208,6 @@ BackingStorePrivate::BackingStorePrivate()
     , m_currentWindowBackBuffer(0)
     , m_preferredTileMatrixDimension(Vertical)
 #if USE(ACCELERATED_COMPOSITING)
-    , m_needsDrawLayersOnCommit(false)
     , m_isDirectRenderingAnimationMessageScheduled(false)
 #endif
 {
@@ -391,7 +389,7 @@ void BackingStorePrivate::repaint(const Platform::IntRect& windowRect,
 
         if (immediate) {
             if (render(rect)) {
-                if (!shouldDirectRenderingToWindow())
+                if (!shouldDirectRenderingToWindow() && !m_webPage->d->commitRootLayerIfNeeded())
                     blitVisibleContents();
                 m_webPage->d->m_client->notifyContentRendered(rect);
             }
@@ -414,7 +412,7 @@ void BackingStorePrivate::slowScroll(const Platform::IntSize& delta, const Platf
     Platform::IntRect rect = m_webPage->d->mapToTransformed(m_client->mapFromViewportToContents(windowRect));
 
     if (immediate) {
-        if (render(rect) && !isSuspended() && !shouldDirectRenderingToWindow())
+        if (render(rect) && !isSuspended() && !shouldDirectRenderingToWindow() && !m_webPage->d->commitRootLayerIfNeeded())
             blitVisibleContents();
     } else {
         m_renderQueue->addToQueue(RenderQueue::VisibleScroll, rect);
@@ -514,7 +512,8 @@ void BackingStorePrivate::dispatchRenderJob()
 
 void BackingStorePrivate::renderJob()
 {
-    ASSERT(shouldPerformRenderJobs());
+    if (!shouldPerformRenderJobs())
+        return;
 
 #if DEBUG_BACKINGSTORE
     BlackBerry::Platform::logAlways(BlackBerry::Platform::LogLevelCritical, "BackingStorePrivate::renderJob");
@@ -523,7 +522,7 @@ void BackingStorePrivate::renderJob()
     m_renderQueue->render(!m_suspendRegularRenderJobs);
 
 #if USE(ACCELERATED_COMPOSITING)
-    drawLayersOnCommitIfNeeded();
+    m_webPage->d->commitRootLayerIfNeeded();
 #endif
 
     if (shouldPerformRenderJobs())
@@ -910,8 +909,6 @@ bool BackingStorePrivate::isCurrentVisibleJob(const TileIndex& index, BackingSto
         return true;
 
     // Second check if the individual parts of the non-rendered region are in the regular queue.
-    bool isCurrent = true; // It is true until it isn't :)
-
     IntRectList tileNotRenderedRegionRects = tile->frontBuffer()->notRenderedRegion().rects();
     for (size_t i = 0; i < tileNotRenderedRegionRects.size(); ++i) {
         Platform::IntRect tileNotRenderedRegionRect = tileNotRenderedRegionRects.at(i);
@@ -920,10 +917,11 @@ bool BackingStorePrivate::isCurrentVisibleJob(const TileIndex& index, BackingSto
         // Map to transformed contents coordinates.
         tileNotRenderedRegionRect.move(origin.x(), origin.y());
 
-        isCurrent = m_renderQueue->isCurrentRegularRenderJob(tileNotRenderedRegionRect) ? isCurrent : false;
+        if (!m_renderQueue->isCurrentRegularRenderJob(tileNotRenderedRegionRect))
+            return false;
     }
 
-    return isCurrent;
+    return true;
 }
 
 void BackingStorePrivate::scrollBackingStore(int deltaX, int deltaY)
@@ -1147,11 +1145,6 @@ void BackingStorePrivate::blitVisibleContents(bool force)
     }
 
     if (!BlackBerry::Platform::userInterfaceThreadMessageClient()->isCurrentThread()) {
-#if USE(ACCELERATED_COMPOSITING)
-        // The blit will draw accelerated compositing layers if necessary
-        m_needsDrawLayersOnCommit = false;
-#endif
-
         BlackBerry::Platform::userInterfaceThreadMessageClient()->dispatchMessage(
             BlackBerry::Platform::createMethodCallMessage(
                 &BackingStorePrivate::blitVisibleContents, this, force));
@@ -1247,11 +1240,6 @@ void BackingStorePrivate::blitContents(const Platform::IntRect& dstRect,
     }
 
     if (!BlackBerry::Platform::userInterfaceThreadMessageClient()->isCurrentThread()) {
-#if USE(ACCELERATED_COMPOSITING)
-        // The blit will draw accelerated compositing layers if necessary
-        m_needsDrawLayersOnCommit = false;
-#endif
-
         BlackBerry::Platform::userInterfaceThreadMessageClient()->dispatchMessage(
             BlackBerry::Platform::createMethodCallMessage(
                 &BackingStorePrivate::blitContents, this, dstRect, srcRect, force));
@@ -2288,18 +2276,6 @@ void BackingStorePrivate::renderContents(BlackBerry::Platform::Graphics::Buffer*
     if (contentsSize.isEmpty())
         return;
 
-#if USE(ACCELERATED_COMPOSITING)
-    // When committing the pending accelerated compositing layer changes, it's
-    // necessary to draw the new layer appearance. This is normally done as
-    // part of a blit, but if no blit happens because of this rendering, for
-    // example because we're rendering an offscreen rectangle, someone needs to
-    // catch this flag and make sure those layers get drawn.
-    // This is just a complicated way to do
-    // "if (commitRootLayerIfNeeded()) drawLayersOnCommit();"
-    if (m_webPage->d->commitRootLayerIfNeeded())
-        m_needsDrawLayersOnCommit = true;
-#endif
-
     BlackBerry::Platform::Graphics::Drawable* bufferDrawable =
         BlackBerry::Platform::Graphics::lockBufferDrawable(targetBuffer);
 
@@ -2601,18 +2577,6 @@ BackingStoreWindowBufferState* BackingStorePrivate::windowBackBufferState() cons
 }
 
 #if USE(ACCELERATED_COMPOSITING)
-bool BackingStorePrivate::drawLayersOnCommitIfNeeded()
-{
-    // Check if rendering caused a commit and we need to redraw the layers
-    if (!m_needsDrawLayersOnCommit)
-        return false;
-
-    m_needsDrawLayersOnCommit = false;
-    m_webPage->d->drawLayersOnCommit();
-
-    return true;
-}
-
 void BackingStorePrivate::drawAndBlendLayersForDirectRendering(const Platform::IntRect& dirtyRect)
 {
     ASSERT(BlackBerry::Platform::userInterfaceThreadMessageClient()->isCurrentThread());
@@ -2628,7 +2592,6 @@ void BackingStorePrivate::drawAndBlendLayersForDirectRendering(const Platform::I
         WebCore::IntRect(WebCore::IntPoint(0, 0), m_webPage->d->transformedViewportSize()));
 
     // Check if rendering caused a commit and we need to redraw the layers.
-    m_needsDrawLayersOnCommit = false;
     if (WebPageCompositorPrivate* compositor = m_webPage->d->compositor())
         compositor->drawLayers(dstRect, untransformedContentsRect);
 
@@ -2646,6 +2609,20 @@ void BackingStorePrivate::drawAndBlendLayersForDirectRendering(const Platform::I
 bool BackingStorePrivate::isActive() const
 {
     return BackingStorePrivate::s_currentBackingStoreOwner == m_webPage && SurfacePool::globalSurfacePool()->isActive();
+}
+
+void BackingStorePrivate::didRenderContent(const Platform::IntRect& renderedRect)
+{
+    if (isScrollingOrZooming())
+        return;
+
+    if (!shouldDirectRenderingToWindow()) {
+        if (!m_webPage->d->needsOneShotDrawingSynchronization())
+            blitVisibleContents();
+    } else
+        invalidateWindow();
+
+    m_webPage->client()->notifyContentRendered(renderedRect);
 }
 
 BackingStore::BackingStore(WebPage* webPage, BackingStoreClient* client)
@@ -2728,12 +2705,14 @@ bool BackingStore::isDirectRenderingToWindow() const
 
 void BackingStore::createBackingStoreMemory()
 {
-    SurfacePool::globalSurfacePool()->createBuffers();
+    if (BackingStorePrivate::s_currentBackingStoreOwner == d->m_webPage)
+        SurfacePool::globalSurfacePool()->createBuffers();
 }
 
 void BackingStore::releaseBackingStoreMemory()
 {
-    SurfacePool::globalSurfacePool()->releaseBuffers();
+    if (BackingStorePrivate::s_currentBackingStoreOwner == d->m_webPage)
+        SurfacePool::globalSurfacePool()->releaseBuffers();
 }
 
 bool BackingStore::defersBlit() const

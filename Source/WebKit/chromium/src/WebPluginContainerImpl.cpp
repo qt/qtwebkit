@@ -51,6 +51,7 @@
 #include "FrameView.h"
 #include "GestureEvent.h"
 #include "GraphicsContext.h"
+#include "GraphicsLayerChromium.h"
 #include "HitTestResult.h"
 #include "HostWindow.h"
 #include "HTMLFormElement.h"
@@ -71,6 +72,8 @@
 #include "WheelEvent.h"
 #include <public/Platform.h>
 #include <public/WebClipboard.h>
+#include <public/WebCompositorSupport.h>
+#include <public/WebExternalTextureLayer.h>
 #include <public/WebRect.h>
 #include <public/WebString.h>
 #include <public/WebURL.h>
@@ -368,8 +371,10 @@ void WebPluginContainerImpl::setBackingTextureId(unsigned textureId)
 
     ASSERT(!m_ioSurfaceLayer);
 
-    if (!m_textureLayer)
-        m_textureLayer = adoptPtr(WebExternalTextureLayer::create());
+    if (!m_textureLayer) {
+        m_textureLayer = adoptPtr(Platform::current()->compositorSupport()->createExternalTextureLayer());
+        GraphicsLayerChromium::registerContentsLayer(m_textureLayer->layer());
+    }
     m_textureLayer->setTextureId(textureId);
 
     // If anyone of the IDs is zero we need to switch between hardware
@@ -392,8 +397,10 @@ void WebPluginContainerImpl::setBackingIOSurfaceId(int width,
 
     ASSERT(!m_textureLayer);
 
-    if (!m_ioSurfaceLayer)
-        m_ioSurfaceLayer = adoptPtr(WebIOSurfaceLayer::create());
+    if (!m_ioSurfaceLayer) {
+        m_ioSurfaceLayer = adoptPtr(Platform::current()->compositorSupport()->createIOSurfaceLayer());
+        GraphicsLayerChromium::registerContentsLayer(m_ioSurfaceLayer->layer());
+    }
     m_ioSurfaceLayer->setIOSurfaceProperties(ioSurfaceId, WebSize(width, height));
 
     // If anyone of the IDs is zero we need to switch between hardware
@@ -500,7 +507,7 @@ bool WebPluginContainerImpl::isRectTopmost(const WebRect& rect)
     LayoutPoint center = documentRect.center();
     // Make the rect we're checking (the point surrounded by padding rects) contained inside the requested rect. (Note that -1/2 is 0.)
     LayoutSize padding((documentRect.width() - 1) / 2, (documentRect.height() - 1) / 2);
-    HitTestResult result = frame->eventHandler()->hitTestResultAtPoint(center, false, false, DontHitTestScrollbars, HitTestRequest::ReadOnly | HitTestRequest::Active, padding);
+    HitTestResult result = frame->eventHandler()->hitTestResultAtPoint(center, HitTestRequest::ReadOnly | HitTestRequest::Active, padding);
     const HitTestResult::NodeSet& nodes = result.rectBasedTestResult();
     if (nodes.size() != 1)
         return false;
@@ -627,6 +634,13 @@ WebPluginContainerImpl::WebPluginContainerImpl(WebCore::HTMLPlugInElement* eleme
 
 WebPluginContainerImpl::~WebPluginContainerImpl()
 {
+#if USE(ACCELERATED_COMPOSITING)
+    if (m_textureLayer)
+        GraphicsLayerChromium::unregisterContentsLayer(m_textureLayer->layer());
+    if (m_ioSurfaceLayer)
+        GraphicsLayerChromium::unregisterContentsLayer(m_ioSurfaceLayer->layer());
+#endif
+
     if (m_isAcceptingTouchEvents)
         m_element->document()->didRemoveTouchEventHandler();
 

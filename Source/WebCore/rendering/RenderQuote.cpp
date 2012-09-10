@@ -22,6 +22,7 @@
 #include "config.h"
 #include "RenderQuote.h"
 
+#include "RenderView.h"
 #include <wtf/text/AtomicString.h>
 
 #define U(x) ((const UChar*)L##x)
@@ -240,6 +241,11 @@ PassRefPtr<StringImpl> RenderQuote::originalText() const
     }
     ASSERT_NOT_REACHED();
     return StringImpl::empty();
+}
+
+void RenderQuote::updateText()
+{
+    computePreferredLogicalWidths(0);
 }
 
 void RenderQuote::computePreferredLogicalWidths(float lead)

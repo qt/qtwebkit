@@ -28,11 +28,14 @@
 #include "Canvas2DLayerBridge.h"
 
 #include "CCRendererGL.h" // For the GLC() macro.
+#include "Canvas2DLayerManager.h"
 #include "GrContext.h"
 #include "GraphicsContext3D.h"
 #include "GraphicsContext3DPrivate.h"
+#include "GraphicsLayerChromium.h"
 #include "TraceEvent.h"
-#include <public/WebCompositor.h>
+#include <public/Platform.h>
+#include <public/WebCompositorSupport.h>
 #include <public/WebGraphicsContext3D.h>
 
 using WebKit::WebExternalTextureLayer;
@@ -43,17 +46,22 @@ namespace WebCore {
 
 Canvas2DLayerBridge::Canvas2DLayerBridge(PassRefPtr<GraphicsContext3D> context, const IntSize& size, DeferralMode deferralMode, unsigned textureId)
     : m_deferralMode(deferralMode)
-    // FIXME: We currently turn off double buffering when canvas rendering is
-    // deferred. What we should be doing is to use a smarter heuristic based
-    // on GPU resource monitoring and other factors to chose between single
-    // and double buffering.
-    , m_useDoubleBuffering(WebKit::WebCompositor::threadingEnabled() && deferralMode == NonDeferred)
     , m_frontBufferTexture(0)
     , m_backBufferTexture(textureId)
     , m_size(size)
     , m_canvas(0)
     , m_context(context)
+    , m_bytesAllocated(0)
+    , m_next(0)
+    , m_prev(0)
 {
+    bool compositorThreadingEnabled = WebKit::Platform::current()->compositorSupport()->isThreadingEnabled();
+    // FIXME: We currently turn off double buffering when canvas rendering is
+    // deferred. What we should be doing is to use a smarter heuristic based
+    // on GPU resource monitoring and other factors to chose between single
+    // and double buffering.
+    m_useDoubleBuffering = compositorThreadingEnabled && deferralMode == NonDeferred;
+
     if (m_useDoubleBuffering) {
         m_context->makeContextCurrent();
         GLC(m_context.get(), m_frontBufferTexture = m_context->createTexture());
@@ -69,13 +77,16 @@ Canvas2DLayerBridge::Canvas2DLayerBridge(PassRefPtr<GraphicsContext3D> context, 
             grContext->resetContext();
     }
 
-    m_layer = adoptPtr(WebExternalTextureLayer::create(this));
+    m_layer = adoptPtr(WebKit::Platform::current()->compositorSupport()->createExternalTextureLayer(this));
     m_layer->setTextureId(textureId);
-    m_layer->setRateLimitContext(!WebKit::WebCompositor::threadingEnabled() || m_useDoubleBuffering);
+    m_layer->setRateLimitContext(!compositorThreadingEnabled || m_useDoubleBuffering);
+    GraphicsLayerChromium::registerContentsLayer(m_layer->layer());
 }
 
 Canvas2DLayerBridge::~Canvas2DLayerBridge()
 {
+    GraphicsLayerChromium::unregisterContentsLayer(m_layer->layer());
+    Canvas2DLayerManager::get().layerToBeDestroyed(this);
     if (SkDeferredCanvas* deferred = deferredCanvas())
         deferred->setNotificationClient(0);
     m_layer->setTextureId(0);
@@ -99,6 +110,35 @@ void Canvas2DLayerBridge::prepareForDraw()
     if (!m_useDoubleBuffering)
         m_layer->willModifyTexture();
     m_context->makeContextCurrent();
+}
+
+void Canvas2DLayerBridge::storageAllocatedForRecordingChanged(size_t bytesAllocated)
+{
+    ASSERT(m_deferralMode == Deferred);
+    intptr_t delta = (intptr_t)bytesAllocated - (intptr_t)m_bytesAllocated;
+    m_bytesAllocated = bytesAllocated;
+    Canvas2DLayerManager::get().layerAllocatedStorageChanged(this, delta);
+}
+
+void Canvas2DLayerBridge::flushedDrawCommands()
+{
+    storageAllocatedForRecordingChanged(deferredCanvas()->storageAllocatedForRecording());
+}
+
+size_t Canvas2DLayerBridge::freeMemoryIfPossible(size_t bytesToFree)
+{
+    ASSERT(deferredCanvas());
+    size_t bytesFreed = deferredCanvas()->freeMemoryIfPossible(bytesToFree);
+    if (bytesFreed)
+        Canvas2DLayerManager::get().layerAllocatedStorageChanged(this, -((intptr_t)bytesFreed));
+    m_bytesAllocated -= bytesFreed;
+    return bytesFreed;
+}
+
+void Canvas2DLayerBridge::flush()
+{
+    ASSERT(deferredCanvas());
+    m_canvas->flush();
 }
 
 SkCanvas* Canvas2DLayerBridge::skCanvas(SkDevice* device)
@@ -154,6 +194,8 @@ void Canvas2DLayerBridge::contextAcquired()
 {
     if (m_deferralMode == NonDeferred && !m_useDoubleBuffering)
         m_layer->willModifyTexture();
+    else if (m_deferralMode == Deferred)
+        Canvas2DLayerManager::get().layerDidDraw(this);
 }
 
 unsigned Canvas2DLayerBridge::backBufferTexture()

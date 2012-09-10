@@ -24,9 +24,9 @@
 #if ENABLE(SVG)
 #include "SVGPaint.h"
 
-#include "MemoryInstrumentation.h"
 #include "SVGException.h"
 #include "SVGURIReference.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -114,7 +114,7 @@ PassRefPtr<SVGPaint> SVGPaint::cloneForCSSOM() const
 
 void SVGPaint::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
     info.addInstrumentedMember(m_uri);
 }
 

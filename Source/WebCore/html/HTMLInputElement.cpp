@@ -111,6 +111,9 @@ HTMLInputElement::HTMLInputElement(const QualifiedName& tagName, Document* docum
     , m_isActivatedSubmit(false)
     , m_autocomplete(Uninitialized)
     , m_isAutofilled(false)
+#if ENABLE(DATALIST_ELEMENT)
+    , m_hasNonEmptyList(false)
+#endif
     , m_stateRestored(false)
     , m_parsingInProgress(createdByParser)
     , m_valueAttributeWasUpdatedAfterParsing(false)
@@ -205,6 +208,11 @@ HTMLElement* HTMLInputElement::speechButtonElement() const
 HTMLElement* HTMLInputElement::sliderThumbElement() const
 {
     return m_inputType->sliderThumbElement();
+}
+
+HTMLElement* HTMLInputElement::sliderTrackElement() const
+{
+    return m_inputType->sliderTrackElement();
 }
 
 HTMLElement* HTMLInputElement::placeholderElement() const
@@ -333,6 +341,31 @@ void HTMLInputElement::stepUp(int n, ExceptionCode& ec)
 void HTMLInputElement::stepDown(int n, ExceptionCode& ec)
 {
     m_inputType->stepUp(-n, ec);
+}
+
+void HTMLInputElement::blur()
+{
+    m_inputType->blur();
+}
+
+void HTMLInputElement::defaultBlur()
+{
+    HTMLTextFormControlElement::blur();
+}
+
+void HTMLInputElement::defaultFocus(bool restorePreviousSelection)
+{
+    HTMLTextFormControlElement::focus(restorePreviousSelection);
+}
+
+void HTMLInputElement::focus(bool restorePreviousSelection)
+{
+    m_inputType->focus(restorePreviousSelection);
+}
+
+bool HTMLInputElement::hasCustomFocusLogic() const
+{
+    return m_inputType->hasCustomFocusLogic();
 }
 
 bool HTMLInputElement::isKeyboardFocusable(KeyboardEvent* event) const

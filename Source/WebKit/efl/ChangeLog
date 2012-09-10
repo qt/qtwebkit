@@ -1,3 +1,580 @@
+2012-09-10  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Create a toggle button for closed captions
+        https://bugs.webkit.org/show_bug.cgi?id=96259
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Add closed caption toggling button to default WebKitEFL
+        theme.
+
+        * DefaultTheme/default.edc:
+        * DefaultTheme/widget/mediacontrol/togglecaptionsbutton/closedcaption.png: Added.
+        * DefaultTheme/widget/mediacontrol/togglecaptionsbutton/closedcaption_disabled.png: Added.
+        * DefaultTheme/widget/mediacontrol/togglecaptionsbutton/toggle_captions_button.edc: Added.
+
+2012-09-09  Emil A Eklund  <eae@chromium.org>
+
+        Rename Node::getRect/getPixelSnappedRect and remove ContainerNode::getRect
+        https://bugs.webkit.org/show_bug.cgi?id=81413
+
+        Reviewed by David Hyatt.
+
+        Update ewk_frame to call pixelSnappedBoundingBox.
+
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_focused_element_geometry_get):
+
+2012-09-07  Benjamin Poulain  <bpoulain@apple.com>
+
+        Rename the ustring() accessor to string()
+        https://bugs.webkit.org/show_bug.cgi?id=95919
+
+        Reviewed by Geoffrey Garen.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::sendWebIntentResponse):
+        (DumpRenderTreeSupportEfl::deliverWebIntent):
+        Aslo update the code from the UString->String conversion through StringImpl.
+
+2012-09-07  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Use same default minimum logical font size in DRT and WTR
+        https://bugs.webkit.org/show_bug.cgi?id=96116
+
+        Reviewed by Martin Robinson.
+
+        Add DRT helper function to set the minimum logical
+        font size setting.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::setMinimumLogicalFontSize):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-09-07  Allan Sandfeld Jensen  <allan.jensen@nokia.com>
+
+        Simplify hitTestResultAtPoint and nodesFromRect APIs
+        https://bugs.webkit.org/show_bug.cgi?id=95720
+
+        Reviewed by Antonio Gomes.
+
+        Update calls to new API.
+
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_hit_test_new):
+
+2012-09-07  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        Unreviewed, rolling out r127839.
+        http://trac.webkit.org/changeset/127839
+        https://bugs.webkit.org/show_bug.cgi?id=90603
+
+        This patch was landed with wrong implementation and policy.
+
+        * WebCoreSupport/NotificationPresenterClientEfl.cpp:
+        (WebCore::NotificationPresenterClientEfl::NotificationPresenterClientEfl):
+        (WebCore::NotificationPresenterClientEfl::requestPermission):
+        (WebCore::NotificationPresenterClientEfl::checkPermission):
+        (WebCore::NotificationPresenterClientEfl::cancelRequestsForPermission):
+        * WebCoreSupport/NotificationPresenterClientEfl.h:
+        (NotificationPresenterClientEfl):
+        * ewk/ewk_view.cpp:
+        (_ewk_view_priv_new):
+        * ewk/ewk_view.h:
+        * ewk/ewk_view_private.h:
+
+2012-09-07  Kihong Kwon  <kihong.kwon@samsung.com>
+
+        [EFL] Support the permission function of the Web Notification.
+        https://bugs.webkit.org/show_bug.cgi?id=90603
+
+        Reviewed by Gyuyoung Kim.
+
+        Implement permission related functions of Web Notifications.
+        checkPermission for Notification.permissionLevel().
+        requestPermission for Notification.requestPermission().
+        In addition, if the application(like a browser) has permitted domains already,
+        it can be cached using ewk_view_notification_permissions_store.
+
+        * WebCoreSupport/NotificationPresenterClientEfl.cpp:
+        (WebCore::NotificationPresenterClientEfl::NotificationPresenterClientEfl):
+        (WebCore::NotificationPresenterClientEfl::requestPermission):
+        (WebCore::NotificationPresenterClientEfl::checkPermission):
+        (WebCore::NotificationPresenterClientEfl::addToPermissionCache):
+        (WebCore):
+        (WebCore::NotificationPresenterClientEfl::setPermission):
+        * WebCoreSupport/NotificationPresenterClientEfl.h:
+        (WebCore):
+        (NotificationPresenterClientEfl):
+        (WebCore::NotificationPresenterClientEfl::requestPermission):
+        (WebCore::NotificationPresenterClientEfl::cancelRequestsForPermission):
+        * ewk/ewk_view.cpp:
+        (_ewk_view_priv_new):
+        (ewk_view_notification_permission_store):
+        (ewk_view_notification_permissions_set):
+        (ewk_view_notification_permission_request):
+        * ewk/ewk_view.h:
+        * ewk/ewk_view_private.h:
+
+2012-09-05  Sam Weinig  <sam@webkit.org>
+
+        Part 2 of removing PlatformString.h, remove PlatformString.h
+        https://bugs.webkit.org/show_bug.cgi?id=95931
+
+        Reviewed by Adam Barth.
+
+        Remove PlatformString.h
+
+        * WebCoreSupport/ChromeClientEfl.cpp:
+        * WebCoreSupport/InspectorClientEfl.cpp:
+
+2012-09-06  Kangil Han  <kangil.han@samsung.com>
+
+        [EFL] Remove unnecessary logic in ewk_frame_source_get.
+        https://bugs.webkit.org/show_bug.cgi?id=95828
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Removed unnecessary logic that checks if <html> tag exists in document.
+        WebKit automatically fill out <html></html> tags if they are not existed.
+
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_source_get):
+
+2012-09-05  Kangil Han  <kangil.han@samsung.com>
+
+        [EFL] Remove '+=' usage in String
+        https://bugs.webkit.org/show_bug.cgi?id=95808
+
+        Reviewed by Benjamin Poulain.
+
+        Replaced use of String operator '+=' with StringBuilder.append*() in order to adopt efficient String concatenation.
+
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_source_get): Removed unnecessary strlen usage.
+
+2012-09-05  Kaustubh Atrawalkar  <kaustubh@motorola.com>
+
+        [DRT] LTC:: Move printing related APIs from LayoutTestController to Internals
+        https://bugs.webkit.org/show_bug.cgi?id=92735
+
+        Reviewed by Hajime Morita.
+
+        Move numberOfPages, pageProperty & pageSizeAndMarginsInPixels in Internals and remove duplicated code from DumprenderTree & WebkitTestRunner.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-09-04  Michał Pakuła vel Rutka  <m.pakula@samsung.com>
+
+        [EFL] Context menu restore. 
+        https://bugs.webkit.org/show_bug.cgi?id=74179
+
+        Reviewed by Gyuyoung Kim.
+
+        Adds context menu support for EFL port using non-CROSS_PLATFORM_CONTEXT_MENUS
+        approach, the same as used in WebKit2.
+
+        * WebCoreSupport/ContextMenuClientEfl.cpp: Added.
+        (WebCore):
+        (WebCore::ContextMenuClientEfl::contextMenuDestroyed):
+        (WebCore::ContextMenuClientEfl::getCustomMenuFromDefaultItems):
+        (WebCore::ContextMenuClientEfl::contextMenuItemSelected):
+        (WebCore::ContextMenuClientEfl::downloadURL):
+        (WebCore::ContextMenuClientEfl::lookUpInDictionary):
+        (WebCore::ContextMenuClientEfl::speak):
+        (WebCore::ContextMenuClientEfl::isSpeaking):
+        (WebCore::ContextMenuClientEfl::stopSpeaking):
+        (WebCore::ContextMenuClientEfl::searchWithGoogle):
+        * WebCoreSupport/ContextMenuClientEfl.h: Added.
+        (WebCore):
+        (ContextMenuClientEfl):
+        * ewk/ewk_contextmenu.cpp: Removed ewk_context_menu_customize implementation.
+        (ewk_context_menu_destroy): Added freeing context menu. 
+        (ewk_context_menu_new): Added filling ewk_contextmenu list.
+        (ewk_context_menu_item_append):
+        * ewk/ewk_contextmenu_private.h: Removed ewk_context_menu_customize and changed ewk_context_menu_new definition.
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (_ewk_view_priv_new):
+        (_ewk_view_priv_del):
+        (ewk_view_context_menu_forward_event):
+
+2012-09-04  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Drop default theme concept
+        https://bugs.webkit.org/show_bug.cgi?id=94778
+
+        Reviewed by Gyuyoung Kim.
+
+        * ewk/ewk_view.h:
+        Updated doxygen document not to mention default theme.
+
+2012-09-03  Jinwoo Song  <jinwoo7.song@samsung.com>
+
+        [EFL] Fix e_dbus_shutdown() error when exiting the Minibrowser
+        https://bugs.webkit.org/show_bug.cgi?id=95636
+
+        Reviewed by Gyuyoung Kim.
+
+        Invoke stopUpdating() in the destructor of BatteryClinetEfl()
+        to call e_ukit_shutdown() and e_dbus_shutdown() if and when 
+        stopUpdating() has not been called explicitly.
+
+        * WebCoreSupport/BatteryClientEfl.cpp:
+        (BatteryClientEfl::~BatteryClientEfl):
+        * WebCoreSupport/BatteryClientEfl.h:
+        (BatteryClientEfl):
+
+2012-09-03  Jinwoo Song  <jinwoo7.song@samsung.com>
+
+        [EFL] Use WebKitVersion.h to get version information
+        https://bugs.webkit.org/show_bug.cgi?id=95669
+
+        Reviewed by Gyuyoung Kim.
+
+        Use WEBKIT_MAJOR_VERSION and WEBKIT_MINOR_VERSION 
+        in the WebKitVersion.h
+
+        Relocate the StorageTracker.h to keep the sorted order.
+
+        * ewk/ewk_settings.cpp:
+        (ewk_settings_default_user_agent_get):
+
+2012-09-01  Jinwoo Song  <jinwoo7.song@samsung.com>
+
+        [EFL] Refactoring the DumpRenderTreeSupportEfl
+        https://bugs.webkit.org/show_bug.cgi?id=95544
+
+        Reviewed by Gyuyoung Kim.
+
+        There are lots of repeated codes for getting the WebCore::Frame 
+        and WebCore::Page. To reduce these duplications, simple macros
+        are added.
+
+        No new tests, just refactoring.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::activeAnimationsCount):
+        (DumpRenderTreeSupportEfl::callShouldCloseOnWebView):
+        (DumpRenderTreeSupportEfl::clearFrameName):
+        (DumpRenderTreeSupportEfl::clearOpener):
+        (DumpRenderTreeSupportEfl::elementDoesAutoCompleteForElementWithId):
+        (DumpRenderTreeSupportEfl::frameChildren):
+        (DumpRenderTreeSupportEfl::frameParent):
+        (DumpRenderTreeSupportEfl::layoutFrame):
+        (DumpRenderTreeSupportEfl::numberOfPages):
+        (DumpRenderTreeSupportEfl::pageSizeAndMarginsInPixels):
+        (DumpRenderTreeSupportEfl::pageProperty):
+        (DumpRenderTreeSupportEfl::pauseAnimation):
+        (DumpRenderTreeSupportEfl::pauseTransition):
+        (DumpRenderTreeSupportEfl::pendingUnloadEventCount):
+        (DumpRenderTreeSupportEfl::renderTreeDump):
+        (DumpRenderTreeSupportEfl::responseMimeType):
+        (DumpRenderTreeSupportEfl::selectionRectangle):
+        (DumpRenderTreeSupportEfl::suitableDRTFrameName):
+        (DumpRenderTreeSupportEfl::setDefersLoading):
+        (DumpRenderTreeSupportEfl::setLoadsSiteIconsIgnoringImageLoadingSetting):
+        (DumpRenderTreeSupportEfl::addUserScript):
+        (DumpRenderTreeSupportEfl::clearUserScripts):
+        (DumpRenderTreeSupportEfl::addUserStyleSheet):
+        (DumpRenderTreeSupportEfl::clearUserStyleSheets):
+        (DumpRenderTreeSupportEfl::executeCoreCommandByName):
+        (DumpRenderTreeSupportEfl::findString):
+        (DumpRenderTreeSupportEfl::setCSSGridLayoutEnabled):
+        (DumpRenderTreeSupportEfl::isCommandEnabled):
+        (DumpRenderTreeSupportEfl::setSmartInsertDeleteEnabled):
+        (DumpRenderTreeSupportEfl::setSelectTrailingWhitespaceEnabled):
+        (DumpRenderTreeSupportEfl::evaluateInWebInspector):
+        (DumpRenderTreeSupportEfl::evaluateScriptInIsolatedWorld):
+        (DumpRenderTreeSupportEfl::globalContextRefForFrame):
+        (DumpRenderTreeSupportEfl::setInteractiveFormValidationEnabled):
+        (DumpRenderTreeSupportEfl::setValidationMessageTimerMagnification):
+        (DumpRenderTreeSupportEfl::setAuthorAndUserStylesEnabled):
+        (DumpRenderTreeSupportEfl::setComposition):
+        (DumpRenderTreeSupportEfl::hasComposition):
+        (DumpRenderTreeSupportEfl::compositionRange):
+        (DumpRenderTreeSupportEfl::confirmComposition):
+        (DumpRenderTreeSupportEfl::firstRectForCharacterRange):
+        (DumpRenderTreeSupportEfl::selectedRange):
+
+2012-08-31  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Add proper support for navigator.onLine and associated events
+        https://bugs.webkit.org/show_bug.cgi?id=95532
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Remove ewk_network_state_notifier_online_set() API since
+        the EFL port no longer relies on the client application to
+        provide it with the online state.
+
+        * ewk/ewk_network.cpp:
+        * ewk/ewk_network.h:
+
+2012-08-31  Jinwoo Song  <jinwoo7.song@samsung.com>
+
+        [EFL] Simplify FrameLoaderClinetEfl by adding a private method.
+        https://bugs.webkit.org/show_bug.cgi?id=95444
+
+        Reviewed by Gyuyoung Kim.
+
+        In the FrameLoaderClientEfl, the codes which checks that 
+        if current frame is main frame are frequently used.
+        This patch adds a private method and replaces those codes 
+        with the method to simplify.
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::dispatchDidChangeLocationWithinPage):
+        (WebCore::FrameLoaderClientEfl::dispatchDidReceiveIcon):
+        (WebCore::FrameLoaderClientEfl::dispatchDidStartProvisionalLoad):
+        (WebCore::FrameLoaderClientEfl::dispatchDidReceiveTitle):
+        (WebCore::FrameLoaderClientEfl::dispatchDidCommitLoad):
+        (WebCore::FrameLoaderClientEfl::dispatchDidFailProvisionalLoad):
+        (WebCore::FrameLoaderClientEfl::transitionToCommittedForNewPage):
+        * WebCoreSupport/FrameLoaderClientEfl.h:
+        (WebCore::FrameLoaderClientEfl::isLoadingMainFrame):
+
+2012-08-30  Benjamin Poulain  <bpoulain@apple.com>
+
+        Replace JSC::UString by WTF::String
+        https://bugs.webkit.org/show_bug.cgi?id=95271
+
+        Reviewed by Geoffrey Garen.
+
+        Replace UString by String.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::sendWebIntentResponse):
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_script_execute):
+
+2012-08-29  Kamil Blank  <k.blank@samsung.com>
+
+        [EFL] Add setting API for allow universal/file access from file URLs.
+        https://bugs.webkit.org/show_bug.cgi?id=83121
+
+        Reviewed by Eric Seidel.
+
+        Make it possible to enable allow universal/file access from file URLs.
+        Default value for both settings is true.
+
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (_ewk_view_priv_new):
+        (ewk_view_setting_allow_universal_access_from_file_urls_set): Function sets if locally loaded documents
+        are allowed to access remote urls.
+        (ewk_view_setting_allow_universal_access_from_file_urls_get):
+        (ewk_view_setting_allow_file_access_from_file_urls_set): Function sets if locally loaded documents
+        are allowed to access other local urls.
+        (ewk_view_setting_allow_file_access_from_file_urls_get):
+        * ewk/ewk_view.h:
+
+2012-08-29  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Add *explicit* keyword to constructors in WebCoreSupport
+        https://bugs.webkit.org/show_bug.cgi?id=95307
+
+        Reviewed by Kentaro Hara.
+
+        Added explicit keyword in constructors in order to avoid implicit type conversion.
+
+        * WebCoreSupport/ColorChooserEfl.h:
+        (ColorChooserEfl):
+        * WebCoreSupport/PopupMenuEfl.h:
+        (PopupMenuEfl):
+        * WebCoreSupport/SearchPopupMenuEfl.h:
+        (SearchPopupMenuEfl):
+
+2012-08-29  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Move several files to remove webkit1 dependency from WebCore.
+        https://bugs.webkit.org/show_bug.cgi?id=95264
+
+        Reviewed by Gyuyoung Kim.
+
+        ColorChooserEfl.cpp, PopupMenuEfl.cpp and SearchPopupMenuEfl.cpp are WebKit1/Efl
+        specific files and they can not be shared with WebKit2/Efl.
+
+        In order to remove WebKit dependency from WebCore, this patch moves them
+        to WebKit/efl/WebCoreSupport.
+
+        * WebCoreSupport/ColorChooserEfl.cpp: Renamed from Source/WebCore/platform/efl/ColorChooserEfl.cpp.
+        (WebCore):
+        (WebCore::ColorChooserEfl::ColorChooserEfl):
+        (WebCore::ColorChooserEfl::~ColorChooserEfl):
+        (WebCore::ColorChooserEfl::setSelectedColor):
+        (WebCore::ColorChooserEfl::endChooser):
+        * WebCoreSupport/ColorChooserEfl.h: Renamed from Source/WebCore/platform/efl/ColorChooserEfl.h.
+        (WebCore):
+        (ColorChooserEfl):
+        * WebCoreSupport/PopupMenuEfl.cpp: Renamed from Source/WebCore/platform/efl/PopupMenuEfl.cpp.
+        (WebCore):
+        (WebCore::PopupMenuEfl::PopupMenuEfl):
+        (WebCore::PopupMenuEfl::~PopupMenuEfl):
+        (WebCore::PopupMenuEfl::show):
+        (WebCore::PopupMenuEfl::hide):
+        (WebCore::PopupMenuEfl::updateFromElement):
+        (WebCore::PopupMenuEfl::disconnectClient):
+        * WebCoreSupport/PopupMenuEfl.h: Renamed from Source/WebCore/platform/efl/PopupMenuEfl.h.
+        (WebCore):
+        (PopupMenuEfl):
+        (WebCore::PopupMenuEfl::client):
+        * WebCoreSupport/SearchPopupMenuEfl.cpp: Renamed from Source/WebCore/platform/efl/SearchPopupMenuEfl.cpp.
+        (WebCore):
+        (WebCore::SearchPopupMenuEfl::SearchPopupMenuEfl):
+        (WebCore::SearchPopupMenuEfl::popupMenu):
+        (WebCore::SearchPopupMenuEfl::saveRecentSearches):
+        (WebCore::SearchPopupMenuEfl::loadRecentSearches):
+        (WebCore::SearchPopupMenuEfl::enabled):
+        * WebCoreSupport/SearchPopupMenuEfl.h: Renamed from Source/WebCore/platform/efl/SearchPopupMenuEfl.h.
+        (WebCore):
+        (SearchPopupMenuEfl):
+
+2012-08-28  Seokju Kwon  <seokju.kwon@samsung.com>
+
+        [EFL] Add support for localization to the Web Inspector
+        https://bugs.webkit.org/show_bug.cgi?id=92961
+
+        Reviewed by Gyuyoung Kim.
+
+        Implement InspectorFrontendClientEfl::localizedStringsURL()
+        to return the URL of the localizedStrings.js.
+
+        * WebCoreSupport/InspectorClientEfl.cpp:
+        (WebCore::InspectorClientEfl::openInspectorFrontend):
+        (WebCore::InspectorClientEfl::inspectorFilesPath):
+        (WebCore::InspectorFrontendClientEfl::localizedStringsURL):
+
+2012-08-28  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r126914.
+        http://trac.webkit.org/changeset/126914
+        https://bugs.webkit.org/show_bug.cgi?id=95239
+
+        it breaks everything and fixes nothing (Requested by pizlo on
+        #webkit).
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::evaluateScriptInIsolatedWorld):
+        * WebCoreSupport/PlatformStrategiesEfl.cpp:
+        (PlatformStrategiesEfl::getPluginInfo):
+        * ewk/ewk_intent.cpp:
+        (ewk_intent_extra_get):
+
+2012-08-28  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        Rename first/second to key/value in HashMap iterators
+        https://bugs.webkit.org/show_bug.cgi?id=82784
+
+        Reviewed by Eric Seidel.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::evaluateScriptInIsolatedWorld):
+        * WebCoreSupport/PlatformStrategiesEfl.cpp:
+        (PlatformStrategiesEfl::getPluginInfo):
+        * ewk/ewk_intent.cpp:
+        (ewk_intent_extra_get):
+
+2012-08-28  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] WebKit EFL updates view on HTTP 204 response
+        https://bugs.webkit.org/show_bug.cgi?id=95199
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Ignore HTTP responses which have status code equal
+        to 204 (No Content).
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::dispatchDecidePolicyForResponse):
+
+2012-08-28  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [EFL] Rename knob images to thumb on the default theme
+        https://bugs.webkit.org/show_bug.cgi?id=95186
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        WebKit reefers to these handles as thumb instead of knob. Let's make
+        it coherent on EFL.
+
+        * DefaultTheme/widget/slider/slider.edc:
+        * DefaultTheme/widget/slider/slider_thumb_h.png: Renamed from Source/WebKit/efl/DefaultTheme/widget/slider/slider_knob_h.png.
+        * DefaultTheme/widget/slider/slider_thumb_press_h.png: Renamed from Source/WebKit/efl/DefaultTheme/widget/slider/slider_knob_press_h.png.
+        * DefaultTheme/widget/slider/slider_thumb_press_v.png: Renamed from Source/WebKit/efl/DefaultTheme/widget/slider/slider_knob_press_v.png.
+        * DefaultTheme/widget/slider/slider_thumb_v.png: Renamed from Source/WebKit/efl/DefaultTheme/widget/slider/slider_knob_v.png.
+
+2012-08-28  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [EFL] Range input ignores padding
+        https://bugs.webkit.org/show_bug.cgi?id=94595
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Updated default theme to paint the slider thumb in a different step.
+        This was done by splitting the thumb into a separated group.
+
+        * DefaultTheme/widget/slider/slider.edc:
+
+2012-08-27  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r126836.
+        http://trac.webkit.org/changeset/126836
+        https://bugs.webkit.org/show_bug.cgi?id=95163
+
+        Broke all Apple ports, EFL, and Qt. (Requested by tkent on
+        #webkit).
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::evaluateScriptInIsolatedWorld):
+        * WebCoreSupport/PlatformStrategiesEfl.cpp:
+        (PlatformStrategiesEfl::getPluginInfo):
+        * ewk/ewk_intent.cpp:
+        (ewk_intent_extra_get):
+
+2012-08-27  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        Rename first/second to key/value in HashMap iterators
+        https://bugs.webkit.org/show_bug.cgi?id=82784
+
+        Reviewed by Eric Seidel.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::evaluateScriptInIsolatedWorld):
+        * WebCoreSupport/PlatformStrategiesEfl.cpp:
+        (PlatformStrategiesEfl::getPluginInfo):
+        * ewk/ewk_intent.cpp:
+        (ewk_intent_extra_get):
+
+2012-08-27  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        Rename RegisterProtocolHandler API to NavigatorContentUtils
+        https://bugs.webkit.org/show_bug.cgi?id=94920
+
+        Reviewed by Adam Barth.
+
+        Renaming whatever RegisterProtocolHandler-prefixed to NavigatorContentUtils-prefixed.
+        RegisterProtocolHandlerClientEfl is renamed to NavigatorContentUtilsClientEfl.
+
+        * WebCoreSupport/NavigatorContentUtilsClientEfl.cpp: Renamed from Source/WebKit/efl/WebCoreSupport/RegisterProtocolHandlerClientEfl.cpp.
+        (WebCore):
+        (WebCore::customHandlerDataCreate):
+        (WebCore::customHandlerDataDelete):
+        (WebCore::NavigatorContentUtilsClientEfl::create):
+        (WebCore::NavigatorContentUtilsClientEfl::NavigatorContentUtilsClientEfl):
+        (WebCore::NavigatorContentUtilsClientEfl::registerProtocolHandler):
+        (WebCore::NavigatorContentUtilsClientEfl::isProtocolHandlerRegistered):
+        (WebCore::NavigatorContentUtilsClientEfl::unregisterProtocolHandler):
+        * WebCoreSupport/NavigatorContentUtilsClientEfl.h: Renamed from Source/WebKit/efl/WebCoreSupport/RegisterProtocolHandlerClientEfl.h.
+        (NavigatorContentUtilsClientEfl):
+        (WebCore::NavigatorContentUtilsClientEfl::~NavigatorContentUtilsClientEfl):
+        * ewk/ewk_custom_handler.cpp:
+        * ewk/ewk_custom_handler_private.h:
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (_ewk_view_priv_new):
+
 2012-08-23  Ryuan Choi  <ryuan.choi@samsung.com>
 
         [EFL] Remove ewk_tile_matrix_tile_update.

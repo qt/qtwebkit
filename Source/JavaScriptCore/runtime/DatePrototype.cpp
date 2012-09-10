@@ -131,7 +131,7 @@ enum LocaleDateTimeFormat { LocaleDateAndTime, LocaleDate, LocaleTime };
 // FIXME: Since this is superior to the strftime-based version, why limit this to PLATFORM(MAC)?
 // Instead we should consider using this whenever USE(CF) is true.
 
-static CFDateFormatterStyle styleFromArgString(const UString& string, CFDateFormatterStyle defaultStyle)
+static CFDateFormatterStyle styleFromArgString(const String& string, CFDateFormatterStyle defaultStyle)
 {
     if (string == "short")
         return kCFDateFormatterShortStyle;
@@ -150,9 +150,9 @@ static JSCell* formatLocaleDate(ExecState* exec, DateInstance*, double timeInMil
     CFDateFormatterStyle timeStyle = (format != LocaleDate ? kCFDateFormatterLongStyle : kCFDateFormatterNoStyle);
 
     bool useCustomFormat = false;
-    UString customFormatString;
+    String customFormatString;
 
-    UString arg0String = exec->argument(0).toString(exec)->value(exec);
+    String arg0String = exec->argument(0).toString(exec)->value(exec);
     if (arg0String == "custom" && !exec->argument(1).isUndefined()) {
         useCustomFormat = true;
         customFormatString = exec->argument(1).toString(exec)->value(exec);
@@ -190,7 +190,7 @@ static JSCell* formatLocaleDate(ExecState* exec, DateInstance*, double timeInMil
 
     CFRelease(string);
 
-    return jsNontrivialString(exec, UString(buffer, length));
+    return jsNontrivialString(exec, String(buffer, length));
 }
 
 #elif USE(ICU_UNICODE) && !UCONFIG_NO_FORMATTING
@@ -212,7 +212,7 @@ static JSCell* formatLocaleDate(ExecState* exec, DateInstance* dateObject, doubl
     if (status != U_ZERO_ERROR)
         return jsEmptyString(exec);
 
-    return jsNontrivialString(exec, UString(buffer, length));
+    return jsNontrivialString(exec, String(buffer, length));
 }
 
 #else
@@ -253,7 +253,7 @@ static JSCell* formatLocaleDate(ExecState* exec, const GregorianDateTime& gdt, L
     if (length)
         length--;
 
-    return jsNontrivialString(exec, UString(buffer.data(), length));
+    return jsNontrivialString(exec, String(buffer.data(), length));
 
 #else // OS(WINDOWS)
 
@@ -322,7 +322,7 @@ static JSCell* formatLocaleDate(ExecState* exec, const GregorianDateTime& gdt, L
     if (length != static_cast<size_t>(-1)) {
         for (size_t i = 0; i < length; ++i)
             buffer[i] = static_cast<UChar>(tempbuffer[i]);
-        return jsNontrivialString(exec, UString(buffer, length));
+        return jsNontrivialString(exec, String(buffer, length));
     }
 #endif
 
@@ -334,7 +334,7 @@ static JSCell* formatLocaleDate(ExecState* exec, DateInstance* dateObject, doubl
 {
     const GregorianDateTime* gregorianDateTime = dateObject->gregorianDateTime(exec);
     if (!gregorianDateTime)
-        return jsNontrivialString(exec, "Invalid Date");
+        return jsNontrivialString(exec, ASCIILiteral("Invalid Date"));
     return formatLocaleDate(exec, *gregorianDateTime, format);
 }
 
@@ -352,7 +352,7 @@ static EncodedJSValue formateDateInstance(ExecState* exec, DateTimeFormat format
         ? thisDateObj->gregorianDateTimeUTC(exec)
         : thisDateObj->gregorianDateTime(exec);
     if (!gregorianDateTime)
-        return JSValue::encode(jsNontrivialString(exec, "Invalid Date"));
+        return JSValue::encode(jsNontrivialString(exec, String(ASCIILiteral("Invalid Date"))));
 
     return JSValue::encode(jsNontrivialString(exec, formatDateTime(*gregorianDateTime, format, asUTCVariant)));
 }
@@ -548,24 +548,30 @@ EncodedJSValue JSC_HOST_CALL dateProtoFuncToISOString(ExecState* exec)
     
     DateInstance* thisDateObj = asDateInstance(thisValue); 
     if (!isfinite(thisDateObj->internalNumber()))
-        return throwVMError(exec, createRangeError(exec, "Invalid Date"));
+        return throwVMError(exec, createRangeError(exec, ASCIILiteral("Invalid Date")));
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTimeUTC(exec);
     if (!gregorianDateTime)
-        return JSValue::encode(jsNontrivialString(exec, "Invalid Date"));
+        return JSValue::encode(jsNontrivialString(exec, String(ASCIILiteral("Invalid Date"))));
     // Maximum amount of space we need in buffer: 7 (max. digits in year) + 2 * 5 (2 characters each for month, day, hour, minute, second) + 4 (. + 3 digits for milliseconds)
     // 6 for formatting and one for null termination = 28. We add one extra character to allow us to force null termination.
-    char buffer[29];
+    char buffer[28];
     // If the year is outside the bounds of 0 and 9999 inclusive we want to use the extended year format (ES 15.9.1.15.1).
     int ms = static_cast<int>(fmod(thisDateObj->internalNumber(), msPerSecond));
     if (ms < 0)
         ms += msPerSecond;
+
+    int charactersWritten;
     if (gregorianDateTime->year() > 9999 || gregorianDateTime->year() < 0)
-        snprintf(buffer, sizeof(buffer) - 1, "%+07d-%02d-%02dT%02d:%02d:%02d.%03dZ", gregorianDateTime->year(), gregorianDateTime->month() + 1, gregorianDateTime->monthDay(), gregorianDateTime->hour(), gregorianDateTime->minute(), gregorianDateTime->second(), ms);
+        charactersWritten = snprintf(buffer, sizeof(buffer), "%+07d-%02d-%02dT%02d:%02d:%02d.%03dZ", gregorianDateTime->year(), gregorianDateTime->month() + 1, gregorianDateTime->monthDay(), gregorianDateTime->hour(), gregorianDateTime->minute(), gregorianDateTime->second(), ms);
     else
-        snprintf(buffer, sizeof(buffer) - 1, "%04d-%02d-%02dT%02d:%02d:%02d.%03dZ", gregorianDateTime->year(), gregorianDateTime->month() + 1, gregorianDateTime->monthDay(), gregorianDateTime->hour(), gregorianDateTime->minute(), gregorianDateTime->second(), ms);
-    buffer[sizeof(buffer) - 1] = 0;
-    return JSValue::encode(jsNontrivialString(exec, buffer));
+        charactersWritten = snprintf(buffer, sizeof(buffer), "%04d-%02d-%02dT%02d:%02d:%02d.%03dZ", gregorianDateTime->year(), gregorianDateTime->month() + 1, gregorianDateTime->monthDay(), gregorianDateTime->hour(), gregorianDateTime->minute(), gregorianDateTime->second(), ms);
+
+    ASSERT(charactersWritten > 0 && static_cast<unsigned>(charactersWritten) < sizeof(buffer));
+    if (static_cast<unsigned>(charactersWritten) >= sizeof(buffer))
+        return JSValue::encode(jsEmptyString(exec));
+
+    return JSValue::encode(jsNontrivialString(exec, String(buffer, charactersWritten)));
 }
 
 EncodedJSValue JSC_HOST_CALL dateProtoFuncToDateString(ExecState* exec)
@@ -1113,13 +1119,13 @@ EncodedJSValue JSC_HOST_CALL dateProtoFuncToJSON(ExecState* exec)
     CallData callData;
     CallType callType = getCallData(toISOValue, callData);
     if (callType == CallTypeNone)
-        return throwVMError(exec, createTypeError(exec, "toISOString is not a function"));
+        return throwVMError(exec, createTypeError(exec, ASCIILiteral("toISOString is not a function")));
 
     JSValue result = call(exec, asObject(toISOValue), callType, callData, object, exec->emptyList());
     if (exec->hadException())
         return JSValue::encode(jsNull());
     if (result.isObject())
-        return throwVMError(exec, createTypeError(exec, "toISOString did not return a primitive value"));
+        return throwVMError(exec, createTypeError(exec, ASCIILiteral("toISOString did not return a primitive value")));
     return JSValue::encode(result);
 }
 

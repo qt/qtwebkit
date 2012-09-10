@@ -467,7 +467,7 @@ bool Dictionary::get(const String& key, ArrayValue& value) const
     return true;
 }
 
-bool Dictionary::getOwnPropertiesAsStringHashMap(WTF::HashMap<String, String>& hashMap) const
+bool Dictionary::getOwnPropertiesAsStringHashMap(HashMap<String, String>& hashMap) const
 {
     if (!isObject())
         return false;
@@ -489,6 +489,28 @@ bool Dictionary::getOwnPropertiesAsStringHashMap(WTF::HashMap<String, String>& h
         String stringValue = toWebCoreString(value);
         if (!stringKey.isEmpty())
             hashMap.set(stringKey, stringValue);
+    }
+
+    return true;
+}
+
+bool Dictionary::getOwnPropertyNames(Vector<String>& names) const
+{
+    if (!isObject())
+        return false;
+
+    v8::Handle<v8::Object> options = m_options->ToObject();
+    if (options.IsEmpty())
+        return false;
+
+    v8::Local<v8::Array> properties = options->GetOwnPropertyNames();
+    if (properties.IsEmpty())
+        return true;
+    for (uint32_t i = 0; i < properties->Length(); ++i) {
+        v8::Local<v8::String> key = properties->Get(i)->ToString();
+        if (!options->Has(key))
+            continue;
+        names.append(toWebCoreString(key));
     }
 
     return true;

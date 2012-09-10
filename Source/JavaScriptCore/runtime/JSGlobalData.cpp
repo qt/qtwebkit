@@ -30,12 +30,12 @@
 #include "JSGlobalData.h"
 
 #include "ArgList.h"
-#include "Heap.h"
 #include "CommonIdentifiers.h"
 #include "DebuggerActivation.h"
 #include "FunctionConstructor.h"
 #include "GCActivityCallback.h"
 #include "GetterSetter.h"
+#include "Heap.h"
 #include "HostCallReturnValue.h"
 #include "IncrementalSweeper.h"
 #include "Interpreter.h"
@@ -45,9 +45,10 @@
 #include "JSClassRef.h"
 #include "JSFunction.h"
 #include "JSLock.h"
+#include "JSNameScope.h"
 #include "JSNotAnObject.h"
 #include "JSPropertyNameIterator.h"
-#include "JSStaticScopeObject.h"
+#include "JSWithScope.h"
 #include "Lexer.h"
 #include "Lookup.h"
 #include "Nodes.h"
@@ -99,12 +100,19 @@ extern const HashTable stringConstructorTable;
 #if ENABLE(ASSEMBLER) && (ENABLE(CLASSIC_INTERPRETER) || ENABLE(LLINT))
 static bool enableAssembler(ExecutableAllocator& executableAllocator)
 {
-    if (!executableAllocator.isValid() || !Options::useJIT())
+    if (!executableAllocator.isValid() || (!Options::useJIT() && !Options::useRegExpJIT()))
         return false;
 
 #if USE(CF)
-    RetainPtr<CFStringRef> canUseJITKey(AdoptCF, CFStringCreateWithCString(0 , "JavaScriptCoreUseJIT", kCFStringEncodingMacRoman));
-    RetainPtr<CFBooleanRef> canUseJIT(AdoptCF, (CFBooleanRef)CFPreferencesCopyAppValue(canUseJITKey.get(), kCFPreferencesCurrentApplication));
+#if COMPILER(GCC) && !COMPILER(CLANG)
+    // FIXME: remove this once the EWS have been upgraded to LLVM.
+    // Work around a bug of GCC with strict-aliasing.
+    RetainPtr<CFStringRef> canUseJITKeyRetain(AdoptCF, CFStringCreateWithCString(0 , "JavaScriptCoreUseJIT", kCFStringEncodingMacRoman));
+    CFStringRef canUseJITKey = canUseJITKeyRetain.get();
+#else
+    CFStringRef canUseJITKey = CFSTR("JavaScriptCoreUseJIT");
+#endif // COMPILER(GCC) && !COMPILER(CLANG)
+    RetainPtr<CFBooleanRef> canUseJIT(AdoptCF, (CFBooleanRef)CFPreferencesCopyAppValue(canUseJITKey, kCFPreferencesCurrentApplication));
     if (canUseJIT)
         return kCFBooleanTrue == canUseJIT.get();
 #endif
@@ -119,7 +127,11 @@ static bool enableAssembler(ExecutableAllocator& executableAllocator)
 #endif
 
 JSGlobalData::JSGlobalData(GlobalDataType globalDataType, ThreadStackType threadStackType, HeapType heapType)
-    : heap(this, heapType)
+    :
+#if ENABLE(ASSEMBLER)
+      executableAllocator(*this),
+#endif
+      heap(this, heapType)
     , globalDataType(globalDataType)
     , clientData(0)
     , topCallFrame(CallFrame::noCaller())
@@ -145,9 +157,6 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, ThreadStackType thread
     , identifierTable(globalDataType == Default ? wtfThreadData().currentIdentifierTable() : createIdentifierTable())
     , propertyNames(new CommonIdentifiers(this))
     , emptyList(new MarkedArgumentBuffer)
-#if ENABLE(ASSEMBLER)
-    , executableAllocator(*this)
-#endif
     , parserArena(adoptPtr(new ParserArena))
     , keywords(adoptPtr(new Keywords(this)))
     , interpreter(0)
@@ -173,6 +182,8 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, ThreadStackType thread
     , m_newStringsSinceLastHashConst(0)
 #if ENABLE(ASSEMBLER) && (ENABLE(CLASSIC_INTERPRETER) || ENABLE(LLINT))
     , m_canUseAssembler(enableAssembler(executableAllocator))
+    , m_canUseJIT(m_canUseAssembler && Options::useJIT())
+    , m_canUseRegExpJIT(m_canUseAssembler && Options::useRegExpJIT())
 #endif
 #if ENABLE(GC_VALIDATION)
     , m_initializingObjectClass(0)
@@ -186,23 +197,21 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, ThreadStackType thread
     IdentifierTable* existingEntryIdentifierTable = wtfThreadData().setCurrentIdentifierTable(identifierTable);
     structureStructure.set(*this, Structure::createStructure(*this));
     debuggerActivationStructure.set(*this, DebuggerActivation::createStructure(*this, 0, jsNull()));
-    activationStructure.set(*this, JSActivation::createStructure(*this, 0, jsNull()));
     interruptedExecutionErrorStructure.set(*this, InterruptedExecutionError::createStructure(*this, 0, jsNull()));
     terminatedExecutionErrorStructure.set(*this, TerminatedExecutionError::createStructure(*this, 0, jsNull()));
-    staticScopeStructure.set(*this, JSStaticScopeObject::createStructure(*this, 0, jsNull()));
-    strictEvalActivationStructure.set(*this, StrictEvalActivation::createStructure(*this, 0, jsNull()));
     stringStructure.set(*this, JSString::createStructure(*this, 0, jsNull()));
     notAnObjectStructure.set(*this, JSNotAnObject::createStructure(*this, 0, jsNull()));
     propertyNameIteratorStructure.set(*this, JSPropertyNameIterator::createStructure(*this, 0, jsNull()));
     getterSetterStructure.set(*this, GetterSetter::createStructure(*this, 0, jsNull()));
     apiWrapperStructure.set(*this, JSAPIValueWrapper::createStructure(*this, 0, jsNull()));
-    scopeChainNodeStructure.set(*this, ScopeChainNode::createStructure(*this, 0, jsNull()));
+    JSScopeStructure.set(*this, JSScope::createStructure(*this, 0, jsNull()));
     executableStructure.set(*this, ExecutableBase::createStructure(*this, 0, jsNull()));
     nativeExecutableStructure.set(*this, NativeExecutable::createStructure(*this, 0, jsNull()));
     evalExecutableStructure.set(*this, EvalExecutable::createStructure(*this, 0, jsNull()));
     programExecutableStructure.set(*this, ProgramExecutable::createStructure(*this, 0, jsNull()));
     functionExecutableStructure.set(*this, FunctionExecutable::createStructure(*this, 0, jsNull()));
     regExpStructure.set(*this, RegExp::createStructure(*this, 0, jsNull()));
+    sharedSymbolTableStructure.set(*this, SharedSymbolTable::createStructure(*this, 0, jsNull()));
     structureChainStructure.set(*this, StructureChain::createStructure(*this, 0, jsNull()));
 
     wtfThreadData().setCurrentIdentifierTable(existingEntryIdentifierTable);
@@ -211,13 +220,13 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, ThreadStackType thread
     jitStubs = adoptPtr(new JITThunks(this));
 #endif
     
-    interpreter->initialize(&llintData, this->canUseJIT());
+    interpreter->initialize(this->canUseJIT());
     
     initializeHostCallReturnValue(); // This is needed to convince the linker not to drop host call return support.
 
     heap.notifyIsSafeToCollect();
     
-    llintData.performAssertions(*this);
+    LLInt::Data::performAssertions(*this);
 }
 
 JSGlobalData::~JSGlobalData()
@@ -371,12 +380,13 @@ NativeExecutable* JSGlobalData::getHostFunction(NativeFunction function, Intrins
     ASSERT(canUseJIT());
     return jitStubs->hostFunctionStub(this, function, intrinsic != NoIntrinsic ? thunkGeneratorForIntrinsic(intrinsic) : 0, intrinsic);
 }
-#else
+
+#else // !ENABLE(JIT)
 NativeExecutable* JSGlobalData::getHostFunction(NativeFunction function, NativeFunction constructor)
 {
     return NativeExecutable::create(*this, function, constructor);
 }
-#endif
+#endif // !ENABLE(JIT)
 
 JSGlobalData::ClientData::~ClientData()
 {
@@ -386,7 +396,7 @@ void JSGlobalData::resetDateCache()
 {
     cachedUTCOffset = std::numeric_limits<double>::quiet_NaN();
     dstOffsetCache.reset();
-    cachedDateString = UString();
+    cachedDateString = String();
     cachedDateStringValue = std::numeric_limits<double>::quiet_NaN();
     dateInstanceCache.reset();
 }

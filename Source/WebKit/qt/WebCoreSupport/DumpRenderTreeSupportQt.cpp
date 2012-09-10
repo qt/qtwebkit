@@ -166,7 +166,7 @@ WebCore::Node* QtDRTNodeRuntime::get(const QDRTNode& node)
     return node.m_node;
 }
 
-static QVariant convertJSValueToNodeVariant(JSC::JSObject* object, int *distance, HashSet<JSC::JSObject*>*)
+static QVariant convertJSValueToNodeVariant(JSC::JSObject* object, int *distance, HashSet<JSObjectRef>*)
 {
     if (!object || !object->inherits(&JSNode::s_info))
         return QVariant();
@@ -384,15 +384,6 @@ void DumpRenderTreeSupportQt::garbageCollectorCollect()
 void DumpRenderTreeSupportQt::garbageCollectorCollectOnAlternateThread(bool waitUntilDone)
 {
     gcController().garbageCollectOnAlternateThreadForDebugging(waitUntilDone);
-}
-
-int DumpRenderTreeSupportQt::numberOfPages(QWebFrame* frame, float width, float height)
-{
-    Frame* coreFrame = QWebFramePrivate::core(frame);
-    if (!coreFrame)
-        return -1;
-
-    return PrintContext::numberOfPages(coreFrame, FloatSize(width, height));
 }
 
 // Suspend active DOM objects in this frame.
@@ -856,19 +847,6 @@ void DumpRenderTreeSupportQt::evaluateScriptInIsolatedWorld(QWebFrame* frame, in
     if (!proxy)
         return;
     proxy->executeScriptInWorld(scriptWorld->world(), script, true);
-}
-
-QString DumpRenderTreeSupportQt::pageSizeAndMarginsInPixels(QWebFrame* frame, int pageIndex, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft)
-{
-    WebCore::Frame* coreFrame = QWebFramePrivate::core(frame);
-    return PrintContext::pageSizeAndMarginsInPixels(coreFrame, pageIndex, width, height,
-                                                    marginTop, marginRight, marginBottom, marginLeft);
-}
-
-QString DumpRenderTreeSupportQt::pageProperty(QWebFrame* frame, const QString& propertyName, int pageNumber)
-{
-    WebCore::Frame* coreFrame = QWebFramePrivate::core(frame);
-    return PrintContext::pageProperty(coreFrame, propertyName.toUtf8().constData(), pageNumber);
 }
 
 void DumpRenderTreeSupportQt::addUserStyleSheet(QWebPage* page, const QString& sourceCode)

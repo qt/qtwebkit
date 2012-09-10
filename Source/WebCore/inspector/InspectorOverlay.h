@@ -32,18 +32,19 @@
 #include "Color.h"
 #include "FloatQuad.h"
 #include "LayoutTypes.h"
-#include "Node.h"
 
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
 class Color;
 class GraphicsContext;
 class InspectorClient;
+class InspectorValue;
 class IntRect;
 class Node;
 class Page;
@@ -66,12 +67,14 @@ struct Highlight {
     void setColors(const HighlightConfig& highlightConfig)
     {
         contentColor = highlightConfig.content;
+        contentOutlineColor = highlightConfig.contentOutline;
         paddingColor = highlightConfig.padding;
         borderColor = highlightConfig.border;
         marginColor = highlightConfig.margin;
     }
 
     Color contentColor;
+    Color contentOutlineColor;
     Color paddingColor;
     Color borderColor;
     Color marginColor;
@@ -88,9 +91,11 @@ public:
     {
         return adoptPtr(new InspectorOverlay(page, client));
     }
+    ~InspectorOverlay();
 
+    void update();
     void paint(GraphicsContext&);
-    void drawOutline(GraphicsContext&, const LayoutRect&, const Color&);
+    void drawOutline(GraphicsContext*, const LayoutRect&, const Color&);
     void getHighlight(Highlight*) const;
 
     void setPausedInDebuggerMessage(const String*);
@@ -104,10 +109,13 @@ public:
 private:
     InspectorOverlay(Page*, InspectorClient*);
 
-    void update();
-    void drawNodeHighlight(GraphicsContext&);
-    void drawRectHighlight(GraphicsContext&);
-    void drawPausedInDebugger(GraphicsContext&);
+    void drawNodeHighlight();
+    void drawRectHighlight();
+    void drawPausedInDebuggerMessage();
+    Page* overlayPage();
+    void reset();
+    void evaluateInOverlay(const String& method, const String& argument);
+    void evaluateInOverlay(const String& method, PassRefPtr<InspectorValue> argument);
 
     Page* m_page;
     InspectorClient* m_client;
@@ -115,6 +123,7 @@ private:
     RefPtr<Node> m_highlightNode;
     HighlightConfig m_nodeHighlightConfig;
     OwnPtr<IntRect> m_highlightRect;
+    OwnPtr<Page> m_overlayPage;
     HighlightConfig m_rectHighlightConfig;
 };
 

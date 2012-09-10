@@ -160,9 +160,6 @@ void WebNotificationClient::notificationObjectDestroyed(Notification* notificati
 
 void WebNotificationClient::notificationControllerDestroyed()
 {
-#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
-    [m_webView _notificationControllerDestroyed];
-#endif
     delete this;
 }
 
@@ -230,6 +227,11 @@ NotificationClient::Permission WebNotificationClient::checkPermission(ScriptExec
 }
 
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+uint64_t WebNotificationClient::notificationIDForTesting(WebCore::Notification* notification)
+{
+    return [m_notificationMap.get(notification).get() notificationID];
+}
+
 @implementation WebNotificationPolicyListener
 
 #if ENABLE(NOTIFICATIONS)

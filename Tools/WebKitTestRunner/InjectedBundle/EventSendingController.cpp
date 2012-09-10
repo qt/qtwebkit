@@ -49,8 +49,15 @@ static WKEventModifiers parseModifier(JSStringRef modifier)
         return kWKEventModifiersShiftKey;
     if (JSStringIsEqualToUTF8CString(modifier, "altKey"))
         return kWKEventModifiersAltKey;
-    if (JSStringIsEqualToUTF8CString(modifier, "metaKey") || JSStringIsEqualToUTF8CString(modifier, "addSelectionKey"))
+    if (JSStringIsEqualToUTF8CString(modifier, "metaKey"))
         return kWKEventModifiersMetaKey;
+    if (JSStringIsEqualToUTF8CString(modifier, "addSelectionKey")) {
+#if OS(MAC_OS_X)
+        return kWKEventModifiersMetaKey;
+#else
+        return kWKEventModifiersControlKey;
+#endif
+    }
     return 0;
 }
 
@@ -261,6 +268,30 @@ void EventSendingController::mouseScrollBy(int x, int y)
     WKRetainPtr<WKStringRef> yKey(AdoptWK, WKStringCreateWithUTF8CString("Y"));
     WKRetainPtr<WKDoubleRef> yRef(AdoptWK, WKDoubleCreate(y));
     WKDictionaryAddItem(EventSenderMessageBody.get(), yKey.get(), yRef.get());
+
+    WKBundlePostSynchronousMessage(InjectedBundle::shared().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+}
+
+void EventSendingController::continuousMouseScrollBy(int x, int y, bool paged)
+{
+    WKRetainPtr<WKStringRef> EventSenderMessageName(AdoptWK, WKStringCreateWithUTF8CString("EventSender"));
+    WKRetainPtr<WKMutableDictionaryRef> EventSenderMessageBody(AdoptWK, WKMutableDictionaryCreate());
+
+    WKRetainPtr<WKStringRef> subMessageKey(AdoptWK, WKStringCreateWithUTF8CString("SubMessage"));
+    WKRetainPtr<WKStringRef> subMessageName(AdoptWK, WKStringCreateWithUTF8CString("ContinuousMouseScrollBy"));
+    WKDictionaryAddItem(EventSenderMessageBody.get(), subMessageKey.get(), subMessageName.get());
+
+    WKRetainPtr<WKStringRef> xKey(AdoptWK, WKStringCreateWithUTF8CString("X"));
+    WKRetainPtr<WKDoubleRef> xRef(AdoptWK, WKDoubleCreate(x));
+    WKDictionaryAddItem(EventSenderMessageBody.get(), xKey.get(), xRef.get());
+
+    WKRetainPtr<WKStringRef> yKey(AdoptWK, WKStringCreateWithUTF8CString("Y"));
+    WKRetainPtr<WKDoubleRef> yRef(AdoptWK, WKDoubleCreate(y));
+    WKDictionaryAddItem(EventSenderMessageBody.get(), yKey.get(), yRef.get());
+
+    WKRetainPtr<WKStringRef> pagedKey(AdoptWK, WKStringCreateWithUTF8CString("Paged"));
+    WKRetainPtr<WKUInt64Ref> pagedRef(AdoptWK, WKUInt64Create(paged));
+    WKDictionaryAddItem(EventSenderMessageBody.get(), pagedKey.get(), pagedRef.get());
 
     WKBundlePostSynchronousMessage(InjectedBundle::shared().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
 }

@@ -21,7 +21,7 @@
 #include "config.h"
 #include "qwebkittest_p.h"
 
-#include "QtViewportHandler.h"
+#include "PageViewportControllerClientQt.h"
 #include "qquickwebview_p_p.h"
 #include <QMutableListIterator>
 #include <QTouchEvent>
@@ -137,51 +137,42 @@ QSize QWebKitTest::contentsSize() const
     return QSize(m_webViewPrivate->pageView->contentsSize().toSize());
 }
 
-QVariant QWebKitTest::contentsScale() const
+static inline QJsonObject toJsonObject(const QSizeF& sizeF)
 {
-    if (QtViewportHandler* viewport = m_webViewPrivate->viewportHandler())
-        return viewport->currentCSSScale();
-    return 1.0;
+    QJsonObject result;
+    result.insert(QLatin1String("width"), sizeF.width());
+    result.insert(QLatin1String("height"), sizeF.height());
+    return result;
+}
+
+QJsonObject QWebKitTest::viewport() const
+{
+    QJsonObject viewportData;
+    if (const PageViewportController* const viewportHandler = m_webViewPrivate->viewportController()) {
+        viewportData.insert(QLatin1String("layoutSize"), toJsonObject(viewportHandler->contentsLayoutSize()));
+        viewportData.insert(QLatin1String("isScalable"), viewportHandler->allowsUserScaling());
+        viewportData.insert(QLatin1String("minimumScale"), viewportHandler->minimumContentsScale());
+        viewportData.insert(QLatin1String("maximumScale"), viewportHandler->maximumContentsScale());
+    } else {
+        viewportData.insert(QLatin1String("initialScale"), 1.0);
+        viewportData.insert(QLatin1String("layoutSize"), toJsonObject(QSizeF()));
+        viewportData.insert(QLatin1String("isScalable"), false);
+        viewportData.insert(QLatin1String("minimumScale"), 1.0);
+        viewportData.insert(QLatin1String("maximumScale"), 1.0);
+    }
+    return viewportData;
 }
 
 QVariant QWebKitTest::devicePixelRatio() const
 {
-    if (QtViewportHandler* viewport = m_webViewPrivate->viewportHandler())
-        return viewport->m_devicePixelRatio;
+    if (const PageViewportController* const viewport = m_webViewPrivate->viewportController())
+        return viewport->devicePixelRatio();
     return 1.0;
 }
 
-QVariant QWebKitTest::initialScale() const
+QVariant QWebKitTest::contentsScale() const
 {
-    if (QtViewportHandler* viewport = m_webViewPrivate->viewportHandler())
-        return viewport->m_rawAttributes.initialScale;
+    if (const PageViewportController* const viewport = m_webViewPrivate->viewportController())
+        return viewport->currentContentsScale();
     return 1.0;
-}
-
-QVariant QWebKitTest::minimumScale() const
-{
-    if (QtViewportHandler* viewport = m_webViewPrivate->viewportHandler())
-        return viewport->m_minimumScale;
-    return 1.0;
-}
-
-QVariant QWebKitTest::maximumScale() const
-{
-    if (QtViewportHandler* viewport = m_webViewPrivate->viewportHandler())
-        return viewport->m_maximumScale;
-    return 1.0;
-}
-
-QVariant QWebKitTest::isScalable() const
-{
-    if (QtViewportHandler* viewport = m_webViewPrivate->viewportHandler())
-        return !!viewport->m_rawAttributes.userScalable;
-    return false;
-}
-
-QVariant QWebKitTest::layoutSize() const
-{
-    if (QtViewportHandler* viewport = m_webViewPrivate->viewportHandler())
-        return QSizeF(viewport->m_rawAttributes.layoutSize);
-    return QSizeF();
 }

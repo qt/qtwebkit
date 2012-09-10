@@ -81,6 +81,7 @@ public:
     void dumpProgressFinishedCallback() { setShouldDumpProgressFinishedCallback(true); }
     void dumpResourceLoadCallbacks() { m_dumpResourceLoadCallbacks = true; }
     void dumpResourceResponseMIMETypes() { m_dumpResourceResponseMIMETypes = true; }
+    void dumpWillCacheResponse() { m_dumpWillCacheResponse = true; }
 
     void setShouldDumpFrameLoadCallbacks(bool value) { m_dumpFrameLoadCallbacks = value; }
     void setShouldDumpProgressFinishedCallback(bool value) { m_dumpProgressFinishedCallback = value; }
@@ -145,8 +146,6 @@ public:
     void setAppCacheMaximumSize(uint64_t);
 
     // Printing
-    int numberOfPages(double pageWidthInPixels, double pageHeightInPixels);
-    JSRetainPtr<JSStringRef> pageSizeAndMarginsInPixels(int pageIndex, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft);
     bool isPageBoxVisible(int pageIndex);
 
     void setValueForUser(JSContextRef, JSValueRef element, JSStringRef value);
@@ -166,6 +165,7 @@ public:
     bool shouldDumpProgressFinishedCallback() const { return m_dumpProgressFinishedCallback; }
     bool shouldDumpResourceLoadCallbacks() const { return m_dumpResourceLoadCallbacks; }
     bool shouldDumpResourceResponseMIMETypes() const { return m_dumpResourceResponseMIMETypes; }
+    bool shouldDumpWillCacheResponse() const { return m_dumpWillCacheResponse; }
 
     bool isPolicyDelegateEnabled() const { return m_policyDelegateEnabled; }
     bool isPolicyDelegatePermissive() const { return m_policyDelegatePermissive; }
@@ -224,6 +224,12 @@ public:
     void setHasCustomFullScreenBehavior(bool value) { m_customFullScreenBehavior = value; }
     bool hasCustomFullScreenBehavior() const { return m_customFullScreenBehavior; }
 
+    // Web notifications.
+    void grantWebNotificationPermission(JSStringRef origin);
+    void denyWebNotificationPermission(JSStringRef origin);
+    void removeAllWebNotificationPermissions();
+    void simulateWebNotificationClick(JSValueRef notification);
+
     JSRetainPtr<JSStringRef> platformName();
 
     void setPageVisibility(JSStringRef state);
@@ -253,6 +259,7 @@ private:
     bool m_dumpProgressFinishedCallback;
     bool m_dumpResourceLoadCallbacks;
     bool m_dumpResourceResponseMIMETypes;
+    bool m_dumpWillCacheResponse;
     bool m_waitToDump; // True if waitUntilDone() has been called, but notifyDone() has not yet been called.
     bool m_testRepaint;
     bool m_testRepaintSweepHorizontally;

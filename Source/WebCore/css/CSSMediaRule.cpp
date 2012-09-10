@@ -27,8 +27,8 @@
 #include "CSSRuleList.h"
 #include "CSSStyleSheet.h"
 #include "ExceptionCode.h"
-#include "MemoryInstrumentation.h"
 #include "StyleRule.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -177,7 +177,7 @@ void CSSMediaRule::reattach(StyleRuleMedia* rule)
 
 void CSSMediaRule::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
     CSSRule::reportBaseClassMemoryUsage(memoryObjectInfo);
     info.addInstrumentedMember(m_mediaCSSOMWrapper);
     info.addInstrumentedVector(m_childRuleCSSOMWrappers);

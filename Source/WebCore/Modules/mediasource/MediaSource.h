@@ -34,6 +34,7 @@
 #if ENABLE(MEDIA_SOURCE)
 
 #include "ContextDestructionObserver.h"
+#include "GenericEventQueue.h"
 #include "MediaPlayer.h"
 #include "SourceBuffer.h"
 #include "SourceBufferList.h"
@@ -43,29 +44,18 @@ namespace WebCore {
 
 class MediaSource : public RefCounted<MediaSource>, public EventTarget, public ContextDestructionObserver {
 public:
-    static const String& openKeyword()
-    {
-        DEFINE_STATIC_LOCAL(const String, open, ("open"));
-        return open;
-    }
-
-    static const String& closedKeyword()
-    {
-        DEFINE_STATIC_LOCAL(const String, closed, ("closed"));
-        return closed;
-    }
-
-    static const String& endedKeyword()
-    {
-        DEFINE_STATIC_LOCAL(const String, ended, ("ended"));
-        return ended;
-    }
+    static const String& openKeyword();
+    static const String& closedKeyword();
+    static const String& endedKeyword();
 
     static PassRefPtr<MediaSource> create(ScriptExecutionContext*);
     virtual ~MediaSource() { }
 
     SourceBufferList* sourceBuffers();
     SourceBufferList* activeSourceBuffers();
+
+    double duration() const;
+    void setDuration(double, ExceptionCode&);
 
     SourceBuffer* addSourceBuffer(const String& type, ExceptionCode&);
     void removeSourceBuffer(SourceBuffer*, ExceptionCode&);
@@ -76,7 +66,7 @@ public:
     void endOfStream(const String& error, ExceptionCode&);
 
     void setMediaPlayer(MediaPlayer* player) { m_player = player; }
-    
+
     PassRefPtr<TimeRanges> buffered(const String& id, ExceptionCode&) const;
     void append(const String& id, PassRefPtr<Uint8Array> data, ExceptionCode&);
     void abort(const String& id, ExceptionCode&);
@@ -98,6 +88,8 @@ private:
     virtual void refEventTarget() OVERRIDE { ref(); }
     virtual void derefEventTarget() OVERRIDE { deref(); }
 
+    void scheduleEvent(const AtomicString& eventName);
+
     EventTargetData m_eventTargetData;
 
     String m_readyState;
@@ -105,6 +97,7 @@ private:
 
     RefPtr<SourceBufferList> m_sourceBuffers;
     RefPtr<SourceBufferList> m_activeSourceBuffers;
+    OwnPtr<GenericEventQueue> m_asyncEventQueue;
 };
 
 } // namespace WebCore

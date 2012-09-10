@@ -49,9 +49,28 @@ MediaSource::MediaSource(ScriptExecutionContext* context)
     : ContextDestructionObserver(context)
     , m_readyState(closedKeyword())
     , m_player(0)
+    , m_asyncEventQueue(GenericEventQueue::create(this))
 {
-    m_sourceBuffers = SourceBufferList::create(scriptExecutionContext());
-    m_activeSourceBuffers = SourceBufferList::create(scriptExecutionContext());
+    m_sourceBuffers = SourceBufferList::create(scriptExecutionContext(), m_asyncEventQueue.get());
+    m_activeSourceBuffers = SourceBufferList::create(scriptExecutionContext(), m_asyncEventQueue.get());
+}
+
+const String& MediaSource::openKeyword()
+{
+    DEFINE_STATIC_LOCAL(const String, open, (ASCIILiteral("open")));
+    return open;
+}
+
+const String& MediaSource::closedKeyword()
+{
+    DEFINE_STATIC_LOCAL(const String, closed, (ASCIILiteral("closed")));
+    return closed;
+}
+
+const String& MediaSource::endedKeyword()
+{
+    DEFINE_STATIC_LOCAL(const String, ended, (ASCIILiteral("ended")));
+    return ended;
 }
 
 SourceBufferList* MediaSource::sourceBuffers()
@@ -63,6 +82,24 @@ SourceBufferList* MediaSource::activeSourceBuffers()
 {
     // FIXME(91649): support track selection
     return m_activeSourceBuffers.get();
+}
+
+double MediaSource::duration() const
+{
+    return m_readyState == closedKeyword() ? std::numeric_limits<float>::quiet_NaN() : m_player->duration();
+}
+
+void MediaSource::setDuration(double duration, ExceptionCode& ec)
+{
+    if (duration < 0.0 || isnan(duration)) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+    if (m_readyState != openKeyword()) {
+        ec = INVALID_STATE_ERR;
+        return;
+    }
+    m_player->sourceSetDuration(duration);
 }
 
 SourceBuffer* MediaSource::addSourceBuffer(const String& type, ExceptionCode& ec)
@@ -84,7 +121,7 @@ SourceBuffer* MediaSource::addSourceBuffer(const String& type, ExceptionCode& ec
         ec = NOT_SUPPORTED_ERR;
         return 0;
     }
-    
+
     // 4. If the readyState attribute is not in the "open" state then throw an
     // INVALID_STATE_ERR exception and abort these steps.
     if (!m_player || m_readyState != openKeyword()) {
@@ -182,17 +219,17 @@ void MediaSource::setReadyState(const String& state)
         m_sourceBuffers->clear();
         m_activeSourceBuffers->clear();
         m_player = 0;
-        dispatchEvent(Event::create(eventNames().webkitsourcecloseEvent, false, false));
+        scheduleEvent(eventNames().webkitsourcecloseEvent);
         return;
     }
-    
+
     if (oldState == openKeyword() && m_readyState == endedKeyword()) {
-        dispatchEvent(Event::create(eventNames().webkitsourceendedEvent, false, false));
+        scheduleEvent(eventNames().webkitsourceendedEvent);
         return;
     }
 
     if (m_readyState == openKeyword()) {
-        dispatchEvent(Event::create(eventNames().webkitsourceopenEvent, false, false));
+        scheduleEvent(eventNames().webkitsourceopenEvent);
         return;
     }
 }
@@ -299,6 +336,16 @@ EventTargetData* MediaSource::eventTargetData()
 EventTargetData* MediaSource::ensureEventTargetData()
 {
     return &m_eventTargetData;
+}
+
+void MediaSource::scheduleEvent(const AtomicString& eventName)
+{
+    ASSERT(m_asyncEventQueue);
+
+    RefPtr<Event> event = Event::create(eventName, false, false);
+    event->setTarget(this);
+
+    m_asyncEventQueue->enqueueEvent(event.release());
 }
 
 } // namespace WebCore

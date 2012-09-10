@@ -83,10 +83,14 @@ public:
 
     bool hasContentsLayer() const { return m_foregroundLayer != 0; }
     GraphicsLayer* foregroundLayer() const { return m_foregroundLayer.get(); }
+
+    bool hasScrollingLayer() const { return m_scrollingLayer; }
+    GraphicsLayer* scrollingLayer() const { return m_scrollingLayer.get(); }
+    GraphicsLayer* scrollingContentsLayer() const { return m_scrollingContentsLayer.get(); }
     
     bool hasMaskLayer() const { return m_maskLayer != 0; }
 
-    GraphicsLayer* parentForSublayers() const { return m_containmentLayer ? m_containmentLayer.get() : m_graphicsLayer.get(); }
+    GraphicsLayer* parentForSublayers() const;
     GraphicsLayer* childForSuperlayers() const { return m_ancestorClippingLayer ? m_ancestorClippingLayer.get() : m_graphicsLayer.get(); }
 
     // RenderLayers with backing normally short-circuit paintLayer() because
@@ -127,6 +131,7 @@ public:
     void updateCompositedBounds();
     
     void updateAfterWidgetResize();
+    void positionOverflowControlsLayers(const IntSize& offsetFromRoot);
 
     // GraphicsLayerClient interface
     virtual bool shouldUseTileCache(const GraphicsLayer*) const;
@@ -186,6 +191,7 @@ private:
     bool requiresHorizontalScrollbarLayer() const;
     bool requiresVerticalScrollbarLayer() const;
     bool requiresScrollCornerLayer() const;
+    bool updateScrollingLayers(bool scrollingLayers);
 
     GraphicsLayerPaintingPhase paintingPhaseForPrimaryLayer() const;
     
@@ -246,6 +252,9 @@ private:
     OwnPtr<GraphicsLayer> m_layerForHorizontalScrollbar;
     OwnPtr<GraphicsLayer> m_layerForVerticalScrollbar;
     OwnPtr<GraphicsLayer> m_layerForScrollCorner;
+
+    OwnPtr<GraphicsLayer> m_scrollingLayer; // only used if the layer is using composited scrolling.
+    OwnPtr<GraphicsLayer> m_scrollingContentsLayer; // only used if the layer is using composited scrolling.
 
     IntRect m_compositedBounds;
 

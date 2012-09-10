@@ -66,6 +66,9 @@ public:
 
     bool isPrimitiveValue() const { return m_classType == PrimitiveClass; }
     bool isValueList() const { return m_classType >= ValueListClass; }
+    
+    bool isBaseValueList() const { return m_classType == ValueListClass; }
+        
 
     bool isAspectRatioValue() const { return m_classType == AspectRatioClass; }
     bool isBorderImageSliceValue() const { return m_classType == BorderImageSliceClass; }
@@ -92,6 +95,7 @@ public:
 #if ENABLE(CSS_FILTERS)
     bool isWebKitCSSFilterValue() const { return m_classType == WebKitCSSFilterClass; }
 #if ENABLE(CSS_SHADERS)
+    bool isWebKitCSSArrayFunctionValue() const { return m_classType == WebKitCSSArrayFunctionValueClass; }
     bool isWebKitCSSMixFunctionValue() const { return m_classType == WebKitCSSMixFunctionValueClass; }
     bool isWebKitCSSShaderValue() const { return m_classType == WebKitCSSShaderClass; }
 #endif
@@ -180,6 +184,7 @@ protected:
 #if ENABLE(CSS_FILTERS)
         WebKitCSSFilterClass,
 #if ENABLE(CSS_SHADERS)
+        WebKitCSSArrayFunctionValueClass,
         WebKitCSSMixFunctionValueClass,
 #endif
 #endif

@@ -22,14 +22,15 @@
 #include "CSSProperty.h"
 
 #include "CSSValueList.h"
-#include "MemoryInstrumentation.h"
-#include "PlatformString.h"
 #include "RenderStyleConstants.h"
 #include "StylePropertyShorthand.h"
+#include "WebCoreMemoryInstrumentation.h"
 
 #if ENABLE(CSS_VARIABLES)
 #include "CSSVariableValue.h"
 #endif
+
+#include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
@@ -53,7 +54,14 @@ String CSSProperty::cssName() const
 
 String CSSProperty::cssText() const
 {
-    return cssName() + ": " + m_value->cssText() + (isImportant() ? " !important" : "") + "; ";
+    StringBuilder result;
+    result.append(cssName());
+    result.appendLiteral(": ");
+    result.append(m_value->cssText());
+    if (isImportant())
+        result.appendLiteral(" !important");
+    result.append(';');
+    return result.toString();
 }
 
 void CSSProperty::wrapValueInCommaSeparatedList()
@@ -468,6 +476,7 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyOutlineStyle:
     case CSSPropertyOutlineWidth:
     case CSSPropertyOverflow:
+    case CSSPropertyOverflowWrap:
     case CSSPropertyOverflowX:
     case CSSPropertyOverflowY:
     case CSSPropertyPadding:
@@ -552,6 +561,7 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitBoxPack:
     case CSSPropertyWebkitBoxReflect:
     case CSSPropertyWebkitBoxShadow:
+    case CSSPropertyWebkitClipPath:
     case CSSPropertyWebkitColumnAxis:
     case CSSPropertyWebkitColumnBreakAfter:
     case CSSPropertyWebkitColumnBreakBefore:
@@ -572,7 +582,6 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
 #if ENABLE(CSS_COMPOSITING)
     case CSSPropertyWebkitBlendMode:
 #endif
-#if ENABLE(CSS3_FLEXBOX)
     case CSSPropertyWebkitAlignContent:
     case CSSPropertyWebkitAlignItems:
     case CSSPropertyWebkitAlignSelf:
@@ -585,7 +594,6 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitFlexWrap:
     case CSSPropertyWebkitJustifyContent:
     case CSSPropertyWebkitOrder:
-#endif
     case CSSPropertyWebkitFontSizeDelta:
     case CSSPropertyWebkitGridColumns:
     case CSSPropertyWebkitGridRows:
@@ -706,7 +714,7 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
 
 void CSSProperty::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
     info.addInstrumentedMember(m_value);
 }
 

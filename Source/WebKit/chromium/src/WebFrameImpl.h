@@ -36,10 +36,10 @@
 
 #include "Frame.h"
 #include "FrameLoaderClientImpl.h"
-#include "PlatformString.h"
 #include <wtf/Compiler.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/RefCounted.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 class GraphicsContext;
@@ -162,6 +162,7 @@ public:
     virtual void commitDocumentData(const char* data, size_t length);
     virtual unsigned unloadListenerCount() const;
     virtual bool isProcessingUserGesture() const;
+    virtual bool consumeUserGesture() const;
     virtual bool willSuppressOpenerInNewFrame() const;
     virtual void replaceSelection(const WebString&);
     virtual void insertText(const WebString&);
@@ -185,6 +186,9 @@ public:
     virtual bool selectWordAroundCaret();
     virtual void selectRange(const WebPoint& start, const WebPoint& end);
     virtual void selectRange(const WebRange&);
+    virtual bool moveSelectionStart(const WebPoint&, bool allowCollapsedSelection);
+    virtual bool moveSelectionEnd(const WebPoint&, bool allowCollapsedSelection);
+    virtual bool moveCaret(const WebPoint&);
     virtual int printBegin(const WebPrintParams&,
                            const WebNode& constrainToNode,
                            bool* useBrowserOverlays);

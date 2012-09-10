@@ -34,6 +34,24 @@
 #include <wtf/Assertions.h>
 #include <wtf/gobject/GOwnPtr.h>
 #include <wtf/gobject/GRefPtr.h>
+#include <wtf/text/WTFString.h>
+#include <wtf/unicode/CharacterNames.h>
+
+static inline gchar* replaceCharactersForResults(gchar* str)
+{
+    String uString = String::fromUTF8(str);
+
+    // The object replacement character is passed along to ATs so we need to be
+    // able to test for their presence and do so without causing test failures.
+    uString.replace(objectReplacementCharacter, "<obj>");
+
+    // The presence of newline characters in accessible text of a single object
+    // is appropriate, but it makes test results (especially the accessible tree)
+    // harder to read.
+    uString.replace("\n", "<\\n>");
+
+    return g_strdup(uString.utf8().data());
+}
 
 AccessibilityUIElement::AccessibilityUIElement(PlatformUIElement element)
     : m_element(element)
@@ -176,8 +194,27 @@ JSStringRef AccessibilityUIElement::attributesOfDocumentLinks()
 
 AccessibilityUIElement AccessibilityUIElement::titleUIElement()
 {
-    // FIXME: implement
-    return 0;
+
+    if (!m_element)
+        return 0;
+
+    AtkRelationSet* set = atk_object_ref_relation_set(ATK_OBJECT(m_element));
+    if (!set)
+        return 0;
+
+    AtkObject* target = 0;
+    int count = atk_relation_set_get_n_relations(set);
+    for (int i = 0; i < count; i++) {
+        AtkRelation* relation = atk_relation_set_get_relation(set, i);
+        if (atk_relation_get_relation_type(relation) == ATK_RELATION_LABELLED_BY) {
+            GPtrArray* targetList = atk_relation_get_target(relation);
+            if (targetList->len)
+                target = static_cast<AtkObject*>(g_ptr_array_index(targetList, 0));
+        }
+        g_object_unref(set);
+    }
+
+    return target ? AccessibilityUIElement(target) : 0;
 }
 
 AccessibilityUIElement AccessibilityUIElement::parentElement()
@@ -252,8 +289,14 @@ JSStringRef AccessibilityUIElement::description()
 
 JSStringRef AccessibilityUIElement::stringValue()
 {
-    // FIXME: implement
-    return JSStringCreateWithCharacters(0, 0);
+    if (!m_element || !ATK_IS_TEXT(m_element))
+        return JSStringCreateWithCharacters(0, 0);
+
+    gchar* text = atk_text_get_text(ATK_TEXT(m_element), 0, -1);
+    GOwnPtr<gchar> axValue(g_strdup_printf("AXValue: %s", replaceCharactersForResults(text)));
+    g_free(text);
+
+    return JSStringCreateWithUTF8CString(axValue.get());
 }
 
 JSStringRef AccessibilityUIElement::language()

@@ -20,7 +20,7 @@
 #include "AboutData.h"
 
 #include "AboutTemplate.html.cpp"
-#include "CString.h"
+#include "CacheHelper.h"
 #include "CookieManager.h"
 #include "JSDOMWindow.h"
 #include "MemoryCache.h"
@@ -28,7 +28,6 @@
 #include "SurfacePool.h"
 #include "WebKitVersion.h"
 
-#include <BlackBerryPlatformClient.h>
 #include <BlackBerryPlatformLog.h>
 #include <BlackBerryPlatformMemory.h>
 #include <BlackBerryPlatformSettings.h>
@@ -39,6 +38,7 @@
 #include <runtime/JSGlobalData.h>
 #include <sys/stat.h>
 #include <sys/utsname.h>
+#include <wtf/text/CString.h>
 
 using namespace WebCore;
 
@@ -142,7 +142,6 @@ static String configPage()
     page += numberToHTMLTr("allowCenterScrollAdjustmentForInputFields", settings->allowCenterScrollAdjustmentForInputFields());
     page += numberToHTMLTr("unrestrictedResizeEvents", settings->unrestrictedResizeEvents());
     page += numberToHTMLTr("isBridgeBrowser", settings->isBridgeBrowser());
-    page += numberToHTMLTr("isWebGLSupported", settings->isWebGLSupported());
     page += numberToHTMLTr("showImageLocationOptionsInGCM", settings->showImageLocationOptionsInGCM());
     page += numberToHTMLTr("forceGLES2WindowUsage", settings->forceGLES2WindowUsage());
     page += numberToHTMLTr("maxClickableSpeed", settings->maxClickableSpeed());
@@ -458,27 +457,14 @@ static String cachePage(String cacheCommand)
 
     result.append(String("<html><head><title>BlackBerry Browser Disk Cache</title></head><body>"));
 
-    BlackBerry::Platform::Client* client = BlackBerry::Platform::Client::get();
-    ASSERT(client);
-
     if (cacheCommand.isEmpty())
-        result.append(String(client->generateHtmlFragmentForCacheKeys().data()));
+        result.append(String(BlackBerry::Platform::generateHtmlFragmentForCacheKeys().data()));
     else if (cacheCommand.startsWith("?query=", false)) {
         std::string key(cacheCommand.substring(7).utf8().data()); // 7 is length of "query=".
         result.append(String(key.data()));
         result.append(String("<hr>"));
-        result.append(String(client->generateHtmlFragmentForCacheHeaders(key).data()));
-    }
-#if !defined(PUBLIC_BUILD) || !PUBLIC_BUILD
-    else if (equalIgnoringCase(cacheCommand, "/disable")) {
-        client->setDiskCacheEnabled(false);
-        result.append("Http disk cache is disabled.");
-    } else if (equalIgnoringCase(cacheCommand, "/enable")) {
-        client->setDiskCacheEnabled(true);
-        result.append("Http disk cache is enabled.");
-    }
-#endif
-    else {
+        result.append(String(BlackBerry::Platform::generateHtmlFragmentForCacheHeaders(key).data()));
+    } else {
         // Unknown cache command.
         return String();
     }
@@ -506,6 +492,7 @@ static String buildPage()
     result.append(String(BlackBerry::Platform::BUILDINFO_WEBKIT));
     result.append(String(BlackBerry::Platform::BUILDINFO_PLATFORM));
     result.append(String(BlackBerry::Platform::BUILDINFO_LIBWEBVIEW));
+    result.append(String(BlackBerry::Platform::BUILDINFO_WEBPLATFORM));
     result.append(String("</body></html>"));
 
     return result;

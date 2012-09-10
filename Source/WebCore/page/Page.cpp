@@ -392,6 +392,7 @@ void Page::setGroupName(const String& name)
 const String& Page::groupName() const
 {
     DEFINE_STATIC_LOCAL(String, nullString, ());
+    // FIXME: Why not just return String()?
     return m_group ? m_group->name() : nullString;
 }
 
@@ -836,7 +837,7 @@ const String& Page::userStyleSheet() const
 
     RefPtr<TextResourceDecoder> decoder = TextResourceDecoder::create("text/css");
     m_userStyleSheet = decoder->decode(data->data(), data->size());
-    m_userStyleSheet += decoder->flush();
+    m_userStyleSheet.append(decoder->flush());
 
     return m_userStyleSheet;
 }

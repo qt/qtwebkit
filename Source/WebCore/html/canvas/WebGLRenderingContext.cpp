@@ -602,6 +602,9 @@ void WebGLRenderingContext::markContextChanged()
 
     m_context->markContextChanged();
 
+    if (m_drawingBuffer)
+        m_drawingBuffer->markContentsChanged();
+
     m_layerCleared = false;
 #if USE(ACCELERATED_COMPOSITING)
     RenderBox* renderBox = canvas()->renderBox();
@@ -5559,7 +5562,20 @@ void WebGLRenderingContext::maybeRestoreContext(Timer<WebGLRenderingContext>*)
         break;
     }
 
-    RefPtr<GraphicsContext3D> context(GraphicsContext3D::create(m_attributes, canvas()->document()->view()->root()->hostWindow()));
+    Document* document = canvas()->document();
+    if (!document)
+        return;
+    FrameView* view = document->view();
+    if (!view)
+        return;
+    ScrollView* root = view->root();
+    if (!root)
+        return;
+    HostWindow* hostWindow = root->hostWindow();
+    if (!hostWindow)
+        return;
+
+    RefPtr<GraphicsContext3D> context(GraphicsContext3D::create(m_attributes, hostWindow));
     if (!context) {
         if (m_contextLostMode == RealLostContext)
             m_restoreTimer.startOneShot(secondsBetweenRestoreAttempts);

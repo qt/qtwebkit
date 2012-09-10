@@ -27,6 +27,7 @@
 #if ENABLE(SVG)
 #include "SVGRenderingContext.h"
 
+#include "BasicShapes.h"
 #include "Frame.h"
 #include "FrameView.h"
 #include "RenderSVGResource.h"
@@ -122,6 +123,15 @@ void SVGRenderingContext::prepareToRenderSVGContent(RenderObject* object, PaintI
         }
     }
 
+    BasicShape* clipShape = style->clipPath();
+    if (clipShape) {
+        // FIXME: Investigate if it is better to store and update a Path object in RenderStyle.
+        // https://bugs.webkit.org/show_bug.cgi?id=95619
+        Path clipPath;
+        clipShape->path(clipPath, object->objectBoundingBox());
+        m_paintInfo->context->clipPath(clipPath, clipShape->windRule());
+    }
+
     SVGResources* resources = SVGResourcesCache::cachedResourcesForRenderObject(m_object);
     if (!resources) {
 #if ENABLE(FILTERS)
@@ -139,7 +149,8 @@ void SVGRenderingContext::prepareToRenderSVGContent(RenderObject* object, PaintI
         }
     }
 
-    if (RenderSVGResourceClipper* clipper = resources->clipper()) {
+    RenderSVGResourceClipper* clipper = resources->clipper();
+    if (!clipShape && clipper) {
         if (!clipper->applyResource(m_object, style, m_paintInfo->context, ApplyToDefaultMode))
             return;
     }
@@ -205,14 +216,10 @@ bool SVGRenderingContext::createImageBuffer(const FloatRect& targetRect, const A
     GraphicsContext* imageContext = image->context();
     ASSERT(imageContext);
 
-    // This is done in absolute coordinates.
-    imageContext->translate(-paintRect.x(), -paintRect.y());
-
-    imageContext->concatCTM(absoluteTransform);
-
-    // This happens in local coordinates.
     imageContext->scale(FloatSize(static_cast<float>(clampedSize.width()) / paintRect.width(),
                                   static_cast<float>(clampedSize.height()) / paintRect.height()));
+    imageContext->translate(-paintRect.x(), -paintRect.y());
+    imageContext->concatCTM(absoluteTransform);
 
     imageBuffer = image.release();
     return true;

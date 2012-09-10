@@ -220,7 +220,7 @@ static inline String resourceString(const v8::Handle<v8::Function> function)
     StringBuilder builder;
     builder.append(resourceName);
     builder.append(':');
-    builder.append(String::number(lineNumber));
+    builder.appendNumber(lineNumber);
     return builder.toString();
 }
 
@@ -334,7 +334,7 @@ void ScriptController::evaluateInIsolatedWorld(unsigned worldID, const Vector<Sc
     v8::HandleScope handleScope;
 
     // FIXME: This will need to get reorganized once we have a windowShell for the isolated world.
-    if (!windowShell()->initContextIfNeeded())
+    if (!windowShell()->initializeIfNeeded())
         return;
 
     v8::Local<v8::Array> v8Results;
@@ -346,7 +346,7 @@ void ScriptController::evaluateInIsolatedWorld(unsigned worldID, const Vector<Sc
             if (iter != m_isolatedWorlds.end())
                 isolatedContext = iter->second;
             else {
-                isolatedContext = new V8IsolatedContext(m_frame, extensionGroup, worldID);
+                isolatedContext = new V8IsolatedContext(m_frame, DOMWrapperWorld::getOrCreateIsolatedWorld(worldID, extensionGroup));
                 if (isolatedContext->context().IsEmpty()) {
                     delete isolatedContext;
                     return;
@@ -360,7 +360,7 @@ void ScriptController::evaluateInIsolatedWorld(unsigned worldID, const Vector<Sc
             if (securityOriginIter != m_isolatedWorldSecurityOrigins.end())
                 isolatedContext->setSecurityOrigin(securityOriginIter->second);
         } else {
-            isolatedContext = new V8IsolatedContext(m_frame, extensionGroup, worldID);
+            isolatedContext = new V8IsolatedContext(m_frame, DOMWrapperWorld::getOrCreateIsolatedWorld(worldID, extensionGroup));
             if (isolatedContext->context().IsEmpty()) {
                 delete isolatedContext;
                 return;
@@ -419,12 +419,13 @@ v8::Local<v8::Context> ScriptController::currentWorldContext()
             return v8::Local<v8::Context>();
         return v8::Local<v8::Context>::New(context->get());
     }
-    return mainWorldContext();
+    windowShell()->initializeIfNeeded();
+    return v8::Local<v8::Context>::New(windowShell()->context());
 }
 
 v8::Local<v8::Context> ScriptController::mainWorldContext()
 {
-    windowShell()->initContextIfNeeded();
+    windowShell()->initializeIfNeeded();
     return v8::Local<v8::Context>::New(windowShell()->context());
 }
 
@@ -434,24 +435,6 @@ v8::Local<v8::Context> ScriptController::mainWorldContext(Frame* frame)
         return v8::Local<v8::Context>();
 
     return frame->script()->mainWorldContext();
-}
-
-bool ScriptController::matchesCurrentContext()
-{
-    // This method is equivalent to 'return v8::Context::GetCurrent() == contextForCurrentWorld()',
-    // but is written without using contextForCurrentWorld().
-    // Given that this method is used by a hot call path of DOM object constructor,
-    // we want to avoid the overhead of contextForCurrentWorld() creating Local<Context> every time.
-    v8::Handle<v8::Context> context;
-    if (V8IsolatedContext* isolatedContext = V8IsolatedContext::getEntered()) {
-        context = isolatedContext->sharedContext()->get();
-        if (m_frame != toFrameIfNotDetached(context))
-            return false;
-    } else {
-        windowShell()->initContextIfNeeded();
-        context = windowShell()->context();
-    }
-    return context == v8::Context::GetCurrent();
 }
 
 // Create a V8 object with an interceptor of NPObjectPropertyGetter.

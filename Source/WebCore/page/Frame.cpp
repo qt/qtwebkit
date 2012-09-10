@@ -303,11 +303,10 @@ void Frame::setDocument(PassRefPtr<Document> newDoc)
     if (m_doc && !m_doc->attached())
         m_doc->attach();
 
-    // Update the cached 'document' property, which is now stale.
-    m_script.updateDocument();
-
-    if (m_doc)
+    if (m_doc) {
+        m_script.updateDocument();
         m_doc->updateViewportArguments();
+    }
 
     if (m_page && m_page->mainFrame() == this) {
         notifyChromeClientWheelEventHandlerCountChanged();
@@ -675,7 +674,7 @@ void Frame::dispatchVisibilityStateChangeEvent()
 
 void Frame::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::DOM);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
     info.addInstrumentedMember(m_doc.get());
     info.addInstrumentedMember(m_loader);
 }
@@ -725,7 +724,7 @@ String Frame::displayStringModifiedByEncoding(const String& str) const
 
 VisiblePosition Frame::visiblePositionForPoint(const IntPoint& framePoint)
 {
-    HitTestResult result = eventHandler()->hitTestResultAtPoint(framePoint, true);
+    HitTestResult result = eventHandler()->hitTestResultAtPoint(framePoint, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::AllowShadowContent);
     Node* node = result.innerNonSharedNode();
     if (!node)
         return VisiblePosition();
@@ -747,7 +746,7 @@ Document* Frame::documentAtPoint(const IntPoint& point)
     HitTestResult result = HitTestResult(pt);
 
     if (contentRenderer())
-        result = eventHandler()->hitTestResultAtPoint(pt, false);
+        result = eventHandler()->hitTestResultAtPoint(pt);
     return result.innerNode() ? result.innerNode()->document() : 0;
 }
 
@@ -851,7 +850,7 @@ void Frame::tiledBackingStorePaintEnd(const Vector<IntRect>& paintedArea)
         return;
     unsigned size = paintedArea.size();
     // Request repaint from the system
-    for (int n = 0; n < size; ++n)
+    for (unsigned n = 0; n < size; ++n)
         m_page->chrome()->invalidateContentsAndRootView(m_view->contentsToRootView(paintedArea[n]), false);
 }
 

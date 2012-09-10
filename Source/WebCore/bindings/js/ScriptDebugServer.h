@@ -33,17 +33,15 @@
 #if ENABLE(JAVASCRIPT_DEBUGGER)
 
 #include "ScriptDebugListener.h"
-#include "PlatformString.h"
 #include "ScriptBreakpoint.h"
 #include "Timer.h"
-
 #include <debugger/Debugger.h>
-#include <runtime/UString.h>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
 #include <wtf/text/TextPosition.h>
+#include <wtf/text/WTFString.h>
 
 namespace JSC {
 class DebuggerCallFrame;
@@ -129,7 +127,7 @@ protected:
 
     virtual void detach(JSC::JSGlobalObject*);
 
-    virtual void sourceParsed(JSC::ExecState*, JSC::SourceProvider*, int errorLine, const JSC::UString& errorMsg);
+    virtual void sourceParsed(JSC::ExecState*, JSC::SourceProvider*, int errorLine, const String& errorMsg);
     virtual void callEvent(const JSC::DebuggerCallFrame&, intptr_t sourceID, int lineNumber, int columnNumber);
     virtual void atStatement(const JSC::DebuggerCallFrame&, intptr_t sourceID, int firstLine, int columnNumber);
     virtual void returnEvent(const JSC::DebuggerCallFrame&, intptr_t sourceID, int lineNumber, int columnNumber);

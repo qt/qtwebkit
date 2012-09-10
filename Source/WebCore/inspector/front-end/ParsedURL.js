@@ -96,16 +96,17 @@ WebInspector.ParsedURL = function(url)
 WebInspector.ParsedURL.completeURL = function(baseURL, href)
 {
     if (href) {
-        // Return absolute URLs as-is.
-        var parsedHref = href.asParsedURL();
-        if (parsedHref && parsedHref.scheme)
-            return href;
-
         // Return special URLs as-is.
         var trimmedHref = href.trim();
-        if (trimmedHref.startsWith("data:") || trimmedHref.startsWith("javascript:") || trimmedHref.startsWith("blob:"))
+        if (trimmedHref.startsWith("data:") || trimmedHref.startsWith("blob:") || trimmedHref.startsWith("javascript:"))
             return href;
-    }
+
+        // Return absolute URLs as-is.
+        var parsedHref = trimmedHref.asParsedURL();
+        if (parsedHref && parsedHref.scheme)
+            return trimmedHref;
+    } else
+        return baseURL;
 
     var parsedURL = baseURL.asParsedURL();
     if (parsedURL) {
@@ -155,7 +156,7 @@ WebInspector.ParsedURL.prototype = {
 
         this._displayName = this.lastPathComponent;
         if (!this._displayName)
-            this._displayName = WebInspector.displayDomain(this.host);
+            this._displayName = this.host;
         if (!this._displayName && this.url)
             this._displayName = this.url.trimURL(WebInspector.inspectedPageDomain ? WebInspector.inspectedPageDomain : "");
         if (this._displayName === "/")

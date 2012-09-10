@@ -44,19 +44,22 @@ public:
         DispatchEvent,
     };
 
-    // FieldEventHandler implementer must call removeEventHandler when
+    // FieldOwner implementer must call removeEventHandler when
     // it doesn't handle event, e.g. at destruction.
-    class FieldEventHandler {
+    class FieldOwner {
     public:
-        virtual ~FieldEventHandler();
+        virtual ~FieldOwner();
+        virtual void didBlurFromField() = 0;
+        virtual void didFocusOnField() = 0;
         virtual void fieldValueChanged() = 0;
-        virtual void focusOnNextField() = 0;
+        virtual bool focusOnNextField(const DateTimeFieldElement&) = 0;
+        virtual bool focusOnPreviousField(const DateTimeFieldElement&) = 0;
     };
 
     virtual void defaultEventHandler(Event*) OVERRIDE;
     virtual bool hasValue() const = 0;
     bool isReadOnly() const;
-    void removeEventHandler() { m_fieldEventHandler = 0; }
+    void removeEventHandler() { m_fieldOwner = 0; }
     void setReadOnly();
     virtual void setEmptyValue(const DateComponents& dateForReadOnlyField, EventBehavior = DispatchNoEvent) = 0;
     virtual void setValueAsDate(const DateComponents&) = 0;
@@ -69,7 +72,9 @@ public:
     virtual String visibleValue() const = 0;
 
 protected:
-    DateTimeFieldElement(Document*, FieldEventHandler&);
+    DateTimeFieldElement(Document*, FieldOwner&);
+    virtual void didBlur();
+    virtual void didFocus();
     void focusOnNextField();
     virtual void handleKeyboardEvent(KeyboardEvent*) = 0;
     void initialize(const AtomicString&);
@@ -78,8 +83,11 @@ protected:
 
 private:
     void defaultKeyboardEventHandler(KeyboardEvent*);
+    virtual bool isFocusable() const OVERRIDE FINAL;
+    bool isRTL() const;
+    virtual bool supportsFocus() const OVERRIDE FINAL;
 
-    FieldEventHandler* m_fieldEventHandler;
+    FieldOwner* m_fieldOwner;
 };
 
 } // namespace WebCore

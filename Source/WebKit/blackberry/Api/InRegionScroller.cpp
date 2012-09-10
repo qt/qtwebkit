@@ -44,7 +44,6 @@ namespace WebKit {
 static bool canScrollInnerFrame(Frame*);
 static bool canScrollRenderBox(RenderBox*);
 static RenderLayer* parentLayer(RenderLayer*);
-static Node* enclosingLayerNode(RenderLayer*);
 static bool isNonRenderViewFixedPositionedContainer(RenderLayer*);
 
 InRegionScroller::InRegionScroller(WebPagePrivate* webPagePrivate)
@@ -76,36 +75,35 @@ bool InRegionScroller::setScrollPositionWebKitThread(unsigned camouflagedLayer, 
 
 InRegionScrollerPrivate::InRegionScrollerPrivate(WebPagePrivate* webPagePrivate)
     : m_webPage(webPagePrivate)
+    , m_needsActiveScrollableAreaCalculation(false)
 {
-}
-
-void InRegionScrollerPrivate::setNode(WebCore::Node* node)
-{
-    m_inRegionScrollStartingNode = node;
-}
-
-WebCore::Node* InRegionScrollerPrivate::node() const
-{
-    return m_inRegionScrollStartingNode.get();
 }
 
 void InRegionScrollerPrivate::reset()
 {
-    setNode(0);
-
+    m_needsActiveScrollableAreaCalculation = false;
     for (size_t i = 0; i < m_activeInRegionScrollableAreas.size(); ++i)
         delete m_activeInRegionScrollableAreas[i];
     m_activeInRegionScrollableAreas.clear();
 }
 
-bool InRegionScrollerPrivate::hasNode() const
+bool InRegionScrollerPrivate::isActive() const
 {
-    return !!m_inRegionScrollStartingNode;
+    return m_activeInRegionScrollableAreas.size() > 0;
 }
 
-bool InRegionScrollerPrivate::canScroll() const
+void InRegionScrollerPrivate::clearDocumentData(const Document* documentGoingAway)
 {
-    return hasNode();
+    if (m_needsActiveScrollableAreaCalculation) {
+        reset();
+        return;
+    }
+
+    InRegionScrollableArea* scrollableArea = static_cast<InRegionScrollableArea*>(m_activeInRegionScrollableAreas[0]);
+    ASSERT(scrollableArea);
+    Node* node = scrollableArea->layer()->enclosingElement();
+    if (node && node->document() == documentGoingAway)
+        reset();
 }
 
 bool InRegionScrollerPrivate::setScrollPositionCompositingThread(unsigned camouflagedLayer, const WebCore::IntPoint& scrollPosition)
@@ -113,7 +111,23 @@ bool InRegionScrollerPrivate::setScrollPositionCompositingThread(unsigned camouf
     LayerCompositingThread* scrollLayer = reinterpret_cast<LayerWebKitThread*>(camouflagedLayer)->layerCompositingThread();
 
     // FIXME: Clamp maximum and minimum scroll positions as a last attempt to fix round errors.
-    scrollLayer->override()->setBoundsOrigin(scrollPosition);
+    FloatPoint anchor;
+    if (scrollLayer->override()->isAnchorPointSet())
+        anchor = scrollLayer->override()->anchorPoint();
+    else
+        anchor = scrollLayer->anchorPoint();
+
+    FloatSize bounds;
+    if (scrollLayer->override()->isBoundsSet())
+        bounds = scrollLayer->override()->bounds();
+    else
+        bounds = scrollLayer->bounds();
+
+    // Position is offset on the layer by the layer anchor point.
+    FloatPoint layerPosition(-scrollPosition.x() + anchor.x() * bounds.width(),
+                             -scrollPosition.y() + anchor.y() * bounds.height());
+
+    scrollLayer->override()->setPosition(FloatPoint(layerPosition.x(), layerPosition.y()));
 
     // The client is going to blitVisibleContens, which allow us benefit from "defer blits" technique.
     return true;
@@ -143,13 +157,42 @@ bool InRegionScrollerPrivate::setScrollPositionWebKitThread(unsigned camouflaged
     if (!layer)
         return false;
 
+    calculateActiveAndShrinkCachedScrollableAreas(layer);
+
     // FIXME: Clamp maximum and minimum scroll positions as a last attempt to fix round errors.
     return setLayerScrollPosition(layer, scrollPosition);
+}
+
+void InRegionScrollerPrivate::calculateActiveAndShrinkCachedScrollableAreas(RenderLayer* layer)
+{
+    if (!m_needsActiveScrollableAreaCalculation)
+        return;
+
+    ASSERT(layer);
+    std::vector<Platform::ScrollViewBase*>::iterator end = m_activeInRegionScrollableAreas.end();
+    std::vector<Platform::ScrollViewBase*>::iterator it = m_activeInRegionScrollableAreas.begin();
+    while (it != end) {
+        InRegionScrollableArea* curr = static_cast<InRegionScrollableArea*>(*it);
+
+        if (layer == curr->layer()) {
+            ++it;
+            continue;
+        }
+
+        delete *it;
+        it = m_activeInRegionScrollableAreas.erase(it);
+        // ::erase invalidates the iterators.
+        end = m_activeInRegionScrollableAreas.end();
+    }
+
+    ASSERT(m_activeInRegionScrollableAreas.size() == 1);
+    m_needsActiveScrollableAreaCalculation = false;
 }
 
 void InRegionScrollerPrivate::calculateInRegionScrollableAreasForPoint(const WebCore::IntPoint& point)
 {
     ASSERT(m_activeInRegionScrollableAreas.empty());
+    m_needsActiveScrollableAreaCalculation = false;
 
     HitTestResult result = m_webPage->m_mainFrame->eventHandler()->hitTestResultAtPoint(m_webPage->mapFromViewportToContents(point), false /*allowShadowContent*/);
     Node* node = result.innerNonSharedNode();
@@ -189,6 +232,8 @@ void InRegionScrollerPrivate::calculateInRegionScrollableAreasForPoint(const Web
 
     if (m_activeInRegionScrollableAreas.empty())
         return;
+
+    m_needsActiveScrollableAreaCalculation = true;
 
     // Post-calculate the visible window rects in reverse hit test order so
     // we account for all and any clipping rects.
@@ -260,13 +305,11 @@ bool InRegionScrollerPrivate::setLayerScrollPosition(RenderLayer* layer, const I
             backingStoreClient->setIsScrollNotificationSuppressed(false);
         }
 
-        return true;
-    }
+    } else {
 
-    // RenderBox-based elements case (scrollable boxes (div's, p's, textarea's, etc)).
-    layer->scrollToOffset(scrollPosition.x(), scrollPosition.y());
-    // FIXME_agomes: Please recheck if it is needed still!
-    layer->renderer()->repaint(true);
+        // RenderBox-based elements case (scrollable boxes (div's, p's, textarea's, etc)).
+        layer->scrollToOffset(toSize(scrollPosition));
+    }
 
     m_webPage->m_selectionHandler->selectionPositionChanged();
     // FIXME: We have code in place to handle scrolling and clipping tap highlight
@@ -343,17 +386,6 @@ static RenderLayer* parentLayer(RenderLayer* layer)
     return 0;
 }
 
-// FIXME: Make RenderLayer::enclosingElement public so this one can be removed.
-static Node* enclosingLayerNode(RenderLayer* layer)
-{
-    for (RenderObject* r = layer->renderer(); r; r = r->parent()) {
-        if (Node* e = r->node())
-            return e;
-    }
-    ASSERT_NOT_REACHED();
-    return 0;
-}
-
 static bool isNonRenderViewFixedPositionedContainer(RenderLayer* layer)
 {
     RenderObject* o = layer->renderer();
@@ -369,10 +401,6 @@ void InRegionScrollerPrivate::pushBackInRegionScrollable(InRegionScrollableArea*
 
     scrollableArea->setCanPropagateScrollingToEnclosingScrollable(!isNonRenderViewFixedPositionedContainer(scrollableArea->layer()));
     m_activeInRegionScrollableAreas.push_back(scrollableArea);
-    if (m_activeInRegionScrollableAreas.size() == 1) {
-        // FIXME: Use RenderLayer::renderBox()->node() instead?
-        setNode(enclosingLayerNode(scrollableArea->layer()));
-    }
 }
 
 }

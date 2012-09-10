@@ -1,3 +1,69 @@
+2012-09-06  Crystal Zhang  <haizhang@rim.com>
+
+        [BlackBerry]  Implement a color picker
+        https://bugs.webkit.org/show_bug.cgi?id=96001
+
+        Reviewed by Rob Buis.
+
+        Add color picker files into building system.
+
+        * PlatformBlackBerry.cmake:
+
+2012-09-06  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Fix build with ANGLE on platforms that provide EGL/GLESv2
+        https://bugs.webkit.org/show_bug.cgi?id=95965
+
+        Reviewed by Tor Arne Vestbø.
+
+        Depend on ANGLE if necessary, due to the use WebCore types that pull in ANGLE
+        headers (GraphicsContext3D.h in particular).
+
+        * WebKit1.pro:
+
+2012-09-04  Michał Pakuła vel Rutka  <m.pakula@samsung.com>
+
+        [EFL] Context menu restore.
+        https://bugs.webkit.org/show_bug.cgi?id=74179
+
+        Reviewed by Gyuyoung Kim.
+
+        Adds context menu support for EFL port using non-CROSS_PLATFORM_CONTEXT_MENUS
+        approach, the same as used in WebKit2.
+
+        * PlatformEfl.cmake: Added ContextMenuClientEfl.cpp file to sources list.
+
+2012-08-29  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Move several files to remove webkit1 dependency from WebCore.
+        https://bugs.webkit.org/show_bug.cgi?id=95264
+
+        Reviewed by Gyuyoung Kim.
+
+        * PlatformEfl.cmake: Added files which is moved.
+
+2012-08-28  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [EFL] Rename knob images to thumb on the default theme
+        https://bugs.webkit.org/show_bug.cgi?id=95186
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Updated buildsystem after renaming theme images.
+
+        * PlatformEfl.cmake:
+
+2012-08-27  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        Rename RegisterProtocolHandler API to NavigatorContentUtils
+        https://bugs.webkit.org/show_bug.cgi?id=94920
+
+        Reviewed by Adam Barth.
+
+        Modified PlatformEfl.cmake so that it includes the renamed files.
+
+        * PlatformEfl.cmake:
+
 2012-08-20  Dominik Röttsches  <dominik.rottsches@intel.com>
 
         [EFL] Get rid of pango backend support once harfbuzz-ng is working

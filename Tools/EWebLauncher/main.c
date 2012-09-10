@@ -31,6 +31,7 @@
 #include "EWebKit.h"
 
 #include "url_bar.h"
+#include "url_utils.h"
 #include <Ecore.h>
 #include <Ecore_Evas.h>
 #include <Ecore_File.h>
@@ -155,6 +156,21 @@ static void browserDestroy(Ecore_Evas *ee);
 static void closeWindow(Ecore_Evas *ee);
 static int browserCreate(const char *url, const char *theme, const char *userAgent, Eina_Rectangle geometry, const char *engine, const char *backingStore, unsigned char isFlattening, unsigned char isFullscreen, const char *databasePath);
 
+static ELauncher *
+find_app_from_ee(Ecore_Evas *ee)
+{
+    Eina_List *l;
+    void *data;
+
+    EINA_LIST_FOREACH(windows, l, data)
+    {
+        ELauncher *app = (ELauncher *) data;
+        if (app->ee == ee)
+            return app;
+    }
+    return NULL;
+}
+
 static void
 print_history(Eina_List *list)
 {
@@ -215,19 +231,24 @@ zoom_level_set(Evas_Object *webview, int level)
 static void
 on_ecore_evas_resize(Ecore_Evas *ee)
 {
+    ELauncher *app;
     Evas_Object *webview;
     Evas_Object *bg;
     int w, h;
 
     ecore_evas_geometry_get(ee, NULL, NULL, &w, &h);
 
+    /* Resize URL bar */
+    app = find_app_from_ee(ee);
+    url_bar_width_set(app->url_bar, w);
+
     bg = evas_object_name_find(ecore_evas_get(ee), "bg");
     evas_object_move(bg, 0, 0);
     evas_object_resize(bg, w, h);
 
     webview = evas_object_name_find(ecore_evas_get(ee), "browser");
-    evas_object_move(webview, 10, 10);
-    evas_object_resize(webview, w - 20, h - 20);
+    evas_object_move(webview, 0, URL_BAR_HEIGHT);
+    evas_object_resize(webview, w, h - URL_BAR_HEIGHT);
 }
 
 static void
@@ -413,8 +434,11 @@ on_url_changed(void* user_data, Evas_Object* webview, void* event_info)
 static void
 on_mouse_down(void* data, Evas* e, Evas_Object* webview, void* event_info)
 {
-    Evas_Event_Mouse_Down *ev = (Evas_Event_Mouse_Down*) event_info;
-    if (ev->button == 2)
+    Evas_Event_Mouse_Down *ev = (Evas_Event_Mouse_Down *)event_info;
+
+    if (ev->button == 1)
+        evas_object_focus_set(webview, EINA_TRUE);
+    else if (ev->button == 2)
         evas_object_focus_set(webview, !evas_object_focus_get(webview));
 }
 
@@ -743,15 +767,11 @@ browserDestroy(Ecore_Evas *ee)
 static void
 closeWindow(Ecore_Evas *ee)
 {
-    Eina_List *l;
-    void *app;
-    EINA_LIST_FOREACH(windows, l, app)
-    {
-        if (((ELauncher*) app)->ee == ee)
-            break;
-    }
+    ELauncher *app;
+
+    app = find_app_from_ee(ee);
     windows = eina_list_remove(windows, app);
-    url_bar_del(((ELauncher *)app)->url_bar);
+    url_bar_del(app->url_bar);
     browserDestroy(ee);
     free(app);
 }
@@ -795,7 +815,6 @@ main(int argc, char *argv[])
     const char *default_url = "http://www.google.com/";
 
     Eina_Rectangle geometry = {0, 0, 0, 0};
-    char *url = NULL;
     char *userAgent = NULL;
     const char *tmp;
     const char *proxyUri;
@@ -850,11 +869,6 @@ main(int argc, char *argv[])
     if (quitOption)
         return quit(EINA_TRUE, NULL);
 
-    if (args < argc)
-        url = argv[args];
-    else
-        url = (char*) default_url;
-
     themePath = findThemePath(theme);
     if (!themePath)
         return quit(EINA_FALSE, "ERROR: could not find theme.\n");
@@ -874,7 +888,13 @@ main(int argc, char *argv[])
     if (proxyUri)
         ewk_network_proxy_uri_set(proxyUri);
 
-    browserCreate(url, themePath, userAgent, geometry, engine, backingStore, isFlattening, isFullscreen, path);
+    if (args < argc) {
+        char *url = url_from_user_input(argv[args]);
+        browserCreate(url, themePath, userAgent, geometry, engine, backingStore, isFlattening, isFullscreen, path);
+        free(url);
+    } else
+        browserCreate(default_url, themePath, userAgent, geometry, engine, backingStore, isFlattening, isFullscreen, path);
+
     ecore_event_handler_add(ECORE_EVENT_SIGNAL_EXIT, main_signal_exit, &windows);
 
     ecore_main_loop_begin();

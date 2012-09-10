@@ -736,6 +736,21 @@ WebInspector.DOMNode.prototype = {
     descendantUserPropertyCount: function(name)
     {
         return this._descendantUserPropertyCounters && this._descendantUserPropertyCounters[name] ? this._descendantUserPropertyCounters[name] : 0;
+    },
+
+    /**
+     * @param {string} url
+     * @return {?string}
+     */
+    resolveURL: function(url)
+    {
+        if (!url)
+            return url;
+        for (var frameOwnerCandidate = this; frameOwnerCandidate; frameOwnerCandidate = frameOwnerCandidate.parentNode) {
+            if (frameOwnerCandidate.documentURL)
+                return WebInspector.ParsedURL.completeURL(frameOwnerCandidate.documentURL, url);
+        }
+        return null;
     }
 }
 

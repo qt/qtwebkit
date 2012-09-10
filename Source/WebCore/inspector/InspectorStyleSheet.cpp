@@ -325,7 +325,7 @@ PassRefPtr<TypeBuilder::Array<TypeBuilder::CSS::CSSComputedStyleProperty> > Insp
 bool InspectorStyle::setPropertyText(unsigned index, const String& propertyText, bool overwrite, String* oldText, ExceptionCode& ec)
 {
     ASSERT(m_parentStyleSheet);
-    DEFINE_STATIC_LOCAL(String, bogusPropertyName, ("-webkit-boguz-propertee"));
+    DEFINE_STATIC_LOCAL(String, bogusPropertyName, (ASCIILiteral("-webkit-boguz-propertee")));
 
     if (!m_parentStyleSheet->ensureParsedDataReady()) {
         ec = NOT_FOUND_ERR;
@@ -635,7 +635,7 @@ Vector<String> InspectorStyle::longhandProperties(const String& shorthandPropert
 
 NewLineAndWhitespace& InspectorStyle::newLineAndWhitespaceDelimiters() const
 {
-    DEFINE_STATIC_LOCAL(String, defaultPrefix, ("    "));
+    DEFINE_STATIC_LOCAL(String, defaultPrefix, (ASCIILiteral("    ")));
 
     if (m_formatAcquired)
         return m_format;
@@ -737,12 +737,18 @@ String InspectorStyleSheet::finalURL() const
 
 void InspectorStyleSheet::reparseStyleSheet(const String& text)
 {
-    CSSStyleSheet::RuleMutationScope mutationScope(m_pageStyleSheet.get());
-    m_pageStyleSheet->contents()->clearRules();
-    m_pageStyleSheet->contents()->parseString(text);
-    m_pageStyleSheet->clearChildRuleCSSOMWrappers();
-    m_inspectorStyles.clear();
-    fireStyleSheetChanged();
+    {
+        // Have a separate scope for clearRules() (bug 95324).
+        CSSStyleSheet::RuleMutationScope mutationScope(m_pageStyleSheet.get());
+        m_pageStyleSheet->contents()->clearRules();
+    }
+    {
+        CSSStyleSheet::RuleMutationScope mutationScope(m_pageStyleSheet.get());
+        m_pageStyleSheet->contents()->parseString(text);
+        m_pageStyleSheet->clearChildRuleCSSOMWrappers();
+        m_inspectorStyles.clear();
+        fireStyleSheetChanged();
+    }
 }
 
 bool InspectorStyleSheet::setText(const String& text)
@@ -795,12 +801,14 @@ bool InspectorStyleSheet::setRuleSelector(const InspectorCSSId& id, const String
 
 CSSStyleRule* InspectorStyleSheet::addRule(const String& selector, ExceptionCode& ec)
 {
-    String styleSheetText;
-    bool success = getText(&styleSheetText);
+    String text;
+    bool success = getText(&text);
     if (!success) {
         ec = NOT_FOUND_ERR;
         return 0;
     }
+    StringBuilder styleSheetText;
+    styleSheetText.append(text);
 
     m_pageStyleSheet->addRule(selector, "", ec);
     if (ec)
@@ -809,13 +817,13 @@ CSSStyleRule* InspectorStyleSheet::addRule(const String& selector, ExceptionCode
     CSSStyleRule* rule = InspectorCSSAgent::asCSSStyleRule(m_pageStyleSheet->item(m_pageStyleSheet->length() - 1));
     ASSERT(rule);
 
-    if (styleSheetText.length())
-        styleSheetText += "\n";
+    if (!styleSheetText.isEmpty())
+        styleSheetText.append('\n');
 
-    styleSheetText += selector;
-    styleSheetText += " {}";
+    styleSheetText.append(selector);
+    styleSheetText.appendLiteral(" {}");
     // Using setText() as this operation changes the style sheet rule set.
-    setText(styleSheetText);
+    setText(styleSheetText.toString());
 
     fireStyleSheetChanged();
 

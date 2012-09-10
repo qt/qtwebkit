@@ -38,7 +38,7 @@ class Quad;
 class RGBColor;
 class Rect;
 class RenderStyle;
-class CSSWrapShape;
+class CSSBasicShape;
 
 struct Length;
 
@@ -99,7 +99,9 @@ public:
         CSS_DPI = 30,
         CSS_DPCM = 31,
         CSS_PAIR = 100, // We envision this being exposed as a means of getting computed style values for pairs (border-spacing/radius, background-position, etc.)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
         CSS_DASHBOARD_REGION = 101, // FIXME: Dashboard region should not be a primitive value.
+#endif
         CSS_UNICODE_RANGE = 102,
 
         // These next types are just used internally to allow us to translate back and forth from CSSPrimitiveValues to CSSParserValues.
@@ -282,9 +284,11 @@ public:
     Pair* getPairValue(ExceptionCode&) const;
     Pair* getPairValue() const { return m_primitiveUnitType != CSS_PAIR ? 0 : m_value.pair; }
 
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
     DashboardRegion* getDashboardRegionValue() const { return m_primitiveUnitType != CSS_DASHBOARD_REGION ? 0 : m_value.region; }
+#endif
 
-    CSSWrapShape* getShapeValue() const { return m_primitiveUnitType != CSS_SHAPE ? 0 : m_value.shape; }
+    CSSBasicShape* getShapeValue() const { return m_primitiveUnitType != CSS_SHAPE ? 0 : m_value.shape; }
     
     CSSCalcValue* cssCalcValue() const { return m_primitiveUnitType != CSS_CALC ? 0 : m_value.calc; }
 
@@ -340,7 +344,7 @@ private:
     void init(PassRefPtr<Pair>);
     void init(PassRefPtr<Quad>);
     void init(PassRefPtr<DashboardRegion>); // FIXME: Dashboard region should not be a primitive value.
-    void init(PassRefPtr<CSSWrapShape>);
+    void init(PassRefPtr<CSSBasicShape>);
     void init(PassRefPtr<CSSCalcValue>);
     bool getDoubleValueInternal(UnitTypes targetUnitType, double* result) const;
 
@@ -356,7 +360,7 @@ private:
         unsigned rgbcolor;
         Pair* pair;
         DashboardRegion* region;
-        CSSWrapShape* shape;
+        CSSBasicShape* shape;
         CSSCalcValue* calc;
     } m_value;
 };

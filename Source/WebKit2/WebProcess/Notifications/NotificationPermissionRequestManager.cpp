@@ -128,11 +128,33 @@ NotificationClient::Permission NotificationPermissionRequestManager::permissionL
 #endif
 }
 
+void NotificationPermissionRequestManager::setPermissionLevelForTesting(const String& originString, bool allowed)
+{
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+    WebProcess::shared().notificationManager().didUpdateNotificationDecision(originString, allowed);
+#else
+    UNUSED_PARAM(originString);
+    UNUSED_PARAM(allowed);
+#endif
+}
+
+void NotificationPermissionRequestManager::removeAllPermissionsForTesting()
+{
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+    WebProcess::shared().notificationManager().removeAllPermissionsForTesting();
+#endif
+}
+
 void NotificationPermissionRequestManager::didReceiveNotificationPermissionDecision(uint64_t requestID, bool allowed)
 {
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     if (!isRequestIDValid(requestID))
         return;
+
+    RefPtr<WebCore::SecurityOrigin> origin = m_idToOriginMap.take(requestID);
+    m_originToIDMap.remove(origin);
+
+    WebProcess::shared().notificationManager().didUpdateNotificationDecision(origin->toString(), allowed);
 
 #if ENABLE(LEGACY_NOTIFICATIONS)
     RefPtr<VoidCallback> voidCallback = m_idToVoidCallbackMap.take(requestID);

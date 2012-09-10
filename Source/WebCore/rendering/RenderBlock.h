@@ -29,16 +29,20 @@
 #include "RenderBox.h"
 #include "RenderLineBoxList.h"
 #include "RootInlineBox.h"
+#include "TextBreakIterator.h"
 #include "TextRun.h"
 #include <wtf/OwnPtr.h>
 #include <wtf/ListHashSet.h>
+
+#if ENABLE(CSS_EXCLUSIONS)
+#include "WrapShapeInfo.h"
+#endif
 
 namespace WebCore {
 
 class BidiContext;
 class InlineIterator;
 class LayoutStateMaintainer;
-class LazyLineBreakIterator;
 class LineLayoutState;
 class LineWidth;
 class RenderInline;
@@ -48,6 +52,7 @@ struct BidiRun;
 struct PaintInfo;
 class LineInfo;
 class RenderRubyRun;
+class TextLayout;
 
 template <class Iterator, class Run> class BidiResolver;
 template <class Run> class BidiRunList;
@@ -195,7 +200,7 @@ public:
             : logicalWidth() - logicalRightOffsetForLine(position, firstLine, logicalHeight);
     }
 
-    LayoutUnit startAlignedOffsetForLine(RenderBox* child, LayoutUnit position, bool firstLine);
+    LayoutUnit startAlignedOffsetForLine(LayoutUnit position, bool firstLine);
     LayoutUnit textIndentOffset() const;
 
     virtual VisiblePosition positionForPoint(const LayoutPoint&);
@@ -229,7 +234,7 @@ public:
 
     void adjustRectForColumns(LayoutRect&) const;
     virtual void adjustForColumns(LayoutSize&, const LayoutPoint&) const;
-    void adjustForColumnRect(LayoutSize& offset, const LayoutPoint& pointInContainer) const;
+    void adjustForColumnRect(LayoutSize& offset, const LayoutPoint& locationInContainer) const;
 
     void addContinuationWithOutline(RenderInline*);
     bool paintsContinuationOutline(RenderInline*);
@@ -396,6 +401,13 @@ public:
     void showLineTreeAndMark(const InlineBox* = 0, const char* = 0, const InlineBox* = 0, const char* = 0, const RenderObject* = 0) const;
 #endif
 
+#if ENABLE(CSS_EXCLUSIONS)
+    WrapShapeInfo* wrapShapeInfo() const
+    {
+        return style()->wrapShapeInside() && WrapShapeInfo::isWrapShapeInfoEnabledForRenderBlock(this) ? WrapShapeInfo::wrapShapeInfoForRenderBlock(this) : 0;
+    }
+#endif
+
 protected:
     virtual void willBeDestroyed();
 
@@ -431,7 +443,7 @@ protected:
     virtual ETextAlign textAlignmentForLine(bool endsWithSoftBreak) const;
     virtual void adjustInlineDirectionLineBounds(int /* expansionOpportunityCount */, float& /* logicalLeft */, float& /* logicalWidth */) const { }
 
-    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
+    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
 
     virtual void computePreferredLogicalWidths();
 
@@ -485,6 +497,9 @@ protected:
     virtual void checkForPaginationLogicalHeightChange(LayoutUnit& pageLogicalHeight, bool& pageLogicalHeightChanged, bool& hasSpecifiedPageLogicalHeight);
 
 private:
+#if ENABLE(CSS_EXCLUSIONS)
+    void updateWrapShapeInfoAfterStyleChange(const BasicShape*, const BasicShape* oldWrapShape);
+#endif
     virtual RenderObjectChildList* virtualChildren() { return children(); }
     virtual const RenderObjectChildList* virtualChildren() const { return children(); }
 
@@ -692,7 +707,16 @@ private:
     LayoutPoint computeLogicalLocationForFloat(const FloatingObject*, LayoutUnit logicalTopOffset) const;
 
     // The following functions' implementations are in RenderBlockLineLayout.cpp.
-    typedef std::pair<RenderText*, LazyLineBreakIterator> LineBreakIteratorInfo;
+    struct RenderTextInfo {
+        // Destruction of m_layout requires TextLayout to be a complete type, so the constructor and destructor are made non-inline to avoid compilation errors.
+        RenderTextInfo();
+        ~RenderTextInfo();
+
+        RenderText* m_text;
+        OwnPtr<TextLayout> m_layout;
+        LazyLineBreakIterator m_lineBreakIterator;
+    };
+
     class LineBreaker {
     public:
         LineBreaker(RenderBlock* block)
@@ -701,7 +725,7 @@ private:
             reset();
         }
 
-        InlineIterator nextLineBreak(InlineBidiResolver&, LineInfo&, LineBreakIteratorInfo&, FloatingObject* lastFloatFromPreviousLine, unsigned consecutiveHyphenatedLines);
+        InlineIterator nextLineBreak(InlineBidiResolver&, LineInfo&, RenderTextInfo&, FloatingObject* lastFloatFromPreviousLine, unsigned consecutiveHyphenatedLines);
 
         bool lineWasHyphenated() { return m_hyphenated; }
         const Vector<RenderBox*>& positionedObjects() { return m_positionedObjects; }
@@ -770,11 +794,11 @@ private:
     LayoutUnit lowestFloatLogicalBottom(FloatingObject::Type = FloatingObject::FloatLeftRight) const; 
     LayoutUnit nextFloatLogicalBottomBelow(LayoutUnit) const;
     
-    virtual bool hitTestColumns(const HitTestRequest&, HitTestResult&, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
-    virtual bool hitTestContents(const HitTestRequest&, HitTestResult&, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
-    bool hitTestFloats(const HitTestRequest&, HitTestResult&, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset);
+    virtual bool hitTestColumns(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
+    virtual bool hitTestContents(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
+    bool hitTestFloats(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset);
 
-    virtual bool isPointInOverflowControl(HitTestResult&, const LayoutPoint& pointInContainer, const LayoutPoint& accumulatedOffset);
+    virtual bool isPointInOverflowControl(HitTestResult&, const LayoutPoint& locationInContainer, const LayoutPoint& accumulatedOffset);
 
     void computeInlinePreferredLogicalWidths();
     void computeBlockPreferredLogicalWidths();
@@ -906,6 +930,7 @@ private:
         bool canCollapseWithMarginAfter() const { return m_atAfterSideOfBlock && m_canCollapseMarginAfterWithChildren; }
         bool canCollapseMarginBeforeWithChildren() const { return m_canCollapseMarginBeforeWithChildren; }
         bool canCollapseMarginAfterWithChildren() const { return m_canCollapseMarginAfterWithChildren; }
+        void setCanCollapseMarginAfterWithChildren(bool collapse) { m_canCollapseMarginAfterWithChildren = collapse; }
         bool quirkContainer() const { return m_quirkContainer; }
         bool determinedMarginBeforeQuirk() const { return m_determinedMarginBeforeQuirk; }
         bool marginBeforeQuirk() const { return m_marginBeforeQuirk; }

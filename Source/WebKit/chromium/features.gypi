@@ -38,7 +38,6 @@
       'ENABLE_BLOB_SLICE=1',
       'ENABLE_CHANNEL_MESSAGING=1',
       'ENABLE_CSP_NEXT=1',
-      'ENABLE_CSS3_FLEXBOX=1',
       'ENABLE_CSS3_TEXT_DECORATION=0',
       'ENABLE_CSS_BOX_DECORATION_BREAK=1',
       'ENABLE_CSS_COMPOSITING=0',
@@ -87,11 +86,11 @@
       'ENABLE_MHTML=1',
       'ENABLE_MICRODATA=0',
       'ENABLE_MUTATION_OBSERVERS=<(enable_mutation_observers)',
+      'ENABLE_NAVIGATOR_CONTENT_UTILS=1',
       'ENABLE_PAGE_VISIBILITY_API=1',
       'ENABLE_POINTER_LOCK=1',
       'ENABLE_PROGRESS_ELEMENT=1',
       'ENABLE_QUOTA=1',
-      'ENABLE_REGISTER_PROTOCOL_HANDLER=1',
       'ENABLE_REQUEST_ANIMATION_FRAME=1',
       'ENABLE_RUBY=1',
       'ENABLE_SANDBOX=1',
@@ -199,6 +198,11 @@
       ['OS!="mac" and OS!="android"', {
         'feature_defines': [
           'WTF_USE_WEBAUDIO_FFMPEG=1',
+        ],
+      }],
+      ['OS=="win"', {
+        'feature_defines': [
+          'ENABLE_OPENTYPE_VERTICAL=1',
         ],
       }],
       ['enable_web_intents==1', {

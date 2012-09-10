@@ -46,6 +46,7 @@ module WTR {
         void dumpProgressFinishedCallback();
         void dumpResourceLoadCallbacks();
         void dumpResourceResponseMIMETypes();
+        void dumpWillCacheResponse();
 
         // Special options.
         void keepWebHistory();
@@ -84,8 +85,6 @@ module WTR {
         void display();
 
         // Printing
-        int numberOfPages(in double pageWidthInPixels, in double pageHeightInPixels);
-        DOMString pageSizeAndMarginsInPixels(in int pageIndex, in int width, in int height, in int marginTop, in int marginRight, in int marginBottom, in int marginLeft);
         boolean isPageBoxVisible(in int pageIndex);
 
         [PassContext] void setValueForUser(in object element, in DOMString value);
@@ -160,6 +159,12 @@ module WTR {
 
         // Control full screen behavior.
         void setHasCustomFullScreenBehavior(in boolean value);
+
+        // Web notifications support
+        void grantWebNotificationPermission(in DOMString origin);
+        void denyWebNotificationPermission(in DOMString origin);
+        void removeAllWebNotificationPermissions();
+        void simulateWebNotificationClick(in object notification);
     };
 
 }

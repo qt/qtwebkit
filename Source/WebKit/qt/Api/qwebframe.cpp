@@ -1406,7 +1406,7 @@ QWebHitTestResult QWebFrame::hitTestContent(const QPoint &pos) const
     if (!d->frame->view() || !d->frame->contentRenderer())
         return QWebHitTestResult();
 
-    HitTestResult result = d->frame->eventHandler()->hitTestResultAtPoint(d->frame->view()->windowToContents(pos), /*allowShadowContent*/ false, /*ignoreClipping*/ true);
+    HitTestResult result = d->frame->eventHandler()->hitTestResultAtPoint(d->frame->view()->windowToContents(pos), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping);
 
     if (result.scrollbar())
         return QWebHitTestResult();
@@ -1534,8 +1534,9 @@ QVariant QWebFrame::evaluateJavaScript(const QString& scriptSource)
     if (proxy) {
         int distance = 0;
         JSC::JSValue v = d->frame->script()->executeScript(ScriptSourceCode(scriptSource)).jsValue();
-
-        rc = JSC::Bindings::convertValueToQVariant(proxy->globalObject(mainThreadNormalWorld())->globalExec(), v, QMetaType::Void, &distance);
+        JSC::ExecState* exec = proxy->globalObject(mainThreadNormalWorld())->globalExec();
+        JSValueRef* ignoredException = 0;
+        rc = JSC::Bindings::convertValueToQVariant(toRef(exec), toRef(exec, v), QMetaType::Void, &distance, ignoredException);
     }
     return rc;
 }

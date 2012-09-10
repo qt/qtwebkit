@@ -1,6 +1,6 @@
 /*
  * (C) 1999 Lars Knoll (knoll@kde.org)
- * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2010, 2012 Apple Inc. All rights reserved.
  * Copyright (C) 2007-2009 Torch Mobile, Inc.
  *
  * This library is free software; you can redistribute it and/or
@@ -22,6 +22,7 @@
 #include "config.h"
 #include "WTFString.h"
 
+#include "IntegerToStringConversion.h"
 #include <stdarg.h>
 #include <wtf/ASCIICType.h>
 #include <wtf/DataLog.h>
@@ -417,54 +418,36 @@ String String::format(const char *format, ...)
 #endif
 }
 
-String String::number(short n)
+String String::number(int number)
 {
-    return String::format("%hd", n);
+    return numberToStringSigned<String>(number);
 }
 
-String String::number(unsigned short n)
+String String::number(unsigned int number)
 {
-    return String::format("%hu", n);
+    return numberToStringUnsigned<String>(number);
 }
 
-String String::number(int n)
+String String::number(long number)
 {
-    return String::format("%d", n);
+    return numberToStringSigned<String>(number);
 }
 
-String String::number(unsigned n)
+String String::number(unsigned long number)
 {
-    return String::format("%u", n);
+    return numberToStringUnsigned<String>(number);
 }
 
-String String::number(long n)
+String String::number(long long number)
 {
-    return String::format("%ld", n);
+    return numberToStringSigned<String>(number);
 }
 
-String String::number(unsigned long n)
+String String::number(unsigned long long number)
 {
-    return String::format("%lu", n);
+    return numberToStringUnsigned<String>(number);
 }
 
-String String::number(long long n)
-{
-#if OS(WINDOWS) && !PLATFORM(QT)
-    return String::format("%I64i", n);
-#else
-    return String::format("%lli", n);
-#endif
-}
-
-String String::number(unsigned long long n)
-{
-#if OS(WINDOWS) && !PLATFORM(QT)
-    return String::format("%I64u", n);
-#else
-    return String::format("%llu", n);
-#endif
-}
-    
 String String::number(double number, unsigned flags, unsigned precision)
 {
     NumberToStringBuffer buffer;
@@ -475,6 +458,12 @@ String String::number(double number, unsigned flags, unsigned precision)
 
     // Mimic String::format("%.[precision]f", ...), but use dtoas rounding facilities.
     return String(numberToFixedWidthString(number, precision, buffer));
+}
+
+String String::numberToStringECMAScript(double number)
+{
+    NumberToStringBuffer buffer;
+    return String(numberToString(number, buffer));
 }
 
 int String::toIntStrict(bool* ok, int base) const
@@ -650,8 +639,7 @@ CString String::ascii() const
     // preserved, characters outside of this range are converted to '?'.
 
     unsigned length = this->length();
-
-    if (!length) {
+    if (!length) { 
         char* characterBuffer;
         return CString::newUninitialized(length, characterBuffer);
     }
@@ -696,7 +684,7 @@ CString String::latin1() const
     if (is8Bit())
         return CString(reinterpret_cast<const char*>(this->characters8()), length);
 
-    const UChar* characters = this->characters();
+    const UChar* characters = this->characters16();
 
     char* characterBuffer;
     CString result = CString::newUninitialized(length, characterBuffer);

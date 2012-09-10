@@ -92,6 +92,8 @@ class TestExpectationParser(object):
         return expectation_lines
 
     def expectation_for_skipped_test(self, test_name):
+        if not self._port.test_exists(test_name):
+            _log.warning('The following test %s from the Skipped list doesn\'t exist' % test_name)
         expectation_line = TestExpectationLine()
         expectation_line.original_string = test_name
         expectation_line.modifiers = [TestExpectationParser.DUMMY_BUG_MODIFIER, TestExpectationParser.SKIP_MODIFIER]
@@ -822,10 +824,10 @@ class TestExpectations(object):
     def remove_rebaselined_tests(self, except_these_tests, filename):
         """Returns a copy of the expectations in the file with the tests removed."""
         def without_rebaseline_modifier(expectation):
-            return not (not expectation.is_invalid() and
-                        expectation.name in except_these_tests and
-                        'rebaseline' in expectation.parsed_modifiers and
-                        filename == expectation.filename)
+            return (expectation.filename == filename and
+                    not (not expectation.is_invalid() and
+                         expectation.name in except_these_tests and
+                         'rebaseline' in expectation.parsed_modifiers))
 
         return self.list_to_string(filter(without_rebaseline_modifier, self._expectations))
 

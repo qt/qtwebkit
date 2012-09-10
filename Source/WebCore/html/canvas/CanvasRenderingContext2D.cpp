@@ -72,6 +72,7 @@
 #include <wtf/OwnPtr.h>
 #include <wtf/Uint8ClampedArray.h>
 #include <wtf/UnusedParam.h>
+#include <wtf/text/StringBuilder.h>
 
 #if USE(CG)
 #include <ApplicationServices/ApplicationServices.h>
@@ -1867,7 +1868,7 @@ PassRefPtr<ImageData> CanvasRenderingContext2D::webkitGetImageDataHD(float sx, f
 PassRefPtr<ImageData> CanvasRenderingContext2D::getImageData(ImageBuffer::CoordinateSystem coordinateSystem, float sx, float sy, float sw, float sh, ExceptionCode& ec) const
 {
     if (!canvas()->originClean()) {
-        DEFINE_STATIC_LOCAL(String, consoleMessage, ("Unable to get image data from canvas because the canvas has been tainted by cross-origin data."));
+        DEFINE_STATIC_LOCAL(String, consoleMessage, (ASCIILiteral("Unable to get image data from canvas because the canvas has been tainted by cross-origin data.")));
         canvas()->document()->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, consoleMessage);
         ec = SECURITY_ERR;
         return 0;
@@ -1992,31 +1993,34 @@ String CanvasRenderingContext2D::font() const
     if (!state().m_realizedFont)
         return defaultFont;
 
-    String serializedFont;
+    StringBuilder serializedFont;
     const FontDescription& fontDescription = state().m_font.fontDescription();
 
     if (fontDescription.italic())
-        serializedFont += "italic ";
+        serializedFont.appendLiteral("italic ");
     if (fontDescription.smallCaps() == FontSmallCapsOn)
-        serializedFont += "small-caps ";
+        serializedFont.appendLiteral("small-caps ");
 
-    serializedFont += String::number(fontDescription.computedPixelSize()) + "px";
+    serializedFont.appendNumber(fontDescription.computedPixelSize());
+    serializedFont.appendLiteral("px");
 
     const FontFamily& firstFontFamily = fontDescription.family();
     for (const FontFamily* fontFamily = &firstFontFamily; fontFamily; fontFamily = fontFamily->next()) {
         if (fontFamily != &firstFontFamily)
-            serializedFont += ",";
+            serializedFont.append(',');
 
+        // FIXME: We should append family directly to serializedFont rather than building a temporary string.
         String family = fontFamily->family();
         if (family.startsWith("-webkit-"))
             family = family.substring(8);
         if (family.contains(' '))
             family = makeString('"', family, '"');
 
-        serializedFont += " " + family;
+        serializedFont.append(' ');
+        serializedFont.append(family);
     }
 
-    return serializedFont;
+    return serializedFont.toString();
 }
 
 void CanvasRenderingContext2D::setFont(const String& newFont)
@@ -2060,11 +2064,12 @@ void CanvasRenderingContext2D::setFont(const String& newFont)
     styleResolver->applyPropertyToCurrentStyle(CSSPropertyFontVariant, parsedStyle->getPropertyCSSValue(CSSPropertyFontVariant).get());
     styleResolver->applyPropertyToCurrentStyle(CSSPropertyFontWeight, parsedStyle->getPropertyCSSValue(CSSPropertyFontWeight).get());
 
-    // As described in BUG66291, setting font-size on a font may entail a CSSPrimitiveValue::computeLengthDouble call,
+    // As described in BUG66291, setting font-size and line-height on a font may entail a CSSPrimitiveValue::computeLengthDouble call,
     // which assumes the fontMetrics are available for the affected font, otherwise a crash occurs (see http://trac.webkit.org/changeset/96122).
-    // The updateFont() call below updates the fontMetrics and ensures the proper setting of font-size.
+    // The updateFont() calls below update the fontMetrics and ensure the proper setting of font-size and line-height.
     styleResolver->updateFont();
     styleResolver->applyPropertyToCurrentStyle(CSSPropertyFontSize, parsedStyle->getPropertyCSSValue(CSSPropertyFontSize).get());
+    styleResolver->updateFont();
     styleResolver->applyPropertyToCurrentStyle(CSSPropertyLineHeight, parsedStyle->getPropertyCSSValue(CSSPropertyLineHeight).get());
 
     modifiableState().m_font = newStyle->font();

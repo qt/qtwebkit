@@ -74,8 +74,6 @@ class GeolocationServiceChromium;
 class GraphicsContext;
 class Image;
 class IDBFactoryBackendInterface;
-class IDBKey;
-class IDBKeyPath;
 class IntRect;
 class KURL;
 class SerializedScriptValue;
@@ -105,7 +103,6 @@ public:
 #if OS(DARWIN)
     static bool loadFont(NSFont* srcFont, CGFontRef*, uint32_t* fontID);
 #elif OS(UNIX)
-    static void getRenderStyleForStrike(const char* family, int sizeAndStyle, FontRenderStyle* result);
     struct FontFamily {
         String name;
         bool isBold;
@@ -119,10 +116,6 @@ public:
 
     // IndexedDB ----------------------------------------------------------
     static PassRefPtr<IDBFactoryBackendInterface> idbFactory();
-    // Extracts keyPath from values and returns the corresponding keys.
-    static void createIDBKeysFromSerializedValuesAndKeyPath(const Vector<RefPtr<SerializedScriptValue> >& values, const IDBKeyPath&, Vector<RefPtr<IDBKey> >& keys);
-    // Injects key via keyPath into value. Returns true on success.
-    static PassRefPtr<SerializedScriptValue> injectIDBKeyIntoSerializedValue(PassRefPtr<IDBKey>, PassRefPtr<SerializedScriptValue>, const IDBKeyPath&);
 
     // JavaScript ---------------------------------------------------------
     static void notifyJSOutOfMemory(Frame*);
@@ -132,11 +125,6 @@ public:
     static bool plugins(bool refresh, Vector<PluginInfo>*);
     static NPObject* pluginScriptableObject(Widget*);
     static bool popupsAllowed(NPP);
-
-    // Resources ----------------------------------------------------------
-#if ENABLE(WEB_AUDIO)
-    static PassOwnPtr<AudioBus> decodeAudioFileData(const char* data, size_t, double sampleRate);
-#endif
 
     // Screen -------------------------------------------------------------
     static int screenHorizontalDPI(Widget*);
@@ -302,10 +290,6 @@ public:
     // Paint the given the given theme part.
     static void paintThemePart(GraphicsContext*, ThemePart, ThemePaintState, const IntRect&, const ThemePaintExtraParams*);
 #endif
-
-    // Visited links ------------------------------------------------------
-    static LinkHash visitedLinkHash(const UChar* url, unsigned length);
-    static LinkHash visitedLinkHash(const KURL& base, const AtomicString& attributeURL);
 };
 
 } // namespace WebCore

@@ -42,7 +42,6 @@
 #include "HTMLFrameOwnerElement.h"
 #include "markup.h"
 #include "Page.h"
-#include "PlatformString.h"
 #include "PrintContext.h"
 #include "RenderTreeAsText.h"
 #include "RenderObject.h"
@@ -54,8 +53,8 @@
 
 #include "JSDOMBinding.h"
 #include <runtime/JSValue.h>
-#include <runtime/UString.h>
 #include <wtf/text/CString.h>
+#include <wtf/text/WTFString.h>
 
 #include "EditorClientWx.h"
 #include "FrameLoaderClientWx.h"
@@ -690,7 +689,7 @@ WebViewDOMElementInfo WebFrame::HitTest(const wxPoint& pos) const
     WebViewDOMElementInfo domInfo;
 
     if (m_impl->frame->view()) {
-        WebCore::HitTestResult result = m_impl->frame->eventHandler()->hitTestResultAtPoint(m_impl->frame->view()->windowToContents(pos), false);
+        WebCore::HitTestResult result = m_impl->frame->eventHandler()->hitTestResultAtPoint(m_impl->frame->view()->windowToContents(pos));
         if (result.innerNode()) {
             domInfo.SetLink(result.absoluteLinkURL().string());
             domInfo.SetText(result.textContent());

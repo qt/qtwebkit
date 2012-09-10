@@ -26,8 +26,8 @@
 #include "config.h"
 #include "CSSTimingFunctionValue.h"
 
-#include "MemoryInstrumentation.h"
-#include "PlatformString.h"
+#include "WebCoreMemoryInstrumentation.h"
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -38,41 +38,31 @@ String CSSLinearTimingFunctionValue::customCssText() const
 
 void CSSLinearTimingFunctionValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
 }
 
 String CSSCubicBezierTimingFunctionValue::customCssText() const
 {
-    String text("cubic-bezier(");
-    text += String::number(m_x1);
-    text += ", ";
-    text += String::number(m_y1);
-    text += ", ";
-    text += String::number(m_x2);
-    text += ", ";
-    text += String::number(m_y2);
-    text += ")";
-    return text;
+    return "cubic-bezier("
+        + String::number(m_x1) + ", "
+        + String::number(m_y1) + ", "
+        + String::number(m_x2) + ", "
+        + String::number(m_y2) + ")";
 }
 
 void CSSCubicBezierTimingFunctionValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
 }
 
 String CSSStepsTimingFunctionValue::customCssText() const
 {
-    String text("steps(");
-    text += String::number(m_steps);
-    text += ", ";
-    text += m_stepAtStart ? "start" : "end";
-    text += ")";
-    return text;
+    return "steps(" + String::number(m_steps) + ", " + (m_stepAtStart ? "start" : "end") + ')';
 }
 
 void CSSStepsTimingFunctionValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
 }
 
 } // namespace WebCore

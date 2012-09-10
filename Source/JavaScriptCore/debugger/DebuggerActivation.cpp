@@ -53,13 +53,12 @@ void DebuggerActivation::visitChildren(JSCell* cell, SlotVisitor& visitor)
     ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);
     COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
     ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
-    JSObject::visitChildren(thisObject, visitor);
 
-    if (thisObject->m_activation)
-        visitor.append(&thisObject->m_activation);
+    JSObject::visitChildren(thisObject, visitor);
+    visitor.append(&thisObject->m_activation);
 }
 
-UString DebuggerActivation::className(const JSObject* object)
+String DebuggerActivation::className(const JSObject* object)
 {
     const DebuggerActivation* thisObject = jsCast<const DebuggerActivation*>(object);
     return thisObject->m_activation->methodTable()->className(thisObject->m_activation.get());

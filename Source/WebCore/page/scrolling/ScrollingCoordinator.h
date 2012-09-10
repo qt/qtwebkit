@@ -34,6 +34,7 @@
 #include <wtf/Forward.h>
 
 #if ENABLE(THREADED_SCROLLING)
+#include "ScrollingTreeState.h"
 #include <wtf/ThreadSafeRefCounted.h>
 #include <wtf/Threading.h>
 #endif
@@ -48,6 +49,7 @@ class FrameView;
 class GraphicsLayer;
 class Page;
 class Region;
+class ScrollableArea;
 class ScrollingCoordinatorPrivate;
 class ScrollingTreeState;
 
@@ -92,6 +94,9 @@ public:
     // Should be called whenever the vertical scrollbar layer for the given frame view changes.
     void frameViewVerticalScrollbarLayerDidChange(FrameView*, GraphicsLayer* verticalScrollbarLayer);
 
+    // Should be called whenever the scrollable layer for the given scroll area changes.
+    void scrollableAreaScrollLayerDidChange(ScrollableArea*, GraphicsLayer*);
+
     // Requests that the scrolling coordinator updates the scroll position of the given frame view. If this function returns true, it means that the
     // position will be updated asynchronously. If it returns false, the caller should update the scrolling position itself.
     bool requestScrollPositionUpdate(FrameView*, const IntPoint&);
@@ -127,8 +132,8 @@ private:
     explicit ScrollingCoordinator(Page*);
 
     void recomputeWheelEventHandlerCount();
-    bool hasNonLayerFixedObjects(FrameView*);
-    void updateShouldUpdateScrollLayerPositionOnMainThread();
+    bool hasNonLayerViewportConstrainedObjects(FrameView*);
+    void updateShouldUpdateScrollLayerPositionOnMainThreadReason();
 
     void setScrollLayer(GraphicsLayer*);
     void setNonFastScrollableRegion(const Region&);
@@ -151,7 +156,9 @@ private:
 
     void setScrollParameters(const ScrollParameters&);
     void setWheelEventHandlerCount(unsigned);
-    void setShouldUpdateScrollLayerPositionOnMainThread(bool);
+#if ENABLE(THREADED_SCROLLING)
+    void setShouldUpdateScrollLayerPositionOnMainThreadReason(ReasonForUpdatingScrollLayerPositionOnMainThreadFlags);
+#endif
 
     void updateMainFrameScrollLayerPosition();
 

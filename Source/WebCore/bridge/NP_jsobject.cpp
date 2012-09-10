@@ -29,7 +29,6 @@
 
 #include "NP_jsobject.h"
 
-#include "PlatformString.h"
 #include "PluginView.h"
 #include "StringSourceProvider.h"
 #include "c_utility.h"
@@ -45,6 +44,7 @@
 #include <runtime/PropertyNameArray.h>
 #include <parser/SourceCode.h>
 #include <runtime/Completion.h>
+#include <wtf/text/WTFString.h>
 
 using namespace JSC;
 using namespace JSC::Bindings;
@@ -267,7 +267,7 @@ bool _NPN_Evaluate(NPP instance, NPObject* o, NPString* s, NPVariant* variant)
         JSLockHolder lock(exec);
         String scriptString = convertNPStringToUTF16(s);
         
-        JSValue returnValue = JSC::evaluate(rootObject->globalObject()->globalExec(), rootObject->globalObject()->globalScopeChain(), makeSource(scriptString), JSC::JSValue());
+        JSValue returnValue = JSC::evaluate(rootObject->globalObject()->globalExec(), makeSource(scriptString), JSC::JSValue());
 
         convertValueToNPVariant(exec, returnValue, variant);
         exec->clearException();
@@ -433,7 +433,7 @@ bool _NPN_HasMethod(NPP, NPObject* o, NPIdentifier methodName)
 void _NPN_SetException(NPObject*, const NPUTF8* message)
 {
     // Ignoring the NPObject param is consistent with the Mozilla implementation.
-    UString exception(message);
+    String exception(message);
     CInstance::setGlobalException(exception);
 }
 
@@ -456,7 +456,7 @@ bool _NPN_Enumerate(NPP, NPObject* o, NPIdentifier** identifier, uint32_t* count
         NPIdentifier* identifiers = static_cast<NPIdentifier*>(malloc(sizeof(NPIdentifier) * size));
         
         for (unsigned i = 0; i < size; ++i)
-            identifiers[i] = _NPN_GetStringIdentifier(propertyNames[i].ustring().utf8().data());
+            identifiers[i] = _NPN_GetStringIdentifier(propertyNames[i].string().utf8().data());
 
         *identifier = identifiers;
         *count = size;

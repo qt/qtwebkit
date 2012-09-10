@@ -23,11 +23,11 @@
 #include "StyleRareInheritedData.h"
 
 #include "CursorList.h"
-#include "MemoryInstrumentation.h"
 #include "QuotesData.h"
 #include "RenderStyle.h"
 #include "RenderStyleConstants.h"
 #include "ShadowData.h"
+#include "WebCoreMemoryInstrumentation.h"
 
 namespace WebCore {
 
@@ -69,7 +69,7 @@ StyleRareInheritedData::StyleRareInheritedData()
     , textSecurity(RenderStyle::initialTextSecurity())
     , userModify(READ_ONLY)
     , wordBreak(RenderStyle::initialWordBreak())
-    , wordWrap(RenderStyle::initialWordWrap())
+    , overflowWrap(RenderStyle::initialOverflowWrap())
     , nbspMode(NBNORMAL)
     , khtmlLineBreak(LBNORMAL)
     , textSizeAdjust(RenderStyle::initialTextSizeAdjust())
@@ -131,7 +131,7 @@ StyleRareInheritedData::StyleRareInheritedData(const StyleRareInheritedData& o)
     , textSecurity(o.textSecurity)
     , userModify(o.userModify)
     , wordBreak(o.wordBreak)
-    , wordWrap(o.wordWrap)
+    , overflowWrap(o.overflowWrap)
     , nbspMode(o.nbspMode)
     , khtmlLineBreak(o.khtmlLineBreak)
     , textSizeAdjust(o.textSizeAdjust)
@@ -212,7 +212,7 @@ bool StyleRareInheritedData::operator==(const StyleRareInheritedData& o) const
         && textSecurity == o.textSecurity
         && userModify == o.userModify
         && wordBreak == o.wordBreak
-        && wordWrap == o.wordWrap
+        && overflowWrap == o.overflowWrap
         && nbspMode == o.nbspMode
         && khtmlLineBreak == o.khtmlLineBreak
 #if ENABLE(OVERFLOW_SCROLLING)
@@ -264,7 +264,7 @@ bool StyleRareInheritedData::shadowDataEquivalent(const StyleRareInheritedData& 
 
 void StyleRareInheritedData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
     info.addMember(textShadow);
     info.addInstrumentedMember(highlight);
     info.addMember(cursorData);

@@ -36,6 +36,8 @@
 #include <wtf/AlwaysInline.h>
 #include <wtf/Vector.h>
 
+#if ENABLE(JIT)
+
 namespace JSC {
     class JSInterfaceJIT : public MacroAssembler {
     public:
@@ -75,6 +77,8 @@ namespace JSC {
         static const FPRegisterID fpRegT1 = X86Registers::xmm1;
         static const FPRegisterID fpRegT2 = X86Registers::xmm2;
         static const FPRegisterID fpRegT3 = X86Registers::xmm3;
+
+        static const RegisterID nonArgGPR1 = X86Registers::eax; // regT0
 #elif CPU(X86)
         static const RegisterID returnValueRegister = X86Registers::eax;
         static const RegisterID cachedResultRegister = X86Registers::eax;
@@ -331,6 +335,8 @@ namespace JSC {
         return Address(base, (static_cast<unsigned>(virtualRegisterIndex) * sizeof(Register)));
     }
 
-}
+} // namespace JSC
+
+#endif // ENABLE(JIT)
 
 #endif // JSInterfaceJIT_h

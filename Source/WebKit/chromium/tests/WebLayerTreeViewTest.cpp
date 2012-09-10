@@ -31,10 +31,12 @@
 #include "WebLayerTreeViewTestCommon.h"
 #include <gmock/gmock.h>
 #include <public/Platform.h>
-#include <public/WebCompositor.h>
+#include <public/WebCompositorSupport.h>
 #include <public/WebLayer.h>
 #include <public/WebLayerTreeViewClient.h>
 #include <public/WebThread.h>
+#include <wtf/RefCounted.h>
+#include <wtf/RefPtr.h>
 
 using namespace WebKit;
 using testing::Mock;
@@ -61,35 +63,34 @@ public:
     {
         initializeCompositor();
         m_rootLayer = adoptPtr(WebLayer::create());
-        EXPECT_TRUE(m_view.initialize(client(), *m_rootLayer, WebLayerTreeView::Settings()));
-        m_view.setSurfaceReady();
+        ASSERT_TRUE(m_view = adoptPtr(WebLayerTreeView::create(client(), *m_rootLayer, WebLayerTreeView::Settings())));
+        m_view->setSurfaceReady();
     }
 
     virtual void TearDown()
     {
         Mock::VerifyAndClearExpectations(client());
 
-        m_view.setRootLayer(0);
         m_rootLayer.clear();
-        m_view.reset();
-        WebKit::WebCompositor::shutdown();
+        m_view.clear();
+        WebKit::Platform::current()->compositorSupport()->shutdown();
     }
 
 protected:
     OwnPtr<WebLayer> m_rootLayer;
-    WebLayerTreeView m_view;
+    OwnPtr<WebLayerTreeView> m_view;
 };
 
 class WebLayerTreeViewSingleThreadTest : public WebLayerTreeViewTestBase {
 protected:
     void composite()
     {
-        m_view.composite();
+        m_view->composite();
     }
 
     virtual void initializeCompositor() OVERRIDE
     {
-        WebKit::WebCompositor::initialize(0);
+        WebKit::Platform::current()->compositorSupport()->initialize(0);
     }
 
     virtual WebLayerTreeViewClient* client() OVERRIDE
@@ -157,18 +158,18 @@ protected:
 
     void composite()
     {
-        m_view.setNeedsRedraw();
+        m_view->setNeedsRedraw();
         RefPtr<CancelableTaskWrapper> timeoutTask = adoptRef(new CancelableTaskWrapper(adoptPtr(new TimeoutTask())));
         WebKit::Platform::current()->currentThread()->postDelayedTask(timeoutTask->createTask(), 5000);
         WebKit::Platform::current()->currentThread()->enterRunLoop();
         timeoutTask->cancel();
-        m_view.finishAllRendering();
+        m_view->finishAllRendering();
     }
 
     virtual void initializeCompositor() OVERRIDE
     {
         m_webThread = adoptPtr(WebKit::Platform::current()->createThread("WebLayerTreeViewTest"));
-        WebCompositor::initialize(m_webThread.get());
+        WebKit::Platform::current()->compositorSupport()->initialize(m_webThread.get());
     }
 
     virtual WebLayerTreeViewClient* client() OVERRIDE

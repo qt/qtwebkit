@@ -200,6 +200,7 @@ public:
     // Helpers for event handlers.
     virtual bool shouldSubmitImplicitly(Event*);
     virtual PassRefPtr<HTMLFormElement> formForSubmission() const;
+    virtual bool hasCustomFocusLogic() const;
     virtual bool isKeyboardFocusable(KeyboardEvent*) const;
     virtual bool isMouseFocusable() const;
     virtual bool shouldUseInputMethod() const;
@@ -211,6 +212,9 @@ public:
 #if ENABLE(TOUCH_EVENTS)
     virtual bool hasTouchEventHandler() const;
 #endif
+
+    virtual void blur();
+    virtual void focus(bool restorePreviousSelection);
 
     // Shadow tree handling
 
@@ -227,6 +231,7 @@ public:
     virtual HTMLElement* speechButtonElement() const { return 0; }
 #endif
     virtual HTMLElement* sliderThumbElement() const { return 0; }
+    virtual HTMLElement* sliderTrackElement() const { return 0; }
     virtual HTMLElement* placeholderElement() const;
 
     // Miscellaneous functions

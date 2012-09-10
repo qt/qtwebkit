@@ -1937,7 +1937,10 @@ sub runAutogenForAutotoolsProjectIfNecessary($@)
 
     # Prefix the command with jhbuild run.
     unshift(@buildArgs, "$relSourceDir/autogen.sh");
-    unshift(@buildArgs, jhbuildWrapperPrefixIfNeeded());
+    my $jhbuildWrapperPrefix = jhbuildWrapperPrefixIfNeeded();
+    if ($jhbuildWrapperPrefix) {
+        unshift(@buildArgs, $jhbuildWrapperPrefix);
+    }
     if (system(@buildArgs) ne 0) {
         die "Calling autogen.sh failed!\n";
     }
@@ -2057,8 +2060,12 @@ sub buildAutotoolsProject($@)
     chdir ".." or die;
 
     if ($project eq 'WebKit' && !isCrossCompilation()) {
-        my @docGenerationOptions = ($runWithJhbuild, "$sourceDir/Tools/gtk/generate-gtkdoc", "--skip-html");
+        my @docGenerationOptions = ("$sourceDir/Tools/gtk/generate-gtkdoc", "--skip-html");
         push(@docGenerationOptions, productDir());
+
+        if ($runWithJhbuild) {
+            unshift(@docGenerationOptions, $runWithJhbuild);
+        }
 
         if (system(@docGenerationOptions)) {
             die "\n gtkdoc did not build without warnings\n";

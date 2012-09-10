@@ -121,6 +121,8 @@ public:
     // graphics context to prevent freeing invalid resources.
     void discardResources();
 
+    void markContentsChanged() { m_contentsChanged = true; }
+
 #if USE(ACCELERATED_COMPOSITING)
     PlatformLayer* platformLayer();
     void prepareBackBuffer();
@@ -163,6 +165,9 @@ private:
     // For multisampling
     Platform3DObject m_multisampleFBO;
     Platform3DObject m_multisampleColorBuffer;
+
+    // True if our contents have been modified since the last presentation of this buffer.
+    bool m_contentsChanged;
 
 #if PLATFORM(CHROMIUM)
     OwnPtr<DrawingBufferPrivate> m_private;

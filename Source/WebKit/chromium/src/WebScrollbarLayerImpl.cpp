@@ -29,19 +29,18 @@
 #include "ScrollbarLayerChromium.h"
 #include "WebLayerImpl.h"
 
-using WebCore::Scrollbar;
 using WebCore::ScrollbarLayerChromium;
 
 namespace WebKit {
 
-WebScrollbarLayer* WebScrollbarLayer::create(WebCore::Scrollbar* scrollbar, WebScrollbarThemePainter painter, PassOwnPtr<WebScrollbarThemeGeometry> geometry)
+WebScrollbarLayer* WebScrollbarLayer::create(WebScrollbar* scrollbar, WebScrollbarThemePainter painter, WebScrollbarThemeGeometry* geometry)
 {
-    return new WebScrollbarLayerImpl(ScrollbarLayerChromium::create(WebScrollbar::create(scrollbar), painter, geometry, 0));
+    return new WebScrollbarLayerImpl(scrollbar, painter, geometry);
 }
 
 
-WebScrollbarLayerImpl::WebScrollbarLayerImpl(PassRefPtr<WebCore::ScrollbarLayerChromium> layer)
-    : m_layer(adoptPtr(new WebLayerImpl(layer)))
+WebScrollbarLayerImpl::WebScrollbarLayerImpl(WebScrollbar* scrollbar, WebScrollbarThemePainter painter, WebScrollbarThemeGeometry* geometry)
+    : m_layer(adoptPtr(new WebLayerImpl(ScrollbarLayerChromium::create(adoptPtr(scrollbar), painter, adoptPtr(geometry), 0))))
 {
 }
 

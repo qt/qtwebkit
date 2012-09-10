@@ -966,14 +966,21 @@ unsigned Internals::touchEventHandlerCount(Document* document, ExceptionCode& ec
 }
 
 PassRefPtr<NodeList> Internals::nodesFromRect(Document* document, int x, int y, unsigned topPadding, unsigned rightPadding,
-    unsigned bottomPadding, unsigned leftPadding, bool ignoreClipping, bool allowShadowContent, ExceptionCode& ec) const
+    unsigned bottomPadding, unsigned leftPadding, bool ignoreClipping, bool allowShadowContent, bool allowChildFrameContent, ExceptionCode& ec) const
 {
     if (!document || !document->frame() || !document->frame()->view()) {
         ec = INVALID_ACCESS_ERR;
         return 0;
     }
+    HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active;
+    if (ignoreClipping)
+        hitType |= HitTestRequest::IgnoreClipping;
+    if (allowShadowContent)
+        hitType |= HitTestRequest::AllowShadowContent;
+    if (allowChildFrameContent)
+        hitType |= HitTestRequest::AllowChildFrameContent;
 
-    return document->nodesFromRect(x, y, topPadding, rightPadding, bottomPadding, leftPadding, ignoreClipping, allowShadowContent);
+    return document->nodesFromRect(x, y, topPadding, rightPadding, bottomPadding, leftPadding, hitType);
 }
 
 void Internals::emitInspectorDidBeginFrame()
@@ -1168,6 +1175,34 @@ PassRefPtr<DOMStringList> Internals::iconURLs(Document* document) const
         stringList->append(iter->m_iconURL.string());
 
     return stringList.release();
+}
+
+int Internals::numberOfPages(float pageWidth, float pageHeight)
+{
+    if (!frame())
+        return -1;
+
+    return PrintContext::numberOfPages(frame(), FloatSize(pageWidth, pageHeight));
+}
+
+String Internals::pageProperty(String propertyName, int pageNumber, ExceptionCode& ec) const
+{
+    if (!frame()) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+
+    return PrintContext::pageProperty(frame(), propertyName.utf8().data(), pageNumber);
+}
+
+String Internals::pageSizeAndMarginsInPixels(int pageNumber, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft, ExceptionCode& ec) const
+{
+    if (!frame()) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+
+    return PrintContext::pageSizeAndMarginsInPixels(frame(), pageNumber, width, height, marginTop, marginRight, marginBottom, marginLeft);
 }
 
 #if ENABLE(FULLSCREEN_API)

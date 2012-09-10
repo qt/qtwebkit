@@ -424,6 +424,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\wtf\text\IntegerToStringConversion.h"
+				>
+			</File>
+			<File
 				RelativePath="..\wtf\text\StringBuffer.h"
 				>
 			</File>

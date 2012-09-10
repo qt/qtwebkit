@@ -222,12 +222,6 @@ InjectedScript.prototype = {
         var descriptors = this._propertyDescriptors(object, ownProperties);
 
         // Go over properties, wrap object values.
-        if (descriptors.length === 0 && "arguments" in object) {
-            // Fill in JSC scope object.
-            for (var key in object)
-                descriptors.push({ name: key, value: object[key], writable: false, configurable: false, enumerable: true});
-        }
-
         for (var i = 0; i < descriptors.length; ++i) {
             var descriptor = descriptors[i];
             if ("get" in descriptor)
@@ -943,16 +937,52 @@ function CommandLineAPIImpl()
 }
 
 CommandLineAPIImpl.prototype = {
-    $: function()
+    /**
+     * @param {string} selector
+     * @param {Node=} start
+     */
+    $: function (selector, start)
     {
-        return document.getElementById.apply(document, arguments)
+        if (this._canQuerySelectorOnNode(start))
+            return start.querySelector(selector);
+
+        var result = document.querySelector(selector);
+        if (result)
+            return result;
+        if (selector && selector[0] !== "#") {
+            result = document.getElementById(selector);
+            if (result) {
+                console.warn("The console function $() has changed from $=getElementById(id) to $=querySelector(selector). You might try $(\"#%s\")", selector );
+                return null;
+            }
+        }
+        return result;
     },
 
-    $$: function()
+    /**
+     * @param {string} selector
+     * @param {Node=} start
+     */
+    $$: function (selector, start)
     {
-        return document.querySelectorAll.apply(document, arguments)
+        if (this._canQuerySelectorOnNode(start))
+            return start.querySelectorAll(selector);
+        return document.querySelectorAll(selector);
     },
 
+    /**
+     * @param {Node} node
+     * @return {boolean}
+     */
+    _canQuerySelectorOnNode: function(node)
+    {
+        return !!node && InjectedScriptHost.type(node) === "node" && (node.nodeType === Node.ELEMENT_NODE || node.nodeType === Node.DOCUMENT_NODE || node.nodeType === Node.DOCUMENT_FRAGMENT_NODE);
+    },
+
+    /**
+     * @param {string} xpath
+     * @param {Node=} context
+     */
     $x: function(xpath, context)
     {
         var doc = (context && context.ownerDocument) || inspectedWindow.document;

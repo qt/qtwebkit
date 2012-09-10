@@ -135,6 +135,7 @@ HEADERS += \
     text/AtomicStringImpl.h \
     text/Base64.h \
     text/CString.h \
+    text/IntegerToStringConversion.h \
     text/StringBuffer.h \
     text/StringBuilder.h \
     text/StringConcatenate.h \

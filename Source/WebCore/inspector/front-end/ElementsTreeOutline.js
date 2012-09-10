@@ -71,6 +71,23 @@ WebInspector.ElementsTreeOutline.Events = {
     SelectedNodeChanged: "SelectedNodeChanged"
 }
 
+WebInspector.ElementsTreeOutline.MappedCharToEntity = {
+    "\u00a0": "nbsp",
+    "\u2002": "ensp",
+    "\u2003": "emsp",
+    "\u2009": "thinsp",
+    "\u200b": "#8203", // ZWSP
+    "\u200c": "zwnj",
+    "\u200d": "zwj",
+    "\u200e": "lrm",
+    "\u200f": "rlm",
+    "\u202a": "#8234", // LRE
+    "\u202b": "#8235", // RLE
+    "\u202c": "#8236", // PDF
+    "\u202d": "#8237", // LRO
+    "\u202e": "#8238" // RLO
+}
+
 WebInspector.ElementsTreeOutline.prototype = {
     _createNodeDecorators: function()
     {
@@ -483,25 +500,17 @@ WebInspector.ElementsTreeOutline.prototype = {
         if (textNode && textNode.hasStyleClass("bogus"))
             textNode = null;
         var commentNode = event.target.enclosingNodeOrSelfWithClass("webkit-html-comment");
-        var populated = WebInspector.populateHrefContextMenu(contextMenu, this.selectedDOMNode(), event);
-        if (textNode && treeElement._populateTextContextMenu) {
-            if (populated)
-                contextMenu.appendSeparator();
+        contextMenu.appendApplicableItems(event.target);
+        if (textNode) {
+            contextMenu.appendSeparator();
             treeElement._populateTextContextMenu(contextMenu, textNode);
-            populated = true;
-        } else if (isTag && treeElement._populateTagContextMenu) {
-            if (populated)
-                contextMenu.appendSeparator();
+        } else if (isTag) {
+            contextMenu.appendSeparator();
             treeElement._populateTagContextMenu(contextMenu, event);
-            populated = true;
-        } else if (commentNode && treeElement._populateNodeContextMenu) {
-            if (populated)
-                contextMenu.appendSeparator();
+        } else if (commentNode) {
+            contextMenu.appendSeparator();
             treeElement._populateNodeContextMenu(contextMenu, textNode);
-            populated = true;
         }
-
-        return populated;
     },
 
     adjustCollapsedRange: function()
@@ -1310,7 +1319,7 @@ WebInspector.ElementsTreeElement.prototype = {
 
         var container = textNode.enclosingNodeOrSelfWithClass("webkit-html-text-node");
         if (container)
-            container.innerText = container.innerText; // Strip the CSS or JS highlighting if present.
+            container.innerText = textNode._originalContent; // Strip the CSS or JS highlighting if present.
         var config = new WebInspector.EditingConfig(this._textNodeEditingCommitted.bind(this), this._editingCancelled.bind(this));
         this._editing = WebInspector.startEditing(textNode, config);
         window.getSelection().setBaseAndExtent(textNode, 0, textNode, 1);
@@ -1664,7 +1673,7 @@ WebInspector.ElementsTreeElement.prototype = {
             attrSpanElement.appendChild(document.createTextNode("=\u200B\""));
 
         if (linkify && (name === "src" || name === "href")) {
-            var rewrittenHref = WebInspector.resourceURLForRelatedNode(node, value);
+            var rewrittenHref = node.resolveURL(value);
             value = value.replace(/([\/;:\)\]\}])/g, "$1\u200B");
             if (rewrittenHref === null) {
                 var attrValueElement = attrSpanElement.createChild("span", "webkit-html-attribute-value");
@@ -1711,6 +1720,25 @@ WebInspector.ElementsTreeElement.prototype = {
         parentElement.appendChild(document.createTextNode("\u200B"));
     },
 
+    _convertWhitespaceToEntities: function(text)
+    {
+        var result = "";
+        var lastIndexAfterEntity = 0;
+        var charToEntity = WebInspector.ElementsTreeOutline.MappedCharToEntity;
+        for (var i = 0, size = text.length; i < size; ++i) {
+            var char = text.charAt(i);
+            if (charToEntity[char]) {
+                result += text.substring(lastIndexAfterEntity, i) + "&" + charToEntity[char] + ";";
+                lastIndexAfterEntity = i + 1;
+            }
+        }
+        if (result) {
+            result += text.substring(lastIndexAfterEntity);
+            return result;
+        }
+        return text;
+    },
+
     _nodeTitleInfo: function(linkify)
     {
         var node = this.representedObject;
@@ -1749,7 +1777,8 @@ WebInspector.ElementsTreeElement.prototype = {
                 // create a subtree for them
                 if (showInlineText) {
                     var textNodeElement = info.titleDOM.createChild("span", "webkit-html-text-node");
-                    textNodeElement.textContent = textChild.nodeValue();
+                    textNodeElement.textContent = this._convertWhitespaceToEntities(textChild.nodeValue());
+                    textNodeElement._originalContent = textChild.nodeValue();
                     info.titleDOM.appendChild(document.createTextNode("\u200B"));
                     this._buildTagDOM(info.titleDOM, tagName, true, false);
                     info.hasChildren = false;
@@ -1772,7 +1801,8 @@ WebInspector.ElementsTreeElement.prototype = {
                 } else {
                     info.titleDOM.appendChild(document.createTextNode("\""));
                     var textNodeElement = info.titleDOM.createChild("span", "webkit-html-text-node");
-                    textNodeElement.textContent = node.nodeValue();
+                    textNodeElement.textContent = this._convertWhitespaceToEntities(node.nodeValue());
+                    textNodeElement._originalContent = node.nodeValue();
                     info.titleDOM.appendChild(document.createTextNode("\""));
                 }
                 break;
@@ -1970,10 +2000,33 @@ WebInspector.ElementsTreeUpdater = function(treeOutline)
     WebInspector.domAgent.addEventListener(WebInspector.DOMAgent.Events.ChildNodeCountUpdated, this._childNodeCountUpdated, this);
 
     this._treeOutline = treeOutline;
-    this._recentlyModifiedNodes = [];
+    this._recentlyModifiedNodes = new Map();
 }
 
 WebInspector.ElementsTreeUpdater.prototype = {
+
+    /**
+     * @param {!WebInspector.DOMNode} node
+     * @param {boolean} isUpdated
+     * @param {WebInspector.DOMNode=} parentNode
+     */
+    _nodeModified: function(node, isUpdated, parentNode)
+    {
+        if (this._treeOutline._visible)
+            this._updateModifiedNodesSoon();
+
+        var entry = /** @type {WebInspector.ElementsTreeUpdater.UpdateEntry} */ this._recentlyModifiedNodes.get(node);
+        if (!entry) {
+            entry = new WebInspector.ElementsTreeUpdater.UpdateEntry(isUpdated, parentNode);
+            this._recentlyModifiedNodes.put(node, entry);
+            return;
+        }
+
+        entry.isUpdated |= isUpdated;
+        if (parentNode)
+            entry.parent = parentNode;
+    },
+
     _documentUpdated: function(event)
     {
         var inspectedRootDocument = event.data;
@@ -1988,30 +2041,22 @@ WebInspector.ElementsTreeUpdater.prototype = {
 
     _attributesUpdated: function(event)
     {
-        this._recentlyModifiedNodes.push({node: event.data.node, updated: true});
-        if (this._treeOutline._visible)
-            this._updateModifiedNodesSoon();
+        this._nodeModified(event.data.node, true);
     },
 
     _characterDataModified: function(event)
     {
-        this._recentlyModifiedNodes.push({node: event.data, updated: true});
-        if (this._treeOutline._visible)
-            this._updateModifiedNodesSoon();
+        this._nodeModified(event.data, true);
     },
 
     _nodeInserted: function(event)
     {
-        this._recentlyModifiedNodes.push({node: event.data, parent: event.data.parentNode, inserted: true});
-        if (this._treeOutline._visible)
-            this._updateModifiedNodesSoon();
+        this._nodeModified(event.data, false, event.data.parentNode);
     },
 
     _nodeRemoved: function(event)
     {
-        this._recentlyModifiedNodes.push({node: event.data.node, parent: event.data.parent, removed: true});
-        if (this._treeOutline._visible)
-            this._updateModifiedNodesSoon();
+        this._nodeModified(event.data.node, false, event.data.parent);
     },
 
     _childNodeCountUpdated: function(event)
@@ -2025,7 +2070,7 @@ WebInspector.ElementsTreeUpdater.prototype = {
     {
         if (this._updateModifiedNodesTimeout)
             return;
-        this._updateModifiedNodesTimeout = setTimeout(this._updateModifiedNodes.bind(this), 0);
+        this._updateModifiedNodesTimeout = setTimeout(this._updateModifiedNodes.bind(this), 50);
     },
 
     _updateModifiedNodes: function()
@@ -2037,15 +2082,18 @@ WebInspector.ElementsTreeUpdater.prototype = {
 
         var updatedParentTreeElements = [];
 
-        var hidePanelWhileUpdating = this._recentlyModifiedNodes.length > 10;
+        var hidePanelWhileUpdating = this._recentlyModifiedNodes.size() > 10;
         if (hidePanelWhileUpdating) {
             var treeOutlineContainerElement = this._treeOutline.element.parentNode;
             this._treeOutline.element.addStyleClass("hidden");
             var originalScrollTop = treeOutlineContainerElement ? treeOutlineContainerElement.scrollTop : 0;
         }
 
-        for (var i = 0; i < this._recentlyModifiedNodes.length; ++i) {
-            var parent = this._recentlyModifiedNodes[i].parent;
+        var keys = this._recentlyModifiedNodes.keys();
+        for (var i = 0, size = keys.length; i < size; ++i) {
+            var node = keys[i];
+            var entry = this._recentlyModifiedNodes.get(node);
+            var parent = entry.parent;
 
             if (parent === this._treeOutline._rootDOMNode) {
                 // Document's children have changed, perform total update.
@@ -2054,13 +2102,10 @@ WebInspector.ElementsTreeUpdater.prototype = {
                 return;
             }
 
-            var node = this._recentlyModifiedNodes[i].node;
-
-            if (this._recentlyModifiedNodes[i].updated) {
+            if (entry.isUpdated) {
                 var nodeItem = this._treeOutline.findTreeElement(node);
                 if (nodeItem)
                     nodeItem.updateTitle();
-                continue;
             }
 
             if (!parent)
@@ -2083,7 +2128,7 @@ WebInspector.ElementsTreeUpdater.prototype = {
                 treeOutlineContainerElement.scrollTop = originalScrollTop;
             this._treeOutline.updateSelection();
         }
-        this._recentlyModifiedNodes = [];
+        this._recentlyModifiedNodes.clear();
     },
 
     _reset: function()
@@ -2091,6 +2136,18 @@ WebInspector.ElementsTreeUpdater.prototype = {
         this._treeOutline.rootDOMNode = null;
         this._treeOutline.selectDOMNode(null, false);
         WebInspector.domAgent.hideDOMNodeHighlight();
-        this._recentlyModifiedNodes = [];
+        this._recentlyModifiedNodes.clear();
     }
+}
+
+/**
+ * @constructor
+ * @param {boolean} isUpdated
+ * @param {WebInspector.DOMNode=} parent
+ */
+WebInspector.ElementsTreeUpdater.UpdateEntry = function(isUpdated, parent)
+{
+    this.isUpdated = isUpdated;
+    if (parent)
+        this.parent = parent;
 }

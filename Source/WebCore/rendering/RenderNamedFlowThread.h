@@ -69,9 +69,11 @@ public:
     void unregisterNamedFlowContentNode(Node*);
     const NamedFlowContentNodes& contentNodes() const { return m_contentNodes; }
     bool hasContentNode(Node* contentNode) const { ASSERT(contentNode); return m_contentNodes.contains(contentNode); }
+    bool isMarkedForDestruction() const;
 
 protected:
-    virtual void willBeDestroyed() OVERRIDE;
+    void setMarkForDestruction();
+    void resetMarkForDestruction();
 
 private:
     virtual const char* renderName() const OVERRIDE;
@@ -85,6 +87,7 @@ private:
     void checkInvalidRegions();
     bool canBeDestroyed() const { return m_regionList.isEmpty() && m_contentNodes.isEmpty(); }
     void regionLayoutUpdateEventTimerFired(Timer<RenderNamedFlowThread>*);
+    void clearContentNodes();
 
 private:
     // Observer flow threads have invalid regions that depend on the state of this thread

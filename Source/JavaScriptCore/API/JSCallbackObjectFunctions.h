@@ -111,10 +111,10 @@ void JSCallbackObject<Parent>::init(ExecState* exec)
 }
 
 template <class Parent>
-UString JSCallbackObject<Parent>::className(const JSObject* object)
+String JSCallbackObject<Parent>::className(const JSObject* object)
 {
     const JSCallbackObject* thisObject = jsCast<const JSCallbackObject*>(object);
-    UString thisClassName = thisObject->classRef()->className();
+    String thisClassName = thisObject->classRef()->className();
     if (!thisClassName.isEmpty())
         return thisClassName;
     
@@ -568,7 +568,7 @@ JSValue JSCallbackObject<Parent>::staticFunctionGetter(ExecState* exec, JSValue 
         }
     }
 
-    return throwError(exec, createReferenceError(exec, "Static function property defined with NULL callAsFunction callback."));
+    return throwError(exec, createReferenceError(exec, ASCIILiteral("Static function property defined with NULL callAsFunction callback.")));
 }
 
 template <class Parent>
@@ -600,7 +600,7 @@ JSValue JSCallbackObject<Parent>::callbackGetter(ExecState* exec, JSValue slotPa
         }
     }
 
-    return throwError(exec, createReferenceError(exec, "hasProperty callback returned true for a property that doesn't exist."));
+    return throwError(exec, createReferenceError(exec, ASCIILiteral("hasProperty callback returned true for a property that doesn't exist.")));
 }
 
 } // namespace JSC

@@ -427,7 +427,7 @@ static IntPoint getLocationForKeyboardGeneratedContextMenu(Frame* frame)
     if (!selection->selection().isNonOrphanedCaretOrRange()
          || (selection->selection().isCaret() && !selection->selection().isContentEditable())) {
         if (Node* focusedNode = getFocusedNode(frame))
-            return focusedNode->getPixelSnappedRect().location();
+            return focusedNode->pixelSnappedBoundingBox().location();
 
         // There was no selection and no focused node, so just put the context
         // menu into the corner of the view, offset slightly.
@@ -992,6 +992,9 @@ static void webkit_web_view_realize(GtkWidget* widget)
                             | GDK_BUTTON_PRESS_MASK
                             | GDK_BUTTON_RELEASE_MASK
                             | GDK_SCROLL_MASK
+#if GTK_CHECK_VERSION(3, 3, 18)
+                            | GDK_SMOOTH_SCROLL_MASK
+#endif
                             | GDK_POINTER_MOTION_MASK
                             | GDK_KEY_PRESS_MASK
                             | GDK_KEY_RELEASE_MASK
@@ -1605,7 +1608,7 @@ static gboolean webkit_web_view_query_tooltip(GtkWidget *widget, gint x, gint y,
                 String title = static_cast<Element*>(titleNode)->title();
                 if (!title.isEmpty()) {
                     if (FrameView* view = coreFrame->view()) {
-                        GdkRectangle area = view->contentsToWindow(node->getPixelSnappedRect());
+                        GdkRectangle area = view->contentsToWindow(node->pixelSnappedBoundingBox());
                         gtk_tooltip_set_tip_area(tooltip, &area);
                     }
                     gtk_tooltip_set_text(tooltip, title.utf8().data());
@@ -3629,9 +3632,9 @@ static void webkit_web_view_init(WebKitWebView* webView)
     WebCore::provideUserMediaTo(priv->corePage, priv->userMediaClient.get());
 #endif
 
-#if ENABLE(REGISTER_PROTOCOL_HANDLER)
-    priv->registerProtocolHandlerClient = WebKit::RegisterProtocolHandlerClient::create();
-    WebCore::provideRegisterProtocolHandlerTo(priv->corePage, priv->registerProtocolHandlerClient.get());
+#if ENABLE(NAVIGATOR_CONTENT_UTILS)
+    priv->navigatorContentUtilsClient = WebKit::NavigatorContentUtilsClient::create();
+    WebCore::provideNavigatorContentUtilsTo(priv->corePage, priv->navigatorContentUtilsClient.get());
 #endif
 
     if (DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled()) {

@@ -1147,14 +1147,12 @@ template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EDisplay e)
         case INLINE_BOX:
             m_value.ident = CSSValueWebkitInlineBox;
             break;
-#if ENABLE(CSS3_FLEXBOX)
         case FLEX:
             m_value.ident = CSSValueWebkitFlex;
             break;
         case INLINE_FLEX:
             m_value.ident = CSSValueWebkitInlineFlex;
             break;
-#endif
         case GRID:
             m_value.ident = CSSValueWebkitGrid;
             break;
@@ -1203,8 +1201,6 @@ template<> inline CSSPrimitiveValue::operator EEmptyCell() const
     ASSERT_NOT_REACHED();
     return SHOW;
 }
-
-#if ENABLE(CSS3_FLEXBOX)
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EAlignItems e)
     : CSSValue(PrimitiveClass)
@@ -1410,8 +1406,6 @@ template<> inline CSSPrimitiveValue::operator EFlexWrap() const
     ASSERT_NOT_REACHED();
     return FlexWrapNone;
 }
-
-#endif
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EFloat e)
     : CSSValue(PrimitiveClass)
@@ -2624,31 +2618,31 @@ template<> inline CSSPrimitiveValue::operator EWordBreak() const
     return NormalWordBreak;
 }
 
-template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EWordWrap e)
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EOverflowWrap e)
     : CSSValue(PrimitiveClass)
 {
     m_primitiveUnitType = CSS_IDENT;
     switch (e) {
-        case NormalWordWrap:
+        case NormalOverflowWrap:
             m_value.ident = CSSValueNormal;
             break;
-        case BreakWordWrap:
+        case BreakOverflowWrap:
             m_value.ident = CSSValueBreakWord;
             break;
     }
 }
 
-template<> inline CSSPrimitiveValue::operator EWordWrap() const
+template<> inline CSSPrimitiveValue::operator EOverflowWrap() const
 {
     switch (m_value.ident) {
         case CSSValueBreakWord:
-            return BreakWordWrap;
+            return BreakOverflowWrap;
         case CSSValueNormal:
-            return NormalWordWrap;
+            return NormalOverflowWrap;
     }
 
     ASSERT_NOT_REACHED();
-    return NormalWordWrap;
+    return NormalOverflowWrap;
 }
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextDirection e)

@@ -88,6 +88,16 @@ static bool putInt(DBOrTransaction* db, const Vector<char>& key, int64_t value)
 }
 
 template <typename DBOrTransaction>
+static bool getVarInt(DBOrTransaction* db, const Vector<char>& key, int64_t& foundInt)
+{
+    Vector<char> result;
+    if (!db->get(key, result))
+        return false;
+
+    return decodeVarInt(result.begin(), result.end(), foundInt) == result.end();
+}
+
+template <typename DBOrTransaction>
 static bool putVarInt(DBOrTransaction* db, const Vector<char>& key, int64_t value)
 {
     return db->put(key, encodeVarInt(value));
@@ -138,16 +148,17 @@ public:
 
 static bool setUpMetadata(LevelDBDatabase* db, const String& origin)
 {
+    const int64_t latestSchemaVersion = 1;
     const Vector<char> metaDataKey = SchemaVersionKey::encode();
 
     int64_t schemaVersion = 0;
     if (!getInt(db, metaDataKey, schemaVersion)) {
-        schemaVersion = 0;
-        if (!putInt(db, metaDataKey, schemaVersion))
+        schemaVersion = latestSchemaVersion;
+        if (!putInt(db, metaDataKey, latestSchemaVersion))
             return false;
     } else {
         if (!schemaVersion) {
-            schemaVersion = 1;
+            schemaVersion = latestSchemaVersion;
             RefPtr<LevelDBTransaction> transaction = LevelDBTransaction::create(db);
             transaction->put(metaDataKey, encodeInt(schemaVersion));
 
@@ -176,8 +187,9 @@ static bool setUpMetadata(LevelDBDatabase* db, const String& origin)
                 return false;
             }
         }
-        ASSERT(schemaVersion == 1);
     }
+
+    ASSERT(schemaVersion == latestSchemaVersion);
 
     return true;
 }
@@ -282,7 +294,7 @@ bool IDBLevelDBBackingStore::getIDBDatabaseMetaData(const String& name, String& 
     if (!ok)
         return false;
 
-    ok = getInt(m_db.get(), DatabaseMetaDataKey::encode(foundId, DatabaseMetaDataKey::UserIntVersion), foundIntVersion);
+    ok = getVarInt(m_db.get(), DatabaseMetaDataKey::encode(foundId, DatabaseMetaDataKey::UserIntVersion), foundIntVersion);
     if (!ok)
         return false;
     if (foundIntVersion == IDBDatabaseMetadata::DefaultIntVersion)

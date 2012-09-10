@@ -82,7 +82,6 @@
 #include "MatrixTransformOperation.h"
 #include "MediaList.h"
 #include "MediaQueryEvaluator.h"
-#include "MemoryInstrumentation.h"
 #include "NodeRenderStyle.h"
 #include "NodeRenderingContext.h"
 #include "Page.h"
@@ -119,6 +118,7 @@
 #include "TransformationMatrix.h"
 #include "TranslateTransformOperation.h"
 #include "UserAgentStyleSheets.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include "WebKitCSSKeyframeRule.h"
 #include "WebKitCSSKeyframesRule.h"
 #include "WebKitCSSRegionRule.h"
@@ -150,6 +150,7 @@
 #include "CustomFilterNumberParameter.h"
 #include "CustomFilterOperation.h"
 #include "CustomFilterParameter.h"
+#include "CustomFilterTransformParameter.h"
 #include "StyleCachedShader.h"
 #include "StyleCustomFilterProgram.h"
 #include "StylePendingShader.h"
@@ -740,7 +741,7 @@ void StyleResolver::Features::clear()
 
 void StyleResolver::Features::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
     info.addHashSet(idsInRules);
     info.addHashSet(attrsInRules);
     info.addVector(siblingRules);
@@ -2028,9 +2029,7 @@ static EDisplay equivalentBlockDisplay(EDisplay display, bool isFloating, bool s
     case BLOCK:
     case TABLE:
     case BOX:
-#if ENABLE(CSS3_FLEXBOX)
     case FLEX:
-#endif
     case GRID:
         return display;
 
@@ -2043,10 +2042,8 @@ static EDisplay equivalentBlockDisplay(EDisplay display, bool isFloating, bool s
         return TABLE;
     case INLINE_BOX:
         return BOX;
-#if ENABLE(CSS3_FLEXBOX)
     case INLINE_FLEX:
         return FLEX;
-#endif
     case INLINE_GRID:
         return GRID;
 
@@ -2083,11 +2080,7 @@ static bool doesNotInheritTextDecoration(RenderStyle* style, Element* e)
 
 static bool isDisplayFlexibleBox(EDisplay display)
 {
-#if ENABLE(CSS3_FLEXBOX)
     return display == FLEX || display == INLINE_FLEX;
-#else
-    return false;
-#endif
 }
 
 void StyleResolver::adjustRenderStyle(RenderStyle* style, RenderStyle* parentStyle, Element *e)
@@ -2196,6 +2189,8 @@ void StyleResolver::adjustRenderStyle(RenderStyle* style, RenderStyle* parentSty
         || style->hasMask()
         || style->boxReflect()
         || style->hasFilter()
+        || style->hasBlendMode()
+        || style->position() == StickyPosition
 #ifdef FIXED_POSITION_CREATES_STACKING_CONTEXT
         || style->position() == FixedPosition
 #else
@@ -2552,7 +2547,7 @@ RuleData::RuleData(StyleRule* rule, unsigned selectorIndex, unsigned position, b
 
 void RuleData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
 }
 
 RuleSet::RuleSet()
@@ -2570,7 +2565,7 @@ static void reportAtomRuleMap(MemoryClassInfo* info, const RuleSet::AtomRuleMap&
 
 void RuleSet::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
     reportAtomRuleMap(&info, m_idRules);
     reportAtomRuleMap(&info, m_classRules);
     reportAtomRuleMap(&info, m_tagRules);
@@ -2584,7 +2579,7 @@ void RuleSet::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 
 void RuleSet::RuleSetSelectorPair::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
     info.addInstrumentedMember(ruleSet);
 }
 
@@ -3358,8 +3353,15 @@ static bool createGridPosition(CSSValue* value, Length& position)
 #if ENABLE(CSS_VARIABLES)
 static bool hasVariableReference(CSSValue* value)
 {
-    if (value->isPrimitiveValue() && static_cast<CSSPrimitiveValue*>(value)->isVariableName())
-        return true;
+    if (value->isPrimitiveValue()) {
+        CSSPrimitiveValue* primitiveValue = static_cast<CSSPrimitiveValue*>(value);
+        if (CSSCalcValue* calcValue = primitiveValue->cssCalcValue())
+            return calcValue->hasVariableReference();
+        return primitiveValue->isVariableName();
+    }
+
+    if (value->isCalculationValue())
+        return static_cast<CSSCalcValue*>(value)->hasVariableReference();
 
     for (CSSValueListIterator i = value; i.hasMore(); i.advance()) {
         if (hasVariableReference(i.value()))
@@ -4301,6 +4303,7 @@ void StyleResolver::applyProperty(CSSPropertyID id, CSSValue* value)
     case CSSPropertyOutlineStyle:
     case CSSPropertyOutlineWidth:
     case CSSPropertyOverflow:
+    case CSSPropertyOverflowWrap:
     case CSSPropertyOverflowX:
     case CSSPropertyOverflowY:
     case CSSPropertyPadding:
@@ -4376,7 +4379,6 @@ void StyleResolver::applyProperty(CSSPropertyID id, CSSValue* value)
     case CSSPropertyWebkitColumns:
     case CSSPropertyWebkitColumnSpan:
     case CSSPropertyWebkitColumnWidth:
-#if ENABLE(CSS3_FLEXBOX)
     case CSSPropertyWebkitAlignContent:
     case CSSPropertyWebkitAlignItems:
     case CSSPropertyWebkitAlignSelf:
@@ -4389,7 +4391,6 @@ void StyleResolver::applyProperty(CSSPropertyID id, CSSValue* value)
     case CSSPropertyWebkitFlexWrap:
     case CSSPropertyWebkitJustifyContent:
     case CSSPropertyWebkitOrder:
-#endif
 #if ENABLE(CSS_REGIONS)
     case CSSPropertyWebkitFlowFrom:
     case CSSPropertyWebkitFlowInto:
@@ -4463,6 +4464,7 @@ void StyleResolver::applyProperty(CSSPropertyID id, CSSValue* value)
     case CSSPropertyWebkitUserDrag:
     case CSSPropertyWebkitUserModify:
     case CSSPropertyWebkitUserSelect:
+    case CSSPropertyWebkitClipPath:
 #if ENABLE(CSS_EXCLUSIONS)
     case CSSPropertyWebkitWrap:
     case CSSPropertyWebkitWrapFlow:
@@ -5245,7 +5247,7 @@ static bool sortParametersByNameComparator(const RefPtr<CustomFilterParameter>& 
     return codePointCompareLessThan(a->name(), b->name());
 }
 
-PassRefPtr<CustomFilterParameter> StyleResolver::parseCustomFilterNumberParamter(const String& name, CSSValueList* values)
+PassRefPtr<CustomFilterParameter> StyleResolver::parseCustomFilterNumberParameter(const String& name, CSSValueList* values)
 {
     RefPtr<CustomFilterNumberParameter> numberParameter = CustomFilterNumberParameter::create(name);
     for (unsigned i = 0; i < values->length(); ++i) {
@@ -5258,6 +5260,46 @@ PassRefPtr<CustomFilterParameter> StyleResolver::parseCustomFilterNumberParamter
         numberParameter->addValue(primitiveValue->getDoubleValue());
     }
     return numberParameter.release();
+}
+
+PassRefPtr<CustomFilterParameter> StyleResolver::parseCustomFilterTransformParameter(const String& name, CSSValueList* values)
+{
+    RefPtr<CustomFilterTransformParameter> transformParameter = CustomFilterTransformParameter::create(name);
+    TransformOperations operations;
+    createTransformOperations(values, style(), m_rootElementStyle, operations);
+    transformParameter->setOperations(operations);
+    return transformParameter.release();
+}
+
+PassRefPtr<CustomFilterParameter> StyleResolver::parseCustomFilterParameter(const String& name, CSSValue* parameterValue)
+{
+    // FIXME: Implement other parameters types parsing.
+    // booleans: https://bugs.webkit.org/show_bug.cgi?id=76438
+    // textures: https://bugs.webkit.org/show_bug.cgi?id=71442
+    // mat2, mat3, mat4: https://bugs.webkit.org/show_bug.cgi?id=71444
+    if (!parameterValue->isValueList())
+        return 0;
+
+    CSSValueList* values = static_cast<CSSValueList*>(parameterValue);
+    if (!values->length())
+        return 0;
+
+    if (values->itemWithoutBoundsCheck(0)->isWebKitCSSTransformValue())
+        return parseCustomFilterTransformParameter(name, values);
+    
+    // We can have only arrays of booleans or numbers, so use the first value to choose between those two.
+    // We need up to 4 values (all booleans or all numbers).
+    if (!values->itemWithoutBoundsCheck(0)->isPrimitiveValue() || values->length() > 4)
+        return 0;
+    
+    CSSPrimitiveValue* firstPrimitiveValue = static_cast<CSSPrimitiveValue*>(values->itemWithoutBoundsCheck(0));
+    if (firstPrimitiveValue->primitiveType() == CSSPrimitiveValue::CSS_NUMBER)
+        return parseCustomFilterNumberParameter(name, values);
+
+    // FIXME: Implement the boolean array parameter here.
+    // https://bugs.webkit.org/show_bug.cgi?id=76438
+
+    return 0;
 }
 
 bool StyleResolver::parseCustomFilterParameterList(CSSValue* parametersValue, CustomFilterParameterList& parameterList)
@@ -5285,34 +5327,9 @@ bool StyleResolver::parseCustomFilterParameterList(CSSValue* parametersValue, Cu
         if (!iterator.hasMore())
             return false;
         
-        // FIXME: Implement other parameters types parsing.
-        // booleans: https://bugs.webkit.org/show_bug.cgi?id=76438
-        // textures: https://bugs.webkit.org/show_bug.cgi?id=71442
-        // 3d-transforms: https://bugs.webkit.org/show_bug.cgi?id=71443
-        // mat2, mat3, mat4: https://bugs.webkit.org/show_bug.cgi?id=71444
-        RefPtr<CustomFilterParameter> parameter;
-        if (iterator.value()->isValueList()) {
-            CSSValueList* values = static_cast<CSSValueList*>(iterator.value());
-            iterator.advance();
-            
-            // We can have only arrays of booleans or numbers, so use the first value to choose between those two.
-            // Make sure we have at least one value. We need up to 4 values (all booleans or all numbers).
-            if (!values->length() || values->length() > 4)
-                return false;
-            
-            if (!values->itemWithoutBoundsCheck(0)->isPrimitiveValue())
-                return false;
-            
-            CSSPrimitiveValue* firstPrimitiveValue = static_cast<CSSPrimitiveValue*>(values->itemWithoutBoundsCheck(0));
-            if (firstPrimitiveValue->primitiveType() == CSSPrimitiveValue::CSS_NUMBER)
-                parameter = parseCustomFilterNumberParamter(name, values);
-            // FIXME: Implement the boolean array parameter here.
-            // https://bugs.webkit.org/show_bug.cgi?id=76438
-        }
-        
+        RefPtr<CustomFilterParameter> parameter = parseCustomFilterParameter(name, iterator.value());
         if (!parameter)
             return false;
-        
         parameterList.append(parameter.release());
     }
     
@@ -5711,25 +5728,25 @@ void StyleResolver::loadPendingResources()
 
 void StyleResolver::MatchedProperties::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
     info.addInstrumentedMember(properties);
 }
 
 void StyleResolver::MatchedPropertiesCacheItem::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
     info.addInstrumentedVector(matchedProperties);
 }
 
 void MediaQueryResult::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
     info.addInstrumentedMember(m_expression);
 }
 
 void StyleResolver::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
     info.addMember(m_style);
     info.addInstrumentedMember(m_authorStyle);
     info.addInstrumentedMember(m_userStyle);

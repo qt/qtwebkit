@@ -27,10 +27,9 @@
 #include "ContentLayerChromium.h"
 
 #include "BitmapCanvasLayerTextureUpdater.h"
-#include "CCLayerTreeTestCommon.h"
+#include "CCGeometryTestUtils.h"
 #include "CCRenderingStats.h"
-#include "GraphicsContext.h"
-#include "OpaqueRectTrackingContentLayerDelegate.h"
+#include "ContentLayerChromiumClient.h"
 #include "skia/ext/platform_canvas.h"
 #include <gtest/gtest.h>
 #include <public/WebFloatRect.h>
@@ -43,49 +42,20 @@ using namespace WebKit;
 
 namespace {
 
-class OpaqueRectDrawingGraphicsContextPainter : public GraphicsContextPainter {
+class MockContentLayerChromiumClient : public ContentLayerChromiumClient {
 public:
-    explicit OpaqueRectDrawingGraphicsContextPainter(const IntRect& opaqueRect, const IntRect& contentRect)
-        : m_opaqueRect(opaqueRect)
-        , m_contentRect(contentRect)
+    explicit MockContentLayerChromiumClient(IntRect opaqueLayerRect)
+        : m_opaqueLayerRect(opaqueLayerRect)
     {
     }
 
-    virtual ~OpaqueRectDrawingGraphicsContextPainter()
+    virtual void paintContents(SkCanvas*, const IntRect&, FloatRect& opaque) OVERRIDE
     {
-    }
-
-    virtual void paint(GraphicsContext& context, const IntRect& clip) OVERRIDE
-    {
-        Color alpha(0, 0, 0, 0);
-        context.fillRect(m_contentRect, alpha, ColorSpaceDeviceRGB);
-
-        Color white(255, 255, 255, 255);
-        context.fillRect(m_opaqueRect, white, ColorSpaceDeviceRGB);
+        opaque = FloatRect(m_opaqueLayerRect);
     }
 
 private:
-    IntRect m_opaqueRect;
-    IntRect m_contentRect;
-};
-
-class MockContentLayerDelegate : public ContentLayerDelegate {
-public:
-    explicit MockContentLayerDelegate(OpaqueRectTrackingContentLayerDelegate* client)
-        : m_client(client)
-    {
-    }
-
-    virtual void paintContents(SkCanvas* canvas, const IntRect& clip, FloatRect& opaque) OVERRIDE
-    {
-        WebFloatRect resultingOpaqueRect(opaque.x(), opaque.y(), opaque.width(), opaque.height());
-        WebRect webClipRect(clip.x(), clip.y(), clip.width(), clip.height());
-        m_client->paintContents(canvas, webClipRect, resultingOpaqueRect);
-        opaque = FloatRect(resultingOpaqueRect.x, resultingOpaqueRect.y, resultingOpaqueRect.width, resultingOpaqueRect.height);
-    }
-
-private:
-    OpaqueRectTrackingContentLayerDelegate* m_client;
+    IntRect m_opaqueLayerRect;
 };
 
 TEST(ContentLayerChromiumTest, ContentLayerPainterWithDeviceScale)
@@ -96,16 +66,14 @@ TEST(ContentLayerChromiumTest, ContentLayerPainterWithDeviceScale)
     IntRect opaqueRectInContentSpace = opaqueRectInLayerSpace;
     opaqueRectInContentSpace.scale(contentsScale);
     OwnPtr<SkCanvas> canvas = adoptPtr(skia::CreateBitmapCanvas(contentRect.width(), contentRect.height(), false));
-    OpaqueRectDrawingGraphicsContextPainter painter(opaqueRectInLayerSpace, contentRect);
-    OpaqueRectTrackingContentLayerDelegate opaqueRectTrackingContentLayerDelegate(&painter);
-    MockContentLayerDelegate delegate(&opaqueRectTrackingContentLayerDelegate);
-    RefPtr<BitmapCanvasLayerTextureUpdater> updater = BitmapCanvasLayerTextureUpdater::create(ContentLayerPainter::create(&delegate));
+    MockContentLayerChromiumClient client(opaqueRectInLayerSpace);
+    RefPtr<BitmapCanvasLayerTextureUpdater> updater = BitmapCanvasLayerTextureUpdater::create(ContentLayerPainter::create(&client));
 
     IntRect resultingOpaqueRect;
     CCRenderingStats stats;
     updater->prepareToUpdate(contentRect, IntSize(256, 256), contentsScale, contentsScale, resultingOpaqueRect, stats);
 
-    EXPECT_INT_RECT_EQ(opaqueRectInContentSpace, resultingOpaqueRect);
+    EXPECT_RECT_EQ(opaqueRectInContentSpace, resultingOpaqueRect);
 }
 
 } // namespace

@@ -46,6 +46,8 @@
                 'chromium_src_dir': '../../../../..',
             }],
         ],
+
+        'use_libcc_for_compositor%': 0,
     },
     'targets': [
         {
@@ -64,7 +66,6 @@
                 '<(chromium_src_dir)/base/base.gyp:test_support_base',
                 '<(chromium_src_dir)/third_party/zlib/zlib.gyp:zlib',
                 '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_support',
-                '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_user_agent',
             ],
             'sources': [
                 'tests/RunAllTests.cpp',
@@ -102,6 +103,11 @@
                             # FIXME: Enable warnings on other platforms.
                             'chromium_code': 1,
                             },
+                        }],
+                        ['use_libcc_for_compositor==0', {
+                            'sources': [
+                                '<@(webkit_compositor_unittest_files)',
+                            ],
                         }],
                     ],
                 }],
@@ -189,6 +195,8 @@
                         '-DANDROID_SDK_VERSION=<(android_sdk_version)',
                         '--ant-args',
                         '-DANDROID_TOOLCHAIN=<(android_toolchain)',
+                        '--ant-args',
+                        '-DANDROID_GDBSERVER=<(android_gdbserver)',
                         '--ant-args',
                         '-DPRODUCT_DIR=<(ant_build_out)',
                         '--ant-args',

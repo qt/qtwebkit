@@ -195,8 +195,10 @@ EXPORTS
         ?lastChild@ComposedShadowTreeWalker@WebCore@@QAEXXZ
         ?next@ComposedShadowTreeWalker@WebCore@@QAEXXZ
         ?previous@ComposedShadowTreeWalker@WebCore@@QAEXXZ
-        ?number@String@WTF@@SA?AV12@I@Z
+        ?number@String@WTF@@SA?AV12@_K@Z
         ?number@String@WTF@@SA?AV12@H@Z
+        ?number@String@WTF@@SA?AV12@I@Z
+        ?number@String@WTF@@SA?AV12@NII@Z
         ?overrideUserPreferredLanguages@WebCore@@YAXABV?$Vector@VString@WTF@@$0A@@WTF@@@Z
         ?numberOfScopedHTMLStyleChildren@Node@WebCore@@QBEIXZ
         ?page@Document@WebCore@@QBEPAVPage@2@XZ
@@ -259,7 +261,7 @@ EXPORTS
         ??1ContextDestructionObserver@WebCore@@MAE@XZ
         ?contextDestroyed@ContextDestructionObserver@WebCore@@UAEXXZ
         ??0ContextDestructionObserver@WebCore@@QAE@PAVScriptExecutionContext@1@@Z
-        ?nodesFromRect@Document@WebCore@@QBE?AV?$PassRefPtr@VNodeList@WebCore@@@WTF@@HHIIII_N0@Z
+        ?nodesFromRect@Document@WebCore@@QBE?AV?$PassRefPtr@VNodeList@WebCore@@@WTF@@HHIIIII@Z
         ?selectionStartHasMarkerFor@Editor@WebCore@@QBE_NW4MarkerType@DocumentMarker@2@HH@Z
         ?webkitWillEnterFullScreenForElement@Document@WebCore@@QAEXPAVElement@2@@Z
         ?webkitDidEnterFullScreenForElement@Document@WebCore@@QAEXPAVElement@2@@Z
@@ -276,7 +278,10 @@ EXPORTS
         ?setAllowsRoundingHacks@TextRun@WebCore@@SAX_N@Z
         ?profilerEnabled@InspectorController@WebCore@@QAE_NXZ
         ?setProfilerEnabled@InspectorController@WebCore@@QAEX_N@Z
-        ?jsStringSlowCase@WebCore@@YA?AVJSValue@JSC@@PAVExecState@3@AAV?$HashMap@PAVStringImpl@WTF@@V?$Weak@VJSString@JSC@@@JSC@@U?$PtrHash@PAVStringImpl@WTF@@@2@U?$HashTraits@PAVStringImpl@WTF@@@2@U?$HashTraits@V?$Weak@VJSString@JSC@@@JSC@@@2@@WTF@@PAVStringImpl@6@@Z        
+        ?jsStringWithCacheSlowCase@WebCore@@YA?AVJSValue@JSC@@PAVExecState@3@AAV?$HashMap@PAVStringImpl@WTF@@V?$Weak@VJSString@JSC@@@JSC@@U?$PtrHash@PAVStringImpl@WTF@@@2@U?$HashTraits@PAVStringImpl@WTF@@@2@U?$HashTraits@V?$Weak@VJSString@JSC@@@JSC@@@2@@WTF@@PAVStringImpl@6@@Z
         ?registerURLSchemeAsBypassingContentSecurityPolicy@SchemeRegistry@WebCore@@SAXABVString@WTF@@@Z
         ?removeURLSchemeRegisteredAsBypassingContentSecurityPolicy@SchemeRegistry@WebCore@@SAXABVString@WTF@@@Z
         ?iconURLs@Document@WebCore@@QAEABV?$Vector@UIconURL@WebCore@@$0A@@WTF@@XZ
+        ?numberOfPages@PrintContext@WebCore@@SAHPAVFrame@2@ABVFloatSize@2@@Z
+        ?pageProperty@PrintContext@WebCore@@SA?AVString@WTF@@PAVFrame@2@PBDH@Z
+        ?pageSizeAndMarginsInPixels@PrintContext@WebCore@@SA?AVString@WTF@@PAVFrame@2@HHHHHHH@Z

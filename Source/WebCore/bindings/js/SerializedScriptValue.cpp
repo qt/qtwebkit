@@ -386,7 +386,7 @@ private:
         : CloneBase(exec)
         , m_buffer(out)
         , m_blobURLs(blobURLs)
-        , m_emptyIdentifier(exec, UString("", 0))
+        , m_emptyIdentifier(exec, emptyString())
     {
         write(CurrentVersion);
         fillTransferMap(messagePorts, m_transferredMessagePorts);
@@ -523,7 +523,7 @@ private:
         }
     }
 
-    void dumpString(UString str)
+    void dumpString(String str)
     {
         if (str.isEmpty())
             write(EmptyStringTag);
@@ -533,7 +533,7 @@ private:
         }
     }
 
-    void dumpStringObject(UString str)
+    void dumpStringObject(String str)
     {
         if (str.isEmpty())
             write(EmptyStringObjectTag);
@@ -589,7 +589,7 @@ private:
         }
 
         if (value.isString()) {
-            UString str = asString(value)->value(m_exec);
+            String str = asString(value)->value(m_exec);
             dumpString(str);
             return true;
         }
@@ -620,7 +620,7 @@ private:
             if (obj->inherits(&StringObject::s_info)) {
                 if (!startObjectInternal(obj)) // handle duplicates
                     return true;
-                UString str = asString(asStringObject(value)->internalValue())->value(m_exec);
+                String str = asString(asStringObject(value)->internalValue())->value(m_exec);
                 dumpStringObject(str);
                 return true;
             }
@@ -676,7 +676,7 @@ private:
                     flags[flagCount++] = 'm';
                 write(RegExpTag);
                 write(regExp->regExp()->pattern());
-                write(UString(flags, flagCount));
+                write(String(flags, flagCount));
                 return true;
             }
             if (obj->inherits(&JSMessagePort::s_info)) {
@@ -792,7 +792,7 @@ private:
 
     void write(const Identifier& ident)
     {
-        UString str = ident.ustring();
+        const String& str = ident.string();
         StringConstantPool::AddResult addResult = m_constantPool.add(str.impl(), m_constantPool.size());
         if (!addResult.isNewEntry) {
             write(StringPoolTag);
@@ -818,20 +818,12 @@ private:
             fail();
     }
 
-    void write(const UString& str)
+    void write(const String& str)
     {
         if (str.isNull())
             write(m_emptyIdentifier);
         else
             write(Identifier(m_exec, str));
-    }
-
-    void write(const String& str)
-    {
-        if (str.isEmpty())
-            write(m_emptyIdentifier);
-        else
-            write(Identifier(m_exec, str.impl()));
     }
 
     void write(const File* file)
@@ -1037,7 +1029,7 @@ public:
         const uint8_t* start = value.begin();
         const uint8_t* end = value.end();
         const uint32_t length = value.size() / sizeof(UChar);
-        UString str;
+        String str;
         if (!CloneDeserializer::readString(start, end, str, length))
             return String();
 
@@ -1057,7 +1049,7 @@ public:
         uint32_t length;
         if (!readLittleEndian(ptr, end, length) || length >= StringPoolTag)
             return String();
-        UString str;
+        String str;
         if (!readString(ptr, end, str, length))
             return String();
         return String(str.impl());
@@ -1077,7 +1069,7 @@ public:
 
 private:
     struct CachedString {
-        CachedString(const UString& string)
+        CachedString(const String& string)
             : m_string(string)
         {
         }
@@ -1088,10 +1080,10 @@ private:
                 m_jsString = JSC::jsString(exec, m_string);
             return m_jsString;
         }
-        const UString& ustring() { return m_string; }
+        const String& string() { return m_string; }
 
     private:
-        UString m_string;
+        String m_string;
         JSValue m_jsString;
     };
 
@@ -1240,7 +1232,7 @@ private:
         return read(i);
     }
 
-    static bool readString(const uint8_t*& ptr, const uint8_t* end, UString& str, unsigned length)
+    static bool readString(const uint8_t*& ptr, const uint8_t* end, String& str, unsigned length)
     {
         if (length >= numeric_limits<int32_t>::max() / sizeof(UChar))
             return false;
@@ -1250,7 +1242,7 @@ private:
             return false;
 
 #if ASSUME_LITTLE_ENDIAN
-        str = UString(reinterpret_cast<const UChar*>(ptr), length);
+        str = String(reinterpret_cast<const UChar*>(ptr), length);
         ptr += length * sizeof(UChar);
 #else
         Vector<UChar> buffer;
@@ -1260,7 +1252,7 @@ private:
             readLittleEndian(ptr, end, ch);
             buffer.append(ch);
         }
-        str = UString::adopt(buffer);
+        str = String::adopt(buffer);
 #endif
         return true;
     }
@@ -1295,7 +1287,7 @@ private:
             cachedString = CachedStringRef(&m_constantPool, index);
             return true;
         }
-        UString str;
+        String str;
         if (!readString(m_ptr, m_end, str, length)) {
             fail();
             return false;
@@ -1322,7 +1314,7 @@ private:
 
     void putProperty(JSArray* array, unsigned index, JSValue value)
     {
-        array->putDirectIndex(m_exec, index, value, false);
+        array->putDirectIndex(m_exec, index, value);
     }
 
     void putProperty(JSObject* object, const Identifier& property, JSValue value)
@@ -1342,7 +1334,7 @@ private:
         if (!readStringData(type))
             return 0;
         if (m_isDOMGlobalObject)
-            file = File::create(String(path->ustring().impl()), KURL(KURL(), String(url->ustring().impl())), String(type->ustring().impl()));
+            file = File::create(path->string(), KURL(KURL(), url->string()), type->string());
         return true;
     }
 
@@ -1536,7 +1528,7 @@ private:
                 return JSValue();
             if (!m_isDOMGlobalObject)
                 return jsNull();
-            return getJSValue(Blob::create(KURL(KURL(), url->ustring().impl()), String(type->ustring().impl()), size).get());
+            return getJSValue(Blob::create(KURL(KURL(), url->string()), type->string(), size).get());
         }
         case StringTag: {
             CachedStringRef cachedString;
@@ -1566,9 +1558,9 @@ private:
             CachedStringRef flags;
             if (!readStringData(flags))
                 return JSValue();
-            RegExpFlags reFlags = regExpFlags(flags->ustring());
+            RegExpFlags reFlags = regExpFlags(flags->string());
             ASSERT(reFlags != InvalidFlags);
-            RegExp* regExp = RegExp::create(m_exec->globalData(), pattern->ustring(), reFlags);
+            RegExp* regExp = RegExp::create(m_exec->globalData(), pattern->string(), reFlags);
             return RegExpObject::create(m_exec, m_exec->lexicalGlobalObject(), m_globalObject->regExpStructure(), regExp); 
         }
         case ObjectReferenceTag: {
@@ -1728,11 +1720,11 @@ DeserializationResult CloneDeserializer::deserialize()
             }
 
             if (JSValue terminal = readTerminal()) {
-                putProperty(outputObjectStack.last(), Identifier(m_exec, cachedString->ustring()), terminal);
+                putProperty(outputObjectStack.last(), Identifier(m_exec, cachedString->string()), terminal);
                 goto objectStartVisitMember;
             }
             stateStack.append(ObjectEndVisitMember);
-            propertyNameStack.append(Identifier(m_exec, cachedString->ustring()));
+            propertyNameStack.append(Identifier(m_exec, cachedString->string()));
             goto stateUnknown;
         }
         case ObjectEndVisitMember: {

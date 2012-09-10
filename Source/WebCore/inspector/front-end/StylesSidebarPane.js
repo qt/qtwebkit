@@ -134,9 +134,11 @@ WebInspector.StylesSidebarPane.canonicalPropertyName = function(name)
 WebInspector.StylesSidebarPane.prototype = {
     _contextMenuEventFired: function(event)
     {
+        // We start editing upon click -> default navigation to resources panel is not available
+        // Hence we add a soft context menu for hrefs.
         var contextMenu = new WebInspector.ContextMenu();
-        if (WebInspector.populateHrefContextMenu(contextMenu, this.node, event))
-            contextMenu.show(event);
+        contextMenu.appendApplicableItems(event.target);
+        contextMenu.show(event);
     },
 
     get _forcedPseudoClasses()
@@ -410,7 +412,7 @@ WebInspector.StylesSidebarPane.prototype = {
                 continue;
             if (section.computedStyle)
                 section.styleRule.style = nodeComputedStyle;
-            var styleRule = { section: section, style: section.styleRule.style, computedStyle: section.computedStyle, rule: section.rule, editable: !!(section.styleRule.style && section.styleRule.style.id) };
+            var styleRule = { section: section, style: section.styleRule.style, computedStyle: section.computedStyle, rule: section.rule, editable: !!(section.styleRule.style && section.styleRule.style.id), isAttribute: section.styleRule.isAttribute };
             styleRules.push(styleRule);
         }
         return styleRules;
@@ -504,9 +506,8 @@ WebInspector.StylesSidebarPane.prototype = {
 
     _markUsedProperties: function(styleRules, usedProperties)
     {
-        var priorityUsed = false;
-
-        // Walk the style rules and make a list of all used and overloaded properties.
+        var foundImportantProperties = {};
+        var propertyToEffectiveRule = {};
         for (var i = 0; i < styleRules.length; ++i) {
             var styleRule = styleRules[i];
             if (styleRule.computedStyle || styleRule.isStyleSeparator)
@@ -524,47 +525,22 @@ WebInspector.StylesSidebarPane.prototype = {
                     continue;
                 var canonicalName = WebInspector.StylesSidebarPane.canonicalPropertyName(property.name);
 
-                if (!priorityUsed && property.priority.length)
-                    priorityUsed = true;
-
-                // If the property name is already used by another rule then this rule's
-                // property is overloaded, so don't add it to the rule's usedProperties.
-                if (!(canonicalName in usedProperties))
-                    styleRule.usedProperties[canonicalName] = true;
-            }
-
-            // Add all the properties found in this style to the used properties list.
-            // Do this here so only future rules are affect by properties used in this rule.
-            for (var canonicalName in styleRules[i].usedProperties)
-                usedProperties[canonicalName] = true;
-        }
-
-        if (priorityUsed) {
-            // Walk the properties again and account for !important.
-            var foundPriorityProperties = {};
-
-            // Walk in direct order to detect the active/most specific rule providing a priority
-            // (in this case all subsequent !important values get canceled.)
-            for (var i = 0; i < styleRules.length; ++i) {
-                if (styleRules[i].computedStyle || styleRules[i].isStyleSeparator)
+                if (foundImportantProperties.hasOwnProperty(canonicalName))
                     continue;
 
-                var style = styleRules[i].style;
-                var allProperties = style.allProperties;
-                for (var j = 0; j < allProperties.length; ++j) {
-                    var property = allProperties[j];
-                    if (!property.isLive)
-                        continue;
-                    var canonicalName = WebInspector.StylesSidebarPane.canonicalPropertyName(property.name);
-                    if (property.priority.length) {
-                        if (!(canonicalName in foundPriorityProperties))
-                            styleRules[i].usedProperties[canonicalName] = true;
-                        else
-                            delete styleRules[i].usedProperties[canonicalName];
-                        foundPriorityProperties[canonicalName] = true;
-                    } else if (canonicalName in foundPriorityProperties)
-                        delete styleRules[i].usedProperties[canonicalName];
+                var isImportant = property.priority.length;
+                if (!isImportant && usedProperties.hasOwnProperty(canonicalName))
+                    continue;
+
+                if (isImportant) {
+                    foundImportantProperties[canonicalName] = true;
+                    if (propertyToEffectiveRule.hasOwnProperty(canonicalName))
+                        delete propertyToEffectiveRule[canonicalName].usedProperties[canonicalName];
                 }
+
+                styleRule.usedProperties[canonicalName] = true;
+                usedProperties[canonicalName] = true;
+                propertyToEffectiveRule[canonicalName] = styleRule;
             }
         }
     },
@@ -621,10 +597,9 @@ WebInspector.StylesSidebarPane.prototype = {
                 editable = true;
 
             if (computedStyle)
-                var section = new WebInspector.ComputedStylePropertiesSection(styleRule, usedProperties);
+                var section = new WebInspector.ComputedStylePropertiesSection(this, styleRule, usedProperties);
             else
                 var section = new WebInspector.StylePropertiesSection(this, styleRule, editable, styleRule.isInherited, lastWasSeparator);
-            section.pane = this;
             section.expanded = true;
 
             if (computedStyle) {
@@ -693,7 +668,6 @@ WebInspector.StylesSidebarPane.prototype = {
     addBlankSection: function()
     {
         var blankSection = new WebInspector.BlankStylePropertiesSection(this, this.node ? this.node.appropriateSelectorFor(true) : "");
-        blankSection.pane = this;
 
         var elementStyleSection = this.sections[0][1];
         this._sectionsContainer.insertBefore(blankSection.element, elementStyleSection.element.nextSibling);
@@ -958,6 +932,11 @@ WebInspector.StylePropertiesSection = function(parentPane, styleRule, editable, 
 }
 
 WebInspector.StylePropertiesSection.prototype = {
+    get pane()
+    {
+        return this._parentPane;
+    },
+
     collapse: function(dontRememberState)
     {
         // Overriding with empty body.
@@ -1341,12 +1320,16 @@ WebInspector.StylePropertiesSection.prototype.__proto__ = WebInspector.Propertie
 /**
  * @constructor
  * @extends {WebInspector.PropertiesSection}
+ * @param {!WebInspector.StylesSidebarPane} parentPane
+ * @param {!Object} styleRule
+ * @param {!Object.<string, boolean>} usedProperties
  */
-WebInspector.ComputedStylePropertiesSection = function(styleRule, usedProperties)
+WebInspector.ComputedStylePropertiesSection = function(parentPane, styleRule, usedProperties)
 {
     WebInspector.PropertiesSection.call(this, "");
     this.headerElement.addStyleClass("hidden");
     this.element.className = "styles-section monospace first-styles-section read-only computed-style";
+    this._parentPane = parentPane;
     this.styleRule = styleRule;
     this._usedProperties = usedProperties;
     this._alwaysShowComputedProperties = { "display": true, "height": true, "width": true };
@@ -1356,6 +1339,11 @@ WebInspector.ComputedStylePropertiesSection = function(styleRule, usedProperties
 }
 
 WebInspector.ComputedStylePropertiesSection.prototype = {
+    get pane()
+    {
+        return this._parentPane;
+    },
+
     collapse: function(dontRememberState)
     {
         // Overriding with empty body.
@@ -1400,7 +1388,7 @@ WebInspector.ComputedStylePropertiesSection.prototype = {
         for (var i = 0; i < uniqueProperties.length; ++i) {
             var property = uniqueProperties[i];
             var inherited = this._isPropertyInherited(property.name);
-            var item = new WebInspector.StylePropertyTreeElement(this, null, this.styleRule, style, property, false, inherited, false);
+            var item = new WebInspector.StylePropertyTreeElement(this, this._parentPane, this.styleRule, style, property, false, inherited, false);
             this.propertiesTreeOutline.appendChild(item);
             this._propertyTreeElements[property.name] = item;
         }
@@ -1718,8 +1706,8 @@ WebInspector.StylePropertyTreeElement.prototype = {
                 container.appendChild(document.createTextNode("url("));
                 if (self._styleRule.sourceURL)
                     hrefUrl = WebInspector.ParsedURL.completeURL(self._styleRule.sourceURL, hrefUrl);
-                else if (this._parentPane.node)
-                    hrefUrl = WebInspector.resourceURLForRelatedNode(this._parentPane.node, hrefUrl);
+                else if (self._parentPane.node)
+                    hrefUrl = self._parentPane.node.resolveURL(hrefUrl);
                 var hasResource = !!WebInspector.resourceForURL(hrefUrl);
                 // FIXME: WebInspector.linkifyURLAsNode() should really use baseURI.
                 container.appendChild(WebInspector.linkifyURLAsNode(hrefUrl, url, undefined, !hasResource));

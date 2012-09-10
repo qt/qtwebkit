@@ -123,6 +123,7 @@ SET(WTF_HEADERS
     text/AtomicStringImpl.h
     text/Base64.h
     text/CString.h
+    text/IntegerToStringConversion.h
     text/StringBuffer.h
     text/StringHash.h
     text/StringImpl.h

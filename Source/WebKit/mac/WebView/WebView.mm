@@ -143,10 +143,13 @@
 #import <WebCore/JSDocument.h>
 #import <WebCore/JSElement.h>
 #import <WebCore/JSNodeList.h>
+#import <WebCore/JSNotification.h>
 #import <WebCore/Logging.h>
 #import <WebCore/MemoryPressureHandler.h>
 #import <WebCore/MIMETypeRegistry.h>
 #import <WebCore/NodeList.h>
+#import <WebCore/Notification.h>
+#import <WebCore/NotificationController.h>
 #import <WebCore/Page.h>
 #import <WebCore/PageCache.h>
 #import <WebCore/PageGroup.h>
@@ -1137,6 +1140,8 @@ static bool fastDocumentTeardownEnabled()
     [self _clearGlibLoopObserver];
 #endif
 
+    [[self _notificationProvider] unregisterWebView:self];
+
     [[NSDistributedNotificationCenter defaultCenter] removeObserver:self];
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 
@@ -1782,7 +1787,7 @@ static inline IMP getMethod(id o, SEL s)
     HTMLNames::init(); // this method is used for importing bookmarks at startup, so HTMLNames are likely to be uninitialized yet
     RefPtr<TextResourceDecoder> decoder = TextResourceDecoder::create("text/html"); // bookmark files are HTML
     String result = decoder->decode(static_cast<const char*>([data bytes]), [data length]);
-    result += decoder->flush();
+    result.append(decoder->flush());
     return result;
 }
 
@@ -4785,7 +4790,7 @@ static NSAppleEventDescriptor* aeDescFromJSValue(ExecState* exec, JSValue jsValu
     if (jsValue.isBoolean())
         return [NSAppleEventDescriptor descriptorWithBoolean:jsValue.asBoolean()];
     if (jsValue.isString())
-        return [NSAppleEventDescriptor descriptorWithString:ustringToString(jsValue.getString(exec))];
+        return [NSAppleEventDescriptor descriptorWithString:jsValue.getString(exec)];
     if (jsValue.isNumber()) {
         double value = jsValue.asNumber();
         int intValue = value;
@@ -6514,15 +6519,10 @@ static void glibContextIterationCallback(CFRunLoopObserverRef, CFRunLoopActivity
 @implementation WebView (WebViewNotification)
 - (void)_setNotificationProvider:(id<WebNotificationProvider>)notificationProvider
 {
-    if (_private) {
+    if (_private && !_private->_notificationProvider) {
         _private->_notificationProvider = notificationProvider;
         [_private->_notificationProvider registerWebView:self];
     }
-}
-
-- (void)_notificationControllerDestroyed
-{
-    [[self _notificationProvider] unregisterWebView:self];
 }
 
 - (id<WebNotificationProvider>)_notificationProvider
@@ -6545,6 +6545,17 @@ static void glibContextIterationCallback(CFRunLoopObserverRef, CFRunLoopActivity
 - (void)_notificationsDidClose:(NSArray *)notificationIDs
 {
     [[self _notificationProvider] webView:self didCloseNotifications:notificationIDs];
+}
+
+- (uint64_t)_notificationIDForTesting:(JSValueRef)jsNotification
+{
+#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
+    JSContextRef context = [[self mainFrame] globalContext];
+    WebCore::Notification* notification = toNotification(toJS(toJS(context), jsNotification));
+    return static_cast<WebNotificationClient*>(NotificationController::clientFrom(_private->page))->notificationIDForTesting(notification);
+#else
+    return 0;
+#endif
 }
 @end
 

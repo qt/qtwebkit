@@ -33,10 +33,12 @@
 #include "GraphicsLayer.h"
 #include "Matrix3DTransformOperation.h"
 #include "RotateTransformOperation.h"
+#include "ScrollableArea.h"
 #include "TranslateTransformOperation.h"
 #include "WebLayerTreeViewTestCommon.h"
 #include <gtest/gtest.h>
-#include <public/WebCompositor.h>
+#include <public/Platform.h>
+#include <public/WebCompositorSupport.h>
 #include <public/WebFloatAnimationCurve.h>
 #include <public/WebGraphicsContext3D.h>
 #include <public/WebLayerTreeView.h>
@@ -62,19 +64,19 @@ public:
     GraphicsLayerChromiumTest()
     {
         // For these tests, we will enable threaded animations.
-        WebCompositor::setAcceleratedAnimationEnabled(true);
-        WebCompositor::initialize(0);
+        Platform::current()->compositorSupport()->setAcceleratedAnimationEnabled(true);
+        Platform::current()->compositorSupport()->initialize(0);
         m_graphicsLayer = static_pointer_cast<GraphicsLayerChromium>(GraphicsLayer::create(&m_client));
         m_platformLayer = m_graphicsLayer->platformLayer();
-        m_layerTreeView.initialize(&m_layerTreeViewClient, *m_platformLayer, WebLayerTreeView::Settings());
-        m_layerTreeView.setViewportSize(WebSize(1, 1), WebSize(1, 1));
+        m_layerTreeView = adoptPtr(Platform::current()->compositorSupport()->createLayerTreeView(&m_layerTreeViewClient, *m_platformLayer, WebLayerTreeView::Settings()));
+        m_layerTreeView->setViewportSize(WebSize(1, 1), WebSize(1, 1));
     }
 
     virtual ~GraphicsLayerChromiumTest()
     {
         m_graphicsLayer.clear();
-        m_layerTreeView.reset();
-        WebCompositor::shutdown();
+        m_layerTreeView.clear();
+        Platform::current()->compositorSupport()->shutdown();
     }
 
 protected:
@@ -88,7 +90,7 @@ protected:
 
 private:
     MockWebLayerTreeViewClient m_layerTreeViewClient;
-    WebLayerTreeView m_layerTreeView;
+    OwnPtr<WebLayerTreeView> m_layerTreeView;
     MockGraphicsLayerClient m_client;
 };
 
@@ -96,9 +98,10 @@ TEST_F(GraphicsLayerChromiumTest, updateLayerPreserves3DWithAnimations)
 {
     ASSERT_FALSE(m_platformLayer->hasActiveAnimation());
 
-    OwnPtr<WebFloatAnimationCurve> curve = adoptPtr(WebFloatAnimationCurve::create());
+    OwnPtr<WebFloatAnimationCurve> curve = adoptPtr(Platform::current()->compositorSupport()->createFloatAnimationCurve());
     curve->add(WebFloatKeyframe(0.0, 0.0));
-    OwnPtr<WebAnimation> floatAnimation(adoptPtr(WebAnimation::create(*curve, 1, 1, WebAnimation::TargetPropertyOpacity)));
+    OwnPtr<WebAnimation> floatAnimation(adoptPtr(Platform::current()->compositorSupport()->createAnimation(*curve, WebAnimation::TargetPropertyOpacity)));
+    int animationId = floatAnimation->id();
     ASSERT_TRUE(m_platformLayer->addAnimation(floatAnimation.get()));
 
     ASSERT_TRUE(m_platformLayer->hasActiveAnimation());
@@ -109,7 +112,7 @@ TEST_F(GraphicsLayerChromiumTest, updateLayerPreserves3DWithAnimations)
     ASSERT_TRUE(m_platformLayer);
 
     ASSERT_TRUE(m_platformLayer->hasActiveAnimation());
-    m_platformLayer->removeAnimation(1);
+    m_platformLayer->removeAnimation(animationId);
     ASSERT_FALSE(m_platformLayer->hasActiveAnimation());
 
     m_graphicsLayer->setPreserves3D(false);
@@ -120,9 +123,38 @@ TEST_F(GraphicsLayerChromiumTest, updateLayerPreserves3DWithAnimations)
     ASSERT_FALSE(m_platformLayer->hasActiveAnimation());
 }
 
-TEST_F(GraphicsLayerChromiumTest, shouldStartWithCorrectContentsScale)
+class FakeScrollableArea : public ScrollableArea {
+public:
+    virtual bool isActive() const OVERRIDE { return false; }
+    virtual int scrollSize(ScrollbarOrientation) const OVERRIDE { return 100; }
+    virtual int scrollPosition(Scrollbar*) const OVERRIDE { return 0; }
+    virtual bool isScrollCornerVisible() const OVERRIDE { return false; }
+    virtual IntRect scrollCornerRect() const OVERRIDE { return IntRect(); }
+    virtual int visibleWidth() const OVERRIDE { return 10; }
+    virtual int visibleHeight() const OVERRIDE { return 10; }
+    virtual IntSize contentsSize() const OVERRIDE { return IntSize(100, 100); }
+    virtual bool isOnActivePage() const OVERRIDE { return false; }
+    virtual ScrollableArea* enclosingScrollableArea() const OVERRIDE { return 0; }
+    virtual IntRect scrollableAreaBoundingBox() const OVERRIDE { return IntRect(); }
+    virtual void invalidateScrollbarRect(Scrollbar*, const IntRect&) OVERRIDE { }
+    virtual void invalidateScrollCornerRect(const IntRect&) OVERRIDE { }
+
+    virtual void setScrollOffset(const IntPoint& scrollOffset) OVERRIDE { m_scrollPosition = scrollOffset; }
+    virtual IntPoint scrollPosition() const OVERRIDE { return m_scrollPosition; }
+
+private:
+    IntPoint m_scrollPosition;
+};
+
+TEST_F(GraphicsLayerChromiumTest, applyScrollToScrollableArea)
 {
-    EXPECT_EQ(2, m_graphicsLayer->contentsScale());
+    FakeScrollableArea scrollableArea;
+    m_graphicsLayer->setScrollableArea(&scrollableArea);
+
+    WebPoint scrollPosition(7, 9);
+    m_platformLayer->setScrollPosition(scrollPosition);
+
+    EXPECT_EQ(scrollPosition, WebPoint(scrollableArea.scrollPosition()));
 }
 
 } // namespace

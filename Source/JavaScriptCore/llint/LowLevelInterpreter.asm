@@ -110,9 +110,13 @@ end
 
 # Some common utilities.
 macro crash()
-    storei t0, 0xbbadbeef[]
-    move 0, t0
-    call t0
+    if C_LOOP
+        cloopCrash
+    else
+        storei t0, 0xbbadbeef[]
+        move 0, t0
+        call t0
+    end
 end
 
 macro assert(assertion)
@@ -124,7 +128,10 @@ macro assert(assertion)
 end
 
 macro preserveReturnAddressAfterCall(destinationRegister)
-    if ARMv7
+    if C_LOOP
+        # In our case, we're only preserving the bytecode vPC. 
+        move lr, destinationRegister
+    elsif ARMv7
         move lr, destinationRegister
     elsif X86 or X86_64
         pop destinationRegister
@@ -134,7 +141,10 @@ macro preserveReturnAddressAfterCall(destinationRegister)
 end
 
 macro restoreReturnAddressBeforeReturn(sourceRegister)
-    if ARMv7
+    if C_LOOP
+        # In our case, we're only restoring the bytecode vPC. 
+        move sourceRegister, lr
+    elsif ARMv7
         move sourceRegister, lr
     elsif X86 or X86_64
         push sourceRegister
@@ -149,13 +159,26 @@ macro traceExecution()
     end
 end
 
+macro callTargetFunction(callLinkInfo)
+    if C_LOOP
+        cloopCallJSFunction LLIntCallLinkInfo::machineCodeTarget[callLinkInfo]
+    else
+        call LLIntCallLinkInfo::machineCodeTarget[callLinkInfo]
+        dispatchAfterCall()
+    end
+end
+
 macro slowPathForCall(advance, slowPath)
     callCallSlowPath(
         advance,
         slowPath,
         macro (callee)
-            call callee
-            dispatchAfterCall()
+            if C_LOOP
+                cloopCallJSFunction callee
+            else
+                call callee
+                dispatchAfterCall()
+            end
         end)
 end
 
@@ -532,7 +555,12 @@ _llint_op_jmp_scopes:
 
 
 _llint_op_loop_if_true:
-    nop
+    traceExecution()
+    jumpTrueOrFalse(
+        macro (value, target) btinz value, target end,
+        _llint_slow_path_jtrue)
+
+
 _llint_op_jtrue:
     traceExecution()
     jumpTrueOrFalse(
@@ -541,7 +569,12 @@ _llint_op_jtrue:
 
 
 _llint_op_loop_if_false:
-    nop
+    traceExecution()
+    jumpTrueOrFalse(
+        macro (value, target) btiz value, target end,
+        _llint_slow_path_jfalse)
+
+
 _llint_op_jfalse:
     traceExecution()
     jumpTrueOrFalse(
@@ -550,7 +583,13 @@ _llint_op_jfalse:
 
 
 _llint_op_loop_if_less:
-    nop
+    traceExecution()
+    compare(
+        macro (left, right, target) bilt left, right, target end,
+        macro (left, right, target) bdlt left, right, target end,
+        _llint_slow_path_jless)
+
+
 _llint_op_jless:
     traceExecution()
     compare(
@@ -568,7 +607,13 @@ _llint_op_jnless:
 
 
 _llint_op_loop_if_greater:
-    nop
+    traceExecution()
+    compare(
+        macro (left, right, target) bigt left, right, target end,
+        macro (left, right, target) bdgt left, right, target end,
+        _llint_slow_path_jgreater)
+
+
 _llint_op_jgreater:
     traceExecution()
     compare(
@@ -586,7 +631,13 @@ _llint_op_jngreater:
 
 
 _llint_op_loop_if_lesseq:
-    nop
+    traceExecution()
+    compare(
+        macro (left, right, target) bilteq left, right, target end,
+        macro (left, right, target) bdlteq left, right, target end,
+        _llint_slow_path_jlesseq)
+
+
 _llint_op_jlesseq:
     traceExecution()
     compare(
@@ -604,7 +655,13 @@ _llint_op_jnlesseq:
 
 
 _llint_op_loop_if_greatereq:
-    nop
+    traceExecution()
+    compare(
+        macro (left, right, target) bigteq left, right, target end,
+        macro (left, right, target) bdgteq left, right, target end,
+        _llint_slow_path_jgreatereq)
+
+
 _llint_op_jgreatereq:
     traceExecution()
     compare(
@@ -641,6 +698,7 @@ _llint_op_new_func_exp:
 
 _llint_op_call:
     traceExecution()
+    arrayProfileForCall()
     doCall(_llint_slow_path_call)
 
 
@@ -715,9 +773,9 @@ _llint_op_get_pnames:
     dispatch(0) # The slow_path either advances the PC or jumps us to somewhere else.
 
 
-_llint_op_push_scope:
+_llint_op_push_with_scope:
     traceExecution()
-    callSlowPath(_llint_slow_path_push_scope)
+    callSlowPath(_llint_slow_path_push_with_scope)
     dispatch(2)
 
 
@@ -727,9 +785,9 @@ _llint_op_pop_scope:
     dispatch(1)
 
 
-_llint_op_push_new_scope:
+_llint_op_push_name_scope:
     traceExecution()
-    callSlowPath(_llint_slow_path_push_new_scope)
+    callSlowPath(_llint_slow_path_push_name_scope)
     dispatch(4)
 
 

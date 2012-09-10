@@ -108,24 +108,6 @@ void AbstractState::initialize(Graph& graph)
             root->valuesAtHead.argument(i).set(SpecInt32);
         else if (isBooleanSpeculation(prediction))
             root->valuesAtHead.argument(i).set(SpecBoolean);
-        else if (isInt8ArraySpeculation(prediction))
-            root->valuesAtHead.argument(i).set(SpecInt8Array);
-        else if (isInt16ArraySpeculation(prediction))
-            root->valuesAtHead.argument(i).set(SpecInt16Array);
-        else if (isInt32ArraySpeculation(prediction))
-            root->valuesAtHead.argument(i).set(SpecInt32Array);
-        else if (isUint8ArraySpeculation(prediction))
-            root->valuesAtHead.argument(i).set(SpecUint8Array);
-        else if (isUint8ClampedArraySpeculation(prediction))
-            root->valuesAtHead.argument(i).set(SpecUint8ClampedArray);
-        else if (isUint16ArraySpeculation(prediction))
-            root->valuesAtHead.argument(i).set(SpecUint16Array);
-        else if (isUint32ArraySpeculation(prediction))
-            root->valuesAtHead.argument(i).set(SpecUint32Array);
-        else if (isFloat32ArraySpeculation(prediction))
-            root->valuesAtHead.argument(i).set(SpecFloat32Array);
-        else if (isFloat64ArraySpeculation(prediction))
-            root->valuesAtHead.argument(i).set(SpecFloat64Array);
         else if (isCellSpeculation(prediction))
             root->valuesAtHead.argument(i).set(SpecCell);
         else
@@ -626,14 +608,9 @@ bool AbstractState::execute(unsigned indexInBlock)
         Node& child = m_graph[node.child1()];
         if (isBooleanSpeculation(child.prediction()))
             speculateBooleanUnary(node);
-        else if (child.shouldSpeculateFinalObjectOrOther()) {
-            node.setCanExit(
-                !isFinalObjectOrOtherSpeculation(forNode(node.child1()).m_type));
-            forNode(node.child1()).filter(SpecFinalObject | SpecOther);
-        } else if (child.shouldSpeculateArrayOrOther()) {
-            node.setCanExit(
-                !isArrayOrOtherSpeculation(forNode(node.child1()).m_type));
-            forNode(node.child1()).filter(SpecArray | SpecOther);
+        else if (child.shouldSpeculateNonStringCellOrOther()) {
+            node.setCanExit(true);
+            forNode(node.child1()).filter((SpecCell & ~SpecString) | SpecOther);
         } else if (child.shouldSpeculateInteger())
             speculateInt32Unary(node);
         else if (child.shouldSpeculateNumber())
@@ -751,45 +728,32 @@ bool AbstractState::execute(unsigned indexInBlock)
                 break;
             }
             
-            if (Node::shouldSpeculateFinalObject(left, right)) {
-                filter = SpecFinalObject;
-                checker = isFinalObjectSpeculation;
-            } else if (Node::shouldSpeculateArray(left, right)) {
-                filter = SpecArray;
-                checker = isArraySpeculation;
-            } else if (left.shouldSpeculateFinalObject() && right.shouldSpeculateFinalObjectOrOther()) {
-                node.setCanExit(
-                    !isFinalObjectSpeculation(forNode(node.child1()).m_type)
-                    || !isFinalObjectOrOtherSpeculation(forNode(node.child2()).m_type));
-                forNode(node.child1()).filter(SpecFinalObject);
-                forNode(node.child2()).filter(SpecFinalObject | SpecOther);
+            if (left.shouldSpeculateString() || right.shouldSpeculateString()) {
+                node.setCanExit(false);
                 break;
-            } else if (right.shouldSpeculateFinalObject() && left.shouldSpeculateFinalObjectOrOther()) {
-                node.setCanExit(
-                    !isFinalObjectOrOtherSpeculation(forNode(node.child1()).m_type)
-                    || !isFinalObjectSpeculation(forNode(node.child2()).m_type));
-                forNode(node.child1()).filter(SpecFinalObject | SpecOther);
-                forNode(node.child2()).filter(SpecFinalObject);
+            } 
+            if (left.shouldSpeculateNonStringCell() && right.shouldSpeculateNonStringCellOrOther()) {
+                node.setCanExit(true);
+                forNode(node.child1()).filter(SpecCell & ~SpecString);
+                forNode(node.child2()).filter((SpecCell & ~SpecString) | SpecOther);
                 break;
-            } else if (left.shouldSpeculateArray() && right.shouldSpeculateArrayOrOther()) {
-                node.setCanExit(
-                    !isArraySpeculation(forNode(node.child1()).m_type)
-                    || !isArrayOrOtherSpeculation(forNode(node.child2()).m_type));
-                forNode(node.child1()).filter(SpecArray);
-                forNode(node.child2()).filter(SpecArray | SpecOther);
-                break;
-            } else if (right.shouldSpeculateArray() && left.shouldSpeculateArrayOrOther()) {
-                node.setCanExit(
-                    !isArrayOrOtherSpeculation(forNode(node.child1()).m_type)
-                    || !isArraySpeculation(forNode(node.child2()).m_type));
-                forNode(node.child1()).filter(SpecArray | SpecOther);
-                forNode(node.child2()).filter(SpecArray);
-                break;
-            } else {
-                filter = SpecTop;
-                checker = isAnySpeculation;
-                clobberWorld(node.codeOrigin, indexInBlock);
             }
+            if (left.shouldSpeculateNonStringCellOrOther() && right.shouldSpeculateNonStringCell()) {
+                node.setCanExit(true);
+                forNode(node.child1()).filter((SpecCell & ~SpecString) | SpecOther);
+                forNode(node.child2()).filter(SpecCell & ~SpecString);
+                break;
+            }
+            if (left.shouldSpeculateNonStringCell() && right.shouldSpeculateNonStringCell()) {
+                node.setCanExit(true);
+                forNode(node.child1()).filter(SpecCell & ~SpecString);
+                forNode(node.child2()).filter(SpecCell & ~SpecString);
+                break;
+            }
+ 
+            filter = SpecTop;
+            checker = isAnySpeculation;
+            clobberWorld(node.codeOrigin, indexInBlock);
         } else {
             filter = SpecTop;
             checker = isAnySpeculation;
@@ -837,22 +801,16 @@ bool AbstractState::execute(unsigned indexInBlock)
             speculateNumberBinary(node);
             break;
         }
-        if (Node::shouldSpeculateFinalObject(
-                m_graph[node.child1()], m_graph[node.child2()])) {
-            node.setCanExit(
-                !isFinalObjectSpeculation(forNode(node.child1()).m_type)
-                || !isFinalObjectSpeculation(forNode(node.child2()).m_type));
-            forNode(node.child1()).filter(SpecFinalObject);
-            forNode(node.child2()).filter(SpecFinalObject);
+        Node& leftNode = m_graph[node.child1()];
+        Node& rightNode = m_graph[node.child2()];
+        if (leftNode.shouldSpeculateString() || rightNode.shouldSpeculateString()) {
+            node.setCanExit(false);
             break;
         }
-        if (Node::shouldSpeculateArray(
-                m_graph[node.child1()], m_graph[node.child2()])) {
-            node.setCanExit(
-                !isArraySpeculation(forNode(node.child1()).m_type)
-                || !isArraySpeculation(forNode(node.child2()).m_type));
-            forNode(node.child1()).filter(SpecArray);
-            forNode(node.child2()).filter(SpecArray);
+        if (leftNode.shouldSpeculateNonStringCell() && rightNode.shouldSpeculateNonStringCell()) {
+            node.setCanExit(true);
+            forNode(node.child1()).filter((SpecCell & ~SpecString) | SpecOther);
+            forNode(node.child2()).filter((SpecCell & ~SpecString) | SpecOther);
             break;
         }
         node.setCanExit(false);
@@ -887,55 +845,47 @@ bool AbstractState::execute(unsigned indexInBlock)
             forNode(nodeIndex).makeTop();
             break;
         case Array::String:
-            forNode(node.child1()).filter(SpecString);
             forNode(node.child2()).filter(SpecInt32);
             forNode(nodeIndex).set(SpecString);
             break;
         case Array::Arguments:
-            forNode(node.child1()).filter(SpecArguments);
             forNode(node.child2()).filter(SpecInt32);
             forNode(nodeIndex).makeTop();
             break;
         case Array::JSArray:
-        case Array::JSArrayOutOfBounds:
-            // FIXME: We should have more conservative handling of the out-of-bounds
-            // case.
-            forNode(node.child1()).filter(SpecCell);
             forNode(node.child2()).filter(SpecInt32);
             forNode(nodeIndex).makeTop();
             break;
+        case Array::JSArrayOutOfBounds:
+            forNode(node.child2()).filter(SpecInt32);
+            clobberWorld(node.codeOrigin, indexInBlock);
+            forNode(nodeIndex).makeTop();
+            break;
         case Array::Int8Array:
-            forNode(node.child1()).filter(SpecInt8Array);
             forNode(node.child2()).filter(SpecInt32);
             forNode(nodeIndex).set(SpecInt32);
             break;
         case Array::Int16Array:
-            forNode(node.child1()).filter(SpecInt16Array);
             forNode(node.child2()).filter(SpecInt32);
             forNode(nodeIndex).set(SpecInt32);
             break;
         case Array::Int32Array:
-            forNode(node.child1()).filter(SpecInt32Array);
             forNode(node.child2()).filter(SpecInt32);
             forNode(nodeIndex).set(SpecInt32);
             break;
         case Array::Uint8Array:
-            forNode(node.child1()).filter(SpecUint8Array);
             forNode(node.child2()).filter(SpecInt32);
             forNode(nodeIndex).set(SpecInt32);
             break;
         case Array::Uint8ClampedArray:
-            forNode(node.child1()).filter(SpecUint8ClampedArray);
             forNode(node.child2()).filter(SpecInt32);
             forNode(nodeIndex).set(SpecInt32);
             break;
         case Array::Uint16Array:
-            forNode(node.child1()).filter(SpecUint16Array);
             forNode(node.child2()).filter(SpecInt32);
             forNode(nodeIndex).set(SpecInt32);
             break;
         case Array::Uint32Array:
-            forNode(node.child1()).filter(SpecUint32Array);
             forNode(node.child2()).filter(SpecInt32);
             if (node.shouldSpeculateInteger())
                 forNode(nodeIndex).set(SpecInt32);
@@ -943,12 +893,10 @@ bool AbstractState::execute(unsigned indexInBlock)
                 forNode(nodeIndex).set(SpecDouble);
             break;
         case Array::Float32Array:
-            forNode(node.child1()).filter(SpecFloat32Array);
             forNode(node.child2()).filter(SpecInt32);
             forNode(nodeIndex).set(SpecDouble);
             break;
         case Array::Float64Array:
-            forNode(node.child1()).filter(SpecFloat64Array);
             forNode(node.child2()).filter(SpecInt32);
             forNode(nodeIndex).set(SpecDouble);
             break;
@@ -959,7 +907,6 @@ bool AbstractState::execute(unsigned indexInBlock)
     case PutByVal:
     case PutByValAlias: {
         node.setCanExit(true);
-        Edge child1 = m_graph.varArgChild(node, 0);
         Edge child2 = m_graph.varArgChild(node, 1);
         Edge child3 = m_graph.varArgChild(node, 2);
         switch (modeForPut(node.arrayMode())) {
@@ -970,20 +917,16 @@ bool AbstractState::execute(unsigned indexInBlock)
             clobberWorld(node.codeOrigin, indexInBlock);
             break;
         case Array::JSArray:
-            forNode(child1).filter(SpecCell);
             forNode(child2).filter(SpecInt32);
             break;
         case Array::JSArrayOutOfBounds:
-            forNode(child1).filter(SpecCell);
             forNode(child2).filter(SpecInt32);
             clobberWorld(node.codeOrigin, indexInBlock);
             break;
         case Array::Arguments:
-            forNode(child1).filter(SpecArguments);
             forNode(child2).filter(SpecInt32);
             break;
         case Array::Int8Array:
-            forNode(child1).filter(SpecInt8Array);
             forNode(child2).filter(SpecInt32);
             if (m_graph[child3].shouldSpeculateInteger())
                 forNode(child3).filter(SpecInt32);
@@ -991,7 +934,6 @@ bool AbstractState::execute(unsigned indexInBlock)
                 forNode(child3).filter(SpecNumber);
             break;
         case Array::Int16Array:
-            forNode(child1).filter(SpecInt16Array);
             forNode(child2).filter(SpecInt32);
             if (m_graph[child3].shouldSpeculateInteger())
                 forNode(child3).filter(SpecInt32);
@@ -999,7 +941,6 @@ bool AbstractState::execute(unsigned indexInBlock)
                 forNode(child3).filter(SpecNumber);
             break;
         case Array::Int32Array:
-            forNode(child1).filter(SpecInt32Array);
             forNode(child2).filter(SpecInt32);
             if (m_graph[child3].shouldSpeculateInteger())
                 forNode(child3).filter(SpecInt32);
@@ -1007,7 +948,6 @@ bool AbstractState::execute(unsigned indexInBlock)
                 forNode(child3).filter(SpecNumber);
             break;
         case Array::Uint8Array:
-            forNode(child1).filter(SpecUint8Array);
             forNode(child2).filter(SpecInt32);
             if (m_graph[child3].shouldSpeculateInteger())
                 forNode(child3).filter(SpecInt32);
@@ -1015,7 +955,6 @@ bool AbstractState::execute(unsigned indexInBlock)
                 forNode(child3).filter(SpecNumber);
             break;
         case Array::Uint8ClampedArray:
-            forNode(child1).filter(SpecUint8ClampedArray);
             forNode(child2).filter(SpecInt32);
             if (m_graph[child3].shouldSpeculateInteger())
                 forNode(child3).filter(SpecInt32);
@@ -1023,7 +962,6 @@ bool AbstractState::execute(unsigned indexInBlock)
                 forNode(child3).filter(SpecNumber);
             break;
         case Array::Uint16Array:
-            forNode(child1).filter(SpecUint16Array);
             forNode(child2).filter(SpecInt32);
             if (m_graph[child3].shouldSpeculateInteger())
                 forNode(child3).filter(SpecInt32);
@@ -1031,7 +969,6 @@ bool AbstractState::execute(unsigned indexInBlock)
                 forNode(child3).filter(SpecNumber);
             break;
         case Array::Uint32Array:
-            forNode(child1).filter(SpecUint32Array);
             forNode(child2).filter(SpecInt32);
             if (m_graph[child3].shouldSpeculateInteger())
                 forNode(child3).filter(SpecInt32);
@@ -1039,12 +976,10 @@ bool AbstractState::execute(unsigned indexInBlock)
                 forNode(child3).filter(SpecNumber);
             break;
         case Array::Float32Array:
-            forNode(child1).filter(SpecFloat32Array);
             forNode(child2).filter(SpecInt32);
             forNode(child3).filter(SpecNumber);
             break;
         case Array::Float64Array:
-            forNode(child1).filter(SpecFloat64Array);
             forNode(child2).filter(SpecInt32);
             forNode(child3).filter(SpecNumber);
             break;
@@ -1057,13 +992,11 @@ bool AbstractState::execute(unsigned indexInBlock)
             
     case ArrayPush:
         node.setCanExit(true);
-        forNode(node.child1()).filter(SpecCell);
         forNode(nodeIndex).set(SpecNumber);
         break;
             
     case ArrayPop:
         node.setCanExit(true);
-        forNode(node.child1()).filter(SpecCell);
         forNode(nodeIndex).makeTop();
         break;
             
@@ -1102,14 +1035,9 @@ bool AbstractState::execute(unsigned indexInBlock)
         Node& child = m_graph[node.child1()];
         if (child.shouldSpeculateBoolean())
             speculateBooleanUnary(node);
-        else if (child.shouldSpeculateFinalObjectOrOther()) {
-            node.setCanExit(
-                !isFinalObjectOrOtherSpeculation(forNode(node.child1()).m_type));
-            forNode(node.child1()).filter(SpecFinalObject | SpecOther);
-        } else if (child.shouldSpeculateArrayOrOther()) {
-            node.setCanExit(
-                !isArrayOrOtherSpeculation(forNode(node.child1()).m_type));
-            forNode(node.child1()).filter(SpecArray | SpecOther);
+        else if (child.shouldSpeculateNonStringCellOrOther()) {
+            node.setCanExit(true);
+            forNode(node.child1()).filter((SpecCell & ~SpecString) | SpecOther);
         } else if (child.shouldSpeculateInteger())
             speculateInt32Unary(node);
         else if (child.shouldSpeculateNumber())
@@ -1235,7 +1163,7 @@ bool AbstractState::execute(unsigned indexInBlock)
         
     case CreateActivation:
         node.setCanExit(false);
-        forNode(nodeIndex).set(m_graph.m_globalData.activationStructure.get());
+        forNode(nodeIndex).set(m_codeBlock->globalObjectFor(node.codeOrigin)->activationStructure());
         m_haveStructures = true;
         break;
         
@@ -1347,80 +1275,8 @@ bool AbstractState::execute(unsigned indexInBlock)
         break;
             
     case GetArrayLength:
-        switch (node.arrayMode()) {
-        case Array::Undecided:
-            ASSERT_NOT_REACHED();
-            break;
-        case Array::ForceExit:
-            m_isValid = false;
-            break;
-        case Array::Generic:
-            ASSERT_NOT_REACHED();
-            break;
-        case Array::String:
-            node.setCanExit(!isStringSpeculation(forNode(node.child1()).m_type));
-            forNode(node.child1()).filter(SpecString);
-            forNode(nodeIndex).set(SpecInt32);
-            break;
-        case Array::JSArray:
-            node.setCanExit(true);
-            forNode(node.child1()).filter(SpecCell);
-            forNode(nodeIndex).set(SpecInt32);
-            break;
-        case Array::JSArrayOutOfBounds:
-            ASSERT_NOT_REACHED();
-            break;
-        case Array::Arguments:
-            node.setCanExit(true);
-            forNode(node.child1()).filter(SpecArguments);
-            forNode(nodeIndex).set(SpecInt32);
-            break;
-        case Array::Int8Array:
-            node.setCanExit(!isInt8ArraySpeculation(forNode(node.child1()).m_type));
-            forNode(node.child1()).filter(SpecInt8Array);
-            forNode(nodeIndex).set(SpecInt32);
-            break;
-        case Array::Int16Array:
-            node.setCanExit(!isInt16ArraySpeculation(forNode(node.child1()).m_type));
-            forNode(node.child1()).filter(SpecInt16Array);
-            forNode(nodeIndex).set(SpecInt32);
-            break;
-        case Array::Int32Array:
-            node.setCanExit(!isInt32ArraySpeculation(forNode(node.child1()).m_type));
-            forNode(node.child1()).filter(SpecInt32Array);
-            forNode(nodeIndex).set(SpecInt32);
-            break;
-        case Array::Uint8Array:
-            node.setCanExit(!isUint8ArraySpeculation(forNode(node.child1()).m_type));
-            forNode(node.child1()).filter(SpecUint8Array);
-            forNode(nodeIndex).set(SpecInt32);
-            break;
-        case Array::Uint8ClampedArray:
-            node.setCanExit(!isUint8ClampedArraySpeculation(forNode(node.child1()).m_type));
-            forNode(node.child1()).filter(SpecUint8ClampedArray);
-            forNode(nodeIndex).set(SpecInt32);
-            break;
-        case Array::Uint16Array:
-            node.setCanExit(!isUint16ArraySpeculation(forNode(node.child1()).m_type));
-            forNode(node.child1()).filter(SpecUint16Array);
-            forNode(nodeIndex).set(SpecInt32);
-            break;
-        case Array::Uint32Array:
-            node.setCanExit(!isUint32ArraySpeculation(forNode(node.child1()).m_type));
-            forNode(node.child1()).filter(SpecUint32Array);
-            forNode(nodeIndex).set(SpecInt32);
-            break;
-        case Array::Float32Array:
-            node.setCanExit(!isFloat32ArraySpeculation(forNode(node.child1()).m_type));
-            forNode(node.child1()).filter(SpecFloat32Array);
-            forNode(nodeIndex).set(SpecInt32);
-            break;
-        case Array::Float64Array:
-            node.setCanExit(!isFloat64ArraySpeculation(forNode(node.child1()).m_type));
-            forNode(node.child1()).filter(SpecFloat64Array);
-            forNode(nodeIndex).set(SpecInt32);
-            break;
-        }
+        node.setCanExit(true); // Lies, but it's true for the common case of JSArray, so it's good enough.
+        forNode(nodeIndex).set(SpecInt32);
         break;
 
     case CheckStructure:
@@ -1492,8 +1348,13 @@ bool AbstractState::execute(unsigned indexInBlock)
         forNode(node.child1()).filter(SpecCell);
         forNode(nodeIndex).clear(); // The result is not a JS value.
         break;
-    case GetIndexedPropertyStorage: {
-        node.setCanExit(true); // Lies, but this is (almost) always followed by GetByVal, which does exit. So no point in trying to be more precise.
+    case CheckArray: {
+        if (modeAlreadyChecked(forNode(node.child1()), node.arrayMode())) {
+            m_foundConstants = true;
+            node.setCanExit(false);
+            break;
+        }
+        node.setCanExit(true); // Lies, but this is followed by operations (like GetByVal) that always exit, so there is no point in us trying to be clever here.
         switch (node.arrayMode()) {
         case Array::String:
             forNode(node.child1()).filter(SpecString);
@@ -1503,6 +1364,9 @@ bool AbstractState::execute(unsigned indexInBlock)
             // This doesn't filter anything meaningful right now. We may want to add
             // CFA tracking of array mode speculations, but we don't have that, yet.
             forNode(node.child1()).filter(SpecCell);
+            break;
+        case Array::Arguments:
+            forNode(node.child1()).filter(SpecArguments);
             break;
         case Array::Int8Array:
             forNode(node.child1()).filter(SpecInt8Array);
@@ -1533,6 +1397,19 @@ bool AbstractState::execute(unsigned indexInBlock)
             break;
         default:
             ASSERT_NOT_REACHED();
+            break;
+        }
+        break;
+    }
+    case GetIndexedPropertyStorage: {
+        switch (node.arrayMode()) {
+        case Array::String:
+            // Strings are weird - we may spec fail if the string was a rope. That is of course
+            // stupid, and we should fix that, but for now let's at least be honest about it.
+            node.setCanExit(true);
+            break;
+        default:
+            node.setCanExit(false);
             break;
         }
         forNode(nodeIndex).clear();

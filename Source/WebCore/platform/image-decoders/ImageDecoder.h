@@ -32,11 +32,11 @@
 #include "IntRect.h"
 #include "ImageSource.h"
 #include "PlatformScreen.h"
-#include "PlatformString.h"
 #include "SharedBuffer.h"
 #include <wtf/Assertions.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
+#include <wtf/text/WTFString.h>
 
 #if USE(SKIA)
 #include "NativeImageSkia.h"
@@ -278,6 +278,9 @@ namespace WebCore {
 
         // Make the best effort guess to check if the requested frame has alpha channel.
         virtual bool frameHasAlphaAtIndex(size_t) const;
+
+        // Number of bytes in the decoded frame requested. Return 0 if not yet decoded.
+        virtual unsigned frameBytesAtIndex(size_t) const;
 
         void setIgnoreGammaAndColorProfile(bool flag) { m_ignoreGammaAndColorProfile = flag; }
         bool ignoresGammaAndColorProfile() const { return m_ignoreGammaAndColorProfile; }

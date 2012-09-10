@@ -68,17 +68,26 @@ public:
     // as other and its descendants.
     WEBKIT_EXPORT bool matchesTypes(const WebTransformOperations& other) const;
 
+    // Returns true if these operations can be blended. It will only return
+    // false if we must resort to matrix interpolation, and matrix interpolation
+    // fails (this can happen if either matrix cannot be decomposed).
+    WEBKIT_EXPORT bool canBlendWith(const WebTransformOperations& other) const;
+
     WEBKIT_EXPORT void appendTranslate(double x, double y, double z);
     WEBKIT_EXPORT void appendRotate(double x, double y, double z, double degrees);
     WEBKIT_EXPORT void appendScale(double x, double y, double z);
     WEBKIT_EXPORT void appendSkew(double x, double y);
     WEBKIT_EXPORT void appendPerspective(double depth);
     WEBKIT_EXPORT void appendMatrix(const WebTransformationMatrix&);
+    WEBKIT_EXPORT void appendIdentity();
+
+    WEBKIT_EXPORT bool isIdentity() const;
 
 private:
     WEBKIT_EXPORT void reset();
     WEBKIT_EXPORT void initialize();
     WEBKIT_EXPORT void initialize(const WebTransformOperations& prototype);
+    WEBKIT_EXPORT bool blendInternal(const WebTransformOperations& from, double progress, WebTransformationMatrix& result) const;
 
     WebPrivateOwnPtr<WebTransformOperationsPrivate> m_private;
 };

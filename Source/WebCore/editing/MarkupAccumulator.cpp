@@ -47,11 +47,11 @@ using namespace HTMLNames;
 
 void appendCharactersReplacingEntities(StringBuilder& result, const UChar* content, size_t length, EntityMask entityMask)
 {
-    DEFINE_STATIC_LOCAL(const String, ampReference, ("&amp;"));
-    DEFINE_STATIC_LOCAL(const String, ltReference, ("&lt;"));
-    DEFINE_STATIC_LOCAL(const String, gtReference, ("&gt;"));
-    DEFINE_STATIC_LOCAL(const String, quotReference, ("&quot;"));
-    DEFINE_STATIC_LOCAL(const String, nbspReference, ("&nbsp;"));
+    DEFINE_STATIC_LOCAL(const String, ampReference, (ASCIILiteral("&amp;")));
+    DEFINE_STATIC_LOCAL(const String, ltReference, (ASCIILiteral("&lt;")));
+    DEFINE_STATIC_LOCAL(const String, gtReference, (ASCIILiteral("&gt;")));
+    DEFINE_STATIC_LOCAL(const String, quotReference, (ASCIILiteral("&quot;")));
+    DEFINE_STATIC_LOCAL(const String, nbspReference, (ASCIILiteral("&nbsp;")));
 
     static const EntityDescription entityMaps[] = {
         { '&', ampReference, EntityAmp },
@@ -235,7 +235,7 @@ bool MarkupAccumulator::shouldAddNamespaceElement(const Element* element)
     if (prefix.isEmpty())
         return !element->hasAttribute(xmlnsAtom);
 
-    DEFINE_STATIC_LOCAL(String, xmlnsWithColon, ("xmlns:"));
+    DEFINE_STATIC_LOCAL(String, xmlnsWithColon, (ASCIILiteral("xmlns:")));
     return !element->hasAttribute(xmlnsWithColon + prefix);
 }
 

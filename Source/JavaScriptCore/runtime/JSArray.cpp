@@ -113,7 +113,7 @@ static inline bool isDenseEnoughForVector(unsigned length, unsigned numValues)
 static bool reject(ExecState* exec, bool throwException, const char* message)
 {
     if (throwException)
-        throwTypeError(exec, message);
+        throwTypeError(exec, ASCIILiteral(message));
     return false;
 }
 
@@ -212,14 +212,14 @@ inline void SparseArrayValueMap::put(ExecState* exec, JSArray* array, unsigned i
     if (result.isNewEntry && !array->isExtensible()) {
         remove(result.iterator);
         if (shouldThrow)
-            throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
+            throwTypeError(exec, ASCIILiteral(StrictModeReadonlyPropertyWriteError));
         return;
     }
 
     if (!(entry.attributes & Accessor)) {
         if (entry.attributes & ReadOnly) {
             if (shouldThrow)
-                throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
+                throwTypeError(exec, ASCIILiteral(StrictModeReadonlyPropertyWriteError));
             return;
         }
 
@@ -233,7 +233,7 @@ inline void SparseArrayValueMap::put(ExecState* exec, JSArray* array, unsigned i
     
     if (!setter) {
         if (shouldThrow)
-            throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
+            throwTypeError(exec, ASCIILiteral(StrictModeReadonlyPropertyWriteError));
         return;
     }
 
@@ -244,7 +244,7 @@ inline void SparseArrayValueMap::put(ExecState* exec, JSArray* array, unsigned i
     call(exec, setter, callType, callData, array, args);
 }
 
-inline bool SparseArrayValueMap::putDirect(ExecState* exec, JSArray* array, unsigned i, JSValue value, bool shouldThrow)
+inline bool SparseArrayValueMap::putDirect(ExecState* exec, JSArray* array, unsigned i, JSValue value, PutDirectIndexMode mode)
 {
     AddResult result = add(array, i);
     SparseArrayEntry& entry = result.iterator->second;
@@ -252,9 +252,9 @@ inline bool SparseArrayValueMap::putDirect(ExecState* exec, JSArray* array, unsi
     // To save a separate find & add, we first always add to the sparse map.
     // In the uncommon case that this is a new property, and the array is not
     // extensible, this is not the right thing to have done - so remove again.
-    if (result.isNewEntry && !array->isExtensible()) {
+    if (mode != PutDirectIndexLikePutDirect && result.isNewEntry && !array->isExtensible()) {
         remove(result.iterator);
-        return reject(exec, shouldThrow, "Attempting to define property on object that is not extensible.");
+        return reject(exec, mode == PutDirectIndexShouldThrow, "Attempting to define property on object that is not extensible.");
     }
 
     entry.attributes = 0;
@@ -414,7 +414,7 @@ bool JSArray::defineOwnNumericProperty(ExecState* exec, unsigned index, Property
         // state (i.e. defineOwnProperty could be used to set a value without needing to entering 'SparseMode').
         if (!descriptor.attributes()) {
             ASSERT(!descriptor.isAccessorDescriptor());
-            return putDirectIndex(exec, index, descriptor.value(), throwException);
+            return putDirectIndex(exec, index, descriptor.value(), throwException ? PutDirectIndexShouldThrow : PutDirectIndexShouldNotThrow);
         }
 
         enterDictionaryMode(exec->globalData());
@@ -723,7 +723,7 @@ void JSArray::put(JSCell* cell, ExecState* exec, PropertyName propertyName, JSVa
     if (propertyName == exec->propertyNames().length) {
         unsigned newLength = value.toUInt32(exec);
         if (value.toNumber(exec) != static_cast<double>(newLength)) {
-            throwError(exec, createRangeError(exec, "Invalid array length"));
+            throwError(exec, createRangeError(exec, ASCIILiteral("Invalid array length")));
             return;
         }
         thisObject->setLength(exec, newLength, slot.isStrictMode());
@@ -811,7 +811,7 @@ void JSArray::putByIndexBeyondVectorLength(ExecState* exec, unsigned i, JSValue 
         // Prohibit growing the array if length is not writable.
         if (map->lengthIsReadOnly() || !isExtensible()) {
             if (shouldThrow)
-                throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
+                throwTypeError(exec, ASCIILiteral(StrictModeReadonlyPropertyWriteError));
             return;
         }
         length = i + 1;
@@ -844,7 +844,7 @@ void JSArray::putByIndexBeyondVectorLength(ExecState* exec, unsigned i, JSValue 
     valueSlot.set(globalData, this, value);
 }
 
-bool JSArray::putDirectIndexBeyondVectorLength(ExecState* exec, unsigned i, JSValue value, bool shouldThrow)
+bool JSArray::putDirectIndexBeyondVectorLength(ExecState* exec, unsigned i, JSValue value, PutDirectIndexMode mode)
 {
     JSGlobalData& globalData = exec->globalData();
 
@@ -875,17 +875,19 @@ bool JSArray::putDirectIndexBeyondVectorLength(ExecState* exec, unsigned i, JSVa
         // We don't want to, or can't use a vector to hold this property - allocate a sparse map & add the value.
         allocateSparseMap(exec->globalData());
         map = m_sparseValueMap;
-        return map->putDirect(exec, this, i, value, shouldThrow);
+        return map->putDirect(exec, this, i, value, mode);
     }
 
     // Update m_length if necessary.
     unsigned length = storage->m_length;
     if (i >= length) {
         // Prohibit growing the array if length is not writable.
-        if (map->lengthIsReadOnly())
-            return reject(exec, shouldThrow, StrictModeReadonlyPropertyWriteError);
-        if (!isExtensible())
-            return reject(exec, shouldThrow, "Attempting to define property on object that is not extensible.");
+        if (mode != PutDirectIndexLikePutDirect) {
+            if (map->lengthIsReadOnly())
+                return reject(exec, mode == PutDirectIndexShouldThrow, StrictModeReadonlyPropertyWriteError);
+            if (!isExtensible())
+                return reject(exec, mode == PutDirectIndexShouldThrow, "Attempting to define property on object that is not extensible.");
+        }
         length = i + 1;
         storage->m_length = length;
     }
@@ -894,7 +896,7 @@ bool JSArray::putDirectIndexBeyondVectorLength(ExecState* exec, unsigned i, JSVa
     // We will continue  to use a sparse map if SparseMode is set, a vector would be too sparse, or if allocation fails.
     unsigned numValuesInArray = storage->m_numValuesInVector + map->size();
     if (map->sparseMode() || !isDenseEnoughForVector(length, numValuesInArray) || !increaseVectorLength(exec->globalData(), length))
-        return map->putDirect(exec, this, i, value, shouldThrow);
+        return map->putDirect(exec, this, i, value, mode);
 
     // Reread m_storage afterincreaseVectorLength, update m_numValuesInVector.
     storage = m_storage;
@@ -1234,7 +1236,7 @@ JSValue JSArray::pop(ExecState* exec)
     unsigned length = storage->m_length;
     if (!length) {
         if (!isLengthWritable())
-            throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
+            throwTypeError(exec, ASCIILiteral(StrictModeReadonlyPropertyWriteError));
         return jsUndefined();
     }
 
@@ -1259,7 +1261,7 @@ JSValue JSArray::pop(ExecState* exec)
         return jsUndefined();
     // Call the [[Delete]] internal method of O with arguments indx and true.
     if (!deletePropertyByIndex(this, exec, index)) {
-        throwTypeError(exec, "Unable to delete property.");
+        throwTypeError(exec, ASCIILiteral("Unable to delete property."));
         return jsUndefined();
     }
     // Call the [[Put]] internal method of O with arguments "length", indx, and true.
@@ -1292,7 +1294,7 @@ void JSArray::push(ExecState* exec, JSValue value)
         methodTable()->putByIndex(this, exec, storage->m_length, value, true);
         // Per ES5.1 15.4.4.7 step 6 & 15.4.5.1 step 3.d.
         if (!exec->hadException())
-            throwError(exec, createRangeError(exec, "Invalid array length"));
+            throwError(exec, createRangeError(exec, ASCIILiteral("Invalid array length")));
         return;
     }
 
@@ -1479,7 +1481,7 @@ void JSArray::sort(ExecState* exec)
     // a toString call raises an exception.
 
     for (size_t i = 0; i < lengthNotIncludingUndefined; i++)
-        values[i].second = values[i].first.toUStringInline(exec);
+        values[i].second = values[i].first.toWTFStringInline(exec);
 
     if (exec->hadException()) {
         Heap::heap(this)->popTempSortVector(&values);

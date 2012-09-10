@@ -27,8 +27,9 @@
 #include "CSSCanvasValue.h"
 
 #include "ImageBuffer.h"
-#include "MemoryInstrumentation.h"
 #include "RenderObject.h"
+#include "WebCoreMemoryInstrumentation.h"
+#include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
@@ -40,9 +41,11 @@ CSSCanvasValue::~CSSCanvasValue()
 
 String CSSCanvasValue::customCssText() const
 {
-    String result = "-webkit-canvas(";
-    result += m_name  + ")";
-    return result;
+    StringBuilder result;
+    result.appendLiteral("-webkit-canvas(");
+    result.append(m_name);
+    result.append(')');
+    return result.toString();
 }
 
 void CSSCanvasValue::canvasChanged(HTMLCanvasElement*, const FloatRect& changedRect)
@@ -95,7 +98,7 @@ PassRefPtr<Image> CSSCanvasValue::image(RenderObject* renderer, const IntSize& /
 
 void CSSCanvasValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
     CSSImageGeneratorValue::reportBaseClassMemoryUsage(memoryObjectInfo);
     info.addInstrumentedMember(m_name);
     info.addInstrumentedMember(m_element);

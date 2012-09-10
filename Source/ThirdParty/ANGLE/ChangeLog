@@ -1,3 +1,52 @@
+2012-09-06  Andras Becsi  <andras.becsi@nokia.com>
+
+        [ANGLE] Fix the build with gcc 4.7
+        https://bugs.webkit.org/show_bug.cgi?id=95989
+
+        Reviewed by Csaba Osztrogonác.
+
+        The build fails because of a bogus warning about the auto-generated
+        pplval variable. Unfortunately the warning is called -Wuninitialized
+        in gcc 4.6 and -Wmaybe-uninitialized in gcc 4.7 thus we also need to
+        ignore unknown pragmas not to break the build with compilers that do
+        not recognize these options.
+
+        * src/compiler/preprocessor/new/ExpressionParser.y:
+
+2012-09-06  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Fix build with ANGLE on platforms that provide EGL/GLESv2
+        https://bugs.webkit.org/show_bug.cgi?id=95965
+
+        Reviewed by Tor Arne Vestbø.
+
+        Add build rules to build ANGLE as a static library for the Qt port.
+
+        * ANGLE.pri: Added.
+        * ANGLE.pro: Added.
+        * DerivedSources.pri: Added.
+        * Target.pri: Added.
+
+2012-08-24  Joshua Netterfield  <jnetterfield@rim.com>
+
+        [CSS Shaders] [ANGLE] RenameFunction::RenameFunction may store references to temporary string
+        https://bugs.webkit.org/show_bug.cgi?id=94736
+        http://code.google.com/p/angleproject/issues/detail?id=360
+
+        Reviewed by George Staikos.
+
+        When RenameFunction::RenameFunction(const TString& oldFunctionName, const TString&
+        newFunctionName) is called from TCompiler::rewriteCSSShader(TIntermNode*), references to
+        the temporaries oldFunctionName and newFunctionName are stored as mOldFunctionName and
+        mNewFunctionName. This results in undefined behaviour in visitAggregate.
+
+        This same patch is being applied in upstream ANGLE, and is needed for CSS Shader
+        sanitization.
+
+        * src/compiler/RenameFunction.h:
+        (RenameFunction::visitAggregate):
+        (RenameFunction):
+
 2012-07-18  Kristóf Kosztyó  <kkristof@inf.u-szeged.hu>
 
         [Qt] Buildfix after r122870.

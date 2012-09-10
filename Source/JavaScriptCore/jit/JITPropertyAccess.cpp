@@ -493,6 +493,7 @@ void JIT::emitSlow_op_put_by_id(Instruction* currentInstruction, Vector<SlowCase
     stubCall.addArgument(regT0);
     stubCall.addArgument(TrustedImmPtr(ident));
     stubCall.addArgument(regT1);
+    move(regT0, nonArgGPR1);
     Call call = stubCall.call();
 
     // Track the location of the call; this will be used to recover patch information.
@@ -537,6 +538,8 @@ void JIT::compileGetDirectOffset(JSObject* base, RegisterID result, PropertyOffs
 
 void JIT::privateCompilePutByIdTransition(StructureStubInfo* stubInfo, Structure* oldStructure, Structure* newStructure, PropertyOffset cachedOffset, StructureChain* chain, ReturnAddressPtr returnAddress, bool direct)
 {
+    move(nonArgGPR1, regT0);
+
     JumpList failureCases;
     // Check eax is an object of the right Structure.
     failureCases.append(emitJumpIfNotJSCell(regT0));
@@ -1067,13 +1070,12 @@ void JIT::emit_op_get_scoped_var(Instruction* currentInstruction)
         Jump activationNotCreated;
         if (checkTopLevel)
             activationNotCreated = branchTestPtr(Zero, addressFor(m_codeBlock->activationRegister()));
-        loadPtr(Address(regT0, OBJECT_OFFSETOF(ScopeChainNode, next)), regT0);
+        loadPtr(Address(regT0, JSScope::offsetOfNext()), regT0);
         activationNotCreated.link(this);
     }
     while (skip--)
-        loadPtr(Address(regT0, OBJECT_OFFSETOF(ScopeChainNode, next)), regT0);
+        loadPtr(Address(regT0, JSScope::offsetOfNext()), regT0);
 
-    loadPtr(Address(regT0, OBJECT_OFFSETOF(ScopeChainNode, object)), regT0);
     loadPtr(Address(regT0, JSVariableObject::offsetOfRegisters()), regT0);
     loadPtr(Address(regT0, currentInstruction[2].u.operand * sizeof(Register)), regT0);
     emitValueProfilingSite();
@@ -1093,12 +1095,11 @@ void JIT::emit_op_put_scoped_var(Instruction* currentInstruction)
         Jump activationNotCreated;
         if (checkTopLevel)
             activationNotCreated = branchTestPtr(Zero, addressFor(m_codeBlock->activationRegister()));
-        loadPtr(Address(regT1, OBJECT_OFFSETOF(ScopeChainNode, next)), regT1);
+        loadPtr(Address(regT1, JSScope::offsetOfNext()), regT1);
         activationNotCreated.link(this);
     }
     while (skip--)
-        loadPtr(Address(regT1, OBJECT_OFFSETOF(ScopeChainNode, next)), regT1);
-    loadPtr(Address(regT1, OBJECT_OFFSETOF(ScopeChainNode, object)), regT1);
+        loadPtr(Address(regT1, JSScope::offsetOfNext()), regT1);
 
     emitWriteBarrier(regT1, regT0, regT2, regT3, ShouldFilterImmediates, WriteBarrierForVariableAccess);
 
@@ -1162,7 +1163,7 @@ void JIT::resetPatchPutById(RepatchBuffer& repatchBuffer, StructureStubInfo* stu
     else
         repatchBuffer.relink(stubInfo->callReturnLocation, cti_op_put_by_id);
     repatchBuffer.repatch(stubInfo->hotPathBegin.dataLabelPtrAtOffset(stubInfo->patch.baseline.u.put.structureToCompare), reinterpret_cast<void*>(-1));
-    repatchBuffer.repatch(stubInfo->hotPathBegin.dataLabelCompactAtOffset(stubInfo->patch.baseline.u.put.displacementLabel), 0);
+    repatchBuffer.repatch(stubInfo->hotPathBegin.dataLabel32AtOffset(stubInfo->patch.baseline.u.put.displacementLabel), 0);
 }
 
 #endif // USE(JSVALUE64)

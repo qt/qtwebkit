@@ -37,11 +37,14 @@ class DateTimeSymbolicFieldElement : public DateTimeFieldElement {
     WTF_MAKE_NONCOPYABLE(DateTimeSymbolicFieldElement);
 
 protected:
-    DateTimeSymbolicFieldElement(Document*, FieldEventHandler&, const Vector<String>&);
+    DateTimeSymbolicFieldElement(Document*, FieldOwner&, const Vector<String>&);
     virtual void setValueAsInteger(int, EventBehavior = DispatchNoEvent) OVERRIDE FINAL;
 
 private:
     static const int invalidIndex = -1;
+
+    virtual PassRefPtr<RenderStyle> customStyleForRenderer() OVERRIDE FINAL;
+    String visibleEmptyValue() const;
 
     // DateTimeFieldElement functions.
     virtual void handleKeyboardEvent(KeyboardEvent*) OVERRIDE FINAL;
@@ -54,6 +57,10 @@ private:
     virtual String visibleValue() const OVERRIDE FINAL;
 
     const Vector<String> m_symbols;
+
+    // We use AtomicString to share visible empty value among multiple
+    // DateTimeEditElements in the page.
+    const AtomicString m_visibleEmptyValue;
     int m_selectedIndex;
 };
 

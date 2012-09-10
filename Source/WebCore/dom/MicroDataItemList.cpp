@@ -40,8 +40,7 @@ using namespace HTMLNames;
 
 const String& MicroDataItemList::undefinedItemType()
 {
-    DEFINE_STATIC_LOCAL(String, undefinedItemTypeString, (""));
-    return undefinedItemTypeString;
+    return emptyString();
 }
 
 MicroDataItemList::MicroDataItemList(PassRefPtr<Node> rootNode, const String& typeNames)

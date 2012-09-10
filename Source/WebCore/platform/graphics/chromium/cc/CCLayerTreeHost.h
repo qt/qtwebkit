@@ -27,6 +27,7 @@
 
 #include "CCAnimationEvents.h"
 #include "CCGraphicsContext.h"
+#include "CCLayerTreeHostClient.h"
 #include "CCLayerTreeHostCommon.h"
 #include "CCOcclusionTracker.h"
 #include "CCPrioritizedTextureManager.h"
@@ -52,28 +53,6 @@ class CCTextureUpdateQueue;
 class HeadsUpDisplayLayerChromium;
 class Region;
 struct CCScrollAndScaleSet;
-
-class CCLayerTreeHostClient {
-public:
-    virtual void willBeginFrame() = 0;
-    // Marks finishing compositing-related tasks on the main thread. In threaded mode, this corresponds to didCommit().
-    virtual void didBeginFrame() = 0;
-    virtual void updateAnimations(double frameBeginTime) = 0;
-    virtual void layout() = 0;
-    virtual void applyScrollAndScale(const IntSize& scrollDelta, float pageScale) = 0;
-    virtual PassOwnPtr<WebKit::WebCompositorOutputSurface> createOutputSurface() = 0;
-    virtual void didRecreateOutputSurface(bool success) = 0;
-    virtual void willCommit() = 0;
-    virtual void didCommit() = 0;
-    virtual void didCommitAndDrawFrame() = 0;
-    virtual void didCompleteSwapBuffers() = 0;
-
-    // Used only in the single-threaded path.
-    virtual void scheduleComposite() = 0;
-
-protected:
-    virtual ~CCLayerTreeHostClient() { }
-};
 
 struct CCLayerTreeSettings {
     CCLayerTreeSettings()
@@ -165,6 +144,7 @@ public:
     void willCommit();
     void commitComplete();
     PassOwnPtr<CCGraphicsContext> createContext();
+    PassOwnPtr<CCInputHandler> createInputHandler();
     virtual PassOwnPtr<CCLayerTreeHostImpl> createLayerTreeHostImpl(CCLayerTreeHostImplClient*);
     void didLoseContext();
     enum RecreateResult {
@@ -182,8 +162,6 @@ public:
     void updateLayers(CCTextureUpdateQueue&, size_t contentsMemoryLimitBytes);
 
     CCLayerTreeHostClient* client() { return m_client; }
-
-    int compositorIdentifier() const { return m_compositorIdentifier; }
 
     // Only used when compositing on the main thread.
     void composite();
@@ -233,11 +211,8 @@ public:
 
     CCPrioritizedTextureManager* contentsTextureManager() const;
 
-    // This will cause contents texture manager to evict all textures, but
-    // without deleting them. This happens after all content textures have
-    // already been deleted on impl, after getting a 0 allocation limit.
-    // Set during a commit, but before updateLayers.
-    void evictAllContentTextures();
+    void unlinkAllContentTextures();
+    void deleteUnlinkedTextures();
 
     bool visible() const { return m_visible; }
     void setVisible(bool);
@@ -260,6 +235,8 @@ public:
     float deviceScaleFactor() const { return m_deviceScaleFactor; }
 
     void setFontAtlas(PassOwnPtr<CCFontAtlas>);
+
+    HeadsUpDisplayLayerChromium* hudLayer() const { return m_hudLayer.get(); }
 
 protected:
     CCLayerTreeHost(CCLayerTreeHostClient*, const CCLayerTreeSettings&);
@@ -285,8 +262,6 @@ private:
     void animateLayers(double monotonicTime);
     bool animateLayersRecursive(LayerChromium* current, double monotonicTime);
     void setAnimationEventsRecursive(const CCAnimationEventsVector&, LayerChromium*, double wallClockTime);
-
-    int m_compositorIdentifier;
 
     bool m_animating;
     bool m_needsAnimateLayers;

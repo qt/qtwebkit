@@ -185,11 +185,9 @@ RenderObject* RenderObject::createObject(Node* node, RenderStyle* style)
     case BOX:
     case INLINE_BOX:
         return new (arena) RenderDeprecatedFlexibleBox(node);
-#if ENABLE(CSS3_FLEXBOX)
     case FLEX:
     case INLINE_FLEX:
         return new (arena) RenderFlexibleBox(node);
-#endif
     case GRID:
     case INLINE_GRID:
         return new (arena) RenderGrid(node);
@@ -640,9 +638,9 @@ void RenderObject::markContainingBlocksForLayout(bool scheduleRelayout, RenderOb
         if (!container && !object->isRenderView())
             return;
         if (!last->isText() && last->style()->hasOutOfFlowPosition()) {
-            bool willSkipRelativelyPositionedInlines = !object->isRenderBlock() || object->isAnonymousBlock() || object->isRenderFlowThreadContainer();
-            // Skip relatively positioned inlines and anonymous blocks (and the flow threads container) to get to the enclosing RenderBlock.
-            while (object && (!object->isRenderBlock() || object->isAnonymousBlock() || object->isRenderFlowThreadContainer()))
+            bool willSkipRelativelyPositionedInlines = !object->isRenderBlock() || object->isAnonymousBlock();
+            // Skip relatively positioned inlines and anonymous blocks to get to the enclosing RenderBlock.
+            while (object && (!object->isRenderBlock() || object->isAnonymousBlock()))
                 object = object->container();
             if (!object || object->posChildNeedsLayout())
                 return;
@@ -1279,7 +1277,7 @@ RenderBoxModelObject* RenderObject::containerForRepaint() const
     return repaintContainer;
 }
 
-void RenderObject::repaintUsingContainer(RenderBoxModelObject* repaintContainer, const LayoutRect& r, bool immediate)
+void RenderObject::repaintUsingContainer(RenderBoxModelObject* repaintContainer, const LayoutRect& r, bool immediate) const
 {
     if (!repaintContainer) {
         view()->repaintViewRectangle(r, immediate);
@@ -1322,7 +1320,7 @@ void RenderObject::repaintUsingContainer(RenderBoxModelObject* repaintContainer,
 #endif
 }
 
-void RenderObject::repaint(bool immediate)
+void RenderObject::repaint(bool immediate) const
 {
     // Don't repaint if we're unrooted (note that view() still returns the view when unrooted)
     RenderView* view;
@@ -1336,7 +1334,7 @@ void RenderObject::repaint(bool immediate)
     repaintUsingContainer(repaintContainer ? repaintContainer : view, clippedOverflowRectForRepaint(repaintContainer), immediate);
 }
 
-void RenderObject::repaintRectangle(const LayoutRect& r, bool immediate)
+void RenderObject::repaintRectangle(const LayoutRect& r, bool immediate) const
 {
     // Don't repaint if we're unrooted (note that view() still returns the view when unrooted)
     RenderView* view;
@@ -1853,7 +1851,7 @@ void RenderObject::styleWillChange(StyleDifference diff, const RenderStyle* newS
             toRenderBox(this)->removeFloatingOrPositionedChildFromBlockLists();
 
         s_affectsParentBlock = isFloatingOrOutOfFlowPositioned()
-            && (!newStyle->isFloating() && newStyle->position() != AbsolutePosition && newStyle->position() != FixedPosition)
+            && (!newStyle->isFloating() && !newStyle->hasOutOfFlowPosition())
             && parent() && (parent()->isBlockFlow() || parent()->isRenderInline());
 
         // reset style flags
@@ -1861,6 +1859,7 @@ void RenderObject::styleWillChange(StyleDifference diff, const RenderStyle* newS
             setFloating(false);
             setPositioned(false);
             setRelPositioned(false);
+            setStickyPositioned(false);
         }
         setHorizontalWritingMode(true);
         setPaintBackground(false);
@@ -1966,9 +1965,9 @@ void RenderObject::propagateStyleToAnonymousChildren(bool blockChildrenOnly)
                 newStyle->setColumnSpan(ColumnSpanAll);
         }
 
-        // Preserve the position style of anonymous block continuations as they can have relative position when
-        // they contain block descendants of relative positioned inlines.
-        if (child->isRelPositioned() && toRenderBlock(child)->isAnonymousBlockContinuation())
+        // Preserve the position style of anonymous block continuations as they can have relative or sticky position when
+        // they contain block descendants of relative or sticky positioned inlines.
+        if (child->isInFlowPositioned() && toRenderBlock(child)->isAnonymousBlockContinuation())
             newStyle->setPosition(child->style()->position());
 
         child->setStyle(newStyle.release());
@@ -2200,9 +2199,9 @@ LayoutRect RenderObject::localCaretRect(InlineBox*, int, LayoutUnit* extraWidthT
     return LayoutRect();
 }
 
-bool RenderObject::isRooted(RenderView** view)
+bool RenderObject::isRooted(RenderView** view) const
 {
-    RenderObject* o = this;
+    const RenderObject* o = this;
     while (o->parent())
         o = o->parent();
 
@@ -2210,7 +2209,7 @@ bool RenderObject::isRooted(RenderView** view)
         return false;
 
     if (view)
-        *view = toRenderView(o);
+        *view = const_cast<RenderView*>(toRenderView(o));
 
     return true;
 }
@@ -2534,25 +2533,25 @@ bool RenderObject::isComposited() const
     return hasLayer() && toRenderBoxModelObject(this)->layer()->isComposited();
 }
 
-bool RenderObject::hitTest(const HitTestRequest& request, HitTestResult& result, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestFilter hitTestFilter)
+bool RenderObject::hitTest(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestFilter hitTestFilter)
 {
     bool inside = false;
     if (hitTestFilter != HitTestSelf) {
         // First test the foreground layer (lines and inlines).
-        inside = nodeAtPoint(request, result, pointInContainer, accumulatedOffset, HitTestForeground);
+        inside = nodeAtPoint(request, result, locationInContainer, accumulatedOffset, HitTestForeground);
 
         // Test floats next.
         if (!inside)
-            inside = nodeAtPoint(request, result, pointInContainer, accumulatedOffset, HitTestFloat);
+            inside = nodeAtPoint(request, result, locationInContainer, accumulatedOffset, HitTestFloat);
 
         // Finally test to see if the mouse is in the background (within a child block's background).
         if (!inside)
-            inside = nodeAtPoint(request, result, pointInContainer, accumulatedOffset, HitTestChildBlockBackgrounds);
+            inside = nodeAtPoint(request, result, locationInContainer, accumulatedOffset, HitTestChildBlockBackgrounds);
     }
 
     // See if the mouse is inside us but not any of our descendants
     if (hitTestFilter != HitTestDescendants && !inside)
-        inside = nodeAtPoint(request, result, pointInContainer, accumulatedOffset, HitTestBlockBackground);
+        inside = nodeAtPoint(request, result, locationInContainer, accumulatedOffset, HitTestBlockBackground);
 
     return inside;
 }
@@ -2571,7 +2570,7 @@ void RenderObject::updateHitTestResult(HitTestResult& result, const LayoutPoint&
     }
 }
 
-bool RenderObject::nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestPoint& /*pointInContainer*/, const LayoutPoint& /*accumulatedOffset*/, HitTestAction)
+bool RenderObject::nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& /*locationInContainer*/, const LayoutPoint& /*accumulatedOffset*/, HitTestAction)
 {
     return false;
 }
@@ -2898,10 +2897,10 @@ RenderBoxModelObject* RenderObject::offsetParent() const
     //       is one of the following HTML elements: td, th, or table.
     //     * Our own extension: if there is a difference in the effective zoom
 
-    bool skipTables = isOutOfFlowPositioned() || isRelPositioned();
+    bool skipTables = isPositioned();
     float currZoom = style()->effectiveZoom();
     RenderObject* curr = parent();
-    while (curr && (!curr->node() || (!curr->isOutOfFlowPositioned() && !curr->isRelPositioned() && !curr->isBody()))) {
+    while (curr && (!curr->node() || (!curr->isPositioned() && !curr->isBody()))) {
         Node* element = curr->node();
         if (!skipTables && element && (element->hasTagName(tableTag) || element->hasTagName(tdTag) || element->hasTagName(thTag)))
             break;

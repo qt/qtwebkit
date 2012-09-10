@@ -25,7 +25,6 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/DateExtension.cpp
     bindings/v8/IDBBindingUtilities.cpp
     bindings/v8/IDBCustomBindings.cpp
-    bindings/v8/IsolatedWorld.cpp
     bindings/v8/Dictionary.cpp
     bindings/v8/PageScriptDebugServer.cpp
     bindings/v8/RetainedDOMInfo.cpp
@@ -220,6 +219,7 @@ ENDIF ()
 
 LIST(APPEND SCRIPTS_BINDINGS
     ${WEBCORE_DIR}/bindings/scripts/CodeGenerator.pm
+    ${WEBCORE_DIR}/bindings/scripts/CodeGeneratorV8.pm
 )
 
 SET(IDL_INCLUDES "")

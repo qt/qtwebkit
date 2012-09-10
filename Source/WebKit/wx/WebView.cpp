@@ -47,7 +47,6 @@
 #include "Page.h"
 #include "PlatformKeyboardEvent.h"
 #include "PlatformMouseEvent.h"
-#include "PlatformString.h"
 #include "PlatformWheelEvent.h"
 #include "RenderObject.h"
 #include "RenderView.h"
@@ -72,9 +71,9 @@
 #include "JSDOMBinding.h"
 #include <runtime/InitializeThreading.h>
 #include <runtime/JSValue.h>
-#include <runtime/UString.h>
 #include <wtf/MainThread.h>
 #include <wtf/text/CString.h>
+#include <wtf/text/WTFString.h>
 
 #if ENABLE(SQL_DATABASE)
 #include "AbstractDatabase.h"

@@ -99,6 +99,7 @@ namespace WebCore {
     class FloatRect;
     class IntSize;
     class ProtectionSpace;
+    class SharedBuffer;
     struct FileChooserSettings;
     struct TextAlternativeWithRange;
     struct TextCheckingResult;
@@ -848,7 +849,7 @@ private:
 #endif
 
 #if ENABLE(INPUT_TYPE_COLOR)
-    void showColorChooser(const WebCore::Color& initialColor);
+    void showColorChooser(const WebCore::Color& initialColor, const WebCore::IntRect&);
     void setColorChooserColor(const WebCore::Color&);
     void endColorChooser();
     void didChooseColor(const WebCore::Color&);

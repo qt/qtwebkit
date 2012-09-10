@@ -96,9 +96,11 @@ public:
     void didBeginFrame();
     void didCancelFrame();
 
+    void didInvalidateLayout(Frame*);
     void willLayout(Frame*);
     void didLayout();
 
+    void didScheduleStyleRecalculation(Frame*);
     void willRecalculateStyle(Frame*);
     void didRecalculateStyle();
 
@@ -159,8 +161,8 @@ public:
 
 private:
     struct TimelineRecordEntry {
-        TimelineRecordEntry(PassRefPtr<InspectorObject> record, PassRefPtr<InspectorObject> data, PassRefPtr<InspectorArray> children, const String& type, const String& frameId)
-            : record(record), data(data), children(children), type(type), frameId(frameId)
+        TimelineRecordEntry(PassRefPtr<InspectorObject> record, PassRefPtr<InspectorObject> data, PassRefPtr<InspectorArray> children, const String& type, const String& frameId, size_t usedHeapSizeAtStart)
+            : record(record), data(data), children(children), type(type), frameId(frameId), usedHeapSizeAtStart(usedHeapSizeAtStart)
         {
         }
         RefPtr<InspectorObject> record;
@@ -168,6 +170,7 @@ private:
         RefPtr<InspectorArray> children;
         String type;
         String frameId;
+        size_t usedHeapSizeAtStart;
     };
         
     InspectorTimelineAgent(InstrumentingAgents*, InspectorPageAgent*, InspectorState*, InspectorType, InspectorClient*);

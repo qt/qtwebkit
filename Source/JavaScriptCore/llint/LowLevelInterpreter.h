@@ -32,25 +32,57 @@
 
 #include "Opcode.h"
 
+#if ENABLE(LLINT_C_LOOP)
+
+namespace JSC {
+
+// The following is a minimal set of alias for the opcode names. This is needed
+// because there is code (e.g. in GetByIdStatus.cpp and PutByIdStatus.cpp)
+// which refers to the opcodes expecting them to be prefixed with "llint_".
+// In the CLoop implementation, the 2 are equivalent. Hence, we set up this
+// alias here.
+//
+// Note: we don't just do this for all opcodes because we only need a few,
+// and currently, FOR_EACH_OPCODE_ID() includes the llint and JIT opcode
+// extensions which we definitely don't want to add an alias for. With some
+// minor refactoring, we can use FOR_EACH_OPCODE_ID() to automatically
+// generate a llint_ alias for all opcodes, but that is not needed at this
+// time.
+
+const OpcodeID llint_op_call = op_call;
+const OpcodeID llint_op_call_eval = op_call_eval;
+const OpcodeID llint_op_call_varargs = op_call_varargs;
+const OpcodeID llint_op_construct = op_construct;
+const OpcodeID llint_op_catch = op_catch;
+const OpcodeID llint_op_get_by_id = op_get_by_id;
+const OpcodeID llint_op_get_by_id_out_of_line = op_get_by_id_out_of_line;
+const OpcodeID llint_op_put_by_id = op_put_by_id;
+const OpcodeID llint_op_put_by_id_out_of_line = op_put_by_id_out_of_line;
+
+const OpcodeID llint_op_put_by_id_transition_direct =
+    op_put_by_id_transition_direct;
+const OpcodeID llint_op_put_by_id_transition_direct_out_of_line =
+    op_put_by_id_transition_direct_out_of_line;
+const OpcodeID llint_op_put_by_id_transition_normal =
+    op_put_by_id_transition_normal;
+const OpcodeID llint_op_put_by_id_transition_normal_out_of_line =
+    op_put_by_id_transition_normal_out_of_line;
+
+const OpcodeID llint_op_method_check = op_method_check;
+
+} // namespace JSC
+
+#else // !ENABLE(LLINT_C_LOOP)
+
 #define LLINT_INSTRUCTION_DECL(opcode, length) extern "C" void llint_##opcode();
     FOR_EACH_OPCODE_ID(LLINT_INSTRUCTION_DECL);
 #undef LLINT_INSTRUCTION_DECL
 
-extern "C" void llint_begin();
-extern "C" void llint_end();
-extern "C" void llint_program_prologue();
-extern "C" void llint_eval_prologue();
-extern "C" void llint_function_for_call_prologue();
-extern "C" void llint_function_for_construct_prologue();
-extern "C" void llint_function_for_call_arity_check();
-extern "C" void llint_function_for_construct_arity_check();
-extern "C" void llint_generic_return_point();
-extern "C" void llint_throw_from_slow_path_trampoline();
-extern "C" void llint_throw_during_call_trampoline();
+#define DECLARE_LLINT_NATIVE_HELPER(name, length) extern "C" void name();
+    FOR_EACH_LLINT_NATIVE_HELPER(DECLARE_LLINT_NATIVE_HELPER)
+#undef DECLARE_LLINT_NATIVE_HELPER
 
-// Native call trampolines
-extern "C" void llint_native_call_trampoline();
-extern "C" void llint_native_construct_trampoline();
+#endif // !ENABLE(LLINT_C_LOOP)
 
 #endif // ENABLE(LLINT)
 

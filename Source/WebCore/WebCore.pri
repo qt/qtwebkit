@@ -16,8 +16,8 @@ INCLUDEPATH += \
     $$SOURCE_DIR/Modules/filesystem \
     $$SOURCE_DIR/Modules/geolocation \
     $$SOURCE_DIR/Modules/indexeddb \
+    $$SOURCE_DIR/Modules/navigatorcontentutils \
     $$SOURCE_DIR/Modules/notifications \
-    $$SOURCE_DIR/Modules/protocolhandler \
     $$SOURCE_DIR/Modules/quota \
     $$SOURCE_DIR/Modules/webaudio \
     $$SOURCE_DIR/Modules/webdatabase \
@@ -165,6 +165,11 @@ contains(DEFINES, ENABLE_GAMEPAD=1) {
     PKGCONFIG += libudev
 }
 
+contains(DEFINES, WTF_USE_GSTREAMER=1) {
+    DEFINES += ENABLE_GLIB_SUPPORT=1
+    PKGCONFIG += glib-2.0 gio-2.0 gstreamer-0.10 gstreamer-app-0.10 gstreamer-base-0.10 gstreamer-interfaces-0.10 gstreamer-pbutils-0.10 gstreamer-plugins-base-0.10
+}
+
 contains(DEFINES, ENABLE_VIDEO=1) {
     contains(DEFINES, WTF_USE_QTKIT=1) {
         INCLUDEPATH += $$SOURCE_DIR/platform/graphics/mac
@@ -174,19 +179,24 @@ contains(DEFINES, ENABLE_VIDEO=1) {
                 -framework QuartzCore -framework QTKit
 
     } else:contains(DEFINES, WTF_USE_GSTREAMER=1) {
-        DEFINES += ENABLE_GLIB_SUPPORT=1
-
         INCLUDEPATH += $$SOURCE_DIR/platform/graphics/gstreamer
-
-        PKGCONFIG += glib-2.0 gio-2.0 gstreamer-0.10 gstreamer-app-0.10 gstreamer-base-0.10 gstreamer-interfaces-0.10 gstreamer-pbutils-0.10 gstreamer-plugins-base-0.10 gstreamer-video-0.10
+        PKGCONFIG += gstreamer-video-0.10
     } else:contains(DEFINES, WTF_USE_QT_MULTIMEDIA=1) {
         CONFIG   *= mobility
         MOBILITY *= multimedia
     }
 }
 
+contains(DEFINES, ENABLE_WEB_AUDIO=1) {
+    contains(DEFINES, WTF_USE_GSTREAMER=1) {
+        DEFINES += WTF_USE_WEBAUDIO_GSTREAMER=1
+        INCLUDEPATH += $$SOURCE_DIR/platform/audio/gstreamer
+        PKGCONFIG += gstreamer-audio-0.10 gstreamer-fft-0.10
+    }
+}
+
 contains(DEFINES, WTF_USE_3D_GRAPHICS=1) {
-    contains(QT_CONFIG, opengles2): LIBS += -lEGL
+    contains(QT_CONFIG, opengles2):!win32: LIBS += -lEGL
     mac: LIBS += -framework IOSurface -framework CoreFoundation
     linux-*:contains(DEFINES, HAVE_XCOMPOSITE=1): LIBS += -lXcomposite
 }

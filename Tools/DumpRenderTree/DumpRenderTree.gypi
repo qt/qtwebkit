@@ -54,6 +54,8 @@
             'chromium/WebUserMediaClientMock.h',
             'chromium/WebViewHost.cpp',
             'chromium/WebViewHost.h',
+            'chromium/WebViewHostOutputSurface.cpp',
+            'chromium/WebViewHostOutputSurface.h',
         ],
         'test_runner_files': [
             'DumpRenderTree.h',
@@ -94,6 +96,7 @@
             'TestNetscapePlugIn/Tests/GetURLWithJavaScriptURL.cpp',
             'TestNetscapePlugIn/Tests/GetURLWithJavaScriptURLDestroyingPlugin.cpp',
             'TestNetscapePlugIn/Tests/GetUserAgentWithNullNPPFromNPPNew.cpp',
+            'TestNetscapePlugIn/Tests/NPPNewFails.cpp',
             'TestNetscapePlugIn/Tests/NPRuntimeObjectFromDestroyedPlugin.cpp',
             'TestNetscapePlugIn/Tests/NPRuntimeRemoveProperty.cpp',
             'TestNetscapePlugIn/Tests/NullNPPGetValuePointer.cpp',

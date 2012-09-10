@@ -37,12 +37,12 @@
 #include "InspectorInstrumentation.h"
 #include "KURL.h"
 #include "Logging.h"
-#include "MemoryInstrumentation.h"
 #include "PurgeableBuffer.h"
 #include "ResourceHandle.h"
 #include "ResourceLoadScheduler.h"
 #include "SharedBuffer.h"
 #include "SubresourceLoader.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/MathExtras.h>
 #include <wtf/RefCountedLeakCounter.h>
@@ -803,7 +803,7 @@ void CachedResource::CachedResourceCallback::timerFired(Timer<CachedResourceCall
 
 void CachedResource::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CachedResource);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CachedResource);
     info.addMember(m_resourceRequest);
     info.addHashSet(m_clients);
     info.addInstrumentedMember(m_accept);

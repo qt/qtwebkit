@@ -176,28 +176,24 @@ bool V8TestActiveDOMObject::HasInstance(v8::Handle<v8::Value> value)
 }
 
 
-v8::Handle<v8::Object> V8TestActiveDOMObject::wrapSlow(PassRefPtr<TestActiveDOMObject> impl, v8::Isolate* isolate)
+v8::Handle<v8::Object> V8TestActiveDOMObject::wrapSlow(PassRefPtr<TestActiveDOMObject> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     v8::Handle<v8::Object> wrapper;
-    Frame* frame = 0;
-    if (impl->frame()) {
-        frame = impl->frame();
-        frame->script()->windowShell()->initContextIfNeeded();
-    }
 
-    // Enter the node's context and create the wrapper in that context.
     v8::Handle<v8::Context> context;
-    if (frame && !frame->script()->matchesCurrentContext()) {
+    if (!creationContext.IsEmpty() && creationContext->CreationContext() != v8::Context::GetCurrent()) {
         // For performance, we enter the context only if the currently running context
         // is different from the context that we are about to enter.
-        context = frame->script()->currentWorldContext();
-        if (!context.IsEmpty())
-            context->Enter();
+        context = v8::Local<v8::Context>::New(creationContext->CreationContext());
+        ASSERT(!context.IsEmpty());
+        context->Enter();
     }
-    wrapper = V8DOMWrapper::instantiateV8Object(frame, &info, impl.get());
-    // Exit the node's context if it was entered.
+
+    wrapper = V8DOMWrapper::instantiateV8Object(&info, impl.get());
+
     if (!context.IsEmpty())
         context->Exit();
+
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
     v8::Persistent<v8::Object> wrapperHandle = V8DOMWrapper::setJSWrapperForDOMObject(impl, wrapper, isolate);

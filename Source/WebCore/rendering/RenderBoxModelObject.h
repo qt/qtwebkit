@@ -24,6 +24,7 @@
 #ifndef RenderBoxModelObject_h
 #define RenderBoxModelObject_h
 
+#include "LayoutTypesInlineMethods.h"
 #include "RenderObject.h"
 #include "ShadowData.h"
 
@@ -50,6 +51,7 @@ enum ContentChangeType {
 };
 
 class KeyframeList;
+class StickyPositionViewportConstraints;
 
 // This class is the base for all objects that adhere to the CSS box model as described
 // at http://www.w3.org/TR/CSS21/box.html
@@ -61,6 +63,10 @@ public:
     
     LayoutSize relativePositionOffset() const;
     LayoutSize relativePositionLogicalOffset() const { return style()->isHorizontalWritingMode() ? relativePositionOffset() : relativePositionOffset().transposedSize(); }
+
+    void computeStickyPositionConstraints(StickyPositionViewportConstraints&, const FloatRect& viewportRect) const;
+    LayoutSize stickyPositionOffset() const;
+    LayoutSize stickyPositionLogicalOffset() const { return style()->isHorizontalWritingMode() ? stickyPositionOffset() : stickyPositionOffset().transposedSize(); }
 
     LayoutSize offsetForInFlowPosition() const;
 
@@ -82,7 +88,8 @@ public:
 
     bool hasSelfPaintingLayer() const;
     RenderLayer* layer() const { return m_layer; }
-    virtual bool requiresLayer() const { return isRoot() || isOutOfFlowPositioned() || isInFlowPositioned() || isTransparent() || hasTransform() || hasHiddenBackface() || hasMask() || hasReflection() || hasFilter() || style()->specifiesColumns(); }
+
+    virtual bool requiresLayer() const { return isRoot() || isPositioned() || createsGroup() || hasClipPath() || hasTransform() || hasHiddenBackface() || hasReflection() || style()->specifiesColumns(); }
 
     // This will work on inlines to return the bounding box of all of the lines' border boxes.
     virtual IntRect borderBoundingBox() const = 0;
@@ -275,6 +282,8 @@ public:
 
 private:
     virtual bool isBoxModelObject() const { return true; }
+    
+    virtual LayoutRect frameRectForStickyPositioning() const = 0;
 
     IntSize calculateFillTileSize(const FillLayer*, const IntSize& scaledPositioningAreaSize) const;
 

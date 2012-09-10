@@ -82,6 +82,7 @@ modules = [
             "JavaScriptSource.js",
             "Linkifier.js",
             "NetworkLog.js",
+            "NetworkUISourceCodeProvider.js",
             "PresentationConsoleMessageHelper.js",
             "SASSSourceMapping.js",
             "Script.js",
@@ -90,8 +91,8 @@ modules = [
             "SnippetStorage.js",
             "SourceMapping.js",
             "StyleSource.js",
+            "StylesSourceMapping.js",
             "TimelineManager.js",
-            "RawSourceCode.js",
             "RemoteObject.js",
             "Resource.js",
             "ResourceScriptMapping.js",
@@ -164,11 +165,14 @@ modules = [
             "DOMBreakpointsSidebarPane.js",
             "DOMPresentationUtils.js",
             "ElementsTreeOutline.js",
+            "FontView.js",
+            "ImageView.js",
             "NativeBreakpointsSidebarPane.js",
-            "JavaScriptContextManager.js",
             "ObjectPopoverHelper.js",
             "ObjectPropertiesSection.js",
+            "RuntimeModel.js",
             "SourceFrame.js",
+            "ResourceView.js",
         ]
     },
     {
@@ -176,6 +180,7 @@ modules = [
         "dependencies": ["components"],
         "sources": [
             "ElementsPanel.js",
+            "ElementsPanelDescriptor.js",
             "EventListenersSidebarPane.js",
             "MetricsSidebarPane.js",
             "PropertiesSidebarPane.js",
@@ -186,8 +191,6 @@ modules = [
         "name": "network",
         "dependencies": ["components"],
         "sources": [
-            "FontView.js",
-            "ImageView.js",
             "NetworkItemView.js",
             "RequestCookiesView.js",
             "RequestHeadersView.js",
@@ -197,7 +200,6 @@ modules = [
             "RequestResponseView.js",
             "RequestTimingView.js",
             "RequestView.js",
-            "ResourceView.js",
             "ResourceWebSocketFrameView.js",
             "NetworkPanel.js",
             "NetworkPanelDescriptor.js",
@@ -328,6 +330,7 @@ modules = [
             "ProfilesPanel.js",
             "ProfileLauncherView.js",
             "TopDownProfileDataGridTree.js",
+            "WebGLProfileView.js",
         ]
     },
     {
@@ -370,11 +373,13 @@ def dump_module(name, recursively, processed_modules):
 modules_dir = tempfile.mkdtemp()
 compiler_command = "java -jar ~/closure/compiler.jar --summary_detail_level 3 --compilation_level SIMPLE_OPTIMIZATIONS --warning_level VERBOSE --language_in ECMASCRIPT5 --accept_const_keyword --module_output_path_prefix %s/ \\\n" % modules_dir
 
-process_recursively = len(sys.argv) == 2
+process_recursively = len(sys.argv) > 1
 if process_recursively:
     module_name = sys.argv[1]
     if module_name != "all":
-        modules = [modules_by_name[sys.argv[1]]]
+        modules = []
+        for i in range(1, len(sys.argv)):
+            modules.append(modules_by_name[sys.argv[i]])
     for module in modules:
         command = compiler_command
         command += "    --externs " + inspector_frontend_path + "/externs.js"

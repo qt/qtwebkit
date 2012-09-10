@@ -28,11 +28,11 @@
 #define HistoryItem_h
 
 #include "IntPoint.h"
-#include "PlatformString.h"
 #include <wtf/HashMap.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefCounted.h>
+#include <wtf/text/WTFString.h>
 
 #if PLATFORM(MAC)
 #import <wtf/RetainPtr.h>
@@ -171,6 +171,7 @@ public:
     const HistoryItemVector& children() const;
     bool hasChildren() const;
     void clearChildren();
+    bool isAncestorOf(const HistoryItem*) const;
     
     bool shouldDoSameDocumentNavigationTo(HistoryItem* otherItem) const;
     bool hasSameFrames(HistoryItem* otherItem) const;

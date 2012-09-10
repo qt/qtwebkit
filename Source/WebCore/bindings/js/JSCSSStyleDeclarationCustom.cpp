@@ -33,7 +33,6 @@
 #include "HashTools.h"
 #include "JSCSSValue.h"
 #include "JSNode.h"
-#include "PlatformString.h"
 #include "Settings.h"
 #include "StylePropertySet.h"
 #include <runtime/StringPrototype.h>
@@ -283,7 +282,7 @@ static inline JSValue getPropertyValueFallback(ExecState* exec, JSCSSStyleDeclar
 {
     // If the property is a shorthand property (such as "padding"),
     // it can only be accessed using getPropertyValue.
-    return jsString(exec, thisObj->impl()->getPropertyValueInternal(static_cast<CSSPropertyID>(index)));
+    return jsStringWithCache(exec, thisObj->impl()->getPropertyValueInternal(static_cast<CSSPropertyID>(index)));
 }
 
 static inline JSValue cssPropertyGetterPixelOrPosPrefix(ExecState* exec, JSCSSStyleDeclaration* thisObj, unsigned propertyID)
@@ -358,7 +357,7 @@ bool JSCSSStyleDeclaration::putDelegate(ExecState* exec, PropertyName propertyNa
 
     String propValue = valueToStringWithNullCheck(exec, value);
     if (propertyInfo.hadPixelOrPosPrefix)
-        propValue += "px";
+        propValue.append("px");
 
     bool important = false;
     if (Settings::shouldRespectPriorityInCSSAttributeSetters()) {
@@ -377,7 +376,7 @@ bool JSCSSStyleDeclaration::putDelegate(ExecState* exec, PropertyName propertyNa
 
 JSValue JSCSSStyleDeclaration::getPropertyCSSValue(ExecState* exec)
 {
-    const String& propertyName(ustringToString(exec->argument(0).toString(exec)->value(exec)));
+    const String& propertyName = exec->argument(0).toString(exec)->value(exec);
     if (exec->hadException())
         return jsUndefined();
 

@@ -36,6 +36,7 @@
 
 #include "Event.h"
 #include "Frame.h"
+#include "FrameView.h"
 #include "IdentifiersFactory.h"
 #include "InspectorClient.h"
 #include "InspectorCounters.h"
@@ -65,8 +66,10 @@ static const char Program[] = "Program";
 
 static const char EventDispatch[] = "EventDispatch";
 static const char BeginFrame[] = "BeginFrame";
-static const char Layout[] = "Layout";
+static const char ScheduleStyleRecalculation[] = "ScheduleStyleRecalculation";
 static const char RecalculateStyles[] = "RecalculateStyles";
+static const char InvalidateLayout[] = "InvalidateLayout";
+static const char Layout[] = "Layout";
 static const char Paint[] = "Paint";
 static const char DecodeImage[] = "DecodeImage";
 static const char ResizeImage[] = "ResizeImage";
@@ -227,6 +230,13 @@ void InspectorTimelineAgent::didDispatchEvent()
     didCompleteCurrentRecord(TimelineRecordType::EventDispatch);
 }
 
+void InspectorTimelineAgent::didInvalidateLayout(Frame* frame)
+{
+    if (frame->view()->layoutPending())
+        return;
+    appendRecord(InspectorObject::create(), TimelineRecordType::InvalidateLayout, true, frame);
+}
+
 void InspectorTimelineAgent::willLayout(Frame* frame)
 {
     pushCurrentRecord(InspectorObject::create(), TimelineRecordType::Layout, true, frame);
@@ -235,6 +245,11 @@ void InspectorTimelineAgent::willLayout(Frame* frame)
 void InspectorTimelineAgent::didLayout()
 {
     didCompleteCurrentRecord(TimelineRecordType::Layout);
+}
+
+void InspectorTimelineAgent::didScheduleStyleRecalculation(Frame* frame)
+{
+    appendRecord(InspectorObject::create(), TimelineRecordType::ScheduleStyleRecalculation, true, frame);
 }
 
 void InspectorTimelineAgent::willRecalculateStyle(Frame* frame)
@@ -487,12 +502,16 @@ void InspectorTimelineAgent::innerAddRecordToTimeline(PassRefPtr<InspectorObject
     }
 }
 
-void InspectorTimelineAgent::setHeapSizeStatistics(InspectorObject* record)
+static size_t getUsedHeapSize()
 {
     HeapInfo info;
     ScriptGCEvent::getHeapSize(info);
-    record->setNumber("usedHeapSize", info.usedJSHeapSize);
-    record->setNumber("totalHeapSize", info.totalJSHeapSize);
+    return info.usedJSHeapSize;
+}
+
+void InspectorTimelineAgent::setHeapSizeStatistics(InspectorObject* record)
+{
+    record->setNumber("usedHeapSize", getUsedHeapSize());
 
     if (m_state->getBoolean(TimelineAgentState::includeMemoryDetails)) {
         RefPtr<InspectorObject> counters = InspectorObject::create();
@@ -520,6 +539,9 @@ void InspectorTimelineAgent::didCompleteCurrentRecord(const String& type)
         entry.record->setObject("data", entry.data);
         entry.record->setArray("children", entry.children);
         entry.record->setNumber("endTime", timestamp());
+        size_t usedHeapSizeDelta = getUsedHeapSize() - entry.usedHeapSizeAtStart;
+        if (usedHeapSizeDelta)
+            entry.record->setNumber("usedHeapSizeDelta", usedHeapSizeDelta);
         addRecordToTimeline(entry.record, type, entry.frameId);
     }
 }
@@ -557,7 +579,7 @@ void InspectorTimelineAgent::pushCurrentRecord(PassRefPtr<InspectorObject> data,
     String frameId;
     if (frame && m_pageAgent)
         frameId = m_pageAgent->frameId(frame);
-    m_recordStack.append(TimelineRecordEntry(record.release(), data, InspectorArray::create(), type, frameId));
+    m_recordStack.append(TimelineRecordEntry(record.release(), data, InspectorArray::create(), type, frameId, getUsedHeapSize()));
     if (hasLowLevelDetails && !m_platformInstrumentationClientInstalledAtStackDepth && !PlatformInstrumentation::hasClient()) {
         m_platformInstrumentationClientInstalledAtStackDepth = m_recordStack.size();
         PlatformInstrumentation::setClient(this);

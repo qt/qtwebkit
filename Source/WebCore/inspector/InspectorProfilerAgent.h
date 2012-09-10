@@ -34,11 +34,11 @@
 
 #include "InspectorBaseAgent.h"
 #include "InspectorFrontend.h"
-#include "PlatformString.h"
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/PassOwnPtr.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -119,6 +119,7 @@ private:
     InspectorFrontend::Profiler* m_frontend;
     bool m_enabled;
     bool m_recordingUserInitiatedProfile;
+    bool m_headersRequested;
     int m_currentUserInitiatedProfileNumber;
     unsigned m_nextUserInitiatedProfileNumber;
     unsigned m_nextUserInitiatedHeapSnapshotNumber;

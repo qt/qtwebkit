@@ -121,6 +121,7 @@ namespace JSC {
         void lastChanceToFinalize();
 
         Heap* heap() const;
+        JSGlobalData* globalData() const;
         WeakSet& weakSet();
         
         enum SweepMode { SweepOnly, SweepToFreeList };
@@ -185,6 +186,7 @@ namespace JSC {
 #endif
 
         template <typename Functor> void forEachCell(Functor&);
+        template <typename Functor> void forEachDeadCell(Functor&);
 
     private:
         static const size_t atomAlignmentMask = atomSize - 1; // atomSize must be a power of two.
@@ -260,6 +262,11 @@ namespace JSC {
     inline Heap* MarkedBlock::heap() const
     {
         return m_weakSet.heap();
+    }
+
+    inline JSGlobalData* MarkedBlock::globalData() const
+    {
+        return m_weakSet.globalData();
     }
 
     inline WeakSet& MarkedBlock::weakSet()
@@ -405,6 +412,17 @@ namespace JSC {
         for (size_t i = firstAtom(); i < m_endAtom; i += m_atomsPerCell) {
             JSCell* cell = reinterpret_cast_ptr<JSCell*>(&atoms()[i]);
             if (!isLive(cell))
+                continue;
+
+            functor(cell);
+        }
+    }
+
+    template <typename Functor> inline void MarkedBlock::forEachDeadCell(Functor& functor)
+    {
+        for (size_t i = firstAtom(); i < m_endAtom; i += m_atomsPerCell) {
+            JSCell* cell = reinterpret_cast_ptr<JSCell*>(&atoms()[i]);
+            if (isLive(cell))
                 continue;
 
             functor(cell);

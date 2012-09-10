@@ -54,6 +54,9 @@ class RenderThemeChromiumSkia : public RenderTheme {
 
         virtual bool supportsDataListUI(const AtomicString& type) const OVERRIDE;
 
+#if ENABLE(VIDEO_TRACK)
+        virtual bool supportsClosedCaptioning() const OVERRIDE;
+#endif
         // The platform selection color.
         virtual Color platformActiveSelectionBackgroundColor() const;
         virtual Color platformInactiveSelectionBackgroundColor() const;
@@ -95,6 +98,7 @@ class RenderThemeChromiumSkia : public RenderTheme {
         virtual bool paintMediaVolumeSliderTrack(RenderObject*, const PaintInfo&, const IntRect&);
         virtual void adjustSliderThumbSize(RenderStyle*, Element*) const;
         virtual bool paintMediaSliderThumb(RenderObject*, const PaintInfo&, const IntRect&);
+        virtual bool paintMediaToggleClosedCaptionsButton(RenderObject*, const PaintInfo&, const IntRect&);
         virtual bool paintMediaVolumeSliderThumb(RenderObject*, const PaintInfo&, const IntRect&);
         virtual bool paintMediaPlayButton(RenderObject*, const PaintInfo&, const IntRect&);
         virtual bool paintMediaMuteButton(RenderObject*, const PaintInfo&, const IntRect&);

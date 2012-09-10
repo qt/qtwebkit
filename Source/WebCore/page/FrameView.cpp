@@ -101,7 +101,7 @@ double FrameView::sCurrentPaintTimeStamp = 0.0;
 // Should be removed when applications start using runtime configuration.
 #if ENABLE(REPAINT_THROTTLING)
 // Normal delay
-double FrameView::s_deferredRepaintDelay = 0.025;
+double FrameView::s_normalDeferredRepaintDelay = 0.016;
 // Negative value would mean that first few repaints happen without a delay
 double FrameView::s_initialDeferredRepaintDelayDuringLoading = 0;
 // The delay grows on each repaint to this maximum value
@@ -112,7 +112,7 @@ double FrameView::s_deferredRepaintDelayIncrementDuringLoading = 0.5;
 // FIXME: Repaint throttling could be good to have on all platform.
 // The balance between CPU use and repaint frequency will need some tuning for desktop.
 // More hooks may be needed to reset the delay on things like GIF and CSS animations.
-double FrameView::s_deferredRepaintDelay = 0;
+double FrameView::s_normalDeferredRepaintDelay = 0;
 double FrameView::s_initialDeferredRepaintDelayDuringLoading = 0;
 double FrameView::s_maxDeferredRepaintDelayDuringLoading = 0;
 double FrameView::s_deferredRepaintDelayIncrementDuringLoading = 0;
@@ -609,8 +609,6 @@ void FrameView::applyOverflowToViewport(RenderObject* o, ScrollbarMode& hMode, S
             // Don't set it at all.
             ;
     }
-
-    Pagination pagination;
     
      switch (overflowY) {
         case OHIDDEN:
@@ -625,20 +623,40 @@ void FrameView::applyOverflowToViewport(RenderObject* o, ScrollbarMode& hMode, S
         case OAUTO:
             vMode = ScrollbarAuto;
             break;
-        case OPAGEDX:
-            pagination.mode = WebCore::paginationModeForRenderStyle(o->style());
-            break;
-        case OPAGEDY:
-            pagination.mode = WebCore::paginationModeForRenderStyle(o->style());
-            break;
         default:
-            // Don't set it at all.
+            // Don't set it at all. Values of OPAGEDX and OPAGEDY are handled by applyPaginationToViewPort().
             ;
     }
 
-    setPagination(pagination);
-
     m_viewportRenderer = o;
+}
+
+void FrameView::applyPaginationToViewport()
+{
+    Document* document = m_frame->document();
+    Node* documentElement = document->documentElement();
+    RenderObject* documentRenderer = documentElement ? documentElement->renderer() : 0;
+    RenderObject* documentOrBodyRenderer = documentRenderer;
+    Node* body = document->body();
+    if (body && body->renderer()) {
+        if (body->hasTagName(bodyTag))
+            documentOrBodyRenderer = documentRenderer->style()->overflowX() == OVISIBLE && documentElement->hasTagName(htmlTag) ? body->renderer() : documentRenderer;
+    }
+
+    Pagination pagination;
+
+    if (!documentOrBodyRenderer) {
+        setPagination(pagination);
+        return;
+    }
+
+    EOverflow overflowY = documentOrBodyRenderer->style()->overflowY();
+    if (overflowY == OPAGEDX || overflowY == OPAGEDY) {
+        pagination.mode = WebCore::paginationModeForRenderStyle(documentOrBodyRenderer->style());
+        pagination.gap = static_cast<unsigned>(documentOrBodyRenderer->style()->columnGap());
+    }
+
+    setPagination(pagination);
 }
 
 void FrameView::calculateScrollbarModesForLayout(ScrollbarMode& hMode, ScrollbarMode& vMode, ScrollbarModesCalculationStrategy strategy)
@@ -788,7 +806,7 @@ bool FrameView::syncCompositingStateForThisFrame(Frame* rootFrameForSync)
 
     // If we sync compositing layers and allow the repaint to be deferred, there is time for a
     // visible flash to occur. Instead, stop the deferred repaint timer and repaint immediately.
-    stopDelayingDeferredRepaints();
+    flushDeferredRepaints();
 
     root->compositor()->flushPendingLayerChanges(rootFrameForSync == m_frame);
 
@@ -1034,6 +1052,10 @@ void FrameView::layout(bool allowSubtree)
             InspectorInstrumentation::mediaQueryResultChanged(document);
         } else
             document->evaluateMediaQueryList();
+
+        // If there is any pagination to apply, it will affect the RenderView's style, so we should
+        // take care of that now.
+        applyPaginationToViewport();
 
         // Always ensure our style info is up-to-date. This can happen in situations where
         // the layout beats any sort of style recalc update that needs to occur.
@@ -1314,7 +1336,7 @@ void FrameView::adjustMediaTypeForPrinting(bool printing)
 
 bool FrameView::useSlowRepaints(bool considerOverlap) const
 {
-    bool mustBeSlow = m_slowRepaintObjectCount > 0 || (platformWidget() && hasFixedObjects());
+    bool mustBeSlow = m_slowRepaintObjectCount > 0 || (platformWidget() && hasViewportConstrainedObjects());
 
     // FIXME: WidgetMac.mm makes the assumption that useSlowRepaints ==
     // m_contentIsOpaque, so don't take the fast path for composited layers
@@ -1399,13 +1421,13 @@ void FrameView::removeSlowRepaintObject()
     }
 }
 
-void FrameView::addFixedObject(RenderObject* object)
+void FrameView::addViewportConstrainedObject(RenderObject* object)
 {
-    if (!m_fixedObjects)
-        m_fixedObjects = adoptPtr(new FixedObjectSet);
+    if (!m_viewportConstrainedObjects)
+        m_viewportConstrainedObjects = adoptPtr(new ViewportConstrainedObjectSet);
 
-    if (!m_fixedObjects->contains(object)) {
-        m_fixedObjects->add(object);
+    if (!m_viewportConstrainedObjects->contains(object)) {
+        m_viewportConstrainedObjects->add(object);
         if (platformWidget())
             updateCanBlitOnScrollRecursively();
 
@@ -1416,12 +1438,10 @@ void FrameView::addFixedObject(RenderObject* object)
     }
 }
 
-void FrameView::removeFixedObject(RenderObject* object)
+void FrameView::removeViewportConstrainedObject(RenderObject* object)
 {
-    ASSERT(hasFixedObjects());
-
-    if (m_fixedObjects->contains(object)) {
-        m_fixedObjects->remove(object);
+    if (m_viewportConstrainedObjects && m_viewportConstrainedObjects->contains(object)) {
+        m_viewportConstrainedObjects->remove(object);
         if (Page* page = m_frame->page()) {
             if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
                 scrollingCoordinator->frameViewFixedObjectsDidChange(this);
@@ -1490,7 +1510,7 @@ IntPoint FrameView::currentMousePosition() const
 
 bool FrameView::scrollContentsFastPath(const IntSize& scrollDelta, const IntRect& rectToScroll, const IntRect& clipRect)
 {
-    if (!m_fixedObjects || m_fixedObjects->isEmpty()) {
+    if (!m_viewportConstrainedObjects || m_viewportConstrainedObjects->isEmpty()) {
         hostWindow()->scroll(scrollDelta, rectToScroll, clipRect);
         return true;
     }
@@ -1499,10 +1519,10 @@ bool FrameView::scrollContentsFastPath(const IntSize& scrollDelta, const IntRect
 
     // Get the rects of the fixed objects visible in the rectToScroll
     Region regionToUpdate;
-    FixedObjectSet::const_iterator end = m_fixedObjects->end();
-    for (FixedObjectSet::const_iterator it = m_fixedObjects->begin(); it != end; ++it) {
+    ViewportConstrainedObjectSet::const_iterator end = m_viewportConstrainedObjects->end();
+    for (ViewportConstrainedObjectSet::const_iterator it = m_viewportConstrainedObjects->begin(); it != end; ++it) {
         RenderObject* renderer = *it;
-        if (renderer->style()->position() != FixedPosition)
+        if (!renderer->style()->hasViewportConstrainedPosition())
             continue;
 #if USE(ACCELERATED_COMPOSITING)
         if (renderer->isComposited())
@@ -1533,8 +1553,8 @@ bool FrameView::scrollContentsFastPath(const IntSize& scrollDelta, const IntRect
 
     // 2) update the area of fixed objects that has been invalidated
     Vector<IntRect> subRectsToUpdate = regionToUpdate.rects();
-    size_t fixObjectsCount = subRectsToUpdate.size();
-    for (size_t i = 0; i < fixObjectsCount; ++i) {
+    size_t viewportConstrainedObjectsCount = subRectsToUpdate.size();
+    for (size_t i = 0; i < viewportConstrainedObjectsCount; ++i) {
         IntRect updateRect = subRectsToUpdate[i];
         IntRect scrolledRect = updateRect;
         scrolledRect.move(scrollDelta);
@@ -1723,7 +1743,7 @@ void FrameView::scrollElementToRect(Element* element, const IntRect& rect)
 {
     m_frame->document()->updateLayoutIgnorePendingStylesheets();
 
-    LayoutRect bounds = element->getRect();
+    LayoutRect bounds = element->boundingBox();
     int centeringOffsetX = (rect.width() - bounds.width()) / 2;
     int centeringOffsetY = (rect.height() - bounds.height()) / 2;
     setScrollPosition(IntPoint(bounds.x() - centeringOffsetX - rect.x(), bounds.y() - centeringOffsetY - rect.y()));
@@ -1754,9 +1774,8 @@ void FrameView::setFixedVisibleContentRect(const IntRect& visibleContentRect)
     bool visibleContentSizeDidChange = false;
     if (visibleContentRect.size() != this->fixedVisibleContentRect().size()) {
         // When the viewport size changes or the content is scaled, we need to
-        // reposition the fixed positioned elements.
-        if (RenderView* root = rootRenderer(this))
-            root->setFixedPositionedObjectsNeedLayout();
+        // reposition the fixed and sticky positioned elements.
+        setViewportConstrainedObjectsNeedLayout();
         visibleContentSizeDidChange = true;
     }
 
@@ -1774,6 +1793,19 @@ void FrameView::setFixedVisibleContentRect(const IntRect& visibleContentRect)
     }
     frame()->loader()->client()->didChangeScrollOffset();
 }
+
+void FrameView::setViewportConstrainedObjectsNeedLayout()
+{
+    if (!hasViewportConstrainedObjects())
+        return;
+
+    ViewportConstrainedObjectSet::const_iterator end = m_viewportConstrainedObjects->end();
+    for (ViewportConstrainedObjectSet::const_iterator it = m_viewportConstrainedObjects->begin(); it != end; ++it) {
+        RenderObject* renderer = *it;
+        renderer->setNeedsLayout(true);
+    }
+}
+
 
 void FrameView::scrollPositionChangedViaPlatformWidget()
 {
@@ -1799,7 +1831,7 @@ void FrameView::repaintFixedElementsAfterScrolling()
 {
     // For fixed position elements, update widget positions and compositing layers after scrolling,
     // but only if we're not inside of layout.
-    if (!m_nestedLayoutCount && hasFixedObjects()) {
+    if (!m_nestedLayoutCount && hasViewportConstrainedObjects()) {
         if (RenderView* root = rootRenderer(this)) {
             root->updateWidgetPositions();
             root->layer()->updateLayerPositionsAfterScroll();
@@ -1810,7 +1842,7 @@ void FrameView::repaintFixedElementsAfterScrolling()
 void FrameView::updateFixedElementsAfterScrolling()
 {
 #if USE(ACCELERATED_COMPOSITING)
-    if (m_nestedLayoutCount <= 1 && hasFixedObjects()) {
+    if (m_nestedLayoutCount <= 1 && hasViewportConstrainedObjects()) {
         if (RenderView* root = rootRenderer(this)) {
             root->compositor()->updateCompositingLayers(CompositingUpdateOnScroll);
         }
@@ -1970,25 +2002,22 @@ void FrameView::startDeferredRepaintTimer(double delay)
     m_deferredRepaintTimer.startOneShot(delay);
 }
 
-void FrameView::checkStopDelayingDeferredRepaints()
+void FrameView::checkFlushDeferredRepaintsAfterLoadComplete()
 {
-    Document* document = m_frame->document();
-    if (document && (document->parsing() || document->cachedResourceLoader()->requestCount()))
+    if (shouldUseLoadTimeDeferredRepaintDelay())
         return;
-
-    stopDelayingDeferredRepaints();
+    m_deferredRepaintDelay = s_normalDeferredRepaintDelay;
+    flushDeferredRepaints();
 }
-    
-void FrameView::stopDelayingDeferredRepaints()
+
+void FrameView::flushDeferredRepaints()
 {
     if (!m_deferredRepaintTimer.isActive())
         return;
-
     m_deferredRepaintTimer.stop();
-
     doDeferredRepaints();
 }
-    
+
 void FrameView::doDeferredRepaints()
 {
     if (m_disableRepaints)
@@ -2013,21 +2042,32 @@ void FrameView::doDeferredRepaints()
     m_repaintRects.clear();
     m_repaintCount = 0;
     
-    updateDeferredRepaintDelay();
+    updateDeferredRepaintDelayAfterRepaint();
 }
 
-void FrameView::updateDeferredRepaintDelay()
+bool FrameView::shouldUseLoadTimeDeferredRepaintDelay() const
 {
+    // Don't defer after the initial load of the page has been completed.
+    if (m_frame->tree()->top()->loader()->isComplete())
+        return false;
     Document* document = m_frame->document();
-    if (!document || (!document->parsing() && !document->cachedResourceLoader()->requestCount())) {
-        m_deferredRepaintDelay = s_deferredRepaintDelay;
+    if (!document)
+        return false;
+    if (document->parsing())
+        return true;
+    if (document->cachedResourceLoader()->requestCount())
+        return true;
+    return false;
+}
+
+void FrameView::updateDeferredRepaintDelayAfterRepaint()
+{
+    if (!shouldUseLoadTimeDeferredRepaintDelay()) {
+        m_deferredRepaintDelay = s_normalDeferredRepaintDelay;
         return;
     }
-    if (m_deferredRepaintDelay < s_maxDeferredRepaintDelayDuringLoading) {
-        m_deferredRepaintDelay += s_deferredRepaintDelayIncrementDuringLoading;
-        if (m_deferredRepaintDelay > s_maxDeferredRepaintDelayDuringLoading)
-            m_deferredRepaintDelay = s_maxDeferredRepaintDelayDuringLoading;
-    }
+    double incrementedRepaintDelay = m_deferredRepaintDelay + s_deferredRepaintDelayIncrementDuringLoading;
+    m_deferredRepaintDelay = std::min(incrementedRepaintDelay, s_maxDeferredRepaintDelayDuringLoading);
 }
 
 void FrameView::resetDeferredRepaintDelay()
@@ -2090,7 +2130,7 @@ void FrameView::scheduleRelayout()
         return;
     if (!m_frame->document()->shouldScheduleLayout())
         return;
-
+    InspectorInstrumentation::didInvalidateLayout(m_frame.get());
     // When frame flattening is enabled, the contents of the frame could affect the layout of the parent frames.
     // Also invalidate parent frame starting from the owner element of this frame.
     if (m_frame->ownerRenderer() && isInChildFrameWithFrameFlattening())
@@ -2152,6 +2192,7 @@ void FrameView::scheduleRelayoutOfSubtree(RenderObject* relayoutRoot)
             }
         }
     } else if (m_layoutSchedulingEnabled) {
+        InspectorInstrumentation::didInvalidateLayout(m_frame.get());
         int delay = m_frame->document()->minimumLayoutDelay();
         m_layoutRoot = relayoutRoot;
         ASSERT(!m_layoutRoot->container() || !m_layoutRoot->container()->needsLayout());
@@ -2300,7 +2341,7 @@ void FrameView::scrollToAnchor()
 
     LayoutRect rect;
     if (anchorNode != m_frame->document())
-        rect = anchorNode->getRect();
+        rect = anchorNode->boundingBox();
 
     // Scroll nested layers and frames to reveal the anchor.
     // Align to the top and to the closest side (this matches other browsers).
@@ -3112,9 +3153,6 @@ void FrameView::paintContents(GraphicsContext* p, const IntRect& rect)
         p->fillRect(rect, Color(0xFF, 0, 0), ColorSpaceDeviceRGB);
 #endif
 
-    if (pagination().mode != Pagination::Unpaginated)
-        p->fillRect(rect, baseBackgroundColor(), ColorSpaceDeviceRGB);
-
     bool isTopLevelPainter = !sCurrentPaintTimeStamp;
     if (isTopLevelPainter)
         sCurrentPaintTimeStamp = currentTime();
@@ -3293,14 +3331,6 @@ void FrameView::updateLayoutAndStyleIfNeededRecursive()
     // needs to call layout on parent frame recursively.
     // This assert ensures that parent frames are clean, when child frames finished updating layout and style.
     ASSERT(!needsLayout());
-}
-    
-void FrameView::flushDeferredRepaints()
-{
-    if (!m_deferredRepaintTimer.isActive())
-        return;
-    m_deferredRepaintTimer.stop();
-    doDeferredRepaints();
 }
 
 void FrameView::enableAutoSizeMode(bool enable, const IntSize& minSize, const IntSize& maxSize)
@@ -3551,7 +3581,7 @@ IntPoint FrameView::convertFromContainingView(const IntPoint& parentPoint) const
 // Normal delay
 void FrameView::setRepaintThrottlingDeferredRepaintDelay(double p)
 {
-    s_deferredRepaintDelay = p;
+    s_normalDeferredRepaintDelay = p;
 }
 
 // Negative value would mean that first few repaints happen without a delay

@@ -66,6 +66,8 @@ public:
     
     virtual bool isAccessibilityNodeObject() const { return true; }
 
+    virtual bool canvasHasFallbackContent() const;
+
     virtual bool canSetFocusAttribute() const;
     
     virtual AccessibilityObject* firstChild() const;
@@ -98,6 +100,7 @@ protected:
     AccessibilityRole ariaRoleAttribute() const;
     AccessibilityRole determineAriaRoleAttribute() const;
     AccessibilityRole remapAriaRoleDueToParent(AccessibilityRole) const;
+    bool hasContentEditableAttributeSet() const;
 
 private:
     Node* m_node;

@@ -33,6 +33,7 @@
 #include "WebContextMenuProxy.h"
 #include "WebPageGroup.h"
 #include "WebPageProxy.h"
+#include "WebPopupMenuProxyEfl.h"
 #include "WebPreferences.h"
 #include "ewk_context.h"
 #include "ewk_context_private.h"
@@ -44,18 +45,9 @@ using namespace WebCore;
 
 namespace WebKit {
 
-PageClientImpl::PageClientImpl(WebContext* context, WebPageGroup* pageGroup, Evas_Object* viewWidget)
+PageClientImpl::PageClientImpl(Evas_Object* viewWidget)
     : m_viewWidget(viewWidget)
 {
-    m_page = context->createWebPage(this, pageGroup);
-
-#if USE(COORDINATED_GRAPHICS)
-    m_page->pageGroup()->preferences()->setAcceleratedCompositingEnabled(true);
-    m_page->pageGroup()->preferences()->setForceCompositingMode(true);
-    m_page->setUseFixedLayout(true);
-#endif
-
-    m_page->initializeWebPage();
 }
 
 PageClientImpl::~PageClientImpl()
@@ -65,7 +57,7 @@ PageClientImpl::~PageClientImpl()
 // PageClient
 PassOwnPtr<DrawingAreaProxy> PageClientImpl::createDrawingAreaProxy()
 {
-    return DrawingAreaProxyImpl::create(m_page.get());
+    return DrawingAreaProxyImpl::create(ewk_view_page_get(m_viewWidget));
 }
 
 void PageClientImpl::setViewNeedsDisplay(const WebCore::IntRect& rect)
@@ -204,10 +196,9 @@ void PageClientImpl::doneWithTouchEvent(const NativeWebTouchEvent&, bool wasEven
 }
 #endif
 
-PassRefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy*)
+PassRefPtr<WebPopupMenuProxy> PageClientImpl::createPopupMenuProxy(WebPageProxy* page)
 {
-    notImplemented();
-    return 0;
+    return WebPopupMenuProxyEfl::create(m_viewWidget, page);
 }
 
 PassRefPtr<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPageProxy*)
@@ -217,7 +208,7 @@ PassRefPtr<WebContextMenuProxy> PageClientImpl::createContextMenuProxy(WebPagePr
 }
 
 #if ENABLE(INPUT_TYPE_COLOR)
-PassRefPtr<WebColorChooserProxy> PageClientImpl::createColorChooserProxy(WebPageProxy*, const WebCore::Color&)
+PassRefPtr<WebColorChooserProxy> PageClientImpl::createColorChooserProxy(WebPageProxy*, const WebCore::Color&, const WebCore::IntRect&)
 {
     notImplemented();
     return 0;

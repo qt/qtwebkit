@@ -47,13 +47,13 @@ public:
     virtual bool isRenderRegion() const { return true; }
 
     virtual void paintReplaced(PaintInfo&, const LayoutPoint&);
-    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
+    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
 
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
 
-    void setRegionRect(const LayoutRect& rect) { m_regionRect = rect; }
-    LayoutRect regionRect() const { return m_regionRect; }
-    LayoutRect regionOversetRect() const;
+    void setFlowThreadPortionRect(const LayoutRect& rect) { m_flowThreadPortionRect = rect; }
+    LayoutRect flowThreadPortionRect() const { return m_flowThreadPortionRect; }
+    LayoutRect flowThreadPortionOverflowRect() const;
 
     void attachRegion();
     void detachRegion();
@@ -95,13 +95,37 @@ public:
     RegionState regionState() const { return isValid() ? m_regionState : RegionUndefined; }
     void setRegionState(RegionState regionState) { m_regionState = regionState; }
     
-    virtual LayoutUnit logicalWidthForFlowThreadContent() const;
-    virtual LayoutUnit logicalHeightForFlowThreadContent() const;
+    // These methods represent the width and height of a "page" and for a RenderRegion they are just the
+    // content width and content height of a region. For RenderRegionSets, however, they will be the width and
+    // height of a single column or page in the set.
+    virtual LayoutUnit pageLogicalWidth() const;
+    virtual LayoutUnit pageLogicalHeight() const;
+    
+    // This method represents the logical height of the entire flow thread portion used by the region or set.
+    // For RenderRegions it matches logicalPaginationHeight(), but for sets it is the height of all the pages
+    // or columns added together.
+    virtual LayoutUnit logicalHeightOfAllFlowThreadContent() const;
+
+    // The top of the nearest page inside the region. For RenderRegions, this is just the logical top of the
+    // flow thread portion we contain. For sets, we have to figure out the top of the nearest column or
+    // page.
+    virtual LayoutUnit pageLogicalTopForOffset(LayoutUnit offset) const;
+    
+    virtual void expandToEncompassFlowThreadContentsIfNeeded() {};
+
+    // Whether or not this region is a set.
+    virtual bool isRenderRegionSet() const { return false; }
+    
+    virtual void repaintFlowThreadContent(const LayoutRect& repaintRect, bool immediate) const;
 
 protected:
     void setRegionObjectsRegionStyle();
     void restoreRegionObjectsOriginalStyle();
-    
+
+    LayoutRect overflowRectForFlowThreadPortion(LayoutRect flowThreadPortionRect, bool isFirstPortion, bool isLastPortion) const;
+    void repaintFlowThreadContentRectangle(const LayoutRect& repaintRect, bool immediate, const LayoutRect& flowThreadPortionRect,
+                                           const LayoutRect& flowThreadPortionOverflowRect, const LayoutPoint& regionLocation) const;
+
 private:
     virtual const char* renderName() const { return "RenderRegion"; }
 
@@ -125,7 +149,7 @@ private:
     // we need to create a dependency tree, so that layout of the
     // regions is always done before the regions themselves.
     RenderNamedFlowThread* m_parentNamedFlowThread;
-    LayoutRect m_regionRect;
+    LayoutRect m_flowThreadPortionRect;
 
     // This map holds unique information about a block that is split across regions.
     // A RenderBoxRegionInfo* tells us about any layout information for a RenderBox that

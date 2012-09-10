@@ -27,7 +27,6 @@
 #include "JSStringBuilder.h"
 #include "ObjectPrototype.h"
 #include "StringRecursionChecker.h"
-#include "UString.h"
 
 namespace JSC {
 
@@ -60,7 +59,7 @@ void ErrorPrototype::finishCreation(ExecState* exec, JSGlobalObject*)
 {
     Base::finishCreation(exec->globalData(), "");
     ASSERT(inherits(&s_info));
-    putDirect(exec->globalData(), exec->propertyNames().name, jsNontrivialString(exec, "Error"), DontEnum);
+    putDirect(exec->globalData(), exec->propertyNames().name, jsNontrivialString(exec, String(ASCIILiteral("Error"))), DontEnum);
 }
 
 bool ErrorPrototype::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName propertyName, PropertySlot &slot)
@@ -97,9 +96,9 @@ EncodedJSValue JSC_HOST_CALL errorProtoFuncToString(ExecState* exec)
         return JSValue::encode(jsUndefined());
 
     // 4. If name is undefined, then let name be "Error"; else let name be ToString(name).
-    UString nameString;
+    String nameString;
     if (name.isUndefined())
-        nameString = "Error";
+        nameString = ASCIILiteral("Error");
     else {
         nameString = name.toString(exec)->value(exec);
         if (exec->hadException())
@@ -114,9 +113,9 @@ EncodedJSValue JSC_HOST_CALL errorProtoFuncToString(ExecState* exec)
     // (sic)
     // 6. If msg is undefined, then let msg be the empty String; else let msg be ToString(msg).
     // 7. If msg is undefined, then let msg be the empty String; else let msg be ToString(msg).
-    UString messageString;
+    String messageString;
     if (message.isUndefined())
-        messageString = "";
+        messageString = String();
     else {
         messageString = message.toString(exec)->value(exec);
         if (exec->hadException())

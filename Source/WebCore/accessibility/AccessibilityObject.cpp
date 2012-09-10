@@ -1294,6 +1294,19 @@ const AtomicString& AccessibilityObject::invalidStatus() const
     return ariaInvalid;
 }
  
+bool AccessibilityObject::hasAttribute(const QualifiedName& attribute) const
+{
+    Node* elementNode = node();
+    if (!elementNode)
+        return false;
+    
+    if (!elementNode->isElementNode())
+        return false;
+    
+    Element* element = static_cast<Element*>(elementNode);
+    return element->fastHasAttribute(attribute);
+}
+    
 const AtomicString& AccessibilityObject::getAttribute(const QualifiedName& attribute) const
 {
     Node* elementNode = node();
@@ -1338,6 +1351,15 @@ bool AccessibilityObject::isAncestorOfObject(const AccessibilityObject* axObject
         return false;
 
     return this == axObject || axObject->isDescendantOfObject(this);
+}
+
+AccessibilityObject* AccessibilityObject::firstAnonymousBlockChild() const
+{
+    for (AccessibilityObject* child = firstChild(); child; child = child->nextSibling()) {
+        if (child->renderer() && child->renderer()->isAnonymousBlock())
+            return child;
+    }
+    return 0;
 }
 
 typedef HashMap<String, AccessibilityRole, CaseFoldingHash> ARIARoleMap;
@@ -1474,7 +1496,12 @@ bool AccessibilityObject::isInsideARIALiveRegion() const
 
 bool AccessibilityObject::supportsARIAAttributes() const
 {
-    return supportsARIALiveRegion() || supportsARIADragging() || supportsARIADropping() || supportsARIAFlowTo() || supportsARIAOwns();
+    return supportsARIALiveRegion()
+        || supportsARIADragging()
+        || supportsARIADropping()
+        || supportsARIAFlowTo()
+        || supportsARIAOwns()
+        || hasAttribute(aria_labelAttr);
 }
     
 bool AccessibilityObject::supportsARIALiveRegion() const
@@ -1533,6 +1560,14 @@ AccessibilitySortDirection AccessibilityObject::sortDirection() const
         return SortDirectionDescending;
     
     return SortDirectionNone;
+}
+
+bool AccessibilityObject::supportsRangeValue() const
+{
+    return isProgressIndicator()
+        || isSlider()
+        || isScrollbar()
+        || isSpinButton();
 }
     
 bool AccessibilityObject::supportsARIAExpanded() const

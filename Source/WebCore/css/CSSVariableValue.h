@@ -34,7 +34,7 @@
 #include "CSSParserValues.h"
 #include "CSSPropertyNames.h"
 #include "CSSValue.h"
-#include "MemoryInstrumentation.h"
+#include "WebCoreMemoryInstrumentation.h"
 
 namespace WebCore {
 
@@ -50,7 +50,7 @@ public:
 
     void reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     {
-        MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::CSS);
+        MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
         info.addInstrumentedMember(m_name);
         info.addInstrumentedMember(m_value);
     }

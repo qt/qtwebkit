@@ -271,6 +271,17 @@
     background-color: rgba(0, 0, 0, 0.05);
 }
 
+.timeline-tree-item.warning::after,
+.timeline-tree-item.child-warning::after {
+    content: url(Images/warningIcon.png);
+    float: right;
+    padding-top: 1px;
+}
+
+.timeline-tree-item.child-warning::after {
+    opacity: 0.5;
+}
+
 .timeline-tree-item .data.dimmed {
     color: rgba(0, 0, 0, 0.7);
 }
@@ -475,7 +486,14 @@
     margin-left: 0;
     margin-right: 0;
     -webkit-mask-image: url(Images/statusbarButtonGlyphs.png);
+    -webkit-mask-size: 320px 72px;
     background-color: black;
+}
+
+@media (-webkit-min-device-pixel-ratio: 1.5) {
+#timeline-overview-sidebar .icon {
+    -webkit-mask-image: url(Images/statusbarButtonGlyphs2x.png);
+}
 }
 
 .timeline-overview-sidebar-events .icon {

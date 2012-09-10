@@ -27,7 +27,7 @@
 
 #include "EditingBoundary.h"
 #include "EventTarget.h"
-#include "ExceptionCodePlaceholder.h"
+#include "FractionalLayoutRect.h"
 #include "KURLHash.h"
 #include "LayoutTypes.h"
 #include "MutationObserver.h"
@@ -187,8 +187,7 @@ public:
 
     void remove(ExceptionCode&);
     bool hasChildNodes() const { return firstChild(); }
-    virtual PassRefPtr<Node> cloneNode(bool deep, ExceptionCode&) = 0;
-    PassRefPtr<Node> cloneNode(bool deep) { return cloneNode(deep, ASSERT_NO_EXCEPTION); }
+    virtual PassRefPtr<Node> cloneNode(bool deep) = 0;
     const AtomicString& localName() const { return virtualLocalName(); }
     const AtomicString& namespaceURI() const { return virtualNamespaceURI(); }
     const AtomicString& prefix() const { return virtualPrefix(); }
@@ -355,6 +354,7 @@ public:
         DoNotSetAttached
     };
     void lazyAttach(ShouldSetAttached = SetAttached);
+    void lazyReattach(ShouldSetAttached = SetAttached);
 
     virtual void setFocus(bool = true);
     virtual void setActive(bool f = true, bool /*pause*/ = false) { setFlag(f, IsActiveFlag); }
@@ -401,8 +401,8 @@ public:
     }
 
     virtual bool shouldUseInputMethod();
-    virtual LayoutRect getRect() const;
-    IntRect getPixelSnappedRect() const { return pixelSnappedIntRect(getRect()); }
+    virtual LayoutRect boundingBox() const;
+    IntRect pixelSnappedBoundingBox() const { return pixelSnappedIntRect(boundingBox()); }
     LayoutRect renderRect(bool* isReplaced);
     IntRect pixelSnappedRenderRect(bool* isReplaced) { return pixelSnappedIntRect(renderRect(isReplaced)); }
 
@@ -582,6 +582,7 @@ public:
 
     virtual bool willRespondToMouseMoveEvents();
     virtual bool willRespondToMouseClickEvents();
+    virtual bool willRespondToTouchEvents();
 
     PassRefPtr<Element> querySelector(const AtomicString& selectors, ExceptionCode&);
     PassRefPtr<NodeList> querySelectorAll(const AtomicString& selectors, ExceptionCode&);
@@ -874,6 +875,13 @@ inline void Node::reattachIfAttached()
 {
     if (attached())
         reattach();
+}
+
+inline void Node::lazyReattach(ShouldSetAttached shouldSetAttached)
+{
+    if (attached())
+        detach();
+    lazyAttach(shouldSetAttached);
 }
 
 } //namespace

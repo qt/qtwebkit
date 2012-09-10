@@ -50,7 +50,7 @@ protected:
         int minimum;
     };
 
-    DateTimeNumericFieldElement(Document*, FieldEventHandler&, int minimum, int maximum);
+    DateTimeNumericFieldElement(Document*, FieldOwner&, int minimum, int maximum);
 
     int clampValue(int value) const { return m_range.clampValue(value); }
     const Range& range() const { return m_range; }
@@ -63,6 +63,7 @@ protected:
 
 private:
     // DateTimeFieldElement functions.
+    virtual void didBlur() OVERRIDE FINAL;
     virtual void handleKeyboardEvent(KeyboardEvent*) OVERRIDE FINAL;
     virtual void setEmptyValue(const DateComponents& dateForReadOnlyField, EventBehavior) OVERRIDE FINAL;
     virtual void stepDown() OVERRIDE FINAL;

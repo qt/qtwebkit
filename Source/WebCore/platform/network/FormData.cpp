@@ -32,9 +32,9 @@
 #include "FormDataBuilder.h"
 #include "FormDataList.h"
 #include "MIMETypeRegistry.h"
-#include "MemoryInstrumentation.h"
 #include "Page.h"
 #include "TextEncoding.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/Decoder.h>
 #include <wtf/Encoder.h>
 
@@ -359,7 +359,7 @@ void FormData::removeGeneratedFilesIfNeeded()
 
 void FormData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::Loader);
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Loader);
     info.addVector(m_boundary);
 }
 

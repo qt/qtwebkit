@@ -33,8 +33,8 @@
 #define ChromeClientImpl_h
 
 #include "ChromeClientChromium.h"
+#include "NavigatorContentUtilsClient.h"
 #include "PopupMenu.h"
-#include "RegisterProtocolHandlerClient.h"
 #include "SearchPopupMenu.h"
 #include "WebNavigationPolicy.h"
 #include <public/WebColor.h>
@@ -50,6 +50,8 @@ class PopupContainer;
 class PopupMenuClient;
 class RenderBox;
 class SecurityOrigin;
+class DateTimeChooser;
+class DateTimeChooserClient;
 struct WindowFeatures;
 }
 
@@ -144,6 +146,9 @@ public:
     virtual PassOwnPtr<WebCore::ColorChooser> createColorChooser(WebCore::ColorChooserClient*, const WebCore::Color&) OVERRIDE;
     PassOwnPtr<WebColorChooser> createWebColorChooser(WebColorChooserClient*, const WebColor&);
 #endif
+#if ENABLE(CALENDAR_PICKER)
+    virtual PassOwnPtr<WebCore::DateTimeChooser> openDateTimeChooser(WebCore::DateTimeChooserClient*, const WebCore::DateTimeChooserParameters&) OVERRIDE;
+#endif
     virtual void runOpenPanel(WebCore::Frame*, PassRefPtr<WebCore::FileChooser>);
     virtual void loadIconForFiles(const Vector<WTF::String>&, WebCore::FileIconLoader*);
 #if ENABLE(DIRECTORY_UPLOAD)
@@ -237,15 +242,15 @@ private:
 #endif
 };
 
-class RegisterProtocolHandlerClientImpl : public WebCore::RegisterProtocolHandlerClient {
+class NavigatorContentUtilsClientImpl : public WebCore::NavigatorContentUtilsClient {
 public:
-    static PassOwnPtr<RegisterProtocolHandlerClientImpl> create(WebViewImpl*);
-    ~RegisterProtocolHandlerClientImpl() { }
+    static PassOwnPtr<NavigatorContentUtilsClientImpl> create(WebViewImpl*);
+    ~NavigatorContentUtilsClientImpl() { }
 
     virtual void registerProtocolHandler(const String& scheme, const String& baseURL, const String& url, const String& title) OVERRIDE;
 
 private:
-    explicit RegisterProtocolHandlerClientImpl(WebViewImpl*);
+    explicit NavigatorContentUtilsClientImpl(WebViewImpl*);
 
     WebViewImpl* m_webView;
 };

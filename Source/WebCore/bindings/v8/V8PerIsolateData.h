@@ -95,12 +95,13 @@ public:
 
     void registerDOMDataStore(DOMDataStore* domDataStore) 
     {
+        ASSERT(m_domDataList.find(domDataStore) == notFound);
         m_domDataList.append(domDataStore);
     }
 
     void unregisterDOMDataStore(DOMDataStore* domDataStore)
     {
-        ASSERT(m_domDataList.find(domDataStore));
+        ASSERT(m_domDataList.find(domDataStore) != notFound);
         m_domDataList.remove(m_domDataList.find(domDataStore));
     }
 
@@ -111,6 +112,8 @@ public:
     int recursionLevel() const { return m_recursionLevel; }
     int incrementRecursionLevel() { return ++m_recursionLevel; }
     int decrementRecursionLevel() { return --m_recursionLevel; }
+
+    int nextDependentRetainedId() { return m_nextDependentRetainedId++; }
 
 #ifndef NDEBUG
     GlobalHandleMap& globalHandleMap() { return m_globalHandleMap; }
@@ -154,6 +157,7 @@ private:
     friend class ConstructorMode;
 
     int m_recursionLevel;
+    int m_nextDependentRetainedId;
 
 #ifndef NDEBUG
     GlobalHandleMap m_globalHandleMap;

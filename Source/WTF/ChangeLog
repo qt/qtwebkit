@@ -1,3 +1,745 @@
+2012-09-09  Mark Lam  <mark.lam@apple.com>
+
+        Fixed ASSERT() and ASSERT_AT() macros so that they can be used in
+        comma expressions. Also, added UNUSED_LABEL().
+        https://bugs.webkit.org/show_bug.cgi?id=96127.
+
+        Reviewed by Geoffrey Garen.
+
+        * wtf/Assertions.h:
+        * wtf/UnusedParam.h: Added UNUSED_LABEL(). Removed an obsolete comment.
+
+2012-09-09  Patrick Gansterer  <paroga@webkit.org>
+
+        Add StringBuilder::appendNumber() and use it
+        https://bugs.webkit.org/show_bug.cgi?id=96030
+
+        Reviewed by Eric Seidel.
+
+        Also fix a bunch of append() vs. appendLiteral() issues in the surrounding code.
+
+        * wtf/DateMath.cpp:
+        (WTF::makeRFC2822DateString):
+        * wtf/text/StringBuilder.cpp:
+        (WTF::StringBuilder::appendNumber):
+        * wtf/text/StringBuilder.h:
+        (StringBuilder):
+
+2012-09-09  Patrick Gansterer  <paroga@webkit.org>
+
+        Make the String initialization on the function side of String::number()
+        https://bugs.webkit.org/show_bug.cgi?id=95940
+
+        Reviewed by Benjamin Poulain.
+
+        Un-Inline String::number() to make the String initialization done on the function side
+        instead of being on the caller side.
+
+        * GNUmakefile.list.am:
+        * WTF.gypi:
+        * WTF.pro:
+        * WTF.vcproj/WTF.vcproj:
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/CMakeLists.txt:
+        * wtf/text/IntegerToStringConversion.cpp: Removed.
+        * wtf/text/IntegerToStringConversion.h:
+        (WTF::numberToStringImpl):
+        (WTF::numberToStringSigned):
+        (WTF::numberToStringUnsigned):
+        * wtf/text/WTFString.cpp:
+        (WTF::String::number):
+        * wtf/text/WTFString.h:
+
+2012-09-08  Andreas Kling  <kling@webkit.org>
+
+        Give AtomicString SimpleClassVectorTraits.
+        <http://webkit.org/b/96186>
+
+        Reviewed by Karl Anders Carlsson.
+
+        AtomicString can be initialized/moved/compared with memset/memcpy/memcmp,
+        so add a VectorTraits<AtomicString> to make Vector<AtomicString> a little
+        more efficient.
+
+        * wtf/VectorTraits.h:
+
+2012-09-07  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r127938.
+        http://trac.webkit.org/changeset/127938
+        https://bugs.webkit.org/show_bug.cgi?id=96166
+
+        It broke the build (Requested by smfr on #webkit).
+
+        * wtf/Assertions.h:
+
+2012-09-07  Mark Lam  <mark.lam@apple.com>
+
+        Fixed ASSERT() and ASSERT_AT() macros so that they can be used in
+        comma expressions.
+        https://bugs.webkit.org/show_bug.cgi?id=96127.
+
+        Reviewed by Filip Pizlo.
+
+        * wtf/Assertions.h:
+        (wtfAssert):
+
+2012-09-07  Michael Saboff  <msaboff@apple.com>
+
+        StringImpl::find(StringImpl*) doesn't handle cases where search and match strings are different bitness
+        https://bugs.webkit.org/show_bug.cgi?id=96125
+
+        Reviewed by Benjamin Poulain.
+
+        Changed findInner and reverseFindInner to be templated on both search and match character types.
+        Changed both find's and reverseFind to use all four bitness combinations of findInner and
+        reverseFindInner.
+
+        * wtf/text/StringImpl.cpp:
+        (WTF::findInner):
+        (WTF::StringImpl::find):
+        (WTF::reverseFindInner):
+        (WTF::StringImpl::reverseFind):
+
+2012-09-07  Michael Saboff  <msaboff@apple.com>
+
+        equalIgnoringCase of two StringImpls doesn't handle 8 bit strings
+        https://bugs.webkit.org/show_bug.cgi?id=96028
+
+        Reviewed by Benjamin Poulain.
+
+        Added 8 bit checks and paths to CaseFoldingHash::equal.  Also cleaned up StringHash::equal(), removing
+        obvious and in one case wrong comments.  Moved equalIgnoringCase(UChar*, UChar*) from StringImpl.cpp
+        to StringImpl.h.
+
+        * wtf/text/StringHash.h:
+        (WTF::StringHash::equal):
+        (WTF::CaseFoldingHash::equal):
+        * wtf/text/StringImpl.cpp:
+        * wtf/text/StringImpl.h:
+        (WTF::equalIgnoringCase):
+
+2012-09-07  Patrick Gansterer  <paroga@webkit.org>
+
+        [WIN] Deprecate String += operator
+        https://bugs.webkit.org/show_bug.cgi?id=96083
+
+        Reviewed by Adam Barth.
+
+        * wtf/Platform.h:
+
+2012-09-06  Michael Saboff  <msaboff@apple.com>
+
+        StringBuilder::toAtomicString() can create an 16 bit string with 8 bit contents
+        https://bugs.webkit.org/show_bug.cgi?id=96029
+
+        Reviewed by Benjamin Poulain.
+
+        Added 8 bit path when creating an AtomicString from a partial 8 bit buffer.
+
+        * wtf/text/StringBuilder.h:
+        (WTF::StringBuilder::toAtomicString):
+
+2012-09-06  Michael Saboff  <msaboff@apple.com>
+
+        16 bit JSRopeString up converts an 8 bit fibers to 16 bits during resolution
+        https://bugs.webkit.org/show_bug.cgi?id=95810
+
+        Reviewed by Benjamin Poulain.
+
+        New copy routine that takes an 8 bit source and a 16 bit destination.  Used when copying
+        the contents of an 8 bit fiber to the 16 bit buffer when resolving a 16 bit rope.
+
+        * wtf/text/StringImpl.h:
+        (WTF::StringImpl::copyChars):
+        (StringImpl):
+
+2012-09-06  Michael Saboff  <msaboff@apple.com>
+
+        Unreviewed fix to r127799.
+        https://bugs.webkit.org/show_bug.cgi?id=95807
+
+        Unreviewed fix.
+
+        Removed extraneous "static".  This code is hidden behind STRING_STATS define and 
+        therefore is not enabled by default.
+
+        * wtf/text/StringImpl.cpp:
+
+2012-09-06  Lauro Neto  <lauro.neto@openbossa.org>
+
+        [Qt] Deprecate String += operator
+        https://bugs.webkit.org/show_bug.cgi?id=95895
+
+        Reviewed by Benjamin Poulain.
+
+        Remove Qt from WTF_DEPRECATED_STRING_OPERATORS guard.
+
+        * wtf/Platform.h:
+
+2012-09-06  Michael Saboff  <msaboff@apple.com>
+
+        ENH: Add Logging to StringImpl to track String Types
+        https://bugs.webkit.org/show_bug.cgi?id=95807
+
+        Reviewed by Benjamin Poulain.
+
+        Added StringsStats class that keeps track of the number of strings, number of 8 and 16 bit
+        strings as well as the number of 8 bit strings up converted to 16 bits. The number of characrters
+        for each type is also accumulated. These statistics are output via DataLog every 5000
+        calls to StringImpl destructor. The 5000 can be adjusted via s_printStringStatsFrequency.
+        This StringStats code is disabled by default and enabled by defining STRING_STATS in
+        wtf/text/StringImpl.h.
+
+        * wtf/text/StringImpl.cpp:
+        (WTF::StringStats::removeString):
+        (WTF::StringStats::printStats):
+        (WTF::StringImpl::~StringImpl):
+        (WTF::StringImpl::getData16SlowCase):
+        * wtf/text/StringImpl.h:
+        (WTF::StringStats::add8BitString):
+        (StringStats):
+        (WTF::StringStats::add16BitString):
+        (WTF::StringStats::addUpconvertedString):
+        (WTF::StringImpl::StringImpl):
+        (StringImpl):
+        (WTF::StringImpl::isSubString):
+        (WTF::StringImpl::stringStats):
+
+2012-09-06  Patrick Gansterer  <paroga@webkit.org>
+
+        Fix export macros in IntegerToStringConversion.h
+        https://bugs.webkit.org/show_bug.cgi?id=95900
+
+        Reviewed by Benjamin Poulain.
+
+        The WTF_EXPORT_STRING_API must be used only for symbols which are compiled
+        on windows in "non-WTF" binaries too. Since this isn't valid for the
+        IntegerToStringConversion function replace it with WTF_EXPORT_PRIVATE.
+
+        * wtf/text/IntegerToStringConversion.h:
+
+2012-09-06  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Various small Windows / MSVC build fixes
+        https://bugs.webkit.org/show_bug.cgi?id=95934
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        For the Qt build on Windows, do not enable WTF_USE_UNIX_DOMAIN_SOCKETS for
+        WebKit2 IPC.
+
+        * wtf/Platform.h:
+
+2012-09-06  Adam Barth  <abarth@chromium.org>
+
+        Remove WTF::String::operator+=
+        https://bugs.webkit.org/show_bug.cgi?id=95797
+
+        Reviewed by Sam Weinig.
+
+        This patch encloses WTF::String::operator+= in an ifdef so that we can
+        gradually remove it from the various port-specific files. The ifdef
+        lets us whitelist use of operator+= in individual files during the
+        transition.
+
+        * wtf/Platform.h
+        * wtf/text/WTFString.h:
+
+2012-09-05  Gabor Rapcsanyi  <rgabor@webkit.org>
+
+        DFG JIT doesn't work properly on ARM hardfp
+        https://bugs.webkit.org/show_bug.cgi?id=95684
+
+        Reviewed by Filip Pizlo.
+
+        Add hardfp support to DFG JIT. The patch is created with the
+        help of Zoltan Herczeg.
+
+        * wtf/Platform.h:
+
+2012-09-04  Zoltan Horvath  <zoltan@webkit.org>
+
+        Extend the coverage of the Custom Allocation Framework in WTF and in JavaScriptCore
+        https://bugs.webkit.org/show_bug.cgi?id=95737
+
+        Reviewed by Eric Seidel.
+
+        Add WTF_MAKE_FAST_ALLOCATED macro to the following class declarations because these are instantiated by operator new.
+
+        * wtf/CryptographicallyRandomNumber.cpp: CryptographicallyRandomNumber is instantiated at wtf/CryptographicallyRandomNumber.cpp:162.
+        * wtf/MediaTime.h: MediaTime is instantiated at wtf/MediaTime.cpp:288.
+        * wtf/MetaAllocator.h:
+        (MetaAllocatorTracker): MetaAllocatorTracker is instantiated at JavaScriptCore/tools/CodeProfiling.cpp:120.
+        * wtf/ThreadingPthreads.cpp:
+        (PthreadState): PthreadState is instantiated at wtf/ThreadingPthreads.cpp:165.
+        * wtf/text/AtomicString.cpp:
+        (AtomicStringTable): AtomicStringTable is instantiated at wtf/text/AtomicString.cpp:43.
+
+2012-09-01  Mark Lam  <mark.lam@apple.com>
+
+        LLInt C loop backend.
+        https://bugs.webkit.org/show_bug.cgi?id=91052.
+
+        Reviewed by Filip Pizlo.
+
+        Added configs for the llint C loop backend.
+
+        * wtf/Platform.h:
+
+2012-08-31  Pratik Solanki  <psolanki@apple.com>
+
+        objc_msgSend and IMP should be cast appropriately before using
+        https://bugs.webkit.org/show_bug.cgi?id=95242
+
+        Reviewed by Benjamin Poulain.
+
+        Fix for older compilers. Pass id as the return type to the template
+        instead of relying on default type.
+
+        * wtf/Functional.h:
+        (WTF::R):
+        * wtf/ObjcRuntimeExtras.h:
+
+2012-08-31  Michael Saboff  <msaboff@apple.com>
+
+        CSS Parser should directly parse 8 bit source strings
+        https://bugs.webkit.org/show_bug.cgi?id=95207
+
+        Reviewed by Geoffrey Garen.
+
+        * wtf/text/StringImpl.h:
+        (WTF::equalIgnoringCase): Added (const char*, const LChar*, unsigned) flavor to support
+        8 bit CSS parser work.
+
+2012-08-30  Benjamin Poulain  <bpoulain@apple.com>
+
+        AtomicString(ASCIILiteral) should not compile
+        https://bugs.webkit.org/show_bug.cgi?id=95413
+
+        Reviewed by Adam Barth.
+
+        * wtf/text/AtomicString.h:
+        (AtomicString): Declare the constructor from ASCIILiteral private to ensure it is
+        not used by accident.
+
+2012-08-30  Benjamin Poulain  <bpoulain@apple.com>
+
+        Ambiguous operator[]  after r127191 on some compiler
+        https://bugs.webkit.org/show_bug.cgi?id=95509
+
+        Reviewed by Simon Fraser.
+
+        * wtf/text/WTFString.h:
+        (WTF::String::characterAt): At this as a synonym to operator[] to attempt a build fix.
+
+2012-08-30  Mark Lam  <mark.lam@apple.com>
+
+        Render unto #ifdef's that which belong to them.
+        https://bugs.webkit.org/show_bug.cgi?id=95482.
+
+        Reviewed by Filip Pizlo.
+
+        * wtf/Platform.h: Added ENABLE(COMPUTED_GOTO_OPCODES).
+
+2012-08-30  Pratik Solanki  <psolanki@apple.com>
+
+        objc_msgSend and IMP should be cast appropriately before using
+        https://bugs.webkit.org/show_bug.cgi?id=95242
+
+        Reviewed by Benjamin Poulain.
+
+        Add new templates wtfObjcMsgSend and wtfCallIMP that do the appropriate
+        casts to correctly typed function pointers before calling objc_msgSend
+        and IMP methods directly.
+
+        * wtf/Functional.h:
+        (WTF::R): Use wtfObjcMsgSend.
+        * wtf/ObjcRuntimeExtras.h: Added.
+        (wtfObjcMsgSend):
+        (wtfCallIMP):
+
+2012-08-30  Benjamin Poulain  <bpoulain@apple.com>
+
+        Replace JSC::UString by WTF::String
+        https://bugs.webkit.org/show_bug.cgi?id=95271
+
+        Reviewed by Geoffrey Garen.
+
+        * wtf/Platform.h: Useless edit to force a full build. This is needed for some bots for some reason.
+        * wtf/text/WTFString.h: Export a symbol that was exported on UString and needed in WebCore.
+
+        Add String::getCharactersWithUpconvert<>(), which is similar to String::getCharacters<>() but with the same
+        behaviors as UString::getCharacters<>().
+
+        String::getCharactersWithUpconvert<>() is useful when manipulating multiple strings, it allow writting code
+        using 16bits characters if any of the input String is not 8bit.
+
+2012-08-30  Yong Li  <yoli@rim.com>
+
+        Vector::shrinkToFit should use realloc when suitable.
+        https://bugs.webkit.org/show_bug.cgi?id=94810
+
+        Reviewed by Benjamin Poulain.
+
+        Only tested on BlackBerry. So it is wrapped with PLATFORM(BLACKBERRY) in the mean time.
+        Use realloc to shrink buffer when inline buffer isn't involved and and canMoveWithMemcpy is true.
+
+        When running the test code attached to the bug, it gives 30-45% performance boost for the large blocks
+        (Every test cycle includes an extra pair of malloc/free, so the boost on shrinkToFit() is even bigger)
+        Performance impact on small blocks is not noticeable. (Tested on BlackBerry)
+
+        * wtf/Vector.h:
+        (WTF::VectorBufferBase::shouldReallocateBuffer):
+        (VectorBufferBase):
+        (WTF::VectorBufferBase::reallocateBuffer):
+        (VectorBuffer):
+        (WTF::VectorBuffer::shouldReallocateBuffer):
+        (WTF::VectorBuffer::reallocateBuffer):
+        (WTF::VectorBuffer::inlineBuffer):
+        (WTF::::shrinkCapacity):
+
+2012-08-30  Patrick Gansterer  <paroga@webkit.org>
+
+        Build fix for COMPILER(MSVC) && !CPU(X86) after r127001.
+
+        * wtf/MathExtras.h:
+        (lrint): Added additional parentheses to silence compiler warning.
+
+2012-08-29  Benjamin Poulain  <bpoulain@apple.com>
+
+        REGRESSION(r126780): Crash using StringImpl::is8Bit before checking if there is an impl
+        https://bugs.webkit.org/show_bug.cgi?id=95380
+
+        Reviewed by Michael Saboff.
+
+        Blindly copying code from UString in r126780 was stupid. I just brought over a bug.
+        This patch adds the zero length branch back so that null strings are handled correctly.
+
+        * wtf/text/WTFString.cpp:
+        (WTF::String::ascii): Return a empty CString if the String is null or empty.
+
+2012-08-29  Dominik Röttsches  <dominik.rottsches@intel.com>
+
+        The 2d.imageData.object.round canvas test is failing
+        https://bugs.webkit.org/show_bug.cgi?id=40272
+
+        Reviewed by Benjamin Poulain.
+
+        Updating previous patch to address Benjamin's comments.
+        #ifdef in Uint8ClampedArray removed, fallback implementation for MSVC on non-X86 added.
+
+        * wtf/MathExtras.h:
+        (lrint): Fallback implementation for non-X86 & MSVC case.
+        * wtf/Uint8ClampedArray.h: Removed #ifdef.
+
+2012-08-28  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r126914.
+        http://trac.webkit.org/changeset/126914
+        https://bugs.webkit.org/show_bug.cgi?id=95239
+
+        it breaks everything and fixes nothing (Requested by pizlo on
+        #webkit).
+
+        * wtf/HashCountedSet.h:
+        (WTF::::add):
+        (WTF::::remove):
+        (WTF::copyToVector):
+        * wtf/HashIterators.h:
+        (WTF::HashTableConstKeysIterator::get):
+        (WTF::HashTableConstValuesIterator::get):
+        (WTF::HashTableKeysIterator::get):
+        (WTF::HashTableValuesIterator::get):
+        * wtf/HashMap.h:
+        (WTF::KeyValuePairKeyExtractor::extract):
+        (WTF::HashMapValueTraits::isEmptyValue):
+        (WTF::HashMapTranslator::translate):
+        (WTF::HashMapTranslatorAdapter::translate):
+        (WTF::::set):
+        (WTF::::get):
+        (WTF::::take):
+        (WTF::operator==):
+        (WTF):
+        (WTF::deleteAllPairSeconds):
+        (WTF::deleteAllValues):
+        (WTF::deleteAllPairFirsts):
+        (WTF::deleteAllKeys):
+        * wtf/HashTable.h:
+        (WTF::hashTableSwap):
+        (WTF::::checkTableConsistencyExceptSize):
+        * wtf/HashTraits.h:
+        (WTF::KeyValuePair::KeyValuePair):
+        (KeyValuePair):
+        (WTF::KeyValuePairHashTraits::constructDeletedValue):
+        (WTF::KeyValuePairHashTraits::isDeletedValue):
+        * wtf/MetaAllocator.cpp:
+        (WTF::MetaAllocator::addFreeSpace):
+        (WTF::MetaAllocator::incrementPageOccupancy):
+        (WTF::MetaAllocator::decrementPageOccupancy):
+        * wtf/RefCountedLeakCounter.cpp:
+        (WTF::RefCountedLeakCounter::~RefCountedLeakCounter):
+        * wtf/RefPtrHashMap.h:
+        (WTF::::set):
+        (WTF::::get):
+        (WTF::::inlineGet):
+        (WTF::::take):
+        * wtf/Spectrum.h:
+        (WTF::Spectrum::add):
+        (WTF::Spectrum::get):
+        (WTF::Spectrum::buildList):
+        * wtf/ThreadingPthreads.cpp:
+        (WTF::identifierByPthreadHandle):
+
+2012-08-28  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        Rename first/second to key/value in HashMap iterators
+        https://bugs.webkit.org/show_bug.cgi?id=82784
+
+        Reviewed by Eric Seidel.
+
+        * wtf/HashCountedSet.h:
+        (WTF::::add):
+        (WTF::::remove):
+        (WTF::copyToVector):
+        * wtf/HashIterators.h:
+        (WTF::HashTableConstKeysIterator::get):
+        (WTF::HashTableConstValuesIterator::get):
+        (WTF::HashTableKeysIterator::get):
+        (WTF::HashTableValuesIterator::get):
+        * wtf/HashMap.h:
+        (WTF::KeyValuePairKeyExtractor::extract):
+        (WTF::HashMapValueTraits::isEmptyValue):
+        (WTF::HashMapTranslator::translate):
+        (WTF::HashMapTranslatorAdapter::translate):
+        (WTF::::set):
+        (WTF::::get):
+        (WTF::::take):
+        (WTF::operator==):
+        (WTF::deleteAllValues):
+        (WTF::deleteAllKeys):
+        Remove deleteAllPairFirsts/Seconds.
+
+        * wtf/HashTable.h:
+        (WTF::hashTableSwap):
+        (WTF::::checkTableConsistencyExceptSize):
+        * wtf/HashTraits.h:
+        (WTF::KeyValuePair::KeyValuePair):
+        (KeyValuePair):
+        (WTF::KeyValuePairHashTraits::constructDeletedValue):
+        (WTF::KeyValuePairHashTraits::isDeletedValue):
+        * wtf/MetaAllocator.cpp:
+        (WTF::MetaAllocator::addFreeSpace):
+        (WTF::MetaAllocator::incrementPageOccupancy):
+        (WTF::MetaAllocator::decrementPageOccupancy):
+        * wtf/RefCountedLeakCounter.cpp:
+        (WTF::RefCountedLeakCounter::~RefCountedLeakCounter):
+        * wtf/RefPtrHashMap.h:
+        (WTF::::set):
+        (WTF::::get):
+        (WTF::::inlineGet):
+        (WTF::::take):
+        * wtf/Spectrum.h:
+        (WTF::Spectrum::add):
+        (WTF::Spectrum::get):
+        (WTF::Spectrum::buildList):
+        * wtf/ThreadingPthreads.cpp:
+        (WTF::identifierByPthreadHandle):
+
+2012-08-27  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r126836.
+        http://trac.webkit.org/changeset/126836
+        https://bugs.webkit.org/show_bug.cgi?id=95163
+
+        Broke all Apple ports, EFL, and Qt. (Requested by tkent on
+        #webkit).
+
+        * wtf/HashCountedSet.h:
+        (WTF::::add):
+        (WTF::::remove):
+        (WTF::copyToVector):
+        * wtf/HashIterators.h:
+        (WTF::HashTableConstKeysIterator::get):
+        (WTF::HashTableConstValuesIterator::get):
+        (WTF::HashTableValuesIterator::get):
+        * wtf/HashMap.h:
+        (WTF::KeyValuePairKeyExtractor::extract):
+        (WTF::HashMapValueTraits::isEmptyValue):
+        (WTF::HashMapTranslator::translate):
+        (WTF::HashMapTranslatorAdapter::translate):
+        (WTF::::set):
+        (WTF::::get):
+        (WTF::::take):
+        (WTF::operator==):
+        (WTF):
+        (WTF::deleteAllPairSeconds):
+        (WTF::deleteAllValues):
+        (WTF::deleteAllPairFirsts):
+        (WTF::deleteAllKeys):
+        * wtf/HashTable.h:
+        (WTF::hashTableSwap):
+        (WTF::::checkTableConsistencyExceptSize):
+        * wtf/HashTraits.h:
+        (WTF::KeyValuePair::KeyValuePair):
+        (KeyValuePair):
+        (WTF::KeyValuePairHashTraits::constructDeletedValue):
+        (WTF::KeyValuePairHashTraits::isDeletedValue):
+        * wtf/MetaAllocator.cpp:
+        (WTF::MetaAllocator::addFreeSpace):
+        (WTF::MetaAllocator::incrementPageOccupancy):
+        (WTF::MetaAllocator::decrementPageOccupancy):
+        * wtf/RefCountedLeakCounter.cpp:
+        (WTF::RefCountedLeakCounter::~RefCountedLeakCounter):
+        * wtf/RefPtrHashMap.h:
+        (WTF::::set):
+        (WTF::::get):
+        (WTF::::inlineGet):
+        (WTF::::take):
+        * wtf/Spectrum.h:
+        (WTF::Spectrum::add):
+        (WTF::Spectrum::get):
+        (WTF::Spectrum::buildList):
+        * wtf/ThreadingPthreads.cpp:
+        (WTF::identifierByPthreadHandle):
+
+2012-08-27  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        Rename first/second to key/value in HashMap iterators
+        https://bugs.webkit.org/show_bug.cgi?id=82784
+
+        Reviewed by Eric Seidel.
+
+        * wtf/HashCountedSet.h:
+        (WTF::::add):
+        (WTF::::remove):
+        (WTF::copyToVector):
+        * wtf/HashIterators.h:
+        (WTF::HashTableConstKeysIterator::get):
+        (WTF::HashTableConstValuesIterator::get):
+        (WTF::HashTableValuesIterator::get):
+        * wtf/HashMap.h:
+        (WTF::KeyValuePairKeyExtractor::extract):
+        (WTF::HashMapValueTraits::isEmptyValue):
+        (WTF::HashMapTranslator::translate):
+        (WTF::HashMapTranslatorAdapter::translate):
+        (WTF::::set):
+        (WTF::::get):
+        (WTF::::take):
+        (WTF::operator==):
+        (WTF::deleteAllValues):
+        (WTF::deleteAllKeys):
+        Remove deleteAllPairFirsts/Seconds.
+
+        * wtf/HashTable.h:
+        (WTF::hashTableSwap):
+        (WTF::::checkTableConsistencyExceptSize):
+        * wtf/HashTraits.h:
+        (WTF::KeyValuePair::KeyValuePair):
+        (KeyValuePair):
+        (WTF::KeyValuePairHashTraits::constructDeletedValue):
+        (WTF::KeyValuePairHashTraits::isDeletedValue):
+        * wtf/MetaAllocator.cpp:
+        (WTF::MetaAllocator::addFreeSpace):
+        (WTF::MetaAllocator::incrementPageOccupancy):
+        (WTF::MetaAllocator::decrementPageOccupancy):
+        * wtf/RefCountedLeakCounter.cpp:
+        (WTF::RefCountedLeakCounter::~RefCountedLeakCounter):
+        * wtf/RefPtrHashMap.h:
+        (WTF::::set):
+        (WTF::::get):
+        (WTF::::inlineGet):
+        (WTF::::take):
+        * wtf/Spectrum.h:
+        (WTF::Spectrum::add):
+        (WTF::Spectrum::get):
+        (WTF::Spectrum::buildList):
+        * wtf/ThreadingPthreads.cpp:
+        (WTF::identifierByPthreadHandle):
+
+2012-08-27  Benjamin Poulain  <benjamin@webkit.org>
+
+        Add ECMAScript Number to String conversion to WTF::String
+        https://bugs.webkit.org/show_bug.cgi?id=95016
+
+        Reviewed by Geoffrey Garen.
+
+        * wtf/text/WTFString.cpp:
+        (WTF::String::numberToStringECMAScript):
+        * wtf/text/WTFString.h:
+        Add the implementation of numberToStringECMAScript(double) from UString to String.
+        This will make it easier to replace UString in the future.
+
+2012-08-27  Benjamin Poulain  <benjamin@webkit.org>
+
+        Even up WTF::String to CString functions
+        https://bugs.webkit.org/show_bug.cgi?id=95008
+
+        Reviewed by Sam Weinig.
+
+        Apply advantages from UString to WTF::String.
+
+        * wtf/text/WTFString.cpp:
+        (WTF::String::ascii): There is no need to special case the null length, both
+        following branches use CString::newUninitialized(), which create empty string
+        for null length.
+        (WTF::String::latin1): Use characters16() instead of characters() to avoid
+        testing is8Bit() a second time.
+
+2012-08-24  Benjamin Poulain  <benjamin@webkit.org>
+
+        Touch Platform.h to solve a build dependency issue
+
+        Unreviewed.
+
+        * wtf/Platform.h:
+
+2012-08-24  Benjamin Poulain  <bpoulain@apple.com>
+
+        Unify Number to StringImpl conversion
+        https://bugs.webkit.org/show_bug.cgi?id=94879
+
+        Reviewed by Geoffrey Garen.
+
+        Previously, UString::number() and String::number() used different implementations.
+
+        WTF::String::number() was simply forwarding to String::format().
+        UString::number() had an optimized version of the conversion.
+
+        This patch replace both implementation by a new version, faster than the two previous versions.
+
+        The new functions numberToStringImpl improvements are:
+        -about 3 times faster than String::number().
+        -14% faster than UString::number() on signed numbers.
+        -9% faster than UString::number() on unsigned numbers.
+
+        * GNUmakefile.list.am:
+        * WTF.gypi:
+        * WTF.pro:
+        * WTF.vcproj/WTF.vcproj:
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/CMakeLists.txt:
+        * wtf/text/IntegerToStringConversion.cpp: Added.
+        (WTF::numberToStringImplSigned):
+        (WTF::numberToStringImpl):
+        (WTF::numberToStringImplUnsigned):
+        * wtf/text/IntegerToStringConversion.h: Added.
+        * wtf/text/WTFString.cpp:
+        (WTF::String::format):
+        * wtf/text/WTFString.h:
+        (WTF::String::number):
+
+2012-08-24  Andras Becsi  <andras.becsi@nokia.com>
+
+        [Qt] Be more explicit about the ICU dependency in the error message
+
+        Rubber-stamped by Simon Hausmann.
+
+        When building QtWebKit with a Qt5 which was not configured with libICU support
+        the error message is somewhat ambiguous about the indirect dependency.
+
+        * WTF.pri:
+
 2012-08-23  Julien Chaffraix  <jchaffraix@webkit.org>
 
         [Chromium] Enable AtomicString && CString && WTFString && StringImpl unit tests

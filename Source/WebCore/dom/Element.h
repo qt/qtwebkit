@@ -275,6 +275,7 @@ public:
     ElementShadow* shadow() const;
     ElementShadow* ensureShadow();
     virtual void willAddAuthorShadowRoot() { }
+    virtual bool areAuthorShadowsAllowed() const { return true; }
 
     ShadowRoot* userAgentShadowRoot() const;
 
@@ -303,7 +304,7 @@ public:
 
     virtual void focus(bool restorePreviousSelection = true);
     virtual void updateFocusAppearance(bool restorePreviousSelection);
-    void blur();
+    virtual void blur();
 
     String innerText();
     String outerText();
@@ -436,7 +437,7 @@ public:
 
     virtual void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     {
-        MemoryClassInfo info(memoryObjectInfo, this, MemoryInstrumentation::DOM);
+        MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
         ContainerNode::reportMemoryUsage(memoryObjectInfo);
         info.addInstrumentedMember(m_tagName);
         info.addInstrumentedMember(m_attributeData);
@@ -500,7 +501,7 @@ private:
     
     // cloneNode is private so that non-virtual cloneElementWithChildren and cloneElementWithoutChildren
     // are used instead.
-    virtual PassRefPtr<Node> cloneNode(bool deep, ExceptionCode&);
+    virtual PassRefPtr<Node> cloneNode(bool deep);
     virtual PassRefPtr<Element> cloneElementWithoutAttributesAndChildren();
 
     QualifiedName m_tagName;
@@ -519,7 +520,7 @@ private:
     ElementRareData* elementRareData() const;
     ElementRareData* ensureElementRareData();
 
-    OwnPtr<ElementAttributeData> m_attributeData;
+    RefPtr<ElementAttributeData> m_attributeData;
 };
     
 inline Element* toElement(Node* node)

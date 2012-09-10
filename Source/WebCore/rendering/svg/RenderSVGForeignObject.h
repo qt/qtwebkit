@@ -51,7 +51,7 @@ public:
     virtual FloatRect repaintRectInLocalCoordinates() const { return FloatRect(FloatPoint(), m_viewport.size()); }
 
     virtual bool nodeAtFloatPoint(const HitTestRequest&, HitTestResult&, const FloatPoint& pointInParent, HitTestAction);
-    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestPoint& pointInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
+    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
     virtual bool isSVGForeignObject() const { return true; }
 
     virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, TransformState&, MapLocalToContainerFlags mode = ApplyContainerFlip | SnapOffsetForTransforms, bool* wasFixed = 0) const OVERRIDE;
@@ -59,8 +59,8 @@ public:
     virtual void setNeedsTransformUpdate() { m_needsTransformUpdate = true; }
 
 private:
-    virtual void computeLogicalWidth();
-    virtual void computeLogicalHeight();
+    virtual void computeLogicalWidth() OVERRIDE;
+    virtual void computeLogicalHeight() OVERRIDE;
 
     virtual const AffineTransform& localToParentTransform() const;
     virtual AffineTransform localTransform() const { return m_localTransform; }

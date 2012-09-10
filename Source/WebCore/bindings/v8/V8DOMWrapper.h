@@ -33,10 +33,8 @@
 
 #include "DOMDataStore.h"
 #include "Event.h"
-#include "IsolatedWorld.h"
 #include "Node.h"
 #include "NodeFilter.h"
-#include "PlatformString.h"
 #include "V8CustomXPathNSResolver.h"
 #include "V8DOMMap.h"
 #include "V8IsolatedContext.h"
@@ -45,6 +43,7 @@
 #include <v8.h>
 #include <wtf/MainThread.h>
 #include <wtf/PassRefPtr.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
@@ -82,12 +81,12 @@ namespace WebCore {
 
         static WrapperTypeInfo* domWrapperType(v8::Handle<v8::Object>);
 
-        static v8::Handle<v8::Value> convertEventTargetToV8Object(PassRefPtr<EventTarget> eventTarget, v8::Isolate* isolate = 0)
+        static v8::Handle<v8::Value> convertEventTargetToV8Object(PassRefPtr<EventTarget> eventTarget, v8::Handle<v8::Object> creationContext = v8::Handle<v8::Object>(), v8::Isolate* isolate = 0)
         {
-            return convertEventTargetToV8Object(eventTarget.get(), isolate);
+            return convertEventTargetToV8Object(eventTarget.get(), creationContext, isolate);
         }
 
-        static v8::Handle<v8::Value> convertEventTargetToV8Object(EventTarget*, v8::Isolate* = 0);
+        static v8::Handle<v8::Value> convertEventTargetToV8Object(EventTarget*, v8::Handle<v8::Object> creationContext = v8::Handle<v8::Object>(), v8::Isolate* = 0);
 
         static PassRefPtr<EventListener> getEventListener(v8::Local<v8::Value> value, bool isAttribute, ListenerLookupType lookup);
 
@@ -120,12 +119,12 @@ namespace WebCore {
         static void setNamedHiddenReference(v8::Handle<v8::Object> parent, const char* name, v8::Handle<v8::Value> child);
         static void setNamedHiddenWindowReference(Frame*, const char*, v8::Handle<v8::Value>);
 
-        static v8::Local<v8::Object> instantiateV8Object(Frame*, WrapperTypeInfo*, void*);
+        static v8::Local<v8::Object> instantiateV8Object(WrapperTypeInfo*, void*);
 
         static v8::Handle<v8::Object> getCachedWrapper(Node* node)
         {
             ASSERT(isMainThread());
-            if (LIKELY(!IsolatedWorld::count())) {
+            if (LIKELY(!DOMWrapperWorld::isolatedWorldsExist())) {
                 v8::Persistent<v8::Object>* wrapper = node->wrapper();
                 if (LIKELY(!!wrapper))
                     return *wrapper;

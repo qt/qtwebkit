@@ -124,7 +124,9 @@ DRTTestRunner::DRTTestRunner(TestShell* shell)
     bindMethod("clearAllDatabases", &DRTTestRunner::clearAllDatabases);
     bindMethod("closeWebInspector", &DRTTestRunner::closeWebInspector);
 #if ENABLE(POINTER_LOCK)
+    bindMethod("didAcquirePointerLock", &DRTTestRunner::didAcquirePointerLock);
     bindMethod("didLosePointerLock", &DRTTestRunner::didLosePointerLock);
+    bindMethod("didNotAcquirePointerLock", &DRTTestRunner::didNotAcquirePointerLock);
 #endif
     bindMethod("disableAutoResizeMode", &DRTTestRunner::disableAutoResizeMode);
     bindMethod("disableImageLoading", &DRTTestRunner::disableImageLoading);
@@ -155,7 +157,10 @@ DRTTestRunner::DRTTestRunner(TestShell* shell)
     bindMethod("execCommand", &DRTTestRunner::execCommand);
     bindMethod("forceRedSelectionColors", &DRTTestRunner::forceRedSelectionColors);
 #if ENABLE(NOTIFICATIONS)
-    bindMethod("grantDesktopNotificationPermission", &DRTTestRunner::grantDesktopNotificationPermission);
+    bindMethod("grantWebNotificationPermission", &DRTTestRunner::grantWebNotificationPermission);
+    bindMethod("denyWebNotificationPermission", &DRTTestRunner::denyWebNotificationPermission);
+    bindMethod("removeAllWebNotificationPermissions", &DRTTestRunner::removeAllWebNotificationPermissions);
+    bindMethod("simulateWebNotificationClick", &DRTTestRunner::simulateWebNotificationClick);
 #endif
     bindMethod("findString", &DRTTestRunner::findString);
     bindMethod("isCommandEnabled", &DRTTestRunner::isCommandEnabled);
@@ -165,12 +170,9 @@ DRTTestRunner::DRTTestRunner(TestShell* shell)
     bindMethod("markerTextForListItem", &DRTTestRunner::markerTextForListItem);
     bindMethod("notifyDone", &DRTTestRunner::notifyDone);
     bindMethod("numberOfActiveAnimations", &DRTTestRunner::numberOfActiveAnimations);
-    bindMethod("numberOfPages", &DRTTestRunner::numberOfPages);
     bindMethod("numberOfPendingGeolocationPermissionRequests", &DRTTestRunner:: numberOfPendingGeolocationPermissionRequests);
     bindMethod("objCIdentityIsEqual", &DRTTestRunner::objCIdentityIsEqual);
     bindMethod("overridePreference", &DRTTestRunner::overridePreference);
-    bindMethod("pageProperty", &DRTTestRunner::pageProperty);
-    bindMethod("pageSizeAndMarginsInPixels", &DRTTestRunner::pageSizeAndMarginsInPixels);
     bindMethod("pathToLocalResource", &DRTTestRunner::pathToLocalResource);
     bindMethod("pauseAnimationAtTimeOnElementWithId", &DRTTestRunner::pauseAnimationAtTimeOnElementWithId);
     bindMethod("pauseTransitionAtTimeOnElementWithId", &DRTTestRunner::pauseTransitionAtTimeOnElementWithId);
@@ -209,7 +211,7 @@ DRTTestRunner::DRTTestRunner(TestShell* shell)
     bindMethod("setPageVisibility", &DRTTestRunner::setPageVisibility);
     bindMethod("setPluginsEnabled", &DRTTestRunner::setPluginsEnabled);
 #if ENABLE(POINTER_LOCK)
-    bindMethod("setPointerLockWillFailAsynchronously", &DRTTestRunner::setPointerLockWillFailAsynchronously);
+    bindMethod("setPointerLockWillRespondAsynchronously", &DRTTestRunner::setPointerLockWillRespondAsynchronously);
     bindMethod("setPointerLockWillFailSynchronously", &DRTTestRunner::setPointerLockWillFailSynchronously);
 #endif
     bindMethod("setPopupBlockingEnabled", &DRTTestRunner::setPopupBlockingEnabled);
@@ -233,7 +235,7 @@ DRTTestRunner::DRTTestRunner(TestShell* shell)
     bindMethod("setAsynchronousSpellCheckingEnabled", &DRTTestRunner::setAsynchronousSpellCheckingEnabled);
     bindMethod("showWebInspector", &DRTTestRunner::showWebInspector);
 #if ENABLE(NOTIFICATIONS)
-    bindMethod("simulateDesktopNotificationClick", &DRTTestRunner::simulateDesktopNotificationClick);
+    bindMethod("simulateLegacyWebNotificationClick", &DRTTestRunner::simulateLegacyWebNotificationClick);
 #endif
     bindMethod("startSpeechInput", &DRTTestRunner::startSpeechInput);
     bindMethod("testRepaint", &DRTTestRunner::testRepaint);
@@ -651,7 +653,7 @@ void DRTTestRunner::reset()
         m_shell->webView()->removeAllUserContent();
         WebKit::WebSize empty;
         m_shell->webView()->disableAutoResizeMode();
-        m_shell->webView()->setDeviceScaleFactor(1);
+        m_shell->webViewHost()->setDeviceScaleFactor(1);
     }
     m_dumpAsText = false;
     m_dumpAsAudio = false;
@@ -1178,7 +1180,7 @@ void DRTTestRunner::callShouldCloseOnWebView(const CppArgumentList&, CppVariant*
 }
 
 #if ENABLE(NOTIFICATIONS)
-void DRTTestRunner::grantDesktopNotificationPermission(const CppArgumentList& arguments, CppVariant* result)
+void DRTTestRunner::grantWebNotificationPermission(const CppArgumentList& arguments, CppVariant* result)
 {
     if (arguments.size() != 1 || !arguments[0].isString()) {
         result->set(false);
@@ -1190,7 +1192,25 @@ void DRTTestRunner::grantDesktopNotificationPermission(const CppArgumentList& ar
     result->set(true);
 }
 
-void DRTTestRunner::simulateDesktopNotificationClick(const CppArgumentList& arguments, CppVariant* result)
+void DRTTestRunner::denyWebNotificationPermission(const CppArgumentList& arguments, CppVariant* result)
+{
+    // FIXME: Implement.
+    result->setNull();
+}
+
+void DRTTestRunner::removeAllWebNotificationPermissions(const CppArgumentList& arguments, CppVariant* result)
+{
+    // FIXME: Implement.
+    result->setNull();
+}
+
+void DRTTestRunner::simulateWebNotificationClick(const CppArgumentList& arguments, CppVariant* result)
+{
+    // FIXME: Implement.
+    result->setNull();
+}
+
+void DRTTestRunner::simulateLegacyWebNotificationClick(const CppArgumentList& arguments, CppVariant* result)
 {
     if (arguments.size() != 1 || !arguments[0].isString()) {
         result->set(false);
@@ -1671,23 +1691,6 @@ static bool parseCppArgumentInt32(const CppArgumentList& arguments, int argIndex
     return true;
 }
 
-static bool parsePageSizeParameters(const CppArgumentList& arguments,
-                                    int argOffset,
-                                    int* pageWidthInPixels,
-                                    int* pageHeightInPixels)
-{
-    // WebKit is using the window width/height of DumpRenderTree as the
-    // default value of the page size.
-    // FIXME: share the default values with other ports.
-    int argCount = static_cast<int>(arguments.size()) - argOffset;
-    if (argCount && argCount != 2)
-        return false;
-    if (!parseCppArgumentInt32(arguments, argOffset, pageWidthInPixels, 800)
-        || !parseCppArgumentInt32(arguments, argOffset + 1, pageHeightInPixels, 600))
-        return false;
-    return true;
-}
-
 static bool parsePageNumber(const CppArgumentList& arguments, int argOffset, int* pageNumber)
 {
     if (static_cast<int>(arguments.size()) > argOffset + 1)
@@ -1697,53 +1700,10 @@ static bool parsePageNumber(const CppArgumentList& arguments, int argOffset, int
     return true;
 }
 
-static bool parsePageNumberSizeMargins(const CppArgumentList& arguments, int argOffset,
-                                       int* pageNumber, int* width, int* height,
-                                       int* marginTop, int* marginRight, int* marginBottom, int* marginLeft)
-{
-    int argCount = static_cast<int>(arguments.size()) - argOffset;
-    if (argCount && argCount != 7)
-        return false;
-    if (!parseCppArgumentInt32(arguments, argOffset, pageNumber, 0)
-        || !parseCppArgumentInt32(arguments, argOffset + 1, width, 0)
-        || !parseCppArgumentInt32(arguments, argOffset + 2, height, 0)
-        || !parseCppArgumentInt32(arguments, argOffset + 3, marginTop, 0)
-        || !parseCppArgumentInt32(arguments, argOffset + 4, marginRight, 0)
-        || !parseCppArgumentInt32(arguments, argOffset + 5, marginBottom, 0)
-        || !parseCppArgumentInt32(arguments, argOffset + 6, marginLeft, 0))
-        return false;
-    return true;
-}
-
 void DRTTestRunner::setPrinting(const CppArgumentList& arguments, CppVariant* result)
 {
     setIsPrinting(true);
     result->setNull();
-}
-
-void DRTTestRunner::pageSizeAndMarginsInPixels(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->set("");
-    int pageNumber = 0;
-    int width = 0;
-    int height = 0;
-    int marginTop = 0;
-    int marginRight = 0;
-    int marginBottom = 0;
-    int marginLeft = 0;
-    if (!parsePageNumberSizeMargins(arguments, 0, &pageNumber, &width, &height, &marginTop, &marginRight, &marginBottom,
-                                    &marginLeft))
-        return;
-
-    WebFrame* frame = m_shell->webView()->mainFrame();
-    if (!frame)
-        return;
-    WebSize pageSize(width, height);
-    frame->pageSizeAndMarginsInPixels(pageNumber, pageSize, marginTop, marginRight, marginBottom, marginLeft);
-    stringstream resultString;
-    resultString << "(" << pageSize.width << ", " << pageSize.height << ") " << marginTop << " " << marginRight << " "
-                 << marginBottom << " " << marginLeft;
-    result->set(resultString.str());
 }
 
 void DRTTestRunner::hasCustomPageSizeStyle(const CppArgumentList& arguments, CppVariant* result)
@@ -1756,40 +1716,6 @@ void DRTTestRunner::hasCustomPageSizeStyle(const CppArgumentList& arguments, Cpp
     if (!frame)
         return;
     result->set(frame->hasCustomPageSizeStyle(pageIndex));
-}
-
-void DRTTestRunner::pageProperty(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->set("");
-    int pageNumber = 0;
-    if (!parsePageNumber(arguments, 1, &pageNumber))
-        return;
-    if (!arguments[0].isString())
-        return;
-    WebFrame* frame = m_shell->webView()->mainFrame();
-    if (!frame)
-        return;
-    WebSize pageSize(800, 800);
-    frame->printBegin(pageSize);
-    result->set(frame->pageProperty(cppVariantToWebString(arguments[0]), pageNumber).utf8());
-    frame->printEnd();
-}
-
-void DRTTestRunner::numberOfPages(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-    int pageWidthInPixels = 0;
-    int pageHeightInPixels = 0;
-    if (!parsePageSizeParameters(arguments, 0, &pageWidthInPixels, &pageHeightInPixels))
-        return;
-
-    WebFrame* frame = m_shell->webView()->mainFrame();
-    if (!frame)
-        return;
-    WebPrintParams printParams(WebSize(pageWidthInPixels, pageHeightInPixels));
-    int numberOfPages = frame->printBegin(printParams);
-    frame->printEnd();
-    result->set(numberOfPages);
 }
 
 void DRTTestRunner::numberOfPendingGeolocationPermissionRequests(const CppArgumentList& arguments, CppVariant* result)
@@ -2217,7 +2143,7 @@ void DRTTestRunner::setBackingScaleFactor(const CppArgumentList& arguments, CppV
         return;
     
     float value = arguments[0].value.doubleValue;
-    m_shell->webView()->setDeviceScaleFactor(value);
+    m_shell->webViewHost()->setDeviceScaleFactor(value);
 
     OwnArrayPtr<CppVariant> callbackArguments = adoptArrayPtr(new CppVariant[1]);
     callbackArguments[0].set(arguments[1]);
@@ -2306,15 +2232,27 @@ void DRTTestRunner::setHasCustomFullScreenBehavior(const CppArgumentList& argume
 }
 
 #if ENABLE(POINTER_LOCK)
+void DRTTestRunner::didAcquirePointerLock(const CppArgumentList&, CppVariant* result)
+{
+    m_shell->webViewHost()->didAcquirePointerLock();
+    result->setNull();
+}
+
+void DRTTestRunner::didNotAcquirePointerLock(const CppArgumentList&, CppVariant* result)
+{
+    m_shell->webViewHost()->didNotAcquirePointerLock();
+    result->setNull();
+}
+
 void DRTTestRunner::didLosePointerLock(const CppArgumentList&, CppVariant* result)
 {
     m_shell->webViewHost()->didLosePointerLock();
     result->setNull();
 }
 
-void DRTTestRunner::setPointerLockWillFailAsynchronously(const CppArgumentList&, CppVariant* result)
+void DRTTestRunner::setPointerLockWillRespondAsynchronously(const CppArgumentList&, CppVariant* result)
 {
-    m_shell->webViewHost()->setPointerLockWillFailAsynchronously();
+    m_shell->webViewHost()->setPointerLockWillRespondAsynchronously();
     result->setNull();
 }
 

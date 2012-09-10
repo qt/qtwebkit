@@ -59,11 +59,10 @@ namespace JSC {
     class LLIntOffsetsExtractor;
     class MarkedArgumentBuffer;
     class RegisterFile;
-    class UString;
     class WeakGCHandlePool;
     class SlotVisitor;
 
-    typedef std::pair<JSValue, UString> ValueStringPair;
+    typedef std::pair<JSValue, WTF::String> ValueStringPair;
     typedef HashCountedSet<JSCell*> ProtectCountSet;
     typedef HashCountedSet<const char*> TypeCountSet;
 
@@ -204,7 +203,8 @@ namespace JSC {
         void harvestWeakReferences();
         void finalizeUnconditionalFinalizers();
         void deleteUnmarkedCompiledCode();
-        
+        void zombifyDeadObjects();
+ 
         RegisterFile& registerFile();
         BlockAllocator& blockAllocator();
 

@@ -49,11 +49,11 @@ class HTMLDocument;
 
 // V8WindowShell represents all the per-global object state for a Frame that
 // persist between navigations.
-class V8DOMWindowShell : public RefCounted<V8DOMWindowShell> {
+class V8DOMWindowShell {
 public:
-    static PassRefPtr<V8DOMWindowShell> create(Frame*);
+    static PassOwnPtr<V8DOMWindowShell> create(Frame*);
 
-    v8::Handle<v8::Context> context() const { return m_context.get(); }
+    v8::Persistent<v8::Context> context() const { return m_context.get(); }
 
     // Update document object of the frame.
     void updateDocument();
@@ -68,10 +68,9 @@ public:
     bool isContextInitialized();
 
     v8::Persistent<v8::Context> createNewContext(v8::Handle<v8::Object> global, int extensionGroup, int worldId);
-    void setContext(v8::Handle<v8::Context>);
     static bool installDOMWindow(v8::Handle<v8::Context> context, DOMWindow*);
 
-    bool initContextIfNeeded();
+    bool initializeIfNeeded();
     void updateDocumentWrapper(v8::Handle<v8::Object> wrapper);
 
     void clearForNavigation();
@@ -82,19 +81,18 @@ public:
     V8PerContextData* perContextData() { return m_perContextData.get(); }
 
 private:
-    V8DOMWindowShell(Frame*);
+    explicit V8DOMWindowShell(Frame*);
 
-    void disposeContextHandles();
+    void disposeContext();
 
     void setSecurityToken();
-    void clearDocumentWrapper();
 
     // The JavaScript wrapper for the document object is cached on the global
-    // object for fast access. UpdateDocumentWrapperCache sets the wrapper
-    // for the current document on the global object. ClearDocumentWrapperCache
+    // object for fast access. UpdateDocumentProperty sets the wrapper
+    // for the current document on the global object. ClearDocumentProperty
     // deletes the document wrapper from the global object.
-    void updateDocumentWrapperCache();
-    void clearDocumentWrapperCache();
+    void updateDocumentProperty();
+    void clearDocumentProperty();
 
     Frame* m_frame;
 

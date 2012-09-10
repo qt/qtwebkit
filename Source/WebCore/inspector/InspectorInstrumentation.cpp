@@ -249,6 +249,12 @@ void InspectorInstrumentation::mouseDidMoveOverElementImpl(InstrumentingAgents* 
         domAgent->mouseDidMoveOverElement(result, modifierFlags);
 }
 
+void InspectorInstrumentation::didScrollImpl(InstrumentingAgents* instrumentingAgents)
+{
+    if (InspectorPageAgent* pageAgent = instrumentingAgents->inspectorPageAgent())
+        pageAgent->didScroll();
+}
+
 bool InspectorInstrumentation::handleMousePressImpl(InstrumentingAgents* instrumentingAgents)
 {
     if (InspectorDOMAgent* domAgent = instrumentingAgents->inspectorDOMAgent())
@@ -429,6 +435,12 @@ void InspectorInstrumentation::didCancelFrameImpl(InstrumentingAgents* instrumen
         timelineAgent->didCancelFrame();
 }
 
+void InspectorInstrumentation::didInvalidateLayoutImpl(InstrumentingAgents* instrumentingAgents, Frame* frame)
+{
+    if (InspectorTimelineAgent* timelineAgent = instrumentingAgents->inspectorTimelineAgent())
+        timelineAgent->didInvalidateLayout(frame);
+}
+
 InspectorInstrumentationCookie InspectorInstrumentation::willLayoutImpl(InstrumentingAgents* instrumentingAgents, Frame* frame)
 {
     int timelineAgentId = 0;
@@ -526,6 +538,8 @@ void InspectorInstrumentation::didRecalculateStyleImpl(const InspectorInstrument
 
 void InspectorInstrumentation::didScheduleStyleRecalculationImpl(InstrumentingAgents* instrumentingAgents, Document* document)
 {
+    if (InspectorTimelineAgent* timelineAgent = instrumentingAgents->inspectorTimelineAgent())
+        timelineAgent->didScheduleStyleRecalculation(document->frame());
     if (InspectorResourceAgent* resourceAgent = instrumentingAgents->inspectorResourceAgent())
         resourceAgent->didScheduleStyleRecalculation(document);
 }
@@ -892,6 +906,10 @@ void InspectorInstrumentation::addMessageToConsoleImpl(InstrumentingAgents* inst
 {
     if (InspectorConsoleAgent* consoleAgent = instrumentingAgents->inspectorConsoleAgent())
         consoleAgent->addMessageToConsole(source, type, level, message, arguments, callStack);
+#if ENABLE(JAVASCRIPT_DEBUGGER)
+    if (InspectorDebuggerAgent* debuggerAgent = instrumentingAgents->inspectorDebuggerAgent())
+        debuggerAgent->addMessageToConsole(source, type);
+#endif
 }
 
 void InspectorInstrumentation::addMessageToConsoleImpl(InstrumentingAgents* instrumentingAgents, MessageSource source, MessageType type, MessageLevel level, const String& message, const String& scriptId, unsigned lineNumber)

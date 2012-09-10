@@ -30,6 +30,8 @@
 #ifndef Opcode_h
 #define Opcode_h
 
+#include "LLIntOpcode.h"
+
 #include <algorithm>
 #include <string.h>
 
@@ -186,9 +188,9 @@ namespace JSC {
         macro(op_get_pnames, 6) \
         macro(op_next_pname, 7) \
         \
-        macro(op_push_scope, 2) \
+        macro(op_push_with_scope, 2) \
         macro(op_pop_scope, 1) \
-        macro(op_push_new_scope, 4) \
+        macro(op_push_name_scope, 4) \
         \
         macro(op_catch, 2) \
         macro(op_throw, 2) \
@@ -197,6 +199,8 @@ namespace JSC {
         macro(op_debug, 5) \
         macro(op_profile_will_call, 2) \
         macro(op_profile_did_call, 2) \
+        \
+        FOR_EACH_LLINT_OPCODE_EXTENSION(macro) \
         \
         macro(op_end, 2) // end must be the last opcode in the list
 
@@ -221,12 +225,8 @@ namespace JSC {
         FOR_EACH_OPCODE_ID(VERIFY_OPCODE_ID);
     #undef VERIFY_OPCODE_ID
 
-#if ENABLE(COMPUTED_GOTO_CLASSIC_INTERPRETER) || ENABLE(LLINT)
-#if COMPILER(RVCT) || COMPILER(INTEL)
+#if ENABLE(COMPUTED_GOTO_OPCODES)
     typedef void* Opcode;
-#else
-    typedef const void* Opcode;
-#endif
 #else
     typedef OpcodeID Opcode;
 #endif

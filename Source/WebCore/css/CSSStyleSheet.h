@@ -81,6 +81,7 @@ public:
     virtual bool isLoading() const OVERRIDE;
     
     void clearOwnerRule() { m_ownerRule = 0; }
+    CSSStyleSheet* rootStyleSheet() const;
     Document* ownerDocument() const;
     MediaQuerySet* mediaQueries() const { return m_mediaQueries.get(); }
     void setMediaQueries(PassRefPtr<MediaQuerySet>);
@@ -102,7 +103,6 @@ public:
     void didMutate();
     
     void clearChildRuleCSSOMWrappers();
-    void reattachChildRuleCSSOMWrappers();
 
     StyleSheetContents* contents() const { return m_contents.get(); }
 
@@ -116,6 +116,7 @@ private:
     virtual String type() const { return "text/css"; }
 
     bool canAccessRules() const;
+    void reattachCSSOMWrappers();
     
     RefPtr<StyleSheetContents> m_contents;
     bool m_isInlineStylesheet;
