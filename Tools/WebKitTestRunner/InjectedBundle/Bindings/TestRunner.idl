@@ -67,6 +67,8 @@ module WTR {
         void removeOriginAccessWhitelistEntry(in DOMString sourceOrigin, in DOMString destinationProtocol, in DOMString destinationHost, in boolean allowDestinationSubdomains);
         void setUserStyleSheetEnabled(in boolean value);
         void setUserStyleSheetLocation(in DOMString location);
+        void setMinimumTimerInterval(in double interval); // Interval specified in seconds.
+        void setSpatialNavigationEnabled(in boolean value);
 
         // Special DOM functions.
         void clearBackForwardList();
@@ -107,6 +109,9 @@ module WTR {
         // Application Cache API
         void clearAllApplicationCaches();
         void setAppCacheMaximumSize(in unsigned long long size);
+        long long applicationCacheDiskUsageForOrigin(in DOMString origin);
+        void clearApplicationCacheForOrigin(in DOMString name);
+        void setApplicationCacheOriginQuota(in unsigned long long bytes);
 
         // Compositing testing.
         DOMString layerTreeAsText();

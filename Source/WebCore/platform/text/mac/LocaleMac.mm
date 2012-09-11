@@ -45,6 +45,11 @@ using namespace std;
 
 namespace WebCore {
 
+PassOwnPtr<Localizer> Localizer::create(const AtomicString& locale)
+{
+    return LocaleMac::create(locale.string());
+}
+
 static NSDateFormatter* createDateTimeFormatter(NSLocale* locale, NSDateFormatterStyle dateStyle, NSDateFormatterStyle timeStyle)
 {
     NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
@@ -270,7 +275,7 @@ const Vector<String>& LocaleMac::timeAMPMLabels()
 }
 #endif
 
-void LocaleMac::initializeNumberLocalizerData()
+void LocaleMac::initializeLocalizerData()
 {
     if (m_didInitializeNumberData)
         return;
@@ -298,7 +303,7 @@ void LocaleMac::initializeNumberLocalizerData()
     String positiveSuffix([formatter.get() positiveSuffix]);
     String negativePrefix([formatter.get() negativePrefix]);
     String negativeSuffix([formatter.get() negativeSuffix]);
-    setNumberLocalizerData(symbols, positivePrefix, positiveSuffix, negativePrefix, negativeSuffix);
+    setLocalizerData(symbols, positivePrefix, positiveSuffix, negativePrefix, negativeSuffix);
 }
 
 }

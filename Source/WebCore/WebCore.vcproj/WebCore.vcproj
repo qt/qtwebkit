@@ -38386,6 +38386,30 @@
 				RelativePath="..\rendering\EllipsisBox.h"
 				>
 			</File>
+                        <File
+                                RelativePath="..\rendering\ExclusionInterval.cpp"
+                                >
+                        </File>
+                        <File
+                                RelativePath="..\rendering\ExclusionInterval.h"
+                                >
+                        </File>
+                        <File
+                                RelativePath="..\rendering\ExclusionRectangle.cpp"
+                                >
+                        </File>
+                        <File
+                                RelativePath="..\rendering\ExclusionSRectangle.h"
+                                >
+                        </File>
+                        <File
+                                RelativePath="..\rendering\ExclusionShape.cpp"
+                                >
+                        </File>
+                        <File
+                                RelativePath="..\rendering\ExclusionShape.h"
+                                >
+                        </File>
 			<File
 				RelativePath="..\rendering\FilterEffectRenderer.cpp"
 				>
@@ -51891,10 +51915,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\dom\MemoryInstrumentation.h"
-				>
-			</File>
-			<File
 				RelativePath="..\dom\MessageChannel.cpp"
 				>
 				<FileConfiguration
@@ -63588,6 +63608,14 @@
 			</File>
 			<File
 				RelativePath="..\html\InputType.h"
+				>
+			</File>  
+			<File
+				RelativePath="..\html\InputTypeNames.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\html\InputTypeNames.h"
 				>
 			</File>
 			<File

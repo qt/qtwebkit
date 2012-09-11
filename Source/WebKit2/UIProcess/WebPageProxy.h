@@ -486,6 +486,9 @@ public:
     bool hasHorizontalScrollbar() const { return m_mainFrameHasHorizontalScrollbar; }
     bool hasVerticalScrollbar() const { return m_mainFrameHasVerticalScrollbar; }
 
+    void setSuppressScrollbarAnimations(bool);
+    bool areScrollbarAnimationsSuppressed() const { return m_suppressScrollbarAnimations; }
+
     bool isPinnedToLeftSide() const { return m_mainFrameIsPinnedToLeftSide; }
     bool isPinnedToRightSide() const { return m_mainFrameIsPinnedToRightSide; }
 
@@ -830,7 +833,7 @@ private:
     void reattachToWebProcessWithItem(WebBackForwardListItem*);
 
     void requestNotificationPermission(uint64_t notificationID, const String& originString);
-    void showNotification(const String& title, const String& body, const String& iconURL, const String& tag, const String& originString, uint64_t notificationID);
+    void showNotification(const String& title, const String& body, const String& iconURL, const String& tag, const String& lang, const String& dir, const String& originString, uint64_t notificationID);
     
 #if USE(TILED_BACKING_STORE)
     void pageDidRequestScroll(const WebCore::IntPoint&);
@@ -1095,6 +1098,8 @@ private:
 
     bool m_useFixedLayout;
     WebCore::IntSize m_fixedLayoutSize;
+
+    bool m_suppressScrollbarAnimations;
 
     WebCore::Pagination::Mode m_paginationMode;
     bool m_paginationBehavesLikeColumns;

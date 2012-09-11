@@ -119,6 +119,7 @@ SET(JavaScriptCore_SOURCES
     heap/MarkedBlock.cpp
     heap/MarkedSpace.cpp
     heap/MarkStack.cpp
+    heap/SlotVisitor.cpp
     heap/WeakSet.cpp
     heap/WeakHandleOwner.cpp
     heap/WeakBlock.cpp
@@ -331,6 +332,7 @@ IF (ENABLE_LLINT)
 
     ADD_SOURCE_DEPENDENCIES(${JAVASCRIPTCORE_DIR}/llint/LLIntOffsetsExtractor.cpp ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/LLIntDesiredOffsets.h)
     ADD_EXECUTABLE(LLIntOffsetsExtractor ${JAVASCRIPTCORE_DIR}/llint/LLIntOffsetsExtractor.cpp)
+    TARGET_LINK_LIBRARIES(LLIntOffsetsExtractor ${WTF_LIBRARY_NAME})
 
     ADD_CUSTOM_COMMAND(
         OUTPUT ${DERIVED_SOURCES_JAVASCRIPTCORE_DIR}/LLIntAssembly.h
@@ -406,10 +408,6 @@ ADD_LIBRARY(${JavaScriptCore_LIBRARY_NAME} ${JavaScriptCore_LIBRARY_TYPE} ${Java
 TARGET_LINK_LIBRARIES(${JavaScriptCore_LIBRARY_NAME} ${JavaScriptCore_LIBRARIES})
 SET_TARGET_PROPERTIES(${JavaScriptCore_LIBRARY_NAME} PROPERTIES FOLDER "JavaScriptCore")
 SET_TARGET_PROPERTIES(${JavaScriptCore_LIBRARY_NAME} PROPERTIES LINK_INTERFACE_LIBRARIES "")
-
-IF (JavaScriptCore_LINK_FLAGS)
-    ADD_TARGET_PROPERTIES(${JavaScriptCore_LIBRARY_NAME} LINK_FLAGS "${JavaScriptCore_LINK_FLAGS}")
-ENDIF ()
 
 IF (SHARED_CORE)
     SET_TARGET_PROPERTIES(${JavaScriptCore_LIBRARY_NAME} PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})

@@ -1,3 +1,229 @@
+2012-09-11  Iain Merrick  <husky@chromium.org>
+
+        [chromium] Fix double call to scrollBegin() when handling scroll gesture
+        https://bugs.webkit.org/show_bug.cgi?id=95322
+
+        Reviewed by James Robinson.
+
+        WebCompositorInputHandlerImpl::handleGestureFling() calls scrollBegin() on its
+        client, then if the result is ScrollStarted, it creates a PlatformGestureCurve
+        object to handle the fling animation. This patch adds a matching scrollEnd()
+        before the animation starts.
+
+        Now using strict mocks in WebCompositorInputHandlerImplTest, which turns all
+        unexpected calls into test failures. This ensures that scrollBegin / scrollEnd
+        happen exactly when we want and at no other times.
+
+        * src/WebCompositorInputHandlerImpl.cpp:
+        (WebKit::WebCompositorInputHandlerImpl::handleGestureFling):
+        * tests/WebCompositorInputHandlerImplTest.cpp:
+        (WebCompositorInputHandlerImplTest):
+        (WebKit::TEST_F):
+
+2012-09-11  Peter Beverloo  <peter@chromium.org>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
+2012-09-11  Keishi Hattori  <keishi@webkit.org>
+
+        Create Localizer factory method for LocaleMac
+        https://bugs.webkit.org/show_bug.cgi?id=96355
+
+        Reviewed by Kent Tamura.
+
+        * tests/LocaleMacTest.cpp:
+        (testNumberIsReversible): Use Localizer::create.
+        (testNumbers):
+
+2012-09-11  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r128150.
+        http://trac.webkit.org/changeset/128150
+        https://bugs.webkit.org/show_bug.cgi?id=96357
+
+        it broke chromium compilation (Requested by loislo on
+        #webkit).
+
+        * DEPS:
+
+2012-09-10  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
+2012-09-10  Joanmarie Diggs  <jdiggs@igalia.com>
+
+        Properly expose <legend> elements to ATs
+        https://bugs.webkit.org/show_bug.cgi?id=84137
+
+        Reviewed by Chris Fleizach.
+
+        Created a new WebCore Accessibility Role, LegendRole. Used it to map to
+        the expected platform role, ATK_ROLE_LABEL. Also established the needed
+        AtkRelation pair, label-for/labelled-by between the legend and fieldset.
+
+        * public/WebAccessibilityRole.h: added WebAccessibilityRoleLegend
+        * src/AssertMatchingEnums.cpp: added the assert matching rule for
+        WebAccessibilityRoleLegend and LegendRole
+
+2012-09-10  Beth Dakin  <bdakin@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=96158
+        Need API to suppress scrollbar animations
+        -and corresponding-
+        <rdar://problem/12210972>
+
+        Reviewed by Sam Weinig.
+
+        ScrollableArea::isOnActivePage() has been re-named to
+        ScrollableArea:: scrollbarsCanBeActive().
+        * src/ScrollbarGroup.cpp:
+        (WebKit::ScrollbarGroup::scrollbarsCanBeActive):
+        * src/ScrollbarGroup.h:
+        * tests/GraphicsLayerChromiumTest.cpp:
+        * tests/ScrollAnimatorNoneTest.cpp:
+        (MockScrollableArea):
+
+2012-09-10  Dan Alcantara  <dfalcantara@chromium.org>
+
+        [chromium, android] Reloading a page with a different user agent can cause the page to be zoomed in
+        https://bugs.webkit.org/show_bug.cgi?id=90222
+
+        Reviewed by Adam Barth.
+
+        When reloading a page with an overridden URL, the page's scroll and zoom
+        state will be restored once the reload is complete.  This is problematic
+        in situations when switching between mobile and desktop versions of the
+        same site because it will zoom back in on a random part of alternate page.
+        This CL just avoids that situation by resetting the zoom and scale whenever
+        this type of reload occurs.
+
+        Chromium half: https://chromiumcodereview.appspot.com/10889019
+
+        * public/WebView.h:
+        (WebView):
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::resetScrollAndScaleState):
+        (WebKit):
+        * src/WebViewImpl.h:
+        (WebViewImpl):
+
+2012-09-10  Adam Barth  <abarth@chromium.org>
+
+        [V8] V8AuxiliaryContext used by IDB leaks memory
+        https://bugs.webkit.org/show_bug.cgi?id=96317
+
+        Reviewed by Tony Chang.
+
+        Call the V8 APIs directly instead of using a helper class.
+
+        * tests/IDBBindingUtilitiesTest.cpp:
+        (WebCore::TEST):
+
+2012-09-10  Adam Barth  <abarth@chromium.org>
+
+        [V8] Inline firstFrame and currentFrame into their unique callers
+        https://bugs.webkit.org/show_bug.cgi?id=96309
+
+        Reviewed by Eric Seidel.
+
+        This patch just lines these WebCore functions because we only call them
+        from here.
+
+        * src/WebFrameImpl.cpp:
+        (WebKit::WebFrame::frameForEnteredContext):
+        (WebKit::WebFrame::frameForCurrentContext):
+
+2012-09-10  Rick Byers  <rbyers@chromium.org>
+
+        [chromium] Add unused GestureTapCancel
+        https://bugs.webkit.org/show_bug.cgi?id=96183
+
+        Reviewed by Adam Barth.
+
+        This adds a new 'tap cancel' gesture type.  This is temporarily unused,
+        so that we can change chromium to start sending the gesture type
+        without breaking anything.
+
+        * public/WebInputEvent.h:
+        * src/PageWidgetDelegate.cpp:
+        (WebKit::PageWidgetDelegate::handleInputEvent):
+        * src/WebInputEventConversion.cpp:
+        (WebKit::PlatformGestureEventBuilder::PlatformGestureEventBuilder):
+        * src/WebPopupMenuImpl.cpp:
+        (WebKit::WebPopupMenuImpl::handleInputEvent):
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::handleGestureEvent):
+
+2012-09-10  Mark Pilgrim  <pilgrim@chromium.org>
+
+        [Chromium] Define new setSharedWorkerRepository function in preparation for removing WebKitPlatformSupport::sharedWorkerRepository()
+        https://bugs.webkit.org/show_bug.cgi?id=95861
+
+        Reviewed by Adam Barth.
+
+        Followup patch to Chromium will call this new function, then we can remove all references to the legacy function on WebKitPlatformSupport.
+
+        * public/WebSharedWorkerRepository.h:
+        (WebKit):
+        * src/SharedWorkerRepository.cpp:
+        (WebKit):
+        (WebKit::setSharedWorkerRepository):
+        (WebKit::sharedWorkerRepository):
+        (WebCore::SharedWorkerRepository::isAvailable):
+        (WebCore::SharedWorkerRepository::connect):
+        (WebCore::SharedWorkerRepository::documentDetached):
+        (WebCore::SharedWorkerRepository::hasSharedWorkers):
+
+2012-09-10  Catalin Badea  <badea@adobe.com>
+
+        webkit build for 64-bit Mac chromium
+        https://bugs.webkit.org/show_bug.cgi?id=95977
+
+        Reviewed by Eric Seidel.
+
+        Ensure header completeness and use the correct include order. This fixes a compilation issues noticeable when building chromium for 64-bit Mac. 
+
+        * public/mac/WebSubstringUtil.h:
+        * src/mac/WebSubstringUtil.mm:
+
+2012-09-10  Adrienne Walker  <enne@google.com>
+
+        [chromium] Fix deadlock between WebMediaPlayerClientImpl dtor and PutCurrentFrame
+        https://bugs.webkit.org/show_bug.cgi?id=96010
+
+        Reviewed by James Robinson.
+
+        The key fix here is that the destructor no longer has a mutex.
+        The m_compositingMutex was supposedly protecting races between
+        ~WebMediaPlayerClientImpl and setVideoFrameProviderClient. The
+        former is only called from the main thread and the latter is called
+        from the compositor thread only when the main thread is blocked (and
+        it already asserts that this is the case).
+
+        In addition, the m_providerMutex in CCVideoLayerImpl prevents the
+        destruction of WebMediaPlayerClientImpl, thus keeping the frame
+        acquired via getCurrentFrame alive until putCurrentFrame is called.
+        These functions are only called by the client, and comments are added
+        to the interface to better document this.
+
+        To prevent a race between load() and getCurrentFrame/putCurrentFrame
+        (which are called from different threads) a new m_webMediaPlayerMutex
+        to replace part of what the old m_compositingMutex was doing.
+
+        * src/WebMediaPlayerClientImpl.cpp:
+        (WebKit::WebMediaPlayerClientImpl::~WebMediaPlayerClientImpl):
+        (WebKit::WebMediaPlayerClientImpl::load):
+        (WebKit::WebMediaPlayerClientImpl::loadInternal):
+        (WebKit::WebMediaPlayerClientImpl::setVideoFrameProviderClient):
+        (WebKit::WebMediaPlayerClientImpl::getCurrentFrame):
+        (WebKit::WebMediaPlayerClientImpl::putCurrentFrame):
+        * src/WebMediaPlayerClientImpl.h:
+        (WebMediaPlayerClientImpl):
+
 2012-09-10  Rick Byers  <rbyers@chromium.org>
 
         [chromium] Don't use WebGestureEvent.boundingBox for touch adjustment

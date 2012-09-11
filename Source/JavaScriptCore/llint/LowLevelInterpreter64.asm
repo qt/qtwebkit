@@ -236,7 +236,7 @@ _llint_op_create_this:
     loadp Callee[cfr], t0
     loadp JSFunction::m_cachedInheritorID[t0], t2
     btpz t2, .opCreateThisSlow
-    allocateBasicJSObject(JSFinalObjectSizeClassIndex, JSGlobalData::jsFinalObjectClassInfo, t2, t0, t1, t3, .opCreateThisSlow)
+    allocateBasicJSObject(JSFinalObjectSizeClassIndex, t2, t0, t1, t3, .opCreateThisSlow)
     loadis 8[PB, PC, 8], t1
     storep t0, [cfr, t1, 8]
     dispatch(2)
@@ -267,7 +267,7 @@ _llint_op_new_object:
     loadp CodeBlock[cfr], t0
     loadp CodeBlock::m_globalObject[t0], t0
     loadp JSGlobalObject::m_emptyObjectStructure[t0], t1
-    allocateBasicJSObject(JSFinalObjectSizeClassIndex, JSGlobalData::jsFinalObjectClassInfo, t1, t0, t2, t3, .opNewObjectSlow)
+    allocateBasicJSObject(JSFinalObjectSizeClassIndex, t1, t0, t2, t3, .opNewObjectSlow)
     loadis 8[PB, PC, 8], t1
     storep t0, [cfr, t1, 8]
     dispatch(2)
@@ -1483,13 +1483,10 @@ end
 _llint_op_tear_off_activation:
     traceExecution()
     loadis 8[PB, PC, 8], t0
-    loadis 16[PB, PC, 8], t1
-    btpnz [cfr, t0, 8], .opTearOffActivationCreated
-    btpz [cfr, t1, 8], .opTearOffActivationNotCreated
-.opTearOffActivationCreated:
+    btpz [cfr, t0, 8], .opTearOffActivationNotCreated
     callSlowPath(_llint_slow_path_tear_off_activation)
 .opTearOffActivationNotCreated:
-    dispatch(3)
+    dispatch(2)
 
 
 _llint_op_tear_off_arguments:
@@ -1499,7 +1496,7 @@ _llint_op_tear_off_arguments:
     btpz [cfr, t0, 8], .opTearOffArgumentsNotCreated
     callSlowPath(_llint_slow_path_tear_off_arguments)
 .opTearOffArgumentsNotCreated:
-    dispatch(2)
+    dispatch(3)
 
 
 _llint_op_ret:

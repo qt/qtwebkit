@@ -771,6 +771,10 @@ bool WebViewImpl::handleGestureEvent(const WebGestureEvent& event)
         PlatformGestureEventBuilder platformEvent(mainFrameImpl()->frameView(), event);
         return mainFrameImpl()->frame()->eventHandler()->handleGestureEvent(platformEvent);
     }
+    case WebInputEvent::GestureTapCancel:
+        // FIXME: Update WebCore to handle this event after chromium has been updated to send it
+        // http://wkb.ug/96060
+        return false;
     default:
         ASSERT_NOT_REACHED();
     }
@@ -2922,6 +2926,18 @@ void WebViewImpl::resetSavedScrollAndScaleState()
 {
     m_savedPageScaleFactor = 0;
     m_savedScrollOffset = IntSize();
+}
+
+void WebViewImpl::resetScrollAndScaleState()
+{
+    page()->setPageScaleFactor(0, IntPoint());
+    m_pageScaleFactorIsSet = false;
+
+    // Clobber saved scales and scroll offsets.
+    if (FrameView* view = page()->mainFrame()->document()->view())
+        view->cacheCurrentScrollPosition();
+    resetSavedScrollAndScaleState();
+    page()->mainFrame()->loader()->history()->saveDocumentAndScrollState();
 }
 
 WebSize WebViewImpl::fixedLayoutSize() const

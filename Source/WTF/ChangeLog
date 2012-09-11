@@ -1,3 +1,131 @@
+2012-09-11  Adrienne Walker  <enne@google.com>
+
+        Clang doesn't optimize away undefined OwnPtr copy constructor
+        https://bugs.webkit.org/show_bug.cgi?id=74625
+
+        Reviewed by Anders Carlsson.
+
+        Original patch by Anders Carlsson, with a minor edit.
+
+        The publicly declared-but-not-defined copy constructor is a compiler
+        optimization-dependent landmine. Clang often fails to optimize the use
+        of this function out, leading to internal linkage errors for the missing
+        definition. gcc doesn't have this problem and optimizes that function
+        out, leading to code that inconsistently fails to link across platforms.
+
+        As a partial fix for this problem, on any compiler that supports C++11
+        move semantics, replace the bogus copy constructor with the move
+        constructors.  In the future, if all compilers support this, then the
+        copy constructor can be removed.
+
+        This still leaves other compilers that don't support move semantics
+        like Visual Studio vulnerable to linking inconsistencies.
+
+        * wtf/OwnPtr.h:
+        (OwnPtr):
+        (WTF):
+        (WTF::::OwnPtr):
+        (WTF::=):
+
+2012-09-11  Raphael Kubo da Costa  <rakuco@webkit.org>
+
+        [EFL] Rewrite the EFL-related Find modules
+        https://bugs.webkit.org/show_bug.cgi?id=95237
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * CMakeLists.txt: Stop setting the LINK_FLAGS property.
+        * PlatformEfl.cmake: Add libraries and include directories for
+        each Enlightenment Foundation Library used by the port.
+
+2012-09-11  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Add a configure step to the Qt build system
+
+        This allows building the Qt port using just 'qmake WebKit.pro'. Using
+        the build-webkit script is still supported, and will add slightly more
+        logic to the build, such as detecting the need for clean or incremental
+        builds.
+
+        Internally, the build system now uses a new variable, WEBKIT_CONFIG, for
+        all things related to configuring the build, such as use/have/enable flags,
+        and these are translated to defines in default_post. Project files should
+        no longer check contains(DEFINES,...) to detect features, but use the new
+        enable?(), use?(), and have?() functions. The no_webkit1 and no_webkit2
+        options have been translated into WEBKIT_CONFIG options as well, and can
+        be checked using build?().
+
+        Reviewed by Simon Hausmann.
+
+        * WTF.pri:
+        * wtf/Platform.h:
+
+2012-09-10  Ilya Tikhonovsky  <loislo@chromium.org>
+
+        Web Inspector: NMI: move MemoryInstrumentation.h to wtf
+        https://bugs.webkit.org/show_bug.cgi?id=96356
+
+        Reviewed by Yury Semikhatsky.
+
+        It is necessary step because it helps us to remove dependency between platform and WebCore.
+
+        * GNUmakefile.list.am:
+        * WTF.gypi:
+        * WTF.pro:
+        * WTF.vcproj/WTF.vcproj:
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/MemoryInstrumentation.h: Renamed from Source/WebCore/dom/MemoryInstrumentation.h.
+        (WebCore):
+        (GenericMemoryTypes):
+        (MemoryInstrumentationTraits):
+        (MemoryInstrumentation):
+        (WebCore::MemoryInstrumentation::~MemoryInstrumentation):
+        (WebCore::MemoryInstrumentation::addRootObject):
+        (InstrumentedPointerBase):
+        (WebCore::MemoryInstrumentation::InstrumentedPointerBase::~InstrumentedPointerBase):
+        (InstrumentedPointer):
+        (WebCore::MemoryInstrumentation::InstrumentedPointer::InstrumentedPointer):
+        (WebCore::MemoryInstrumentation::addObject):
+        (WebCore::MemoryInstrumentation::addInstrumentedObject):
+        (WebCore::MemoryInstrumentation::addRawBuffer):
+        (WebCore::MemoryInstrumentation::OwningTraits::addInstrumentedObject):
+        (WebCore::MemoryInstrumentation::OwningTraits::addObject):
+        (WebCore::MemoryInstrumentationTraits::addInstrumentedObject):
+        (WebCore::MemoryInstrumentationTraits::addObject):
+        (MemoryObjectInfo):
+        (WebCore::MemoryObjectInfo::MemoryObjectInfo):
+        (WebCore::MemoryObjectInfo::objectType):
+        (WebCore::MemoryObjectInfo::objectSize):
+        (WebCore::MemoryObjectInfo::memoryInstrumentation):
+        (WebCore::MemoryObjectInfo::reportObjectInfo):
+        (MemoryClassInfo):
+        (WebCore::MemoryClassInfo::MemoryClassInfo):
+        (WebCore::MemoryClassInfo::addInstrumentedMember):
+        (WebCore::MemoryClassInfo::addMember):
+        (WebCore::MemoryClassInfo::addHashMap):
+        (WebCore::MemoryClassInfo::addHashSet):
+        (WebCore::MemoryClassInfo::addHashCountedSet):
+        (WebCore::MemoryClassInfo::addInstrumentedHashSet):
+        (WebCore::MemoryClassInfo::addInstrumentedVector):
+        (WebCore::MemoryClassInfo::addInstrumentedVectorPtr):
+        (WebCore::MemoryClassInfo::addInstrumentedMapEntries):
+        (WebCore::MemoryClassInfo::addInstrumentedMapValues):
+        (WebCore::MemoryClassInfo::addListHashSet):
+        (WebCore::MemoryClassInfo::addVector):
+        (WebCore::MemoryClassInfo::addVectorPtr):
+        (WebCore::MemoryClassInfo::addRawBuffer):
+        (WebCore::MemoryInstrumentation::addInstrumentedObjectImpl):
+        (WebCore::MemoryInstrumentation::addObjectImpl):
+        (WebCore::MemoryInstrumentation::addHashMap):
+        (WebCore::MemoryInstrumentation::addHashSet):
+        (WebCore::MemoryInstrumentation::addInstrumentedCollection):
+        (WebCore::MemoryInstrumentation::addInstrumentedMapEntries):
+        (WebCore::MemoryInstrumentation::addInstrumentedMapValues):
+        (WebCore::MemoryInstrumentation::addListHashSet):
+        (WebCore::MemoryInstrumentation::addVector):
+        (WebCore::MemoryInstrumentation::calculateContainerSize):
+        (WebCore::::process):
+
 2012-09-09  Mark Lam  <mark.lam@apple.com>
 
         Fixed ASSERT() and ASSERT_AT() macros so that they can be used in

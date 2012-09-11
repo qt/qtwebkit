@@ -74,6 +74,13 @@ void V8PerIsolateData::dispose(v8::Isolate* isolate)
     isolate->SetData(0);
 }
 
+v8::Handle<v8::FunctionTemplate> V8PerIsolateData::toStringTemplate()
+{
+    if (m_toStringTemplate.isEmpty())
+        m_toStringTemplate.set(v8::FunctionTemplate::New(constructorOfToString));
+    return v8::Local<v8::FunctionTemplate>::New(m_toStringTemplate.get());
+}
+
 void V8PerIsolateData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Binding);
@@ -106,6 +113,13 @@ void V8PerIsolateData::visitExternalStrings(ExternalStringVisitor* visitor)
     v8::V8::VisitExternalResources(&v8Visitor);
 }
 #endif
+
+v8::Handle<v8::Context> V8PerIsolateData::ensureAuxiliaryContext()
+{
+    if (m_auxiliaryContext.isEmpty())
+        m_auxiliaryContext.adopt(v8::Context::New());
+    return m_auxiliaryContext.get();
+}
 
 v8::Handle<v8::Value> V8PerIsolateData::constructorOfToString(const v8::Arguments& args)
 {

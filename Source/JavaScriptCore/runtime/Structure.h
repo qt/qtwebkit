@@ -460,7 +460,7 @@ namespace JSC {
         ASSERT(!heap.globalData()->isInitializingObject());
         heap.globalData()->setInitializingObjectClass(&Structure::s_info);
 #endif
-        JSCell* result = static_cast<JSCell*>(heap.allocateStructure());
+        JSCell* result = static_cast<JSCell*>(heap.allocateStructure(sizeof(Structure)));
         result->clearStructure();
         return result;
     }
@@ -554,17 +554,7 @@ namespace JSC {
         m_structure.set(globalData, this, structure);
     }
 
-    inline const ClassInfo* JSCell::validatedClassInfo() const
-    {
-#if ENABLE(GC_VALIDATION)
-        ASSERT(m_structure.unvalidatedGet()->classInfo() == m_classInfo);
-#else
-        ASSERT(m_structure->classInfo() == m_classInfo);
-#endif
-        return m_classInfo;
-    }
-
-    ALWAYS_INLINE void MarkStack::internalAppend(JSCell* cell)
+    ALWAYS_INLINE void SlotVisitor::internalAppend(JSCell* cell)
     {
         ASSERT(!m_isCheckingForDefaultMarkViolation);
         if (!cell)
@@ -603,8 +593,7 @@ namespace JSC {
     }
 
     inline JSCell::JSCell(JSGlobalData& globalData, Structure* structure)
-        : m_classInfo(structure->classInfo())
-        , m_structure(globalData, this, structure)
+        : m_structure(globalData, this, structure)
     {
     }
 
@@ -616,7 +605,6 @@ namespace JSC {
         if (structure)
 #endif
             m_structure.setEarlyValue(globalData, this, structure);
-        m_classInfo = structure->classInfo();
         // Very first set of allocations won't have a real structure.
         ASSERT(m_structure || !globalData.structureStructure);
     }

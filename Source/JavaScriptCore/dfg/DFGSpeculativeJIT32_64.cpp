@@ -3296,18 +3296,20 @@ void SpeculativeJIT::compile(Node& node)
         
         SpeculateCellOperand callee(this, node.child1());
         GPRTemporary result(this);
+        GPRTemporary structure(this);
         GPRTemporary scratch(this);
         
         GPRReg calleeGPR = callee.gpr();
         GPRReg resultGPR = result.gpr();
+        GPRReg structureGPR = structure.gpr();
         GPRReg scratchGPR = scratch.gpr();
         
         // Load the inheritorID. If the inheritorID is not set, go to slow path.
-        m_jit.loadPtr(MacroAssembler::Address(calleeGPR, JSFunction::offsetOfCachedInheritorID()), scratchGPR);
+        m_jit.loadPtr(MacroAssembler::Address(calleeGPR, JSFunction::offsetOfCachedInheritorID()), structureGPR);
         MacroAssembler::JumpList slowPath;
-        slowPath.append(m_jit.branchTestPtr(MacroAssembler::Zero, scratchGPR));
+        slowPath.append(m_jit.branchTestPtr(MacroAssembler::Zero, structureGPR));
         
-        emitAllocateJSFinalObject(scratchGPR, resultGPR, scratchGPR, slowPath);
+        emitAllocateJSFinalObject(structureGPR, resultGPR, scratchGPR, slowPath);
         
         addSlowPathGenerator(slowPathCall(slowPath, this, operationCreateThis, resultGPR, calleeGPR));
         
@@ -4023,43 +4025,39 @@ void SpeculativeJIT::compile(Node& node)
         
     case TearOffActivation: {
         JSValueOperand activationValue(this, node.child1());
-        JSValueOperand argumentsValue(this, node.child2());
         
         GPRReg activationValueTagGPR = activationValue.tagGPR();
         GPRReg activationValuePayloadGPR = activationValue.payloadGPR();
-        GPRReg argumentsValueTagGPR = argumentsValue.tagGPR();
-        
-        JITCompiler::JumpList created;
-        created.append(m_jit.branch32(JITCompiler::NotEqual, activationValueTagGPR, TrustedImm32(JSValue::EmptyValueTag)));
-        created.append(m_jit.branch32(JITCompiler::NotEqual, argumentsValueTagGPR, TrustedImm32(JSValue::EmptyValueTag)));
-        
+
+        JITCompiler::Jump created = m_jit.branch32(JITCompiler::NotEqual, activationValueTagGPR, TrustedImm32(JSValue::EmptyValueTag));
+
         addSlowPathGenerator(
             slowPathCall(
-                created, this, operationTearOffActivation, NoResult, activationValuePayloadGPR,
-                static_cast<int32_t>(node.unmodifiedArgumentsRegister())));
+                created, this, operationTearOffActivation, NoResult, activationValuePayloadGPR));
         
         noResult(m_compileIndex);
         break;
     }
         
     case TearOffArguments: {
-        JSValueOperand argumentsValue(this, node.child1());
-        GPRReg argumentsValueTagGPR = argumentsValue.tagGPR();
-        GPRReg argumentsValuePayloadGPR = argumentsValue.payloadGPR();
+        JSValueOperand unmodifiedArgumentsValue(this, node.child1());
+        JSValueOperand activationValue(this, node.child2());
+        GPRReg unmodifiedArgumentsValuePayloadGPR = unmodifiedArgumentsValue.payloadGPR();
+        GPRReg activationValuePayloadGPR = activationValue.payloadGPR();
         
-        JITCompiler::Jump created = m_jit.branch32(
-            JITCompiler::NotEqual, argumentsValueTagGPR, TrustedImm32(JSValue::EmptyValueTag));
+        JITCompiler::Jump created = m_jit.branchTest32(
+            JITCompiler::NonZero, unmodifiedArgumentsValuePayloadGPR);
         
         if (node.codeOrigin.inlineCallFrame) {
             addSlowPathGenerator(
                 slowPathCall(
                     created, this, operationTearOffInlinedArguments, NoResult,
-                    argumentsValuePayloadGPR, node.codeOrigin.inlineCallFrame));
+                    unmodifiedArgumentsValuePayloadGPR, activationValuePayloadGPR, node.codeOrigin.inlineCallFrame));
         } else {
             addSlowPathGenerator(
                 slowPathCall(
                     created, this, operationTearOffArguments, NoResult,
-                    argumentsValuePayloadGPR));
+                    unmodifiedArgumentsValuePayloadGPR, activationValuePayloadGPR));
         }
         
         noResult(m_compileIndex);

@@ -46,6 +46,8 @@
 #include "WebProcess.h"
 #include <JavaScriptCore/APICast.h>
 #include <JavaScriptCore/JSLock.h>
+#include <WebCore/ApplicationCache.h>
+#include <WebCore/ApplicationCacheStorage.h>
 #include <WebCore/Frame.h>
 #include <WebCore/FrameView.h>
 #include <WebCore/GCController.h>
@@ -292,6 +294,13 @@ void InjectedBundle::setAuthorAndUserStylesEnabled(WebPageGroupProxy* pageGroup,
         (*iter)->settings()->setAuthorAndUserStylesEnabled(enabled);
 }
 
+void InjectedBundle::setSpatialNavigationEnabled(WebPageGroupProxy* pageGroup, bool enabled)
+{
+    const HashSet<Page*>& pages = PageGroup::pageGroup(pageGroup->identifier())->pages();
+    for (HashSet<Page*>::iterator iter = pages.begin(); iter != pages.end(); ++iter)
+        (*iter)->settings()->setSpatialNavigationEnabled(enabled);
+}
+
 void InjectedBundle::addOriginAccessWhitelistEntry(const String& sourceOrigin, const String& destinationProtocol, const String& destinationHost, bool allowDestinationSubdomains)
 {
     SecurityPolicy::addOriginAccessWhitelistEntry(*SecurityOrigin::createFromString(sourceOrigin), destinationProtocol, destinationHost, allowDestinationSubdomains);
@@ -326,9 +335,27 @@ void InjectedBundle::clearApplicationCache()
     WebApplicationCacheManager::shared().deleteAllEntries();
 }
 
+void InjectedBundle::clearApplicationCacheForOrigin(const String& originString)
+{
+    RefPtr<SecurityOrigin> origin = SecurityOrigin::createFromString(originString);
+    ApplicationCache::deleteCacheForOrigin(origin.get());
+}
+
 void InjectedBundle::setAppCacheMaximumSize(uint64_t size)
 {
     WebApplicationCacheManager::shared().setAppCacheMaximumSize(size);
+}
+
+uint64_t InjectedBundle::appCacheUsageForOrigin(const String& originString)
+{
+    RefPtr<SecurityOrigin> origin = SecurityOrigin::createFromString(originString);
+    return ApplicationCache::diskUsageForOrigin(origin.get());
+}
+
+void InjectedBundle::setApplicationCacheOriginQuota(const String& originString, uint64_t bytes)
+{
+    RefPtr<SecurityOrigin> origin = SecurityOrigin::createFromString(originString);
+    cacheStorage().storeUpdatedQuotaForOrigin(origin.get(), bytes);
 }
 
 int InjectedBundle::numberOfPages(WebFrame* frame, double pageWidthInPixels, double pageHeightInPixels)
@@ -548,6 +575,13 @@ void InjectedBundle::setUserStyleSheetLocation(WebPageGroupProxy* pageGroup, con
     const HashSet<Page*>& pages = PageGroup::pageGroup(pageGroup->identifier())->pages();
     for (HashSet<Page*>::iterator iter = pages.begin(); iter != pages.end(); ++iter)
         (*iter)->settings()->setUserStyleSheetLocation(KURL(KURL(), location));
+}
+
+void InjectedBundle::setMinimumTimerInterval(WebPageGroupProxy* pageGroup, double seconds)
+{
+    const HashSet<Page*>& pages = PageGroup::pageGroup(pageGroup->identifier())->pages();
+    for (HashSet<Page*>::iterator iter = pages.begin(); iter != pages.end(); ++iter)
+        (*iter)->settings()->setMinDOMTimerInterval(seconds);
 }
 
 void InjectedBundle::setWebNotificationPermission(WebPage* page, const String& originString, bool allowed)

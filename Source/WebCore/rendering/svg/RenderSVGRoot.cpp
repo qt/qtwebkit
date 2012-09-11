@@ -229,8 +229,8 @@ void RenderSVGRoot::layout()
     LayoutRepainter repainter(*this, checkForRepaintDuringLayout() && needsLayout);
 
     LayoutSize oldSize = size();
-    computeLogicalWidth();
-    computeLogicalHeight();
+    updateLogicalWidth();
+    updateLogicalHeight();
     buildLocalToBorderBoxTransform();
 
     SVGSVGElement* svg = static_cast<SVGSVGElement*>(node());

@@ -302,9 +302,25 @@ void TestRunner::clearAllApplicationCaches()
     WKBundleClearApplicationCache(InjectedBundle::shared().bundle());
 }
 
+void TestRunner::clearApplicationCacheForOrigin(JSStringRef origin)
+{
+    WKBundleClearApplicationCacheForOrigin(InjectedBundle::shared().bundle(), toWK(origin).get());
+}
+
 void TestRunner::setAppCacheMaximumSize(uint64_t size)
 {
     WKBundleSetAppCacheMaximumSize(InjectedBundle::shared().bundle(), size);
+}
+
+long long TestRunner::applicationCacheDiskUsageForOrigin(JSStringRef origin)
+{
+    return WKBundleGetAppCacheUsageForOrigin(InjectedBundle::shared().bundle(), toWK(origin).get());
+}
+
+void TestRunner::setApplicationCacheOriginQuota(unsigned long long bytes)
+{
+    WKRetainPtr<WKStringRef> origin(AdoptWK, WKStringCreateWithUTF8CString("http://127.0.0.1:8000"));
+    WKBundleSetApplicationCacheOriginQuota(InjectedBundle::shared().bundle(), origin.get(), bytes);
 }
 
 bool TestRunner::isCommandEnabled(JSStringRef name)
@@ -671,6 +687,16 @@ void TestRunner::setUserStyleSheetLocation(JSStringRef location)
 
     if (m_userStyleSheetEnabled)
         setUserStyleSheetEnabled(true);
+}
+
+void TestRunner::setMinimumTimerInterval(double seconds)
+{
+    WKBundleSetMinimumTimerInterval(InjectedBundle::shared().bundle(), InjectedBundle::shared().pageGroup(), seconds);
+}
+
+void TestRunner::setSpatialNavigationEnabled(bool enabled)
+{
+    WKBundleSetSpatialNavigationEnabled(InjectedBundle::shared().bundle(), InjectedBundle::shared().pageGroup(), enabled);
 }
 
 void TestRunner::grantWebNotificationPermission(JSStringRef origin)

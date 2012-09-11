@@ -30,6 +30,7 @@
 #include "JSLock.h"
 #include "JSValueInlineMethods.h"
 #include "SlotVisitor.h"
+#include "SlotVisitorInlineMethods.h"
 #include "WriteBarrier.h"
 #include <wtf/Noncopyable.h>
 
@@ -108,7 +109,6 @@ namespace JSC {
 
         // Object operations, with the toObject operation included.
         const ClassInfo* classInfo() const;
-        const ClassInfo* validatedClassInfo() const;
         const MethodTable* methodTable() const;
         static void put(JSCell*, ExecState*, PropertyName, JSValue, PutPropertySlot&);
         static void putByIndex(JSCell*, ExecState*, unsigned propertyName, JSValue, bool shouldThrow);
@@ -133,11 +133,6 @@ namespace JSC {
             return OBJECT_OFFSETOF(JSCell, m_structure);
         }
 
-        static ptrdiff_t classInfoOffset()
-        {
-            return OBJECT_OFFSETOF(JSCell, m_classInfo);
-        }
-        
         void* structureAddress()
         {
             return &m_structure;
@@ -170,7 +165,6 @@ namespace JSC {
     private:
         friend class LLIntOffsetsExtractor;
         
-        const ClassInfo* m_classInfo;
         WriteBarrier<Structure> m_structure;
     };
 

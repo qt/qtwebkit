@@ -191,6 +191,11 @@ void WKBundleSetAuthorAndUserStylesEnabled(WKBundleRef bundleRef, WKBundlePageGr
     toImpl(bundleRef)->setAuthorAndUserStylesEnabled(toImpl(pageGroupRef), enabled);
 }
 
+void WKBundleSetSpatialNavigationEnabled(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, bool enabled)
+{
+    toImpl(bundleRef)->setSpatialNavigationEnabled(toImpl(pageGroupRef), enabled);
+}
+
 void WKBundleAddOriginAccessWhitelistEntry(WKBundleRef bundleRef, WKStringRef sourceOrigin, WKStringRef destinationProtocol, WKStringRef destinationHost, bool allowDestinationSubdomains)
 {
     toImpl(bundleRef)->addOriginAccessWhitelistEntry(toImpl(sourceOrigin)->string(), toImpl(destinationProtocol)->string(), toImpl(destinationHost)->string(), allowDestinationSubdomains);
@@ -226,9 +231,29 @@ void WKBundleClearApplicationCache(WKBundleRef bundleRef)
     toImpl(bundleRef)->clearApplicationCache();
 }
 
+void WKBundleClearApplicationCacheForOrigin(WKBundleRef bundleRef, WKStringRef origin)
+{
+    toImpl(bundleRef)->clearApplicationCacheForOrigin(toImpl(origin)->string());
+}
+
 void WKBundleSetAppCacheMaximumSize(WKBundleRef bundleRef, uint64_t size)
 {
     toImpl(bundleRef)->setAppCacheMaximumSize(size);
+}
+
+uint64_t WKBundleGetAppCacheUsageForOrigin(WKBundleRef bundleRef, WKStringRef origin)
+{
+    return toImpl(bundleRef)->appCacheUsageForOrigin(toImpl(origin)->string());
+}
+
+void WKBundleSetApplicationCacheOriginQuota(WKBundleRef bundleRef, WKStringRef origin, uint64_t bytes)
+{
+    return toImpl(bundleRef)->setApplicationCacheOriginQuota(toImpl(origin)->string(), bytes);
+}
+
+void WKBundleSetMinimumTimerInterval(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, double seconds)
+{
+    toImpl(bundleRef)->setMinimumTimerInterval(toImpl(pageGroupRef), seconds);
 }
 
 int WKBundleNumberOfPages(WKBundleRef bundleRef, WKBundleFrameRef frameRef, double pageWidthInPixels, double pageHeightInPixels)

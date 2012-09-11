@@ -26,6 +26,7 @@
 #ifndef V8PerIsolateData_h
 #define V8PerIsolateData_h
 
+#include "ScopedPersistent.h"
 #include <v8.h>
 #include <wtf/HashMap.h>
 #include <wtf/OwnPtr.h>
@@ -47,11 +48,6 @@ class ExternalStringVisitor;
 
 typedef WTF::Vector<DOMDataStore*> DOMDataList;
 
-#ifndef NDEBUG
-class GlobalHandleInfo;
-typedef HashMap<v8::Value*, GlobalHandleInfo*> GlobalHandleMap;
-#endif
-
 class V8PerIsolateData {
 public:
     static V8PerIsolateData* create(v8::Isolate*);
@@ -70,13 +66,7 @@ public:
     TemplateMap& rawTemplateMap() { return m_rawTemplates; }
     TemplateMap& templateMap() { return m_templates; }
 
-    v8::Persistent<v8::FunctionTemplate>& toStringTemplate()
-    {
-        if (m_toStringTemplate.IsEmpty())
-            m_toStringTemplate = v8::Persistent<v8::FunctionTemplate>::New(v8::FunctionTemplate::New(constructorOfToString));
-        return m_toStringTemplate;
-    }
-
+    v8::Handle<v8::FunctionTemplate> toStringTemplate();
     v8::Persistent<v8::FunctionTemplate>& lazyEventListenerToStringTemplate()
     {
         return m_lazyEventListenerToStringTemplate;
@@ -91,7 +81,7 @@ public:
     DOMDataList& allStores() { return m_domDataList; }
 
     V8HiddenPropertyName* hiddenPropertyName() { return m_hiddenPropertyName.get(); }
-    v8::Persistent<v8::Context>& auxiliaryContext() { return m_auxiliaryContext; }
+    v8::Handle<v8::Context> ensureAuxiliaryContext();
 
     void registerDOMDataStore(DOMDataStore* domDataStore) 
     {
@@ -116,8 +106,6 @@ public:
     int nextDependentRetainedId() { return m_nextDependentRetainedId++; }
 
 #ifndef NDEBUG
-    GlobalHandleMap& globalHandleMap() { return m_globalHandleMap; }
-
     int internalScriptRecursionLevel() const { return m_internalScriptRecursionLevel; }
     int incrementInternalScriptRecursionLevel() { return ++m_internalScriptRecursionLevel; }
     int decrementInternalScriptRecursionLevel() { return --m_internalScriptRecursionLevel; }
@@ -142,7 +130,7 @@ private:
 
     TemplateMap m_rawTemplates;
     TemplateMap m_templates;
-    v8::Persistent<v8::FunctionTemplate> m_toStringTemplate;
+    ScopedPersistent<v8::FunctionTemplate> m_toStringTemplate;
     v8::Persistent<v8::FunctionTemplate> m_lazyEventListenerToStringTemplate;
     OwnPtr<StringCache> m_stringCache;
     OwnPtr<IntegerCache> m_integerCache;
@@ -151,7 +139,7 @@ private:
     DOMDataStore* m_domDataStore;
 
     OwnPtr<V8HiddenPropertyName> m_hiddenPropertyName;
-    v8::Persistent<v8::Context> m_auxiliaryContext;
+    ScopedPersistent<v8::Context> m_auxiliaryContext;
 
     bool m_constructorMode;
     friend class ConstructorMode;
@@ -160,7 +148,6 @@ private:
     int m_nextDependentRetainedId;
 
 #ifndef NDEBUG
-    GlobalHandleMap m_globalHandleMap;
     int m_internalScriptRecursionLevel;
 #endif
     OwnPtr<GCEventData> m_gcEventData;

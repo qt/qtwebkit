@@ -106,6 +106,8 @@ public:
     void removeOriginAccessWhitelistEntry(JSStringRef sourceOrigin, JSStringRef destinationProtocol, JSStringRef destinationHost, bool allowDestinationSubdomains);
     void setUserStyleSheetEnabled(bool);
     void setUserStyleSheetLocation(JSStringRef);
+    void setMinimumTimerInterval(double seconds); // Interval specified in seconds.
+    void setSpatialNavigationEnabled(bool);
 
     // Special DOM functions.
     JSValueRef computedStyleIncludingVisitedInfo(JSValueRef element);
@@ -143,7 +145,10 @@ public:
 
     // Application Cache
     void clearAllApplicationCaches();
+    void clearApplicationCacheForOrigin(JSStringRef origin);
     void setAppCacheMaximumSize(uint64_t);
+    long long applicationCacheDiskUsageForOrigin(JSStringRef origin);
+    void setApplicationCacheOriginQuota(unsigned long long);
 
     // Printing
     bool isPageBoxVisible(int pageIndex);

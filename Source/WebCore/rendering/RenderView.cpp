@@ -90,13 +90,13 @@ bool RenderView::hitTest(const HitTestRequest& request, HitTestResult& result)
     return layer()->hitTest(request, result);
 }
 
-void RenderView::computeLogicalHeight()
+void RenderView::updateLogicalHeight()
 {
     if (!shouldUsePrintingLayout() && m_frameView)
         setLogicalHeight(viewLogicalHeight());
 }
 
-void RenderView::computeLogicalWidth()
+void RenderView::updateLogicalWidth()
 {
     if (!shouldUsePrintingLayout() && m_frameView)
         setLogicalWidth(viewLogicalWidth());

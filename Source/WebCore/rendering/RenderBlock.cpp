@@ -1402,7 +1402,7 @@ void RenderBlock::computeInitialRegionRangeForBlock()
         LayoutUnit oldHeight =  logicalHeight();
         LayoutUnit oldLogicalTop = logicalTop();
         setLogicalHeight(MAX_LAYOUT_UNIT / 2);
-        computeLogicalHeight();
+        updateLogicalHeight();
         enclosingRenderFlowThread()->setRegionRangeForBox(this, offsetFromLogicalTopOfFirstPage());
         setLogicalHeight(oldHeight);
         setLogicalTop(oldLogicalTop);
@@ -1415,12 +1415,12 @@ void RenderBlock::computeRegionRangeForBlock()
         enclosingRenderFlowThread()->setRegionRangeForBox(this, offsetFromLogicalTopOfFirstPage());
 }
 
-bool RenderBlock::recomputeLogicalWidth()
+bool RenderBlock::updateLogicalWidthAndColumnWidth()
 {
     LayoutUnit oldWidth = logicalWidth();
     LayoutUnit oldColumnWidth = desiredColumnWidth();
 
-    computeLogicalWidth();
+    updateLogicalWidth();
     calcColumnWidth();
 
     return oldWidth != logicalWidth() || oldColumnWidth != desiredColumnWidth();
@@ -1433,7 +1433,7 @@ void RenderBlock::checkForPaginationLogicalHeightChange(LayoutUnit& pageLogicalH
         if (!pageLogicalHeight) {
             // We need to go ahead and set our explicit page height if one exists, so that we can
             // avoid doing two layout passes.
-            computeLogicalHeight();
+            updateLogicalHeight();
             LayoutUnit columnHeight = contentLogicalHeight();
             if (columnHeight > ZERO_LAYOUT_UNIT) {
                 pageLogicalHeight = columnHeight;
@@ -1468,7 +1468,7 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
 
     LayoutRepainter repainter(*this, checkForRepaintDuringLayout());
 
-    if (recomputeLogicalWidth())
+    if (updateLogicalWidthAndColumnWidth())
         relayoutChildren = true;
 
     m_overflow.clear();
@@ -1546,7 +1546,7 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
     // Calculate our new height.
     LayoutUnit oldHeight = logicalHeight();
     LayoutUnit oldClientAfterEdge = clientLogicalBottom();
-    computeLogicalHeight();
+    updateLogicalHeight();
     LayoutUnit newHeight = logicalHeight();
     if (oldHeight != newHeight) {
         if (oldHeight > newHeight && maxFloatLogicalBottom > newHeight && !childrenInline()) {
@@ -2652,9 +2652,9 @@ void RenderBlock::layoutPositionedObjects(bool relayoutChildren)
         bool needsBlockDirectionLocationSetBeforeLayout = r->needsLayout() && view()->layoutState()->needsBlockDirectionLocationSetBeforeLayout(); 
         if (needsBlockDirectionLocationSetBeforeLayout) {
             if (isHorizontalWritingMode() == r->isHorizontalWritingMode())
-                r->computeLogicalHeight();
+                r->updateLogicalHeight();
             else
-                r->computeLogicalWidth();
+                r->updateLogicalWidth();
             oldLogicalTop = logicalTopForChild(r);
         }
         
@@ -3760,7 +3760,7 @@ RenderBlock::FloatingObject* RenderBlock::insertFloatingObject(RenderBox* o)
     if (!needsBlockDirectionLocationSetBeforeLayout || isWritingModeRoot()) // We are unsplittable if we're a block flow root.
         o->layoutIfNeeded();
     else {
-        o->computeLogicalWidth();
+        o->updateLogicalWidth();
         o->computeAndSetBlockDirectionMargins(this);
     }
     setLogicalWidthForFloat(newObj, logicalWidthForChild(o) + marginStartForChild(o) + marginEndForChild(o));
@@ -4652,7 +4652,7 @@ LayoutUnit RenderBlock::getClearDelta(RenderBox* child, LayoutUnit logicalTop)
             LayoutUnit childOldLogicalTop = child->logicalTop();
 
             child->setLogicalTop(newLogicalTop);
-            child->computeLogicalWidth();
+            child->updateLogicalWidth();
             region = regionAtBlockOffset(logicalTopForChild(child));
             borderBox = child->borderBoxRectInRegion(region, offsetFromLogicalTopOfFirstPage() + logicalTopForChild(child), DoNotCacheRenderBoxRegionInfo);
             LayoutUnit childLogicalWidthAtNewLogicalTopOffset = isHorizontalWritingMode() ? borderBox.width() : borderBox.height();
@@ -5552,7 +5552,7 @@ void RenderBlock::computePreferredLogicalWidths()
     RenderStyle* styleToUse = style();
     if (!isTableCell() && styleToUse->logicalWidth().isFixed() && styleToUse->logicalWidth().value() >= 0 
        && style()->marqueeBehavior() != MALTERNATE && !(isDeprecatedFlexItem() && !styleToUse->logicalWidth().intValue()))
-        m_minPreferredLogicalWidth = m_maxPreferredLogicalWidth = computeContentBoxLogicalWidth(styleToUse->logicalWidth().value());
+        m_minPreferredLogicalWidth = m_maxPreferredLogicalWidth = adjustContentBoxLogicalWidthForBoxSizing(styleToUse->logicalWidth().value());
     else {
         m_minPreferredLogicalWidth = 0;
         m_maxPreferredLogicalWidth = 0;
@@ -5584,7 +5584,7 @@ void RenderBlock::computePreferredLogicalWidths()
         if (isTableCell()) {
             Length w = toRenderTableCell(this)->styleOrColLogicalWidth();
             if (w.isFixed() && w.value() > 0) {
-                m_maxPreferredLogicalWidth = max(m_minPreferredLogicalWidth, computeContentBoxLogicalWidth(w.value()));
+                m_maxPreferredLogicalWidth = max(m_minPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(w.value()));
                 scrollbarWidth = 0;
             }
         }
@@ -5593,13 +5593,13 @@ void RenderBlock::computePreferredLogicalWidths()
     }
     
     if (styleToUse->logicalMinWidth().isFixed() && styleToUse->logicalMinWidth().value() > 0) {
-        m_maxPreferredLogicalWidth = max(m_maxPreferredLogicalWidth, computeContentBoxLogicalWidth(styleToUse->logicalMinWidth().value()));
-        m_minPreferredLogicalWidth = max(m_minPreferredLogicalWidth, computeContentBoxLogicalWidth(styleToUse->logicalMinWidth().value()));
+        m_maxPreferredLogicalWidth = max(m_maxPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(styleToUse->logicalMinWidth().value()));
+        m_minPreferredLogicalWidth = max(m_minPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(styleToUse->logicalMinWidth().value()));
     }
     
     if (styleToUse->logicalMaxWidth().isFixed()) {
-        m_maxPreferredLogicalWidth = min(m_maxPreferredLogicalWidth, computeContentBoxLogicalWidth(styleToUse->logicalMaxWidth().value()));
-        m_minPreferredLogicalWidth = min(m_minPreferredLogicalWidth, computeContentBoxLogicalWidth(styleToUse->logicalMaxWidth().value()));
+        m_maxPreferredLogicalWidth = min(m_maxPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(styleToUse->logicalMaxWidth().value()));
+        m_minPreferredLogicalWidth = min(m_minPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(styleToUse->logicalMaxWidth().value()));
     }
 
     LayoutUnit borderAndPadding = borderAndPaddingLogicalWidth();
@@ -6057,7 +6057,7 @@ void RenderBlock::computeBlockPreferredLogicalWidths()
             RenderBox* childBox = toRenderBox(child);
             LayoutUnit oldHeight = childBox->logicalHeight();
             childBox->setLogicalHeight(childBox->borderAndPaddingLogicalHeight());
-            childBox->computeLogicalHeight();
+            childBox->updateLogicalHeight();
             childMinPreferredLogicalWidth = childMaxPreferredLogicalWidth = childBox->logicalHeight();
             childBox->setLogicalHeight(oldHeight);
         } else {

@@ -85,8 +85,8 @@ void RenderReplaced::layout()
     
     setHeight(minimumReplacedHeight());
 
-    computeLogicalWidth();
-    computeLogicalHeight();
+    updateLogicalWidth();
+    updateLogicalHeight();
 
     m_overflow.clear();
     addVisualEffectOverflow();

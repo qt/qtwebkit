@@ -1,3 +1,518 @@
+2012-09-11  Brady Eidson  <beidson@apple.com>
+
+        We should wait longer before killing the PluginProcess.
+        <rdar://problem/12067728> and https://bugs.webkit.org/show_bug.cgi?id=96407
+
+        Reviewed by Anders Carlsson.
+
+        Currently we kill the PluginProcess 15 seconds after the last plug-in is destroyed.
+        This is short enough that most users will have the process killed many times during browsing sessions,
+        which is painful because relaunching the process is I/O and kernel intensive.
+
+        In an ideal world we could keep it around forever until the system tells us resources are running low.
+
+        In reality we do want to kill it occasionally to get a clean slate from any plug-in leaks.
+
+        A reasonable balance for now is to set a minimum lifetime of 30 minutes on the plug-in process and to 
+        extend the termination timer from 15 seconds to 10 minutes.
+        
+        * PluginProcess/PluginProcess.cpp:
+        (WebKit::PluginProcess::PluginProcess):
+        (WebKit::PluginProcess::initializePluginProcess):
+        (WebKit::PluginProcess::setMinimumLifetime):
+        (WebKit):
+        (WebKit::PluginProcess::minimumLifetimeTimerFired):
+        * PluginProcess/PluginProcess.h:
+        (PluginProcess):
+
+        * Shared/Plugins/PluginProcessCreationParameters.cpp:
+        (WebKit::PluginProcessCreationParameters::encode):
+        (WebKit::PluginProcessCreationParameters::decode):
+        * Shared/Plugins/PluginProcessCreationParameters.h:
+        (PluginProcessCreationParameters):
+
+        * UIProcess/Plugins/PluginProcessProxy.cpp:
+        (WebKit):
+        (WebKit::PluginProcessProxy::didFinishLaunching):
+
+2012-09-11  Jinwoo Song  <jinwoo7.song@samsung.com>
+
+        Deploy StringBuilder::appendNumber() and StringBuilder::appendLiteral() in more places
+        https://bugs.webkit.org/show_bug.cgi?id=96344
+
+        Reviewed by Benjamin Poulain.
+
+        Use StringBuilder::appendNumber() instead of String::number(). Also deploy 
+        StringBuilder::appendLiteral() instead of String::append() in the surrounding code.
+
+        * Shared/WebMemorySampler.cpp:
+        (WebKit::WebMemorySampler::appendCurrentMemoryUsageToFile):
+        * UIProcess/InspectorServer/WebSocketServerConnection.cpp:
+        (WebKit::WebSocketServerConnection::sendHTTPResponseHeader):
+        * UIProcess/InspectorServer/qt/WebInspectorServerQt.cpp:
+        (WebKit::WebInspectorServer::inspectorUrlForPageID):
+        (WebKit::WebInspectorServer::buildPageList):
+
+2012-09-11  Anders Carlsson  <andersca@apple.com>
+
+        Fix speling error in comment.
+
+        * WebProcess/Plugins/Netscape/NetscapePlugin.cpp:
+        (WebKit::isTransparentSilverlightBackgroundValue):
+
+2012-09-11  Raphael Kubo da Costa  <rakuco@webkit.org>
+
+        [EFL] Rewrite the EFL-related Find modules
+        https://bugs.webkit.org/show_bug.cgi?id=95237
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * CMakeLists.txt: Stop setting the LINK_FLAGS property.
+        * PlatformEfl.cmake: Add libraries and include directories for
+        each Enlightenment Foundation Library used by the port.
+
+2012-09-11  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [WK2][WKTR] TestRunner needs to implement setApplicationCacheOriginQuota
+        https://bugs.webkit.org/show_bug.cgi?id=96379
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Add Bundle C API to set the application cache quota for a
+        given security origin. This is needed by WebKitTestRunner
+        to implement setApplicationCacheOriginQuota().
+
+        * WebProcess/InjectedBundle/API/c/WKBundle.cpp:
+        (WKBundleSetApplicationCacheOriginQuota):
+        * WebProcess/InjectedBundle/API/c/WKBundlePrivate.h:
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::setApplicationCacheOriginQuota):
+        (WebKit):
+        * WebProcess/InjectedBundle/InjectedBundle.h:
+        (InjectedBundle):
+
+2012-09-11  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [WK2][WTR] WebKitTestRunner needs testRunner.setSpatialNavigationEnabled
+        https://bugs.webkit.org/show_bug.cgi?id=96269
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Added a new setter for spacial navigation enabling to Injected Bundle private API.
+
+        * WebProcess/InjectedBundle/API/c/WKBundle.cpp:
+        (WKBundleSetSpatialNavigationEnabled):
+        * WebProcess/InjectedBundle/API/c/WKBundlePrivate.h:
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::setSpatialNavigationEnabled):
+        (WebKit):
+        * WebProcess/InjectedBundle/InjectedBundle.h:
+        (InjectedBundle):
+
+2012-09-11  Marcelo Lira  <marcelo.lira@openbossa.org>
+
+        [Qt][WK2] Page loading status API lacks a status for intentionally stopped loading
+        https://bugs.webkit.org/show_bug.cgi?id=83062
+
+        Reviewed by Tor Arne Vestbø.
+
+        When the loading of a page is intentionally interrupted, the loading
+        status is set to the new state LoadStoppedStatus. This reflects
+        reality more accurately because the page was not fully loaded
+        (a LoadSucceededStatus), and it wasn't an unexpected error
+        (a LoadFailedStatus).
+
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewPrivate::loadDidStop):
+        * UIProcess/API/qt/qquickwebview_p.h:
+        * UIProcess/API/qt/qquickwebview_p_p.h:
+        (QQuickWebViewPrivate):
+        * UIProcess/API/qt/tests/publicapi/tst_publicapi.cpp:
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_loadUrl.qml:
+        * UIProcess/API/qt/tests/qmltests/common/TestWebView.qml:
+        * UIProcess/qt/QtWebPageLoadClient.cpp:
+        (WebKit::QtWebPageLoadClient::dispatchLoadStopped):
+        (WebKit):
+        (WebKit::QtWebPageLoadClient::dispatchLoadFailed):
+        * UIProcess/qt/QtWebPageLoadClient.h:
+        (QtWebPageLoadClient):
+
+2012-09-11  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Add a configure step to the Qt build system
+
+        This allows building the Qt port using just 'qmake WebKit.pro'. Using
+        the build-webkit script is still supported, and will add slightly more
+        logic to the build, such as detecting the need for clean or incremental
+        builds.
+
+        Internally, the build system now uses a new variable, WEBKIT_CONFIG, for
+        all things related to configuring the build, such as use/have/enable flags,
+        and these are translated to defines in default_post. Project files should
+        no longer check contains(DEFINES,...) to detect features, but use the new
+        enable?(), use?(), and have?() functions. The no_webkit1 and no_webkit2
+        options have been translated into WEBKIT_CONFIG options as well, and can
+        be checked using build?().
+
+        Reviewed by Simon Hausmann.
+
+        * Target.pri:
+        * UIProcess/API/qt/tests/tests.pri:
+        * WebKit2.pri:
+        * config.h:
+
+2012-09-11  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [WK2][WKTR] TestRunner needs to implement clearApplicationCacheForOrigin
+        https://bugs.webkit.org/show_bug.cgi?id=96372
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Add Bundle C API to clear the application cache for a
+        given origin. This is needed by WebKitTestRunner to
+        implement clearApplicationCacheForOrigin().
+
+        * WebProcess/InjectedBundle/API/c/WKBundle.cpp:
+        (WKBundleClearApplicationCacheForOrigin):
+        * WebProcess/InjectedBundle/API/c/WKBundlePrivate.h:
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::clearApplicationCacheForOrigin):
+        (WebKit):
+        * WebProcess/InjectedBundle/InjectedBundle.h:
+        (InjectedBundle):
+
+2012-09-11  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [WK2][WTR] WebKitTestRunner needs layoutTestController.setMinimumTimerInterval
+        https://bugs.webkit.org/show_bug.cgi?id=96256
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Added new setter for minimum DOM timer interval to InjectedBundle private API.
+
+        * WebProcess/InjectedBundle/API/c/WKBundle.cpp:
+        (WKBundleSetMinimumTimerInterval):
+        * WebProcess/InjectedBundle/API/c/WKBundlePrivate.h:
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::setMinimumTimerInterval):
+        (WebKit):
+        * WebProcess/InjectedBundle/InjectedBundle.h:
+        (InjectedBundle):
+
+2012-09-11  Kangil Han  <kangil.han@samsung.com>
+
+        [WK2][EFL] Fix compile warnings when enable tiled backing store
+        https://bugs.webkit.org/show_bug.cgi?id=95342
+
+        Reviewed by Gyuyoung Kim.
+
+        Fixed compile time warning messages when enable tiled backing store.
+
+        * UIProcess/API/efl/ewk_view.cpp:
+        (ewk_view_accelerated_compositing_mode_enter): Fixed invalid use of 'EINA_SAFETY_ON_NULL_RETURN_VAL' since it used '!' ahead of evasGl value so it is always null.
+        * WebProcess/WebPage/CoordinatedGraphics/CoordinatedGraphicsLayer.cpp:
+        (WebCore::CoordinatedGraphicsLayer::setChildren): Replaced 'int' i with 'unsigned' because its comparing value is 'size_t'.
+        * WebProcess/WebPage/CoordinatedGraphics/LayerTreeCoordinator.cpp:
+        (WebKit::LayerTreeCoordinator::renderNextFrame): Replaced 'int' i with 'unsigned' because its comparing value is 'size_t'.
+        (WebKit::LayerTreeCoordinator::beginContentUpdate): Replaced 'int' i with 'unsigned' because its comparing value is 'size_t'.
+
+2012-09-11  Byungwoo Lee  <bw80.lee@samsung.com>
+
+        [EFL][WK2] WKEinaSharedString needs a function to adopt eina stringshare.
+        https://bugs.webkit.org/show_bug.cgi?id=96201
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        WKEinaSharedString needs a to adopt eina stringshare directly.
+
+        With this adopt function, an instance that is directly created with
+        eina_stringshare_add() can be easily handled by WKEinaSharedString
+        without calling eina_stringshare_del() for preventing memory leak.
+
+        * UIProcess/API/cpp/efl/WKEinaSharedString.cpp:
+        (WKEinaSharedString::adopt):
+        * UIProcess/API/cpp/efl/WKEinaSharedString.h:
+        * UIProcess/API/efl/tests/test_ewk2_eina_shared_string.cpp:
+        (TEST_F):
+
+2012-09-11  Andras Becsi  <andras.becsi@nokia.com>
+
+        [Qt][WK2] Fix the build with recent Qt5
+        https://bugs.webkit.org/show_bug.cgi?id=96283
+
+        Reviewed by Simon Hausmann.
+
+        We should not use deprecated Qt API because doing that results
+        in build failure since all the deprecated API was disabled
+        in qtbase (https://codereview.qt-project.org/#change,24890).
+
+        * UIProcess/API/qt/qwebnavigationhistory.cpp:
+        (QWebNavigationListModel::roleNames):
+        (QWebNavigationListModel::reset):
+        * UIProcess/API/qt/qwebnavigationhistory_p.h:
+        * UIProcess/API/qt/tests/qrawwebview/tst_qrawwebview.cpp:
+        (WebView::load):
+        * UIProcess/qt/WebPopupMenuProxyQt.cpp:
+        (PopupMenuItemModel):
+        (WebKit::PopupMenuItemModel::PopupMenuItemModel):
+        (WebKit::PopupMenuItemModel::roleNames):
+        (WebKit):
+
+2012-09-11  Christophe Dumez  <christophe.dumez@intel.com>
+
+        WTR needs an implementation of applicationCacheDiskUsageForOrigin
+        https://bugs.webkit.org/show_bug.cgi?id=87188
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Add Bundle private C API to retrieve the application cache
+        usage for a specific security origin. This is needed by
+        WebKitTestRunner.
+
+        * WebProcess/InjectedBundle/API/c/WKBundle.cpp:
+        (WKBundleGetAppCacheUsageForOrigin):
+        * WebProcess/InjectedBundle/API/c/WKBundlePrivate.h:
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::appCacheUsageForOrigin):
+        (WebKit):
+        * WebProcess/InjectedBundle/InjectedBundle.h:
+        (InjectedBundle):
+
+2012-09-11  Zhigang Gong  <zhigang.gong@linux.intel.com>
+
+        [EFL][WK2] Add necessary include directory in WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=95173
+
+        Unreviewed build fix.
+
+        revision r126694: Move TextureMapperGL to use
+        GraphicsContext3D. modify the TextureMapperGL.h to include
+        GraphicsContext3D.h. And when enable TEXTURE_MAPPER,
+        file WebKit2/Shared/ShareableSurface.cpp will include
+        TextureMapperGL.h then depends on GraphicsContext3D.h
+        thus it need to add ANGLE director. As currently, this
+        problem only affect EFL platform, according to Gyuyoung Kim's
+        suggestion, we add this include dir into EFL private file
+        PlatformEfl.cmake. Otherwise, the build will fail.
+
+        To trigger this problem by using the following command:
+        ./Tools/Scripts/build-webkit --efl --3d-rendering --tiled-backing-store
+
+        * CMakeLists.txt:
+
+2012-09-10  Byungwoo Lee  <bw80.lee@samsung.com>
+
+        [EFL][WK2] Build warning : fix warning about extended initializer lists on EWK2UnitTestBase.cpp.
+        https://bugs.webkit.org/show_bug.cgi?id=95990
+
+        Reviewed by Gyuyoung Kim.
+
+        Fix build warning about extended initializer lists only available with
+        -std=c++0x or -std=gnu++0x.
+
+        * UIProcess/API/efl/tests/UnitTestUtils/EWK2UnitTestBase.cpp:
+        (EWK2UnitTest::ewk2UnitTestBrowserViewSmartClass):
+        (EWK2UnitTest):
+        (EWK2UnitTest::EWK2UnitTestBase::EWK2UnitTestBase):
+
+2012-09-10  Beth Dakin  <bdakin@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=96158
+        Need API to suppress scrollbar animations
+        -and corresponding-
+        <rdar://problem/12210972>
+
+        Reviewed by Sam Weinig.
+
+        Add suppressScrollbarAnimations as a WebCreationParameter.
+        * Shared/WebPageCreationParameters.h:
+        (WebPageCreationParameters):
+
+        New API. Calls into the web process for the setter but not the 
+        getter.
+        * UIProcess/API/C/WKPage.cpp:
+        (WKPageSetSuppressScrollbarAnimations):
+        (WKPageAreScrollbarAnimationsSuppressed):
+        * UIProcess/API/C/WKPage.h:
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::WebPageProxy):
+        (WebKit::WebPageProxy::setSuppressScrollbarAnimations):
+        (WebKit):
+        (WebKit::WebPageProxy::creationParameters):
+        * UIProcess/WebPageProxy.h:
+        (WebPageProxy):
+        (WebKit::WebPageProxy::areScrollbarAnimationsSuppressed):
+        * WebProcess/WebPage/WebPage.messages.in:
+
+        Call into WebCore.
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::setSuppressScrollbarAnimations):
+        (WebKit):
+        * WebProcess/WebPage/WebPage.h:
+        (WebPage):
+
+        This ScrollableArea area function is re-named by this patch in 
+        WebCore.
+        * WebProcess/Plugins/PDF/BuiltInPDFView.h:
+        * WebProcess/Plugins/PDF/BuiltInPDFView.mm:
+        (WebKit::BuiltInPDFView::scrollbarsCanBeActive):
+
+2012-09-10  James Robinson  <jamesr@chromium.org>
+
+        Unreviewed, rolling out r127837.
+        http://trac.webkit.org/changeset/127837
+        https://bugs.webkit.org/show_bug.cgi?id=93898
+
+        Broke ScrollingCoordinator on chromium
+
+        * WebProcess/WebPage/mac/TiledCoreAnimationDrawingArea.mm:
+        (WebKit::TiledCoreAnimationDrawingArea::updatePreferences):
+
+2012-09-10  Jer Noble  <jer.noble@apple.com>
+
+        Unreviewed; rolling out r128081.
+        http://trac.webkit.org/changeset/128081
+        https://bugs.webkit.org/show_bug.cgi?id=96134
+
+        New test http/tests/media/video-donottrack.html fails to run on Apple test bots.
+
+        * Shared/APIClientTraits.h:
+        * WebProcess/InjectedBundle/API/c/WKBundlePage.h:
+        * WebProcess/InjectedBundle/InjectedBundlePageLoaderClient.cpp:
+        * WebProcess/InjectedBundle/InjectedBundlePageLoaderClient.h:
+        (InjectedBundlePageLoaderClient):
+        * WebProcess/WebCoreSupport/WebFrameLoaderClient.cpp:
+        * WebProcess/WebCoreSupport/WebFrameLoaderClient.h:
+        (WebFrameLoaderClient):
+        * WebProcess/qt/QtBuiltinBundlePage.cpp:
+        (WebKit::QtBuiltinBundlePage::QtBuiltinBundlePage):
+
+2012-09-07  Jon Lee  <jonlee@apple.com>
+
+        Update notifications to latest spec
+        https://bugs.webkit.org/show_bug.cgi?id=91726
+        <rdar://problem/11910451>
+
+        Reviewed by Alexey Proskuryakov.
+
+        Expose lang and dir.
+
+        * UIProcess/API/C/WKNotification.cpp:
+        (WKNotificationCopyLang):
+        (WKNotificationCopyDir):
+        * UIProcess/API/C/WKNotification.h:
+        * UIProcess/Notifications/WebNotification.cpp:
+        (WebKit::WebNotification::WebNotification):
+        * UIProcess/Notifications/WebNotification.h:
+        (WebKit::WebNotification::create):
+        (WebKit::WebNotification::lang):
+        (WebKit::WebNotification::dir):
+        (WebNotification):
+        * UIProcess/Notifications/WebNotificationManagerProxy.cpp:
+        (WebKit::WebNotificationManagerProxy::show):
+        * UIProcess/Notifications/WebNotificationManagerProxy.h:
+        (WebNotificationManagerProxy):
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::showNotification):
+        * UIProcess/WebPageProxy.h:
+        (WebPageProxy):
+        * UIProcess/WebPageProxy.messages.in:
+        * WebProcess/Notifications/WebNotificationManager.cpp:
+        (WebKit::WebNotificationManager::show):
+
+2012-09-10  Alexey Proskuryakov  <ap@apple.com>
+
+        Build fix.
+
+        * UIProcess/WebContext.h: Added a default value for relatedPage argment - if
+        you don't have one, null is fine.
+
+2012-09-10  Alexey Proskuryakov  <ap@apple.com>
+
+        [WK2] Add an API to open a page in same process
+        https://bugs.webkit.org/show_bug.cgi?id=96306
+
+        Reviewed by Anders Carlsson.
+
+        The name "related" inspired by <http://wiki.whatwg.org/wiki/Links_to_Unrelated_Browsing_Contexts>.
+
+        * UIProcess/API/mac/WKView.h: Added an API. It's unwieldy, but I blame
+        WKBrowsingContextGroup, not the related view.
+
+        * UIProcess/API/mac/WKViewPrivate.h: Matching SPI for clients that mostly use
+        C APIs.
+
+        * UIProcess/API/mac/WKView.mm:
+        (-[WKView initWithFrame:processGroup:browsingContextGroup:]): Use new back-end
+        signature.
+        (-[WKView initWithFrame:processGroup:browsingContextGroup:relatedToView:]):
+        Get page from WKView, and call back-end.
+        (-[WKView initWithFrame:contextRef:pageGroupRef:]): Reimplement existing method
+        by calling new, more powerful one.
+        (-[WKView initWithFrame:contextRef:pageGroupRef:relatedToPage:]): Just one change,
+        pass relatedPage to the context.
+
+        * UIProcess/WebContext.cpp: (WebKit::WebContext::createWebPage): If related page
+        is not null, use its process.
+
+        * UIProcess/WebContext.h: (WebContext): Updated createWebPage signature.
+
+2012-09-10  Brady Eidson  <beidson@apple.com>
+
+        Javascript in foreground tabs should not wait synchronously for plug-ins to load
+        <rdar://problem/12067415> and https://bugs.webkit.org/show_bug.cgi?id=96167
+
+        Reviewed by Geoff Garen.
+
+        Synchronously waiting for initialization to complete when javascript accesses the plug-in script object severely
+        reduces the effectiveness of having an asynchronous NPP_New.
+
+        Such as with background tabs that have never been viewed, we already have cases where JS calls into the plug-in 
+        element fail because we haven't bothered to initialize the plug-in.
+
+        We get a huge win by expanding that to foreground tabs that simply haven't finished initializing their plug-ins.
+
+        * WebProcess/Plugins/PluginView.cpp:
+        (WebKit::PluginView::scriptObject): If initialization is not complete just return 0 - They can get at the script object later.
+
+        Remove the notion of "wait for asynchronous initialization" altogether:
+        * WebProcess/Plugins/Netscape/NetscapePlugin.h:
+        (NetscapePlugin):
+        * WebProcess/Plugins/PDF/BuiltInPDFView.h:
+        (BuiltInPDFView):
+        * WebProcess/Plugins/Plugin.h:
+        (Plugin):
+        * WebProcess/Plugins/PluginProxy.cpp:
+        * WebProcess/Plugins/PluginProxy.h:
+        (PluginProxy):
+
+2012-09-07  Jer Noble  <jer.noble@apple.com>
+
+        <audio> and <video> should send Do Not Track when appropriate
+        https://bugs.webkit.org/show_bug.cgi?id=96134
+
+        Reviewed by Eric Carlson.
+
+        Add support for the shouldSendDoNotTrackHTTPHeader by passing the request
+        on to the WebFrameLoadDelegate.
+
+        * Shared/APIClientTraits.cpp: Increment the interfaceSizes for 
+            WKBundlePageLoaderClient by the value of the new functions.
+        * Shared/APIClientTraits.h: Ditto.
+        * WebProcess/InjectedBundle/API/c/WKBundlePage.h: Add a new API to 
+            WKBundlePageLoaderClient and bump the version number.
+        * WebProcess/InjectedBundle/InjectedBundlePageLoaderClient.cpp:
+        (WebKit::InjectedBundlePageLoaderClient::shouldSendDoNotTrackHTTPHeader):
+            Pass the question on to the client.
+        * WebProcess/InjectedBundle/InjectedBundlePageLoaderClient.h:
+        * WebProcess/WebCoreSupport/WebFrameLoaderClient.cpp:
+        (WebKit::WebFrameLoaderClient::shouldSendDoNotTrackHTTPHeader):
+            Pass the question on to the bundle.
+        * WebProcess/WebCoreSupport/WebFrameLoaderClient.h:
+        * WebProcess/qt/QtBuiltinBundlePage.cpp:
+        (WebKit::QtBuiltinBundlePage::QtBuiltinBundlePage):
+            Add an entry for the new function in the Qt loader client.
+
 2012-09-10  Carlos Garcia Campos  <cgarcia@igalia.com>
 
         [SOUP] Don't convert to UTF-8 the suggestedFilename passed to Download::decideDestinationWithSuggestedFilename()

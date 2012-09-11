@@ -1,3 +1,158 @@
+2012-09-11  Jinwoo Song  <jinwoo7.song@samsung.com>
+
+        Deploy StringBuilder::appendNumber() and StringBuilder::appendLiteral() in more places
+        https://bugs.webkit.org/show_bug.cgi?id=96344
+
+        Reviewed by Benjamin Poulain.
+
+        Use StringBuilder::appendNumber() instead of String::number(). Also deploy 
+        StringBuilder::appendLiteral() instead of String::append() in the surrounding code.
+
+        * WebCoreSupport/DatePickerClient.cpp:
+        (WebCore::DatePickerClient::generateHTML):
+        * WebCoreSupport/SelectPopupClient.cpp:
+        (WebCore::SelectPopupClient::generateHTML):
+
+2012-09-11  Jacky Jiang  <zhajiang@rim.com>
+
+        [BlackBerry] InRegion scrollable area dangling pointers were accessed in UI thread
+        https://bugs.webkit.org/show_bug.cgi?id=96318
+
+        Reviewed by Antonio Gomes.
+
+        PR: 204066
+        Dangling pointers were accessed in UI thread, as the actual InRegion
+        scrollable areas of WebKit side had been destroyed before that in
+        WebKit thread after UI thread set scrolling to false.
+        Notify the client side to clear InRegion scrollable areas before we
+        destroy them in WebKit side.
+
+        Internally reviewed by Gen Mak and George Staikos.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::notifyInRegionScrollStopped):
+        (BlackBerry::WebKit::WebPagePrivate::setScrollOriginPoint):
+        * Api/WebPageClient.h:
+
+2012-09-11  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Suppress keyboard requests while processing spell checking suggestions.
+        https://bugs.webkit.org/show_bug.cgi?id=96394
+
+        Reviewed by Rob Buis.
+
+        Suppress the VKB notification when the touch event
+        is a spell checking request.
+
+        PR 192925.
+
+        Reviewed Internally by Gen Mak.
+
+        * WebKitSupport/TouchEventHandler.cpp:
+        (BlackBerry::WebKit::TouchEventHandler::handleTouchPoint):
+
+2012-09-11  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Colour Dialog popup request should return proper state.
+        https://bugs.webkit.org/show_bug.cgi?id=96392
+
+        Reviewed by Rob Buis.
+
+        Return proper state from openColorPopup dependent on
+        whether the popup actually opened.
+
+        Reviewed Internally by Chris Hutten-Czapski
+
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::openColorPopup):
+
+2012-09-11  Nima Ghanavatian  <nghanavatian@rim.com>
+
+        [BlackBerry] Take account for single words that exceed our client character limit
+        https://bugs.webkit.org/show_bug.cgi?id=96389
+
+        Fix to the processing of long single-line text using getRangeForSpellCheckWithFineGranularity.
+        This was failing if a single word was longer than our maximum allowed limit.
+
+        Internally reviewed by Mike Fenton.
+
+        Reviewed by Rob Buis.
+
+        * WebKitSupport/InputHandler.cpp:
+        (WebKit):
+        (BlackBerry::WebKit::InputHandler::getRangeForSpellCheckWithFineGranularity):
+
+2012-09-11  Arvid Nilsson  <anilsson@rim.com>
+
+        [BlackBerry] SelectionHandler drops caret change notifications
+        https://bugs.webkit.org/show_bug.cgi?id=96378
+
+        Reviewed by Antonio Gomes.
+
+        The selection handler deliberately drops caret change notifications
+        while the input handler is processing changes, to avoid displaying
+        intermediate state during a complex change.
+
+        However, this meant that the client was never informed of the final
+        caret position.
+
+        Fixed by notifying client about caret change after processing ends, if
+        one or more caret change notifications were dropped during processing.
+
+        PR #205073
+
+        Reviewed internally by Mike Fenton.
+
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::setProcessingChange):
+        (WebKit):
+        * WebKitSupport/InputHandler.h:
+        (InputHandler):
+        * WebKitSupport/SelectionHandler.cpp:
+        (BlackBerry::WebKit::SelectionHandler::SelectionHandler):
+        (BlackBerry::WebKit::SelectionHandler::inputHandlerDidFinishProcessingChange):
+        (WebKit):
+        (BlackBerry::WebKit::SelectionHandler::selectionPositionChanged):
+        (BlackBerry::WebKit::SelectionHandler::notifyCaretPositionChangedIfNeeded):
+        * WebKitSupport/SelectionHandler.h:
+        (SelectionHandler):
+
+2012-09-10  Antonio Gomes  <agomes@rim.com>
+
+        [BlackBerry] add a way to overscroll non-overflown content
+        https://bugs.webkit.org/show_bug.cgi?id=96331
+        [UxD] Vertical lists should always be scrollable
+        PR #195305
+
+        Reviewed by Yong Li.
+        Internally reviewed by Gen Mak.
+
+        Check if the RenderLayer is composited / hardware acceleratable prior to
+        check if its contents overflows. If that is the case, check if
+        our custom data-blackberry-force-overscroll is present.
+
+        That makes it possible for us to align to UX requirements: settings
+        and CCM panels should be always scrollable.
+
+        * Api/InRegionScroller.cpp:
+        (BlackBerry::WebKit::canScrollRenderBox):
+        * WebKitSupport/InRegionScrollableArea.cpp:
+        (BlackBerry::WebKit::InRegionScrollableArea::InRegionScrollableArea):
+
+2012-09-10  Genevieve Mak  <gmak@rim.com>
+
+        Change -data-blackberry-webworks-context to -data-webworks-context
+        because not all webworks apps are blackberry apps.
+        https://bugs.webkit.org/show_bug.cgi?id=96297
+
+        Reviewed by Antonio Gomes.
+
+        PR #193726
+        Rubber Stamped interally by Mike Fenton.
+
+        * WebKitSupport/DOMSupport.cpp:
+        (BlackBerry::WebKit::DOMSupport::webWorksContext):
+
 2012-09-09  Arvid Nilsson  <anilsson@rim.com>
 
         [BlackBerry] Fix flicker due to introduction of the fence extension.

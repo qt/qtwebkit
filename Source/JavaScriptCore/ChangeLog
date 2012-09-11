@@ -1,3 +1,351 @@
+2012-09-11  Raphael Kubo da Costa  <rakuco@webkit.org>
+
+        [EFL] Rewrite the EFL-related Find modules
+        https://bugs.webkit.org/show_bug.cgi?id=95237
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * CMakeLists.txt: Stop setting the LINK_FLAGS property.
+        * PlatformEfl.cmake: Ditto.
+        * shell/PlatformEfl.cmake: Ditto.
+
+2012-09-11  Raphael Kubo da Costa  <rakuco@webkit.org>
+
+        [EFL] Unreviewed build fix after r128065.
+
+        * CMakeLists.txt: Link against WTF for FastMalloc symbols, which
+        are needed when building with SYSTEM_MALLOC off.
+
+2012-09-10  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Remove m_classInfo from JSCell
+        https://bugs.webkit.org/show_bug.cgi?id=96311
+
+        Reviewed by Oliver Hunt.
+
+        Now that no one is using the ClassInfo in JSCell, we can remove it for the greater good. This is a 1.5% win on v8v7 and 
+        a 1.7% win on kraken, and is an overall performance progression.
+
+        * dfg/DFGSpeculativeJIT.h:
+        (JSC::DFG::SpeculativeJIT::emitAllocateBasicJSObject): Had to rearrange the order of when we take things off the free list 
+        and when we store the Structure in the object because we would clobber the free list otherwise. This made it not okay for 
+        the structure argument and the scratch register to alias one another. Also removed the store of the ClassInfo pointer in the
+        object. Yay!
+        (SpeculativeJIT):
+        * dfg/DFGSpeculativeJIT32_64.cpp: Since it's no longer okay for for the scratch register and structure register to alias 
+        one another as stated above, had to add an extra temporary for passing the Structure.
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp: Ditto.
+        (JSC::DFG::SpeculativeJIT::compile):
+        * jit/JITInlineMethods.h:
+        (JSC::JIT::emitAllocateBasicJSObject): Similar changes to DFG's inline allocation except that it removed the object from 
+        the free list first, so no changes were necessary there.
+        * llint/LowLevelInterpreter.asm: Change the constants for amount of inline storage to match PropertyOffset.h and remove 
+        the store of the ClassInfo pointer during inline allocation.
+        * llint/LowLevelInterpreter32_64.asm:
+        * llint/LowLevelInterpreter64.asm:
+        * runtime/JSCell.h: Remove the m_classInfo field and associated methods.
+        (JSCell):
+        * runtime/JSObject.h:
+        (JSObject):
+        * runtime/PropertyOffset.h: Expand the number of inline storage properties to take up the extra space that we're freeing 
+        with the removal of the ClassInfo pointer.
+        (JSC):
+        * runtime/Structure.h:
+        (JSC):
+        (JSC::JSCell::JSCell):
+        (JSC::JSCell::finishCreation):
+
+2012-09-10  Geoffrey Garen  <ggaren@apple.com>
+
+        Added large allocation support to MarkedSpace
+        https://bugs.webkit.org/show_bug.cgi?id=96214
+
+        Originally reviewed by Oliver Hunt, then I added a design revision by
+        suggested by Phil Pizlo.
+
+        I expanded the imprecise size classes to cover up to 32KB, then added
+        an mmap-based allocator for everything bigger. There's a lot of tuning
+        we could do in these size classes, but currently they're almost
+        completely unused, so I haven't done any tuning.
+
+        Subtle point: the large allocator is a degenerate case of our free list
+        logic. Its list only ever contains zero or one items.
+
+        * heap/Heap.h:
+        (JSC::Heap::allocateStructure): Pipe in size information.
+
+        * heap/MarkedAllocator.cpp:
+        (JSC::MarkedAllocator::tryAllocateHelper): Handle the case where we
+        find a free item in the sweep list but the item isn't big enough. This
+        can happen in the large allocator because it mixes sizes.
+
+        (JSC::MarkedAllocator::tryAllocate):
+        (JSC::MarkedAllocator::allocateSlowCase): More piping.
+
+        (JSC::MarkedAllocator::allocateBlock): Handle the oversize case.
+
+        (JSC::MarkedAllocator::addBlock): I moved the call to didAddBlock here
+        because it made more sense.
+
+        * heap/MarkedAllocator.h:
+        (MarkedAllocator):
+        (JSC::MarkedAllocator::allocate):
+        * heap/MarkedSpace.cpp:
+        (JSC::MarkedSpace::MarkedSpace):
+        (JSC::MarkedSpace::resetAllocators):
+        (JSC::MarkedSpace::canonicalizeCellLivenessData):
+        (JSC::MarkedSpace::isPagedOut):
+        (JSC::MarkedSpace::freeBlock):
+        * heap/MarkedSpace.h:
+        (MarkedSpace):
+        (JSC::MarkedSpace::allocatorFor):
+        (JSC::MarkedSpace::destructorAllocatorFor):
+        (JSC::MarkedSpace::allocateWithoutDestructor):
+        (JSC::MarkedSpace::allocateWithDestructor):
+        (JSC::MarkedSpace::allocateStructure):
+        (JSC::MarkedSpace::forEachBlock):
+        * runtime/Structure.h:
+        (JSC::Structure): More piping.
+
+2012-09-10  Geoffrey Garen  <ggaren@apple.com>
+
+        Try to fix the Windows (32-bit) build.
+
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_tear_off_arguments):
+        * jit/JITOpcodes32_64.cpp:
+        (JSC::JIT::emit_op_tear_off_arguments): Get operands 1 and 2, not 1 and 1. :(
+
+        Also took this opportunity to rename to indicate that these values are
+        not destinations anymore.
+
+2012-09-10  Geoffrey Garen  <ggaren@apple.com>
+
+        DFG misses arguments tear-off for function.arguments if 'arguments' is used
+        https://bugs.webkit.org/show_bug.cgi?id=96227
+
+        Reviewed by Gavin Barraclough.
+
+        We've decided not to allow function.arguments to alias the local
+        'arguments' object, or a local var or function named 'arguments'.
+        Aliasing complicates the implementation (cf, this bug) and can produce
+        surprising behavior for web programmers.
+
+        Eliminating the aliasing has the side-effect of fixing this bug.
+
+        The compatibilty story: function.arguments is deprecated, was never
+        specified, and throws an exception in strict mode, so we expect it to
+        disappear over time. Firefox does not alias to 'arguments'; Chrome
+        does, but not if you use eval or with; IE does; Safari did.
+
+        * dfg/DFGByteCodeParser.cpp: Noticed a little cleanup while verifying
+        this code. Use the CodeBlock method for better encapsulation.
+
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::retrieveArgumentsFromVMCode): Behavior change: don't
+        alias.
+
+        * tests/mozilla/js1_4/Functions/function-001.js:
+        (TestFunction_4): Updated test expectations for changed behavior.
+
+2012-09-10  Filip Pizlo  <fpizlo@apple.com>
+
+        offlineasm has some impossible to implement, and unused, instructions
+        https://bugs.webkit.org/show_bug.cgi?id=96310
+
+        Reviewed by Mark Hahnenberg.
+
+        * offlineasm/armv7.rb:
+        * offlineasm/instructions.rb:
+        * offlineasm/x86.rb:
+
+2012-09-09  Geoffrey Garen  <ggaren@apple.com>
+
+        Refactored op_tear_off* to support activations that don't allocate space for 'arguments'
+        https://bugs.webkit.org/show_bug.cgi?id=96231
+
+        Reviewed by Gavin Barraclough.
+
+        This is a step toward smaller activations.
+
+        As a side-effect, this patch eliminates a load and branch from the hot path
+        of activation tear-off by moving it to the cold path of arguments tear-off. Our
+        optimizing assumptions are that activations are common and that reifying the
+        arguments object is less common.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dump):
+        * bytecode/Opcode.h:
+        (JSC::padOpcodeName): Updated for new opcode lengths.
+
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::BytecodeGenerator):
+        (JSC::BytecodeGenerator::addConstantValue): Added support for JSValue()
+        in the bytecode, which we use when we have 'arguments' but no activation.
+
+        (JSC::BytecodeGenerator::emitReturn): Always emit tear_off_arguments
+        if we've allocated the arguments registers. This allows tear_off_activation
+        not to worry about the arguments object anymore.
+
+        Also, pass the activation and arguments values directly to these opcodes
+        instead of requiring the opcodes to infer the values through special
+        registers. This gives us more flexibility to move or eliminate registers.
+
+        * dfg/DFGArgumentsSimplificationPhase.cpp:
+        (JSC::DFG::ArgumentsSimplificationPhase::run):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::parseBlock):
+        * dfg/DFGNode.h:
+        (Node): Updated for new opcode lengths.
+
+        * dfg/DFGOperations.cpp: Activation tear-off doesn't worry about the
+        arguments object anymore. If 'arguments' is in use and reified, it's
+        responsible for aliasing back to the activation object in tear_off_arguments.
+
+        * dfg/DFGOperations.h:
+        * dfg/DFGSpeculativeJIT.h:
+        (JSC::DFG::SpeculativeJIT::callOperation):
+        (SpeculativeJIT):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile): Don't pass the arguments object to
+        activation tear-off; do pass the activation object to arguments tear-off.
+
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::privateExecute): Ditto.
+
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_tear_off_activation):
+        (JSC::JIT::emit_op_tear_off_arguments):
+        * jit/JITOpcodes32_64.cpp:
+        (JSC::JIT::emit_op_tear_off_activation):
+        (JSC::JIT::emit_op_tear_off_arguments):
+        * jit/JITStubs.cpp:
+        (JSC::DEFINE_STUB_FUNCTION):
+        * llint/LLIntSlowPaths.cpp:
+        (JSC::LLInt::LLINT_SLOW_PATH_DECL):
+        * llint/LowLevelInterpreter32_64.asm:
+        * llint/LowLevelInterpreter64.asm: Same change in a few more execution engines.
+
+2012-09-10  Patrick Gansterer  <paroga@webkit.org>
+
+        [JSC] Use StringBuilder::appendNumber() instead of String::number()
+        https://bugs.webkit.org/show_bug.cgi?id=96236
+
+        Reviewed by Benjamin Poulain.
+
+        * API/JSContextRef.cpp:
+        (JSContextCreateBacktrace):
+
+2012-09-06  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Combine MarkStack and SlotVisitor into single class
+        https://bugs.webkit.org/show_bug.cgi?id=96043
+
+        Reviewed by Geoff Garen.
+
+        Move all of MarkStack into SlotVisitor. The remaining stuff in MarkStack.cpp actually has to do 
+        with MarkStack management/allocation. Cleaned up a few of the header files while I was at it.
+
+        * CMakeLists.txt:
+        * GNUmakefile.list.am:
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.vcproj:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * Target.pri:
+        * bytecode/CodeBlock.cpp:
+        * dfg/DFGCommon.h:
+        * heap/GCThreadSharedData.cpp:
+        * heap/GCThreadSharedData.h:
+        (GCThreadSharedData):
+        * heap/HeapRootVisitor.h:
+        * heap/MarkStack.cpp:
+        (JSC):
+        * heap/MarkStack.h:
+        (JSC):
+        (MarkStackSegment):
+        (JSC::MarkStackSegment::data):
+        (JSC::MarkStackSegment::capacityFromSize):
+        (JSC::MarkStackSegment::sizeFromCapacity):
+        (MarkStackSegmentAllocator):
+        (MarkStackArray):
+        * heap/MarkStackInlineMethods.h:
+        (JSC::MarkStackArray::postIncTop):
+        (JSC):
+        (JSC::MarkStackArray::preDecTop):
+        (JSC::MarkStackArray::setTopForFullSegment):
+        (JSC::MarkStackArray::setTopForEmptySegment):
+        (JSC::MarkStackArray::top):
+        (JSC::MarkStackArray::validatePrevious):
+        (JSC::MarkStackArray::append):
+        (JSC::MarkStackArray::canRemoveLast):
+        (JSC::MarkStackArray::removeLast):
+        (JSC::MarkStackArray::isEmpty):
+        (JSC::MarkStackArray::size):
+        * heap/SlotVisitor.cpp: Added.
+        (JSC):
+        (JSC::SlotVisitor::SlotVisitor):
+        (JSC::SlotVisitor::~SlotVisitor):
+        (JSC::SlotVisitor::setup):
+        (JSC::SlotVisitor::reset):
+        (JSC::SlotVisitor::append):
+        (JSC::visitChildren):
+        (JSC::SlotVisitor::donateKnownParallel):
+        (JSC::SlotVisitor::drain):
+        (JSC::SlotVisitor::drainFromShared):
+        (JSC::SlotVisitor::mergeOpaqueRoots):
+        (JSC::SlotVisitor::startCopying):
+        (JSC::SlotVisitor::allocateNewSpaceSlow):
+        (JSC::SlotVisitor::allocateNewSpaceOrPin):
+        (JSC::JSString::tryHashConstLock):
+        (JSC::JSString::releaseHashConstLock):
+        (JSC::JSString::shouldTryHashConst):
+        (JSC::SlotVisitor::internalAppend):
+        (JSC::SlotVisitor::copyAndAppend):
+        (JSC::SlotVisitor::doneCopying):
+        (JSC::SlotVisitor::harvestWeakReferences):
+        (JSC::SlotVisitor::finalizeUnconditionalFinalizers):
+        (JSC::SlotVisitor::validate):
+        * heap/SlotVisitor.h:
+        (JSC):
+        (SlotVisitor):
+        (JSC::SlotVisitor::sharedData):
+        (JSC::SlotVisitor::isEmpty):
+        (JSC::SlotVisitor::visitCount):
+        (JSC::SlotVisitor::resetChildCount):
+        (JSC::SlotVisitor::childCount):
+        (JSC::SlotVisitor::incrementChildCount):
+        (ParallelModeEnabler):
+        (JSC::ParallelModeEnabler::ParallelModeEnabler):
+        (JSC::ParallelModeEnabler::~ParallelModeEnabler):
+        * heap/SlotVisitorInlineMethods.h:
+        (JSC::SlotVisitor::append):
+        (JSC):
+        (JSC::SlotVisitor::appendUnbarrieredPointer):
+        (JSC::SlotVisitor::appendUnbarrieredValue):
+        (JSC::SlotVisitor::internalAppend):
+        (JSC::SlotVisitor::addWeakReferenceHarvester):
+        (JSC::SlotVisitor::addUnconditionalFinalizer):
+        (JSC::SlotVisitor::addOpaqueRoot):
+        (JSC::SlotVisitor::containsOpaqueRoot):
+        (JSC::SlotVisitor::opaqueRootCount):
+        (JSC::SlotVisitor::mergeOpaqueRootsIfNecessary):
+        (JSC::SlotVisitor::mergeOpaqueRootsIfProfitable):
+        (JSC::SlotVisitor::donate):
+        (JSC::SlotVisitor::donateAndDrain):
+        * jit/JITWriteBarrier.h:
+        (JSC::SlotVisitor::append):
+        * jit/JumpReplacementWatchpoint.cpp:
+        * runtime/JSCell.h:
+        * runtime/Structure.h:
+        (JSC::SlotVisitor::internalAppend):
+        * runtime/WriteBarrier.h:
+        (JSC):
+        (JSC::SlotVisitor::append):
+        (JSC::SlotVisitor::appendValues):
+        * yarr/YarrJIT.cpp:
+
 2012-09-10  Hojong Han  <hojong.han@samsung.com>
 
         [EFL] JIT memory usage is not retrieved

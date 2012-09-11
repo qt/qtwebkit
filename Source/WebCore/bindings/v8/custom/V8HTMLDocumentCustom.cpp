@@ -40,9 +40,9 @@
 #include "HTMLNames.h"
 #include "V8Binding.h"
 #include "V8DOMWindow.h"
+#include "V8DOMWindowShell.h"
 #include "V8HTMLAllCollection.h"
 #include "V8HTMLCollection.h"
-#include "V8IsolatedContext.h"
 #include "V8Node.h"
 #include "V8RecursionScope.h"
 #include <wtf/text/StringBuilder.h>
@@ -119,8 +119,7 @@ v8::Handle<v8::Value> V8HTMLDocument::writeCallback(const v8::Arguments& args)
 {
     INC_STATS("DOM.HTMLDocument.write()");
     HTMLDocument* htmlDocument = V8HTMLDocument::toNative(args.Holder());
-    Frame* frame = activeFrame(BindingState::instance());
-    htmlDocument->write(writeHelperGetString(args), frame ? frame->document() : NULL);
+    htmlDocument->write(writeHelperGetString(args), activeDOMWindow(BindingState::instance())->document());
     return v8::Undefined();
 }
 
@@ -128,8 +127,7 @@ v8::Handle<v8::Value> V8HTMLDocument::writelnCallback(const v8::Arguments& args)
 {
     INC_STATS("DOM.HTMLDocument.writeln()");
     HTMLDocument* htmlDocument = V8HTMLDocument::toNative(args.Holder());
-    Frame* frame = activeFrame(BindingState::instance());
-    htmlDocument->writeln(writeHelperGetString(args), frame ? frame->document() : NULL);
+    htmlDocument->writeln(writeHelperGetString(args), activeDOMWindow(BindingState::instance())->document());
     return v8::Undefined();
 }
 
@@ -160,9 +158,7 @@ v8::Handle<v8::Value> V8HTMLDocument::openCallback(const v8::Arguments& args)
         }
     }
 
-    Frame* frame = activeFrame(BindingState::instance());
-    htmlDocument->open(frame ? frame->document() : NULL);
-    // Return the document.
+    htmlDocument->open(activeDOMWindow(BindingState::instance())->document());
     return args.Holder();
 }
 
@@ -187,7 +183,7 @@ v8::Handle<v8::Value> toV8(HTMLDocument* impl, v8::Handle<v8::Object> creationCo
     v8::Handle<v8::Object> wrapper = V8HTMLDocument::wrap(impl, creationContext, isolate, forceNewObject);
     if (wrapper.IsEmpty())
         return wrapper;
-    if (!V8IsolatedContext::getEntered()) {
+    if (!V8DOMWindowShell::getEntered()) {
         if (Frame* frame = impl->frame())
             frame->script()->windowShell()->updateDocumentWrapper(wrapper);
     }

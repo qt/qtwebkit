@@ -1420,6 +1420,7 @@ SET(WebCore_SOURCES
     html/ImageDocument.cpp
     html/ImageInputType.cpp
     html/InputType.cpp
+    html/InputTypeNames.cpp
     html/LabelableElement.cpp
     html/LabelsNodeList.cpp
     html/LinkRelAttribute.cpp
@@ -2015,6 +2016,9 @@ SET(WebCore_SOURCES
     rendering/BidiRun.cpp
     rendering/CounterNode.cpp
     rendering/EllipsisBox.cpp
+    rendering/ExclusionInterval.cpp
+    rendering/ExclusionRectangle.cpp
+    rendering/ExclusionShape.cpp
     rendering/FilterEffectRenderer.cpp
     rendering/FixedTableLayout.cpp
     rendering/FlowThreadController.cpp
@@ -2678,28 +2682,6 @@ IF (WTF_USE_3D_GRAPHICS)
     )
 ENDIF ()
 
-IF (ENABLE_REQUEST_ANIMATION_FRAME)
-    LIST(APPEND WebCore_IDL_FILES
-        dom/RequestAnimationFrameCallback.idl
-    )
-    LIST(APPEND WebCore_SOURCES
-        dom/ScriptedAnimationController.cpp
-    )
-ENDIF ()
-
-IF (ENABLE_VIBRATION)
-    LIST(APPEND WebCore_INCLUDE_DIRECTORIES
-        ${WEBCORE_DIR}/Modules/vibration
-    )
-    LIST(APPEND WebCore_IDL_FILES
-        Modules/vibration/NavigatorVibration.idl
-    )
-    LIST(APPEND WebCore_SOURCES
-        Modules/vibration/NavigatorVibration.cpp
-        Modules/vibration/Vibration.cpp
-    )
-ENDIF ()
-
 SET(WebCoreTestSupport_INCLUDE_DIRECTORIES
     "${WebCore_INCLUDE_DIRECTORIES}"
     "${WEBCORE_DIR}/testing"
@@ -2737,7 +2719,6 @@ SET(IDL_ATTRIBUTES_FILE ${WEBCORE_DIR}/bindings/scripts/IDLAttributes.txt)
 INCLUDE(${WEBCORE_DIR}/UseJSC.cmake)
 
 SET(WebCore_LIBRARIES ${WTF_LIBRARY_NAME} ${JavaScriptCore_LIBRARY_NAME})
-SET(WebCore_LINK_FLAGS "")
 WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS()
 
 # ANGLE tokenizer & parser
@@ -2981,11 +2962,6 @@ IF (WTF_USE_3D_GRAPHICS)
 ENDIF ()
 
 TARGET_LINK_LIBRARIES(${WebCore_LIBRARY_NAME} ${WebCore_LIBRARIES})
-
-IF (WebCore_LINK_FLAGS)
-    ADD_TARGET_PROPERTIES(${WebCore_LIBRARY_NAME} LINK_FLAGS "${WebCore_LINK_FLAGS}")
-    ADD_TARGET_PROPERTIES(${WebCoreTestSupport_LIBRARY_NAME} LINK_FLAGS "${WebCore_LINK_FLAGS}")
-ENDIF ()
 
 IF (SHARED_CORE)
     SET_TARGET_PROPERTIES(${WebCore_LIBRARY_NAME} PROPERTIES VERSION ${PROJECT_VERSION} SOVERSION ${PROJECT_VERSION_MAJOR})

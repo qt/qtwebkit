@@ -43,7 +43,6 @@
 #include "V8DOMWrapper.h"
 #include "V8Document.h"
 #include "V8Float32Array.h"
-#include "V8IsolatedContext.h"
 #include "V8SVGDocument.h"
 #include "V8SVGPoint.h"
 #include "V8ScriptProfile.h"
@@ -546,8 +545,6 @@ static v8::Handle<v8::Value> withScriptExecutionContextAttributeAttrGetter(v8::L
     INC_STATS("DOM.TestObj.withScriptExecutionContextAttribute._get");
     TestObj* imp = V8TestObj::toNative(info.Holder());
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    if (!scriptContext)
-        return v8Undefined();
     return toV8(imp->withScriptExecutionContextAttribute(scriptContext), info.Holder(), info.GetIsolate());
 }
 
@@ -557,8 +554,6 @@ static void withScriptExecutionContextAttributeAttrSetter(v8::Local<v8::String> 
     TestObj* imp = V8TestObj::toNative(info.Holder());
     TestObj* v = V8TestObj::HasInstance(value) ? V8TestObj::toNative(v8::Handle<v8::Object>::Cast(value)) : 0;
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    if (!scriptContext)
-        return;
     imp->setWithScriptExecutionContextAttribute(scriptContext, WTF::getPtr(v));
     return;
 }
@@ -602,8 +597,6 @@ static v8::Handle<v8::Value> withScriptExecutionContextAttributeRaisesAttrGetter
     TestObj* imp = V8TestObj::toNative(info.Holder());
     ExceptionCode ec = 0;
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    if (!scriptContext)
-        return v8Undefined();
     RefPtr<TestObj> v = imp->withScriptExecutionContextAttributeRaises(scriptContext, ec);
     if (UNLIKELY(ec))
         return setDOMException(ec, info.GetIsolate());
@@ -617,8 +610,6 @@ static void withScriptExecutionContextAttributeRaisesAttrSetter(v8::Local<v8::St
     TestObj* v = V8TestObj::HasInstance(value) ? V8TestObj::toNative(v8::Handle<v8::Object>::Cast(value)) : 0;
     ExceptionCode ec = 0;
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    if (!scriptContext)
-        return;
     imp->setWithScriptExecutionContextAttributeRaises(scriptContext, WTF::getPtr(v), ec);
     if (UNLIKELY(ec))
         setDOMException(ec, info.GetIsolate());
@@ -633,8 +624,6 @@ static v8::Handle<v8::Value> withScriptExecutionContextAndScriptStateAttributeAt
     if (!state)
         return v8Undefined();
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    if (!scriptContext)
-        return v8Undefined();
     return toV8(imp->withScriptExecutionContextAndScriptStateAttribute(state, scriptContext), info.Holder(), info.GetIsolate());
 }
 
@@ -647,8 +636,6 @@ static void withScriptExecutionContextAndScriptStateAttributeAttrSetter(v8::Loca
     if (!state)
         return;
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    if (!scriptContext)
-        return;
     imp->setWithScriptExecutionContextAndScriptStateAttribute(state, scriptContext, WTF::getPtr(v));
     if (state.hadException())
         throwError(state.exception(), info.GetIsolate());
@@ -664,8 +651,6 @@ static v8::Handle<v8::Value> withScriptExecutionContextAndScriptStateAttributeRa
     if (!state)
         return v8Undefined();
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    if (!scriptContext)
-        return v8Undefined();
     RefPtr<TestObj> v = imp->withScriptExecutionContextAndScriptStateAttributeRaises(state, scriptContext, ec);
     if (UNLIKELY(ec))
         return setDOMException(ec, info.GetIsolate());
@@ -684,8 +669,6 @@ static void withScriptExecutionContextAndScriptStateAttributeRaisesAttrSetter(v8
     if (!state)
         return;
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    if (!scriptContext)
-        return;
     imp->setWithScriptExecutionContextAndScriptStateAttributeRaises(state, scriptContext, WTF::getPtr(v), ec);
     if (UNLIKELY(ec))
         setDOMException(ec, info.GetIsolate());
@@ -702,8 +685,6 @@ static v8::Handle<v8::Value> withScriptExecutionContextAndScriptStateWithSpacesA
     if (!state)
         return v8Undefined();
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    if (!scriptContext)
-        return v8Undefined();
     return toV8(imp->withScriptExecutionContextAndScriptStateWithSpacesAttribute(state, scriptContext), info.Holder(), info.GetIsolate());
 }
 
@@ -716,8 +697,6 @@ static void withScriptExecutionContextAndScriptStateWithSpacesAttributeAttrSette
     if (!state)
         return;
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    if (!scriptContext)
-        return;
     imp->setWithScriptExecutionContextAndScriptStateWithSpacesAttribute(state, scriptContext, WTF::getPtr(v));
     if (state.hadException())
         throwError(state.exception(), info.GetIsolate());
@@ -1311,8 +1290,6 @@ static v8::Handle<v8::Value> withScriptExecutionContextCallback(const v8::Argume
     INC_STATS("DOM.TestObj.withScriptExecutionContext");
     TestObj* imp = V8TestObj::toNative(args.Holder());
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    if (!scriptContext)
-        return v8Undefined();
     imp->withScriptExecutionContext(scriptContext);
     return v8Undefined();
 }
@@ -1323,8 +1300,6 @@ static v8::Handle<v8::Value> withScriptExecutionContextAndScriptStateCallback(co
     TestObj* imp = V8TestObj::toNative(args.Holder());
     EmptyScriptState state;
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    if (!scriptContext)
-        return v8Undefined();
     imp->withScriptExecutionContextAndScriptState(&state, scriptContext);
     if (state.hadException())
         return throwError(state.exception(), args.GetIsolate());
@@ -1339,8 +1314,6 @@ static v8::Handle<v8::Value> withScriptExecutionContextAndScriptStateObjExceptio
     {
     EmptyScriptState state;
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    if (!scriptContext)
-        return v8Undefined();
     RefPtr<TestObj> result = imp->withScriptExecutionContextAndScriptStateObjException(&state, scriptContext, ec);
     if (UNLIKELY(ec))
         goto fail;
@@ -1358,8 +1331,6 @@ static v8::Handle<v8::Value> withScriptExecutionContextAndScriptStateWithSpacesC
     TestObj* imp = V8TestObj::toNative(args.Holder());
     EmptyScriptState state;
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    if (!scriptContext)
-        return v8Undefined();
     RefPtr<TestObj> result = imp->withScriptExecutionContextAndScriptStateWithSpaces(&state, scriptContext);
     if (state.hadException())
         return throwError(state.exception(), args.GetIsolate());
