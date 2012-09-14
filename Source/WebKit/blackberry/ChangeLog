@@ -1,3 +1,242 @@
+2012-09-13  Antonio Gomes  <agomes@rim.com>
+
+        [BlackBerry]  Remove the ability to schedule a zoom about point call.
+        https://bugs.webkit.org/show_bug.cgi?id=96696
+
+        [FullScreen] entering/leaving fullscreen results in temporary glitches on the screen (Part I)
+        PR #180866
+
+        Reviewed by Rob Buis.
+
+        Internally reviewed by Jacky Jiang and Arvid Nilsson.
+
+        Patch replaces the async call to zoomAboutPoint (via scheduling it with a one-shot-0-timer).
+        Instead, at its single call site, we inline most of the previous scheduleZoomAboutPoint code,
+        and in the end call zoomAboutPoint directly.
+
+        Change was estimulated by Arvid's comment on PRzilla: "There is no longer any reason to have
+        zoom about point be async.. That was a hack I did for BB6, back when we were doing everything on the WK
+        thread and needed manual time slicing betwren rendering and user interaction."
+
+        The bigger goal though is to be able to remove screen glitches while entering/leaving
+        fullscreen mode: since we could accurately use the count-based suspend/resume backing
+        store mechanism to prevent it.
+
+        * Api/WebPage.cpp:
+        (WebKit):
+        (BlackBerry::WebKit::WebPagePrivate::WebPagePrivate):
+        (BlackBerry::WebKit::WebPagePrivate::setLoadState):
+        (BlackBerry::WebKit::WebPagePrivate::setViewportSize):
+        * Api/WebPage_p.h:
+        (WebPagePrivate):
+
+2012-09-14  Arvid Nilsson  <anilsson@rim.com>
+
+        [BlackBerry] Add renderTreeAsText API to WebPage
+        https://bugs.webkit.org/show_bug.cgi?id=96629
+
+        Reviewed by Antonio Gomes.
+
+        This will be used for automated testing.
+
+        PR #198595
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPage::renderTreeAsText):
+        (WebKit):
+        * Api/WebPage.h:
+
+2012-09-13  Rob Buis  <rbuis@rim.com>
+
+        [BlackBerry] Cleanup AboutDataEnableFeatures.in
+        https://bugs.webkit.org/show_bug.cgi?id=96695
+
+        Reviewed by Antonio Gomes.
+
+        Remove unused features.
+
+        * WebCoreSupport/AboutDataEnableFeatures.in:
+
+2012-09-13  Rob Buis  <rbuis@rim.com>
+
+        [BlackBerry] Rename InspectorOverlay in blackberry/WebKitSupport
+        https://bugs.webkit.org/show_bug.cgi?id=96689
+
+        Reviewed by Antonio Gomes.
+
+        Rename to InspectorClientBlackBerry to avoid include problems.
+
+        * WebCoreSupport/InspectorClientBlackBerry.h:
+        * WebKitSupport/InspectorOverlayBlackBerry.cpp: Renamed from Source/WebKit/blackberry/WebKitSupport/InspectorOverlay.cpp.
+        (WebKit):
+        (BlackBerry::WebKit::InspectorOverlay::create):
+        (BlackBerry::WebKit::InspectorOverlay::InspectorOverlay):
+        (BlackBerry::WebKit::InspectorOverlay::notifySyncRequired):
+        (BlackBerry::WebKit::InspectorOverlay::paintContents):
+        (BlackBerry::WebKit::InspectorOverlay::showDebugBorders):
+        (BlackBerry::WebKit::InspectorOverlay::showRepaintCounter):
+        (BlackBerry::WebKit::InspectorOverlay::~InspectorOverlay):
+        (BlackBerry::WebKit::InspectorOverlay::clear):
+        (BlackBerry::WebKit::InspectorOverlay::update):
+        * WebKitSupport/InspectorOverlayBlackBerry.h: Renamed from Source/WebKit/blackberry/WebKitSupport/InspectorOverlay.h.
+        (WebCore):
+        (WebKit):
+        (InspectorOverlay):
+        (InspectorOverlayClient):
+        (BlackBerry::WebKit::InspectorOverlay::setClient):
+        (BlackBerry::WebKit::InspectorOverlay::notifyAnimationStarted):
+
+2012-09-13  Antonio Gomes  <agomes@rim.com>
+
+        Unreviewed, warning fix left over from r128456 (bug 96645)
+
+        * Api/InRegionScroller.cpp:
+        (WebKit):
+
+2012-09-13  Genevieve Mak  <gmak@rim.com>
+
+        Continue to send mouse move events to a non-scrollable page
+        even if they are not consumed.
+        PR #207024
+        https://bugs.webkit.org/show_bug.cgi?id=96655
+
+        Reviewed by Antonio Gomes.
+
+        * WebKitSupport/TouchEventHandler.cpp:
+        (BlackBerry::WebKit::isMainFrameScrollable):
+        (WebKit):
+        (BlackBerry::WebKit::TouchEventHandler::handleTouchPoint):
+
+2012-09-13  Jacky Jiang  <zhajiang@rim.com>
+
+        [BlackBerry] Missing conditions in InRegionScrollerPrivate::canScrollRenderBox
+        https://bugs.webkit.org/show_bug.cgi?id=96660
+
+        Reviewed by Antonio Gomes.
+
+        PR: 207884
+        According to RenderBox::canBeScrolledAndHasScrollableArea(), we should
+        bail out early in InRegionScrollerPrivate::canScrollRenderBox() if the
+        RenderBox's scroll height equals the client height and the scroll width
+        equals the client width. Otherwise, we will miss the conditions.
+
+        * Api/InRegionScroller.cpp:
+        (BlackBerry::WebKit::InRegionScrollerPrivate::canScrollRenderBox):
+
+2012-09-13  Jessica Cao  <jecao@rim.com>
+
+        [BlackBerry] Page Popup for Month is non-functional.
+        https://bugs.webkit.org/show_bug.cgi?id=96651
+
+        Reviewed by Rob Buis.
+
+        Hook up support for Month popup.
+
+        * WebCoreSupport/DatePickerClient.cpp:
+        (WebCore::DatePickerClient::generateHTML):
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::openDatePopup):
+
+2012-09-13  Antonio Gomes  <agomes@rim.com>
+
+        [BlackBerry] ASSERT failure in InRegionScrollableArea::InRegionScrollableArea
+        https://bugs.webkit.org/show_bug.cgi?id=96645
+        PR #207307
+
+        Reviewed by George Staikos.
+
+        We use canScrollRenderBox to promote the layer as scrollable instead
+        of RenderBox::canScrollAndHasScrollableArea (see comment above the former).
+        We should assert against the former as well.
+
+        * Api/InRegionScroller.cpp:
+        (BlackBerry::WebKit::InRegionScrollerPrivate::canScrollRenderBox):
+        * Api/InRegionScroller_p.h:
+        (WebCore):
+        (InRegionScrollerPrivate):
+        * WebKitSupport/InRegionScrollableArea.cpp:
+        (BlackBerry::WebKit::InRegionScrollableArea::InRegionScrollableArea):
+
+2012-09-12  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r127876.
+        http://trac.webkit.org/changeset/127876
+        https://bugs.webkit.org/show_bug.cgi?id=96600
+
+        mouse click doesn't work for spin button if spin button in
+        iframe (Requested by yosin on #webkit).
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::contextNode):
+        (BlackBerry::WebKit::WebPagePrivate::nodeForZoomUnderPoint):
+        (BlackBerry::WebKit::WebPagePrivate::handleMouseEvent):
+        (BlackBerry::WebKit::WebPage::nodeAtPoint):
+        * WebKitSupport/FatFingers.cpp:
+        (BlackBerry::WebKit::FatFingers::getNodesFromRect):
+        (BlackBerry::WebKit::FatFingers::getRelevantInfoFromPoint):
+        * WebKitSupport/SelectionHandler.cpp:
+        (BlackBerry::WebKit::visiblePositionForPointIgnoringClipping):
+
+2012-09-12  Sami Kyostila  <skyostil@google.com>
+
+        Rename OVERFLOW_SCROLLING as ACCELERATED_OVERFLOW_SCROLLING
+        https://bugs.webkit.org/show_bug.cgi?id=96251
+
+        Reviewed by Simon Fraser.
+
+        Rename OVERFLOW_SCROLLING as ACCELERATED_OVERFLOW_SCROLLING to better describe
+        the feature it controls.
+
+        * WebCoreSupport/AboutDataEnableFeatures.in:
+
+2012-09-11  Antonio Gomes  <agomes@rim.com>
+
+        [BlackBerry] add a way to overscroll non-overflown content
+        https://bugs.webkit.org/show_bug.cgi?id=96331
+        PR #195305
+
+        Reviewed by Yong Li.
+
+        Check -webkit-overflow-scrolling value for '-blackberry-touch' instead
+        of checking a custom HTML5 attribute.
+
+        No behavioural change. Mostly a rework of r128142.
+
+        * Api/InRegionScroller.cpp:
+        (BlackBerry::WebKit::canScrollRenderBox):
+
+2012-09-11  Rob Buis  <rbuis@rim.com>
+
+        [BlackBerry] make pickers/dialogs use appendLiteral
+        https://bugs.webkit.org/show_bug.cgi?id=96424
+
+        Reviewed by Antonio Gomes.
+
+        PR 204032
+
+        Other pickers were updated in r128204.
+
+        * WebCoreSupport/ColorPickerClient.cpp:
+        (WebCore::ColorPickerClient::generateHTML):
+        * WebCoreSupport/PagePopupBlackBerry.cpp:
+        (WebCore::PagePopupBlackBerry::generateHTML):
+
+2012-09-11  Konrad Piascik  <kpiascik@rim.com>
+
+        [BlackBerry] Fix history navigation for error pages.
+        https://bugs.webkit.org/show_bug.cgi?id=96410
+
+        Reviewed by Rob Buis.
+
+        Fix how history navigation handles restoring view state when navigating between error pages.
+
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::FrameLoaderClientBlackBerry):
+        (WebCore::FrameLoaderClientBlackBerry::saveViewStateToItem):
+        (WebCore::FrameLoaderClientBlackBerry::restoreViewState):
+        * WebCoreSupport/FrameLoaderClientBlackBerry.h:
+        (FrameLoaderClientBlackBerry):
+
 2012-09-11  Jinwoo Song  <jinwoo7.song@samsung.com>
 
         Deploy StringBuilder::appendNumber() and StringBuilder::appendLiteral() in more places

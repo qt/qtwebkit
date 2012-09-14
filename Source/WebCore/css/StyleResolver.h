@@ -66,7 +66,6 @@ class KURL;
 class KeyframeList;
 class KeyframeValue;
 class MediaQueryEvaluator;
-class MemoryObjectInfo;
 class Node;
 class RenderRegion;
 class RuleData;
@@ -207,8 +206,6 @@ public:
     static int legacyFontSize(Document*, int pixelFontSize, bool shouldUseFixedDefaultSize);
 
 public:
-    void setStyle(PassRefPtr<RenderStyle> s) { m_style = s; } // Used by the document when setting up its root style.
-
     void applyPropertyToStyle(CSSPropertyID, CSSValue*, RenderStyle*);
 
     void applyPropertyToCurrentStyle(CSSPropertyID, CSSValue*);
@@ -483,6 +480,7 @@ private:
     RefPtr<RenderStyle> m_rootDefaultStyle;
 
     PseudoId m_dynamicPseudo;
+    PseudoId m_pseudoStyle;
 
     SelectorChecker m_checker;
 
@@ -499,6 +497,7 @@ private:
     bool m_matchAuthorAndUserStyles;
     bool m_sameOriginOnly;
     bool m_distributedToInsertionPoint;
+    bool m_hasUnknownPseudoElements;
 
     RefPtr<CSSFontSelector> m_fontSelector;
     Vector<OwnPtr<MediaQueryResult> > m_viewportDependentMediaQueryResults;

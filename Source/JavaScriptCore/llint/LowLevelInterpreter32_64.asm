@@ -947,21 +947,21 @@ _llint_op_is_string:
 macro loadPropertyAtVariableOffsetKnownNotFinal(propertyOffset, objectAndStorage, tag, payload)
     assert(macro (ok) bigteq propertyOffset, InlineStorageCapacity, ok end)
     negi propertyOffset
-    loadp JSObject::m_outOfLineStorage[objectAndStorage], objectAndStorage
-    loadi TagOffset + (InlineStorageCapacity - 2) * 8[objectAndStorage, propertyOffset, 8], tag
-    loadi PayloadOffset + (InlineStorageCapacity - 2) * 8[objectAndStorage, propertyOffset, 8], payload
+    loadp JSObject::m_butterfly[objectAndStorage], objectAndStorage
+    loadi TagOffset + (InlineStorageCapacity - 1) * 8 - sizeof IndexingHeader[objectAndStorage, propertyOffset, 8], tag
+    loadi PayloadOffset + (InlineStorageCapacity - 1) * 8 - sizeof IndexingHeader[objectAndStorage, propertyOffset, 8], payload
 end
 
 macro loadPropertyAtVariableOffset(propertyOffset, objectAndStorage, tag, payload)
     bilt propertyOffset, InlineStorageCapacity, .isInline
-    loadp JSObject::m_outOfLineStorage[objectAndStorage], objectAndStorage
+    loadp JSObject::m_butterfly[objectAndStorage], objectAndStorage
     negi propertyOffset
     jmp .ready
 .isInline:
-    addp JSFinalObject::m_inlineStorage - (InlineStorageCapacity - 2) * 8, objectAndStorage
+    addp JSFinalObject::m_inlineStorage - (InlineStorageCapacity - 1) * 8 + sizeof IndexingHeader, objectAndStorage
 .ready:
-    loadi TagOffset + (InlineStorageCapacity - 2) * 8[objectAndStorage, propertyOffset, 8], tag
-    loadi PayloadOffset + (InlineStorageCapacity - 2) * 8[objectAndStorage, propertyOffset, 8], payload
+    loadi TagOffset + (InlineStorageCapacity - 1) * 8 - sizeof IndexingHeader[objectAndStorage, propertyOffset, 8], tag
+    loadi PayloadOffset + (InlineStorageCapacity - 1) * 8 - sizeof IndexingHeader[objectAndStorage, propertyOffset, 8], payload
 end
 
 macro resolveGlobal(size, slow)
@@ -1101,6 +1101,7 @@ _llint_op_get_global_var_watchable:
     getGlobalVar(5)
 
 
+_llint_op_init_global_const:
 _llint_op_put_global_var:
     traceExecution()
     loadi 8[PC], t1
@@ -1112,6 +1113,7 @@ _llint_op_put_global_var:
     dispatch(3)
 
 
+_llint_op_init_global_const_check:
 _llint_op_put_global_var_check:
     traceExecution()
     loadp 12[PC], t2
@@ -1166,6 +1168,33 @@ _llint_op_get_by_id:
 
 _llint_op_get_by_id_out_of_line:
     getById(withOutOfLineStorage)
+
+
+_llint_op_get_array_length:
+    traceExecution()
+    loadi 8[PC], t0
+    loadp 16[PC], t1
+    loadConstantOrVariablePayload(t0, CellTag, t3, .opGetArrayLengthSlow)
+    loadp JSCell::m_structure[t3], t2
+    if VALUE_PROFILER
+        storep t2, ArrayProfile::m_lastSeenStructure[t1]
+    end
+    loadb Structure::m_indexingType[t2], t1
+    btiz t1, IsArray, .opGetArrayLengthSlow
+    btiz t1, HasArrayStorage, .opGetArrayLengthSlow
+    loadi 4[PC], t1
+    loadp 32[PC], t2
+    loadp JSObject::m_butterfly[t3], t0
+    loadi -sizeof IndexingHeader + IndexingHeader::m_publicLength[t0], t0
+    bilt t0, 0, .opGetArrayLengthSlow
+    valueProfile(Int32Tag, t0, t2)
+    storep t0, PayloadOffset[cfr, t1, 8]
+    storep Int32Tag, TagOffset[cfr, t1, 8]
+    dispatch(9)
+
+.opGetArrayLengthSlow:
+    callSlowPath(_llint_slow_path_get_by_id)
+    dispatch(9)
 
 
 _llint_op_get_arguments_length:
@@ -1287,12 +1316,9 @@ _llint_op_get_by_val:
     if VALUE_PROFILER
         storep t3, ArrayProfile::m_lastSeenStructure[t2]
     end
-    loadp CodeBlock[cfr], t2
-    loadp CodeBlock::m_globalData[t2], t2
-    loadp JSGlobalData::jsArrayClassInfo[t2], t2
-    bpneq Structure::m_classInfo[t3], t2, .opGetByValSlow
-    loadp JSArray::m_storage[t0], t3
-    biaeq t1, JSArray::m_vectorLength[t0], .opGetByValSlow
+    btpz Structure::m_indexingType[t3], HasArrayStorage, .opGetByValSlow
+    loadp JSObject::m_butterfly[t0], t3
+    biaeq t1, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t0], .opGetByValSlow
     loadi 4[PC], t0
     loadi ArrayStorage::m_vector + TagOffset[t3, t1, 8], t2
     loadi ArrayStorage::m_vector + PayloadOffset[t3, t1, 8], t1
@@ -1373,12 +1399,9 @@ _llint_op_put_by_val:
     if VALUE_PROFILER
         storep t3, ArrayProfile::m_lastSeenStructure[t0]
     end
-    loadp CodeBlock[cfr], t0
-    loadp CodeBlock::m_globalData[t0], t0
-    loadp JSGlobalData::jsArrayClassInfo[t0], t0
-    bpneq Structure::m_classInfo[t3], t0, .opPutByValSlow
-    biaeq t2, JSArray::m_vectorLength[t1], .opPutByValSlow
-    loadp JSArray::m_storage[t1], t0
+    btpz Structure::m_indexingType[t3], HasArrayStorage, .opPutByValSlow
+    loadp JSObject::m_butterfly[t1], t0
+    biaeq t2, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t0], .opPutByValSlow
     bieq ArrayStorage::m_vector + TagOffset[t0, t2, 8], EmptyValueTag, .opPutByValEmpty
 .opPutByValStoreResult:
     loadi 12[PC], t3
@@ -1390,9 +1413,9 @@ _llint_op_put_by_val:
 
 .opPutByValEmpty:
     addi 1, ArrayStorage::m_numValuesInVector[t0]
-    bib t2, ArrayStorage::m_length[t0], .opPutByValStoreResult
+    bib t2, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t0], .opPutByValStoreResult
     addi 1, t2, t1
-    storei t1, ArrayStorage::m_length[t0]
+    storei t1, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t0]
     jmp .opPutByValStoreResult
 
 .opPutByValSlow:

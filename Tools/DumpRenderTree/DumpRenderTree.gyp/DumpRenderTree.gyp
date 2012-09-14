@@ -195,7 +195,7 @@
                                     '<(SHARED_INTERMEDIATE_DIR)/ui/gfx/gfx_resources.pak',
                                     '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_chromium_resources.pak',
                                     '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_strings_en-US.pak',
-                                    '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_resources.pak',
+                                    '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_resources_100_percent.pak',
                             ]},
                             'inputs': [
                                 '<(repack_path)',
@@ -452,9 +452,9 @@
                 'target_name': 'DumpRenderTree_apk',
                 'type': 'none',
                 'dependencies': [
-                    '<(chromium_src_dir)/base/base.gyp:base_java',
-                    '<(chromium_src_dir)/net/net.gyp:net_java',
+                    '<(chromium_src_dir)/base/base.gyp:base',
                     '<(chromium_src_dir)/media/media.gyp:media_java',
+                    '<(chromium_src_dir)/net/net.gyp:net',
                     'DumpRenderTree',
                 ],
                 'variables': {

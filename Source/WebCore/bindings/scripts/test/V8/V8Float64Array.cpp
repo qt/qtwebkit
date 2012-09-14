@@ -76,7 +76,7 @@ v8::Handle<v8::Value> toV8(Float64Array* impl, v8::Handle<v8::Object> creationCo
     return wrapper;
 }
 
-static const V8DOMConfiguration::BatchedCallback Float64ArrayCallbacks[] = {
+static const V8DOMConfiguration::BatchedCallback V8Float64ArrayCallbacks[] = {
     {"set", Float64ArrayV8Internal::setCallback},
 };
 
@@ -93,7 +93,7 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8Float64ArrayTemplate(v8::
     v8::Local<v8::Signature> defaultSignature;
     defaultSignature = V8DOMConfiguration::configureTemplate(desc, "Float64Array", V8ArrayBufferView::GetTemplate(), V8Float64Array::internalFieldCount,
         0, 0,
-        Float64ArrayCallbacks, WTF_ARRAY_LENGTH(Float64ArrayCallbacks));
+        V8Float64ArrayCallbacks, WTF_ARRAY_LENGTH(V8Float64ArrayCallbacks));
     UNUSED_PARAM(defaultSignature); // In some cases, it will not be used.
     desc->SetCallHandler(V8Float64Array::constructorCallback);
     v8::Local<v8::ObjectTemplate> instance = desc->InstanceTemplate();
@@ -150,6 +150,8 @@ v8::Handle<v8::Object> V8Float64Array::wrapSlow(PassRefPtr<Float64Array> impl, v
 {
     v8::Handle<v8::Object> wrapper;
     ASSERT(static_cast<void*>(static_cast<ArrayBufferView*>(impl.get())) == static_cast<void*>(impl.get()));
+    Document* document = 0;
+    UNUSED_PARAM(document);
 
     v8::Handle<v8::Context> context;
     if (!creationContext.IsEmpty() && creationContext->CreationContext() != v8::Context::GetCurrent()) {
@@ -160,7 +162,7 @@ v8::Handle<v8::Object> V8Float64Array::wrapSlow(PassRefPtr<Float64Array> impl, v
         context->Enter();
     }
 
-    wrapper = V8DOMWrapper::instantiateV8Object(&info, impl.get());
+    wrapper = V8DOMWrapper::instantiateV8Object(document, &info, impl.get());
 
     if (!context.IsEmpty())
         context->Exit();

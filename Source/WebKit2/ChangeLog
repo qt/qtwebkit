@@ -1,3 +1,711 @@
+2012-09-14  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Move .mm file to OBJECTIVE_SOURCES
+
+        Reviewed by Simon Hausmann.
+
+        * Target.pri:
+
+2012-09-14  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        WebKitTestRunner needs layoutTestController.setTabKeyCyclesThroughElements
+        https://bugs.webkit.org/show_bug.cgi?id=42687
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Implement testRunner.setTabKeyCyclesThroughElements for
+        WebKitTestRunner.
+
+        * WebProcess/InjectedBundle/API/c/WKBundle.cpp:
+        (WKBundleSetTabKeyCyclesThroughElements):
+        * WebProcess/InjectedBundle/API/c/WKBundlePrivate.h:
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::setTabKeyCyclesThroughElements):
+        (WebKit):
+        * WebProcess/InjectedBundle/InjectedBundle.h:
+        (InjectedBundle):
+
+2012-09-14  Keishi Hattori  <keishi@webkit.org>
+
+        Add runtime flag that enables lang attribute for form controls in LayoutTests
+        https://bugs.webkit.org/show_bug.cgi?id=96636
+
+        Reviewed by Kent Tamura.
+
+        * win/WebKit2.def:
+        * win/WebKit2CFLite.def:
+
+2012-09-14  Grzegorz Czajkowski  <g.czajkowski@samsung.com>
+
+        Add method to get the list of all available dictionaries
+        https://bugs.webkit.org/show_bug.cgi?id=96518
+
+        Reviewed by Carlos Garcia Campos.
+
+        * UIProcess/API/gtk/WebKitTextChecker.cpp:
+        (WebKitTextChecker::getSpellCheckingLanguages):
+        Update the method name that is called inside getSpellCheckingLanguages.
+        This replace doesn't affect any on API changes.
+
+2012-09-13  KwangYong Choi  <ky0.choi@samsung.com>
+
+        [WK2] Add color picker API support for WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=95058
+
+        Reviewed by Gyuyoung Kim.
+
+        Add support for color picker API to WebKit2.
+
+        * CMakeLists.txt:
+        * GNUmakefile.list.am:
+        * Shared/API/c/WKBase.h:
+        * Shared/APIClientTraits.cpp:
+        (WebKit):
+        * Shared/APIClientTraits.h:
+        * Shared/APIObject.h:
+        * Target.pri:
+        * UIProcess/API/C/WKAPICast.h:
+        (WebKit):
+        * UIProcess/API/C/WKColorPickerResultListener.cpp: Added.
+        (WKColorPickerResultListenerGetTypeID):
+        (WKColorPickerResultListenerColorSet):
+        * UIProcess/API/C/WKColorPickerResultListener.h: Added.
+        * UIProcess/API/C/WKPage.h:
+        * UIProcess/API/gtk/WebKitUIClient.cpp:
+        (attachUIClientToView):
+        * UIProcess/WebColorChooserProxy.cpp: Added.
+        (WebKit):
+        (WebKit::WebColorChooserProxy::WebColorChooserProxy):
+        (WebKit::WebColorChooserProxy::~WebColorChooserProxy):
+        (WebKit::WebColorChooserProxy::endChooser):
+        (WebKit::WebColorChooserProxy::setSelectedColor):
+        * UIProcess/WebColorChooserProxy.h:
+        (WebColorChooserProxy):
+        (WebKit::WebColorChooserProxy::create):
+        * UIProcess/WebColorPickerResultListenerProxy.cpp: Added.
+        (WebKit):
+        (WebKit::WebColorPickerResultListenerProxy::WebColorPickerResultListenerProxy):
+        (WebKit::WebColorPickerResultListenerProxy::~WebColorPickerResultListenerProxy):
+        (WebKit::WebColorPickerResultListenerProxy::invalidate):
+        (WebKit::WebColorPickerResultListenerProxy::setColor):
+        * UIProcess/WebColorPickerResultListenerProxy.h: Added.
+        (WebKit):
+        (WebColorPickerResultListenerProxy):
+        (WebKit::WebColorPickerResultListenerProxy::create):
+        (WebKit::WebColorPickerResultListenerProxy::type):
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::close):
+        (WebKit::WebPageProxy::showColorChooser):
+        (WebKit::WebPageProxy::didEndColorChooser):
+        (WebKit::WebPageProxy::processDidCrash):
+        * UIProcess/WebPageProxy.h:
+        (WebKit):
+        (WebPageProxy):
+        * UIProcess/WebUIClient.cpp:
+        (WebKit):
+        (WebKit::WebUIClient::showColorPicker):
+        (WebKit::WebUIClient::hideColorPicker):
+        * UIProcess/WebUIClient.h:
+        (WebKit):
+        (WebUIClient):
+        * WebKit2.xcodeproj/project.pbxproj:
+        * win/WebKit2.vcproj:
+        * win/WebKit2Generated.make:
+
+2012-09-13  KwangYong Choi  <ky0.choi@samsung.com>
+
+        [EFL][WK2] Implement missing initializeLogChannel function
+        https://bugs.webkit.org/show_bug.cgi?id=96478
+
+        Reviewed by Gyuyoung Kim.
+
+        Implemented log channel initialization function for EFL platform in WebKit2.
+
+        * Platform/Logging.cpp:
+        (WebKit):
+        * Platform/Logging.h:
+        (WebKit):
+        * Platform/efl/LoggingEfl.cpp: Added.
+        (WebKit):
+        (WebKit::initializeLogChannel): Channel is initialized if its name is found in WEBKIT_DEBUG.
+        * PlatformEfl.cmake:
+
+2012-09-13  Mark Rowe  <mrowe@apple.com>
+
+        <rdar://problem/12283706> WebKit looks for some files on the system even when building against an SDK.
+
+        Reviewed by David Kilzer.
+
+        If an SDK is being used, pass it through to our custom invocations of the preprocessor.
+
+        * DerivedSources.make:
+
+2012-09-13  Brent Fulgham  <bfulgham@webkit.org>
+
+        [WinCairo] Unreviewed build fix for export declarations.
+
+        New entries were added to the standard Windows export definition
+        file, but were not added to the WinCairo version, breaking the build.
+
+        * win/WebKit2CFLite.def: Incoproate changes from WebKit2.def file.
+
+2012-09-13  Tim Horton  <timothy_horton@apple.com>
+
+        Add optional debug logging when we fall into/out of threaded scrolling
+        https://bugs.webkit.org/show_bug.cgi?id=93898
+        <rdar://problem/12089098>
+
+        Reviewed by Simon Fraser.
+
+        Update the scrolling tree's scrollingPerformanceLoggingEnabled preference
+        before the early-return if we don't have layer debugging borders on.
+
+        * WebProcess/WebPage/mac/TiledCoreAnimationDrawingArea.mm:
+        (WebKit::TiledCoreAnimationDrawingArea::updatePreferences):
+
+2012-09-13  Sudarsana Nagineni  <sudarsana.nagineni@linux.intel.com>
+
+        [WK2][WTR] WebKitTestRunner needs testRunner.callShouldCloseOnWebView
+        https://bugs.webkit.org/show_bug.cgi?id=96366
+
+        Reviewed by Anders Carlsson.
+
+        Implement testRunner.callShouldCloseOnWebView for WebKitTestRunner
+        by calling shouldClose() on the FrameLoader.
+
+        * WebProcess/InjectedBundle/API/c/WKBundleFrame.cpp:
+        (WKBundleFrameCallShouldCloseOnWebView):
+        * WebProcess/InjectedBundle/API/c/WKBundleFrame.h:
+
+2012-09-13  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [EFL] Assertion reached on RenderThemeEFL when setting a theme to an invalid path
+        https://bugs.webkit.org/show_bug.cgi?id=96649
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Updated the alternative test theme file. It is basically
+        the default theme with extra padding on the button widget as
+        specified by the comments on the test case.
+
+        * UIProcess/API/efl/tests/resources/big_button_theme.edj:
+
+2012-09-13  Balazs Kelemen  <kbalazs@webkit.org>
+
+        [WK2] LayerTreeCoordinator should release unused UpdatedAtlases
+        https://bugs.webkit.org/show_bug.cgi?id=95072
+
+        Reviewed by Jocelyn Turcotte.
+
+        Release graphic buffers that haven't been used for a while in order to save memory.
+        This way we can give back memory to the system when no user interaction happens
+        after a period of time, for example when we are in the background.
+
+        * Shared/ShareableBitmap.h:
+        * WebProcess/WebPage/CoordinatedGraphics/LayerTreeCoordinator.cpp:
+        (WebKit::LayerTreeCoordinator::LayerTreeCoordinator):
+        (WebKit::LayerTreeCoordinator::beginContentUpdate):
+        (WebKit):
+        (WebKit::LayerTreeCoordinator::scheduleReleaseInactiveAtlases):
+        (WebKit::LayerTreeCoordinator::releaseInactiveAtlasesTimerFired):
+        * WebProcess/WebPage/CoordinatedGraphics/LayerTreeCoordinator.h:
+        (LayerTreeCoordinator):
+        * WebProcess/WebPage/UpdateAtlas.cpp:
+        (WebKit::UpdateAtlas::UpdateAtlas):
+        (WebKit::UpdateAtlas::didSwapBuffers):
+        Don't call buildLayoutIfNeeded here. It's enought to call it in beginPaintingOnAvailableBuffer
+        and this way we can track whether this atlas is used with m_areaAllocator.
+        (WebKit::UpdateAtlas::beginPaintingOnAvailableBuffer):
+        * WebProcess/WebPage/UpdateAtlas.h:
+        (WebKit::UpdateAtlas::addTimeInactive):
+        (WebKit::UpdateAtlas::isInactive):
+        (WebKit::UpdateAtlas::isInUse):
+        (UpdateAtlas):
+
+2012-09-13  Lauro Neto  <lauro.neto@openbossa.org>
+
+        [Qt][WK2] fast/forms/access-key-for-all-elements.html fails
+        https://bugs.webkit.org/show_bug.cgi?id=73917
+
+        Reviewed by Simon Hausmann.
+
+        Access-key tests were failing due to hardcoded Mac OS X in the
+        Qt WK2 user agent string. This commit moves the WK1 implementation
+        to a shared one to be used by both versions.
+
+        Use the shared implementation instead of hardcoding the user agent.
+
+        * UIProcess/qt/WebPageProxyQt.cpp:
+        (WebKit::WebPageProxy::standardUserAgent):
+
+2012-09-13  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Fix build of WTR and the QML2 plugin on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=96652
+
+        Reviewed by Tor Arne Vestbø.
+
+        Some components that we build such as WTR or the QML2 plugin include
+        WebKit2 header files as well as WebKit2's config.h. Only the include
+        paths of WebKit2 are required for that at the moment (WEBKIT +=
+        webkit2). Only on Windows WebKit2's config.h also includes
+        WebCore/config.h, which in turn requires to have WebCore/platform in
+        your include search path. That in turn means that any component that
+        wants to use WebKit2 headers also needs the WebCore headers, but only
+        one Windows. It turns out that for the Qt build we don't need it, so
+        skip it in our configuration and make the include path requirement
+        the same across all the platforms we build.
+
+        * config.h:
+
+2012-09-13  Andras Becsi  <andras.becsi@nokia.com>
+
+        [Qt][WK2] REGRESSION(r128245): It made zillion API tests fail
+        https://bugs.webkit.org/show_bug.cgi?id=96531
+
+        Reviewed by Jocelyn Turcotte.
+
+        Preferences have to be updated after the drawing area was created
+        for compositing mode to be set.
+
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::WebPage):
+
+2012-09-13  Simon Hausmann  <simon.hausmann@nokia.com>
+
+        [Qt] Fix UIProcess build with Qt on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=96635
+
+        Reviewed by Csaba Osztrogonác.
+
+        Enabling setShouldCloseConnectionOnProcessTermination on the connection
+        is something that is only implemented in ConnectionUnix, not
+        ConnectionWin.cpp, where appears to be built-in functionality.
+
+        * UIProcess/WebConnectionToWebProcess.cpp:
+        (WebKit::WebConnectionToWebProcess::WebConnectionToWebProcess):
+
+2012-09-13  Oswald Buddenhagen  <oswald.buddenhagen@nokia.com>
+
+        [Qt] Fix build against namespaced Qt
+
+        Reviewed by Tor Arne Vestbø.
+
+        * UIProcess/qt/PageViewportControllerClientQt.h:
+
+2012-09-13  Michał Pakuła vel Rutka  <m.pakula@samsung.com>
+
+        [EFL][Qt][WK2] Implement shared undo controller for EFL and Qt port.
+        https://bugs.webkit.org/show_bug.cgi?id=92504
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        EFL port needs an undo controller similiar to one from Qt port. Instead of
+        duplicating the code existing class was renamed and moved to UIProcess
+        directory.
+
+        * PlatformEfl.cmake:
+        * Target.pri:
+        * UIProcess/API/efl/PageClientImpl.cpp:
+        (WebKit::PageClientImpl::registerEditCommand):
+        (WebKit::PageClientImpl::clearAllEditCommands):
+        (WebKit::PageClientImpl::canUndoRedo):
+        (WebKit::PageClientImpl::executeUndoRedo):
+        * UIProcess/API/efl/PageClientImpl.h:
+        (PageClientImpl):
+        * UIProcess/API/qt/qquickwebview_p_p.h:
+        (QQuickWebViewPrivate):
+        * UIProcess/DefaultUndoController.cpp: Renamed from Source/WebKit2/UIProcess/qt/QtWebUndoController.cpp.
+        (WebKit):
+        (WebKit::DefaultUndoController::registerEditCommand):
+        (WebKit::DefaultUndoController::clearAllEditCommands):
+        (WebKit::DefaultUndoController::canUndoRedo):
+        (WebKit::DefaultUndoController::executeUndoRedo):
+        * UIProcess/DefaultUndoController.h: Renamed from Source/WebKit2/UIProcess/qt/QtWebUndoController.h.
+        (WebKit):
+        (DefaultUndoController):
+        * UIProcess/qt/QtPageClient.cpp:
+        (WebKit::QtPageClient::initialize):
+        * UIProcess/qt/QtPageClient.h:
+        (WebKit):
+        (QtPageClient):
+
+2012-09-13  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Make _ref() functions return the object
+        https://bugs.webkit.org/show_bug.cgi?id=96604
+
+        Reviewed by Gyuyoung Kim.
+
+        Make _ref() functions return the ref'd object to
+        make them more convenient to use. Also fix their
+        usage to make use of the newly returned value.
+
+        This change is consistent with eina_stringshare_ref()
+        in EFL and g_object_ref() in glib.
+
+        * UIProcess/API/efl/ewk_back_forward_list.cpp:
+        (createEinaList):
+        * UIProcess/API/efl/ewk_back_forward_list_item.cpp:
+        (ewk_back_forward_list_item_ref):
+        * UIProcess/API/efl/ewk_back_forward_list_item.h:
+        * UIProcess/API/efl/ewk_context.cpp:
+        (ewk_context_download_job_add):
+        * UIProcess/API/efl/ewk_download_job.cpp:
+        (ewk_download_job_ref):
+        (ewk_download_job_response_set):
+        * UIProcess/API/efl/ewk_download_job.h:
+        * UIProcess/API/efl/ewk_form_submission_request.cpp:
+        (ewk_form_submission_request_ref):
+        * UIProcess/API/efl/ewk_form_submission_request.h:
+        * UIProcess/API/efl/ewk_intent.cpp:
+        (ewk_intent_ref):
+        * UIProcess/API/efl/ewk_intent.h:
+        * UIProcess/API/efl/ewk_intent_service.cpp:
+        (ewk_intent_service_ref):
+        * UIProcess/API/efl/ewk_intent_service.h:
+        * UIProcess/API/efl/ewk_navigation_policy_decision.cpp:
+        (ewk_navigation_policy_decision_ref):
+        * UIProcess/API/efl/ewk_navigation_policy_decision.h:
+        * UIProcess/API/efl/ewk_url_request.cpp:
+        (ewk_url_request_ref):
+        * UIProcess/API/efl/ewk_url_request.h:
+        * UIProcess/API/efl/ewk_url_response.cpp:
+        (ewk_url_response_ref):
+        * UIProcess/API/efl/ewk_url_response.h:
+        * UIProcess/API/efl/ewk_url_scheme_request.cpp:
+        (ewk_url_scheme_request_ref):
+        * UIProcess/API/efl/ewk_url_scheme_request.h:
+        * UIProcess/API/efl/ewk_view.cpp:
+        (ewk_view_resource_load_initiated):
+        * UIProcess/API/efl/ewk_web_resource.cpp:
+        (ewk_web_resource_ref):
+        * UIProcess/API/efl/ewk_web_resource.h:
+
+2012-09-12  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r127876.
+        http://trac.webkit.org/changeset/127876
+        https://bugs.webkit.org/show_bug.cgi?id=96600
+
+        mouse click doesn't work for spin button if spin button in
+        iframe (Requested by yosin on #webkit).
+
+        * WebProcess/InjectedBundle/InjectedBundleNavigationAction.cpp:
+        (WebKit::InjectedBundleNavigationAction::InjectedBundleNavigationAction):
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::handleContextMenuEvent):
+        (WebKit::WebPage::highlightPotentialActivation):
+        (WebKit::WebPage::findZoomableAreaForPoint):
+        * WebProcess/WebPage/mac/WebPageMac.mm:
+        (WebKit::WebPage::characterIndexForPoint):
+        (WebKit::WebPage::performDictionaryLookupAtLocation):
+        (WebKit::WebPage::shouldDelayWindowOrderingEvent):
+        (WebKit::WebPage::acceptsFirstMouse):
+        * win/WebKit2.def:
+        * win/WebKit2CFLite.def:
+
+2012-09-12  Brady Eidson  <beidson@apple.com>
+
+        Assert in NetscapePlugin::destroy() with async plugin init
+        <rdar://problem/12277595> and https://bugs.webkit.org/show_bug.cgi?id=96576
+
+        Reviewed by Anders Carlsson.
+
+        Most of the NPN_* API calls have a plug-in protector during the calls.
+        NPN_Invoke and NPN_InvokeDefault do not.
+
+        * WebProcess/Plugins/Netscape/NetscapeBrowserFuncs.cpp:
+        (WebKit::NPN_Invoke): Protect the plug-in during this call.
+        (WebKit::NPN_InvokeDefault): Ditto.
+
+2012-09-11  Alexey Proskuryakov  <ap@apple.com>
+
+        <rdar://problem/12275537> REGRESSION(r127384): Non-existent directories are no longer created for sandbox paths
+        https://bugs.webkit.org/show_bug.cgi?id=96442
+
+        Reviewed by Darin Adler.
+
+        * Shared/SandboxExtension.h:
+        (WebKit::SandboxExtension::createHandleForReadWriteDirectory):
+        * Shared/mac/SandboxExtensionMac.mm:
+        (WebKit::SandboxExtension::createHandleForReadWriteDirectory):
+        Added a function for read-write configuration directories. It matches
+        appendReadwriteSandboxDirectory() function behavior from WebProcessMac.mm.
+
+        * UIProcess/WebContext.cpp:
+        (WebKit::WebContext::createNewWebProcess):
+        * UIProcess/mac/WebContextMac.mm:
+        (WebKit::WebContext::platformInitializeWebProcess):
+        Use the new function for directories that need to be created if they don't exist.
+
+2012-09-12  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [WK2][WKTR] TestRunner needs to implement originsWithApplicationCache
+        https://bugs.webkit.org/show_bug.cgi?id=96496
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Add Bundle C API to retrieve security origins with
+        an application cache. This is needed by WebKitTestRunner
+        to support originsWithApplicationCache.
+
+        * WebProcess/InjectedBundle/API/c/WKBundle.cpp:
+        (WKBundleCopyOriginsWithApplicationCache):
+        * WebProcess/InjectedBundle/API/c/WKBundlePrivate.h:
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::originsWithApplicationCache):
+        (WebKit):
+        * WebProcess/InjectedBundle/InjectedBundle.h:
+        (InjectedBundle):
+
+2012-09-12  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [WK2][WKTR] TestRunner needs to implement dumpApplicationCacheDelegateCallbacks
+        https://bugs.webkit.org/show_bug.cgi?id=96374
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Add Bundle C API to reset the application cache quota
+        for a given origin.
+
+        Add new reachedApplicationCacheOriginQuota callback
+        to WKBundlePageUIClient which is called from
+        WebChromeClient::reachedApplicationCacheOriginQuota().
+
+        Those are needed by WebKitTestRunner to dump
+        information about the application cache callbacks
+        if instructed to.
+
+        * Shared/APIClientTraits.cpp:
+        (WebKit):
+        * Shared/APIClientTraits.h:
+        * WebProcess/InjectedBundle/API/c/WKBundle.cpp:
+        (WKBundleSetApplicationCacheOriginQuota):
+        (WKBundleResetApplicationCacheOriginQuota):
+        * WebProcess/InjectedBundle/API/c/WKBundlePage.h:
+        * WebProcess/InjectedBundle/API/c/WKBundlePrivate.h:
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::resetApplicationCacheOriginQuota):
+        (WebKit):
+        * WebProcess/InjectedBundle/InjectedBundle.h:
+        (InjectedBundle):
+        * WebProcess/InjectedBundle/InjectedBundlePageUIClient.cpp:
+        (WebKit::InjectedBundlePageUIClient::didReachApplicationCacheOriginQuota):
+        (WebKit):
+        * WebProcess/InjectedBundle/InjectedBundlePageUIClient.h:
+        (WebKit):
+        (InjectedBundlePageUIClient):
+        * WebProcess/WebCoreSupport/WebChromeClient.cpp:
+        (WebKit::WebChromeClient::reachedApplicationCacheOriginQuota):
+        * win/WebKit2.def:
+        * win/WebKit2CFLite.def:
+
+2012-09-12  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r128280.
+        http://trac.webkit.org/changeset/128280
+        https://bugs.webkit.org/show_bug.cgi?id=96498
+
+        it broke compilation on windows debug bot (Requested by loislo
+        on #webkit).
+
+        * Shared/APIClientTraits.cpp:
+        (WebKit):
+        * Shared/APIClientTraits.h:
+        * WebProcess/InjectedBundle/API/c/WKBundle.cpp:
+        (WKBundleSetApplicationCacheOriginQuota):
+        * WebProcess/InjectedBundle/API/c/WKBundlePage.h:
+        * WebProcess/InjectedBundle/API/c/WKBundlePrivate.h:
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        * WebProcess/InjectedBundle/InjectedBundle.h:
+        (InjectedBundle):
+        * WebProcess/InjectedBundle/InjectedBundlePageUIClient.cpp:
+        * WebProcess/InjectedBundle/InjectedBundlePageUIClient.h:
+        (WebKit):
+        (InjectedBundlePageUIClient):
+        * WebProcess/WebCoreSupport/WebChromeClient.cpp:
+        (WebKit::WebChromeClient::reachedApplicationCacheOriginQuota):
+
+2012-09-12  Byungwoo Lee  <bw80.lee@samsung.com>
+
+        [EFL][WK2] WorkQueue::dispatchAfterDelay() doesn't work properly.
+        https://bugs.webkit.org/show_bug.cgi?id=91179
+
+        Reviewed by Gyuyoung Kim.
+
+        When UI Process is crashed and WebProcess's ecore main loop is very
+        busy or lockup also, watchdocCallback() function in the
+        ChildProcess.cpp doesn't triggered. And this is because of that
+        WorkQueue::dispatchAfterDelay() function uses ecore timer for getting
+        timer event.
+
+        For removing the dependency between the dispatchAfterDelay() and ecore
+        main loop, new timer event mechanism is added to WorkQueue main loop.
+
+        * Platform/WorkQueue.h:
+        (TimerWorkItem):
+        (WorkQueue::TimerWorkItem::dispatch):
+        (WorkQueue::TimerWorkItem::expireTime):
+        (WorkQueue::TimerWorkItem::expired):
+        (WorkQueue):
+        * Platform/efl/WorkQueueEfl.cpp:
+        (WorkQueue::TimerWorkItem::create):
+        (WorkQueue::TimerWorkItem::TimerWorkItem):
+        (WorkQueue::performFileDescriptorWork):
+        (WorkQueue::getCurrentTime):
+        (WorkQueue::getNextTimeOut):
+        (WorkQueue::performTimerWork):
+        (WorkQueue::workQueueThread):
+        (WorkQueue::dispatchAfterDelay):
+
+2012-09-12  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [WK2][WKTR] TestRunner needs to implement dumpApplicationCacheDelegateCallbacks
+        https://bugs.webkit.org/show_bug.cgi?id=96374
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Add Bundle C API to reset the application cache quota
+        for a given origin.
+
+        Add new reachedApplicationCacheOriginQuota callback
+        to WKBundlePageUIClient which is called from
+        WebChromeClient::reachedApplicationCacheOriginQuota().
+
+        Those are needed by WebKitTestRunner to dump
+        information about the application cache callbacks
+        if instructed to.
+
+        * Shared/APIClientTraits.cpp:
+        (WebKit):
+        * Shared/APIClientTraits.h:
+        * WebProcess/InjectedBundle/API/c/WKBundle.cpp:
+        (WKBundleSetApplicationCacheOriginQuota):
+        (WKBundleResetApplicationCacheOriginQuota):
+        * WebProcess/InjectedBundle/API/c/WKBundlePage.h:
+        * WebProcess/InjectedBundle/API/c/WKBundlePrivate.h:
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::resetApplicationCacheOriginQuota):
+        (WebKit):
+        * WebProcess/InjectedBundle/InjectedBundle.h:
+        (InjectedBundle):
+        * WebProcess/InjectedBundle/InjectedBundlePageUIClient.cpp:
+        (WebKit::InjectedBundlePageUIClient::didReachApplicationCacheOriginQuota):
+        (WebKit):
+        * WebProcess/InjectedBundle/InjectedBundlePageUIClient.h:
+        (WebKit):
+        (InjectedBundlePageUIClient):
+        * WebProcess/WebCoreSupport/WebChromeClient.cpp:
+        (WebKit::WebChromeClient::reachedApplicationCacheOriginQuota):
+
+2012-09-12  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [WK2] [WTR] WebKitTestRunner needs TestRunner.workerThreadCount
+        https://bugs.webkit.org/show_bug.cgi?id=96388
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Added WKBundleGetWorkerThreadCount() function to Injected Bundle private API.
+
+        * WebProcess/InjectedBundle/API/c/WKBundle.cpp:
+        (WKBundleGetWorkerThreadCount):
+        * WebProcess/InjectedBundle/API/c/WKBundlePrivate.h:
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::workerThreadCount): Returns count of worker threads.
+        (WebKit):
+        * WebProcess/InjectedBundle/InjectedBundle.h:
+        (InjectedBundle):
+
+2012-09-12  Darin Adler  <darin@apple.com>
+
+        Make NetscapePlugin::m_timers use HashMap<OwnPtr> instead of deleteAllValues
+        https://bugs.webkit.org/show_bug.cgi?id=96469
+
+        Reviewed by Dan Bernstein.
+
+        * WebProcess/Plugins/Netscape/NetscapePlugin.cpp:
+        (WebKit::NetscapePlugin::scheduleTimer): Call release rather than leakPtr when
+        entering a timer into the map.
+        (WebKit::NetscapePlugin::unscheduleTimer): Take an existing timer from the map
+        with the take function rather than the roundabout code needed before.
+        (WebKit::NetscapePlugin::destroy): Remove now-unneeded call to deleteAllValues.
+        * WebProcess/Plugins/Netscape/NetscapePlugin.h: Change the value type for
+        TimerMap to OwnPtr<Timer> rather than Timer*.
+
+2012-09-11  Anders Carlsson  <andersca@apple.com>
+
+        Accelerated compositing should always be forced when using the tiled drawing area
+        https://bugs.webkit.org/show_bug.cgi?id=96449
+
+        Reviewed by Andy Estes.
+
+        There's code in WebPage::updatePreferences that will turn off accelerated compositing unless accelerated drawing is enabled.
+        This should only be done in the non-tiled model, so move the code to DrawingAreaImpl::updatePreferences.
+
+        * WebProcess/WebPage/DrawingArea.h:
+        (WebKit::DrawingArea::updatePreferences):
+        This now takes a WebPreferencesStore.
+
+        * WebProcess/WebPage/DrawingAreaImpl.cpp:
+        (WebKit::DrawingAreaImpl::updatePreferences):
+        Move code here from WebPage::updatePreferences.
+
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::updatePreferences):
+        Pass the WebPreferencesStore to DrawingArea::updatePreferences.
+
+        * WebProcess/WebPage/mac/TiledCoreAnimationDrawingArea.h:
+        * WebProcess/WebPage/mac/TiledCoreAnimationDrawingArea.mm:
+        (WebKit::TiledCoreAnimationDrawingArea::TiledCoreAnimationDrawingArea):
+        Remove call to updatePreferences, it's going to be called by the WebPage object later.
+
+        (WebKit::TiledCoreAnimationDrawingArea::updatePreferences):
+        This now takes a WebPreferencesStore.
+
+2012-09-11  Brady Eidson  <beidson@apple.com>
+
+        Get rid of the PluginProcessShim for 64-bit plug-ins
+        <rdar://problem/12068560> and https://bugs.webkit.org/show_bug.cgi?id=96415
+
+        Reviewed by Anders Carlsson.
+
+        * PluginProcess/PluginProcess.h:
+        (PluginProcess):
+
+        * PluginProcess/mac/PluginProcessMac.mm:
+        (WebKit::getCurrentEventButtonState):
+        (WebKit):
+        (WebKit::beginModal): Moved from the shim, to be shared with shimmed processes.
+        (WebKit::endModal): Ditto.
+        (WebKit::replacedRunModalForWindow): Only used by Cocoa overrides.
+        (WebKit::PluginProcess::initializeShim):
+        (WebKit::PluginProcess::initializeCocoaOverrides): 
+
+        * PluginProcess/mac/PluginProcessMainMac.mm:
+        (WebKit::PluginProcessMain): Only call initializeShim for 32-bit processes, always call initializeCocoaOverrides
+
+        * PluginProcess/mac/PluginProcessShim.h:
+        (PluginProcessShimCallbacks):
+        * PluginProcess/mac/PluginProcessShim.mm:
+        (WebKit):
+        (WebKit::shimModalDialog): Call beginModal/endModal from the shim callbacks.
+        (WebKit::shimAlert): Ditto.
+        (WebKit::WebKitPluginProcessShimInitialize): Don't do the Cocoa overrides as they are now handled outside the shim.
+
+2012-09-11  Marcelo Lira  <marcelo.lira@openbossa.org>
+
+        Restore original value of mock scrollbars enabled in InternalSettings
+        https://bugs.webkit.org/show_bug.cgi?id=87680
+
+        Reviewed by Adam Barth.
+
+        Added backup support for mock scrollbars state in
+        InternalSettings::Backup, and removed support for these
+        from Qt's DumpRenderTree.
+
+        * win/WebKit2.def:
+
 2012-09-11  Brady Eidson  <beidson@apple.com>
 
         We should wait longer before killing the PluginProcess.

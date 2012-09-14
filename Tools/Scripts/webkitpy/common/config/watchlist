@@ -232,6 +232,10 @@
                         r"|Source/WebCore/svg/graphics/filters"
                         r"|Source/WebCore/svg/graphics/.*Filter.*",
         },
+        "SVG": {
+            "filename": r"Source/WebCore/svg"
+                        r"|Source/WebCore/rendering/svg",
+        },
     },
     "CC_RULES": {
         # Note: All email addresses listed must be registered with bugzilla.
@@ -239,7 +243,7 @@
         # two different accounts as far as bugzilla is concerned.
         "AppleMacPublicApi": [ "timothy@apple.com" ],
         "Battery": [ "gyuyoung.kim@samsung.com" ],
-        "BlackBerry": [ "mifenton@rim.com" ],
+        "BlackBerry": [ "mifenton@rim.com", "rwlbuis@gmail.com" ],
         "CMake": [ "rakuco@webkit.org", "gyuyoung.kim@samsung.com" ],
         "CSS": [ "alexis@webkit.org", "macpherson@chromium.org", "cmarcelo@webkit.org" ],
         "ChromiumGraphics": [ "jamesr@chromium.org", "cc-bugs@google.com" ],
@@ -269,6 +273,7 @@
         "SecurityCritical": [ "abarth@webkit.org" ],
         "SoupNetwork": [ "rakuco@webkit.org", "gns@gnome.org", "mrobinson@webkit.org", "danw@gnome.org" ],
         "StyleChecker": [ "levin@chromium.org", ],
+        "SVG": ["schenney@chromium.org", "pdr@google.com", "fmalita@chromium.org" ],
         "TestFailures": [ "abarth@webkit.org", "dglazkov@chromium.org" ],
         "TextureMapper" : [ "noam.rosenthal@nokia.com" ],
         "ThreadingFiles|ThreadingUsage": [ "levin+threading@chromium.org", ],

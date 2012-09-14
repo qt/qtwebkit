@@ -858,7 +858,7 @@ LLINT_SLOW_PATH_DECL(slow_path_get_by_id)
     JSValue result = baseValue.get(exec, ident, slot);
     LLINT_CHECK_EXCEPTION();
     LLINT_OP(1) = result;
-
+    
     if (!LLINT_ALWAYS_ACCESS_SLOW
         && baseValue.isCell()
         && slot.isCacheable()
@@ -877,9 +877,20 @@ LLINT_SLOW_PATH_DECL(slow_path_get_by_id)
                 pc[5].u.operand = offsetInInlineStorage(slot.cachedOffset()) * sizeof(JSValue) + JSObject::offsetOfInlineStorage();
             } else {
                 pc[0].u.opcode = LLInt::getOpcode(llint_op_get_by_id_out_of_line);
-                pc[5].u.operand = offsetInOutOfLineStorage(slot.cachedOffset()) * sizeof(JSValue);
+                pc[5].u.operand = offsetInButterfly(slot.cachedOffset()) * sizeof(JSValue);
             }
         }
+    }
+
+    if (!LLINT_ALWAYS_ACCESS_SLOW
+        && isJSArray(baseValue)
+        && ident == exec->propertyNames().length) {
+        pc[0].u.opcode = LLInt::getOpcode(llint_op_get_array_length);
+#if ENABLE(VALUE_PROFILER)
+        ArrayProfile* arrayProfile = codeBlock->getOrAddArrayProfile(pc - codeBlock->instructions().begin());
+        arrayProfile->observeStructure(baseValue.asCell()->structure());
+        pc[4].u.arrayProfile = arrayProfile;
+#endif
     }
 
 #if ENABLE(VALUE_PROFILER)    
@@ -939,7 +950,7 @@ LLINT_SLOW_PATH_DECL(slow_path_put_by_id)
                     if (isInlineOffset(slot.cachedOffset()))
                         pc[5].u.operand = offsetInInlineStorage(slot.cachedOffset()) * sizeof(JSValue) + JSObject::offsetOfInlineStorage();
                     else
-                        pc[5].u.operand = offsetInOutOfLineStorage(slot.cachedOffset()) * sizeof(JSValue);
+                        pc[5].u.operand = offsetInButterfly(slot.cachedOffset()) * sizeof(JSValue);
                     pc[6].u.structure.set(
                         globalData, codeBlock->ownerExecutable(), structure);
                     StructureChain* chain = structure->prototypeChain(exec);
@@ -967,7 +978,7 @@ LLINT_SLOW_PATH_DECL(slow_path_put_by_id)
                     pc[5].u.operand = offsetInInlineStorage(slot.cachedOffset()) * sizeof(JSValue) + JSObject::offsetOfInlineStorage();
                 } else {
                     pc[0].u.opcode = LLInt::getOpcode(llint_op_put_by_id_out_of_line);
-                    pc[5].u.operand = offsetInOutOfLineStorage(slot.cachedOffset()) * sizeof(JSValue);
+                    pc[5].u.operand = offsetInButterfly(slot.cachedOffset()) * sizeof(JSValue);
                 }
             }
         }
@@ -1046,12 +1057,12 @@ LLINT_SLOW_PATH_DECL(slow_path_put_by_val)
     
     if (LIKELY(subscript.isUInt32())) {
         uint32_t i = subscript.asUInt32();
-        if (isJSArray(baseValue)) {
-            JSArray* jsArray = asArray(baseValue);
-            if (jsArray->canSetIndex(i))
-                jsArray->setIndex(globalData, i, value);
+        if (baseValue.isObject()) {
+            JSObject* object = asObject(baseValue);
+            if (object->canSetIndexQuickly(i))
+                object->setIndexQuickly(globalData, i, value);
             else
-                JSArray::putByIndex(jsArray, exec, i, value, exec->codeBlock()->isStrictMode());
+                object->methodTable()->putByIndex(object, exec, i, value, exec->codeBlock()->isStrictMode());
             LLINT_END();
         }
         baseValue.putByIndex(exec, i, value, exec->codeBlock()->isStrictMode());
@@ -1128,7 +1139,7 @@ LLINT_SLOW_PATH_DECL(slow_path_put_getter_setter)
     if (!setter.isUndefined())
         accessor->setSetter(globalData, asObject(setter));
     baseObj->putDirectAccessor(
-        globalData,
+        exec,
         exec->codeBlock()->identifier(pc[2].u.operand),
         accessor, Accessor);
     LLINT_END();

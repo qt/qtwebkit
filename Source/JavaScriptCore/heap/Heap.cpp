@@ -618,7 +618,7 @@ size_t Heap::protectedGlobalObjectCount()
 
 size_t Heap::globalObjectCount()
 {
-    return m_objectSpace.forEachCell<CountIfGlobalObject>();
+    return m_objectSpace.forEachLiveCell<CountIfGlobalObject>();
 }
 
 size_t Heap::protectedObjectCount()
@@ -633,7 +633,7 @@ PassOwnPtr<TypeCountSet> Heap::protectedObjectTypeCounts()
 
 PassOwnPtr<TypeCountSet> Heap::objectTypeCounts()
 {
-    return m_objectSpace.forEachCell<RecordType>();
+    return m_objectSpace.forEachLiveCell<RecordType>();
 }
 
 void Heap::deleteAllCompiledCode()
@@ -801,12 +801,9 @@ void Heap::didAllocate(size_t bytes)
     m_bytesAllocated += bytes;
 }
 
-bool Heap::isValidAllocation(size_t bytes)
+bool Heap::isValidAllocation(size_t)
 {
     if (!isValidThreadState(m_globalData))
-        return false;
-
-    if (bytes > MarkedSpace::maxCellSize)
         return false;
 
     if (m_operationInProgress != NoOperation)

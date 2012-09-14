@@ -1265,7 +1265,7 @@ size_t WebFrameImpl::characterIndexForPoint(const WebPoint& webPoint) const
         return notFound;
 
     IntPoint point = frame()->view()->windowToContents(webPoint);
-    HitTestResult result = frame()->eventHandler()->hitTestResultAtPoint(point);
+    HitTestResult result = frame()->eventHandler()->hitTestResultAtPoint(point, false);
     RefPtr<Range> range = frame()->rangeForPoint(result.roundedPoint());
     if (!range)
         return notFound;
@@ -2571,13 +2571,13 @@ void WebFrameImpl::invalidateArea(AreaToInvalidate area)
             contentArea.move(-frameRect.x(), -frameRect.y());
             view->invalidateRect(contentArea);
         }
+    }
 
-        if ((area & InvalidateScrollbar) == InvalidateScrollbar) {
-            // Invalidate the vertical scroll bar region for the view.
-            Scrollbar* scrollbar = view->verticalScrollbar();
-            if (scrollbar)
-                scrollbar->invalidate();
-        }
+    if ((area & InvalidateScrollbar) == InvalidateScrollbar) {
+        // Invalidate the vertical scroll bar region for the view.
+        Scrollbar* scrollbar = view->verticalScrollbar();
+        if (scrollbar)
+            scrollbar->invalidate();
     }
 }
 

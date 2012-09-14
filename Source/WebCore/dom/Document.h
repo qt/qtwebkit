@@ -34,7 +34,6 @@
 #include "DOMTimeStamp.h"
 #include "DocumentEventQueue.h"
 #include "DocumentTiming.h"
-#include "HitTestRequest.h"
 #include "IconURL.h"
 #include "InspectorCounters.h"
 #include "IntRect.h"
@@ -109,6 +108,7 @@ class HitTestResult;
 class IntPoint;
 class DOMWrapperWorld;
 class JSNode;
+class Localizer;
 class MediaCanStartListener;
 class MediaQueryList;
 class MediaQueryMatcher;
@@ -377,10 +377,12 @@ public:
      * @param rightPadding How much to expand the right of the rectangle
      * @param bottomPadding How much to expand the bottom of the rectangle
      * @param leftPadding How much to expand the left of the rectangle
+     * @param ignoreClipping whether or not to ignore the root scroll frame when retrieving the element.
+     *        If false, this method returns null for coordinates outside of the viewport.
      */
     PassRefPtr<NodeList> nodesFromRect(int centerX, int centerY,
                                        unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding,
-                                       HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active) const;
+                                       bool ignoreClipping, bool allowShadowContent, bool allowChildFrameContent = false) const;
     Element* elementFromPoint(int x, int y) const;
     PassRefPtr<Range> caretRangeFromPoint(int x, int y);
 
@@ -744,6 +746,8 @@ public:
     void removeFocusedNodeOfSubtree(Node*, bool amongChildrenOnly = false);
     void hoveredNodeDetached(Node*);
     void activeChainNodeDetached(Node*);
+
+    void updateHoverActiveState(const HitTestRequest&, HitTestResult&);
 
     // Updates for :target (CSS3 selector).
     void setCSSTarget(Element*);
@@ -1189,6 +1193,8 @@ public:
 
     PassRefPtr<ElementAttributeData> cachedImmutableAttributeData(const Element*, const Vector<Attribute>&);
 
+    Localizer& getLocalizer(const AtomicString& locale);
+
 protected:
     Document(Frame*, const KURL&, bool isXHTML, bool isHTML);
 
@@ -1579,6 +1585,9 @@ private:
 #ifndef NDEBUG
     bool m_didDispatchViewportPropertiesChanged;
 #endif
+
+    typedef HashMap<AtomicString, OwnPtr<Localizer> > LocaleToLocalizerMap;
+    LocaleToLocalizerMap m_localizerCache;
 };
 
 inline void Document::notifyRemovePendingSheetIfNeeded()

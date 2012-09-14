@@ -150,6 +150,7 @@ HEADERS += \
     UIProcess/API/C/WKBackForwardListItem.h \
     UIProcess/API/C/WKBatteryManager.h \
     UIProcess/API/C/WKBatteryStatus.h \
+    UIProcess/API/C/WKColorPickerResultListener.h \
     UIProcess/API/C/WKContext.h \
     UIProcess/API/C/WKContextPrivate.h \
     UIProcess/API/C/WKCredential.h \
@@ -200,6 +201,7 @@ HEADERS += \
     UIProcess/CoordinatedGraphics/CoordinatedBackingStore.h \
     UIProcess/CoordinatedGraphics/LayerTreeCoordinatorProxy.h \
     UIProcess/CoordinatedGraphics/LayerTreeRenderer.h \
+    UIProcess/DefaultUndoController.h \
     UIProcess/DrawingAreaProxy.h \
     UIProcess/DrawingAreaProxyImpl.h \
     UIProcess/FindIndicator.h \
@@ -227,6 +229,7 @@ HEADERS += \
     UIProcess/WebBatteryManagerProxy.h \
     UIProcess/WebBatteryProvider.h \
     UIProcess/WebColorChooserProxy.h \
+    UIProcess/WebColorPickerResultListenerProxy.h \
     UIProcess/WebConnectionToWebProcess.h \
     UIProcess/WebContext.h \
     UIProcess/WebContextConnectionClient.h \
@@ -500,6 +503,7 @@ SOURCES += \
     UIProcess/API/C/WKBackForwardListItem.cpp \
     UIProcess/API/C/WKBatteryManager.cpp \
     UIProcess/API/C/WKBatteryStatus.cpp \
+    UIProcess/API/C/WKColorPickerResultListener.cpp \
     UIProcess/API/C/WKContext.cpp \
     UIProcess/API/C/WKCredential.cpp \
     UIProcess/API/C/WKDatabaseManager.cpp \
@@ -541,6 +545,7 @@ SOURCES += \
     UIProcess/CoordinatedGraphics/CoordinatedBackingStore.cpp \
     UIProcess/CoordinatedGraphics/LayerTreeCoordinatorProxy.cpp \
     UIProcess/CoordinatedGraphics/LayerTreeRenderer.cpp \
+    UIProcess/DefaultUndoController.cpp \
     UIProcess/Downloads/DownloadProxy.cpp \
     UIProcess/DrawingAreaProxy.cpp \
     UIProcess/DrawingAreaProxyImpl.cpp \
@@ -567,6 +572,8 @@ SOURCES += \
     UIProcess/WebBackForwardList.cpp \
     UIProcess/WebBatteryManagerProxy.cpp \
     UIProcess/WebBatteryProvider.cpp \
+    UIProcess/WebColorChooserProxy.cpp \
+    UIProcess/WebColorPickerResultListenerProxy.cpp \
     UIProcess/WebConnectionToWebProcess.cpp \
     UIProcess/WebContext.cpp \
     UIProcess/WebContextConnectionClient.cpp \
@@ -611,7 +618,6 @@ SOURCES += \
     UIProcess/WebVibrationProvider.cpp \
     UIProcess/WebVibrationProxy.cpp \
     UIProcess/qt/QtWebContext.cpp \
-    UIProcess/qt/QtWebUndoController.cpp \
     UIProcess/qt/TextCheckerQt.cpp \
     UIProcess/qt/WebContextQt.cpp \
     UIProcess/qt/WebFullScreenManagerProxyQt.cpp \
@@ -782,7 +788,6 @@ have?(QTQUICK) {
         UIProcess/qt/QtWebPagePolicyClient.h \
         UIProcess/qt/QtWebPageSGNode.h \
         UIProcess/qt/QtWebPageUIClient.h \
-        UIProcess/qt/QtWebUndoController.h \
         UIProcess/qt/QtWebIconDatabaseClient.h \
         UIProcess/qt/WebContextMenuProxyQt.h \
         UIProcess/qt/WebGeolocationProviderQt.h \
@@ -837,7 +842,7 @@ mac: {
             $$PWD/../../WebKitLibraries/
         HEADERS += \
             WebProcess/WebCoreSupport/qt/WebSystemInterface.h
-        SOURCES += \
+        OBJECTIVE_SOURCES += \
             WebProcess/WebCoreSupport/qt/WebSystemInterface.mm
     }
     INCLUDEPATH += \

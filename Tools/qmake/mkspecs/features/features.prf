@@ -79,12 +79,15 @@ defineTest(detectFeatures) {
     }
 
     # Enable the USE(3D_GRAPHICS) flag when QtOpenGL is enabled.
-    contains(QT_CONFIG, opengl) {
-        # Disable USE(3D_GRAPHICS) on Windows temporarily, see https://bugs.webkit.org/show_bug.cgi?id=90850 for details.
-        # Also disable on QNX, see https://bugs.webkit.org/show_bug.cgi?id=93278
-        !win32-*:!qnx {
-            WEBKIT_CONFIG += use_3d_graphics
-        }
+    # Disable on Windows CE for now, as ANGLE won't compile.
+    !wince*:contains(QT_CONFIG, opengl) {
+        # On Windows we require GLES2/EGL through ANGLE.
+        !win32|contains(QT_CONFIG, opengles2): WEBKIT_CONFIG += use_3d_graphics
+    }
+
+    # Temporarily disable FTPDIR on Windows CE (missing functions from time.h)
+    wince* {
+        WEBKIT_CONFIG -= ftpdir
     }
 
     # WebGL support - only enabled if we can use 3D graphics
@@ -111,7 +114,7 @@ defineTest(detectFeatures) {
         }
 
     } else: linux-* {
-        !contains(QT_CONFIG, no-pkg-config):system(pkg-config --exists glib-2.0 gio-2.0 \'gstreamer-0.10 >= 0.10.30\' \'gstreamer-plugins-base-0.10 >= 0.10.30\'): {
+        !contains(QT_CONFIG, no-pkg-config):packagesExist("glib-2.0 gio-2.0 \'gstreamer-0.10 >= 0.10.30\' \'gstreamer-plugins-base-0.10 >= 0.10.30\'") {
             WEBKIT_CONFIG += video use_gstreamer
         } else {
             CONFIGURE_WARNINGS += "Missing GLib/Gio/GStreamer, disabling media element support"
@@ -148,6 +151,9 @@ defineTest(santizeFeatures) {
 
     # Fullscreen API relies on WebKit2
     !build?(webkit2): WEBKIT_CONFIG -= fullscreen_api
+
+    # WK2's plugin process code requires NPAPI
+    !enable?(netscape_plugin_api): WEBKIT_CONFIG -= plugin_process
 
     export(WEBKIT_CONFIG)
 }

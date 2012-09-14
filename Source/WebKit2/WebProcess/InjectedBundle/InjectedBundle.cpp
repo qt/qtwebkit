@@ -67,6 +67,7 @@
 #include <WebCore/SecurityPolicy.h>
 #include <WebCore/Settings.h>
 #include <WebCore/UserGestureIndicator.h>
+#include <WebCore/WorkerThread.h>
 #include <wtf/OwnArrayPtr.h>
 #include <wtf/PassOwnArrayPtr.h>
 
@@ -358,6 +359,26 @@ void InjectedBundle::setApplicationCacheOriginQuota(const String& originString, 
     cacheStorage().storeUpdatedQuotaForOrigin(origin.get(), bytes);
 }
 
+void InjectedBundle::resetApplicationCacheOriginQuota(const String& originString)
+{
+    RefPtr<SecurityOrigin> origin = SecurityOrigin::createFromString(originString);
+    cacheStorage().storeUpdatedQuotaForOrigin(origin.get(), cacheStorage().defaultOriginQuota());
+}
+
+PassRefPtr<ImmutableArray> InjectedBundle::originsWithApplicationCache()
+{
+    HashSet<RefPtr<SecurityOrigin>, SecurityOriginHash> origins;
+    cacheStorage().getOriginsWithCache(origins);
+    Vector< RefPtr<APIObject> > originsVector;
+
+    HashSet<RefPtr<SecurityOrigin>, SecurityOriginHash>::iterator it = origins.begin();
+    HashSet<RefPtr<SecurityOrigin>, SecurityOriginHash>::iterator end = origins.end();
+    for ( ; it != end; ++it)
+        originsVector.append(WebString::create((*it)->databaseIdentifier()));
+
+    return ImmutableArray::adopt(originsVector);
+}
+
 int InjectedBundle::numberOfPages(WebFrame* frame, double pageWidthInPixels, double pageHeightInPixels)
 {
     Frame* coreFrame = frame ? frame->coreFrame() : 0;
@@ -570,6 +591,15 @@ void InjectedBundle::setPageVisibilityState(WebPage* page, int state, bool isIni
 #endif
 }
 
+size_t InjectedBundle::workerThreadCount()
+{
+#if ENABLE(WORKERS)
+    return WebCore::WorkerThread::workerThreadCount();
+#else
+    return 0;
+#endif
+}
+
 void InjectedBundle::setUserStyleSheetLocation(WebPageGroupProxy* pageGroup, const String& location)
 {
     const HashSet<Page*>& pages = PageGroup::pageGroup(pageGroup->identifier())->pages();
@@ -614,6 +644,11 @@ uint64_t InjectedBundle::webNotificationID(JSContextRef jsContext, JSValueRef js
 #else
     return 0;
 #endif
+}
+
+void InjectedBundle::setTabKeyCyclesThroughElements(WebPage* page, bool enabled)
+{
+    page->corePage()->setTabKeyCyclesThroughElements(enabled);
 }
 
 } // namespace WebKit

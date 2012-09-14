@@ -64,6 +64,7 @@ namespace JSC {
         friend class JSValue;
         friend class MarkedBlock;
         template<typename T> friend void* allocateCell(Heap&);
+        template<typename T> friend void* allocateCell(Heap&, size_t);
 
     public:
         static const unsigned StructureFlags = 0;
@@ -137,7 +138,7 @@ namespace JSC {
         {
             return &m_structure;
         }
-
+        
 #if ENABLE(GC_VALIDATION)
         Structure* unvalidatedStructure() { return m_structure.unvalidatedGet(); }
 #endif
@@ -155,6 +156,7 @@ namespace JSC {
         // Dummy implementations of override-able static functions for classes to put in their MethodTable
         static JSValue defaultValue(const JSObject*, ExecState*, PreferredPrimitiveType);
         static NO_RETURN_DUE_TO_ASSERT void getOwnPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
+        static NO_RETURN_DUE_TO_ASSERT void getOwnNonIndexPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
         static NO_RETURN_DUE_TO_ASSERT void getPropertyNames(JSObject*, ExecState*, PropertyNameArray&, EnumerationMode);
         static String className(const JSObject*);
         static bool hasInstance(JSObject*, ExecState*, JSValue, JSValue prototypeProperty);
@@ -332,6 +334,25 @@ namespace JSC {
         else {
             ASSERT(T::s_info.methodTable.destroy == JSCell::destroy);
             result = static_cast<JSCell*>(heap.allocateWithoutDestructor(sizeof(T)));
+        }
+        result->clearStructure();
+        return result;
+    }
+    
+    template<typename T>
+    void* allocateCell(Heap& heap, size_t size)
+    {
+        ASSERT(size >= sizeof(T));
+#if ENABLE(GC_VALIDATION)
+        ASSERT(!heap.globalData()->isInitializingObject());
+        heap.globalData()->setInitializingObjectClass(&T::s_info);
+#endif
+        JSCell* result = 0;
+        if (NeedsDestructor<T>::value)
+            result = static_cast<JSCell*>(heap.allocateWithDestructor(size));
+        else {
+            ASSERT(T::s_info.methodTable.destroy == JSCell::destroy);
+            result = static_cast<JSCell*>(heap.allocateWithoutDestructor(size));
         }
         result->clearStructure();
         return result;

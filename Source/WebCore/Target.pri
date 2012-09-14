@@ -918,9 +918,11 @@ SOURCES += \
     platform/text/BidiContext.cpp \
     platform/text/DateTimeFormat.cpp \
     platform/text/Hyphenation.cpp \
+    platform/text/LocaleNone.cpp \
     platform/text/LocaleToScriptMappingDefault.cpp \
     platform/text/LocalizedDateNone.cpp \
     platform/text/LocalizedNumberNone.cpp \
+    platform/text/Localizer.cpp \
     platform/text/QuotedPrintable.cpp \
     platform/CalculationValue.cpp \
     platform/Clock.cpp \
@@ -1046,6 +1048,7 @@ SOURCES += \
     platform/text/RegularExpression.cpp \
     platform/PlatformEvent.cpp \
     platform/PlatformInstrumentation.cpp \
+    platform/PlatformMemoryInstrumentation.cpp \
     platform/RuntimeApplicationChecks.cpp \
     platform/RunLoop.cpp \
     platform/SchemeRegistry.cpp \
@@ -1341,12 +1344,10 @@ HEADERS += \
     bindings/js/ScriptProfileNode.h \
     bindings/js/ScriptProfiler.h \
     bindings/js/ScriptSourceCode.h \
-    bindings/js/ScriptSourceProvider.h \
     bindings/js/ScriptState.h \
     bindings/js/ScriptValue.h \
     bindings/js/ScriptWrappable.h \
     bindings/js/SerializedScriptValue.h \
-    bindings/js/StringSourceProvider.h \
     bindings/js/WebCoreJSClientData.h \
     bindings/js/WorkerScriptController.h \
     bindings/js/WorkerScriptDebugServer.h \
@@ -2012,6 +2013,7 @@ HEADERS += \
     page/SpeechInputResult.h \
     page/SpeechInputResultList.h \
     page/TouchAdjustment.h \
+    page/ValidationMessageClient.h \
     page/WebKitAnimation.h \
     page/WebKitAnimationList.h \
     page/WindowFeatures.h \
@@ -2113,6 +2115,7 @@ HEADERS += \
     platform/graphics/IntPoint.h \
     platform/graphics/IntPointHash.h \
     platform/graphics/IntRect.h \
+    platform/graphics/Latin1TextIterator.h \
     platform/graphics/MediaPlayer.h \
     platform/graphics/NativeImagePtr.h \
     platform/graphics/opentype/OpenTypeVerticalData.h \
@@ -2215,6 +2218,7 @@ HEADERS += \
     platform/network/qt/DnsPrefetchHelper.h \
     platform/network/qt/NetworkStateNotifierPrivate.h \
     platform/PlatformExportMacros.h \
+    platform/PlatformMemoryInstrumentation.h \
     platform/PlatformTouchEvent.h \
     platform/PlatformTouchPoint.h \
     platform/PopupMenu.h \
@@ -2224,6 +2228,7 @@ HEADERS += \
     platform/qt/QWebPageClient.h \
     platform/qt/RenderThemeQt.h \
     platform/qt/RenderThemeQtMobile.h \
+    platform/qt/UserAgentQt.h \
     platform/ScrollableArea.h \
     platform/ScrollAnimator.h \
     platform/Scrollbar.h \
@@ -2782,6 +2787,7 @@ SOURCES += \
     platform/qt/RunLoopQt.cpp \
     platform/qt/SharedBufferQt.cpp \
     platform/qt/ThirdPartyCookiesQt.cpp \
+    platform/qt/UserAgentQt.cpp \
     platform/graphics/qt/FontCacheQt.cpp \
     platform/graphics/qt/FontCustomPlatformDataQt.cpp \
     platform/graphics/qt/GlyphPageTreeNodeQt.cpp \

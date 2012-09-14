@@ -130,6 +130,7 @@ inline ClipRect intersection(const ClipRect& a, const ClipRect& b)
 }
 
 class ClipRects {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     static PassRefPtr<ClipRects> create()
     {
@@ -227,6 +228,8 @@ enum ClipRectsType {
 };
 
 struct ClipRectsCache {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
     ClipRectsCache()
     {
 #ifndef NDEBUG
@@ -563,8 +566,6 @@ public:
     typedef unsigned CalculateLayerBoundsFlags;
     static IntRect calculateLayerBounds(const RenderLayer*, const RenderLayer* ancestorLayer, CalculateLayerBoundsFlags = DefaultCalculateLayerBoundsFlags);
     
-    void updateHoverActiveState(const HitTestRequest&, HitTestResult&);
-
     // WARNING: This method returns the offset for the parent as this is what updateLayerPositions expects.
     LayoutPoint computeOffsetFromRoot(bool& hasLayerOffset) const;
 

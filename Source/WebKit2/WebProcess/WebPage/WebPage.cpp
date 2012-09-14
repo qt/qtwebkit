@@ -307,16 +307,15 @@ WebPage::WebPage(uint64_t pageID, const WebPageCreationParameters& parameters)
 
     m_page->setCanStartMedia(false);
 
-    updatePreferences(parameters.store);
-
     m_pageGroup = WebProcess::shared().webPageGroup(parameters.pageGroupData);
     m_page->setGroupName(m_pageGroup->identifier());
     m_page->setDeviceScaleFactor(parameters.deviceScaleFactor);
 
-    platformInitialize();
-
     m_drawingArea = DrawingArea::create(this, parameters);
     m_drawingArea->setPaintingEnabled(false);
+
+    updatePreferences(parameters.store);
+    platformInitialize();
 
     m_mainFrame = WebFrame::createMainFrame(this);
 
@@ -1315,7 +1314,7 @@ static bool isContextClick(const PlatformMouseEvent& event)
 static bool handleContextMenuEvent(const PlatformMouseEvent& platformMouseEvent, WebPage* page)
 {
     IntPoint point = page->corePage()->mainFrame()->view()->windowToContents(platformMouseEvent.position());
-    HitTestResult result = page->corePage()->mainFrame()->eventHandler()->hitTestResultAtPoint(point);
+    HitTestResult result = page->corePage()->mainFrame()->eventHandler()->hitTestResultAtPoint(point, false);
 
     Frame* frame = page->corePage()->mainFrame();
     if (result.innerNonSharedNode())
@@ -1566,7 +1565,7 @@ void WebPage::highlightPotentialActivation(const IntPoint& point, const IntSize&
             return;
 
 #else
-        HitTestResult result = mainframe->eventHandler()->hitTestResultAtPoint(mainframe->view()->windowToContents(point), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::AllowShadowContent);
+        HitTestResult result = mainframe->eventHandler()->hitTestResultAtPoint(mainframe->view()->windowToContents(point), /*allowShadowContent*/ false, /*ignoreClipping*/ true);
         adjustedNode = result.innerNode();
 #endif
         // Find the node to highlight. This is not the same as the node responding the tap gesture, because many
@@ -2081,15 +2080,6 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
 #endif
     settings->setInteractiveFormValidationEnabled(store.getBoolValueForKey(WebPreferencesKey::interactiveFormValidationEnabledKey()));
 
-    // <rdar://problem/10697417>: It is necessary to force compositing when accelerate drawing
-    // is enabled on Mac so that scrollbars are always in their own layers.
-#if PLATFORM(MAC)
-    if (settings->acceleratedDrawingEnabled())
-        settings->setForceCompositingMode(LayerTreeHost::supportsAcceleratedCompositing());
-    else
-#endif
-        settings->setForceCompositingMode(store.getBoolValueForKey(WebPreferencesKey::forceCompositingModeKey()) && LayerTreeHost::supportsAcceleratedCompositing());
-
 #if ENABLE(SQL_DATABASE)
     AbstractDatabase::setIsAvailable(store.getBoolValueForKey(WebPreferencesKey::databasesEnabledKey()));
 #endif
@@ -2134,7 +2124,7 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     platformPreferencesDidChange(store);
 
     if (m_drawingArea)
-        m_drawingArea->updatePreferences();
+        m_drawingArea->updatePreferences(store);
 }
 
 #if ENABLE(INSPECTOR)
@@ -2736,7 +2726,7 @@ void WebPage::findZoomableAreaForPoint(const WebCore::IntPoint& point, const Web
 {
     UNUSED_PARAM(area);
     Frame* mainframe = m_mainFrame->coreFrame();
-    HitTestResult result = mainframe->eventHandler()->hitTestResultAtPoint(mainframe->view()->windowToContents(point), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping);
+    HitTestResult result = mainframe->eventHandler()->hitTestResultAtPoint(mainframe->view()->windowToContents(point), /*allowShadowContent*/ false, /*ignoreClipping*/ true);
 
     Node* node = result.innerNode();
 

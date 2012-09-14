@@ -7,7 +7,7 @@
 
 defineReplace(toSanitizedPath) {
     path = $$1
-    win32-msvc* {
+    win32-msvc*|wince* {
         components = $$split(path, :)
         count(components, 2): path = $$lower($$first(components)):$$last(components)
         return($$replace(path, \\\\, /))
@@ -142,18 +142,18 @@ defineTest(addStrictSubdirOrderBetween) {
     # with the qmake-run of the -qmake_all target, and we end up with a race
     # and potentially half-written makefiles. The custom target depends explicitly
     # on -qmake_all, to ensure that we have a makefile, and then calls make.
-    derived_make_for_qmake.target = $${first_base_target}-make_for_qmake
-    derived_make_for_qmake.depends = $${first_base_target}-qmake_all
-    derived_make_for_qmake.commands = $(MAKE) -f $$eval($${firstSubdir}.makefile)
-    QMAKE_EXTRA_TARGETS += derived_make_for_qmake
+    derived_make_for_qmake = $${first_base_target}-make_for_qmake
+    eval($${derived_make_for_qmake}.depends = $${first_base_target}-qmake_all)
+    eval($${derived_make_for_qmake}.commands = $(MAKE) -f $$eval($${firstSubdir}.makefile))
+    QMAKE_EXTRA_TARGETS += $${derived_make_for_qmake}
 
     # This target ensures that running "make qmake_all" will force both qmake and make
     # to be run on the derived sources before running qmake on the target, so that
     # qmake can pick up the right dependencies for the target based on the derived
     # sources that were generated.
-    target_make_qmake.target = $${second_base_target}-qmake_all
-    target_make_qmake.depends = $${derived_make_for_qmake.target}
-    QMAKE_EXTRA_TARGETS += target_make_qmake
+    target_make_qmake = $${second_base_target}-qmake_all
+    eval($${target_make_qmake}.depends = $${derived_make_for_qmake})
+    QMAKE_EXTRA_TARGETS += $${target_make_qmake}
 
     # Make things work even if qmake -r is used.
     CONFIG += dont_recurse
@@ -161,13 +161,10 @@ defineTest(addStrictSubdirOrderBetween) {
     export(SUBDIRS)
     export(NO_RECURSIVE_QMAKE_SUBDIRS)
     export(CONFIG)
-    export(target_make_qmake.target)
-    export(target_make_qmake.depends)
-    export(derived_make_for_qmake.target)
-    export(derived_make_for_qmake.depends)
-    export(derived_make_for_qmake.commands)
-    export(target_make.target)
-    export(target_make.depends)
+    export($${target_make_qmake}.target)
+    export($${target_make_qmake}.depends)
+    export($${derived_make_for_qmake}.depends)
+    export($${derived_make_for_qmake}.commands)
     export(QMAKE_EXTRA_TARGETS)
     return(true)
 }
@@ -262,22 +259,12 @@ defineTest(linkAgainstLibrary) {
             LIBS += -Wl,-whole-archive -l$$target -Wl,-no-whole-archive
         }
 
+        LIBS += -L$$path
+
         win32-msvc*|wince*|win32-icc {
-            LIBS += -L$$path
             POST_TARGETDEPS += $${path}$${QMAKE_DIR_SEP}$${target}.lib
         } else {
-            QMAKE_LIBDIR += $$path
             POST_TARGETDEPS += $${path}$${QMAKE_DIR_SEP}lib$${target}.a
-        }
-
-        # gprof does not support profiling a shared library.
-        # To profile WebKit, applications must link QtWebKit statically.
-        !contains(CONFIG, gprof) {
-            # The following line is to prevent qmake from adding jscore to libQtWebKit's prl dependencies.
-            # The compromise we have to accept by disabling explicitlib is to drop support to link QtWebKit
-            # statically in applications (which isn't used often because, among other things, of licensing obstacles).
-            CONFIG -= explicitlib
-            CONFIG -= staticlib
         }
     }
 
@@ -377,4 +364,13 @@ defineReplace(configDefines) {
 defineReplace(javascriptFeatureDefines) {
     defines = LANGUAGE_JAVASCRIPT=1 $$configDefines(enable)
     return($$defines)
+}
+
+defineReplace(setEnvironmentVariable) {
+  variable = $$1
+  value = $$2
+  win32 {
+      return((set \"$$variable=$$value\"))
+  }
+  return(export \"$$variable=$$value\")
 }

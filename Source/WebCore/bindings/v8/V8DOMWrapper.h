@@ -93,11 +93,6 @@ namespace WebCore {
         // Wrap JS node filter in C++.
         static PassRefPtr<NodeFilter> wrapNativeNodeFilter(v8::Handle<v8::Value>);
 
-        static v8::Local<v8::Function> constructorForType(WrapperTypeInfo*, DOMWindow*);
-#if ENABLE(WORKERS)
-        static v8::Local<v8::Function> constructorForType(WrapperTypeInfo*, WorkerContext*);
-#endif
-
         template<typename T>
         static v8::Persistent<v8::Object> setJSWrapperForDOMObject(PassRefPtr<T>, v8::Handle<v8::Object>, v8::Isolate* = 0);
         template<typename T>
@@ -112,7 +107,7 @@ namespace WebCore {
 
         static void setNamedHiddenReference(v8::Handle<v8::Object> parent, const char* name, v8::Handle<v8::Value> child);
 
-        static v8::Local<v8::Object> instantiateV8Object(WrapperTypeInfo*, void*);
+        static v8::Local<v8::Object> instantiateV8Object(Document*, WrapperTypeInfo*, void*);
 
         static v8::Handle<v8::Object> getCachedWrapper(Node* node)
         {
@@ -134,10 +129,6 @@ namespace WebCore {
             DOMNodeMapping& domNodeMap = node->isActiveNode() ? store->activeDomNodeMap() : store->domNodeMap();
             return domNodeMap.get(node);
         }
-    private:
-#if ENABLE(WORKERS)
-        static V8PerContextData* perContextData(WorkerContext*);
-#endif
     };
 
     template<typename T>

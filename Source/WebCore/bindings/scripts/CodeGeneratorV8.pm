@@ -804,25 +804,10 @@ static v8::Handle<v8::Value> ${implClassName}ConstructorGetter(v8::Local<v8::Str
     INC_STATS(\"DOM.$implClassName.constructors._get\");
     v8::Handle<v8::Value> data = info.Data();
     ASSERT(data->IsExternal() || data->IsNumber());
-    WrapperTypeInfo* type = WrapperTypeInfo::unwrap(data);
-END
-
-    if ($implClassName eq "DOMWindow") {
-        push(@implContentDecls, <<END);
-    // Get the proxy corresponding to the DOMWindow if possible to
-    // make sure that the constructor function is constructed in the
-    // context of the DOMWindow and not in the context of the caller.
-    return V8DOMWrapper::constructorForType(type, V8DOMWindow::toNative(info.Holder()));
-END
-    } elsif ($dataNode->extendedAttributes->{"IsWorkerContext"}) {
-        push(@implContentDecls, <<END);
-    return V8DOMWrapper::constructorForType(type, V8WorkerContext::toNative(info.Holder()));
-END
-    } else {
-        push(@implContentDecls, "    return v8Undefined();");
-    }
-
-    push(@implContentDecls, <<END);
+    V8PerContextData* perContextData = V8PerContextData::from(info.Holder()->CreationContext());
+    if (!perContextData)
+        return v8Undefined();
+    return perContextData->constructorForType(WrapperTypeInfo::unwrap(data));
 }
 
 END
@@ -2700,7 +2685,7 @@ END
     my $has_attributes = 0;
     if (@$attributes) {
         $has_attributes = 1;
-        push(@implContent, "static const V8DOMConfiguration::BatchedAttribute ${interfaceName}Attrs[] = {\n");
+        push(@implContent, "static const V8DOMConfiguration::BatchedAttribute V8${interfaceName}Attrs[] = {\n");
         GenerateBatchedAttributeData($dataNode, $attributes);
         push(@implContent, "};\n\n");
     }
@@ -2715,7 +2700,7 @@ END
         next if !IsStandardFunction($dataNode, $function);
         if (!$has_callbacks) {
             $has_callbacks = 1;
-            push(@implContent, "static const V8DOMConfiguration::BatchedCallback ${interfaceName}Callbacks[] = {\n");
+            push(@implContent, "static const V8DOMConfiguration::BatchedCallback V8${interfaceName}Callbacks[] = {\n");
         }
         my $name = $function->signature->name;
         my $callback = GetFunctionTemplateCallbackName($function, $interfaceName);
@@ -2734,7 +2719,7 @@ END
     my @constantsEnabledAtRuntime;
     if (@{$dataNode->constants}) {
         $has_constants = 1;
-        push(@implContent, "static const V8DOMConfiguration::BatchedConstant ${interfaceName}Consts[] = {\n");
+        push(@implContent, "static const V8DOMConfiguration::BatchedConstant V8${interfaceName}Consts[] = {\n");
     }
     foreach my $constant (@{$dataNode->constants}) {
         my $name = $constant->name;
@@ -2825,7 +2810,7 @@ END
     # Set up our attributes if we have them
     if ($has_attributes) {
         push(@implContent, <<END);
-        ${interfaceName}Attrs, WTF_ARRAY_LENGTH(${interfaceName}Attrs),
+        V8${interfaceName}Attrs, WTF_ARRAY_LENGTH(V8${interfaceName}Attrs),
 END
     } else {
         push(@implContent, <<END);
@@ -2835,7 +2820,7 @@ END
 
     if ($has_callbacks) {
         push(@implContent, <<END);
-        ${interfaceName}Callbacks, WTF_ARRAY_LENGTH(${interfaceName}Callbacks));
+        V8${interfaceName}Callbacks, WTF_ARRAY_LENGTH(V8${interfaceName}Callbacks));
 END
     } else {
         push(@implContent, <<END);
@@ -2917,7 +2902,7 @@ END
 
     if ($has_constants) {
         push(@implContent, <<END);
-    V8DOMConfiguration::batchConfigureConstants(desc, proto, ${interfaceName}Consts, WTF_ARRAY_LENGTH(${interfaceName}Consts));
+    V8DOMConfiguration::batchConfigureConstants(desc, proto, V8${interfaceName}Consts, WTF_ARRAY_LENGTH(V8${interfaceName}Consts));
 END
     }
 
@@ -3358,6 +3343,17 @@ END
     }
 
     push(@implContent, <<END);
+    Document* document = 0;
+    UNUSED_PARAM(document);
+END
+
+    if (IsNodeSubType($dataNode)) {
+        push(@implContent, <<END);
+    document = impl->document(); 
+END
+    }
+
+    push(@implContent, <<END);
 
     v8::Handle<v8::Context> context;
     if (!creationContext.IsEmpty() && creationContext->CreationContext() != v8::Context::GetCurrent()) {
@@ -3368,7 +3364,7 @@ END
         context->Enter();
     }
 
-    wrapper = V8DOMWrapper::instantiateV8Object(&info, impl.get());
+    wrapper = V8DOMWrapper::instantiateV8Object(document, &info, impl.get());
 
     if (!context.IsEmpty())
         context->Exit();
@@ -3648,7 +3644,7 @@ sub GetNativeType
     # EventTarget can be passed as a parameter.
     return "Node*" if $type eq "EventTarget" and $isParameter;
     return "double" if $type eq "Date";
-    return "ScriptValue" if $type eq "DOMObject";
+    return "ScriptValue" if $type eq "DOMObject" or $type eq "any";
     return "Dictionary" if $type eq "Dictionary";
 
     return "String" if $type eq "DOMUserData";  # FIXME: Temporary hack?
@@ -3747,7 +3743,7 @@ sub JSValueToNative
         return "Dictionary($value, $getIsolate)";
     }
 
-    if ($type eq "DOMObject") {
+    if ($type eq "DOMObject" or $type eq "any") {
         AddToImplIncludes("ScriptValue.h");
         return "ScriptValue($value)";
     }
@@ -3808,7 +3804,7 @@ sub GetV8HeaderName
     return "V8Event.h" if $type eq "DOMTimeStamp";
     return "EventListener.h" if $type eq "EventListener";
     return "SerializedScriptValue.h" if $type eq "SerializedScriptValue";
-    return "ScriptValue.h" if $type eq "DOMObject";
+    return "ScriptValue.h" if $type eq "DOMObject" or $type eq "any";
     return "V8DOMStringList.h" if $type eq "DOMString[]";
     return "V8${type}.h";
 }
@@ -3906,6 +3902,7 @@ my %non_wrapper_types = (
     'MediaQueryListListener' => 1,
     'NodeFilter' => 1,
     'SerializedScriptValue' => 1,
+    'any' => 1,
     'boolean' => 1,
     'double' => 1,
     'float' => 1,

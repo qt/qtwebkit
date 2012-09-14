@@ -36,6 +36,7 @@
 #include "RenderTheme.h"
 
 #include <cairo.h>
+#include <wtf/efl/RefPtrEfl.h>
 
 typedef struct _Ecore_Evas Ecore_Evas;
 typedef struct _Evas_Object Evas_Object;
@@ -210,7 +211,7 @@ public:
     virtual bool shouldShowPlaceholderWhenFocused() const OVERRIDE { return true; }
 
     void setThemePath(const String&);
-    String themePath() { return m_themePath; }
+    String themePath() const;
 
 protected:
     static float defaultFontSize;
@@ -219,15 +220,16 @@ private:
     bool loadTheme();
     ALWAYS_INLINE bool loadThemeIfNeeded() const
     {
-        return m_edje || const_cast<RenderThemeEfl*>(this)->loadTheme();
+        return m_edje || (!m_themePath.isEmpty() && const_cast<RenderThemeEfl*>(this)->loadTheme());
     }
 
-    void applyPartDescriptionsFrom(Evas_Object*);
+    ALWAYS_INLINE Ecore_Evas* canvas() const { return m_canvas.get(); }
+    ALWAYS_INLINE Evas_Object* edje() const { return m_edje.get(); }
 
-    const char* edjeGroupFromFormType(FormType) const;
+    void applyPartDescriptionsFrom(const String& themePath);
+
     void applyEdjeStateFromForm(Evas_Object*, ControlStates);
     bool paintThemePart(RenderObject*, FormType, const PaintInfo&, const IntRect&);
-    bool isFormElementTooLargeToDisplay(const IntSize&);
 
 #if ENABLE(VIDEO)
     bool emitMediaButtonSignal(FormType, MediaControlElementType, const IntRect&);
@@ -247,8 +249,9 @@ private:
 #endif
 
     String m_themePath;
-    Ecore_Evas* m_canvas;
-    Evas_Object* m_edje;
+    // Order so that the canvas gets destroyed at last.
+    OwnPtr<Ecore_Evas> m_canvas;
+    RefPtr<Evas_Object> m_edje;
 
     struct ThemePartDesc {
         FormType type;
@@ -260,31 +263,31 @@ private:
     void applyPartDescription(Evas_Object*, struct ThemePartDesc*);
 
     struct ThemePartCacheEntry {
+        static ThemePartCacheEntry* create(const String& themePath, FormType, const IntSize&);
+        void reuse(const String& themePath, FormType, const IntSize& = IntSize());
+
+        ALWAYS_INLINE Ecore_Evas* canvas() { return m_canvas.get(); }
+        ALWAYS_INLINE Evas_Object* edje() { return m_edje.get(); }
+        ALWAYS_INLINE cairo_surface_t* surface() { return m_surface.get(); }
+
         FormType type;
         IntSize size;
-        Ecore_Evas* ee;
-        Evas_Object* o;
-        cairo_surface_t* surface;
+
+    private:
+        // Order so that the canvas gets destroyed at last.
+        OwnPtr<Ecore_Evas> m_canvas;
+        RefPtr<Evas_Object> m_edje;
+        RefPtr<cairo_surface_t> m_surface;
     };
 
     struct ThemePartDesc m_partDescs[FormTypeLast];
 
     // this should be small and not so frequently used,
     // so use a vector and do linear searches
-    Vector<struct ThemePartCacheEntry *> m_partCache;
+    Vector<ThemePartCacheEntry*> m_partCache;
 
-    // get (use, create or replace) entry from cache
-    struct ThemePartCacheEntry* cacheThemePartGet(FormType, const IntSize&);
-    // flush cache, deleting all entries
-    void cacheThemePartFlush();
-
-    // internal, used by cacheThemePartGet()
-    bool themePartCacheEntryReset(struct ThemePartCacheEntry*, FormType);
-    bool themePartCacheEntrySurfaceCreate(struct ThemePartCacheEntry*);
-    struct ThemePartCacheEntry* cacheThemePartNew(FormType, const IntSize&);
-    struct ThemePartCacheEntry* cacheThemePartReset(FormType, struct ThemePartCacheEntry*);
-    struct ThemePartCacheEntry* cacheThemePartResizeAndReset(FormType, const IntSize&, struct ThemePartCacheEntry*);
-
+    ThemePartCacheEntry* getThemePartFromCache(FormType, const IntSize&);
+    void flushThemePartCache();
 };
 }
 

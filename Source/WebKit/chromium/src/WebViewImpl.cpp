@@ -120,7 +120,6 @@
 #include "TextIterator.h"
 #include "Timer.h"
 #include "TraceEvent.h"
-#include "UserGestureIndicator.h"
 #include "WebAccessibilityObject.h"
 #include "WebActiveWheelFlingParameters.h"
 #include "WebAutofillClient.h"
@@ -639,7 +638,7 @@ void WebViewImpl::handleMouseUp(Frame& mainFrame, const WebMouseEvent& event)
         FrameView* view = m_page->mainFrame()->view();
         IntPoint clickPoint(m_lastMouseDownPoint.x, m_lastMouseDownPoint.y);
         IntPoint contentPoint = view->windowToContents(clickPoint);
-        HitTestResult hitTestResult = focused->eventHandler()->hitTestResultAtPoint(contentPoint, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::TestChildFrameScrollBars);
+        HitTestResult hitTestResult = focused->eventHandler()->hitTestResultAtPoint(contentPoint, false, false, ShouldHitTestScrollbars);
         // We don't want to send a paste when middle clicking a scroll bar or a
         // link (which will navigate later in the code).  The main scrollbars
         // have to be handled separately.
@@ -1008,8 +1007,9 @@ WebRect WebViewImpl::computeBlockBounds(const WebRect& rect, AutoZoomType zoomTy
 
     // Use the rect-based hit test to find the node.
     IntPoint point = mainFrameImpl()->frameView()->windowToContents(IntPoint(rect.x, rect.y));
-    HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active | ((zoomType == FindInPage) ? HitTestRequest::IgnoreClipping : 0);
-    HitTestResult result = mainFrameImpl()->frame()->eventHandler()->hitTestResultAtPoint(point, hitType, IntSize(rect.width, rect.height));
+    HitTestResult result = mainFrameImpl()->frame()->eventHandler()->hitTestResultAtPoint(point,
+            false, zoomType == FindInPage, DontHitTestScrollbars, HitTestRequest::Active | HitTestRequest::ReadOnly,
+            IntSize(rect.width, rect.height));
 
     Node* node = result.innerNonSharedNode();
     if (!node)
@@ -1741,28 +1741,11 @@ void WebViewImpl::doPixelReadbackToCanvas(WebCanvas* canvas, const IntRect& rect
 {
     ASSERT(m_layerTreeView);
 
-    PlatformContextSkia context(canvas);
-
-    // PlatformGraphicsContext is actually a pointer to PlatformContextSkia
-    GraphicsContext gc(reinterpret_cast<PlatformGraphicsContext*>(&context));
-    int bitmapHeight = canvas->getDevice()->accessBitmap(false).height();
-
-    // Compute rect to sample from inverted GPU buffer.
-    IntRect invertRect(rect.x(), bitmapHeight - rect.maxY(), rect.width(), rect.height());
-
-    OwnPtr<ImageBuffer> imageBuffer(ImageBuffer::create(rect.size()));
-    RefPtr<Uint8ClampedArray> pixelArray(Uint8ClampedArray::createUninitialized(rect.width() * rect.height() * 4));
-    if (imageBuffer && pixelArray) {
-        m_layerTreeView->compositeAndReadback(pixelArray->data(), invertRect);
-        imageBuffer->putByteArray(Premultiplied, pixelArray.get(), rect.size(), IntRect(IntPoint(), rect.size()), IntPoint());
-        gc.save();
-        gc.translate(IntSize(0, bitmapHeight));
-        gc.scale(FloatSize(1.0f, -1.0f));
-        // Use invertRect in next line, so that transform above inverts it back to
-        // desired destination rect.
-        gc.drawImageBuffer(imageBuffer.get(), ColorSpaceDeviceRGB, invertRect.location());
-        gc.restore();
-    }
+    SkBitmap target;
+    target.setConfig(SkBitmap::kARGB_8888_Config, rect.width(), rect.height(), rect.width() * 4);
+    target.allocPixels();
+    m_layerTreeView->compositeAndReadback(target.getPixels(), rect);
+    canvas->writePixels(target, rect.x(), rect.y());
 }
 #endif
 
@@ -1923,8 +1906,6 @@ const WebInputEvent* WebViewImpl::m_currentInputEvent = 0;
 
 bool WebViewImpl::handleInputEvent(const WebInputEvent& inputEvent)
 {
-    UserGestureIndicator gestureIndicator(WebInputEvent::isUserGestureEventType(inputEvent.type) ? DefinitelyProcessingUserGesture : PossiblyProcessingUserGesture);
-
     // If we've started a drag and drop operation, ignore input events until
     // we're done.
     if (m_doingDragAndDrop)

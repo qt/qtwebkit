@@ -366,7 +366,7 @@ public:
 
     virtual void updateLogicalWidth();
     virtual void updateLogicalHeight();
-    void computeLogicalHeight(LogicalExtentComputedValues&) const;
+    void computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop, LogicalExtentComputedValues&) const;
 
     RenderBoxRegionInfo* renderBoxRegionInfo(RenderRegion*, LayoutUnit offsetFromLogicalTopOfFirstPage, RenderBoxRegionInfoFlags = CacheRenderBoxRegionInfo) const;
     void computeLogicalWidthInRegion(LogicalExtentComputedValues&, RenderRegion* = 0, LayoutUnit offsetFromLogicalTopOfFirstPage = ZERO_LAYOUT_UNIT) const;
@@ -389,8 +389,8 @@ public:
 
     LayoutUnit computeLogicalWidthInRegionUsing(SizeType, LayoutUnit availableLogicalWidth, const RenderBlock* containingBlock, RenderRegion*, LayoutUnit offsetFromLogicalTopOfFirstPage) const;
     LayoutUnit computeLogicalHeightUsing(SizeType, const Length& height) const;
-    LayoutUnit computeLogicalClientHeight(SizeType, const Length& height);
-    LayoutUnit computeContentLogicalHeightUsing(SizeType, const Length& height) const;
+    LayoutUnit computeContentLogicalHeight(SizeType, const Length& height);
+    LayoutUnit computeContentAndScrollbarLogicalHeightUsing(SizeType, const Length& height) const;
     LayoutUnit computeReplacedLogicalWidthUsing(SizeType, Length width) const;
     LayoutUnit computeReplacedLogicalWidthRespectingMinMaxWidth(LayoutUnit logicalWidth, bool includeMaxWidth = true) const;
     LayoutUnit computeReplacedLogicalHeightUsing(SizeType, Length height) const;
@@ -509,6 +509,7 @@ public:
 
     IntSize scrolledContentOffset() const;
     LayoutSize cachedSizeForOverflowClip() const;
+    void applyCachedClipAndScrollOffsetForRepaint(LayoutRect& paintRect) const;
 
     virtual bool hasRelativeDimensions() const;
     virtual bool hasRelativeLogicalHeight() const;
@@ -592,8 +593,8 @@ private:
                                             LayoutUnit containerLogicalWidth, LayoutUnit bordersPlusPadding,
                                             Length logicalLeft, Length logicalRight, Length marginLogicalLeft, Length marginLogicalRight,
                                             LogicalExtentComputedValues&) const;
-    void computePositionedLogicalHeightUsing(SizeType, Length logicalHeight, const RenderBoxModelObject* containerBlock,
-                                             LayoutUnit containerLogicalHeight, LayoutUnit bordersPlusPadding,
+    void computePositionedLogicalHeightUsing(SizeType, Length logicalHeightLength, const RenderBoxModelObject* containerBlock,
+                                             LayoutUnit containerLogicalHeight, LayoutUnit bordersPlusPadding, LayoutUnit logicalHeight,
                                              Length logicalTop, Length logicalBottom, Length marginLogicalTop, Length marginLogicalBottom,
                                              LogicalExtentComputedValues&) const;
 

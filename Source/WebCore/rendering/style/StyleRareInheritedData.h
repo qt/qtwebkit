@@ -39,7 +39,6 @@
 namespace WebCore {
 
 class CursorList;
-class MemoryObjectInfo;
 class QuotesData;
 class ShadowData;
 
@@ -104,7 +103,7 @@ public:
     unsigned m_imageRendering : 2; // EImageRendering
     unsigned m_lineSnap : 2; // LineSnap
     unsigned m_lineAlign : 1; // LineAlign
-#if ENABLE(OVERFLOW_SCROLLING)
+#if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
     unsigned useTouchOverflowScrolling: 1;
 #endif
 #if ENABLE(CSS_IMAGE_RESOLUTION)

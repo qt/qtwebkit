@@ -755,17 +755,36 @@ void Element::parseAttribute(const Attribute& attribute)
         classAttributeChanged(attribute.value());
 }
 
-void Element::classAttributeChanged(const AtomicString& newClassString)
+template <typename CharacterType>
+static inline bool classStringHasClassName(const CharacterType* characters, unsigned length)
 {
-    const UChar* characters = newClassString.characters();
-    unsigned length = newClassString.length();
-    unsigned i;
-    for (i = 0; i < length; ++i) {
+    ASSERT(length > 0);
+
+    unsigned i = 0;
+    do {
         if (isNotHTMLSpace(characters[i]))
             break;
-    }
-    bool hasClass = i < length;
-    if (hasClass) {
+        ++i;
+    } while (i < length);
+
+    return i < length;
+}
+
+static inline bool classStringHasClassName(const AtomicString& newClassString)
+{
+    unsigned length = newClassString.length();
+
+    if (!length)
+        return false;
+
+    if (newClassString.is8Bit())
+        return classStringHasClassName(newClassString.characters8(), length);
+    return classStringHasClassName(newClassString.characters16(), length);
+}
+
+void Element::classAttributeChanged(const AtomicString& newClassString)
+{
+    if (classStringHasClassName(newClassString)) {
         const bool shouldFoldCase = document()->inQuirksMode();
         ensureAttributeData()->setClass(newClassString, shouldFoldCase);
     } else if (attributeData())
@@ -2043,6 +2062,24 @@ const AtomicString& Element::webkitRegionOverset() const
     return undefinedState;
 }
 
+#if ENABLE(CSS_REGIONS)
+
+Vector<RefPtr<Range> > Element::webkitGetRegionFlowRanges() const
+{
+    document()->updateLayoutIgnorePendingStylesheets();
+
+    Vector<RefPtr<Range> > rangeObjects;
+    if (document()->cssRegionsEnabled() && renderer() && renderer()->isRenderRegion()) {
+        RenderRegion* region = toRenderRegion(renderer());
+        if (region->isValid())
+            region->getRanges(rangeObjects);
+    }
+
+    return rangeObjects;
+}
+
+#endif
+
 #ifndef NDEBUG
 bool Element::fastAttributeLookupAllowed(const QualifiedName& name) const
 {
@@ -2246,7 +2283,7 @@ void Element::createMutableAttributeData()
     if (!m_attributeData)
         m_attributeData = ElementAttributeData::create();
     else
-        m_attributeData = m_attributeData->makeMutable();
+        m_attributeData = m_attributeData->makeMutableCopy();
 }
 
 } // namespace WebCore

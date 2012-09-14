@@ -1768,6 +1768,7 @@ SET(WebCore_SOURCES
     platform/MemoryPressureHandler.cpp
     platform/PlatformEvent.cpp
     platform/PlatformInstrumentation.cpp
+    platform/PlatformMemoryInstrumentation.cpp
     platform/RunLoop.cpp
     platform/RuntimeApplicationChecks.cpp
     platform/ScrollAnimator.cpp
@@ -1985,9 +1986,11 @@ SET(WebCore_SOURCES
     platform/text/DateTimeFormat.cpp
     platform/text/Hyphenation.cpp
     platform/text/LineEnding.cpp
+    platform/text/LocaleNone.cpp
     platform/text/LocaleToScriptMappingDefault.cpp
     platform/text/LocalizedDateNone.cpp
     platform/text/LocalizedNumberNone.cpp
+    platform/text/Localizer.cpp
     platform/text/QuotedPrintable.cpp
     platform/text/RegularExpression.cpp
     platform/text/SegmentedString.cpp
@@ -2814,16 +2817,11 @@ ADD_CUSTOM_COMMAND(
     VERBATIM)
 LIST(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/HTMLEntityTable.cpp)
 
-
-# Replace ";" with "space" in order to recognize feature definition in css files.
-SET(FEATURE_DEFINES_WITH_SPACE_SEPARATOR "")
-FOREACH(_feature ${FEATURE_DEFINES})
+SET(FEATURE_DEFINES_CSS ${FEATURE_DEFINES_WITH_SPACE_SEPARATOR})
+IF (CMAKE_SYSTEM_NAME MATCHES "QNX")
     # filter out color input since we have our own solution
-    IF (NOT CMAKE_SYSTEM_NAME MATCHES "QNX" OR NOT _feature MATCHES "ENABLE_INPUT_TYPE_COLOR")
-        SET(FEATURE_DEFINES_WITH_SPACE_SEPARATOR "${FEATURE_DEFINES_WITH_SPACE_SEPARATOR} ${_feature}")
-    ENDIF()
-ENDFOREACH()
-
+    STRING(REPLACE "ENABLE_INPUT_TYPE_COLOR" "" FEATURE_DEFINES_CSS "${FEATURE_DEFINES_CSS}")
+ENDIF()
 
 # Generate CSS property names
 ADD_CUSTOM_COMMAND (
@@ -2832,7 +2830,7 @@ ADD_CUSTOM_COMMAND (
     DEPENDS ${WebCore_CSS_PROPERTY_NAMES}
     WORKING_DIRECTORY ${DERIVED_SOURCES_WEBCORE_DIR}
     COMMAND ${PERL_EXECUTABLE} -ne "print" ${WebCore_CSS_PROPERTY_NAMES} > ${DERIVED_SOURCES_WEBCORE_DIR}/CSSPropertyNames.in
-    COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${WEBCORE_DIR}/css/makeprop.pl --defines "${FEATURE_DEFINES_WITH_SPACE_SEPARATOR}" --preprocessor "${CODE_GENERATOR_PREPROCESSOR}"
+    COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${WEBCORE_DIR}/css/makeprop.pl --defines "${FEATURE_DEFINES_CSS}" --preprocessor "${CODE_GENERATOR_PREPROCESSOR}"
     VERBATIM)
 LIST(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/CSSPropertyNames.cpp)
 ADD_SOURCE_WEBCORE_DERIVED_DEPENDENCIES(${WEBCORE_DIR}/css/CSSParser.cpp CSSValueKeywords.h)
@@ -2846,7 +2844,7 @@ ADD_CUSTOM_COMMAND (
     DEPENDS ${WebCore_CSS_VALUE_KEYWORDS}
     WORKING_DIRECTORY ${DERIVED_SOURCES_WEBCORE_DIR}
     COMMAND ${PERL_EXECUTABLE} -ne "print" ${WebCore_CSS_VALUE_KEYWORDS} > ${DERIVED_SOURCES_WEBCORE_DIR}/CSSValueKeywords.in
-    COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${WEBCORE_DIR}/css/makevalues.pl --defines "${FEATURE_DEFINES_WITH_SPACE_SEPARATOR}" --preprocessor "${CODE_GENERATOR_PREPROCESSOR}"
+    COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${WEBCORE_DIR}/css/makevalues.pl --defines "${FEATURE_DEFINES_CSS}" --preprocessor "${CODE_GENERATOR_PREPROCESSOR}"
     VERBATIM)
 LIST(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/CSSValueKeywords.cpp)
 ADD_SOURCE_WEBCORE_DERIVED_DEPENDENCIES(${WEBCORE_DIR}/css/CSSParser.cpp CSSValueKeywords.h)
@@ -2858,7 +2856,7 @@ ADD_CUSTOM_COMMAND(
     OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/UserAgentStyleSheetsData.cpp ${DERIVED_SOURCES_WEBCORE_DIR}/UserAgentStyleSheets.h
     MAIN_DEPENDENCY ${WEBCORE_DIR}/css/make-css-file-arrays.pl
     DEPENDS ${WebCore_USER_AGENT_STYLE_SHEETS} ${WEBCORE_DIR}/bindings/scripts/preprocessor.pm
-    COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${WEBCORE_DIR}/css/make-css-file-arrays.pl --defines "${FEATURE_DEFINES_WITH_SPACE_SEPARATOR}" --preprocessor "${CODE_GENERATOR_PREPROCESSOR}" ${DERIVED_SOURCES_WEBCORE_DIR}/UserAgentStyleSheets.h ${DERIVED_SOURCES_WEBCORE_DIR}/UserAgentStyleSheetsData.cpp ${WebCore_USER_AGENT_STYLE_SHEETS}
+    COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${WEBCORE_DIR}/css/make-css-file-arrays.pl --defines "${FEATURE_DEFINES_CSS}" --preprocessor "${CODE_GENERATOR_PREPROCESSOR}" ${DERIVED_SOURCES_WEBCORE_DIR}/UserAgentStyleSheets.h ${DERIVED_SOURCES_WEBCORE_DIR}/UserAgentStyleSheetsData.cpp ${WebCore_USER_AGENT_STYLE_SHEETS}
     VERBATIM)
 LIST(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/UserAgentStyleSheetsData.cpp)
 ADD_SOURCE_WEBCORE_DERIVED_DEPENDENCIES(${WEBCORE_DIR}/css/StyleResolver.cpp UserAgentStyleSheetsData.cpp UserAgentStyleSheets.h)

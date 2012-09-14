@@ -25,11 +25,12 @@
 
 #include "config.h"
 #include "WKBundle.h"
-#include "WKBundlePrivate.h"
 
+#include "ImmutableArray.h"
 #include "InjectedBundle.h"
 #include "WKAPICast.h"
 #include "WKBundleAPICast.h"
+#include "WKBundlePrivate.h"
 
 using namespace WebKit;
 
@@ -248,7 +249,18 @@ uint64_t WKBundleGetAppCacheUsageForOrigin(WKBundleRef bundleRef, WKStringRef or
 
 void WKBundleSetApplicationCacheOriginQuota(WKBundleRef bundleRef, WKStringRef origin, uint64_t bytes)
 {
-    return toImpl(bundleRef)->setApplicationCacheOriginQuota(toImpl(origin)->string(), bytes);
+    toImpl(bundleRef)->setApplicationCacheOriginQuota(toImpl(origin)->string(), bytes);
+}
+
+void WKBundleResetApplicationCacheOriginQuota(WKBundleRef bundleRef, WKStringRef origin)
+{
+    toImpl(bundleRef)->resetApplicationCacheOriginQuota(toImpl(origin)->string());
+}
+
+WKArrayRef WKBundleCopyOriginsWithApplicationCache(WKBundleRef bundleRef)
+{
+    RefPtr<ImmutableArray> origins = toImpl(bundleRef)->originsWithApplicationCache();
+    return toAPI(origins.release().leakRef());
 }
 
 void WKBundleSetMinimumTimerInterval(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, double seconds)
@@ -286,6 +298,12 @@ void WKBundleSetPageVisibilityState(WKBundleRef bundleRef, WKBundlePageRef pageR
     toImpl(bundleRef)->setPageVisibilityState(toImpl(pageRef), state, isInitialState);
 }
 
+size_t WKBundleGetWorkerThreadCount(WKBundleRef)
+{
+    // Actually do not need argument here, keeping it however for consistency.
+    return InjectedBundle::workerThreadCount();
+}
+
 void WKBundleSetUserStyleSheetLocation(WKBundleRef bundleRef, WKBundlePageGroupRef pageGroupRef, WKStringRef location)
 {
     toImpl(bundleRef)->setUserStyleSheetLocation(toImpl(pageGroupRef), toImpl(location)->string());
@@ -306,3 +324,7 @@ uint64_t WKBundleGetWebNotificationID(WKBundleRef bundleRef, JSContextRef contex
     return toImpl(bundleRef)->webNotificationID(context, notification);
 }
 
+void WKBundleSetTabKeyCyclesThroughElements(WKBundleRef bundleRef, WKBundlePageRef pageRef, bool enabled)
+{
+    toImpl(bundleRef)->setTabKeyCyclesThroughElements(toImpl(pageRef), enabled);
+}

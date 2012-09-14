@@ -31,47 +31,19 @@
 #ifndef WebCoreMemoryInstrumentation_h
 #define WebCoreMemoryInstrumentation_h
 
-#include <wtf/Forward.h>
-#include <wtf/MemoryInstrumentation.h>
+#include "PlatformMemoryInstrumentation.h"
 
 namespace WebCore {
 
-class KURL;
+using WTF::MemoryClassInfo;
+using WTF::MemoryObjectType;
 
-// Explicit specializations for some types.
-template<> void MemoryInstrumentationTraits::addInstrumentedObject<KURL>(MemoryInstrumentation*, const KURL* const&, MemoryObjectType, MemoryOwningType);
-template<> void MemoryInstrumentationTraits::addInstrumentedObject<const KURL>(MemoryInstrumentation*, const KURL* const&, MemoryObjectType, MemoryOwningType);
-
-template<> void MemoryInstrumentationTraits::addInstrumentedObject<String>(MemoryInstrumentation*, const String* const&, MemoryObjectType, MemoryOwningType);
-template<> void MemoryInstrumentationTraits::addInstrumentedObject<const String>(MemoryInstrumentation*, const String* const&, MemoryObjectType, MemoryOwningType);
-
-template<> void MemoryInstrumentationTraits::addInstrumentedObject<StringImpl>(MemoryInstrumentation*, const StringImpl* const&, MemoryObjectType, MemoryOwningType);
-template<> void MemoryInstrumentationTraits::addInstrumentedObject<const StringImpl>(MemoryInstrumentation*, const StringImpl* const&, MemoryObjectType, MemoryOwningType);
-
-template<> void MemoryInstrumentationTraits::addInstrumentedObject<AtomicString>(MemoryInstrumentation*, const AtomicString* const&, MemoryObjectType, MemoryOwningType);
-template<> void MemoryInstrumentationTraits::addInstrumentedObject<const AtomicString>(MemoryInstrumentation*, const AtomicString* const&, MemoryObjectType, MemoryOwningType);
-
-
-// Link time guards with no body.
-template<> void MemoryInstrumentationTraits::addObject<KURL>(MemoryInstrumentation*, const KURL* const&, MemoryObjectType, MemoryOwningType);
-template<> void MemoryInstrumentationTraits::addObject<const KURL>(MemoryInstrumentation*, const KURL* const&, MemoryObjectType, MemoryOwningType);
-
-template<> void MemoryInstrumentationTraits::addObject<String>(MemoryInstrumentation*, const String* const&, MemoryObjectType, MemoryOwningType);
-template<> void MemoryInstrumentationTraits::addObject<const String>(MemoryInstrumentation*, const String* const&, MemoryObjectType, MemoryOwningType);
-
-template<> void MemoryInstrumentationTraits::addObject<StringImpl>(MemoryInstrumentation*, const StringImpl* const&, MemoryObjectType, MemoryOwningType);
-template<> void MemoryInstrumentationTraits::addObject<const StringImpl>(MemoryInstrumentation*, const StringImpl* const&, MemoryObjectType, MemoryOwningType);
-
-template<> void MemoryInstrumentationTraits::addObject<AtomicString>(MemoryInstrumentation*, const AtomicString* const&, MemoryObjectType, MemoryOwningType);
-template<> void MemoryInstrumentationTraits::addObject<const AtomicString>(MemoryInstrumentation*, const AtomicString* const&, MemoryObjectType, MemoryOwningType);
-
-class WebCoreMemoryTypes {
+class WebCoreMemoryTypes : public PlatformMemoryTypes {
 public:
     static MemoryObjectType Page;
     static MemoryObjectType DOM;
     static MemoryObjectType CSS;
     static MemoryObjectType Binding;
-    static MemoryObjectType Loader;
 
     static MemoryObjectType MemoryCache;
     static MemoryObjectType MemoryCacheStructures;

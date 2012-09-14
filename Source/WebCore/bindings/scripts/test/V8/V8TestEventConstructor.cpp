@@ -54,7 +54,7 @@ static v8::Handle<v8::Value> attr2AttrGetter(v8::Local<v8::String> name, const v
 
 } // namespace TestEventConstructorV8Internal
 
-static const V8DOMConfiguration::BatchedAttribute TestEventConstructorAttrs[] = {
+static const V8DOMConfiguration::BatchedAttribute V8TestEventConstructorAttrs[] = {
     // Attribute 'attr1' (Type: 'readonly attribute' ExtAttr: '')
     {"attr1", TestEventConstructorV8Internal::attr1AttrGetter, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     // Attribute 'attr2' (Type: 'readonly attribute' ExtAttr: 'InitializedByEventConstructor')
@@ -102,7 +102,7 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestEventConstructorTempl
 
     v8::Local<v8::Signature> defaultSignature;
     defaultSignature = V8DOMConfiguration::configureTemplate(desc, "TestEventConstructor", v8::Persistent<v8::FunctionTemplate>(), V8TestEventConstructor::internalFieldCount,
-        TestEventConstructorAttrs, WTF_ARRAY_LENGTH(TestEventConstructorAttrs),
+        V8TestEventConstructorAttrs, WTF_ARRAY_LENGTH(V8TestEventConstructorAttrs),
         0, 0);
     UNUSED_PARAM(defaultSignature); // In some cases, it will not be used.
     desc->SetCallHandler(V8TestEventConstructor::constructorCallback);
@@ -149,6 +149,8 @@ bool V8TestEventConstructor::HasInstance(v8::Handle<v8::Value> value)
 v8::Handle<v8::Object> V8TestEventConstructor::wrapSlow(PassRefPtr<TestEventConstructor> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     v8::Handle<v8::Object> wrapper;
+    Document* document = 0;
+    UNUSED_PARAM(document);
 
     v8::Handle<v8::Context> context;
     if (!creationContext.IsEmpty() && creationContext->CreationContext() != v8::Context::GetCurrent()) {
@@ -159,7 +161,7 @@ v8::Handle<v8::Object> V8TestEventConstructor::wrapSlow(PassRefPtr<TestEventCons
         context->Enter();
     }
 
-    wrapper = V8DOMWrapper::instantiateV8Object(&info, impl.get());
+    wrapper = V8DOMWrapper::instantiateV8Object(document, &info, impl.get());
 
     if (!context.IsEmpty())
         context->Exit();

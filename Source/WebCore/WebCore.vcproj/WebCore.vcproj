@@ -28611,6 +28611,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\platform\PlatformMemoryInstrumentation.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\platform\PlatformMemoryInstrumentation.h"
+				>
+			</File>
+			<File
 				RelativePath="..\platform\PlatformMenuDescription.h"
 				>
 			</File>
@@ -33670,6 +33678,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\platform\graphics\Latin1TextIterator.h"
+					>
+				</File>
+				<File
 					RelativePath="..\platform\text\LineBreakIteratorPoolICU.h"
 					>
 				</File>
@@ -33679,6 +33691,10 @@
 				</File>
 				<File
 					RelativePath="..\platform\text\LineEnding.h"
+					>
+				</File>
+				<File
+					RelativePath="..\platform\text\LocaleNone.cpp"
 					>
 				</File>
 				<File
@@ -33704,6 +33720,14 @@
 				<File
 					RelativePath="..\platform\text\LocalizedNumberNone.cpp"
 					>
+				<File
+					RelativePath="..\platform\text\Localizer.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\platform\text\Localizer.h"
+					>
+				</File>
 				</File>
 				<File
 					RelativePath="..\platform\text\ParserUtilities.h"
@@ -65926,6 +65950,10 @@
 					>
 				</File>
 				<File
+					RelativePath="..\bindings\js\JSDependentRetained.h"
+					>
+				</File>
+				<File
 					RelativePath="..\bindings\js\JSDedicatedWorkerContextCustom.cpp"
 					>
 					<FileConfiguration
@@ -72054,10 +72082,6 @@
 					>
 				</File>
 				<File
-					RelativePath="..\bindings\js\ScriptSourceProvider.h"
-					>
-				</File>
-				<File
 					RelativePath="..\bindings\js\ScriptState.cpp"
 					>
 					<FileConfiguration
@@ -72179,10 +72203,6 @@
 				</File>
 				<File
 					RelativePath="..\bindings\js\SerializedScriptValue.h"
-					>
-				</File>
-				<File
-					RelativePath="..\bindings\js\StringSourceProvider.h"
 					>
 				</File>
 				<File
@@ -75999,6 +76019,14 @@
 				</File>
 				<File
 					RelativePath="..\inspector\front-end\CSSKeywordCompletions.js"
+					>
+				</File>
+				<File
+					RelativePath="..\inspector\front-end\CSSNamedFlowCollectionsView.js"
+					>
+				</File>
+				<File
+					RelativePath="..\inspector\front-end\cssNamedFlows.css"
 					>
 				</File>
 				<File

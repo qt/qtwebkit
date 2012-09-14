@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2009 Daniel Bates (dbates@intudata.com)
- * All rights reserved.
+ * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -14,34 +13,24 @@
  * THIS SOFTWARE IS PROVIDED BY APPLE INC. ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE COMPUTER, INC. OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL APPLE INC. OR
  * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
  * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
  * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef ScriptSourceProvider_h
-#define ScriptSourceProvider_h
+#ifndef PutDirectIndexMode_h
+#define PutDirectIndexMode_h
 
-#include <parser/SourceProvider.h>
-#include <wtf/Forward.h>
+namespace JSC {
 
-namespace WebCore {
+enum PutDirectIndexMode { PutDirectIndexLikePutDirect, PutDirectIndexShouldNotThrow, PutDirectIndexShouldThrow };
 
-    class ScriptSourceProvider : public JSC::SourceProvider {
-    public:
-        ScriptSourceProvider(const String& url, const TextPosition& startPosition, JSC::SourceProviderCache* cache = 0)
-            : SourceProvider(url, startPosition, cache)
-        {
-        }
+} // namespace JSC
 
-        virtual const String& source() const = 0;
-    };
+#endif // PutDirectIndexMode_h
 
-} // namespace WebCore
-
-#endif // ScriptSourceProvider_h

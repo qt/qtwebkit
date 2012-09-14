@@ -1542,8 +1542,21 @@ sub checkRequiredSystemConfig
             print "*************************************************************\n";
         }
     } elsif (isGtk() or isQt() or isWx() or isEfl()) {
-        my @cmds = qw(flex bison gperf);
+        my @cmds = qw(bison gperf);
+        if (isQt() and isWindows()) {
+            push @cmds, "win_flex";
+        } else {
+            push @cmds, "flex";
+        }
         my @missing = ();
+        my $oldPath = $ENV{PATH};
+        if (isQt() and isWindows()) {
+            chomp(my $gnuWin32Dir = `$qmakebin -query QT_HOST_DATA`);
+            $gnuWin32Dir = File::Spec->catfile($gnuWin32Dir, "..", "gnuwin32", "bin");
+            if (-d "$gnuWin32Dir") {
+                $ENV{PATH} = $gnuWin32Dir . ";" . $ENV{PATH};
+            }
+        }
         foreach my $cmd (@cmds) {
             push @missing, $cmd if not commandExists($cmd);
         }
@@ -1551,6 +1564,9 @@ sub checkRequiredSystemConfig
         if (@missing) {
             my $list = join ", ", @missing;
             die "ERROR: $list missing but required to build WebKit.\n";
+        }
+        if (isQt() and isWindows()) {
+            $ENV{PATH} = $oldPath;
         }
     }
     # Win32 and other platforms may want to check for minimum config
@@ -1589,9 +1605,9 @@ sub setupAppleWinEnv()
 
         # FIXME: We should remove this explicit version check for cygwin once we stop supporting Cygwin 1.7.9 or older versions. 
         # https://bugs.webkit.org/show_bug.cgi?id=85791
-        my $currentCygwinVersion = version->parse(`uname -r`);
-        my $firstCygwinVersionWithoutTTYSupport = version->parse("1.7.10");
-        if ($currentCygwinVersion < $firstCygwinVersionWithoutTTYSupport) {
+        my $uname_version = (POSIX::uname())[2];
+        $uname_version =~ s/\(.*\)//;  # Remove the trailing cygwin version, if any.
+        if (version->parse($uname_version) < version->parse("1.7.10")) {
             # Setting the environment variable 'CYGWIN' to 'tty' makes cygwin enable extra support (i.e., termios)
             # for UNIX-like ttys in the Windows console
             $variablesToSet{CYGWIN} = "tty" unless $ENV{CYGWIN};
@@ -2251,7 +2267,6 @@ sub buildQMakeProjects
     } elsif ($passedConfig) {
         die "Build type $passedConfig is not supported with --qt.\n";
     }
-    push @buildArgs, "CONFIG-=debug_and_release" if ($passedConfig && isDarwin());
 
     # Using build-webkit to build assumes you want a developer-build
     push @buildArgs, "CONFIG-=production_build";

@@ -27,8 +27,8 @@
 #include "config.h"
 #include "SharedBuffer.h"
 
+#include "PlatformMemoryInstrumentation.h"
 #include "PurgeableBuffer.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/unicode/UTF8.h>
 #include <wtf/unicode/Unicode.h>
@@ -250,7 +250,7 @@ const Vector<char>& SharedBuffer::buffer() const
 
 void SharedBuffer::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, GenericMemoryTypes::Undefined);
+    MemoryClassInfo info(memoryObjectInfo, this);
     info.addVector(m_buffer);
     info.addVector(m_segments);
     for (unsigned i = 0; i < m_segments.size(); ++i)

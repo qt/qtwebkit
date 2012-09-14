@@ -1,4 +1,5 @@
 LIST(APPEND WebKit2_SOURCES
+    Platform/efl/LoggingEfl.cpp
     Platform/efl/ModuleEfl.cpp
     Platform/efl/WorkQueueEfl.cpp
     Platform/unix/SharedMemoryUnix.cpp
@@ -23,6 +24,8 @@ LIST(APPEND WebKit2_SOURCES
 
     Shared/soup/PlatformCertificateInfo.cpp
     Shared/soup/WebCoreArgumentCodersSoup.cpp
+
+    UIProcess/DefaultUndoController.cpp
 
     UIProcess/API/C/efl/WKView.cpp
     

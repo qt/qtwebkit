@@ -150,6 +150,8 @@ public:
     void setAppCacheMaximumSize(uint64_t);
     uint64_t appCacheUsageForOrigin(const String& origin);
     void setApplicationCacheOriginQuota(const String& origin, uint64_t);
+    void resetApplicationCacheOriginQuota(const String& origin);
+    PassRefPtr<ImmutableArray> originsWithApplicationCache();
 
     // Garbage collection API
     void garbageCollectJavaScriptObjects();
@@ -170,6 +172,10 @@ public:
     static bool isProcessingUserGesture();
 
     void setPageVisibilityState(WebPage*, int state, bool isInitialState);
+
+    static size_t workerThreadCount();
+
+    void setTabKeyCyclesThroughElements(WebPage*, bool enabled);
 
 private:
     explicit InjectedBundle(const String&);

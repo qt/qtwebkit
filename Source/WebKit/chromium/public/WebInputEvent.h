@@ -194,16 +194,6 @@ public:
             || type == TouchCancel;
     }
 
-    // Returns true if the WebInputEvent |type| should be handled as user gesture.
-    static bool isUserGestureEventType(int type)
-    {
-        return isKeyboardEventType(type)
-            || type == MouseDown
-            || type == MouseUp
-            || type == TouchStart
-            || type == TouchEnd;
-    }
-
     // Returns true if the WebInputEvent is a gesture event.
     static bool isGestureEventType(int type)
     {
@@ -388,12 +378,6 @@ public:
     int globalX;
     int globalY;
 
-    // FIXME: These are currently overloaded. We're in the process of moving
-    // to the union below. http://wkb.ug/93123
-    float deltaX;
-    float deltaY;
-    WebRect boundingBox;
-
     union {
       struct {
         int tapCount;
@@ -430,8 +414,6 @@ public:
         , y(0)
         , globalX(0)
         , globalY(0)
-        , deltaX(0.0f)
-        , deltaY(0.0f)
     {
       memset(&data, 0, sizeof(data)); 
     }

@@ -122,7 +122,7 @@ static String selectMisspelledWord(const ContextMenu* defaultMenu, Frame* select
 
     // Selection is empty, so change the selection to the word under the cursor.
     HitTestResult hitTestResult = selectedFrame->eventHandler()->
-        hitTestResultAtPoint(selectedFrame->page()->contextMenuController()->hitTestResult().point(), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::AllowShadowContent);
+        hitTestResultAtPoint(selectedFrame->page()->contextMenuController()->hitTestResult().point(), true);
     Node* innerNode = hitTestResult.innerNode();
     VisiblePosition pos(innerNode->renderer()->positionForPoint(
         hitTestResult.localPoint()));
@@ -160,7 +160,7 @@ PlatformMenuDescription ContextMenuClientImpl::getCustomMenuFromDefaultItems(
     Frame* selectedFrame = r.innerNonSharedNode()->document()->frame();
 
     WebContextMenuData data;
-    data.mousePosition = selectedFrame->view()->contentsToWindow(r.roundedPoint());
+    data.mousePosition = r.roundedPoint();
 
     // Compute edit flags.
     data.editFlags = WebContextMenuData::CanDoNone;

@@ -110,15 +110,11 @@ public:
     static void getFontFamilyForCharacters(const UChar*, size_t numCharacters, const char* preferredLocale, FontFamily*);
 #endif
 
-    // Forms --------------------------------------------------------------
-    static void notifyFormStateChanged(const Document*);
-
     // IndexedDB ----------------------------------------------------------
     static PassRefPtr<IDBFactoryBackendInterface> idbFactory();
 
     // JavaScript ---------------------------------------------------------
     static void notifyJSOutOfMemory(Frame*);
-    static bool allowScriptDespiteSettings(const KURL& documentURL);
 
     // Plugin -------------------------------------------------------------
     static bool plugins(bool refresh, Vector<PluginInfo>*);
@@ -134,10 +130,6 @@ public:
     static IntRect screenRect(Widget*);
     static IntRect screenAvailableRect(Widget*);
 
-    // Returns private and shared usage, in bytes. Private bytes is the amount of
-    // memory currently allocated to this process that cannot be shared. Returns
-    // false on platform specific error conditions.
-    static bool getProcessMemorySize(size_t* privateBytes, size_t* sharedBytes);
     // Theming ------------------------------------------------------------
 #if OS(WINDOWS)
     static void paintButton(

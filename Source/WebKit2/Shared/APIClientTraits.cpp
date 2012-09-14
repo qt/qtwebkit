@@ -67,12 +67,18 @@ const size_t APIClientTraits<WKPageLoaderClient>::interfaceSizesByVersion[] = {
 
 const size_t APIClientTraits<WKPageUIClient>::interfaceSizesByVersion[] = {
     offsetof(WKPageUIClient, createNewPage),
+    offsetof(WKPageUIClient, showColorPicker),
     sizeof(WKPageUIClient)
 };
     
 const size_t APIClientTraits<WKBundlePageFormClient>::interfaceSizesByVersion[] = {
     offsetof(WKBundlePageFormClient, willSendSubmitEvent),
     sizeof(WKBundlePageFormClient)
+};
+
+const size_t APIClientTraits<WKBundlePageUIClient>::interfaceSizesByVersion[] = {
+    offsetof(WKBundlePageUIClient, didReachApplicationCacheOriginQuota),
+    sizeof(WKBundlePageUIClient)
 };
 
 const size_t APIClientTraits<WKContextInjectedBundleClient>::interfaceSizesByVersion[] = {

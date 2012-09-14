@@ -291,10 +291,14 @@ void CodeBlock::printGetByIdCacheStatus(ExecState* exec, int location)
     UNUSED_PARAM(ident); // tell the compiler to shut up in certain platform configurations.
     
 #if ENABLE(LLINT)
-    Structure* structure = instruction[4].u.structure.get();
-    dataLog(" llint(");
-    dumpStructure("struct", exec, structure, ident);
-    dataLog(")");
+    if (exec->interpreter()->getOpcodeID(instruction[0].u.opcode) == op_get_array_length)
+        dataLog(" llint(array_length)");
+    else {
+        Structure* structure = instruction[4].u.structure.get();
+        dataLog(" llint(");
+        dumpStructure("struct", exec, structure, ident);
+        dataLog(")");
+    }
 #endif
 
 #if ENABLE(JIT)
@@ -996,6 +1000,22 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             WriteBarrier<Unknown>* registerPointer = (++it)->u.registerPointer;
             int r0 = (++it)->u.operand;
             dataLog("[%4d] put_global_var_check\t g%d(%p), %s", location, m_globalObject->findRegisterIndex(registerPointer), registerPointer, registerName(exec, r0).data());
+            dumpBytecodeCommentAndNewLine(location);
+            it++;
+            it++;
+            break;
+        }
+        case op_init_global_const: {
+            WriteBarrier<Unknown>* registerPointer = (++it)->u.registerPointer;
+            int r0 = (++it)->u.operand;
+            dataLog("[%4d] init_global_const\t g%d(%p), %s", location, m_globalObject->findRegisterIndex(registerPointer), registerPointer, registerName(exec, r0).data());
+            dumpBytecodeCommentAndNewLine(location);
+            break;
+        }
+        case op_init_global_const_check: {
+            WriteBarrier<Unknown>* registerPointer = (++it)->u.registerPointer;
+            int r0 = (++it)->u.operand;
+            dataLog("[%4d] init_global_const_check\t g%d(%p), %s", location, m_globalObject->findRegisterIndex(registerPointer), registerPointer, registerName(exec, r0).data());
             dumpBytecodeCommentAndNewLine(location);
             it++;
             it++;
@@ -2080,6 +2100,8 @@ void CodeBlock::finalizeUnconditionally()
                 curInstruction[6].u.structure.clear();
                 curInstruction[7].u.structureChain.clear();
                 curInstruction[0].u.opcode = interpreter->getOpcode(op_put_by_id);
+                break;
+            case op_get_array_length:
                 break;
             default:
                 ASSERT_NOT_REACHED();

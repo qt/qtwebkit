@@ -35,7 +35,7 @@
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefPtr.h>
 
-namespace WebCore {
+namespace WTF {
 
 class MemoryClassInfo;
 class MemoryObjectInfo;
@@ -43,20 +43,9 @@ class MemoryInstrumentation;
 
 typedef const char* MemoryObjectType;
 
-class GenericMemoryTypes {
-public:
-    static MemoryObjectType Undefined;
-};
-
 enum MemoryOwningType {
     byPointer,
     byReference
-};
-
-class MemoryInstrumentationTraits {
-public:
-    template<typename T> static void addInstrumentedObject(MemoryInstrumentation*, const T* const&, MemoryObjectType, MemoryOwningType);
-    template<typename T> static void addObject(MemoryInstrumentation*, const T* const&, MemoryObjectType, MemoryOwningType);
 };
 
 class MemoryInstrumentation {
@@ -65,7 +54,7 @@ public:
 
     template <typename T> void addRootObject(const T& t)
     {
-        addInstrumentedObject(t, GenericMemoryTypes::Undefined);
+        addInstrumentedObject(t, 0);
         processDeferredInstrumentedPointers();
     }
 
@@ -85,7 +74,6 @@ private:
     virtual void processDeferredInstrumentedPointers() = 0;
 
     friend class MemoryClassInfo;
-    friend class MemoryInstrumentationTraits;
 
     template<typename T> class InstrumentedPointer : public InstrumentedPointerBase {
     public:
@@ -121,11 +109,11 @@ private:
     struct OwningTraits { // Default byReference implementation.
         static void addInstrumentedObject(MemoryInstrumentation* instrumentation, const T& t, MemoryObjectType ownerObjectType)
         {
-            MemoryInstrumentationTraits::addInstrumentedObject<T>(instrumentation, &t, ownerObjectType, byReference);
+            instrumentation->addInstrumentedObjectImpl(&t, ownerObjectType, byReference);
         }
         static void addObject(MemoryInstrumentation* instrumentation, const T& t, MemoryObjectType ownerObjectType)
         {
-            MemoryInstrumentationTraits::addObject<T>(instrumentation, &t, ownerObjectType, byReference);
+            instrumentation->addObjectImpl(&t, ownerObjectType, byReference);
         }
     };
 
@@ -133,11 +121,11 @@ private:
     struct OwningTraits<T*> { // Custom byPointer implementation.
         static void addInstrumentedObject(MemoryInstrumentation* instrumentation, const T* const& t, MemoryObjectType ownerObjectType)
         {
-            MemoryInstrumentationTraits::addInstrumentedObject<T>(instrumentation, t, ownerObjectType, byPointer);
+            instrumentation->addInstrumentedObjectImpl(t, ownerObjectType, byPointer);
         }
         static void addObject(MemoryInstrumentation* instrumentation, const T* const& t, MemoryObjectType ownerObjectType)
         {
-            MemoryInstrumentationTraits::addObject<T>(instrumentation, t, ownerObjectType, byPointer);
+            instrumentation->addObjectImpl(t, ownerObjectType, byPointer);
         }
     };
 
@@ -149,18 +137,6 @@ private:
     template<typename T> void addObjectImpl(const OwnPtr<T>* const&, MemoryObjectType, MemoryOwningType);
     template<typename T> void addObjectImpl(const RefPtr<T>* const&, MemoryObjectType, MemoryOwningType);
 };
-
-template<typename T>
-void MemoryInstrumentationTraits::addInstrumentedObject(MemoryInstrumentation* instrumentation, const T* const& t, MemoryObjectType ownerObjectType, MemoryOwningType owningType)
-{
-    instrumentation->addInstrumentedObjectImpl(t, ownerObjectType, owningType);
-}
-
-template<typename T>
-void MemoryInstrumentationTraits::addObject(MemoryInstrumentation* instrumentation, const T* const& t, MemoryObjectType ownerObjectType, MemoryOwningType owningType)
-{
-    instrumentation->addObjectImpl(t, ownerObjectType, owningType);
-}
 
 class MemoryObjectInfo {
 public:
@@ -184,7 +160,7 @@ private:
     {
         if (!m_objectSize) {
             m_objectSize = actualSize ? actualSize : sizeof(T);
-            if (objectType != GenericMemoryTypes::Undefined)
+            if (objectType)
                 m_objectType = objectType;
         }
     }
@@ -197,7 +173,7 @@ private:
 class MemoryClassInfo {
 public:
     template<typename T>
-    MemoryClassInfo(MemoryObjectInfo* memoryObjectInfo, const T*, MemoryObjectType objectType = GenericMemoryTypes::Undefined, size_t actualSize = 0)
+    MemoryClassInfo(MemoryObjectInfo* memoryObjectInfo, const T*, MemoryObjectType objectType = 0, size_t actualSize = 0)
         : m_memoryObjectInfo(memoryObjectInfo)
         , m_memoryInstrumentation(memoryObjectInfo->memoryInstrumentation())
     {
@@ -221,6 +197,8 @@ public:
     template<typename VectorType> void addVector(const VectorType& vector) { m_memoryInstrumentation->addVector(vector, m_objectType, true); }
     template<typename VectorType> void addVectorPtr(const VectorType* const vector) { m_memoryInstrumentation->addVector(*vector, m_objectType, false); }
     void addRawBuffer(const void* const& buffer, size_t size) { m_memoryInstrumentation->addRawBuffer(buffer, m_objectType, size); }
+
+    void addWeakPointer(void*) { }
 
 private:
     MemoryObjectInfo* m_memoryObjectInfo;
@@ -359,6 +337,6 @@ void MemoryInstrumentation::InstrumentedPointer<T>::process(MemoryInstrumentatio
     memoryInstrumentation->countObjectSize(memoryObjectInfo.objectType(), memoryObjectInfo.objectSize());
 }
 
-} // namespace WebCore
+} // namespace WTF
 
 #endif // !defined(MemoryInstrumentation_h)

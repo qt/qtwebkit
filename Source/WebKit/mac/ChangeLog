@@ -1,3 +1,148 @@
+2012-09-13  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r128552.
+        http://trac.webkit.org/changeset/128552
+        https://bugs.webkit.org/show_bug.cgi?id=96729
+
+        Still breaks the test on chromium linux debug. It's quite
+        annoying. (Requested by rniwa on #webkit).
+
+        * WebView/WebHTMLView.mm:
+        (-[WebHTMLView _invalidateGStatesForTree]):
+
+2012-09-13  Ryosuke Niwa  <rniwa@webkit.org>
+
+        suspend/resumeWidgetHierarchyUpdates should be a RAII object
+        https://bugs.webkit.org/show_bug.cgi?id=96706
+
+        Reviewed by Simon Fraser.
+
+        * WebView/WebHTMLView.mm:
+        (-[WebHTMLView _invalidateGStatesForTree]):
+
+2012-09-13  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r128531.
+        http://trac.webkit.org/changeset/128531
+        https://bugs.webkit.org/show_bug.cgi?id=96719
+
+        plugins/document-open.html crash on Chromium-Linux (Requested
+        by tkent1 on #webkit).
+
+        * WebView/WebHTMLView.mm:
+        (-[WebHTMLView _invalidateGStatesForTree]):
+
+2012-09-13  Benjamin Poulain  <bpoulain@apple.com>
+
+        Improve the SourceProvider hierarchy
+        https://bugs.webkit.org/show_bug.cgi?id=95635
+
+        Reviewed by Geoffrey Garen.
+
+        * Plugins/Hosted/NetscapePluginInstanceProxy.mm: Fix a #include abuse.
+        * WebView/WebScriptDebugger.mm:
+        (toNSString): We can now use the (faster) implicit conversion
+        from String to NSString.
+
+2012-09-13  Ryosuke Niwa  <rniwa@webkit.org>
+
+        suspend/resumeWidgetHierarchyUpdates should be a RAII object
+        https://bugs.webkit.org/show_bug.cgi?id=96706
+
+        Reviewed by Simon Fraser.
+
+        * WebView/WebHTMLView.mm:
+        (-[WebHTMLView _invalidateGStatesForTree]):
+
+2012-09-12  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r127876.
+        http://trac.webkit.org/changeset/127876
+        https://bugs.webkit.org/show_bug.cgi?id=96600
+
+        mouse click doesn't work for spin button if spin button in
+        iframe (Requested by yosin on #webkit).
+
+        * WebCoreSupport/WebFrameLoaderClient.mm:
+        (WebFrameLoaderClient::actionDictionary):
+        * WebView/WebHTMLView.mm:
+        (-[WebHTMLView elementAtPoint:allowShadowContent:]):
+
+2012-09-11  Geoffrey Garen  <ggaren@apple.com>
+
+        Mac build fix: Commit a file I forgot.
+
+        * WebView/WebScriptDebugDelegate.mm:
+        (-[WebScriptCallFrame functionName]):
+
+2012-09-11  Michael Saboff  <msaboff@apple.com>
+
+        Build fixed for http://trac.webkit.org/changeset/128243
+
+        Rubber stamped by Stephanie Lewis.
+
+        Added missing include file needed by 96422.
+
+        * icu/unicode/unorm2.h: Added.
+
+2012-09-11  Michael Saboff  <msaboff@apple.com>
+
+        Build fixed for http://trac.webkit.org/changeset/128243
+
+        Rubber stamped by Stephanie Lewis.
+
+        Added missing include file needed by 96422.
+
+        * icu/unicode/ptypes.h: Added.
+
+2012-09-11  Michael Saboff  <msaboff@apple.com>
+
+        Update ICU header files to more recent version
+        https://bugs.webkit.org/show_bug.cgi?id=96422
+
+        Reviewed by Geoff Garen.
+
+        Updated ICU header files to 4.6.1.  Modifications made as part of the merge are:
+        platform.h - Changed ifndef / define / endif for U_HAVE_UINT8_T, U_HAVE_UINT16_T, U_HAVE_UINT32_T,
+            U_HAVE_UINT64_T, U_IS_BIG_ENDIAN and U_ENABLE_TRACING to match the existing platform.h
+        putil.h (line 132) - Changes defined(U_WINDOWS) to defined(WIN32) || defined(OS2) to match existing putil.h
+        ustring.h (line 945) - Wrapped macro argument cs with { (const UChar *)cs } to match existing ustring.h
+        utypes.h (line 545) - Changed defined(U_WINDOWS) to defined(WIN32) to match existing utypes.h
+
+        * icu/unicode/localpointer.h: Added.
+        * icu/unicode/parseerr.h:
+        * icu/unicode/platform.h:
+        * icu/unicode/putil.h:
+        * icu/unicode/uchar.h:
+        * icu/unicode/uconfig.h:
+        * icu/unicode/uidna.h:
+        * icu/unicode/uiter.h:
+        * icu/unicode/umachine.h:
+        * icu/unicode/unorm.h:
+        * icu/unicode/urename.h:
+        * icu/unicode/uscript.h:
+        * icu/unicode/ustring.h:
+        * icu/unicode/utf.h:
+        * icu/unicode/utf16.h:
+        * icu/unicode/utf8.h:
+        * icu/unicode/utypes.h:
+        * icu/unicode/uvernum.h: Added.
+        * icu/unicode/uversion.h:
+
+2012-09-11  Matt Lilek  <mrl@apple.com>
+
+        OS X port should compile with newer versions of clang
+        https://bugs.webkit.org/show_bug.cgi?id=96434
+
+        m_isTerminated is unused in the Hosted flavor of NetscapePluginStream.
+
+        Reviewed by Anders Carlsson.
+
+        * Plugins/Hosted/HostedNetscapePluginStream.h:
+        (HostedNetscapePluginStream):
+        * Plugins/Hosted/HostedNetscapePluginStream.mm:
+        (WebKit::HostedNetscapePluginStream::HostedNetscapePluginStream):
+
 2012-09-10  Jer Noble  <jer.noble@apple.com>
 
         Unreviewed; rolling out r128081.

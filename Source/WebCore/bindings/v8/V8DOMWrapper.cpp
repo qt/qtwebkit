@@ -86,39 +86,10 @@ v8::Persistent<v8::Object> V8DOMWrapper::setJSWrapperForActiveDOMNode(PassRefPtr
     return wrapperHandle;
 }
 
-v8::Local<v8::Function> V8DOMWrapper::constructorForType(WrapperTypeInfo* type, DOMWindow* window)
-{
-    Frame* frame = window->frame();
-    if (!frame)
-        return v8::Local<v8::Function>();
-
-    if (V8PerContextData* contextData = perContextDataForCurrentWorld(frame))
-        return contextData->constructorForType(type);
-
-    return v8::Local<v8::Function>();
-}
-
-#if ENABLE(WORKERS)
-v8::Local<v8::Function> V8DOMWrapper::constructorForType(WrapperTypeInfo* type, WorkerContext*)
-{
-    WorkerScriptController* controller = WorkerScriptController::controllerForContext();
-    WorkerContextExecutionProxy* proxy = controller ? controller->proxy() : 0;
-    return proxy ? proxy->perContextData()->constructorForType(type) : v8::Local<v8::Function>();
-}
-#endif
-
-#if ENABLE(WORKERS)
-V8PerContextData* V8DOMWrapper::perContextData(WorkerContext*)
-{
-    WorkerScriptController* controller = WorkerScriptController::controllerForContext();
-    WorkerContextExecutionProxy* proxy = controller ? controller->proxy() : 0;
-    return proxy ? proxy->perContextData() : 0;
-}
-#endif
-
 void V8DOMWrapper::setNamedHiddenReference(v8::Handle<v8::Object> parent, const char* name, v8::Handle<v8::Value> child)
 {
-    parent->SetHiddenValue(V8HiddenPropertyName::hiddenReferenceName(name), child);
+    ASSERT(name);
+    parent->SetHiddenValue(V8HiddenPropertyName::hiddenReferenceName(name, strlen(name)), child);
 }
 
 WrapperTypeInfo* V8DOMWrapper::domWrapperType(v8::Handle<v8::Object> object)
@@ -140,9 +111,16 @@ PassRefPtr<NodeFilter> V8DOMWrapper::wrapNativeNodeFilter(v8::Handle<v8::Value> 
     return NodeFilter::create(V8NodeFilterCondition::create(filter));
 }
 
-v8::Local<v8::Object> V8DOMWrapper::instantiateV8Object(WrapperTypeInfo* type, void* impl)
+v8::Local<v8::Object> V8DOMWrapper::instantiateV8Object(Document* document, WrapperTypeInfo* type, void* impl)
 {
-    V8PerContextData* perContextData = V8PerContextData::current();
+    V8PerContextData* perContextData = 0;
+
+    // If we have a pointer to the frame, we cna get the V8PerContextData
+    // directly, which is faster than going through V8.
+    if (document && document->frame())
+        perContextData = perContextDataForCurrentWorld(document->frame());
+    else
+        perContextData = V8PerContextData::from(v8::Context::GetCurrent());
 
     v8::Local<v8::Object> instance = perContextData ? perContextData->createWrapperFromCache(type) : V8ObjectConstructor::newInstance(type->getTemplate()->GetFunction());
 

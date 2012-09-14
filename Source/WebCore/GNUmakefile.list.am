@@ -2238,6 +2238,7 @@ webcore_sources += \
 	Source/WebCore/bindings/js/JSCustomSQLStatementErrorCallback.cpp \
 	Source/WebCore/bindings/js/JSCustomXPathNSResolver.cpp \
 	Source/WebCore/bindings/js/JSCustomXPathNSResolver.h \
+	Source/WebCore/bindings/js/JSDependentRetained.h \
 	Source/WebCore/bindings/js/JSDictionary.cpp \
 	Source/WebCore/bindings/js/JSDictionary.h \
 	Source/WebCore/bindings/js/JSDOMBinding.cpp \
@@ -2416,7 +2417,6 @@ webcore_sources += \
 	Source/WebCore/bindings/js/ScriptProfiler.cpp \
 	Source/WebCore/bindings/js/ScriptProfiler.h \
 	Source/WebCore/bindings/js/ScriptSourceCode.h \
-	Source/WebCore/bindings/js/ScriptSourceProvider.h \
 	Source/WebCore/bindings/js/ScriptState.cpp \
 	Source/WebCore/bindings/js/ScriptState.h \
 	Source/WebCore/bindings/js/ScriptValue.cpp \
@@ -2424,7 +2424,6 @@ webcore_sources += \
 	Source/WebCore/bindings/js/ScriptWrappable.h \
 	Source/WebCore/bindings/js/SerializedScriptValue.cpp \
 	Source/WebCore/bindings/js/SerializedScriptValue.h \
-	Source/WebCore/bindings/js/StringSourceProvider.h \
 	Source/WebCore/bindings/js/WebCoreJSClientData.h \
 	Source/WebCore/bindings/js/WorkerScriptController.cpp \
 	Source/WebCore/bindings/js/WorkerScriptController.h \
@@ -4068,6 +4067,7 @@ webcore_sources += \
 	Source/WebCore/page/UserScriptTypes.h \
 	Source/WebCore/page/UserStyleSheet.h \
 	Source/WebCore/page/UserStyleSheetTypes.h \
+	Source/WebCore/page/ValidationMessageClient.h \
 	Source/WebCore/page/WebCoreKeyboardUIMode.h \
 	Source/WebCore/page/WebKitAnimation.h \
 	Source/WebCore/page/WebKitAnimation.cpp \
@@ -4384,6 +4384,10 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/GlyphPageTreeNode.h \
 	Source/WebCore/platform/graphics/gpu/DrawingBuffer.cpp \
 	Source/WebCore/platform/graphics/gpu/DrawingBuffer.h \
+	Source/WebCore/platform/graphics/gpu/Texture.cpp \
+	Source/WebCore/platform/graphics/gpu/Texture.h \
+	Source/WebCore/platform/graphics/gpu/TilingData.cpp \
+	Source/WebCore/platform/graphics/gpu/TilingData.h \
 	Source/WebCore/platform/graphics/Gradient.cpp \
 	Source/WebCore/platform/graphics/Gradient.h \
 	Source/WebCore/platform/graphics/GraphicsContext.cpp \
@@ -4413,6 +4417,7 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/IntRect.h \
 	Source/WebCore/platform/graphics/IntSize.h \
 	Source/WebCore/platform/graphics/IntSizeHash.h \
+	Source/WebCore/platform/graphics/Latin1TextIterator.h \
 	Source/WebCore/platform/graphics/MediaPlayer.cpp \
 	Source/WebCore/platform/graphics/MediaPlayer.h \
 	Source/WebCore/platform/graphics/MediaPlayerPrivate.h \
@@ -4683,6 +4688,8 @@ webcore_sources += \
 	Source/WebCore/platform/PlatformGestureCurve.h \
 	Source/WebCore/platform/PlatformGestureEvent.h \
 	Source/WebCore/platform/PlatformKeyboardEvent.h \
+	Source/WebCore/platform/PlatformMemoryInstrumentation.cpp \
+	Source/WebCore/platform/PlatformMemoryInstrumentation.h \
 	Source/WebCore/platform/PlatformMenuDescription.h \
 	Source/WebCore/platform/PlatformMouseEvent.h \
 	Source/WebCore/platform/PlatformPasteboard.h \
@@ -4763,12 +4770,15 @@ webcore_sources += \
 	Source/WebCore/platform/text/LineBreakIteratorPoolICU.h \
 	Source/WebCore/platform/text/LineEnding.cpp \
 	Source/WebCore/platform/text/LineEnding.h \
+	Source/WebCore/platform/text/LocaleNone.cpp \
 	Source/WebCore/platform/text/LocaleToScriptMapping.h \
 	Source/WebCore/platform/text/LocaleToScriptMappingDefault.cpp \
 	Source/WebCore/platform/text/LocalizedDate.h \
 	Source/WebCore/platform/text/LocalizedDateNone.cpp \
 	Source/WebCore/platform/text/LocalizedNumber.h \
 	Source/WebCore/platform/text/LocalizedNumberNone.cpp \
+	Source/WebCore/platform/text/Localizer.cpp \
+	Source/WebCore/platform/text/Localizer.h \
 	Source/WebCore/platform/text/ParserUtilities.h \
 	Source/WebCore/platform/text/QuotedPrintable.cpp \
 	Source/WebCore/platform/text/QuotedPrintable.h \

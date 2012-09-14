@@ -168,6 +168,7 @@
 #define FIXED_POSITION_CREATES_STACKING_CONTEXT 1
 #endif
 
+
 using namespace std;
 
 namespace WebCore {
@@ -251,7 +252,7 @@ struct SameSizeAsRuleData {
 COMPILE_ASSERT(sizeof(RuleData) == sizeof(SameSizeAsRuleData), RuleData_should_stay_small);
 
 class RuleSet {
-    WTF_MAKE_NONCOPYABLE(RuleSet);
+    WTF_MAKE_NONCOPYABLE(RuleSet); WTF_MAKE_FAST_ALLOCATED;
 public:
     static PassOwnPtr<RuleSet> create() { return adoptPtr(new RuleSet); }
 
@@ -379,6 +380,7 @@ StyleResolver::StyleResolver(Document* document, bool matchAuthorAndUserStyles)
     , m_matchAuthorAndUserStyles(matchAuthorAndUserStyles)
     , m_sameOriginOnly(false)
     , m_distributedToInsertionPoint(false)
+    , m_hasUnknownPseudoElements(false)
     , m_fontSelector(CSSFontSelector::create(document))
     , m_applyPropertyToRegularStyle(true)
     , m_applyPropertyToVisitedLinkStyle(false)
@@ -1101,7 +1103,7 @@ void StyleResolver::collectMatchingRulesForList(const Vector<RuleData>* rules, i
 #if ENABLE(STYLE_SCOPED)
                 && (!options.scope || options.scope->treeScope() != treeScope)
 #endif
-                && !m_checker.hasUnknownPseudoElements()) {
+                && !m_hasUnknownPseudoElements) {
 
                 InspectorInstrumentation::didMatchRule(cookie, false);
                 continue;
@@ -1119,7 +1121,7 @@ void StyleResolver::collectMatchingRulesForList(const Vector<RuleData>* rules, i
             }
             // If we're matching normal rules, set a pseudo bit if
             // we really just matched a pseudo-element.
-            if (m_dynamicPseudo != NOPSEUDO && m_checker.pseudoStyle() == NOPSEUDO) {
+            if (m_dynamicPseudo != NOPSEUDO && m_pseudoStyle == NOPSEUDO) {
                 if (m_checker.mode() == SelectorChecker::CollectingRules) {
                     InspectorInstrumentation::didMatchRule(cookie, false);
                     continue;
@@ -1216,7 +1218,7 @@ inline void StyleResolver::initElement(Element* e)
 
 inline void StyleResolver::initForStyleResolve(Element* e, RenderStyle* parentStyle, PseudoId pseudoID)
 {
-    m_checker.setPseudoStyle(pseudoID);
+    m_pseudoStyle = pseudoID;
 
     if (e) {
         NodeRenderingContext context(e);
@@ -2198,7 +2200,7 @@ void StyleResolver::adjustRenderStyle(RenderStyle* style, RenderStyle* parentSty
 #else
         || (style->position() == FixedPosition && e && e->document()->page() && e->document()->page()->settings()->fixedPositionCreatesStackingContext())
 #endif
-#if ENABLE(OVERFLOW_SCROLLING)
+#if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
         // Touch overflow scrolling creates a stacking context.
         || ((style->overflowX() != OHIDDEN || style->overflowY() != OHIDDEN) && style->useTouchOverflowScrolling())
 #endif
@@ -2399,11 +2401,11 @@ PassRefPtr<CSSRuleList> StyleResolver::pseudoStyleRulesForElement(Element* e, Ps
 inline bool StyleResolver::checkSelector(const RuleData& ruleData, const ContainerNode* scope)
 {
     m_dynamicPseudo = NOPSEUDO;
-    m_checker.clearHasUnknownPseudoElements();
+    m_hasUnknownPseudoElements = false;
 
     if (ruleData.hasFastCheckableSelector()) {
         // We know this selector does not include any pseudo elements.
-        if (m_checker.pseudoStyle() != NOPSEUDO)
+        if (m_pseudoStyle != NOPSEUDO)
             return false;
         // We know a sufficiently simple single part selector matches simply because we found it from the rule hash.
         // This is limited to HTML only so we don't need to check the namespace.
@@ -2422,10 +2424,11 @@ inline bool StyleResolver::checkSelector(const RuleData& ruleData, const Contain
     context.elementStyle = style();
     context.elementParentStyle = m_parentNode ? m_parentNode->renderStyle() : 0;
     context.scope = scope;
-    SelectorChecker::SelectorMatch match = m_checker.checkSelector(context, m_dynamicPseudo);
+    context.pseudoStyle = m_pseudoStyle;
+    SelectorChecker::SelectorMatch match = m_checker.checkSelector(context, m_dynamicPseudo, m_hasUnknownPseudoElements);
     if (match != SelectorChecker::SelectorMatches)
         return false;
-    if (m_checker.pseudoStyle() != NOPSEUDO && m_checker.pseudoStyle() != m_dynamicPseudo)
+    if (m_pseudoStyle != NOPSEUDO && m_pseudoStyle != m_dynamicPseudo)
         return false;
     return true;
 }
@@ -2435,8 +2438,8 @@ bool StyleResolver::checkRegionSelector(CSSSelector* regionSelector, Element* re
     if (!regionSelector || !regionElement)
         return false;
 
-    m_checker.clearHasUnknownPseudoElements();
-    m_checker.setPseudoStyle(NOPSEUDO);
+    m_hasUnknownPseudoElements = false;
+    m_pseudoStyle = NOPSEUDO;
 
     for (CSSSelector* s = regionSelector; s; s = CSSSelectorList::next(s))
         if (m_checker.checkSelector(s, regionElement))
@@ -4045,7 +4048,7 @@ void StyleResolver::applyProperty(CSSPropertyID id, CSSValue* value)
         return;
     }
 #endif
-#if ENABLE(OVERFLOW_SCROLLING)
+#if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
     case CSSPropertyWebkitOverflowScrolling: {
         HANDLE_INHERIT_AND_INITIAL(useTouchOverflowScrolling, UseTouchOverflowScrolling);
         if (!primitiveValue)

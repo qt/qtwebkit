@@ -463,23 +463,20 @@ NEVER_INLINE bool Interpreter::unwindCallFrame(CallFrame*& callFrame, JSValue ex
             debugger->didExecuteProgram(debuggerCallFrame, codeBlock->ownerExecutable()->sourceID(), codeBlock->ownerExecutable()->lastLine(), 0);
     }
 
-    // If this call frame created an activation or an 'arguments' object, tear it off.
-    if (oldCodeBlock->codeType() == FunctionCode && oldCodeBlock->needsFullScopeChain()) {
-        if (!callFrame->uncheckedR(oldCodeBlock->activationRegister()).jsValue()) {
-            oldCodeBlock->createActivation(callFrame);
-            scope = callFrame->scope();
-        }
-        while (!scope->inherits(&JSActivation::s_info))
-            scope = scope->next();
+    JSValue activation;
+    if (oldCodeBlock->codeType() == FunctionCode && oldCodeBlock->needsActivation()) {
+        activation = callFrame->uncheckedR(oldCodeBlock->activationRegister()).jsValue();
+        if (activation)
+            jsCast<JSActivation*>(activation)->tearOff(*scope->globalData());
+    }
 
-        callFrame->setScope(scope);
-        JSActivation* activation = asActivation(scope);
-        activation->tearOff(*scope->globalData());
-        if (JSValue arguments = callFrame->uncheckedR(unmodifiedArgumentsRegister(oldCodeBlock->argumentsRegister())).jsValue())
-            asArguments(arguments)->didTearOffActivation(callFrame->globalData(), activation);
-    } else if (oldCodeBlock->usesArguments() && !oldCodeBlock->isStrictMode()) {
-        if (JSValue arguments = callFrame->uncheckedR(unmodifiedArgumentsRegister(oldCodeBlock->argumentsRegister())).jsValue())
-            asArguments(arguments)->tearOff(callFrame);
+    if (oldCodeBlock->codeType() == FunctionCode && oldCodeBlock->usesArguments()) {
+        if (JSValue arguments = callFrame->uncheckedR(unmodifiedArgumentsRegister(oldCodeBlock->argumentsRegister())).jsValue()) {
+            if (activation)
+                jsCast<Arguments*>(arguments)->didTearOffActivation(callFrame->globalData(), jsCast<JSActivation*>(activation));
+            else
+                jsCast<Arguments*>(arguments)->tearOff(callFrame);
+        }
     }
 
     CallFrame* callerFrame = callFrame->callerFrame();
@@ -528,7 +525,8 @@ static void appendSourceToError(CallFrame* callFrame, ErrorInstance* exception, 
     int expressionStart = divotPoint - startOffset;
     int expressionStop = divotPoint + endOffset;
 
-    if (!expressionStop || expressionStart > codeBlock->source()->length())
+    const String& sourceString = codeBlock->source()->source();
+    if (!expressionStop || expressionStart > static_cast<int>(sourceString.length()))
         return;
 
     JSGlobalData* globalData = &callFrame->globalData();
@@ -542,8 +540,8 @@ static void appendSourceToError(CallFrame* callFrame, ErrorInstance* exception, 
         message =  makeString(message, " (evaluating '", codeBlock->source()->getRange(expressionStart, expressionStop), "')");
     else {
         // No range information, so give a few characters of context
-        const StringImpl* data = codeBlock->source()->data();
-        int dataLength = codeBlock->source()->length();
+        const StringImpl* data = sourceString.impl();
+        int dataLength = sourceString.length();
         int start = expressionStart;
         int stop = expressionStart;
         // Get up to 20 characters of context to the left and right of the divot, clamping to the line.
@@ -2683,6 +2681,7 @@ JSValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         vPC += OPCODE_LENGTH(op_get_global_var_watchable);
         NEXT_INSTRUCTION();
     }
+    DEFINE_OPCODE(op_init_global_const)
     DEFINE_OPCODE(op_put_global_var) {
         /* put_global_var globalObject(c) registerPointer(n) value(r)
          
@@ -2697,6 +2696,7 @@ JSValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         vPC += OPCODE_LENGTH(op_put_global_var);
         NEXT_INSTRUCTION();
     }
+    DEFINE_OPCODE(op_init_global_const_check)
     DEFINE_OPCODE(op_put_global_var_check) {
         /* put_global_var_check globalObject(c) registerPointer(n) value(r)
          

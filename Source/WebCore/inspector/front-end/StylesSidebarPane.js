@@ -97,9 +97,8 @@ WebInspector.StylesSidebarPane = function(computedStylePane, setPseudoClassCallb
 
     WebInspector.cssModel.addEventListener(WebInspector.CSSStyleModel.Events.StyleSheetChanged, this._styleSheetOrMediaQueryResultChanged, this);
     WebInspector.cssModel.addEventListener(WebInspector.CSSStyleModel.Events.MediaQueryResultChanged, this._styleSheetOrMediaQueryResultChanged, this);
-    WebInspector.domAgent.addEventListener(WebInspector.DOMAgent.Events.AttrModified, this._attributesModified, this);
-    WebInspector.domAgent.addEventListener(WebInspector.DOMAgent.Events.AttrRemoved, this._attributesRemoved, this);
-    WebInspector.domAgent.addEventListener(WebInspector.DOMAgent.Events.StyleInvalidated, this._styleInvalidated, this);
+    WebInspector.domAgent.addEventListener(WebInspector.DOMAgent.Events.AttrModified, this._attributeChanged, this);
+    WebInspector.domAgent.addEventListener(WebInspector.DOMAgent.Events.AttrRemoved, this._attributeChanged, this);
     WebInspector.settings.showUserAgentStyles.addChangeListener(this._showUserAgentStylesSettingChanged.bind(this));
 }
 
@@ -235,17 +234,14 @@ WebInspector.StylesSidebarPane.prototype = {
         }
     },
 
-    /**
-     * @param {function()=} userCallback
-     */
-    _rebuildUpdate: function(userCallback)
+    _rebuildUpdate: function()
     {
         if (this._rebuildUpdateInProgress) {
             this._lastNodeForInnerRebuild = this.node;
             return;
         }
 
-        var node = this._validateNode(userCallback);
+        var node = this._validateNode();
         if (!node)
             return;
 
@@ -257,10 +253,13 @@ WebInspector.StylesSidebarPane.prototype = {
         {
             delete this._rebuildUpdateInProgress;
 
-            if (this._lastNodeForInnerRebuild) {
+            var lastNodeForRebuild = this._lastNodeForInnerRebuild;
+            if (lastNodeForRebuild) {
                 delete this._lastNodeForInnerRebuild;
-                this._rebuildUpdate(userCallback);
-                return;
+                if (lastNodeForRebuild !== this.node) {
+                    this._rebuildUpdate();
+                    return;
+                }
             }
 
             if (matchedResult && this.node === node) {
@@ -269,8 +268,12 @@ WebInspector.StylesSidebarPane.prototype = {
                 resultStyles.inherited = matchedResult.inherited;
                 this._innerRebuildUpdate(node, resultStyles);
             }
-            if (userCallback)
-                userCallback();
+
+            if (lastNodeForRebuild) {
+                // lastNodeForRebuild is the same as this.node - another rebuild has been requested.
+                this._rebuildUpdate();
+                return;
+            }
         }
 
         function inlineCallback(inlineStyle, attributesStyle)
@@ -314,37 +317,22 @@ WebInspector.StylesSidebarPane.prototype = {
         this._rebuildUpdate();
     },
 
-    _attributesModified: function(event)
+    _attributeChanged: function(event)
     {
-        if (this.node !== event.data.node)
+        // Any attribute removal or modification can affect the styles of "related" nodes.
+        // Do not touch the styles if they are being edited.
+        if (this._isEditingStyle || this._userOperation)
             return;
 
-        // Changing style attribute will anyways generate _styleInvalidated message.
-        if (event.data.name === "style")
+        if (!this._canAffectCurrentStyles(event.data.node))
             return;
 
-        // "class" (or any other) attribute might have changed. Update styles unless they are being edited.
-        if (!this._isEditingStyle && !this._userOperation)
-            this._rebuildUpdate();
+        this._rebuildUpdate();
     },
 
-    _attributesRemoved: function(event)
+    _canAffectCurrentStyles: function(node)
     {
-        if (this.node !== event.data.node)
-            return;
-
-        // "style" attribute might have been removed.
-        if (!this._isEditingStyle && !this._userOperation)
-            this._rebuildUpdate();
-    },
-
-    _styleInvalidated: function(event)
-    {
-        if (this.node !== event.data)
-            return;
-
-        if (!this._isEditingStyle && !this._userOperation)
-            this._rebuildUpdate();
+        return this.node && (this.node === node || node.parentNode === this.node.parentNode || node.isAncestor(this.node));
     },
 
     _innerRefreshUpdate: function(node, computedStyle, editedSection)

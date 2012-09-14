@@ -105,6 +105,8 @@
 #include "ImageLoader.h"
 #include "InspectorCounters.h"
 #include "InspectorInstrumentation.h"
+#include "Language.h"
+#include "Localizer.h"
 #include "Logging.h"
 #include "MediaQueryList.h"
 #include "MediaQueryMatcher.h"
@@ -131,6 +133,7 @@
 #include "RenderTextControl.h"
 #include "RenderView.h"
 #include "RenderWidget.h"
+#include "RuntimeEnabledFeatures.h"
 #include "SchemeRegistry.h"
 #include "ScopedEventQueue.h"
 #include "ScriptCallStack.h"
@@ -1384,7 +1387,7 @@ String Document::suggestedMIMEType() const
 // * making it receive a rect as parameter, i.e. nodesFromRect(x, y, w, h);
 // * making it receive the expading size of each direction separately,
 //   i.e. nodesFromRect(x, y, topSize, rightSize, bottomSize, leftSize);
-PassRefPtr<NodeList> Document::nodesFromRect(int centerX, int centerY, unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding, HitTestRequest::HitTestRequestType hitType) const
+PassRefPtr<NodeList> Document::nodesFromRect(int centerX, int centerY, unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding, bool ignoreClipping, bool allowShadowContent, bool allowChildFrameContent) const
 {
     // FIXME: Share code between this, elementFromPoint and caretRangeFromPoint.
     if (!renderer())
@@ -1399,11 +1402,19 @@ PassRefPtr<NodeList> Document::nodesFromRect(int centerX, int centerY, unsigned 
     float zoomFactor = frame->pageZoomFactor();
     LayoutPoint point = roundedLayoutPoint(FloatPoint(centerX * zoomFactor + view()->scrollX(), centerY * zoomFactor + view()->scrollY()));
 
-    HitTestRequest request(hitType);
+    int type = HitTestRequest::ReadOnly | HitTestRequest::Active;
 
     // When ignoreClipping is false, this method returns null for coordinates outside of the viewport.
-    if (!request.ignoreClipping() && !frameView->visibleContentRect().intersects(HitTestResult::rectForPoint(point, topPadding, rightPadding, bottomPadding, leftPadding)))
+    if (ignoreClipping)
+        type |= HitTestRequest::IgnoreClipping;
+    else if (!frameView->visibleContentRect().intersects(HitTestResult::rectForPoint(point, topPadding, rightPadding, bottomPadding, leftPadding)))
         return 0;
+    if (allowShadowContent)
+        type |= HitTestRequest::AllowShadowContent;
+    if (allowChildFrameContent)
+        type |= HitTestRequest::AllowChildFrameContent;
+
+    HitTestRequest request(type);
 
     // Passing a zero padding will trigger a rect hit test, however for the purposes of nodesFromRect,
     // we special handle this case in order to return a valid NodeList.
@@ -6112,6 +6123,121 @@ void Document::setContextFeatures(PassRefPtr<ContextFeatures> features)
     m_contextFeatures = features;
 }
 
+static RenderObject* nearestCommonHoverAncestor(RenderObject* obj1, RenderObject* obj2)
+{
+    if (!obj1 || !obj2)
+        return 0;
+
+    for (RenderObject* currObj1 = obj1; currObj1; currObj1 = currObj1->hoverAncestor()) {
+        for (RenderObject* currObj2 = obj2; currObj2; currObj2 = currObj2->hoverAncestor()) {
+            if (currObj1 == currObj2)
+                return currObj1;
+        }
+    }
+
+    return 0;
+}
+
+void Document::updateHoverActiveState(const HitTestRequest& request, HitTestResult& result)
+{
+    // We don't update :hover/:active state when the result is marked as readOnly.
+    if (request.readOnly())
+        return;
+
+    Node* innerNodeInDocument = result.innerNode();
+    while (innerNodeInDocument && innerNodeInDocument->document() != this)
+        innerNodeInDocument = innerNodeInDocument->document()->ownerElement();
+
+    Node* oldActiveNode = activeNode();
+    if (oldActiveNode && !request.active()) {
+        // We are clearing the :active chain because the mouse has been released.
+        for (RenderObject* curr = oldActiveNode->renderer(); curr; curr = curr->parent()) {
+            if (curr->node() && !curr->isText()) {
+                curr->node()->setActive(false);
+                curr->node()->clearInActiveChain();
+            }
+        }
+        setActiveNode(0);
+    } else {
+        Node* newActiveNode = innerNodeInDocument;
+        if (!oldActiveNode && newActiveNode && request.active() && !request.touchMove()) {
+            // We are setting the :active chain and freezing it. If future moves happen, they
+            // will need to reference this chain.
+            for (RenderObject* curr = newActiveNode->renderer(); curr; curr = curr->parent()) {
+                if (curr->node() && !curr->isText())
+                    curr->node()->setInActiveChain();
+            }
+            setActiveNode(newActiveNode);
+        }
+    }
+    // If the mouse has just been pressed, set :active on the chain. Those (and only those)
+    // nodes should remain :active until the mouse is released.
+    bool allowActiveChanges = !oldActiveNode && activeNode();
+
+    // If the mouse is down and if this is a mouse move event, we want to restrict changes in
+    // :hover/:active to only apply to elements that are in the :active chain that we froze
+    // at the time the mouse went down.
+    bool mustBeInActiveChain = request.active() && request.move();
+
+    RefPtr<Node> oldHoverNode = hoverNode();
+    // Clear the :hover chain when the touch gesture is over.
+    if (request.touchRelease()) {
+        if (oldHoverNode) {
+            for (RenderObject* curr = oldHoverNode->renderer(); curr; curr = curr->hoverAncestor()) {
+                if (curr->node() && !curr->isText())
+                    curr->node()->setHovered(false);
+            }
+            setHoverNode(0);
+        }
+        // A touch release can not set new hover or active target.
+        return;
+    }
+
+    // Check to see if the hovered node has changed.
+    // If it hasn't, we do not need to do anything.
+    Node* newHoverNode = innerNodeInDocument;
+    while (newHoverNode && !newHoverNode->renderer())
+        newHoverNode = newHoverNode->parentOrHostNode();
+
+    // Update our current hover node.
+    setHoverNode(newHoverNode);
+
+    // We have two different objects. Fetch their renderers.
+    RenderObject* oldHoverObj = oldHoverNode ? oldHoverNode->renderer() : 0;
+    RenderObject* newHoverObj = newHoverNode ? newHoverNode->renderer() : 0;
+
+    // Locate the common ancestor render object for the two renderers.
+    RenderObject* ancestor = nearestCommonHoverAncestor(oldHoverObj, newHoverObj);
+
+    Vector<RefPtr<Node>, 32> nodesToRemoveFromChain;
+    Vector<RefPtr<Node>, 32> nodesToAddToChain;
+
+    if (oldHoverObj != newHoverObj) {
+        // The old hover path only needs to be cleared up to (and not including) the common ancestor;
+        for (RenderObject* curr = oldHoverObj; curr && curr != ancestor; curr = curr->hoverAncestor()) {
+            if (curr->node() && !curr->isText() && (!mustBeInActiveChain || curr->node()->inActiveChain()))
+                nodesToRemoveFromChain.append(curr->node());
+        }
+    }
+
+    // Now set the hover state for our new object up to the root.
+    for (RenderObject* curr = newHoverObj; curr; curr = curr->hoverAncestor()) {
+        if (curr->node() && !curr->isText() && (!mustBeInActiveChain || curr->node()->inActiveChain()))
+            nodesToAddToChain.append(curr->node());
+    }
+
+    size_t removeCount = nodesToRemoveFromChain.size();
+    for (size_t i = 0; i < removeCount; ++i)
+        nodesToRemoveFromChain[i]->setHovered(false);
+
+    size_t addCount = nodesToAddToChain.size();
+    for (size_t i = 0; i < addCount; ++i) {
+        if (allowActiveChanges)
+            nodesToAddToChain[i]->setActive(true);
+        nodesToAddToChain[i]->setHovered(true);
+    }
+}
+
 void Document::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
@@ -6170,6 +6296,7 @@ PassRefPtr<UndoManager> Document::undoManager()
 #endif
 
 class ImmutableAttributeDataCacheKey {
+    WTF_MAKE_FAST_ALLOCATED;
 public:
     ImmutableAttributeDataCacheKey()
         : m_localName(0)
@@ -6236,6 +6363,17 @@ PassRefPtr<ElementAttributeData> Document::cachedImmutableAttributeData(const El
     cacheIterator->second = newEntry.release();
 
     return attributeData.release();
+}
+
+Localizer& Document::getLocalizer(const AtomicString& locale)
+{
+    AtomicString localeKey = locale;
+    if (locale.isEmpty() || !RuntimeEnabledFeatures::langAttributeAwareFormControlUIEnabled())
+        localeKey = defaultLanguage();
+    LocaleToLocalizerMap::AddResult result = m_localizerCache.add(localeKey, nullptr);
+    if (result.isNewEntry)
+        result.iterator->second = Localizer::create(localeKey);
+    return *(result.iterator->second);
 }
 
 } // namespace WebCore

@@ -102,7 +102,7 @@ static v8::Handle<v8::Value> dispatchEventCallback(const v8::Arguments& args)
 
 } // namespace TestEventTargetV8Internal
 
-static const V8DOMConfiguration::BatchedCallback TestEventTargetCallbacks[] = {
+static const V8DOMConfiguration::BatchedCallback V8TestEventTargetCallbacks[] = {
     {"item", TestEventTargetV8Internal::itemCallback},
     {"addEventListener", TestEventTargetV8Internal::addEventListenerCallback},
     {"removeEventListener", TestEventTargetV8Internal::removeEventListenerCallback},
@@ -115,7 +115,7 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestEventTargetTemplate(v
     v8::Local<v8::Signature> defaultSignature;
     defaultSignature = V8DOMConfiguration::configureTemplate(desc, "TestEventTarget", v8::Persistent<v8::FunctionTemplate>(), V8TestEventTarget::internalFieldCount,
         0, 0,
-        TestEventTargetCallbacks, WTF_ARRAY_LENGTH(TestEventTargetCallbacks));
+        V8TestEventTargetCallbacks, WTF_ARRAY_LENGTH(V8TestEventTargetCallbacks));
     UNUSED_PARAM(defaultSignature); // In some cases, it will not be used.
     v8::Local<v8::ObjectTemplate> instance = desc->InstanceTemplate();
     v8::Local<v8::ObjectTemplate> proto = desc->PrototypeTemplate();
@@ -173,6 +173,8 @@ bool V8TestEventTarget::HasInstance(v8::Handle<v8::Value> value)
 v8::Handle<v8::Object> V8TestEventTarget::wrapSlow(PassRefPtr<TestEventTarget> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     v8::Handle<v8::Object> wrapper;
+    Document* document = 0;
+    UNUSED_PARAM(document);
 
     v8::Handle<v8::Context> context;
     if (!creationContext.IsEmpty() && creationContext->CreationContext() != v8::Context::GetCurrent()) {
@@ -183,7 +185,7 @@ v8::Handle<v8::Object> V8TestEventTarget::wrapSlow(PassRefPtr<TestEventTarget> i
         context->Enter();
     }
 
-    wrapper = V8DOMWrapper::instantiateV8Object(&info, impl.get());
+    wrapper = V8DOMWrapper::instantiateV8Object(document, &info, impl.get());
 
     if (!context.IsEmpty())
         context->Exit();
