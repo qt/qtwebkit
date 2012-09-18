@@ -139,7 +139,8 @@ StyledElement::StyledElement(const QualifiedName& name, Document* document, Cons
 
 StyledElement::~StyledElement()
 {
-    destroyInlineStyle();
+    if (attributeData() && attributeData()->isMutable())
+        mutableAttributeData()->detachCSSOMWrapperIfNeeded(this);
 }
 
 CSSStyleDeclaration* StyledElement::style()
@@ -163,8 +164,8 @@ void StyledElement::styleAttributeChanged(const AtomicString& newStyleString, Sh
         WTF::OrdinalNumber startLineNumber = WTF::OrdinalNumber::beforeFirst();
         if (document() && document()->scriptableDocumentParser() && !document()->isInDocumentWrite())
             startLineNumber = document()->scriptableDocumentParser()->lineNumber();
-        if (newStyleString.isNull())
-            destroyInlineStyle();
+        if (newStyleString.isNull() && attributeData())
+            mutableAttributeData()->destroyInlineStyle(this);
         else if (document()->contentSecurityPolicy()->allowInlineStyle(document()->url(), startLineNumber))
             ensureAttributeData()->updateInlineStyleAvoidingMutation(this, newStyleString);
         setIsStyleAttributeValid();
@@ -266,7 +267,7 @@ static unsigned computePresentationAttributeCacheHash(const PresentationAttribut
         return 0;
     ASSERT(key.attributesAndValues.size());
     unsigned attributeHash = StringHasher::hashMemory(key.attributesAndValues.data(), key.attributesAndValues.size() * sizeof(key.attributesAndValues[0]));
-    return WTF::intHash((static_cast<uint64_t>(key.tagName->existingHash()) << 32 | attributeHash));
+    return WTF::pairIntHash(key.tagName->existingHash(), attributeHash);
 }
 
 void StyledElement::updateAttributeStyle()

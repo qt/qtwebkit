@@ -79,7 +79,7 @@ CachedImage::~CachedImage()
 
 void CachedImage::load(CachedResourceLoader* cachedResourceLoader, const ResourceLoaderOptions& options)
 {
-    if (!cachedResourceLoader || cachedResourceLoader->autoLoadImages())
+    if (!cachedResourceLoader || !cachedResourceLoader->shouldDeferImageLoad(m_resourceRequest.url()))
         CachedResource::load(cachedResourceLoader, options);
     else
         setLoading(false);
@@ -474,7 +474,7 @@ void CachedImage::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CachedResourceImage);
     CachedResource::reportMemoryUsage(memoryObjectInfo);
-    info.addInstrumentedMember(m_image);
+    info.addMember(m_image);
 #if ENABLE(SVG)
     info.addMember(m_svgImageCache);
 #endif

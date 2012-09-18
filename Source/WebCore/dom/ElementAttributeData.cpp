@@ -213,11 +213,15 @@ void ElementAttributeData::updateInlineStyleAvoidingMutation(StyledElement* elem
         m_inlineStyleDecl->parseDeclaration(text, element->document()->elementSheet()->contents());
 }
 
-void ElementAttributeData::destroyInlineStyle(StyledElement* element) const
+void ElementAttributeData::detachCSSOMWrapperIfNeeded(StyledElement* element)
 {
-    if (!m_inlineStyleDecl)
-        return;
-    m_inlineStyleDecl->clearParentElement(element);
+    if (m_inlineStyleDecl)
+        m_inlineStyleDecl->clearParentElement(element);
+}
+
+void ElementAttributeData::destroyInlineStyle(StyledElement* element)
+{
+    detachCSSOMWrapperIfNeeded(element);
     m_inlineStyleDecl = 0;
 }
 
@@ -291,14 +295,14 @@ void ElementAttributeData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo)
 {
     size_t actualSize = m_isMutable ? sizeof(ElementAttributeData) : immutableElementAttributeDataSize(m_arraySize);
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM, actualSize);
-    info.addInstrumentedMember(m_inlineStyleDecl);
-    info.addInstrumentedMember(m_attributeStyle);
+    info.addMember(m_inlineStyleDecl);
+    info.addMember(m_attributeStyle);
     info.addMember(m_classNames);
-    info.addInstrumentedMember(m_idForStyleResolution);
+    info.addMember(m_idForStyleResolution);
     if (m_isMutable)
         info.addVector(mutableAttributeVector());
     for (unsigned i = 0, len = length(); i < len; i++)
-        info.addInstrumentedMember(*attributeItem(i));
+        info.addMember(*attributeItem(i));
 }
 
 size_t ElementAttributeData::getAttributeItemIndexSlowCase(const AtomicString& name, bool shouldIgnoreAttributeCase) const

@@ -498,7 +498,10 @@ bool ewk_view_accelerated_compositing_mode_enter(const Evas_Object* ewkView)
     EWK_VIEW_SD_GET_OR_RETURN(ewkView, smartData, false);
     EWK_VIEW_PRIV_GET_OR_RETURN(smartData, priv, false);
 
-    EINA_SAFETY_ON_NULL_RETURN_VAL(priv->evasGl, false);
+    if (priv->evasGl) {
+        EINA_LOG_DOM_WARN(_ewk_log_dom, "Accelerated compositing mode already entered.");
+        return false;
+    }
 
     Evas* evas = evas_object_evas_get(ewkView);
     priv->evasGl = evas_gl_new(evas);
@@ -1622,4 +1625,27 @@ Eina_Bool ewk_view_mouse_events_enabled_get(const Evas_Object* ewkView)
     EWK_VIEW_PRIV_GET_OR_RETURN(smartData, priv, false);
 
     return priv->areMouseEventsEnabled;
+}
+
+/**
+ * @internal
+ * Web process has crashed.
+ *
+ * Emits signal: "webprocess,crashed" with pointer to crash handling boolean.
+ */
+void ewk_view_webprocess_crashed(Evas_Object* ewkView)
+{
+    EWK_VIEW_SD_GET_OR_RETURN(ewkView, smartData);
+    EWK_VIEW_PRIV_GET_OR_RETURN(smartData, priv);
+
+    bool handled = false;
+    evas_object_smart_callback_call(ewkView, "webprocess,crashed", &handled);
+
+    if (!handled) {
+        CString url = priv->pageProxy->urlAtProcessExit().utf8();
+        EINA_LOG_DOM_WARN(_ewk_log_dom, "WARNING: The web process experienced a crash on '%s'.\n", url.data());
+
+        // Display an error page
+        ewk_view_html_string_load(ewkView, "The web process has crashed.", 0, url.data());
+    }
 }

@@ -1,3 +1,78 @@
+2012-09-17  Brian Anderson  <brianderson@chromium.org>
+
+        [chromium] Add rendering commit statistics
+        https://bugs.webkit.org/show_bug.cgi?id=96938
+
+        Reviewed by James Robinson.
+
+        Adds total commit time and total commit count to WebRenderingStats.
+        Allows us to caculate average commit time in performance tests.
+
+        * chromium/public/WebRenderingStats.h:
+        (WebRenderingStats):
+        (WebKit::WebRenderingStats::WebRenderingStats):
+        (WebKit::WebRenderingStats::enumerateFields):
+
+2012-09-17  Antoine Labour  <piman@chromium.org>
+
+        [chromium] Add onSendFrameToParentCompositorAck to WebCompositorOutputSurfaceClient
+        https://bugs.webkit.org/show_bug.cgi?id=96850
+
+        Reviewed by James Robinson.
+
+        Hook for the WebCompositorOutputSurface::sendFrameToParent ack.
+        Also changes WebCompositorFrame from a class to a struct.
+
+        * chromium/public/WebCompositorOutputSurface.h:
+        (WebKit):
+        * chromium/public/WebCompositorOutputSurfaceClient.h:
+        (WebKit):
+        (WebCompositorOutputSurfaceClient):
+
+2012-09-17  Alexandre Elias  <aelias@chromium.org>
+
+        [chromium] WebCompositorOutputSurface software API
+        https://bugs.webkit.org/show_bug.cgi?id=96851
+
+        Reviewed by James Robinson.
+
+        This adds a software-based output option to
+        WebCompositorOutputSurface, for use with the new software compositor.
+        If returns a "tear-off" which provides a WebImage object that can be
+        written to or read.
+
+        * Platform.gypi:
+        * chromium/public/WebCompositorOutputSurface.h:
+        (WebKit):
+        (WebCompositorOutputSurface):
+        (WebKit::WebCompositorOutputSurface::surfaceSoftware):
+        * chromium/public/WebCompositorOutputSurfaceSoftware.h: Added.
+        (WebKit):
+        (WebCompositorOutputSurfaceSoftware):
+        (WebKit::WebCompositorOutputSurfaceSoftware::~WebCompositorOutputSurfaceSoftware):
+
+2012-09-14  Dana Jansens  <danakj@chromium.org>
+
+        [chromium] Add the ubercomp WebDelegatedRendererLayer
+        https://bugs.webkit.org/show_bug.cgi?id=94145
+
+        Reviewed by Adrienne Walker.
+
+        Expose a WebDelegatedRendererLayer to allow the browser compositor to
+        embed such a layer in its tree. This layer will be connected to IPC
+        machinery in the compositor that is yet TBD which will give a set of
+        RenderPasses with DrawQuads to the impl copy of the layer.
+
+        * Platform.gypi:
+        * chromium/public/WebCompositorSupport.h:
+        (WebKit):
+        (WebKit::WebCompositorSupport::createDelegatedRendererLayer):
+        (WebCompositorSupport):
+        * chromium/public/WebDelegatedRendererLayer.h: Added.
+        (WebKit):
+        (WebDelegatedRendererLayer):
+        (WebKit::WebDelegatedRendererLayer::~WebDelegatedRendererLayer):
+
 2012-09-11  Zach Kuznia  <zork@chromium.org>
 
         Fix FilterTypeZoom to properly call canvas->restore()

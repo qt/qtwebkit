@@ -1,3 +1,267 @@
+2012-09-17  Brian Anderson  <brianderson@chromium.org>
+
+        [chromium] Add rendering commit statistics
+        https://bugs.webkit.org/show_bug.cgi?id=96938
+
+        Reviewed by James Robinson.
+
+        Adds total commit time and total commit count to WebRenderingStats.
+        Allows us to caculate average commit time in performance tests.
+
+        * src/WebLayerTreeViewImpl.cpp:
+        (WebKit::WebLayerTreeViewImpl::renderingStats):
+
+2012-09-17  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Move a FilterOperationsTest and WebInputEventConversionTest back to webkit_unittest_files variable
+        https://bugs.webkit.org/show_bug.cgi?id=96964
+
+        Reviewed by Adrienne Walker.
+
+        These targets are really webkit unit tests and shouldn't be guarded by use_libcc_for_compositor.
+
+        * WebKit.gypi:
+
+2012-09-17  Rick Byers  <rbyers@chromium.org>
+
+        Send GestureTapDownCancel to WebCore
+        https://bugs.webkit.org/show_bug.cgi?id=96060
+
+        Reviewed by Antonio Gomes.
+
+        Plumb WebInputEvent::GetsureTapCancel to
+        PlatformInputEvent::GestureTapDownCancel.  After all the chromium code
+        was landed, it was suggested that 'TapDownCancel' was a better name
+        than 'TapCancel' since you can't cancel a Tap.  I'm not changing the
+        WebInputEvent definition here because that would be a breaking change
+        to chromium, but I can do that as a series of follow-up CLs.
+        * src/WebInputEventConversion.cpp:
+        (WebKit::PlatformGestureEventBuilder::PlatformGestureEventBuilder):
+        * src/WebPopupMenuImpl.cpp:
+        (WebKit::WebPopupMenuImpl::handleInputEvent):
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::handleGestureEvent):
+
+2012-09-17  Alec Flett  <alecflett@chromium.org>
+
+        IndexedDB: Use ScriptValue instead of SerializedScriptValue for get/openCursor
+        https://bugs.webkit.org/show_bug.cgi?id=95409
+
+        Reviewed by Kentaro Hara.
+
+        This removes a bunch of tests that have been migrated to
+        LayoutTests, in https://bugs.webkit.org/show_bug.cgi?id=96818.
+
+        * tests/IDBBindingUtilitiesTest.cpp:
+        (WebCore::checkKeyFromValueAndKeyPathInternal):
+        (WebCore::checkKeyPathNullValue):
+        (WebCore::injectKey):
+        (WebCore::checkInjection):
+        (WebCore::checkInjectionFails):
+        (WebCore::checkKeyPathStringValue):
+        (WebCore::checkKeyPathNumberValue):
+        (WebCore::TEST):
+        * tests/IDBKeyPathTest.cpp:
+
+2012-09-17  Leandro Gracia Gil  <leandrogracia@chromium.org>
+
+        [Chromium] Fix cases where find-in-page doesn't send a final update
+        https://bugs.webkit.org/show_bug.cgi?id=96402
+
+        Fix some issues in the WebKit implementation that prevented to send a final
+        reportFindInPageMatchCount message.
+
+        Reviewed by Adam Barth.
+
+        * src/WebFrameImpl.cpp:
+        (WebKit::WebFrameImpl::scopeStringMatches):
+        (WebKit):
+        (WebKit::WebFrameImpl::finishCurrentScopingEffort):
+        (WebKit::WebFrameImpl::cancelPendingScopingEffort):
+        (WebKit::WebFrameImpl::WebFrameImpl):
+        (WebKit::WebFrameImpl::shouldScopeMatches):
+        * src/WebFrameImpl.h:
+
+2012-09-17  Joshua Bell  <jsbell@chromium.org>
+
+        [Chromium] IndexedDB: Remove legacy two-phase open() API members
+        https://bugs.webkit.org/show_bug.cgi?id=96802
+
+        Reviewed by Tony Chang.
+
+        Following http://webkit.org/b/90411 and subsequent cleanup on the Chromium side,
+        these entry points are no longer needed.
+
+        * public/WebIDBDatabase.h: Delete old second-phase open(db-callbacks)
+        * public/WebIDBFactory.h: Delete old first-phase open() w/o db-callbacks
+        * src/WebIDBDatabaseImpl.cpp: No longer need to account for a close between phases.
+        (WebKit::WebIDBDatabaseImpl::WebIDBDatabaseImpl):
+        (WebKit::WebIDBDatabaseImpl::close):
+        (WebKit::WebIDBDatabaseImpl::forceClose):
+        * src/WebIDBDatabaseImpl.h:
+        (WebIDBDatabaseImpl):
+
+2012-09-17  Ilya Tikhonovsky  <loislo@chromium.org>
+
+        Unreviewed. Temporary disable visited set counter check.
+
+        * tests/MemoryInstrumentationTest.cpp:
+        (WebCore::TEST):
+
+2012-09-17  Ilya Tikhonovsky  <loislo@chromium.org>
+
+        Web Inspector: NMI: now when we can detect instrumented classes we can
+        remove addInstrumentedMember and use addMember for everything.
+        https://bugs.webkit.org/show_bug.cgi?id=96913
+
+        Reviewed by Yury Semikhatsky.
+
+        * tests/MemoryInstrumentationTest.cpp:
+        (WebCore::InstrumentedDOM::reportMemoryUsage):
+        (WebCore::NonVirtualInstrumented::reportMemoryUsage):
+        (WebCore::InstrumentedOwner::reportMemoryUsage):
+
+2012-09-17  Ilya Tikhonovsky  <loislo@chromium.org>
+
+        Unreviewed single line fix for mac chromium canary bot.
+
+        * tests/MemoryInstrumentationTest.cpp:
+        (WebCore::TEST):
+
+2012-09-15  Yury Semikhatsky  <yurys@chromium.org>
+
+        Web Inspector: automatically detect if class has reportMemoryUsage method
+        https://bugs.webkit.org/show_bug.cgi?id=96756
+
+        Reviewed by Alexander Pavlov.
+
+        Test that reportMemoryUsage method will be called on the instrumented object
+        even if it is a template.
+
+        * tests/MemoryInstrumentationTest.cpp:
+        (WebCore):
+        (InstrumentedTemplate):
+        (WebCore::InstrumentedTemplate::InstrumentedTemplate):
+        (WebCore::InstrumentedTemplate::reportMemoryUsage):
+        (WebCore::TEST):
+
+2012-09-14  Yury Semikhatsky  <yurys@chromium.org>
+
+        Web Inspector: OwnPtr and RefPtr reported by pointer can be double counted by the memory instrumentation
+        https://bugs.webkit.org/show_bug.cgi?id=96791
+
+        Reviewed by Alexander Pavlov.
+
+        Test that pointers to RefPtr and OwnPtr won't be double counted by
+        the memory instrumentation.
+
+        * tests/MemoryInstrumentationTest.cpp:
+        (WebCore):
+        (TwoPointersToRefPtr):
+        (WebCore::TwoPointersToRefPtr::TwoPointersToRefPtr):
+        (WebCore::TwoPointersToRefPtr::reportMemoryUsage):
+        (WebCore::TEST):
+        (TwoPointersToOwnPtr):
+        (WebCore::TwoPointersToOwnPtr::TwoPointersToOwnPtr):
+        (WebCore::TwoPointersToOwnPtr::reportMemoryUsage):
+
+2012-09-16  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
+2012-09-14  Julien Chaffraix  <jchaffraix@webkit.org>
+
+        Revert r127457 and following fixes due to several hit-testing regressions
+        https://bugs.webkit.org/show_bug.cgi?id=96830
+
+        Reviewed by Antonio Gomes.
+
+        This change reverts r127457, r127863 and r128505.
+
+        * src/ContextMenuClientImpl.cpp:
+        (WebKit::ContextMenuClientImpl::getCustomMenuFromDefaultItems):
+
+2012-09-14  Ojan Vafai  <ojan@chromium.org>
+
+        Provide a runtime setting to disable position:sticky
+        https://bugs.webkit.org/show_bug.cgi?id=96827
+
+        Reviewed by James Robinson.
+
+        * public/WebSettings.h:
+        * src/WebSettingsImpl.cpp:
+        (WebKit::WebSettingsImpl::setCSSStickyPositionEnabled):
+        (WebKit):
+        * src/WebSettingsImpl.h:
+        (WebSettingsImpl):
+
+2012-09-14  Adam Barth  <abarth@webkit.org>
+
+        Remove webkitPostMessage
+        https://bugs.webkit.org/show_bug.cgi?id=96577
+
+        Reviewed by Ojan Vafai.
+
+        Add ENABLE_LEGACY_VENDOR_PREFIXES flag.
+
+        * features.gypi:
+
+2012-09-14  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
+2012-09-14  Rick Byers  <rbyers@chromium.org>
+
+        [chromium] add touch area to gestureTapDown data
+        https://bugs.webkit.org/show_bug.cgi?id=96806
+
+        Reviewed by Adam Barth.
+
+        Add width/height for GestureTapDown as for GestureTap/LongPress so that
+        we can eventually do fuzzing on it.
+        * public/WebInputEvent.h:
+        * src/WebInputEventConversion.cpp:
+        (WebKit::PlatformGestureEventBuilder::PlatformGestureEventBuilder):
+
+2012-09-14  Peter Beverloo  <peter@chromium.org>
+
+        [Chromium] Support the --{in,out,err}-fifo arguments on TestWebKitAPI and webkit_unit_tests
+        https://bugs.webkit.org/show_bug.cgi?id=96687
+
+        Reviewed by Tony Chang.
+
+        Android's DumpRenderTree currently supports these arguments, implemented
+        as part of TestShellAndroid:
+        http://trac.webkit.org/browser/trunk/Tools/DumpRenderTree/chromium/TestShellAndroid.cpp?rev=128496
+
+        They're used by the layout test runner to get the STDOUT and STDERR while
+        a layout test run is in process, which is a safer alternative to parsing
+        all the logcat output manually. The implementation can be seen here:
+        http://trac.webkit.org/browser/trunk/Tools/Scripts/webkitpy/layout_tests/port/chromium_android.py?rev=128496#L590
+
+        This patch generalizes parsing of and applying the effects of these arguments
+        so that they can be used for TestWebKitAPI and webkit_unit_tests as well.
+        After this patch, this will make it possible to pull out the output-reading
+        code from Android's layout test port and generalize it so it can be re-used
+        in the new test-runner for the other two test suites.
+
+        This has no effect when compiling and running these tests as part of Chromium
+        code, which has a much more advanced test-runner that does parse complete log
+        output, but also directly depends on code licensed under Apache 2.
+
+        * WebKit.gypi:
+        * tests/ForwardIOStreamsAndroid.cpp: Added.
+        (WebKit):
+        (WebKit::maybeInitIOStreamForwardingForAndroid):
+        * tests/ForwardIOStreamsAndroid.h: Added.
+        (WebKit):
+        * tests/RunAllTests.cpp:
+        (main):
+
 2012-09-14  Keishi Hattori  <keishi@webkit.org>
 
         Make time input lang attribute aware for testing

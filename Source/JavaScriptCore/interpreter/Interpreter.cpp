@@ -473,7 +473,7 @@ NEVER_INLINE bool Interpreter::unwindCallFrame(CallFrame*& callFrame, JSValue ex
     if (oldCodeBlock->codeType() == FunctionCode && oldCodeBlock->usesArguments()) {
         if (JSValue arguments = callFrame->uncheckedR(unmodifiedArgumentsRegister(oldCodeBlock->argumentsRegister())).jsValue()) {
             if (activation)
-                jsCast<Arguments*>(arguments)->didTearOffActivation(callFrame->globalData(), jsCast<JSActivation*>(activation));
+                jsCast<Arguments*>(arguments)->didTearOffActivation(callFrame, jsCast<JSActivation*>(activation));
             else
                 jsCast<Arguments*>(arguments)->tearOff(callFrame);
         }
@@ -3610,8 +3610,8 @@ skip_id_custom_self:
             uint32_t i = subscript.asUInt32();
             if (isJSArray(baseValue)) {
                 JSArray* jsArray = asArray(baseValue);
-                if (jsArray->canGetIndex(i))
-                    result = jsArray->getIndex(i);
+                if (jsArray->canGetIndexQuickly(i))
+                    result = jsArray->getIndexQuickly(i);
                 else
                     result = jsArray->JSArray::get(callFrame, i);
             } else if (isJSString(baseValue) && asString(baseValue)->canGetIndex(i))
@@ -3652,8 +3652,8 @@ skip_id_custom_self:
             uint32_t i = subscript.asUInt32();
             if (isJSArray(baseValue)) {
                 JSArray* jsArray = asArray(baseValue);
-                if (jsArray->canSetIndex(i))
-                    jsArray->setIndex(*globalData, i, callFrame->r(value).jsValue());
+                if (jsArray->canSetIndexQuickly(i))
+                    jsArray->setIndexQuickly(*globalData, i, callFrame->r(value).jsValue());
                 else
                     jsArray->JSArray::putByIndex(jsArray, callFrame, i, callFrame->r(value).jsValue(), codeBlock->isStrictMode());
             } else
@@ -4508,7 +4508,7 @@ skip_id_custom_self:
         ASSERT(codeBlock->usesArguments());
         if (JSValue argumentsValue = callFrame->r(unmodifiedArgumentsRegister(arguments)).jsValue()) {
             if (JSValue activationValue = callFrame->r(activation).jsValue())
-                asArguments(argumentsValue)->didTearOffActivation(callFrame->globalData(), asActivation(activationValue));
+                asArguments(argumentsValue)->didTearOffActivation(callFrame, asActivation(activationValue));
             else
                 asArguments(argumentsValue)->tearOff(callFrame);
         }
@@ -5012,7 +5012,7 @@ skip_id_custom_self:
             accessor->setGetter(callFrame->globalData(), asObject(getter));
         if (!setter.isUndefined())
             accessor->setSetter(callFrame->globalData(), asObject(setter));
-        baseObj->putDirectAccessor(callFrame->globalData(), ident, accessor, Accessor);
+        baseObj->putDirectAccessor(callFrame, ident, accessor, Accessor);
 
         vPC += OPCODE_LENGTH(op_put_getter_setter);
         NEXT_INSTRUCTION();

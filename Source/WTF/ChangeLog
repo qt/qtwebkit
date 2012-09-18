@@ -1,3 +1,266 @@
+2012-09-17  Glenn Adams  <glenn@skynav.com>
+
+        Including HexNumber.h fails build if hexDigitsForMode is not referenced
+        https://bugs.webkit.org/show_bug.cgi?id=96873
+
+        Reviewed by Benjamin Poulain.
+
+        Ensure release build is possible when hexDigitsForMode is not referenced by
+        template expansion.
+
+        * wtf/HexNumber.h:
+        (WTF::Internal::hexDigitsForMode):
+        Change hexDigitsForMode to inline (rather than static). Make string literals
+        {lower,upper}HexDigits non-local and non-static, but const, to which the linker
+        should merge references in the RO data segment.
+
+2012-09-17  Filip Pizlo  <fpizlo@apple.com>
+
+        The ThreadRescrictionVerifier should be more forcibly disabled on systems that use threads
+        https://bugs.webkit.org/show_bug.cgi?id=96957
+
+        Reviewed by Oliver Hunt.
+
+        * wtf/ThreadRestrictionVerifier.h:
+        (WTF):
+        (WTF::ThreadRestrictionVerifier::ThreadRestrictionVerifier):
+        (ThreadRestrictionVerifier):
+        (WTF::ThreadRestrictionVerifier::setMutexMode):
+        (WTF::ThreadRestrictionVerifier::setDispatchQueueMode):
+        (WTF::ThreadRestrictionVerifier::turnOffVerification):
+        (WTF::ThreadRestrictionVerifier::setShared):
+        (WTF::ThreadRestrictionVerifier::isSafeToUse):
+
+2012-09-17  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r128796.
+        http://trac.webkit.org/changeset/128796
+        https://bugs.webkit.org/show_bug.cgi?id=96966
+
+        It broke everything (Requested by Ossy_NIGHT on #webkit).
+
+        * wtf/OSAllocatorPosix.cpp:
+        (WTF::OSAllocator::reserveUncommitted):
+        (WTF::OSAllocator::reserveAndCommit):
+        (WTF::OSAllocator::commit):
+        (WTF::OSAllocator::decommit):
+
+2012-09-17  Uli Schlachter  <psychon@znc.in>
+
+        Implement uncommitted memory for Linux.
+        https://bugs.webkit.org/show_bug.cgi?id=65766
+
+        Reviewed by Gavin Barraclough.
+
+        The old approach used MAP_NORESERVE to allocate address space without
+        committing it. However, that flag gets ignored if
+        /proc/sys/vm/overcommit_memory is set to 2. The new approach uses a
+        mapping with PROT_NONE. This works because mappings which aren't even
+        readable don't get accounted as committed on Linux.
+
+        * wtf/OSAllocatorPosix.cpp:
+        (WTF::OSAllocator::reserveUncommitted):
+        (WTF::OSAllocator::reserveAndCommit):
+        (WTF::OSAllocator::commit):
+        (WTF::OSAllocator::decommit):
+
+2012-09-17  Filip Pizlo  <fpizlo@apple.com>
+
+        Array profiling has convergence issues
+        https://bugs.webkit.org/show_bug.cgi?id=96891
+
+        Reviewed by Gavin Barraclough.
+
+        Added functions for testing if something is a power of 2.
+
+        * wtf/MathExtras.h:
+        (hasZeroOrOneBitsSet):
+        (hasTwoOrMoreBitsSet):
+
+2012-09-17  Ilya Tikhonovsky  <loislo@chromium.org>
+
+        Web Inspector: NMI: now when we can detect instrumented classes we can
+        remove addInstrumentedMember and use addMember for everything.
+        https://bugs.webkit.org/show_bug.cgi?id=96913
+
+        Reviewed by Yury Semikhatsky.
+
+        * wtf/MemoryInstrumentation.h:
+        (WTF::MemoryInstrumentation::addRootObject):
+        (WTF::MemoryInstrumentation::addObject):
+        (WTF::MemoryInstrumentation::addObjectImpl):
+        (WTF):
+        (WTF::MemoryInstrumentation::addInstrumentedCollection):
+        (WTF::MemoryInstrumentation::addInstrumentedMapEntries):
+        (WTF::MemoryInstrumentation::addInstrumentedMapValues):
+        * wtf/text/AtomicString.cpp:
+        (WTF::AtomicString::reportMemoryUsage):
+        * wtf/text/CString.h:
+        (WTF::CString::reportMemoryUsage):
+        * wtf/text/StringImpl.cpp:
+        (WTF::StringImpl::reportMemoryUsage):
+        * wtf/text/WTFString.cpp:
+        (WTF::String::reportMemoryUsage):
+        * wtf/url/api/ParsedURL.cpp:
+        (WTF::ParsedURL::reportMemoryUsage):
+        * wtf/url/api/URLString.cpp:
+        (WTF::URLString::reportMemoryUsage):
+
+2012-09-17  Ilya Tikhonovsky  <loislo@chromium.org>
+
+        Unreviewed compilation fix.
+
+        * wtf/MemoryInstrumentation.h:
+        (WTF::MemoryInstrumentation::reportObjectMemoryUsage):
+
+2012-09-15  Yury Semikhatsky  <yurys@chromium.org>
+
+        Web Inspector: automatically detect if class has reportMemoryUsage method
+        https://bugs.webkit.org/show_bug.cgi?id=96756
+
+        Reviewed by Alexander Pavlov.
+
+        Implemeted automatic selector of the memory reporting method. If
+        an object has reportMemoryUsage method then call it. Otherwise
+        count only object's self size. As the next step we will delete
+        addInstrumentedMember and addInstrumentedObjectImpl and will
+        have only addMember and addObjectImpl that would automatically
+        call reportMemoryUsage if it is present.
+
+        * wtf/MemoryInstrumentation.h:
+        (WTF::MemoryInstrumentation::selectInstrumentationMethod):
+        (MemoryInstrumentation):
+        (WTF::MemoryInstrumentation::reportObjectMemoryUsage):
+        (WTF::MemoryInstrumentation::addInstrumentedObjectImpl):
+        (WTF::MemoryInstrumentation::addObjectImpl):
+        (WTF::::process):
+
+2012-09-14  Yury Semikhatsky  <yurys@chromium.org>
+
+        Web Inspector: OwnPtr and RefPtr reported by pointer can be double counted by the memory instrumentation
+        https://bugs.webkit.org/show_bug.cgi?id=96791
+
+        Reviewed by Alexander Pavlov.
+
+        * wtf/MemoryInstrumentation.h:
+        (WTF::MemoryInstrumentation::addObjectImpl): check if the smart pointer has already
+        been visited before counting its size.
+
+2012-09-15  Benjamin Poulain  <benjamin@webkit.org>
+
+        Fix the build with WTF URL
+        https://bugs.webkit.org/show_bug.cgi?id=96875
+
+        Reviewed by Adam Barth.
+
+        Add support for MemoryInstrumentation to WTF's URL classes.
+
+        * wtf/url/api/ParsedURL.cpp:
+        (WTF::ParsedURL::reportMemoryUsage):
+        * wtf/url/api/ParsedURL.h:
+        (ParsedURL):
+        * wtf/url/api/URLString.cpp:
+        (WTF::URLString::reportMemoryUsage):
+        * wtf/url/api/URLString.h:
+        (URLString):
+
+2012-09-15  Raphael Kubo da Costa  <rakuco@FreeBSD.org>
+
+        llint: Implement LOCAL_LABEL_STRING for the BSD platforms.
+        https://bugs.webkit.org/show_bug.cgi?id=96870
+
+        Reviewed by Filip Pizlo.
+
+        * wtf/InlineASM.h: Extend the definition of LOCAL_LABEL_STRING
+        currently used for OS(LINUX) to the BSDs, since they also normally
+        use GNU as, and clang/llvm seems to parse that syntax just fine as
+        well.
+
+2012-09-14  Alexey Proskuryakov  <ap@apple.com>
+
+        Minimize collisions when hashing pairs
+        https://bugs.webkit.org/show_bug.cgi?id=96022
+
+        Build fix (with newer clang?)
+
+        * wtf/HashFunctions.h: (WTF::pairIntHash): Be explicit about casting from
+        64 bit to 32 bit.
+
+2012-09-14  Dana Jansens  <danakj@chromium.org>
+
+        Minimize collisions when hashing pairs
+        https://bugs.webkit.org/show_bug.cgi?id=96022
+
+        Reviewed by Adrienne Walker.
+
+        The current hash function for pairs has poor performance as it does a
+        nice hash function on 64 bits, but then just drops the top 32 bits. The
+        hash method for pairs tries to use Thomas Wang's 64 bit Mix Function,
+        but this requires not dropping any bits in order to retain the
+        characteristics mentioned by Thomas.
+
+        A better method of hashing sets of 32-bit integers is to use
+        multiplication in 64 bits with random integers. This method is a
+        provably almost-universal hash function. Testing shows that this
+        method decreases the time required, when compared with the current
+        method, by more than 20% due to better hashing characteristics.
+
+        * wtf/HashFunctions.h:
+        (WTF):
+        (WTF::pairIntHash):
+        Implments the hashing method for a pair of unsigned integers.
+
+        (WTF::PairHash::hash):
+        Use pairIntHash() on the hash results of each object in the pair.
+
+        (WTF::IntPairHash::hash):
+        Implement an integer-specific PairHash class that does not need to
+        hash each object in the pair. It uses pairIntHash on the two
+        integers in the pair directly.
+
+        (WTF::IntPairHash::equal):
+        (IntPairHash):
+
+2012-09-14  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Make force_static_libs_as_shared work on Mac OS
+
+        We had to move a few LIBS += around that were in the wrong place,
+        and not caught when everything was just linked into the final
+        QtWebKit library.
+
+        Reviewed by Simon Hausmann.
+
+        * WTF.pri:
+
+2012-09-14  Ilya Tikhonovsky  <loislo@chromium.org>
+
+        Web Inspector: NMI: convert template versions of String*::reportMemoryUsage functions to normal functions.
+        https://bugs.webkit.org/show_bug.cgi?id=96759
+
+        Reviewed by Yury Semikhatsky.
+
+        Now when MemoryInstrumentation.h is a part of WTF we can move reportMemoryUsage functions to cpp file.
+
+        * wtf/text/AtomicString.cpp:
+        (WTF::AtomicString::reportMemoryUsage):
+        (WTF):
+        * wtf/text/AtomicString.h:
+        (WTF):
+        (AtomicString):
+        * wtf/text/StringImpl.cpp:
+        (WTF::StringImpl::reportMemoryUsage):
+        (WTF):
+        * wtf/text/StringImpl.h:
+        (WTF):
+        (StringImpl):
+        * wtf/text/WTFString.cpp:
+        (WTF::String::reportMemoryUsage):
+        (WTF):
+        * wtf/text/WTFString.h:
+        (WTF):
+        (String):
+
 2012-09-14  Ilya Tikhonovsky  <loislo@chromium.org>
 
         Web Inspector: NMI: remove current traits helper class because it is customizing the instrumentation at a wrong place and is not necessary at the moment.

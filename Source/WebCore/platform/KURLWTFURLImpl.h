@@ -28,6 +28,7 @@
 
 #if USE(WTFURL)
 
+#include "PlatformMemoryInstrumentation.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
@@ -41,12 +42,11 @@ public:
     WTF::ParsedURL m_parsedURL;
     String m_invalidUrlString;
 
-    template<typename MemoruObjectInfo>
-    void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo)
+    void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     {
         typename MemoryObjectInfo::ClassInfo info(memoryObjectInfo, this);
-        info.addInstrumentedMember(m_parsedURL);
-        info.addInstrumentedMember(m_invalidUrlString);
+        info.addMember(m_parsedURL);
+        info.addMember(m_invalidUrlString);
     }
     PassRefPtr<KURLWTFURLImpl> copy() const;
 };

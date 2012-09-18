@@ -83,6 +83,7 @@ public:
     void dumpResourceResponseMIMETypes() { m_dumpResourceResponseMIMETypes = true; }
     void dumpWillCacheResponse() { m_dumpWillCacheResponse = true; }
     void dumpApplicationCacheDelegateCallbacks() { m_dumpApplicationCacheDelegateCallbacks = true; }
+    void dumpDatabaseCallbacks() { m_dumpDatabaseCallbacks = true; }
 
     void setShouldDumpFrameLoadCallbacks(bool value) { m_dumpFrameLoadCallbacks = value; }
     void setShouldDumpProgressFinishedCallback(bool value) { m_dumpProgressFinishedCallback = value; }
@@ -177,6 +178,7 @@ public:
     bool shouldDumpResourceResponseMIMETypes() const { return m_dumpResourceResponseMIMETypes; }
     bool shouldDumpWillCacheResponse() const { return m_dumpWillCacheResponse; }
     bool shouldDumpApplicationCacheDelegateCallbacks() const { return m_dumpApplicationCacheDelegateCallbacks; }
+    bool shouldDumpDatabaseCallbacks() const { return m_dumpDatabaseCallbacks; }
 
     bool isPolicyDelegateEnabled() const { return m_policyDelegateEnabled; }
     bool isPolicyDelegatePermissive() const { return m_policyDelegatePermissive; }
@@ -206,6 +208,9 @@ public:
     void setShouldStayOnPageAfterHandlingBeforeUnload(bool);
 
     void setDefersLoading(bool);
+
+    void setStopProvisionalFrameLoads() { m_shouldStopProvisionalFrameLoads = true; }
+    bool shouldStopProvisionalFrameLoads() const { return m_shouldStopProvisionalFrameLoads; }
     
     bool globalFlag() const { return m_globalFlag; }
     void setGlobalFlag(bool value) { m_globalFlag = value; }
@@ -276,12 +281,14 @@ private:
     bool m_dumpResourceResponseMIMETypes;
     bool m_dumpWillCacheResponse;
     bool m_dumpApplicationCacheDelegateCallbacks;
+    bool m_dumpDatabaseCallbacks;
     bool m_disallowIncreaseForApplicationCacheQuota;
     bool m_waitToDump; // True if waitUntilDone() has been called, but notifyDone() has not yet been called.
     bool m_testRepaint;
     bool m_testRepaintSweepHorizontally;
 
     bool m_willSendRequestReturnsNull;
+    bool m_shouldStopProvisionalFrameLoads;
 
     bool m_policyDelegateEnabled;
     bool m_policyDelegatePermissive;

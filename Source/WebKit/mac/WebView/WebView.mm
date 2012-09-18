@@ -1547,6 +1547,10 @@ static bool needsSelfRetainWhileLoadingQuirk()
     settings->setRequestAnimationFrameEnabled([preferences requestAnimationFrameEnabled]);
     settings->setNeedsDidFinishLoadOrderQuirk(needsDidFinishLoadOrderQuirk());
     settings->setDiagnosticLoggingEnabled([preferences diagnosticLoggingEnabled]);
+
+    // We have enabled this setting in WebKit2 for the sake of some ScrollingCoordinator work.
+    // To avoid possible rendering differences, we should enable it for WebKit1 too.
+    settings->setFixedPositionCreatesStackingContext(true);
     
     NSTimeInterval timeout = [preferences incrementalRenderingSuppressionTimeoutInSeconds];
     if (timeout > 0)
@@ -2866,6 +2870,8 @@ static PassOwnPtr<Vector<String> > toStringVector(NSArray* patterns)
 
     Pagination pagination = page->pagination();
     pagination.behavesLikeColumns = behavesLikeColumns;
+
+    page->setPagination(pagination);
 }
 
 - (BOOL)_paginationBehavesLikeColumns

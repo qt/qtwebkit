@@ -1,3 +1,232 @@
+2012-09-18  Arvid Nilsson  <anilsson@rim.com>
+
+        [BlackBerry] Prevent scroll adjustment of input fields when region of interest mechanism active
+        https://bugs.webkit.org/show_bug.cgi?id=96750
+
+        Reviewed by Antonio Gomes.
+
+        The region of interest mechanism replaces the scrolling/zooming
+        functionality in InputHandler::ensureFocusTextElementVisible().
+
+        We introduce a new fine-grained setting for the various adjustment
+        modes. The WebKit embedder can disable all scroll types in favor of the
+        region of interest mechanism by using the new setting.
+
+        PR #208387
+
+        Reviewed internally by Mike Fenton.
+
+        * WebKitSupport/AboutData.cpp:
+        (BlackBerry::WebKit::configPage):
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::ensureFocusTextElementVisible):
+        * WebKitSupport/InputHandler.h:
+
+2012-09-17  Jakob Petsovits  <jpetsovits@rim.com>
+
+        [BlackBerry] Remove dysfunctional zoom blit in setViewportSize().
+        https://bugs.webkit.org/show_bug.cgi?id=96954
+        PR 178411
+
+        Reviewed by Antonio Gomes.
+
+        The blitContents() call removed by this patch used to
+        be part of scheduleZoomAboutPoint(). Its goal was to
+        display a preview of the zoomed contents, primarily
+        when auto-zoomed after rotation. Nested inside a pair
+        of screen suspend/resume calls, it has been a pointless
+        no-op for a while.
+
+        Antonio's recent change to remove scheduleZoomAboutPoint()
+        and call zoomAboutPoint() from setViewportSize() directly
+        (the only call site) obsoletes the call completely.
+        The zoomAboutPoint() call itself will cause a re-render
+        and blit right away, so we don't care about any preview.
+        zoomAboutPoint() will also take care of the necessary
+        screen/backingstore suspension.
+
+        The result is a vastly simplified block of code.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::setViewportSize):
+
+2012-09-17  Antonio Gomes  <agomes@rim.com>
+
+        [BlackBerry] [FullScreen] entering/leaving fullscreen results in temporary glitches on the screen
+        https://bugs.webkit.org/show_bug.cgi?id=96927
+        PR #180866
+
+        Reviewed by Yong Li.
+
+        Suspend backing store and screen updates while entering fullscreen,
+        and only resume at the end, when viewport is resized.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::WebPagePrivate):
+        (BlackBerry::WebKit::WebPagePrivate::setViewportSize):
+        * Api/WebPage_p.h:
+        (WebPagePrivate):
+        * WebCoreSupport/ChromeClientBlackBerry.cpp:
+        (WebCore::ChromeClientBlackBerry::enterFullScreenForElement):
+        (WebCore::ChromeClientBlackBerry::exitFullScreenForElement):
+
+2012-09-17  Rob Buis  <rbuis@rim.com>
+
+        [BlackBerry] Fix compile problems in WebKit/blackberry
+        https://bugs.webkit.org/show_bug.cgi?id=96926
+
+        Reviewed by Antonio Gomes.
+
+        This code is slightly out of date and so will not compile, fix it.
+
+        * WebCoreSupport/BatteryClientBlackBerry.cpp:
+        (WebCore::BatteryClientBlackBerry::BatteryClientBlackBerry):
+        * WebCoreSupport/BatteryClientBlackBerry.h:
+        (WebKit):
+        * WebCoreSupport/CredentialTransformData.h:
+        * WebCoreSupport/DeviceOrientationClientBlackBerry.cpp:
+        (DeviceOrientationClientBlackBerry::onOrientation):
+        * WebCoreSupport/InspectorClientBlackBerry.h:
+        * WebCoreSupport/PagePopupBlackBerry.cpp:
+        * WebKitSupport/DOMSupport.cpp:
+        (BlackBerry::WebKit::DOMSupport::isDateTimeInputField):
+        (BlackBerry::WebKit::DOMSupport::isTextBasedContentEditableElement):
+        * WebKitSupport/DumpRenderTreeSupport.cpp:
+        (DumpRenderTreeSupport::numberOfPendingGeolocationPermissionRequests):
+        * WebKitSupport/InPageSearchManager.cpp:
+        (BlackBerry::WebKit::InPageSearchManager::scopeStringMatches):
+
+2012-09-17  Antonio Gomes  <agomes@rim.com>
+
+        [BlackBerry] BackingStorePrivate::resumeScreenAndBackingStoreUpdates more atomic
+        https://bugs.webkit.org/show_bug.cgi?id=96925
+
+        [FullScreen] entering/leaving fullscreen results in temporary glitches on the screen (part 2/3)
+        PR #180866
+
+        Reviewed by Rob Buis.
+        Internally reviewed by Arvid Nilsson.
+
+        Paraphrasing Arvid "resumeBackingStore will be a truly atomic operation.
+        Well more atomic than it was before, with regards to a mix of accelerated and
+        non-accelerated compositing content".
+
+        I.e. by committing the root layer (if needed) when resuming the Backing
+        Store, we call blitVisibleContents right way, so we are actually shortcutting when
+        AC content will get on screen.
+
+        * Api/BackingStore.cpp:
+        (BlackBerry::WebKit::BackingStorePrivate::resumeScreenAndBackingStoreUpdates):
+
+2012-09-17  Peter Wang  <peter.wang@torchmobile.com.cn>
+
+        [BlackBerry] To support "Frames View" of "TimeLine" panel in Inspector
+        https://bugs.webkit.org/show_bug.cgi?id=96077
+
+        Reviewed by Rob Buis.
+
+        Invoke the "instrumentBeginFrame" and "instrumentCancelFrame" at the start and end of processing
+        render message to record one time of page's update.
+
+        * Api/BackingStore.cpp:
+        (BlackBerry::WebKit::BackingStorePrivate::instrumentBeginFrame):
+        (WebKit):
+        (BlackBerry::WebKit::BackingStorePrivate::instrumentCancelFrame):
+        * Api/BackingStore_p.h:
+        * WebKitSupport/RenderQueue.cpp:
+        (BlackBerry::WebKit::RenderQueue::render):
+
+2012-09-17  Jakob Petsovits  <jpetsovits@rim.com>
+
+        [BlackBerry] Support copying image data in WebOverlay.
+        https://bugs.webkit.org/show_bug.cgi?id=96684
+        RIM PR 195444
+
+        Reviewed by Rob Buis.
+        Internally reviewed by Arvid Nilsson.
+
+        The publicly exposed WebOverlay class provides a method
+        setContentsToImage() to assign a pointer to pixel data,
+        which is later used to provide texture data for the
+        underlying compositing layer. This works well for static
+        images that stay in memory and never change, but not
+        so well for images with changing contents or where the
+        image data is being reassigned from different image
+        sources that are not constantly kept around in memory.
+
+        Due to the delayed upload and delayed fetching of
+        EGLImage data by the GPU, we shouldn't assume the caller
+        to know how long the image should be retained. Instead,
+        we should offer another method of setting image data
+        that takes ownership of the pixel data.
+
+        This patch adds an option to setContentsToImage() that
+        copies the passed pixel data and doesn't destroy it
+        until both the texture is destroyed and the image
+        contents are changed. Using this method, the caller can
+        withdraw the passed pixel array right after the
+        setContentsToImage() call without consequences.
+
+        * Api/WebOverlay.cpp:
+        (BlackBerry::WebKit::WebOverlay::setContentsToImage):
+        (BlackBerry::WebKit::WebOverlayPrivateWebKitThread::setContentsToImage):
+        (BlackBerry::WebKit::WebOverlayLayerCompositingThreadClient::WebOverlayLayerCompositingThreadClient):
+        (BlackBerry::WebKit::WebOverlayLayerCompositingThreadClient::invalidate):
+        (BlackBerry::WebKit::WebOverlayLayerCompositingThreadClient::setContents):
+        (WebKit):
+        (BlackBerry::WebKit::WebOverlayLayerCompositingThreadClient::clearUploadedContents):
+        (BlackBerry::WebKit::WebOverlayLayerCompositingThreadClient::setContentsToColor):
+        (BlackBerry::WebKit::WebOverlayLayerCompositingThreadClient::uploadTexturesIfNeeded):
+        (BlackBerry::WebKit::WebOverlayLayerCompositingThreadClient::deleteTextures):
+        (BlackBerry::WebKit::WebOverlayPrivateCompositingThread::setContentsToImage):
+        * Api/WebOverlay.h:
+        * Api/WebOverlay_p.h:
+        (WebOverlayPrivate):
+        (WebOverlayPrivateWebKitThread):
+        (WebOverlayLayerCompositingThreadClient):
+        (WebOverlayPrivateCompositingThread):
+
+2012-09-14  Dana Jansens  <danakj@chromium.org>
+
+        Minimize collisions when hashing pairs
+        https://bugs.webkit.org/show_bug.cgi?id=96022
+
+        Reviewed by Adrienne Walker.
+
+        Use WTF::pairIntHash() to hash a pair of integers.
+
+        * WebKitSupport/TileIndexHash.h:
+
+2012-09-14  Genevieve Mak  <gmak@rim.com>
+
+        Always send mouse events on pages that don't scroll even if there
+        is no mouse move listener attatched.
+        PR #208228
+        https://bugs.webkit.org/show_bug.cgi?id=96800
+
+        Reviewed by Antonio Gomes.
+
+        Reviewed Internally By Antonio Gomes.
+
+        * WebKitSupport/TouchEventHandler.cpp:
+        (BlackBerry::WebKit::TouchEventHandler::handleTouchPoint):
+
+2012-09-14  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Update the minimum zoom scale when focusing an input field.
+        https://bugs.webkit.org/show_bug.cgi?id=96789
+
+        Reviewed by Antonio Gomes.
+
+        PR 188751.
+
+        Increase the minimum font fix and base it on mm instead of pixels.
+
+        Reviewed Internally by Gen Mak.
+
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::ensureFocusTextElementVisible):
+
 2012-09-13  Antonio Gomes  <agomes@rim.com>
 
         [BlackBerry]  Remove the ability to schedule a zoom about point call.

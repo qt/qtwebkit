@@ -90,6 +90,7 @@ my (
     $inspectorSupport,
     $javascriptDebuggerSupport,
     $legacyNotificationsSupport,
+    $legacyVendorPrefixSupport,
     $legacyWebKitBlobBuilderSupport,
     $linkPrefetchSupport,
     $linkPrerenderSupport,
@@ -281,6 +282,9 @@ my @features = (
     { option => "legacy-notifications", desc => "Toggle Legacy Notifications support",
       define => "ENABLE_LEGACY_NOTIFICATIONS", default => isBlackBerry(), value => \$legacyNotificationsSupport },
 
+    { option => "legacy-vendor-prefixes", desc => "Toggle Legacy Vendor Prefix support",
+      define => "ENABLE_LEGACY_VENDOR_PREFIXES", default => !isChromium(), value => \$legacyVendorPrefixSupport },
+
     { option => "legacy-webkit-blob-builder", desc => "Toggle Legacy WebKit Blob Builder support",
       define => "ENABLE_LEGACY_WEBKIT_BLOB_BUILDER", default => (isGtk() || isChromium() || isBlackBerry() || isEfl()), value => \$legacyWebKitBlobBuilderSupport },
 
@@ -393,7 +397,7 @@ my @features = (
       define => "ENABLE_VIDEO", default => (isAppleWebKit() || isGtk() || isBlackBerry() || isEfl()), value => \$videoSupport },
 
     { option => "video-track", desc => "Toggle Video Track support",
-      define => "ENABLE_VIDEO_TRACK", default => (isAppleWebKit() || isGtk() || isEfl()), value => \$videoTrackSupport },
+      define => "ENABLE_VIDEO_TRACK", default => (isAppleWebKit() || isGtk() || isEfl() || isBlackBerry()), value => \$videoTrackSupport },
 
     { option => "webgl", desc => "Toggle WebGL support",
       define => "ENABLE_WEBGL", default => (isAppleMacWebKit() || isGtk()), value => \$webglSupport },

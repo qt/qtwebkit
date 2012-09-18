@@ -126,7 +126,8 @@ namespace JSC {
         WriteBarrier<Structure> m_activationStructure;
         WriteBarrier<Structure> m_nameScopeStructure;
         WriteBarrier<Structure> m_argumentsStructure;
-        WriteBarrier<Structure> m_arrayStructure;
+        WriteBarrier<Structure> m_arrayStructure; // This gets set to m_arrayStructureForSlowPut as soon as we decide to have a bad time.
+        WriteBarrier<Structure> m_arrayStructureForSlowPut;
         WriteBarrier<Structure> m_booleanObjectStructure;
         WriteBarrier<Structure> m_callbackConstructorStructure;
         WriteBarrier<Structure> m_callbackFunctionStructure;
@@ -149,12 +150,14 @@ namespace JSC {
         Debugger* m_debugger;
 
         RefPtr<WatchpointSet> m_masqueradesAsUndefinedWatchpoint;
+        RefPtr<WatchpointSet> m_havingABadTimeWatchpoint;
 
         OwnPtr<JSGlobalObjectRareData> m_rareData;
 
         WeakRandom m_weakRandom;
 
         bool m_evalEnabled;
+        String m_evalDisabledErrorMessage;
         bool m_experimentsEnabled;
 
         static JS_EXPORTDATA const GlobalObjectMethodTable s_globalObjectMethodTable;
@@ -259,6 +262,7 @@ namespace JSC {
         Structure* nameScopeStructure() const { return m_nameScopeStructure.get(); }
         Structure* argumentsStructure() const { return m_argumentsStructure.get(); }
         Structure* arrayStructure() const { return m_arrayStructure.get(); }
+        void* addressOfArrayStructure() { return &m_arrayStructure; }
         Structure* booleanObjectStructure() const { return m_booleanObjectStructure.get(); }
         Structure* callbackConstructorStructure() const { return m_callbackConstructorStructure.get(); }
         Structure* callbackFunctionStructure() const { return m_callbackFunctionStructure.get(); }
@@ -279,6 +283,14 @@ namespace JSC {
         Structure* stringObjectStructure() const { return m_stringObjectStructure.get(); }
 
         WatchpointSet* masqueradesAsUndefinedWatchpoint() { return m_masqueradesAsUndefinedWatchpoint.get(); }
+        WatchpointSet* havingABadTimeWatchpoint() { return m_havingABadTimeWatchpoint.get(); }
+        
+        bool isHavingABadTime() const
+        {
+            return m_havingABadTimeWatchpoint->hasBeenInvalidated();
+        }
+        
+        void haveABadTime(JSGlobalData&);
 
         void setProfileGroup(unsigned value) { createRareDataIfNeeded(); m_rareData->profileGroup = value; }
         unsigned profileGroup() const
@@ -304,8 +316,13 @@ namespace JSC {
 
         bool isDynamicScope(bool& requiresDynamicChecks) const;
 
-        void setEvalEnabled(bool enabled) { m_evalEnabled = enabled; }
-        bool evalEnabled() { return m_evalEnabled; }
+        bool evalEnabled() const { return m_evalEnabled; }
+        const String& evalDisabledErrorMessage() const { return m_evalDisabledErrorMessage; }
+        void setEvalEnabled(bool enabled, const String& errorMessage = String())
+        {
+            m_evalEnabled = enabled;
+            m_evalDisabledErrorMessage = errorMessage;
+        }
 
         void resetPrototype(JSGlobalData&, JSValue prototype);
 

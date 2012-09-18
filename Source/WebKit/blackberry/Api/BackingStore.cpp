@@ -28,6 +28,7 @@
 #include "FrameView.h"
 #include "GraphicsContext.h"
 #include "InspectorController.h"
+#include "InspectorInstrumentation.h"
 #include "Page.h"
 #include "SurfacePool.h"
 #include "WebPage.h"
@@ -235,6 +236,16 @@ BackingStorePrivate::~BackingStorePrivate()
     pthread_mutex_destroy(&m_mutex);
 }
 
+void BackingStorePrivate::instrumentBeginFrame()
+{
+    WebCore::InspectorInstrumentation::didBeginFrame(WebPagePrivate::core(m_webPage));
+}
+
+void BackingStorePrivate::instrumentCancelFrame()
+{
+    WebCore::InspectorInstrumentation::didCancelFrame(WebPagePrivate::core(m_webPage));
+}
+
 bool BackingStorePrivate::shouldDirectRenderingToWindow() const
 {
     // Direct rendering doesn't work with OpenGL compositing code paths due to
@@ -349,9 +360,14 @@ void BackingStorePrivate::resumeScreenAndBackingStoreUpdates(BackingStore::Resum
     --m_suspendScreenUpdates;
     BlackBerry::Platform::userInterfaceThreadMessageClient()->syncToCurrentMessage();
 
+#if USE(ACCELERATED_COMPOSITING)
+    // This will also blit since we set the OSDS flag above.
+    m_webPage->d->commitRootLayerIfNeeded();
+#else
     // Do some blitting if necessary.
     if ((op == BackingStore::Blit || op == BackingStore::RenderAndBlit) && !shouldDirectRenderingToWindow())
         blitVisibleContents();
+#endif
 }
 
 void BackingStorePrivate::repaint(const Platform::IntRect& windowRect,

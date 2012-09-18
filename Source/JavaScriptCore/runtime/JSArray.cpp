@@ -34,7 +34,6 @@
 #include "IndexingHeaderInlineMethods.h"
 #include "PropertyNameArray.h"
 #include "Reject.h"
-#include "SparseArrayValueMapInlineMethods.h"
 #include <wtf/AVLTree.h>
 #include <wtf/Assertions.h>
 #include <wtf/OwnPtr.h>
@@ -405,7 +404,7 @@ JSValue JSArray::pop(ExecState* exec)
     case ArrayClass:
         return jsUndefined();
         
-    case ArrayWithArrayStorage: {
+    case ARRAY_WITH_ARRAY_STORAGE_INDEXING_TYPES: {
         ArrayStorage* storage = m_butterfly->arrayStorage();
     
         unsigned length = storage->length();
@@ -465,6 +464,16 @@ void JSArray::push(ExecState* exec, JSValue value)
         break;
     }
         
+    case ArrayWithSlowPutArrayStorage: {
+        unsigned oldLength = length();
+        if (attemptToInterceptPutByIndexOnHole(exec, oldLength, value, true)) {
+            if (!exec->hadException() && oldLength < 0xFFFFFFFFu)
+                setLength(exec, oldLength + 1, true);
+            return;
+        }
+        // Fall through.
+    }
+        
     case ArrayWithArrayStorage: {
         ArrayStorage* storage = m_butterfly->arrayStorage();
 
@@ -478,8 +487,8 @@ void JSArray::push(ExecState* exec, JSValue value)
             return;
         }
 
-        // Pushing to an array of length 2^32-1 stores the property, but throws a range error.
-        if (UNLIKELY(storage->length() == 0xFFFFFFFFu)) {
+        // Pushing to an array of invalid length (2^31-1) stores the property, but throws a range error.
+        if (storage->length() > MAX_ARRAY_INDEX) {
             methodTable()->putByIndex(this, exec, storage->length(), value, true);
             // Per ES5.1 15.4.4.7 step 6 & 15.4.5.1 step 3.d.
             if (!exec->hadException())
@@ -549,7 +558,9 @@ bool JSArray::unshiftCount(ExecState* exec, unsigned count)
         storage = m_butterfly->arrayStorage();
         storage->m_indexBias -= count;
         storage->setVectorLength(storage->vectorLength() + count);
-    } else if (!unshiftCountSlowCase(exec->globalData(), count)) {
+    } else if (unshiftCountSlowCase(exec->globalData(), count))
+        storage = arrayStorage();
+    else {
         throwOutOfMemoryError(exec);
         return true;
     }
@@ -916,7 +927,7 @@ void JSArray::fillArgList(ExecState* exec, MarkedArgumentBuffer& args)
     case ArrayClass:
         return;
     
-    case ArrayWithArrayStorage: {
+    case ARRAY_WITH_ARRAY_STORAGE_INDEXING_TYPES: {
         ArrayStorage* storage = m_butterfly->arrayStorage();
         
         WriteBarrier<Unknown>* vector = storage->m_vector;
@@ -946,7 +957,7 @@ void JSArray::copyToArguments(ExecState* exec, CallFrame* callFrame, uint32_t le
     case ArrayClass:
         return;
         
-    case ArrayWithArrayStorage: {
+    case ARRAY_WITH_ARRAY_STORAGE_INDEXING_TYPES: {
         ArrayStorage* storage = m_butterfly->arrayStorage();
         unsigned i = 0;
         WriteBarrier<Unknown>* vector = storage->m_vector;

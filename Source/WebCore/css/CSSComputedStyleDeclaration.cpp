@@ -64,10 +64,12 @@
 #include <wtf/text/StringBuilder.h>
 
 #if ENABLE(CSS_SHADERS)
+#include "CustomFilterArrayParameter.h"
 #include "CustomFilterNumberParameter.h"
 #include "CustomFilterOperation.h"
 #include "CustomFilterParameter.h"
 #include "CustomFilterTransformParameter.h"
+#include "WebKitCSSArrayFunctionValue.h"
 #include "WebKitCSSMixFunctionValue.h"
 #endif
 
@@ -771,6 +773,14 @@ static PassRefPtr<CSSValue> computedTransform(RenderObject* renderer, const Rend
 }
 
 #if ENABLE(CSS_SHADERS)
+static PassRefPtr<CSSValue> valueForCustomFilterArrayParameter(const CustomFilterArrayParameter* arrayParameter)
+{
+    RefPtr<WebKitCSSArrayFunctionValue> arrayParameterValue = WebKitCSSArrayFunctionValue::create();
+    for (unsigned i = 0, size = arrayParameter->size(); i < size; ++i)
+        arrayParameterValue->append(cssValuePool().createValue(arrayParameter->valueAt(i), CSSPrimitiveValue::CSS_NUMBER));
+    return arrayParameterValue.release();
+}
+
 static PassRefPtr<CSSValue> valueForCustomFilterNumberParameter(const CustomFilterNumberParameter* numberParameter)
 {
     RefPtr<CSSValueList> numberParameterValue = CSSValueList::createSpaceSeparated();
@@ -793,6 +803,8 @@ static PassRefPtr<CSSValue> valueForCustomFilterParameter(const RenderObject* re
     // FIXME: Add here computed style for the other types: boolean, transform, matrix, texture.
     ASSERT(parameter);
     switch (parameter->parameterType()) {
+    case CustomFilterParameter::ARRAY:
+        return valueForCustomFilterArrayParameter(static_cast<const CustomFilterArrayParameter*>(parameter));
     case CustomFilterParameter::NUMBER:
         return valueForCustomFilterNumberParameter(static_cast<const CustomFilterNumberParameter*>(parameter));
     case CustomFilterParameter::TRANSFORM:
@@ -2405,9 +2417,11 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         case CSSPropertyCounterReset:
             return counterToCSSValue(style.get(), propertyID);
         case CSSPropertyWebkitClipPath:
-            if (!style->clipPath())
-                return cssValuePool().createIdentifierValue(CSSValueNone);
-            return valueForBasicShape(style->clipPath());
+            if (ClipPathOperation* operation = style->clipPath()) {
+                if (operation->getOperationType() == ClipPathOperation::SHAPE)
+                    return valueForBasicShape(static_cast<ShapeClipPathOperation*>(operation)->basicShape());
+            }
+            return cssValuePool().createIdentifierValue(CSSValueNone);
 #if ENABLE(CSS_REGIONS)
         case CSSPropertyWebkitFlowInto:
             if (style->flowThread().isNull())
@@ -2735,7 +2749,7 @@ PassRefPtr<StylePropertySet> CSSComputedStyleDeclaration::copyPropertiesInSet(co
 void CSSComputedStyleDeclaration::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addInstrumentedMember(m_node);
+    info.addMember(m_node);
 }
 
 CSSRule* CSSComputedStyleDeclaration::parentRule() const

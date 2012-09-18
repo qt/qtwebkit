@@ -114,6 +114,9 @@ class ChromiumPort(Port):
     def default_pixel_tests(self):
         return True
 
+    def default_baseline_search_path(self):
+        return map(self._webkit_baseline_path, self.FALLBACK_PATHS[self.version()])
+
     def default_timeout_ms(self):
         if self.get_option('configuration') == 'Debug':
             return 12 * 1000
@@ -351,8 +354,8 @@ class ChromiumPort(Port):
         if stderr and 'AddressSanitizer' in stderr:
             asan_filter_path = self.path_from_chromium_base('tools', 'valgrind', 'asan', 'asan_symbolize.py')
             if self._filesystem.exists(asan_filter_path):
-                output = self._executive.run_command([asan_filter_path], input=stderr)
-                stderr = self._executive.run_command(['c++filt'], input=output)
+                output = self._executive.run_command([asan_filter_path], input=stderr, decode_output=False)
+                stderr = self._executive.run_command(['c++filt'], input=output, decode_output=False)
 
         return super(ChromiumPort, self)._get_crash_log(name, pid, stdout, stderr, newer_than)
 

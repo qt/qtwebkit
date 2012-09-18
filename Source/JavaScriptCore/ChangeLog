@@ -1,3 +1,978 @@
+2012-09-18  Mark Lam  <mark.lam@apple.com>
+
+        Not reviewed. Attempt at greening the WinCairo bot. Touching
+        LowLevelInterpreter.asm to trigger a rebuild of LLIntDesiredOffsets.
+        https://bugs.webkit.org/show_bug.cgi?id=96992.
+
+        * llint/LowLevelInterpreter.asm:
+
+2012-09-18  Peter Gal  <galpeter@inf.u-szeged.hu>
+
+        [Qt] REGRESSION(r128790): It broke the ARM build
+        https://bugs.webkit.org/show_bug.cgi?id=96968
+
+        Reviewed by Filip Pizlo.
+
+        Implement the missing or32 method in the MacroAssemblerARM.h.
+
+        * assembler/MacroAssemblerARM.h:
+        (JSC::MacroAssemblerARM::or32):
+        (MacroAssemblerARM):
+
+2012-09-18  Mark Lam  <mark.lam@apple.com>
+
+        Fix for WinCairo builds.
+        https://bugs.webkit.org/show_bug.cgi?id=96992.
+
+        Reviewed by Filip Pizlo.
+
+        Adding additional vcproj build targets in LLIntDesiredOffsets.vcproj,
+        LLIntOffsetsExtractor.vcproj, and LLIntAssembly.vcproj to match those
+        in jsc.vcproj.
+
+        * JavaScriptCore.vcproj/LLIntAssembly/LLIntAssembly.vcproj:
+        * JavaScriptCore.vcproj/LLIntDesiredOffsets/LLIntDesiredOffsets.vcproj:
+        * JavaScriptCore.vcproj/LLIntOffsetsExtractor/LLIntOffsetsExtractor.vcproj:
+        * JavaScriptCore.vcproj/LLIntOffsetsExtractor/LLIntOffsetsExtractorCommon.vsprops: Added property svn:eol-style.
+        * JavaScriptCore.vcproj/LLIntOffsetsExtractor/LLIntOffsetsExtractorDebug.vsprops: Added property svn:eol-style.
+        * JavaScriptCore.vcproj/LLIntOffsetsExtractor/LLIntOffsetsExtractorDebugAll.vsprops: Added.
+        * JavaScriptCore.vcproj/LLIntOffsetsExtractor/LLIntOffsetsExtractorDebugCairoCFLite.vsprops: Added.
+        * JavaScriptCore.vcproj/LLIntOffsetsExtractor/LLIntOffsetsExtractorProduction.vsprops: Added.
+        * JavaScriptCore.vcproj/LLIntOffsetsExtractor/LLIntOffsetsExtractorRelease.vsprops: Added property svn:eol-style.
+        * JavaScriptCore.vcproj/LLIntOffsetsExtractor/LLIntOffsetsExtractorReleaseCairoCFLite.vsprops: Added.
+        * JavaScriptCore.vcproj/LLIntOffsetsExtractor/LLIntOffsetsExtractorReleasePGO.vsprops: Added.
+
+2012-09-18  Filip Pizlo  <fpizlo@apple.com>
+
+        Unreviewed, fix sloppy English in comment.
+
+        * runtime/JSGlobalObject.cpp:
+        (JSC):
+
+2012-09-17  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Unreviewed, rolling out r128826 and r128813.
+
+        * API/JSCallbackConstructor.cpp:
+        (JSC):
+        (JSC::JSCallbackConstructor::JSCallbackConstructor):
+        * API/JSCallbackConstructor.h:
+        (JSCallbackConstructor):
+        * API/JSCallbackObject.cpp:
+        (JSC):
+        (JSC::::createStructure):
+        * API/JSCallbackObject.h:
+        (JSC::JSCallbackObject::create):
+        (JSCallbackObject):
+        * API/JSClassRef.cpp:
+        (OpaqueJSClass::prototype):
+        * API/JSObjectRef.cpp:
+        (JSObjectMake):
+        (JSObjectGetPrivate):
+        (JSObjectSetPrivate):
+        (JSObjectGetPrivateProperty):
+        (JSObjectSetPrivateProperty):
+        (JSObjectDeletePrivateProperty):
+        * API/JSValueRef.cpp:
+        (JSValueIsObjectOfClass):
+        * API/JSWeakObjectMapRefPrivate.cpp:
+        * GNUmakefile.list.am:
+        * JSCTypedArrayStubs.h:
+        (JSC):
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.vcproj:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * dfg/DFGSpeculativeJIT.h:
+        (JSC::DFG::SpeculativeJIT::emitAllocateBasicJSObject):
+        (JSC::DFG::SpeculativeJIT::emitAllocateJSFinalObject):
+        * heap/Heap.cpp:
+        (JSC::Heap::isSafeToSweepStructures):
+        (JSC):
+        * heap/Heap.h:
+        (JSC::Heap::allocatorForObjectWithDestructor):
+        (Heap):
+        (JSC::Heap::allocateWithDestructor):
+        (JSC::Heap::allocateStructure):
+        (JSC):
+        * heap/IncrementalSweeper.cpp:
+        (JSC::IncrementalSweeper::IncrementalSweeper):
+        (JSC::IncrementalSweeper::sweepNextBlock):
+        (JSC::IncrementalSweeper::startSweeping):
+        (JSC::IncrementalSweeper::willFinishSweeping):
+        (JSC::IncrementalSweeper::structuresCanBeSwept):
+        (JSC):
+        * heap/IncrementalSweeper.h:
+        (IncrementalSweeper):
+        * heap/MarkedAllocator.cpp:
+        (JSC::MarkedAllocator::tryAllocateHelper):
+        (JSC::MarkedAllocator::allocateBlock):
+        * heap/MarkedAllocator.h:
+        (JSC::MarkedAllocator::cellsNeedDestruction):
+        (JSC::MarkedAllocator::onlyContainsStructures):
+        (MarkedAllocator):
+        (JSC::MarkedAllocator::MarkedAllocator):
+        (JSC::MarkedAllocator::init):
+        * heap/MarkedBlock.cpp:
+        (JSC::MarkedBlock::create):
+        (JSC::MarkedBlock::MarkedBlock):
+        (JSC):
+        (JSC::MarkedBlock::specializedSweep):
+        (JSC::MarkedBlock::sweep):
+        (JSC::MarkedBlock::sweepHelper):
+        * heap/MarkedBlock.h:
+        (JSC):
+        (MarkedBlock):
+        (JSC::MarkedBlock::cellsNeedDestruction):
+        (JSC::MarkedBlock::onlyContainsStructures):
+        * heap/MarkedSpace.cpp:
+        (JSC::MarkedSpace::MarkedSpace):
+        (JSC::MarkedSpace::resetAllocators):
+        (JSC::MarkedSpace::canonicalizeCellLivenessData):
+        (JSC::MarkedSpace::isPagedOut):
+        (JSC::MarkedSpace::freeBlock):
+        * heap/MarkedSpace.h:
+        (MarkedSpace):
+        (Subspace):
+        (JSC::MarkedSpace::allocatorFor):
+        (JSC::MarkedSpace::destructorAllocatorFor):
+        (JSC::MarkedSpace::allocateWithDestructor):
+        (JSC::MarkedSpace::allocateStructure):
+        (JSC::MarkedSpace::forEachBlock):
+        * heap/SlotVisitor.cpp:
+        * jit/JIT.h:
+        * jit/JITInlineMethods.h:
+        (JSC::JIT::emitAllocateBasicJSObject):
+        (JSC::JIT::emitAllocateJSFinalObject):
+        (JSC::JIT::emitAllocateJSArray):
+        * jsc.cpp:
+        (GlobalObject::create):
+        * runtime/Arguments.cpp:
+        (JSC):
+        * runtime/Arguments.h:
+        (Arguments):
+        (JSC::Arguments::Arguments):
+        * runtime/ErrorPrototype.cpp:
+        (JSC):
+        * runtime/Executable.h:
+        * runtime/InternalFunction.cpp:
+        (JSC):
+        (JSC::InternalFunction::InternalFunction):
+        * runtime/InternalFunction.h:
+        (InternalFunction):
+        * runtime/JSCell.h:
+        (JSC):
+        (JSC::allocateCell):
+        * runtime/JSDestructibleObject.h: Removed.
+        * runtime/JSGlobalObject.cpp:
+        (JSC::JSGlobalObject::reset):
+        (JSC):
+        * runtime/JSGlobalObject.h:
+        (JSGlobalObject):
+        (JSC::JSGlobalObject::createRareDataIfNeeded):
+        (JSC::JSGlobalObject::create):
+        * runtime/JSGlobalThis.h:
+        (JSGlobalThis):
+        (JSC::JSGlobalThis::JSGlobalThis):
+        * runtime/JSPropertyNameIterator.h:
+        * runtime/JSScope.cpp:
+        (JSC):
+        * runtime/JSString.h:
+        (JSC):
+        * runtime/JSWrapperObject.h:
+        (JSWrapperObject):
+        (JSC::JSWrapperObject::JSWrapperObject):
+        * runtime/MathObject.cpp:
+        (JSC):
+        * runtime/NameInstance.h:
+        (NameInstance):
+        * runtime/RegExp.h:
+        * runtime/RegExpObject.cpp:
+        (JSC):
+        * runtime/SparseArrayValueMap.h:
+        * runtime/Structure.h:
+        (JSC::Structure):
+        (JSC::JSCell::classInfo):
+        (JSC):
+        * runtime/StructureChain.h:
+        * runtime/SymbolTable.h:
+        * testRegExp.cpp:
+        (GlobalObject::create):
+
+2012-09-17  Geoffrey Garen  <ggaren@apple.com>
+
+        Refactored the arguments object so it doesn't dictate closure layout
+        https://bugs.webkit.org/show_bug.cgi?id=96955
+
+        Reviewed by Oliver Hunt.
+
+        * bytecode/CodeBlock.h:
+        (JSC::ExecState::argumentAfterCapture): Helper function for accessing an
+        argument that has been moved for capture.
+
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::BytecodeGenerator): Generate metadata for arguments
+        that are captured. We don't move any arguments yet, but we do use this
+        metadata to tell the arguments object if an argument is stored in the
+        activation.
+
+        * dfg/DFGOperations.cpp:
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compileGetByValOnArguments):
+        (JSC::DFG::SpeculativeJIT::compileGetArgumentsLength):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile): Updated for the arguments object not
+        malloc'ing a separate backing store, and for a rename from deletedArguments
+        to slowArguments.
+
+        * interpreter/CallFrame.h:
+        (ExecState):
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::unwindCallFrame):
+        (JSC::Interpreter::privateExecute):
+        * jit/JITStubs.cpp:
+        (JSC::DEFINE_STUB_FUNCTION):
+        * llint/LLIntSlowPaths.cpp:
+        (JSC::LLInt::LLINT_SLOW_PATH_DECL): Updated for small interface changes.
+
+        * runtime/Arguments.cpp:
+        (JSC::Arguments::visitChildren):
+        (JSC::Arguments::copyToArguments):
+        (JSC::Arguments::fillArgList):
+        (JSC::Arguments::getOwnPropertySlotByIndex):
+        (JSC::Arguments::createStrictModeCallerIfNecessary):
+        (JSC::Arguments::createStrictModeCalleeIfNecessary):
+        (JSC::Arguments::getOwnPropertySlot):
+        (JSC::Arguments::getOwnPropertyDescriptor):
+        (JSC::Arguments::getOwnPropertyNames):
+        (JSC::Arguments::putByIndex):
+        (JSC::Arguments::put):
+        (JSC::Arguments::deletePropertyByIndex):
+        (JSC::Arguments::deleteProperty):
+        (JSC::Arguments::defineOwnProperty):
+        (JSC::Arguments::tearOff): Moved all data inline into the object, for speed,
+        and refactored all internal argument accesses to use helper functions, so
+        we can change the implementation without changing lots of code.
+
+        (JSC::Arguments::didTearOffActivation): This function needs to account
+        for arguments that were moved by the activation object. We do this accounting
+        through a side vector that tells us where our arguments will be in the
+        activation.
+
+        (JSC::Arguments::tearOffForInlineCallFrame):
+        * runtime/Arguments.h:
+        (Arguments):
+        (JSC::Arguments::length):
+        (JSC::Arguments::isTornOff):
+        (JSC::Arguments::Arguments):
+        (JSC::Arguments::allocateSlowArguments):
+        (JSC::Arguments::tryDeleteArgument):
+        (JSC::Arguments::trySetArgument):
+        (JSC::Arguments::tryGetArgument):
+        (JSC::Arguments::isDeletedArgument):
+        (JSC::Arguments::isArgument):
+        (JSC::Arguments::argument):
+        (JSC::Arguments::finishCreation):
+
+        * runtime/JSActivation.h:
+        (JSC::JSActivation::create):
+        (JSActivation):
+        (JSC::JSActivation::captureStart):
+        (JSC::JSActivation::storageSize):
+        (JSC::JSActivation::registerOffset):
+        (JSC::JSActivation::isValid): The activation object is no longer responsible
+        for copying extra arguments provided by the caller. The argumnents object
+        does this instead. This means we can allocate and initialize an activation
+        without worrying about the call frame's argument count.
+
+        * runtime/SymbolTable.h:
+        (JSC::SlowArgument::SlowArgument):
+        (SlowArgument):
+        (JSC):
+        (JSC::SharedSymbolTable::parameterCount):
+        (SharedSymbolTable):
+        (JSC::SharedSymbolTable::slowArguments):
+        (JSC::SharedSymbolTable::setSlowArguments): Added data structures to back
+        the algorithms above.
+
+2012-09-17  Filip Pizlo  <fpizlo@apple.com>
+
+        32-bit LLInt get_by_val does vector length checks incorrectly
+        https://bugs.webkit.org/show_bug.cgi?id=96893
+        <rdar://problem/12311678>
+
+        Reviewed by Mark Hahnenberg.
+
+        * llint/LowLevelInterpreter32_64.asm:
+
+2012-09-17  Filip Pizlo  <fpizlo@apple.com>
+
+        We don't have a bad enough time if an object's prototype chain crosses global objects
+        https://bugs.webkit.org/show_bug.cgi?id=96962
+
+        Reviewed by Geoffrey Garen.
+
+        * runtime/JSGlobalObject.cpp:
+        (JSC):
+
+2012-09-17  Filip Pizlo  <fpizlo@apple.com>
+
+        Unreviewed, fix a broken assertion in offlineasm.
+
+        * offlineasm/armv7.rb:
+        * offlineasm/backends.rb:
+
+2012-09-16  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Delayed structure sweep can leak structures without bound
+        https://bugs.webkit.org/show_bug.cgi?id=96546
+
+        Reviewed by Gavin Barraclough.
+
+        This patch gets rid of the separate Structure allocator in the MarkedSpace and adds two new destructor-only
+        allocators. We now have separate allocators for our three types of objects: those objects with no destructors,
+        those objects with destructors and with immortal structures, and those objects with destructors that don't have 
+        immortal structures. All of the objects of the third type (destructors without immortal structures) now 
+        inherit from a new class named JSDestructibleObject (which in turn is a subclass of JSNonFinalObject), which stores 
+        the ClassInfo for these classes at a fixed offset for safe retrieval during sweeping/destruction.
+
+        * API/JSCallbackConstructor.cpp: Use JSDestructibleObject for JSCallbackConstructor.
+        (JSC):
+        (JSC::JSCallbackConstructor::JSCallbackConstructor):
+        * API/JSCallbackConstructor.h:
+        (JSCallbackConstructor):
+        * API/JSCallbackObject.cpp: Inherit from JSDestructibleObject for normal JSCallbackObjects and use a finalizer for 
+        JSCallbackObject<JSGlobalObject>, since JSGlobalObject also uses a finalizer.
+        (JSC):
+        (JSC::::create): We need to move the create function for JSCallbackObject<JSGlobalObject> out of line so we can add 
+        the finalizer for it. We don't want to add the finalizer is something like finishCreation in case somebody decides 
+        to subclass this. We use this same technique for many other subclasses of JSGlobalObject.
+        (JSC::::createStructure):
+        * API/JSCallbackObject.h:
+        (JSCallbackObject):
+        (JSC):
+        * API/JSClassRef.cpp: Change all the JSCallbackObject<JSNonFinalObject> to use JSDestructibleObject instead.
+        (OpaqueJSClass::prototype):
+        * API/JSObjectRef.cpp: Ditto.
+        (JSObjectMake):
+        (JSObjectGetPrivate):
+        (JSObjectSetPrivate):
+        (JSObjectGetPrivateProperty):
+        (JSObjectSetPrivateProperty):
+        (JSObjectDeletePrivateProperty):
+        * API/JSValueRef.cpp: Ditto.
+        (JSValueIsObjectOfClass):
+        * API/JSWeakObjectMapRefPrivate.cpp: Ditto.
+        * JSCTypedArrayStubs.h:
+        (JSC):
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * dfg/DFGSpeculativeJIT.h: Use the proper allocator type when doing inline allocation in the DFG.
+        (JSC::DFG::SpeculativeJIT::emitAllocateBasicJSObject):
+        (JSC::DFG::SpeculativeJIT::emitAllocateJSFinalObject):
+        * heap/Heap.cpp:
+        (JSC):
+        * heap/Heap.h: Add accessors for the various types of allocators now. Also remove the isSafeToSweepStructures function 
+        since it's always safe to sweep Structures now.
+        (JSC::Heap::allocatorForObjectWithNormalDestructor): 
+        (JSC::Heap::allocatorForObjectWithImmortalStructureDestructor):
+        (Heap):
+        (JSC::Heap::allocateWithNormalDestructor):
+        (JSC):
+        (JSC::Heap::allocateWithImmortalStructureDestructor):
+        * heap/IncrementalSweeper.cpp: Remove all the logic to detect when it's safe to sweep Structures from the 
+        IncrementalSweeper since it's always safe to sweep Structures now.
+        (JSC::IncrementalSweeper::IncrementalSweeper):
+        (JSC::IncrementalSweeper::sweepNextBlock):
+        (JSC::IncrementalSweeper::startSweeping):
+        (JSC::IncrementalSweeper::willFinishSweeping):
+        (JSC):
+        * heap/IncrementalSweeper.h:
+        (IncrementalSweeper):
+        * heap/MarkedAllocator.cpp: Remove the logic that was preventing us from sweeping Structures if it wasn't safe. Add 
+        tracking of the specific destructor type of allocator. 
+        (JSC::MarkedAllocator::tryAllocateHelper):
+        (JSC::MarkedAllocator::allocateBlock):
+        * heap/MarkedAllocator.h:
+        (JSC::MarkedAllocator::destructorType):
+        (MarkedAllocator):
+        (JSC::MarkedAllocator::MarkedAllocator):
+        (JSC::MarkedAllocator::init):
+        * heap/MarkedBlock.cpp: Add all the destructor type stuff to MarkedBlocks so that we do the right thing when sweeping. 
+        We also use the stored destructor type to determine the right thing to do in all JSCell::classInfo() calls.
+        (JSC::MarkedBlock::create):
+        (JSC::MarkedBlock::MarkedBlock):
+        (JSC):
+        (JSC::MarkedBlock::specializedSweep):
+        (JSC::MarkedBlock::sweep):
+        (JSC::MarkedBlock::sweepHelper):
+        * heap/MarkedBlock.h:
+        (JSC):
+        (JSC::MarkedBlock::allocator):
+        (JSC::MarkedBlock::destructorType):
+        * heap/MarkedSpace.cpp: Add the new destructor allocators to MarkedSpace.
+        (JSC::MarkedSpace::MarkedSpace):
+        (JSC::MarkedSpace::resetAllocators):
+        (JSC::MarkedSpace::canonicalizeCellLivenessData):
+        (JSC::MarkedSpace::isPagedOut):
+        (JSC::MarkedSpace::freeBlock):
+        * heap/MarkedSpace.h:
+        (MarkedSpace):
+        (JSC::MarkedSpace::immortalStructureDestructorAllocatorFor):
+        (JSC::MarkedSpace::normalDestructorAllocatorFor):
+        (JSC::MarkedSpace::allocateWithImmortalStructureDestructor):
+        (JSC::MarkedSpace::allocateWithNormalDestructor):
+        (JSC::MarkedSpace::forEachBlock):
+        * heap/SlotVisitor.cpp: Add include because the symbol was needed in an inlined function.
+        * jit/JIT.h: Make sure we use the correct allocator when doing inline allocations in the baseline JIT.
+        * jit/JITInlineMethods.h:
+        (JSC::JIT::emitAllocateBasicJSObject):
+        (JSC::JIT::emitAllocateJSFinalObject):
+        (JSC::JIT::emitAllocateJSArray):
+        * jsc.cpp: 
+        (GlobalObject::create): Add finalizer here since JSGlobalObject needs to use a finalizer instead of inheriting from 
+        JSDestructibleObject.
+        * runtime/Arguments.cpp: Inherit from JSDestructibleObject.
+        (JSC):
+        * runtime/Arguments.h:
+        (Arguments):
+        (JSC::Arguments::Arguments):
+        * runtime/ErrorPrototype.cpp: Added an assert to make sure we have a trivial destructor.
+        (JSC):
+        * runtime/Executable.h: Indicate that all of the Executable* classes have immortal Structures.
+        (JSC):
+        * runtime/InternalFunction.cpp: Inherit from JSDestructibleObject.
+        (JSC):
+        (JSC::InternalFunction::InternalFunction):
+        * runtime/InternalFunction.h:
+        (InternalFunction):
+        * runtime/JSCell.h: Added the NEEDS_DESTRUCTOR  macro to make it easier for classes to indicate that instead of being 
+        allocated in a destructor MarkedAllocator that they will handle their destruction themselves through the 
+        use of a finalizer.
+        (JSC):
+        (HasImmortalStructure): New template to help us determine at compile-time if a particular class 
+        should be allocated in the immortal structure MarkedAllocator. The default value is false. In order 
+        to be allocated in the immortal structure allocator, classes must specialize this template. Also added 
+        a macro to make it easier for classes to specialize the template.
+        (JSC::allocateCell): Use the appropriate allocator depending on the destructor type.
+        * runtime/JSDestructibleObject.h: Added. New class that stores the ClassInfo of any subclass so that it can be 
+        accessed safely when the object is being destroyed.
+        (JSC):
+        (JSDestructibleObject):
+        (JSC::JSDestructibleObject::classInfo):
+        (JSC::JSDestructibleObject::JSDestructibleObject):
+        (JSC::JSCell::classInfo): Checks the current MarkedBlock to see where it should get the ClassInfo from so that it's always safe.
+        * runtime/JSGlobalObject.cpp: JSGlobalObject now uses a finalizer instead of a destructor so that it can avoid forcing all 
+        of its relatives in the inheritance hierarchy (e.g. JSScope) to use destructors as well.
+        (JSC::JSGlobalObject::reset):
+        * runtime/JSGlobalObject.h:
+        (JSGlobalObject):
+        (JSC::JSGlobalObject::createRareDataIfNeeded): Since we always create a finalizer now, we don't have to worry about adding one 
+        for the m_rareData field when it's created.
+        (JSC::JSGlobalObject::create):
+        (JSC):
+        * runtime/JSGlobalThis.h: Inherit from JSDestructibleObject.
+        (JSGlobalThis):
+        (JSC::JSGlobalThis::JSGlobalThis):
+        * runtime/JSPropertyNameIterator.h: Has an immortal Structure.
+        (JSC):
+        * runtime/JSScope.cpp:
+        (JSC):
+        * runtime/JSString.h: Has an immortal Structure.
+        (JSC):
+        * runtime/JSWrapperObject.h: Inherit from JSDestructibleObject.
+        (JSWrapperObject):
+        (JSC::JSWrapperObject::JSWrapperObject):
+        * runtime/MathObject.cpp: Cleaning up some of the inheritance stuff.
+        (JSC):
+        * runtime/NameInstance.h: Inherit from JSDestructibleObject.
+        (NameInstance):
+        * runtime/RegExp.h: Has immortal Structure.
+        (JSC):
+        * runtime/RegExpObject.cpp: Inheritance cleanup.
+        (JSC):
+        * runtime/SparseArrayValueMap.h: Has immortal Structure.
+        (JSC):
+        * runtime/Structure.h: Has immortal Structure.
+        (JSC):
+        * runtime/StructureChain.h: Ditto.
+        (JSC):
+        * runtime/SymbolTable.h: Ditto.
+        (SharedSymbolTable):
+        (JSC):
+
+2012-09-17  Filip Pizlo  <fpizlo@apple.com>
+
+        If a prototype has indexed setters and its instances have indexed storage, then all put_by_val's should have a bad time
+        https://bugs.webkit.org/show_bug.cgi?id=96596
+
+        Reviewed by Gavin Barraclough.
+
+        Added comprehensive support for accessors and read-only indexed properties on the
+        prototype chain. This is done without any performance regression on benchmarks that
+        we're aware of, by having the entire VM's strategy with respect to arrays tilted
+        heavily in favor of:
+        
+        - The prototype chain of JSArrays never having any accessors or read-only indexed
+          properties. If that changes, you're going to have a bad time.
+        
+        - Prototypes of non-JSArray objects either having no indexed accessors or read-only
+          indexed properties, or, having those indexed accessor thingies inserted before
+          any instance object (i.e. object with that prototype as its prototype) is created.
+          If you add indexed accessors or read-only indexed properties to an object that is
+          already used as a prototype, you're going to have a bad time.
+        
+        See below for the exact definition of having a bad time.
+        
+        Put another way, "fair" uses of indexed accessors and read-only indexed properties
+        are:
+        
+        - Put indexed accessors and read-only indexed properties on an object that is never
+          used as a prototype. This will slow down accesses to that object, but will not
+          have any effect on any other object.
+        
+        - Put those indexed accessor thingies on an object before it is used as a prototype
+          and then start instantiating objects that claim that object as their prototype.
+          This will slightly slow down indexed stores to the instance objects, and greatly
+          slow down all indexed accesses to the prototype, but will have no other effect.
+        
+        In short, "fair" uses only affect the object itself and any instance objects. But
+        if you start using indexed accessors in more eclectic ways, you're going to have
+        a bad time.
+        
+        Specifically, if an object that may be used as a prototype has an indexed accessor
+        added, the VM performs a whole-heap scan to find all objects that belong to the
+        same global object as the prototype you modified. If any of those objects has
+        indexed storage, their indexed storage is put into slow-put mode, just as if their
+        prototype chain had indexed accessors. This will happen even for objects that do
+        not currently have indexed accessors in their prototype chain. As well, all JSArray
+        allocations are caused to create arrays with slow-put storage, and all future
+        allocations of indexed storage for non-JSArray objects are also flipped to slow-put
+        mode. Note there are two aspects to having a bad time: (i) the whole-heap scan and
+        (ii) the poisoning of all indexed storage in the entire global object. (i) is
+        necessary for correctness. If we detect that an object that may be used as a
+        prototype has had an indexed accessor or indexed read-only property inserted into
+        it, then we need to ensure that henceforth all instances of that object inspect
+        the prototype chain whenever an indexed hole is stored to. But by default, indexed
+        stores do no such checking because doing so would be unnecessarily slow. So, we must
+        find all instances of the affected object and flip them into a different array
+        storage mode that omits all hole optimizations. Since prototypes never keep a list
+        of instance objects, the only way to find those objects is a whole-heap scan. But
+        (i) alone would be a potential disaster, if a program frequently allocated an
+        object without indexed accessors, then allocated a bunch of objects that used that
+        one as their prototype, and then added indexed accessors to the prototype. So, to
+        prevent massive heap scan storms in such awkward programs, having a bad time also
+        implies (ii): henceforth *all* objects belonging to that global object will use
+        slow put indexed storage, so that we don't ever have to scan the heap again. Note
+        that here we are using the global object as just an approximation of a program
+        module; it may be worth investigating in the future if other approximations can be
+        used instead.
+
+        * bytecode/ArrayProfile.h:
+        (JSC):
+        (JSC::arrayModeFromStructure):
+        * dfg/DFGAbstractState.cpp:
+        (JSC::DFG::AbstractState::execute):
+        * dfg/DFGArrayMode.cpp:
+        (JSC::DFG::fromObserved):
+        (JSC::DFG::modeAlreadyChecked):
+        (JSC::DFG::modeToString):
+        * dfg/DFGArrayMode.h:
+        (DFG):
+        (JSC::DFG::isSlowPutAccess):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::checkArray):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * jit/JIT.h:
+        * jit/JITInlineMethods.h:
+        (JSC::JIT::emitAllocateJSArray):
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_new_array):
+        * runtime/ArrayPrototype.cpp:
+        (JSC::ArrayPrototype::finishCreation):
+        (JSC::arrayProtoFuncSort):
+        * runtime/IndexingType.h:
+        (JSC):
+        (JSC::hasIndexedProperties):
+        (JSC::hasIndexingHeader):
+        (JSC::hasArrayStorage):
+        (JSC::shouldUseSlowPut):
+        * runtime/JSArray.cpp:
+        (JSC::JSArray::pop):
+        (JSC::JSArray::push):
+        (JSC::JSArray::fillArgList):
+        (JSC::JSArray::copyToArguments):
+        * runtime/JSArray.h:
+        (JSC::JSArray::createStructure):
+        * runtime/JSGlobalObject.cpp:
+        (JSC::JSGlobalObject::JSGlobalObject):
+        (JSC::JSGlobalObject::reset):
+        (JSC):
+        (JSC::JSGlobalObject::haveABadTime):
+        * runtime/JSGlobalObject.h:
+        (JSGlobalObject):
+        (JSC::JSGlobalObject::addressOfArrayStructure):
+        (JSC::JSGlobalObject::havingABadTimeWatchpoint):
+        (JSC::JSGlobalObject::isHavingABadTime):
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::visitButterfly):
+        (JSC::JSObject::getOwnPropertySlotByIndex):
+        (JSC::JSObject::put):
+        (JSC::JSObject::putByIndex):
+        (JSC::JSObject::enterDictionaryIndexingMode):
+        (JSC::JSObject::notifyPresenceOfIndexedAccessors):
+        (JSC):
+        (JSC::JSObject::createArrayStorage):
+        (JSC::JSObject::ensureArrayStorageExistsAndEnterDictionaryIndexingMode):
+        (JSC::JSObject::switchToSlowPutArrayStorage):
+        (JSC::JSObject::setPrototype):
+        (JSC::JSObject::resetInheritorID):
+        (JSC::JSObject::inheritorID):
+        (JSC::JSObject::allowsAccessFrom):
+        (JSC::JSObject::deletePropertyByIndex):
+        (JSC::JSObject::getOwnPropertyNames):
+        (JSC::JSObject::unwrappedGlobalObject):
+        (JSC::JSObject::notifyUsedAsPrototype):
+        (JSC::JSObject::createInheritorID):
+        (JSC::JSObject::defineOwnIndexedProperty):
+        (JSC::JSObject::attemptToInterceptPutByIndexOnHoleForPrototype):
+        (JSC::JSObject::attemptToInterceptPutByIndexOnHole):
+        (JSC::JSObject::putByIndexBeyondVectorLength):
+        (JSC::JSObject::putDirectIndexBeyondVectorLength):
+        (JSC::JSObject::getNewVectorLength):
+        (JSC::JSObject::getOwnPropertyDescriptor):
+        * runtime/JSObject.h:
+        (JSC::JSObject::mayBeUsedAsPrototype):
+        (JSObject):
+        (JSC::JSObject::mayInterceptIndexedAccesses):
+        (JSC::JSObject::getArrayLength):
+        (JSC::JSObject::getVectorLength):
+        (JSC::JSObject::canGetIndexQuickly):
+        (JSC::JSObject::getIndexQuickly):
+        (JSC::JSObject::canSetIndexQuickly):
+        (JSC::JSObject::setIndexQuickly):
+        (JSC::JSObject::initializeIndex):
+        (JSC::JSObject::completeInitialization):
+        (JSC::JSObject::inSparseIndexingMode):
+        (JSC::JSObject::arrayStorage):
+        (JSC::JSObject::arrayStorageOrNull):
+        (JSC::JSObject::ensureArrayStorage):
+        (JSC):
+        (JSC::JSValue::putByIndex):
+        * runtime/JSValue.cpp:
+        (JSC::JSValue::putToPrimitive):
+        (JSC::JSValue::putToPrimitiveByIndex):
+        (JSC):
+        * runtime/JSValue.h:
+        (JSValue):
+        * runtime/ObjectPrototype.cpp:
+        (JSC::ObjectPrototype::finishCreation):
+        * runtime/SparseArrayValueMap.cpp:
+        (JSC::SparseArrayValueMap::putEntry):
+        (JSC::SparseArrayEntry::put):
+        (JSC):
+        * runtime/SparseArrayValueMap.h:
+        (JSC):
+        (SparseArrayEntry):
+        * runtime/Structure.cpp:
+        (JSC::Structure::anyObjectInChainMayInterceptIndexedAccesses):
+        (JSC):
+        (JSC::Structure::suggestedIndexingTransition):
+        * runtime/Structure.h:
+        (Structure):
+        (JSC::Structure::mayInterceptIndexedAccesses):
+        * runtime/StructureTransitionTable.h:
+        (JSC::newIndexingType):
+
+2012-09-17  Filip Pizlo  <fpizlo@apple.com>
+
+        Array profiling has convergence issues
+        https://bugs.webkit.org/show_bug.cgi?id=96891
+
+        Reviewed by Gavin Barraclough.
+
+        Now each array profiling site merges in the indexing type it observed into
+        the m_observedArrayModes bitset. The ArrayProfile also uses this to detect
+        cases where the structure must have gone polymorphic (if the bitset is
+        polymorphic then the structure must be). This achieves something like the
+        best of both worlds: on the one hand, we get a probabilistic structure that
+        we can use to optimize the monomorphic structure case, but on the other hand,
+        we get an accurate view of the set of types that were encountered.
+
+        * assembler/MacroAssemblerARMv7.h:
+        (JSC::MacroAssemblerARMv7::or32):
+        (MacroAssemblerARMv7):
+        * assembler/MacroAssemblerX86.h:
+        (JSC::MacroAssemblerX86::or32):
+        (MacroAssemblerX86):
+        * assembler/MacroAssemblerX86_64.h:
+        (JSC::MacroAssemblerX86_64::or32):
+        (MacroAssemblerX86_64):
+        * assembler/X86Assembler.h:
+        (X86Assembler):
+        (JSC::X86Assembler::orl_rm):
+        * bytecode/ArrayProfile.cpp:
+        (JSC::ArrayProfile::computeUpdatedPrediction):
+        * bytecode/ArrayProfile.h:
+        (JSC::ArrayProfile::addressOfArrayModes):
+        (JSC::ArrayProfile::structureIsPolymorphic):
+        * jit/JIT.h:
+        (JIT):
+        * jit/JITInlineMethods.h:
+        (JSC):
+        (JSC::JIT::emitArrayProfilingSite):
+        * jit/JITPropertyAccess.cpp:
+        (JSC::JIT::emit_op_get_by_val):
+        (JSC::JIT::emit_op_put_by_val):
+        (JSC::JIT::privateCompilePatchGetArrayLength):
+        * jit/JITPropertyAccess32_64.cpp:
+        (JSC::JIT::emit_op_get_by_val):
+        (JSC::JIT::emit_op_put_by_val):
+        (JSC::JIT::privateCompilePatchGetArrayLength):
+        * llint/LowLevelInterpreter.asm:
+        * llint/LowLevelInterpreter32_64.asm:
+        * llint/LowLevelInterpreter64.asm:
+
+2012-09-17  Mark Lam  <mark.lam@apple.com>
+
+        Not reviewed. Added svn:eol-style native to unbreak some build bots.
+        https://bugs.webkit.org/show_bug.cgi?id=96175.
+
+        * JavaScriptCore.vcproj/LLIntAssembly/LLIntAssembly.vcproj: Added property svn:eol-style.
+        * JavaScriptCore.vcproj/LLIntDesiredOffsets/LLIntDesiredOffsets.vcproj: Added property svn:eol-style.
+        * JavaScriptCore.vcproj/LLIntOffsetsExtractor/LLIntOffsetsExtractor.vcproj: Added property svn:eol-style.
+
+2012-09-16  Mark Lam  <mark.lam@apple.com>
+
+        Added MSVC project changes to enable building the llint.
+        https://bugs.webkit.org/show_bug.cgi?id=96175.
+
+        Reviewed by Geoff Garen.
+
+        This only adds the ability to build the llint, but currently, only the
+        C++ backend is supported. By default, the Windows port will remain
+        running with the baseline JIT.  The llint will not be enabled.
+
+        * JavaScriptCore.vcproj/JavaScriptCore.sln:
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.vcproj:
+        * JavaScriptCore.vcproj/LLIntAssembly: Added.
+        * JavaScriptCore.vcproj/LLIntAssembly/LLIntAssembly.make: Added.
+        * JavaScriptCore.vcproj/LLIntAssembly/LLIntAssembly.vcproj: Added.
+        * JavaScriptCore.vcproj/LLIntAssembly/build-LLIntAssembly.sh: Added.
+        * JavaScriptCore.vcproj/LLIntDesiredOffsets: Added.
+        * JavaScriptCore.vcproj/LLIntDesiredOffsets/LLIntDesiredOffsets.make: Added.
+        * JavaScriptCore.vcproj/LLIntDesiredOffsets/LLIntDesiredOffsets.vcproj: Added.
+        * JavaScriptCore.vcproj/LLIntDesiredOffsets/build-LLIntDesiredOffsets.sh: Added.
+        * JavaScriptCore.vcproj/LLIntOffsetsExtractor: Added.
+        * JavaScriptCore.vcproj/LLIntOffsetsExtractor/LLIntOffsetsExtractor.vcproj: Added.
+        * JavaScriptCore.vcproj/LLIntOffsetsExtractor/LLIntOffsetsExtractorCommon.vsprops: Added.
+        * JavaScriptCore.vcproj/LLIntOffsetsExtractor/LLIntOffsetsExtractorDebug.vsprops: Added.
+        * JavaScriptCore.vcproj/LLIntOffsetsExtractor/LLIntOffsetsExtractorRelease.vsprops: Added.
+
+2012-09-16  Filip Pizlo  <fpizlo@apple.com>
+
+        JSObject.cpp and JSArray.cpp have inconsistent tests for the invalid array index case
+        https://bugs.webkit.org/show_bug.cgi?id=96878
+
+        Reviewed by Sam Weinig.
+
+        Removed the uses of UNLIKELY() because I don't believe they are buying us anything,
+        since we're already on the slow path. Also found other places where we're testing for
+        the invalid array index case using unusual predicates rather than just using
+        MAX_ARRAY_INDEX. With this change, I believe that all of our tests for invalid
+        array indices (i.e. indices that should be treated as non-indexed properties)
+        uniformly use MAX_ARRAY_INDEX and PropertyName::NotAnIndex.
+
+        * runtime/JSArray.cpp:
+        (JSC::JSArray::push):
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::putByIndex):
+        (JSC::JSObject::defineOwnIndexedProperty):
+
+2012-09-15  Filip Pizlo  <fpizlo@apple.com>
+
+        Following the Butterfly refactoring, the comment for lastArraySize was not updated
+        https://bugs.webkit.org/show_bug.cgi?id=96877
+
+        Reviewed by Sam Weinig.
+
+        * runtime/JSObject.cpp:
+        (JSC):
+
+2012-09-15  Mark Lam  <mark.lam@apple.com>
+
+        Fixed JSLock to use the platform abstraction for Mutex instead of
+        depending on pthreads.
+        https://bugs.webkit.org/show_bug.cgi?id=96858.
+
+        Reviewed by Filip Pizlo.
+
+        This fixes a synchronization problem on the Windows port and makes
+        it more reliable when running the layout tests.
+
+        * runtime/InitializeThreading.cpp:
+        (JSC::initializeThreadingOnce):
+        * runtime/JSLock.cpp:
+        (JSC):
+        (JSC::GlobalJSLock::GlobalJSLock):
+        (JSC::GlobalJSLock::~GlobalJSLock):
+        (JSC::GlobalJSLock::initialize):
+        * runtime/JSLock.h:
+        (GlobalJSLock):
+        (JSLock):
+
+2012-09-15  Filip Pizlo  <fpizlo@apple.com>
+
+        Structure check hoisting fails to consider the possibility of conflicting checks on the source of the first assignment to the hoisted variable
+        https://bugs.webkit.org/show_bug.cgi?id=96872
+
+        Reviewed by Oliver Hunt.
+
+        This does a few related things:
+        
+        - It turns off the use of ForceOSRExit for sure-to-fail CheckStructures, because
+          I noticed that this would sometimes happen for a ForwardCheckStructure. The
+          problem is that ForceOSRExit exits backwards, not forwards. Since the code that
+          led to those ForceOSRExit's being inserted was written out of paranoia rather
+          than need, I removed it. Specifically, I removed the m_isValid = false code
+          for CheckStructure/StructureTransitionWatchpoint in AbstractState.
+        
+        - If a structure check causes a structure set to go empty, we don't want a
+          PutStructure to revive the set. It should instead be smart enough to realize 
+          that an empty set implies that the code can't execute. This was the only "bug"
+          that the use of m_isValid = false was preventing.
+        
+        - Finally, the main change: structure check hoisting looks at the source of the
+          SetLocals on structure-check-hoistable variables and ensures that the source
+          is not checked with a conflicting structure. This is O(n^2) but it does not
+          show up at all in performance tests.
+        
+        The first two parts of this change were auxiliary bugs that were revealed by
+        the structure check hoister doing bad things.
+
+        * dfg/DFGAbstractState.cpp:
+        (JSC::DFG::AbstractState::initialize):
+        (JSC::DFG::AbstractState::execute):
+        * dfg/DFGStructureCheckHoistingPhase.cpp:
+        (JSC::DFG::StructureCheckHoistingPhase::run):
+
+2012-09-14  Filip Pizlo  <fpizlo@apple.com>
+
+        All of the things in SparseArrayValueMap should be out-of-line
+        https://bugs.webkit.org/show_bug.cgi?id=96854
+
+        Reviewed by Andy Estes.
+
+        Those inline methods were buying us nothing.
+
+        * GNUmakefile.list.am:
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.vcproj:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * runtime/JSArray.cpp:
+        * runtime/JSGlobalData.cpp:
+        * runtime/JSObject.cpp:
+        * runtime/RegExpMatchesArray.cpp:
+        * runtime/SparseArrayValueMap.cpp:
+        (JSC::SparseArrayValueMap::SparseArrayValueMap):
+        (JSC):
+        (JSC::SparseArrayValueMap::~SparseArrayValueMap):
+        (JSC::SparseArrayValueMap::finishCreation):
+        (JSC::SparseArrayValueMap::create):
+        (JSC::SparseArrayValueMap::destroy):
+        (JSC::SparseArrayValueMap::createStructure):
+        (JSC::SparseArrayValueMap::add):
+        (JSC::SparseArrayValueMap::putEntry):
+        (JSC::SparseArrayValueMap::putDirect):
+        (JSC::SparseArrayEntry::get):
+        (JSC::SparseArrayEntry::getNonSparseMode):
+        (JSC::SparseArrayValueMap::visitChildren):
+        * runtime/SparseArrayValueMapInlineMethods.h: Removed.
+
+2012-09-14  Mike West  <mkwst@chromium.org>
+
+        JSC should throw a more descriptive exception when blocking 'eval' via CSP.
+        https://bugs.webkit.org/show_bug.cgi?id=94331
+
+        Reviewed by Geoffrey Garen.
+
+        Unless explicitly whitelisted, the 'script-src' Content Security Policy
+        directive blocks 'eval' and 'eval'-like constructs such as
+        'new Function()'. When 'eval' is encountered in code, an 'EvalError' is
+        thrown, but the associated message is poor: "Eval is disabled" doesn't
+        give developers enough information about why their code isn't behaving
+        as expected.
+
+        This patch adds an 'errorMessage' parameter to the JavaScriptCore method
+        used to disable 'eval'; ContentSecurityPolicy has the opportunity to
+        pass in a more detailed and descriptive error that contains more context
+        for the developer.
+
+        * runtime/Executable.cpp:
+        (JSC::EvalExecutable::compileInternal):
+            Drop the hard-coded "Eval is disabled" error message in favor of
+            reading the error message off the global object.
+        * runtime/FunctionConstructor.cpp:
+        (JSC::FunctionConstructor::getCallData):
+            Drop the hard-coded "Function constructor is disabled" error message
+            in favor of reading the error message off the global object.
+        * runtime/JSGlobalObject.h:
+        (JSGlobalObject):
+        (JSC::JSGlobalObject::evalEnabled):
+            Making this accessor method const.
+        (JSC::JSGlobalObject::evalDisabledErrorMessage):
+            Accessor for the error message set via 'setEvalDisabled'.
+        (JSC::JSGlobalObject::setEvalEnabled):
+            Adding an 'errorMessage' parameter which is stored on the global
+            object, and used when exceptions are thrown.
+
+2012-09-14  Filip Pizlo  <fpizlo@apple.com>
+
+        bbc homepage crashes immediately
+        https://bugs.webkit.org/show_bug.cgi?id=96812
+        <rdar://problem/12081386>
+
+        Reviewed by Oliver Hunt.
+
+        If you use the old storage pointer to write to space you thought was newly allocated,
+        you're going to have a bad time.
+
+        * runtime/JSArray.cpp:
+        (JSC::JSArray::unshiftCount):
+
+2012-09-14  Adam Barth  <abarth@webkit.org>
+
+        Remove webkitPostMessage
+        https://bugs.webkit.org/show_bug.cgi?id=96577
+
+        Reviewed by Ojan Vafai.
+
+        Add ENABLE_LEGACY_VENDOR_PREFIXES flag.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-09-14  Tor Arne Vestbø  <tor.arne.vestbo@nokia.com>
+
+        [Qt] Make force_static_libs_as_shared work on Mac OS
+
+        We had to move a few LIBS += around that were in the wrong place,
+        and not caught when everything was just linked into the final
+        QtWebKit library.
+
+        Reviewed by Simon Hausmann.
+
+        * jsc.pro: No need for AppKit, we get it from WTF.pri
+
+2012-09-14  Kevin Funk  <kevin.funk@kdab.com>
+
+        Fix interpreter build
+        https://bugs.webkit.org/show_bug.cgi?id=96617
+
+        Reviewed by Simon Hausmann.
+
+        Make compile.
+
+        * interpreter/Interpreter.cpp:
+
 2012-09-14  Parth Patel  <parpatel@rim.com>
 
         [BlackBerry] Switching from Slogger to Slogger2 requires changes in CMakeList of 

@@ -185,8 +185,7 @@ PassRefPtr<StyleSheetContents> CachedCSSStyleSheet::restoreParsedStyleSheet(cons
 void CachedCSSStyleSheet::saveParsedStyleSheet(PassRefPtr<StyleSheetContents> sheet)
 {
     ASSERT(sheet && sheet->isCacheable());
-    if (m_parsedStyleSheetCache == sheet)
-        return;
+
     if (m_parsedStyleSheetCache)
         m_parsedStyleSheetCache->removedFromMemoryCache();
     m_parsedStyleSheetCache = sheet;
@@ -200,8 +199,8 @@ void CachedCSSStyleSheet::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) 
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CachedResourceCSS);
     CachedResource::reportMemoryUsage(memoryObjectInfo);
     info.addMember(m_decoder);
-    info.addInstrumentedMember(m_parsedStyleSheetCache);
-    info.addInstrumentedMember(m_decodedSheetText);
+    info.addMember(m_parsedStyleSheetCache);
+    info.addMember(m_decodedSheetText);
 }
 
 }

@@ -1139,6 +1139,11 @@ bool Document::regionBasedColumnsEnabled() const
     return settings() && settings()->regionBasedColumnsEnabled(); 
 }
 
+bool Document::cssStickyPositionEnabled() const
+{
+    return settings() && settings()->cssStickyPositionEnabled(); 
+}
+
 bool Document::cssRegionsEnabled() const
 {
     return settings() && settings()->cssRegionsEnabled(); 
@@ -1387,7 +1392,7 @@ String Document::suggestedMIMEType() const
 // * making it receive a rect as parameter, i.e. nodesFromRect(x, y, w, h);
 // * making it receive the expading size of each direction separately,
 //   i.e. nodesFromRect(x, y, topSize, rightSize, bottomSize, leftSize);
-PassRefPtr<NodeList> Document::nodesFromRect(int centerX, int centerY, unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding, bool ignoreClipping, bool allowShadowContent, bool allowChildFrameContent) const
+PassRefPtr<NodeList> Document::nodesFromRect(int centerX, int centerY, unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding, bool ignoreClipping, bool allowShadowContent) const
 {
     // FIXME: Share code between this, elementFromPoint and caretRangeFromPoint.
     if (!renderer())
@@ -1411,8 +1416,6 @@ PassRefPtr<NodeList> Document::nodesFromRect(int centerX, int centerY, unsigned 
         return 0;
     if (allowShadowContent)
         type |= HitTestRequest::AllowShadowContent;
-    if (allowChildFrameContent)
-        type |= HitTestRequest::AllowChildFrameContent;
 
     HitTestRequest request(type);
 
@@ -2821,12 +2824,12 @@ String Document::userAgent(const KURL& url) const
     return frame() ? frame()->loader()->userAgent(url) : String();
 }
 
-void Document::disableEval()
+void Document::disableEval(const String& errorMessage)
 {
     if (!frame())
         return;
 
-    frame()->script()->disableEval();
+    frame()->script()->disableEval(errorMessage);
 }
 
 bool Document::canNavigate(Frame* targetFrame)
@@ -4552,6 +4555,12 @@ void Document::unregisterForMediaVolumeCallbacks(Element* e)
     m_mediaVolumeCallbackElements.remove(e);
 }
 
+void Document::storageBlockingStateDidChange()
+{
+    if (Settings* settings = this->settings())
+        securityOrigin()->setStorageBlockingPolicy(settings->storageBlockingPolicy());
+}
+
 void Document::privateBrowsingStateDidChange() 
 {
     HashSet<Element*>::iterator end = m_privateBrowsingStateChangedElements.end();
@@ -6145,8 +6154,7 @@ void Document::updateHoverActiveState(const HitTestRequest& request, HitTestResu
         return;
 
     Node* innerNodeInDocument = result.innerNode();
-    while (innerNodeInDocument && innerNodeInDocument->document() != this)
-        innerNodeInDocument = innerNodeInDocument->document()->ownerElement();
+    ASSERT(!innerNodeInDocument || innerNodeInDocument->document() == this);
 
     Node* oldActiveNode = activeNode();
     if (oldActiveNode && !request.active()) {
@@ -6241,21 +6249,21 @@ void Document::updateHoverActiveState(const HitTestRequest& request, HitTestResu
 void Document::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    info.addInstrumentedMember(m_styleResolver);
+    info.addMember(m_styleResolver);
     ContainerNode::reportMemoryUsage(memoryObjectInfo);
     info.addVector(m_customFonts);
-    info.addInstrumentedMember(m_url);
-    info.addInstrumentedMember(m_baseURL);
-    info.addInstrumentedMember(m_baseURLOverride);
-    info.addInstrumentedMember(m_baseElementURL);
-    info.addInstrumentedMember(m_cookieURL);
-    info.addInstrumentedMember(m_firstPartyForCookies);
-    info.addInstrumentedMember(m_documentURI);
-    info.addInstrumentedMember(m_baseTarget);
-    info.addInstrumentedMember(m_frame);
-    info.addInstrumentedMember(m_cachedResourceLoader);
-    info.addInstrumentedMember(m_elemSheet);
-    info.addInstrumentedMember(m_pageUserSheet);
+    info.addMember(m_url);
+    info.addMember(m_baseURL);
+    info.addMember(m_baseURLOverride);
+    info.addMember(m_baseElementURL);
+    info.addMember(m_cookieURL);
+    info.addMember(m_firstPartyForCookies);
+    info.addMember(m_documentURI);
+    info.addMember(m_baseTarget);
+    info.addMember(m_frame);
+    info.addMember(m_cachedResourceLoader);
+    info.addMember(m_elemSheet);
+    info.addMember(m_pageUserSheet);
     if (m_pageGroupUserSheets)
         info.addInstrumentedVectorPtr(m_pageGroupUserSheets);
     if (m_userSheets)
@@ -6263,13 +6271,13 @@ void Document::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addHashSet(m_nodeIterators);
     info.addHashSet(m_ranges);
     info.addListHashSet(m_styleSheetCandidateNodes);
-    info.addInstrumentedMember(m_preferredStylesheetSet);
-    info.addInstrumentedMember(m_selectedStylesheetSet);
-    info.addInstrumentedMember(m_title.string());
-    info.addInstrumentedMember(m_rawTitle.string());
-    info.addInstrumentedMember(m_xmlEncoding);
-    info.addInstrumentedMember(m_xmlVersion);
-    info.addInstrumentedMember(m_contentLanguage);
+    info.addMember(m_preferredStylesheetSet);
+    info.addMember(m_selectedStylesheetSet);
+    info.addMember(m_title.string());
+    info.addMember(m_rawTitle.string());
+    info.addMember(m_xmlEncoding);
+    info.addMember(m_xmlVersion);
+    info.addMember(m_contentLanguage);
     info.addHashMap(m_documentNamedItemCollections);
     info.addHashMap(m_windowNamedItemCollections);
 #if ENABLE(DASHBOARD_SUPPORT)
@@ -6281,7 +6289,7 @@ void Document::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addHashSet(m_mediaVolumeCallbackElements);
     info.addHashSet(m_privateBrowsingStateChangedElements);
     info.addHashMap(m_elementsByAccessKey);
-    info.addInstrumentedMember(m_eventQueue);
+    info.addMember(m_eventQueue);
     info.addHashSet(m_mediaCanStartListeners);
     info.addVector(m_pendingTasks);
 }
@@ -6322,7 +6330,7 @@ public:
     unsigned hash() const
     {
         unsigned attributeHash = StringHasher::hashMemory(m_attributes, m_attributeCount * sizeof(Attribute));
-        return WTF::intHash((static_cast<uint64_t>(m_localName->existingHash()) << 32 | attributeHash));
+        return WTF::pairIntHash(m_localName->existingHash(), attributeHash);
     }
 
 private:

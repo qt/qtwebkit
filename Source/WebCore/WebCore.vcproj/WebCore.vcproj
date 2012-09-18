@@ -27051,6 +27051,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\page\FeatureObserver.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\page\FeatureObserver.h"
+				>
+			</File>
+			<File
 				RelativePath="..\page\FocusController.cpp"
 				>
 			</File>
@@ -31876,6 +31884,10 @@
 				<Filter
 					Name="filters"
 					>
+					<File
+						RelativePath="..\platform\graphics\filters\CustomFilterArrayParameter.h"
+						>
+					</File>
 					<File
 						RelativePath="..\platform\graphics\filters\CustomFilterGlobalContext.cpp"
 						>
@@ -46681,6 +46693,10 @@
 				</File>
 				<File
 					RelativePath="..\rendering\style\BasicShapes.h"
+					>
+				</File>
+				<File
+					RelativePath="..\rendering\style\ClipPathOperation.h"
 					>
 				</File>
 			</Filter>
@@ -76023,6 +76039,10 @@
 				</File>
 				<File
 					RelativePath="..\inspector\front-end\CSSNamedFlowCollectionsView.js"
+					>
+				</File>
+				<File
+					RelativePath="..\inspector\front-end\CSSNamedFlowView.js"
 					>
 				</File>
 				<File

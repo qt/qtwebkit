@@ -3968,6 +3968,8 @@ webcore_sources += \
 	Source/WebCore/page/EventHandler.h \
 	Source/WebCore/page/EventSource.cpp \
 	Source/WebCore/page/EventSource.h \
+	Source/WebCore/page/FeatureObserver.cpp \
+	Source/WebCore/page/FeatureObserver.h \
 	Source/WebCore/page/FocusController.cpp \
 	Source/WebCore/page/FocusController.h \
 	Source/WebCore/page/FocusDirection.h \
@@ -4251,6 +4253,7 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/cairo/RefPtrCairo.cpp \
 	Source/WebCore/platform/graphics/cairo/RefPtrCairo.h \
 	Source/WebCore/platform/graphics/cairo/TransformationMatrixCairo.cpp \
+	Source/WebCore/platform/graphics/filters/CustomFilterArrayParameter.h \
 	Source/WebCore/platform/graphics/filters/CustomFilterGlobalContext.cpp \
 	Source/WebCore/platform/graphics/filters/CustomFilterGlobalContext.h \
 	Source/WebCore/platform/graphics/filters/CustomFilterMesh.cpp \
@@ -5116,6 +5119,7 @@ webcore_sources += \
 	Source/WebCore/rendering/style/BasicShapes.h \
 	Source/WebCore/rendering/style/BorderData.h \
 	Source/WebCore/rendering/style/BorderValue.h \
+	Source/WebCore/rendering/style/ClipPathOperation.h \
 	Source/WebCore/rendering/style/CollapsedBorderValue.h \
 	Source/WebCore/rendering/style/ContentData.cpp \
 	Source/WebCore/rendering/style/ContentData.h \
@@ -5976,6 +5980,7 @@ else
 if TARGET_WIN32
 webcore_sources += \
 	Source/WebCore/platform/graphics/win/DIBPixelData.cpp \
+	Source/WebCore/platform/graphics/win/DIBPixelData.h \
 	Source/WebCore/platform/graphics/win/GraphicsContextCairoWin.cpp \
 	Source/WebCore/platform/graphics/win/GraphicsContextWin.cpp \
 	Source/WebCore/platform/graphics/win/LocalWindowsContext.h \
@@ -5986,6 +5991,7 @@ webcore_sources += \
 	Source/WebCore/platform/win/SystemInfo.h \
 	Source/WebCore/platform/win/WebCoreInstanceHandle.cpp \
 	Source/WebCore/platform/win/WebCoreInstanceHandle.h \
+	Source/WebCore/platform/win/WindowsExtras.h \
 	Source/WebCore/plugins/win/PluginDatabaseWin.cpp \
 	Source/WebCore/plugins/win/PluginMessageThrottlerWin.cpp \
 	Source/WebCore/plugins/win/PluginMessageThrottlerWin.h \
