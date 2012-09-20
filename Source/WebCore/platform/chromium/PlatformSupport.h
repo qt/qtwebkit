@@ -113,13 +113,9 @@ public:
     // IndexedDB ----------------------------------------------------------
     static PassRefPtr<IDBFactoryBackendInterface> idbFactory();
 
-    // JavaScript ---------------------------------------------------------
-    static void notifyJSOutOfMemory(Frame*);
-
     // Plugin -------------------------------------------------------------
     static bool plugins(bool refresh, Vector<PluginInfo>*);
     static NPObject* pluginScriptableObject(Widget*);
-    static bool popupsAllowed(NPP);
 
     // Screen -------------------------------------------------------------
     static int screenHorizontalDPI(Widget*);

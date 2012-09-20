@@ -1,3 +1,308 @@
+2012-09-19  Adam Barth  <abarth@webkit.org>
+
+        Remove webkitPostMessage
+        https://bugs.webkit.org/show_bug.cgi?id=96577
+
+        Reviewed by Ojan Vafai.
+
+        Actually disable webkitPostMessage. See
+        http://trac.webkit.org/changeset/128658 for more information.
+
+        * features.gypi:
+
+2012-09-19  Joshua Bell  <jsbell@chromium.org>
+
+        IndexedDB: Remove "current transaction" concept from backing store
+        https://bugs.webkit.org/show_bug.cgi?id=96663
+
+        Reviewed by Tony Chang.
+
+        Update fake class with new method signatures.
+
+        * tests/IDBFakeBackingStore.h:
+
+2012-09-19  Terry Anderson  <tdanderson@chromium.org>
+
+        [chromium] Store the contents scale factor in PlatformContextSkia on initialization
+        https://bugs.webkit.org/show_bug.cgi?id=96137
+
+        Reviewed by Stephen White.
+
+        Define SK_SUPPORT_HINTING_SCALE_FACTOR by default. This is also used
+        for the skia patch here: https://codereview.appspot.com/6506099/.
+        Also added two new unit tests.
+
+        * features.gypi:
+        * tests/OpaqueRectTrackingContentLayerDelegateTest.cpp:
+        (WebCore):
+        (WebCore::HintingScaleCallback::HintingScaleCallback):
+        (HintingScaleCallback):
+        (WebCore::HintingScaleCallback::operator()):
+        (WebCore::TEST_F):
+        * tests/PlatformContextSkiaTest.cpp:
+        (WebCore):
+        (WebCore::TEST):
+
+2012-09-19  David Grogan  <dgrogan@chromium.org>
+
+        Disable some failing IDB tests
+        https://bugs.webkit.org/show_bug.cgi?id=97135
+
+        Reviewed by Nate Chapin.
+
+        They were broken in r129037.
+
+        * tests/IDBDatabaseBackendTest.cpp:
+
+2012-09-19  Alpha Lam  <hclam@chromium.org>
+
+        [chromium] Unreviewed. Build fix.
+
+        Not building WebImageTest.cpp for component build.
+
+        * WebKit.gyp:
+
+2012-09-19  Alpha Lam  <hclam@chromium.org>
+
+        [chromium] WebImage should use ImageDecoder directly
+        https://bugs.webkit.org/show_bug.cgi?id=96135
+
+        Reviewed by Adam Barth.
+
+        This patch is for preparation of deferred image decoding.
+        ImageSource will be used as a portal to access deferred image decoder
+        by BitmapImage, it should not be accessible through WebKit APIs.
+
+        WebImage now calls ImageDecoder directly which is the actual
+        implementation of an image decoder.
+
+        Tests: WebImageTest.PNGImage
+               WebImageTest.ICOImage
+               WebImageTest.BadImage
+
+        * WebKit.gypi:
+        * src/WebImageSkia.cpp:
+        (WebKit::WebImage::fromData):
+        (WebKit::WebImage::framesFromData):
+        * tests/WebImageTest.cpp: Added.
+        (WebKit):
+        (WebKit::readFile):
+        (WebKit::TEST):
+        * tests/data/black-and-white.ico: Added.
+        * tests/data/white-1x1.png: Added.
+
+2012-09-19  Oli Lan  <olilan@chromium.org>
+
+        [chromium] Add a method didHandleGestureEvent to WebViewClient, called from WebViewImpl::handleGestureEvent.
+        https://bugs.webkit.org/show_bug.cgi?id=96112
+
+        Reviewed by Adam Barth.
+
+        Adds a new method didHandleGestureEvent to WebViewClient, called from WebViewImpl::handleGestureEvent.
+
+        This will be used by the Android port to implement platform-specific gesture behaviour.
+
+        This is tested by the new test WebViewTest.ClientTapHandlers.
+
+        * public/WebViewClient.h:
+        (WebViewClient):
+        (WebKit::WebViewClient::didHandleGestureEvent):
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::handleGestureEvent):
+        * tests/WebViewTest.cpp:
+
+2012-09-19  Robert Flack  <flackr@chromium.org>
+
+        [chromium] Support high DPI scroll bar on top level web frame.
+        https://bugs.webkit.org/show_bug.cgi?id=95134
+
+        Reviewed by Adrienne Walker.
+
+        Calls setAppliesPageScale(true) on root scrollbar layers as these are not scaled.
+
+        * src/NonCompositedContentHost.cpp:
+        (WebKit::setScrollbarBoundsContainPageScale):
+        (WebKit):
+        (WebKit::NonCompositedContentHost::setViewport):
+
+2012-09-19  Mark Pilgrim  <pilgrim@chromium.org>
+
+        [Chromium] Move notifyJSOutOfMemory out of PlatformSupport
+        https://bugs.webkit.org/show_bug.cgi?id=97116
+
+        Reviewed by Adam Barth.
+
+        Part of a refactoring series. See tracking bug 82948.
+        
+        * src/FrameLoaderClientImpl.cpp:
+        (WebKit::FrameLoaderClientImpl::didExhaustMemoryAvailableForScript):
+        (WebKit):
+        * src/FrameLoaderClientImpl.h:
+        (FrameLoaderClientImpl):
+        * src/PlatformSupport.cpp:
+        (WebCore):
+
+2012-09-19  Mark Pilgrim  <pilgrim@chromium.org>
+
+        [Chromium] Remove unused popupsAllowed function from PlatformSupport
+        https://bugs.webkit.org/show_bug.cgi?id=96521
+
+        Reviewed by Eric Seidel.
+
+        Part of a refactoring series. See tracking bug 82948.
+
+        * src/PlatformSupport.cpp:
+        (WebCore):
+
+2012-09-19  Kent Tamura  <tkent@chromium.org>
+
+        [Chromium] Fix crash in WebFrameImpl::loadHistoryItem
+        https://bugs.webkit.org/show_bug.cgi?id=96352
+
+        Reviewed by Adam Barth.
+
+        We have some crash reports with the following stack:
+          - HistoryItem::shouldDoSameDocumentNavigationTo.
+          - WebFrameImpl::loadHistoryItem
+          ...
+
+        We don't have reproducible steps, and not sure what's the root
+        cause. Anyway we should check nullness of currentItem because
+        HistoryController::m_currentItem can be 0.
+
+        * src/WebFrameImpl.cpp:
+        (WebKit::WebFrameImpl::loadHistoryItem):
+        Check nullness of currentItem.
+
+2012-09-18  Sailesh Agrawal  <sail@chromium.org>
+
+        Chromium: Scrollbar with tickmarks doesn't respond to clicks
+        https://bugs.webkit.org/show_bug.cgi?id=96049
+
+        Reviewed by Beth Dakin.
+
+        Pipe isAlphaLocked and setIsAlphaLocked.
+
+        * src/WebPluginScrollbarImpl.cpp:
+        (WebKit::WebPluginScrollbarImpl::isAlphaLocked):
+        (WebKit):
+        (WebKit::WebPluginScrollbarImpl::setIsAlphaLocked):
+        * src/WebPluginScrollbarImpl.h:
+        (WebPluginScrollbarImpl):
+        * src/WebScrollbarThemeClientImpl.cpp:
+        (WebKit::WebScrollbarThemeClientImpl::isAlphaLocked):
+        (WebKit):
+        (WebKit::WebScrollbarThemeClientImpl::setIsAlphaLocked):
+        * src/WebScrollbarThemeClientImpl.h:
+        (WebScrollbarThemeClientImpl):
+        * tests/ScrollbarLayerChromiumTest.cpp:
+
+2012-09-18  Alpha Lam  <hclam@chromium.org>
+
+        Unreviewed, rolling out r128939.
+        http://trac.webkit.org/changeset/128939
+        https://bugs.webkit.org/show_bug.cgi?id=96135
+
+        Failing test_shell_tests.
+
+        * WebKit.gypi:
+        * src/WebImageSkia.cpp:
+        (WebKit::WebImage::fromData):
+        (WebKit::WebImage::framesFromData):
+        * tests/WebImageTest.cpp: Removed.
+        * tests/data/black-and-white.ico: Removed.
+        * tests/data/white-1x1.png: Removed.
+
+2012-09-18  Alpha Lam  <hclam@chromium.org>
+
+        [chromium] WebImage should use ImageDecoder directly
+        https://bugs.webkit.org/show_bug.cgi?id=96135
+
+        Reviewed by Adam Barth.
+
+        This patch is for preparation of deferred image decoding.
+        ImageSource will be used as a portal to access deferred image decoder
+        by BitmapImage, it should not be accessible through WebKit APIs.
+
+        WebImage now calls ImageDecoder directly which is the actual
+        implementation of an image decoder.
+
+        Tests: WebImageTest.PNGImage
+               WebImageTest.ICOImage
+
+        * WebKit.gypi:
+        * src/WebImageSkia.cpp:
+        (WebKit::WebImage::fromData):
+        (WebKit::WebImage::framesFromData):
+        * tests/WebImageTest.cpp: Added.
+        (WebKit):
+        (WebKit::readFile):
+        (WebKit::TEST):
+        * tests/data/black-and-white.ico: Added.
+        * tests/data/white-1x1.png: Added.
+
+2012-09-18  Tommy Widenflycht  <tommyw@google.com>
+
+        MediaStream API: Create a flag to enable PeerConnection00
+        https://bugs.webkit.org/show_bug.cgi?id=96989
+
+        Reviewed by Adam Barth.
+
+        Adding the functionality to separately enable/disable PeerConnection00.
+        For now it is enabled by default.
+
+        * public/WebRuntimeFeatures.h:
+        (WebRuntimeFeatures):
+        * src/WebRuntimeFeatures.cpp:
+        (WebKit::WebRuntimeFeatures::enableDeprecatedPeerConnection):
+        (WebKit):
+        (WebKit::WebRuntimeFeatures::isDeprecatedPeerConnectionEnabled):
+
+2012-09-18  Iain Merrick  <husky@google.com>
+
+        [Chromium] Merge moveSelectionStart, moveSelectionEnd, and moveCaret into selectRange
+        https://bugs.webkit.org/show_bug.cgi?id=96508
+
+        Reviewed by Ryosuke Niwa.
+
+        These methods had "start" and "end" parameters, but this is incorrect.
+        selectRange() actually takes base and extent (where the user actually
+        touched), and selectionBounds() returns anchor and focus (base and extent
+        expanded to account for the selection granularity).
+
+        This patch fixes the parameter names, and updates selectRange, its test
+        and its documentation to reflect the correct usage. It also removes
+        moveSelectionStart/moveSelectionEnd/moveCaret (which aren't being used
+        yet), and updates WebFrameTest to show how these can be implemented via
+        selectRange.
+
+        * public/WebFrame.h:
+        (WebFrame):
+        * public/WebWidget.h:
+        (WebWidget):
+        (WebKit::WebWidget::selectionBounds):
+        * src/WebFrameImpl.cpp:
+        (WebKit::WebFrameImpl::selectRange):
+        * src/WebFrameImpl.h:
+        (WebFrameImpl):
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::selectionBounds):
+        * src/WebViewImpl.h:
+        (WebViewImpl):
+        * tests/WebFrameTest.cpp:
+
+2012-09-18  Terry Anderson  <tdanderson@chromium.org>
+
+        Roll chromium DEPS to r157342
+        https://bugs.webkit.org/show_bug.cgi?id=96963
+
+        Reviewed by Stephen White.
+
+        Roll chromium DEPS to r157342. Also include the top-level directory 
+        google_apis as a dependency, which was required for r157130.
+
+        * DEPS:
+
 2012-09-17  Brian Anderson  <brianderson@chromium.org>
 
         [chromium] Add rendering commit statistics

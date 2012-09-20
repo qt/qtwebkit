@@ -288,6 +288,16 @@ uint32_t WKPreferencesGetMinimumFontSize(WKPreferencesRef preferencesRef)
     return toImpl(preferencesRef)->minimumFontSize();
 }
 
+void WKPreferencesSetScreenFontSubstitutionEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setScreenFontSubstitutionEnabled(enabled);
+}
+
+bool WKPreferencesGetScreenFontSubstitutionEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->screenFontSubstitutionEnabled();
+}
+
 void WKPreferencesSetEditableLinkBehavior(WKPreferencesRef preferencesRef, WKEditableLinkBehavior wkBehavior)
 {
     toImpl(preferencesRef)->setEditableLinkBehavior(toEditableLinkBehavior(wkBehavior));
@@ -648,11 +658,11 @@ bool WKPreferencesGetFileAccessFromFileURLsAllowed(WKPreferencesRef preferencesR
     return toImpl(preferencesRef)->allowFileAccessFromFileURLs();
 }
 
-void WKPreferencesSetHixie76WebSocketProtocolEnabled(WKPreferencesRef preferencesRef, bool enabled)
+void WKPreferencesSetHixie76WebSocketProtocolEnabled(WKPreferencesRef, bool /*enabled*/)
 {
 }
 
-bool WKPreferencesGetHixie76WebSocketProtocolEnabled(WKPreferencesRef preferencesRef)
+bool WKPreferencesGetHixie76WebSocketProtocolEnabled(WKPreferencesRef)
 {
     return false;
 }

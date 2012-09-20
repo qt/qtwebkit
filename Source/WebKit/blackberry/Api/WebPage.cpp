@@ -2058,6 +2058,11 @@ bool WebPagePrivate::setViewMode(ViewMode mode)
     return true; // Needs re-layout!
 }
 
+int WebPagePrivate::playerID() const
+{
+    return m_client ? m_client->getInstanceId() : 0;
+}
+
 void WebPagePrivate::setCursor(PlatformCursor handle)
 {
     if (m_currentCursor.type() != handle.type()) {
@@ -5667,6 +5672,8 @@ void WebPagePrivate::rootLayerCommitTimerFired(Timer<WebPagePrivate>*)
 #if DEBUG_AC_COMMIT
     Platform::log(Platform::LogLevelCritical, "%s", WTF_PRETTY_FUNCTION);
 #endif
+
+    m_backingStore->d->instrumentBeginFrame();
 
     // The commit timer may have fired just before the layout timer, or for some
     // other reason we need layout. It's not allowed to commit when a layout is

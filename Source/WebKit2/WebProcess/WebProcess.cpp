@@ -292,6 +292,26 @@ void WebProcess::setDomainRelaxationForbiddenForURLScheme(const String& urlSchem
     SchemeRegistry::setDomainRelaxationForbiddenForURLScheme(true, urlScheme);
 }
 
+void WebProcess::registerURLSchemeAsLocal(const String& urlScheme) const
+{
+    SchemeRegistry::registerURLSchemeAsLocal(urlScheme);
+}
+
+void WebProcess::registerURLSchemeAsNoAccess(const String& urlScheme) const
+{
+    SchemeRegistry::registerURLSchemeAsNoAccess(urlScheme);
+}
+
+void WebProcess::registerURLSchemeAsDisplayIsolated(const String& urlScheme) const
+{
+    SchemeRegistry::registerURLSchemeAsDisplayIsolated(urlScheme);
+}
+
+void WebProcess::registerURLSchemeAsCORSEnabled(const String& urlScheme) const
+{
+    SchemeRegistry::registerURLSchemeAsCORSEnabled(urlScheme);
+}
+
 void WebProcess::setDefaultRequestTimeoutInterval(double timeoutInterval)
 {
     ResourceRequest::setDefaultTimeoutInterval(timeoutInterval);
@@ -870,6 +890,8 @@ void WebProcess::getSitesWithPluginData(const Vector<String>& pluginPaths, uint6
         for (size_t i = 0; i < sites.size(); ++i)
             sitesSet.add(sites[i]);
     }
+#else
+    UNUSED_PARAM(pluginPaths);
 #endif
 
     Vector<String> sites;
@@ -897,6 +919,11 @@ void WebProcess::clearPluginSiteData(const Vector<String>& pluginPaths, const Ve
         for (size_t i = 0; i < sites.size(); ++i)
             netscapePluginModule->clearSiteData(sites[i], flags, maxAgeInSeconds);
     }
+#else
+    UNUSED_PARAM(pluginPaths);
+    UNUSED_PARAM(sites);
+    UNUSED_PARAM(flags);
+    UNUSED_PARAM(maxAgeInSeconds);
 #endif
 
     connection()->send(Messages::WebProcessProxy::DidClearPluginSiteData(callbackID), 0);

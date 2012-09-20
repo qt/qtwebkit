@@ -40,6 +40,10 @@ _log = logging.getLogger(__name__)
 
 
 # Test expectation and modifier constants.
+# TEXT, IMAGE_PLUS_TEXT, and AUDIO are no longer used in new test runs but
+# we keep them around for now so we can parse old results.json entries and to
+# avoid changing the numbering for the constants.
+#
 # FIXME: range() starts with 0 which makes if expectation checks harder
 # as PASS is 0.
 (PASS, FAIL, TEXT, IMAGE, IMAGE_PLUS_TEXT, AUDIO, TIMEOUT, CRASH, SKIP, WONTFIX,
@@ -205,10 +209,15 @@ class TestExpectationParser(object):
         if expectation_line.path in self._full_test_list:
             expectation_line.matching_tests.append(expectation_line.path)
 
+    # FIXME: Seems like these should be classmethods on TestExpectationLine instead of TestExpectationParser.
     @classmethod
     def _tokenize_line(cls, filename, expectation_string, line_number):
-        # FIXME: Add in support for the new format as well.
-        return cls._tokenize_line_using_old_format(filename, expectation_string, line_number)
+        expectation_line = cls._tokenize_line_using_new_format(filename, expectation_string, line_number)
+        if expectation_line.is_invalid():
+            old_expectation_line = cls._tokenize_line_using_old_format(filename, expectation_string, line_number)
+            if not old_expectation_line.is_invalid():
+                return old_expectation_line
+        return expectation_line
 
     @classmethod
     def _tokenize_line_using_old_format(cls, filename, expectation_string, line_number):
@@ -250,10 +259,152 @@ class TestExpectationParser(object):
 
         return expectation_line
 
+    # FIXME: Update the original modifiers and remove this once the old syntax is gone.
+    _configuration_tokens_list = [
+        'Mac', 'SnowLeopard', 'Lion', 'MountainLion',
+        'Win', 'XP', 'Vista', 'Win7',
+        'Linux',
+        'Android',
+        'Release',
+        'Debug',
+    ]
+
+    _configuration_tokens = dict((token, token.upper()) for token in _configuration_tokens_list)
+    _inverted_configuration_tokens = dict((value, name) for name, value in _configuration_tokens.iteritems())
+
+    # FIXME: Update the original modifiers list and remove this once the old syntax is gone.
+    _expectation_tokens = {
+        'Crash': 'CRASH',
+        'Failure': 'FAIL',
+        'ImageOnlyFailure': 'IMAGE',
+        'Missing': 'MISSING',
+        'Pass': 'PASS',
+        'Rebaseline': 'REBASELINE',
+        'Skip': 'SKIP',
+        'Slow': 'SLOW',
+        'Timeout': 'TIMEOUT',
+        'WontFix': 'WONTFIX',
+    }
+
+    _inverted_expectation_tokens = dict((value, name) for name, value in _expectation_tokens.iteritems())
+
     @classmethod
     def _tokenize_line_using_new_format(cls, filename, expectation_string, line_number):
-        # FIXME: implement :).
-        raise NotImplementedError
+        """Tokenizes a line from TestExpectations and returns an unparsed TestExpectationLine instance using the old format.
+
+        The new format for a test expectation line is:
+
+        [[bugs] [ "[" <configuration modifiers> "]" <name> [ "[" <expectations> "]" ["#" <comment>]
+
+        Any errant whitespace is not preserved.
+
+        """
+        expectation_line = TestExpectationLine()
+        expectation_line.original_string = expectation_string
+        expectation_line.filename = filename
+        expectation_line.line_number = line_number
+
+        comment_index = expectation_string.find("#")
+        if comment_index == -1:
+            comment_index = len(expectation_string)
+        else:
+            expectation_line.comment = expectation_string[comment_index + 1:]
+
+        remaining_string = re.sub(r"\s+", " ", expectation_string[:comment_index].strip())
+        if len(remaining_string) == 0:
+            return expectation_line
+
+        # special-case parsing this so that we fail immediately instead of treating this as a test name
+        if remaining_string.startswith('//'):
+            expectation_line.warnings = ['use "#" instead of "//" for comments']
+            return expectation_line
+
+        bugs = []
+        modifiers = []
+        name = None
+        expectations = []
+        warnings = []
+
+        WEBKIT_BUG_PREFIX = 'webkit.org/b/'
+        CHROMIUM_BUG_PREFIX = 'crbug.com/'
+        V8_BUG_PREFIX = 'code.google.com/p/v8/issues/detail?id='
+
+        tokens = remaining_string.split()
+        state = 'start'
+        for token in tokens:
+            if (token.startswith(WEBKIT_BUG_PREFIX) or
+                token.startswith(CHROMIUM_BUG_PREFIX) or
+                token.startswith(V8_BUG_PREFIX) or
+                token.startswith('Bug(')):
+                if state != 'start':
+                    warnings.append('"%s" is not at the start of the line.' % token)
+                    break
+                if token.startswith(WEBKIT_BUG_PREFIX):
+                    bugs.append(token.replace(WEBKIT_BUG_PREFIX, 'BUGWK'))
+                elif token.startswith(CHROMIUM_BUG_PREFIX):
+                    bugs.append(token.replace(CHROMIUM_BUG_PREFIX, 'BUGCR'))
+                elif token.startswith(V8_BUG_PREFIX):
+                    bugs.append(token.replace(V8_BUG_PREFIX, 'BUGV8_'))
+                else:
+                    match = re.match('Bug\((\w+)\)$', token)
+                    if not match:
+                        warnings.append('unrecognized bug identifier "%s"' % token)
+                        break
+                    else:
+                        bugs.append('BUG' + match.group(1).upper())
+            elif token.startswith('BUG'):
+                warnings.append('unrecognized old-style bug identifier "%s"' % token)
+                break
+            elif token == '[':
+                if state == 'start':
+                    state = 'configuration'
+                elif state == 'name_found':
+                    state = 'expectations'
+                else:
+                    warnings.append('unexpected "["')
+                    break
+            elif token == ']':
+                if state == 'configuration':
+                    state = 'name'
+                elif state == 'expectations':
+                    state = 'done'
+                else:
+                    warnings.append('unexpected "]"')
+                    break
+            elif token in ('//', ':', '='):
+                warnings.append('"%s" is not legal in the new TestExpectations syntax.' % token)
+                break
+            elif state == 'configuration':
+                modifiers.append(cls._configuration_tokens.get(token, token))
+            elif state == 'expectations':
+                if token in ('Rebaseline', 'Skip', 'Slow', 'WontFix'):
+                    modifiers.append(token.upper())
+                else:
+                    expectations.append(cls._expectation_tokens.get(token, token))
+            elif state == 'name_found':
+                warnings.append('expecting "[", "#", or end of line instead of "%s"' % token)
+                break
+            else:
+                name = token
+                state = 'name_found'
+
+        if not warnings:
+            if not name:
+                warnings.append('Did not find a test name.')
+            elif state not in ('name_found', 'done'):
+                warnings.append('Missing a "]"')
+
+        if not expectations:
+            if 'SKIP' not in modifiers and 'REBASELINE' not in modifiers and 'SLOW' not in modifiers:
+                modifiers.append('SKIP')
+            expectations = ['PASS']
+
+        # FIXME: expectation line should just store bugs and modifiers separately.
+        expectation_line.modifiers = bugs + modifiers
+        expectation_line.expectations = expectations
+        expectation_line.name = name
+        expectation_line.warnings = warnings
+        return expectation_line
 
     @classmethod
     def _split_space_separated(cls, space_separated_string):
@@ -304,18 +455,19 @@ class TestExpectationLine(object):
             return self.original_string or ''
 
         if self.name is None:
-            return '' if self.comment is None else "//%s" % self.comment
+            return '' if self.comment is None else "#%s" % self.comment
 
         if test_configuration_converter and self.parsed_bug_modifiers:
             specifiers_list = test_configuration_converter.to_specifiers_list(self.matching_configurations)
             result = []
             for specifiers in specifiers_list:
-                modifiers = self._serialize_parsed_modifiers(test_configuration_converter, specifiers)
-                expectations = self._serialize_parsed_expectations(parsed_expectation_to_string)
+                # FIXME: this is silly that we join the modifiers and then immediately split them.
+                modifiers = self._serialize_parsed_modifiers(test_configuration_converter, specifiers).split()
+                expectations = self._serialize_parsed_expectations(parsed_expectation_to_string).split()
                 result.append(self._format_line(modifiers, self.name, expectations, self.comment))
             return "\n".join(result) if result else None
 
-        return self._format_line(" ".join(self.modifiers), self.name, " ".join(self.expectations), self.comment,
+        return self._format_line(self.modifiers, self.name, self.expectations, self.comment,
             include_modifiers, include_expectations, include_comment)
 
     def to_csv(self):
@@ -339,14 +491,38 @@ class TestExpectationLine(object):
 
     @staticmethod
     def _format_line(modifiers, name, expectations, comment, include_modifiers=True, include_expectations=True, include_comment=True):
+        bugs = []
+        new_modifiers = []
+        new_expectations = []
+        for modifier in modifiers:
+            modifier = modifier.upper()
+            if modifier.startswith('BUGWK'):
+                bugs.append('webkit.org/b/' + modifier.replace('BUGWK', ''))
+            elif modifier.startswith('BUGCR'):
+                bugs.append('crbug.com/' + modifier.replace('BUGCR', ''))
+            elif modifier.startswith('BUG'):
+                # FIXME: we should preserve case once we can drop the old syntax.
+                bugs.append('Bug(' + modifier[3:].lower() + ')')
+            elif modifier in ('SLOW', 'SKIP', 'REBASELINE', 'WONTFIX'):
+                new_expectations.append(TestExpectationParser._inverted_expectation_tokens.get(modifier))
+            else:
+                new_modifiers.append(TestExpectationParser._inverted_configuration_tokens.get(modifier, modifier))
+
+        for expectation in expectations:
+            expectation = expectation.upper()
+            new_expectations.append(TestExpectationParser._inverted_expectation_tokens.get(expectation, expectation))
+
         result = ''
-        if include_modifiers:
-            result += '%s : ' % modifiers.upper()
+        if include_modifiers and (bugs or new_modifiers):
+            if bugs:
+                result += ' '.join(bugs) + ' '
+            if new_modifiers:
+                result += '[ %s ] ' % ' '.join(new_modifiers)
         result += name
-        if include_expectations:
-            result += ' = %s' % expectations.upper()
+        if include_expectations and new_expectations and set(new_expectations) != set(['Skip', 'Pass']):
+            result += ' [ %s ]' % ' '.join(sorted(set(new_expectations)))
         if include_comment and comment is not None:
-            result += " //%s" % comment
+            result += " #%s" % comment
         return result
 
 
@@ -590,35 +766,33 @@ class TestExpectations(object):
     in which case the expectations apply to all test cases in that
     directory and any subdirectory. The format is along the lines of:
 
-      LayoutTests/fast/js/fixme.js = TEXT
-      LayoutTests/fast/js/flaky.js = TEXT PASS
-      LayoutTests/fast/js/crash.js = CRASH TIMEOUT TEXT PASS
+      LayoutTests/fast/js/fixme.js [ Failure ]
+      LayoutTests/fast/js/flaky.js [ Failure Pass ]
+      LayoutTests/fast/js/crash.js [ Crash Failure Pass Timeout ]
       ...
 
     To add modifiers:
-      SKIP : LayoutTests/fast/js/no-good.js = TIMEOUT PASS
-      DEBUG : LayoutTests/fast/js/no-good.js = TIMEOUT PASS
-      DEBUG SKIP : LayoutTests/fast/js/no-good.js = TIMEOUT PASS
-      LINUX DEBUG SKIP : LayoutTests/fast/js/no-good.js = TIMEOUT PASS
-      LINUX WIN : LayoutTests/fast/js/no-good.js = TIMEOUT PASS
+      LayoutTests/fast/js/no-good.js
+      [ Debug ] LayoutTests/fast/js/no-good.js [ Pass Timeout ]
+      [ Debug ] LayoutTests/fast/js/no-good.js [ Pass Skip Timeout ]
+      [ Linux Debug ] LayoutTests/fast/js/no-good.js [ Pass Skip Timeout ]
+      [ Linux Win ] LayoutTests/fast/js/no-good.js [ Pass Skip Timeout ]
 
-    SKIP: Doesn't run the test.
-    SLOW: The test takes a long time to run, but does not timeout indefinitely.
-    WONTFIX: For tests that we never intend to pass on a given platform.
+    Skip: Doesn't run the test.
+    Slow: The test takes a long time to run, but does not timeout indefinitely.
+    WontFix: For tests that we never intend to pass on a given platform (treated like Skip).
 
     Notes:
       -A test cannot be both SLOW and TIMEOUT
-      -A test should only be one of IMAGE, TEXT, IMAGE+TEXT, or AUDIO.
       -A test can be included twice, but not via the same path.
       -If a test is included twice, then the more precise path wins.
       -CRASH tests cannot be WONTFIX
     """
 
+    # FIXME: Update to new syntax once the old format is no longer supported.
     EXPECTATIONS = {'pass': PASS,
-                    'text': TEXT,
+                    'fail': FAIL,
                     'image': IMAGE,
-                    'image+text': IMAGE_PLUS_TEXT,
-                    'audio': AUDIO,
                     'timeout': TIMEOUT,
                     'crash': CRASH,
                     'missing': MISSING}
@@ -626,15 +800,13 @@ class TestExpectations(object):
     # (aggregated by category, pass/fail/skip, type)
     EXPECTATION_DESCRIPTIONS = {SKIP: ('skipped', 'skipped', ''),
                                 PASS: ('passes', 'passed', ''),
-                                TEXT: ('text failures', 'failed', ' (text diff)'),
+                                FAIL: ('failures', 'failed', ''),
                                 IMAGE: ('image-only failures', 'failed', ' (image diff)'),
-                                IMAGE_PLUS_TEXT: ('both image and text failures', 'failed', ' (both image and text diffs'),
-                                AUDIO: ('audio failures', 'failed', ' (audio diff)'),
                                 CRASH: ('crashes', 'crashed', ''),
                                 TIMEOUT: ('timeouts', 'timed out', ''),
                                 MISSING: ('no expected results found', 'no expected result found', '')}
 
-    EXPECTATION_ORDER = (PASS, CRASH, TIMEOUT, MISSING, IMAGE_PLUS_TEXT, TEXT, IMAGE, AUDIO, SKIP)
+    EXPECTATION_ORDER = (PASS, CRASH, TIMEOUT, MISSING, FAIL, IMAGE, SKIP)
 
     BUILD_TYPES = ('debug', 'release')
 
@@ -683,23 +855,20 @@ class TestExpectations(object):
         if IMAGE in expected_results:
             expected_results.remove(IMAGE)
             expected_results.add(PASS)
-        if IMAGE_PLUS_TEXT in expected_results:
-            expected_results.remove(IMAGE_PLUS_TEXT)
-            expected_results.add(TEXT)
         return expected_results
 
     @staticmethod
     def has_pixel_failures(actual_results):
-        return IMAGE in actual_results or IMAGE_PLUS_TEXT in actual_results
+        return IMAGE in actual_results or FAIL in actual_results
 
     @staticmethod
     def suffixes_for_expectations(expectations):
         suffixes = set()
-        if expectations.intersection(set([TEXT, IMAGE_PLUS_TEXT])):
-            suffixes.add('txt')
-        if expectations.intersection(set([IMAGE, IMAGE_PLUS_TEXT])):
+        if IMAGE in expectations:
             suffixes.add('png')
-        if AUDIO in expectations:
+        if FAIL in expectations:
+            suffixes.add('txt')
+            suffixes.add('png')
             suffixes.add('wav')
         return set(suffixes)
 
@@ -735,10 +904,7 @@ class TestExpectations(object):
         return self._model
 
     def get_rebaselining_failures(self):
-        return (self._model.get_test_set(REBASELINE, IMAGE) |
-                self._model.get_test_set(REBASELINE, TEXT) |
-                self._model.get_test_set(REBASELINE, IMAGE_PLUS_TEXT) |
-                self._model.get_test_set(REBASELINE, AUDIO))
+        return self._model.get_test_set(REBASELINE, IMAGE) | self._model.get_test_set(REBASELINE, FAIL)
 
     # FIXME: Change the callsites to use TestExpectationsModel and remove.
     def get_expectations(self, test):
@@ -815,7 +981,7 @@ class TestExpectations(object):
         for expectation in self._expectations:
             if expectation.name != test or expectation.is_flaky() or not expectation.parsed_expectations:
                 continue
-            if iter(expectation.parsed_expectations).next() not in (TEXT, IMAGE, IMAGE_PLUS_TEXT, AUDIO):
+            if iter(expectation.parsed_expectations).next() not in (FAIL, IMAGE):
                 continue
             if test_configuration not in expectation.matching_configurations:
                 continue

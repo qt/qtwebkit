@@ -1954,6 +1954,8 @@ void WebPage::getWebArchiveOfFrame(uint64_t frameID, uint64_t callbackID)
         if ((data = frame->webArchiveData(0, 0)))
             dataReference = CoreIPC::DataReference(CFDataGetBytePtr(data.get()), CFDataGetLength(data.get()));
     }
+#else
+    UNUSED_PARAM(frameID);
 #endif
 
     send(Messages::WebPageProxy::DataCallback(dataReference, callbackID));
@@ -2054,6 +2056,7 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings->setMinimumLogicalFontSize(store.getUInt32ValueForKey(WebPreferencesKey::minimumLogicalFontSizeKey()));
     settings->setDefaultFontSize(store.getUInt32ValueForKey(WebPreferencesKey::defaultFontSizeKey()));
     settings->setDefaultFixedFontSize(store.getUInt32ValueForKey(WebPreferencesKey::defaultFixedFontSizeKey()));
+    settings->setScreenFontSubstitutionEnabled(store.getBoolValueForKey(WebPreferencesKey::screenFontSubstitutionEnabledKey()));
     settings->setLayoutFallbackWidth(store.getUInt32ValueForKey(WebPreferencesKey::layoutFallbackWidthKey()));
     settings->setDeviceWidth(store.getUInt32ValueForKey(WebPreferencesKey::deviceWidthKey()));
     settings->setDeviceHeight(store.getUInt32ValueForKey(WebPreferencesKey::deviceHeightKey()));

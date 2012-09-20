@@ -1,3 +1,684 @@
+2012-09-20  Balazs Kelemen  <kbalazs@webkit.org>
+
+        [CoordinatedGraphics] Don't reset m_shouldSyncFrame in flushPendingLayerChanges
+        https://bugs.webkit.org/show_bug.cgi?id=97108
+
+        Reviewed by Noam Rosenthal.
+
+        Stop ignoring if m_shouldSyncFrame has been set between the two
+        layer flush. It can be set during layout in several situations,
+        for example when a layer is deleted or changed state. We want to
+        send the DidRenderFrame message at the next flush in those situations
+        so the UI process will apply the changes as soon as possible.
+
+        * WebProcess/WebPage/CoordinatedGraphics/LayerTreeCoordinator.cpp:
+        (WebKit::LayerTreeCoordinator::flushPendingLayerChanges):
+
+2012-09-20  Byungwoo Lee  <bw80.lee@samsung.com>
+
+        [EFL][WK2] Check timeout on waitUntilLoadFinished() and waitUntilTitleChangedTo().
+        https://bugs.webkit.org/show_bug.cgi?id=97081
+
+        Reviewed by Gyuyoung Kim.
+
+        Add assertion to check timeout on waitUntilLoadFinished() and
+        waitUntilTitleChangedTo().
+        Set the default timeout for the functions as 10 seconds.
+
+        * UIProcess/API/efl/tests/UnitTestUtils/EWK2UnitTestBase.h:
+        (EWK2UnitTestBase):
+        * UIProcess/API/efl/tests/test_ewk2_back_forward_list.cpp:
+        (TEST_F):
+        * UIProcess/API/efl/tests/test_ewk2_context.cpp:
+        (TEST_F):
+        * UIProcess/API/efl/tests/test_ewk2_view.cpp:
+        (TEST_F):
+
+2012-09-20  Jinwoo Song  <jinwoo7.song@samsung.com>
+
+        [EFL] Change the log macro names to be more consistent with EINA LOG
+        https://bugs.webkit.org/show_bug.cgi?id=97158
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Some log macro names in WebKit2 are inconsistent with EINA LOG names
+        such as WRN/INF not WARN/INFO.
+
+          #define WRN(...) EINA_LOG_DOM_WARN(_ewk_log_dom, __VA_ARGS__)
+          #define INF(...) EINA_LOG_DOM_INFO(_ewk_log_dom, __VA_ARGS__)
+
+        This patch changes the such names to be consistent with EINA LOG's names.
+
+        * UIProcess/API/efl/ewk_main.cpp:
+        (ewk_init):
+        * UIProcess/API/efl/ewk_private.h:
+        * UIProcess/API/efl/ewk_view.cpp:
+        (ewk_view_webprocess_crashed):
+
+2012-09-20  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Same page navigation does not update view URI
+        https://bugs.webkit.org/show_bug.cgi?id=97094
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Handle didSameDocumentNavigationForFrame callback in
+        WKPageLoaderClient in order to update the view URI.
+        This fixes issues with the view URI not being updated
+        in case of a same page navigation.
+
+        * UIProcess/API/efl/ewk_view_loader_client.cpp:
+        (didSameDocumentNavigationForFrame):
+        (ewk_view_loader_client_attach):
+        * UIProcess/API/efl/ewk_view_private.h:
+        * UIProcess/API/efl/tests/UnitTestUtils/EWK2UnitTestBase.cpp:
+        (CallbackDataTimer):
+        (EWK2UnitTest::CallbackDataTimer::CallbackDataTimer):
+        (EWK2UnitTest::CallbackDataTimer::~CallbackDataTimer):
+        (EWK2UnitTest::CallbackDataTimer::isDone):
+        (EWK2UnitTest::CallbackDataTimer::setDone):
+        (EWK2UnitTest::CallbackDataTimer::didTimeOut):
+        (EWK2UnitTest::CallbackDataTimer::setTimedOut):
+        (EWK2UnitTest):
+        (CallbackDataExpectedValue):
+        (EWK2UnitTest::CallbackDataExpectedValue::CallbackDataExpectedValue):
+        (EWK2UnitTest::CallbackDataExpectedValue::expectedValue):
+        (EWK2UnitTest::onLoadFinished):
+        (EWK2UnitTest::timeOutWhileWaitingUntilLoadFinished):
+        (EWK2UnitTest::EWK2UnitTestBase::waitUntilLoadFinished):
+        (EWK2UnitTest::onTitleChanged):
+        (EWK2UnitTest::timeOutWhileWaitingUntilTitleChangedTo):
+        (EWK2UnitTest::EWK2UnitTestBase::waitUntilTitleChangedTo):
+        (EWK2UnitTest::onURIChanged):
+        (EWK2UnitTest::timeOutWhileWaitingUntilURIChangedTo):
+        (EWK2UnitTest::EWK2UnitTestBase::waitUntilURIChangedTo): Add convenience function to test
+        framework in order to wait until the view URI changes to a given value.
+        * UIProcess/API/efl/tests/UnitTestUtils/EWK2UnitTestBase.h:
+        (EWK2UnitTestBase):
+        * UIProcess/API/efl/tests/resources/same_page_navigation.html: Added.
+        * UIProcess/API/efl/tests/test_ewk2_view.cpp:
+        (TEST_F): Add corresponding unit test to verify fix and prevent regressions
+        in the future.
+
+2012-09-19  Dan Bernstein  <mitz@apple.com>
+
+        WebKit2 part of adding a setting and API for disabling screen font substitution
+        https://bugs.webkit.org/show_bug.cgi?id=97168
+
+        Reviewed by Tim Horton.
+
+        * Shared/WebPreferencesStore.h:
+        (WebKit): Defined ScreenFontSubstitutionEnabled key with a default value of true.
+        * UIProcess/API/C/WKPreferences.cpp:
+        (WKPreferencesSetScreenFontSubstitutionEnabled): Added this setter.
+        (WKPreferencesGetScreenFontSubstitutionEnabled): Added this getter.
+        * UIProcess/API/C/WKPreferencesPrivate.h:
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::updatePreferences): Added a call to Settings::setScreenFontSubstitutionEnabled
+        to push the preference into Settings.
+
+2012-09-19  Jinwoo Song  <jinwoo7.song@samsung.com>
+
+        Fix unused parameter compile warnings in WebKit/WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=96742
+
+        Reviewed by Gyuyoung Kim.
+
+        Fix unused parameter compile warning messages(-Wunused-parameter) in WebKit2 during EFL build.
+        WebCore's warning messages were fixed in r128570.
+
+        * Shared/FontInfo.cpp:
+        (WebKit::FontInfo::encode):
+        (WebKit::FontInfo::decode):
+        * Shared/PlatformPopupMenuData.cpp:
+        (WebKit::PlatformPopupMenuData::encode):
+        (WebKit::PlatformPopupMenuData::decode):
+        * Shared/SandboxExtension.h:
+        (WebKit::SandboxExtension::createHandleForTemporaryFile):
+        * Shared/ShareableSurface.cpp:
+        (WebKit::ShareableSurface::create):
+        * Shared/WebMemorySampler.cpp:
+        (WebKit::WebMemorySampler::appendCurrentMemoryUsageToFile):
+        * UIProcess/API/C/WKPage.cpp:
+        (WKPageGetContentsAsMHTMLData):
+        * UIProcess/API/C/WKPluginSiteDataManager.cpp:
+        (WKPluginSiteDataManagerClearSiteData):
+        (WKPluginSiteDataManagerClearAllSiteData):
+        * UIProcess/API/C/WKPreferences.cpp:
+        (WKPreferencesSetHixie76WebSocketProtocolEnabled):
+        (WKPreferencesGetHixie76WebSocketProtocolEnabled):
+        * UIProcess/API/efl/BatteryProvider.cpp:
+        (startUpdatingCallback):
+        (stopUpdatingCallback):
+        * UIProcess/API/efl/PageClientImpl.cpp:
+        (WebKit::PageClientImpl::doneWithTouchEvent):
+        * UIProcess/API/efl/VibrationProvider.cpp:
+        (vibrateCallback):
+        (cancelVibrationCallback):
+        * UIProcess/API/efl/ewk_context_download_client.cpp:
+        (decideDestinationWithSuggestedFilename):
+        (didCreateDestination):
+        * UIProcess/API/efl/ewk_view.cpp:
+        (_ewk_view_on_focus_in):
+        (_ewk_view_on_focus_out):
+        (_ewk_view_on_mouse_wheel):
+        (_ewk_view_on_mouse_down):
+        (_ewk_view_on_mouse_up):
+        (_ewk_view_on_mouse_move):
+        (_ewk_view_on_key_down):
+        (_ewk_view_on_key_up):
+        (_ewk_view_smart_move):
+        (ewk_view_contents_size_changed):
+        * UIProcess/API/efl/ewk_view_find_client.cpp:
+        (didFindString):
+        * UIProcess/API/efl/ewk_view_form_client.cpp:
+        (willSubmitForm):
+        * UIProcess/API/efl/ewk_view_loader_client.cpp:
+        (didReceiveIntentForFrame):
+        (registerIntentServiceForFrame):
+        (didFinishLoadForFrame):
+        (didFailLoadWithErrorForFrame):
+        (didStartProvisionalLoadForFrame):
+        (didReceiveServerRedirectForProvisionalLoadForFrame):
+        (didFailProvisionalLoadWithErrorForFrame):
+        (didChangeBackForwardList):
+        * UIProcess/API/efl/ewk_view_policy_client.cpp:
+        (decidePolicyForNavigationAction):
+        (decidePolicyForNewWindowAction):
+        (decidePolicyForResponseCallback):
+        * UIProcess/DrawingAreaProxy.h:
+        (WebKit::DrawingAreaProxy::update):
+        (WebKit::DrawingAreaProxy::didUpdateBackingStoreState):
+        * UIProcess/DrawingAreaProxyImpl.cpp:
+        (WebKit::DrawingAreaProxyImpl::didUpdateBackingStoreState):
+        (WebKit::DrawingAreaProxyImpl::enterAcceleratedCompositingMode):
+        (WebKit::DrawingAreaProxyImpl::updateAcceleratedCompositingMode):
+        * UIProcess/FindIndicator.cpp:
+        (WebKit::FindIndicator::draw):
+        * UIProcess/GeolocationPermissionRequestManagerProxy.cpp:
+        (WebKit::GeolocationPermissionRequestManagerProxy::didReceiveGeolocationPermissionDecision):
+        * UIProcess/Plugins/unix/PluginInfoStoreUnix.cpp:
+        (WebKit::PluginInfoStore::shouldUsePlugin):
+        * UIProcess/WebContext.cpp:
+        (WebKit::WebContext::setHTTPPipeliningEnabled):
+        * UIProcess/WebFullScreenManagerProxy.cpp:
+        (WebKit::WebFullScreenManagerProxy::supportsFullScreen):
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::sessionStateData):
+        (WebKit::WebPageProxy::recommendedScrollbarStyleDidChange):
+        (WebKit::WebPageProxy::didBlockInsecurePluginVersion):
+        * UIProcess/WebProcessProxy.cpp:
+        (WebKit::WebProcessProxy::createWebPage):
+        * UIProcess/efl/TextCheckerEfl.cpp:
+        (WebKit::TextChecker::continuousSpellCheckingEnabledStateChanged):
+        (WebKit::TextChecker::grammarCheckingEnabledStateChanged):
+        * UIProcess/efl/WebFullScreenManagerProxyEfl.cpp:
+        (WebKit::WebFullScreenManagerProxy::beganEnterFullScreen):
+        (WebKit::WebFullScreenManagerProxy::beganExitFullScreen):
+        * UIProcess/efl/WebPageProxyEfl.cpp:
+        (WebKit::WebPageProxy::standardUserAgent):
+        (WebKit::WebPageProxy::getEditorCommandsForKeyEvent):
+        * WebProcess/Downloads/soup/DownloadSoup.cpp:
+        (WebKit::Download::start):
+        (WebKit::Download::startWithHandle):
+        (WebKit::Download::didDecideDestination):
+        (WebKit::Download::receivedCredential):
+        (WebKit::Download::receivedRequestToContinueWithoutCredential):
+        (WebKit::Download::receivedCancellation):
+        * WebProcess/Geolocation/WebGeolocationManager.cpp:
+        (WebKit::WebGeolocationManager::didChangePosition):
+        * WebProcess/IconDatabase/WebIconDatabaseProxy.cpp:
+        (WebKit::WebIconDatabaseProxy::synchronousIconForPageURL):
+        (WebKit::WebIconDatabaseProxy::synchronousIconURLForPageURL):
+        (WebKit::WebIconDatabaseProxy::synchronousIconDataKnownForIconURL):
+        (WebKit::WebIconDatabaseProxy::synchronousLoadDecisionForIconURL):
+        (WebKit::WebIconDatabaseProxy::iconDataForIconURL):
+        * WebProcess/InjectedBundle/API/c/WKBundleFrame.cpp:
+        (WKBundleFrameCopyWebArchiveFilteringSubframes):
+        * WebProcess/InjectedBundle/API/c/WKBundlePage.cpp:
+        (WKAccessibilityRootObject):
+        (WKAccessibilityFocusedObject):
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::setGeoLocationPermission):
+        (WebKit::InjectedBundle::didReceiveMessage):
+        (WebKit::InjectedBundle::webNotificationID):
+        * WebProcess/Notifications/WebNotificationManager.cpp:
+        (WebKit::WebNotificationManager::initialize):
+        (WebKit::WebNotificationManager::didUpdateNotificationDecision):
+        (WebKit::WebNotificationManager::didRemoveNotificationDecisions):
+        (WebKit::WebNotificationManager::policyForOrigin):
+        (WebKit::WebNotificationManager::notificationIDForTesting):
+        (WebKit::WebNotificationManager::show):
+        (WebKit::WebNotificationManager::cancel):
+        (WebKit::WebNotificationManager::clearNotifications):
+        (WebKit::WebNotificationManager::didDestroyNotification):
+        (WebKit::WebNotificationManager::didShowNotification):
+        (WebKit::WebNotificationManager::didClickNotification):
+        (WebKit::WebNotificationManager::didCloseNotifications):
+        * WebProcess/Plugins/PluginView.cpp:
+        (WebKit::PluginView::paint):
+        * WebProcess/WebCoreSupport/WebChromeClient.cpp:
+        (WebKit::WebChromeClient::addMessageToConsole):
+        (WebKit::WebChromeClient::contentsSizeChanged):
+        (WebKit::WebChromeClient::customHighlightRect):
+        (WebKit::WebChromeClient::paintCustomHighlight):
+        (WebKit::WebChromeClient::supportsFullScreenForElement):
+        * WebProcess/WebCoreSupport/WebContextMenuClient.cpp:
+        (WebKit::WebContextMenuClient::downloadURL):
+        * WebProcess/WebCoreSupport/WebDragClient.cpp:
+        (WebKit::WebDragClient::dragSourceActionMaskForPoint):
+        * WebProcess/WebCoreSupport/WebEditorClient.cpp:
+        (WebKit::WebEditorClient::shouldEraseMarkersAfterChangeSelection):
+        * WebProcess/WebCoreSupport/WebFrameLoaderClient.cpp:
+        (WebKit::WebFrameLoaderClient::dispatchDidCancelAuthenticationChallenge):
+        (WebKit::WebFrameLoaderClient::dispatchDidLoadResourceFromMemoryCache):
+        (WebKit::WebFrameLoaderClient::shouldStopLoadingForHistoryItem):
+        (WebKit::WebFrameLoaderClient::canShowMIMEType):
+        (WebKit::WebFrameLoaderClient::canShowMIMETypeAsHTML):
+        (WebKit::WebFrameLoaderClient::representationExistsForURLScheme):
+        (WebKit::WebFrameLoaderClient::generatedMIMETypeForURLScheme):
+        (WebKit::WebFrameLoaderClient::createFrame):
+        (WebKit::WebFrameLoaderClient::createJavaAppletWidget):
+        (WebKit::WebFrameLoaderClient::registerForIconNotification):
+        * WebProcess/WebCoreSupport/WebInspectorClient.cpp:
+        (WebKit::WebInspectorClient::drawRect):
+        * WebProcess/WebPage/DrawingArea.h:
+        (WebKit::DrawingArea::forceRepaintAsync):
+        (WebKit::DrawingArea::updateBackingStoreState):
+        * WebProcess/WebPage/FindController.cpp:
+        (WebKit::FindController::mouseEvent):
+        * WebProcess/WebPage/LayerTreeHost.cpp:
+        (WebKit::LayerTreeHost::create):
+        * WebProcess/WebPage/LayerTreeHost.h:
+        (WebKit::LayerTreeHost::forceRepaintAsync):
+        * WebProcess/WebPage/TapHighlightController.cpp:
+        (WebKit::TapHighlightController::drawRect):
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::getWebArchiveOfFrame):
+        * WebProcess/WebProcess.cpp:
+        (WebKit::WebProcess::getSitesWithPluginData):
+        (WebKit::WebProcess::clearPluginSiteData):
+        * WebProcess/soup/WebKitSoupRequestGeneric.cpp:
+        (webkitSoupRequestGenericSendFinish):
+        * WebProcess/soup/WebKitSoupRequestInputStream.cpp:
+        (webkitSoupRequestInputStreamReadAsync):
+        (webkitSoupRequestInputStreamReadFinish):
+
+2012-09-19  Pratik Solanki  <psolanki@apple.com>
+
+        Warning in SandboxExtension.h if WEB_PROCESS_SANDBOX is not enabled
+        https://bugs.webkit.org/show_bug.cgi?id=97137
+
+        Reviewed by Benjamin Poulain.
+
+        m_size is only used when WEB_PROCESS_SANDBOX is enabled, so move its declaration inside
+        #if ENABLE(WEB_PROCESS_SANDBOX).
+
+        * Shared/SandboxExtension.h:
+        (HandleArray):
+
+2012-09-19  Sudarsana Nagineni  <sudarsana.nagineni@intel.com>
+
+        [WTR] Memory leaks in TestRunner::deliverWebIntent()
+        https://bugs.webkit.org/show_bug.cgi?id=97111
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Fix memory leaks in WKBundleIntentCreate() by adopting strings
+        created with WKStringCreateWithUTF8CString().
+
+        * WebProcess/InjectedBundle/API/c/WKBundleIntent.cpp:
+        (WKBundleIntentCreate):
+
+2012-09-19  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] fast/forms/select-writing-direction-natural.html is failing
+        https://bugs.webkit.org/show_bug.cgi?id=97082
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        WebChromeClient::selectItemWritingDirectionIsNatural() now returns
+        true for EFL-WK2, consistently with EFL-WK1, so that the style
+        is properly adjusted in RenderMenuList::adjustInnerStyle().
+
+        * WebProcess/WebCoreSupport/WebChromeClient.cpp:
+        (WebKit::WebChromeClient::selectItemWritingDirectionIsNatural):
+
+2012-09-19  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Add API to get/set the security policy of a given URI scheme to WebKit2 GTK+
+        https://bugs.webkit.org/show_bug.cgi?id=96497
+
+        Reviewed by Martin Robinson.
+
+        Add WebKitSecurityManager object associated to a WebKitWebContext
+        to get/set the security policy of a URI scheme.
+
+        * GNUmakefile.list.am: Add new files to compilation.
+        * Shared/WebProcessCreationParameters.cpp:
+        (WebKit::WebProcessCreationParameters::encode): Encode the list of
+        schemes to be reigstered as Local, NoAccess, DisplayIsolated and
+        CORSEnabled.
+        (WebKit::WebProcessCreationParameters::decode): Decode the list of
+        schemes to be reigstered as Local, NoAccess, DisplayIsolated and
+        CORSEnabled.
+        * Shared/WebProcessCreationParameters.h:
+        (WebProcessCreationParameters): Add new parameters to be able to
+        register schemes as Local, NoAccess, DisplayIsolated and
+        CORSEnabled.
+        * UIProcess/API/gtk/WebKitSecurityManager.cpp: Added.
+        (webkit_security_manager_init):
+        (webkitSecurityManagerFinalize):
+        (webkit_security_manager_class_init):
+        (webkitSecurityManagerCreate): Private function to create the
+        WebKitSecurityManager object associated to the given
+        WebKitWebContext.
+        (registerSecurityPolicyForURIScheme):
+        (checkSecurityPolicyForURIScheme):
+        (webkit_security_manager_register_uri_scheme_as_local):
+        (webkit_security_manager_uri_scheme_is_local):
+        (webkit_security_manager_register_uri_scheme_as_no_access):
+        (webkit_security_manager_uri_scheme_is_no_access):
+        (webkit_security_manager_register_uri_scheme_as_display_isolated):
+        (webkit_security_manager_uri_scheme_is_display_isolated):
+        (webkit_security_manager_register_uri_scheme_as_secure):
+        (webkit_security_manager_uri_scheme_is_secure):
+        (webkit_security_manager_register_uri_scheme_as_cors_enabled):
+        (webkit_security_manager_uri_scheme_is_cors_enabled):
+        (webkit_security_manager_register_uri_scheme_as_empty_document):
+        (webkit_security_manager_uri_scheme_is_empty_document):
+        * UIProcess/API/gtk/WebKitSecurityManager.h: Added.
+        * UIProcess/API/gtk/WebKitSecurityManagerPrivate.h: Added.
+        * UIProcess/API/gtk/WebKitWebContext.cpp:
+        (webkit_web_context_get_security_manager): Return the
+        WebKitSecurityManager object, creating it before if it doesn't exist.
+        * UIProcess/API/gtk/WebKitWebContext.h:
+        * UIProcess/API/gtk/docs/webkit2gtk-docs.sgml: Add new section for
+        WebKitSecurityManager.
+        * UIProcess/API/gtk/docs/webkit2gtk-sections.txt: Add new symbols.
+        * UIProcess/API/gtk/tests/TestWebKitWebContext.cpp:
+        (testWebContextSecurityPolicy):
+        (beforeAll):
+        * UIProcess/API/gtk/webkit2.h: Add WebKitSecurityManager.h.
+        * UIProcess/WebContext.cpp:
+        (WebKit::WebContext::createNewWebProcess): Copy new vector
+        schemes.
+        (WebKit::WebContext::registerURLSchemeAsLocal): Send a message to
+        WebProcess to register the given URL scheme as Local.
+        (WebKit::WebContext::registerURLSchemeAsNoAccess): Send a message
+        to WebProcess to register the given URL scheme as NoAccess.
+        (WebKit::WebContext::registerURLSchemeAsDisplayIsolated): Send a
+        message to WebProcess to register the given URL scheme as
+        DisplayIsolated.
+        (WebKit::WebContext::registerURLSchemeAsCORSEnabled): Send a
+        message to WebProcess to register the given URL scheme as
+        CORSEnabled.
+        * UIProcess/WebContext.h:
+        (WebContext):
+        * WebProcess/WebProcess.cpp:
+        (WebKit::WebProcess::registerURLSchemeAsLocal): Register the
+        given URL scheme as Local in the SchemeRegistry.
+        (WebKit::WebProcess::registerURLSchemeAsNoAccess): Register the
+        given URL scheme as NoAccess in the SchemeRegistry.
+        (WebKit::WebProcess::registerURLSchemeAsDisplayIsolated): Register
+        the given URL scheme as DisplayIsolated in the SchemeRegistry.
+        (WebKit::WebProcess::registerURLSchemeAsCORSEnabled): Register the
+        given URL scheme as CORSEnabled in the SchemeRegistry.
+        * WebProcess/WebProcess.h:
+        * WebProcess/WebProcess.messages.in: Add new messages.
+
+2012-09-19  Balazs Kelemen  <kbalazs@webkit.org>
+
+        [Texmap] Potential crash in TextureMapperLayer because of referencing deleted mask/replica layer
+        https://bugs.webkit.org/show_bug.cgi?id=96919
+
+        Reviewed by Noam Rosenthal.
+
+        Delay syncing deleted layers until flushPendingLayerChanges so the UI side state
+        will contain all changes related to the deletion of a layer. This saves us from
+        referencing a deleted layer.
+
+        * WebProcess/WebPage/CoordinatedGraphics/LayerTreeCoordinator.cpp:
+        (WebKit::LayerTreeCoordinator::flushPendingLayerChanges):
+        (WebKit::LayerTreeCoordinator::detachLayer):
+        * WebProcess/WebPage/CoordinatedGraphics/LayerTreeCoordinator.h:
+        (LayerTreeCoordinator):
+
+2012-09-19  Byungwoo Lee  <bw80.lee@samsung.com>
+
+        [EFL][WK2] waitUntilTitleChangedTo() and waitUntilLoadFinished() needs timeout.
+        https://bugs.webkit.org/show_bug.cgi?id=96910
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Currently, the waitUntilTitleChangedTo() and waitUntilLoadFinished()
+        functions doesn't handle timeout by itself.
+        And if there are some failed cases that loading is not finished or
+        title is not changed to the expected string, test case just stopped
+        with timeout and there is no more information about this such as line
+        number.
+
+        To handle timeout status more properly, timeout parameter is added to
+        these functions.
+
+        * UIProcess/API/efl/tests/UnitTestUtils/EWK2UnitTestBase.cpp:
+        (EWK2UnitTest::LoadFinishedData::LoadFinishedData):
+        (LoadFinishedData):
+        (EWK2UnitTest::LoadFinishedData::~LoadFinishedData):
+        (EWK2UnitTest):
+        (EWK2UnitTest::onLoadFinished):
+        (EWK2UnitTest::timeOutWhileWaitingUntilLoadFinished):
+        (EWK2UnitTest::EWK2UnitTestBase::waitUntilLoadFinished):
+        (EWK2UnitTest::TitleChangedData::TitleChangedData):
+        (TitleChangedData):
+        (EWK2UnitTest::TitleChangedData::~TitleChangedData):
+        (EWK2UnitTest::onTitleChanged):
+        (EWK2UnitTest::timeOutWhileWaitingUntilTitleChangedTo):
+        (EWK2UnitTest::EWK2UnitTestBase::waitUntilTitleChangedTo):
+        * UIProcess/API/efl/tests/UnitTestUtils/EWK2UnitTestBase.h:
+        (EWK2UnitTestBase):
+
+2012-09-18  Byungwoo Lee  <bw80.lee@samsung.com>
+
+        [EFL][WK2] Add javascript popup API.
+        https://bugs.webkit.org/show_bug.cgi?id=95672
+
+        Reviewed by Gyuyoung Kim.
+
+        Add smart class member function for javascript alert(), confirm() and prompt().
+
+        * UIProcess/API/efl/ewk_view.cpp:
+        (ewk_view_run_javascript_alert):
+        (ewk_view_run_javascript_confirm):
+        (ewk_view_run_javascript_prompt):
+        * UIProcess/API/efl/ewk_view.h:
+        * UIProcess/API/efl/ewk_view_private.h:
+        * UIProcess/API/efl/ewk_view_ui_client.cpp:
+        (runJavaScriptAlert):
+        (runJavaScriptConfirm):
+        (runJavaScriptPrompt):
+        (ewk_view_ui_client_attach):
+        * UIProcess/API/efl/tests/test_ewk2_view.cpp:
+        Added unit test for javascript popup smart class member function.
+        (checkAlert):
+        (TEST_F):
+        (checkConfirm):
+        (checkPrompt):
+
+2012-09-18  Sailesh Agrawal  <sail@chromium.org>
+
+        Chromium: Scrollbar with tickmarks doesn't respond to clicks
+        https://bugs.webkit.org/show_bug.cgi?id=96049
+
+        Reviewed by Beth Dakin.
+
+        Update exported symbols.
+
+        * win/WebKit2.def:
+        * win/WebKit2CFLite.def:
+
+2012-09-18  Jinwoo Song  <jinwoo7.song@samsung.com>
+
+        [EFL][WK2] Add log macros for EINA_LOG_DOM_XXX series
+        https://bugs.webkit.org/show_bug.cgi?id=97061
+
+        Reviewed by Gyuyoung Kim.
+
+        EFL Webkit2 is using the EINA_LOG_DOM_XXX series in several places to log a message on the specified domain and format.
+        This patch adds log macros to simplify these logging codes.
+
+        * UIProcess/API/efl/ewk_main.cpp:
+        (ewk_init):
+        * UIProcess/API/efl/ewk_private.h:
+        * UIProcess/API/efl/ewk_view.cpp:
+        (ewk_view_webprocess_crashed):
+
+2012-09-17  Martin Robinson  <mrobinson@igalia.com>
+
+        [WebKit2] [GTK] Add API for controlling the user agent
+        https://bugs.webkit.org/show_bug.cgi?id=95697
+
+        Reviewed by Carlos Garcia Campos.
+
+        Add API for changing the user agent in WebKit2. This adds two styles of
+        setting the user agent: complete override and a method that just inserts
+        the application name and version, but preserves the carefully crafted user agent
+        in the library.
+
+        * UIProcess/API/gtk/WebKitSettings.cpp:
+        (_WebKitSettingsPrivate): Added a new field to store the user agent.
+        This is stored in the private data structure, because we can only
+        set the user agent when attaching the settings to the page.
+        (webKitSettingsSetProperty): Add hooks for the new user agent property.
+        (webKitSettingsGetProperty): Ditto.
+        (webkit_settings_class_init): Ditto.
+        (webkitSettingsAttachSettingsToPage): Ditto.
+        (webkit_settings_get_user_agent): Added.
+        (webkit_settings_set_user_agent): Added.
+        (webkit_settings_set_user_agent_with_application_name): Added.
+        * UIProcess/API/gtk/WebKitSettings.h: Added new methods.
+        * UIProcess/API/gtk/WebKitWebView.cpp: Update the glue for the settings
+        when attaching and detaching from WebViews.
+        * UIProcess/API/gtk/docs/webkit2gtk-sections.txt: Added new methods to
+        the documentation.
+        * UIProcess/API/gtk/tests/TestWebKitSettings.cpp: Test the new user agent
+        property.
+        (testWebKitSettingsUserAgent): Ditto.
+        (beforeAll): Ditto.
+        * UIProcess/gtk/WebPageProxyGtk.cpp:
+        (WebKit::WebPageProxy::standardUserAgent): Now use the shared WebCore
+        code when setting the user agent.
+
+2012-09-18  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL][WK2] Implement PageClientImpl::isViewFocused.
+        https://bugs.webkit.org/show_bug.cgi?id=97015
+
+        Reviewed by Gyuyoung Kim.
+
+        WebKit2/Efl always returns true for PageClientImpl::isViewFocused.
+        So window.onblur events will not be generated when webview lost focus.
+
+        This patch implements isViewFocused to return the current focus of webview.
+
+        * UIProcess/API/efl/PageClientImpl.cpp:
+        (WebKit::PageClientImpl::isViewFocused):
+
+2012-09-18  Byungwoo Lee  <bw80.lee@samsung.com>
+
+        Title string should be changed when document.title is set to ''.
+        https://bugs.webkit.org/show_bug.cgi?id=96793
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Added unit test for setting document.title and checking the title
+        string with title,changed signal and ewk_view_title_get() function.
+
+        * UIProcess/API/efl/tests/test_ewk2_view.cpp:
+        (TEST_F):
+
+2012-09-18  Anders Carlsson  <andersca@apple.com>
+
+        Division by zero crash in BackingStore::scroll
+        https://bugs.webkit.org/show_bug.cgi?id=97046
+        <rdar://problem/11722564>
+
+        Reviewed by Dan Bernstein.
+
+        It appears that DrawingAreaImpl::scroll can be called with an empty scroll rect. Do nothing
+        if that's the case. Also, assert that the scrolling rect in BackingStoreMac is never empty.
+
+        * UIProcess/mac/BackingStoreMac.mm:
+        (WebKit::BackingStore::scroll):
+        * WebProcess/WebPage/DrawingAreaImpl.cpp:
+        (WebKit::DrawingAreaImpl::scroll):
+
+2012-09-18  Bo Liu  <boliu@chromium.org>
+
+        Revert 128780, 128676, 128645
+        https://bugs.webkit.org/show_bug.cgi?id=97022
+
+        Reviewed by Adam Barth.
+
+        I made these revisions to add in-place reload behavior to ImagesEnabled setting.
+        Reverting this for now due to them causing performance regression in
+        chromium, possibly caused by increased calls to
+        PermissionClient::imageAllowed.
+
+        * win/WebKit2.def:
+
+2012-09-18  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] [WebKit2] Use XComposite window for accelerated compositing
+        https://bugs.webkit.org/show_bug.cgi?id=94417
+
+        Reviewed by Carlos Garcia Campos.
+
+        Instead of rendering directly to the widget's native window, render to an
+        offscreen window redirected to a Pixmap with XComposite.
+
+        * UIProcess/API/gtk/WebKitWebViewBase.cpp:
+        (_WebKitWebViewBasePrivate): Added a few members necessary to track the 
+        offscreen window.
+        (webkit_web_view_base_init):
+        (renderAcceleratedCompositingResults): Added this helper functions which renders
+        the results of the accelerated compositing operations during the GTK+ draw loop.
+        (webkitWebViewBaseDraw): Call renderAcceleratedCompositingResults when appropriate.
+        (resizeWebKitWebViewBaseFromAllocation): Resize the offscreen window when appropriate.
+        (webkitWebViewBaseSizeAllocate): Do not call resizeWebKitWebViewBaseFromAllocation when
+        the actual size of the widget does not change. This prevents destroying and recreating
+        the offscreen window pixmap when it isn't necessary.
+        (webkitWebViewBaseMap): We no longer send the window id during map, instead it's sent
+        as soon as there is WebPageProxy.
+        (webkitWebViewBaseCreateWebPage): Send the window id of the redirected window to
+        the WebProcess.
+        (queueAnotherDrawOfAcceleratedCompositingResults): Added this helper which works
+        around the issue of slow updates of the pixmap backing the redirected XComposite window.
+        (webkitWebViewBaseQueueDrawOfAcceleratedCompositingResults): Added this method which
+        is what the WebProcess uses to force a redraw on the UIProcess side.
+        * UIProcess/API/gtk/WebKitWebViewBasePrivate.h: Added new method to the list of private methods.
+        * UIProcess/DrawingAreaProxyImpl.h:
+        (DrawingAreaProxyImpl):
+        (WebKit::DrawingAreaProxyImpl::isInAcceleratedCompositingMode): Exposed this method publically
+        so that it can be used from WebKitWebViewBase.
+        * UIProcess/WebPageProxy.h:
+        (WebPageProxy): Renamed widgetMapped to setAcceleratedCompositingWindowId.
+        * UIProcess/WebPageProxy.messages.in: Ditto.
+        * UIProcess/gtk/WebPageProxyGtk.cpp: Ditto.
+        (WebKit::WebPageProxy::setAcceleratedCompositingWindowId):
+        * WebProcess/WebPage/WebPage.h:
+        (WebPage): Ditto.
+        * WebProcess/WebPage/WebPage.messages.in: Ditto.
+        * WebProcess/WebPage/gtk/LayerTreeHostGtk.cpp:
+        (WebKit::LayerTreeHostGtk::sizeDidChange): Force a composite to the resized window right
+        away so that the new window pixmap is updated before the first draw.
+        (WebKit::LayerTreeHostGtk::compositeLayersToContext): If the composition is for a resize,
+        first clear the entire GL context so that we don't see black artifacts during resize.
+        * WebProcess/WebPage/gtk/LayerTreeHostGtk.h:
+        (LayerTreeHostGtk): Update the signature of  compositeLayersToContext.
+        * WebProcess/WebPage/gtk/WebPageGtk.cpp:
+        (WebKit::WebPage::setAcceleratedCompositingWindowId): Added.
+
 2012-09-18  Sheriff Bot  <webkit.review.bot@gmail.com>
 
         Unreviewed, rolling out r128849.

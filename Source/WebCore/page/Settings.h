@@ -108,6 +108,9 @@ namespace WebCore {
         void setDefaultFixedFontSize(int);
         int defaultFixedFontSize() const { return m_defaultFixedFontSize; }
 
+        void setScreenFontSubstitutionEnabled(bool);
+        bool screenFontSubstitutionEnabled() const { return m_screenFontSubstitutionEnabled; }
+
 #if ENABLE(TEXT_AUTOSIZING)
         void setTextAutosizingEnabled(bool);
         bool textAutosizingEnabled() const { return m_textAutosizingEnabled; }
@@ -548,6 +551,9 @@ namespace WebCore {
         static void setMockScrollbarsEnabled(bool flag);
         static bool mockScrollbarsEnabled();
 
+        static void setUsesOverlayScrollbars(bool flag);
+        static bool usesOverlayScrollbars();
+
         void setVisualWordMovementEnabled(bool enabled) { m_visualWordMovementEnabled = enabled; }
         bool visualWordMovementEnabled() const { return m_visualWordMovementEnabled; }
 
@@ -652,6 +658,7 @@ namespace WebCore {
         int m_minimumLogicalFontSize;
         int m_defaultFontSize;
         int m_defaultFixedFontSize;
+        bool m_screenFontSubstitutionEnabled;
         int m_validationMessageTimerMagnification;
         int m_minimumAccelerated2dCanvasSize;
         int m_layoutFallbackWidth;
@@ -811,8 +818,8 @@ namespace WebCore {
 
         bool m_scrollingPerformanceLoggingEnabled : 1;
 
-        Timer<Settings> m_setImageLoadingSettingsTimer;
-        void imageLoadingSettingsTimerFired(Timer<Settings>*);
+        Timer<Settings> m_loadsImagesAutomaticallyTimer;
+        void loadsImagesAutomaticallyTimerFired(Timer<Settings>*);
         
         double m_incrementalRenderingSuppressionTimeoutInSeconds;
 
@@ -820,6 +827,7 @@ namespace WebCore {
         static bool gAVFoundationEnabled;
 #endif
         static bool gMockScrollbarsEnabled;
+        static bool gUsesOverlayScrollbars;
 
 #if USE(SAFARI_THEME)
         static bool gShouldPaintNativeControls;

@@ -46,12 +46,10 @@ using namespace std;
 
 namespace WebCore {
 
-static void setImageLoadingSettings(Page* page)
+static void setLoadsImagesAutomaticallyInAllFrames(Page* page)
 {
-    for (Frame* frame = page->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
-        frame->document()->cachedResourceLoader()->setImagesEnabled(page->settings()->areImagesEnabled());
+    for (Frame* frame = page->mainFrame(); frame; frame = frame->tree()->traverseNext())
         frame->document()->cachedResourceLoader()->setAutoLoadImages(page->settings()->loadsImagesAutomatically());
-    }
 }
 
 // Sets the entry in the font map for the given script. If family is the empty string, removes the entry instead.
@@ -90,6 +88,7 @@ bool Settings::gAVFoundationEnabled(false);
 #endif
 
 bool Settings::gMockScrollbarsEnabled = false;
+bool Settings::gUsesOverlayScrollbars = false;
 
 #if PLATFORM(WIN) || (OS(WINDOWS) && PLATFORM(WX))
 bool Settings::gShouldUseHighResolutionTimers = true;
@@ -131,6 +130,7 @@ Settings::Settings(Page* page)
     , m_minimumLogicalFontSize(0)
     , m_defaultFontSize(0)
     , m_defaultFixedFontSize(0)
+    , m_screenFontSubstitutionEnabled(true)
     , m_validationMessageTimerMagnification(50)
     , m_minimumAccelerated2dCanvasSize(257 * 256)
     , m_layoutFallbackWidth(980)
@@ -291,7 +291,7 @@ Settings::Settings(Page* page)
     , m_windowFocusRestricted(true)
     , m_diagnosticLoggingEnabled(false)
     , m_scrollingPerformanceLoggingEnabled(false)
-    , m_setImageLoadingSettingsTimer(this, &Settings::imageLoadingSettingsTimerFired)
+    , m_loadsImagesAutomaticallyTimer(this, &Settings::loadsImagesAutomaticallyTimerFired)
     , m_incrementalRenderingSuppressionTimeoutInSeconds(defaultIncrementalRenderingSuppressionTimeoutInSeconds)
 {
     // A Frame may not have been created yet, so we initialize the AtomicString
@@ -419,6 +419,15 @@ void Settings::setDefaultFixedFontSize(int defaultFontSize)
     m_page->setNeedsRecalcStyleInAllFrames();
 }
 
+void Settings::setScreenFontSubstitutionEnabled(bool screenFontSubstitutionEnabled)
+{
+    if (m_screenFontSubstitutionEnabled == screenFontSubstitutionEnabled)
+        return;
+
+    m_screenFontSubstitutionEnabled = screenFontSubstitutionEnabled;
+    m_page->setNeedsRecalcStyleInAllFrames();
+}
+
 #if ENABLE(TEXT_AUTOSIZING)
 void Settings::setTextAutosizingEnabled(bool textAutosizingEnabled)
 {
@@ -457,12 +466,12 @@ void Settings::setLoadsImagesAutomatically(bool loadsImagesAutomatically)
     // Starting these loads synchronously is not important.  By putting it on a 0-delay, properly closing the Page cancels them
     // before they have a chance to really start.
     // See http://webkit.org/b/60572 for more discussion.
-    m_setImageLoadingSettingsTimer.startOneShot(0);
+    m_loadsImagesAutomaticallyTimer.startOneShot(0);
 }
 
-void Settings::imageLoadingSettingsTimerFired(Timer<Settings>*)
+void Settings::loadsImagesAutomaticallyTimerFired(Timer<Settings>*)
 {
-    setImageLoadingSettings(m_page);
+    setLoadsImagesAutomaticallyInAllFrames(m_page);
 }
 
 void Settings::setLoadsSiteIconsIgnoringImageLoadingSetting(bool loadsSiteIcons)
@@ -508,9 +517,6 @@ void Settings::setJavaEnabledForLocalFiles(bool isJavaEnabledForLocalFiles)
 void Settings::setImagesEnabled(bool areImagesEnabled)
 {
     m_areImagesEnabled = areImagesEnabled;
-
-    // See comment in setLoadsImagesAutomatically.
-    m_setImageLoadingSettingsTimer.startOneShot(0);
 }
 
 void Settings::setMediaEnabled(bool isMediaEnabled)
@@ -973,6 +979,16 @@ void Settings::setMockScrollbarsEnabled(bool flag)
 bool Settings::mockScrollbarsEnabled()
 {
     return gMockScrollbarsEnabled;
+}
+
+void Settings::setUsesOverlayScrollbars(bool flag)
+{
+    gUsesOverlayScrollbars = flag;
+}
+
+bool Settings::usesOverlayScrollbars()
+{
+    return gUsesOverlayScrollbars;
 }
 
 #if USE(JSC)

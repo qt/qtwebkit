@@ -89,8 +89,7 @@ bool PageClientImpl::isViewWindowActive()
 
 bool PageClientImpl::isViewFocused()
 {
-    notImplemented();
-    return true;
+    return evas_object_focus_get(m_viewWidget);
 }
 
 bool PageClientImpl::isViewVisible()
@@ -195,7 +194,7 @@ void PageClientImpl::doneWithKeyEvent(const NativeWebKeyboardEvent&, bool)
 }
 
 #if ENABLE(TOUCH_EVENTS)
-void PageClientImpl::doneWithTouchEvent(const NativeWebTouchEvent&, bool wasEventHandled)
+void PageClientImpl::doneWithTouchEvent(const NativeWebTouchEvent&, bool /*wasEventHandled*/)
 {
     notImplemented();
 }

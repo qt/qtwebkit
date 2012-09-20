@@ -360,6 +360,8 @@ void BackingStorePrivate::resumeScreenAndBackingStoreUpdates(BackingStore::Resum
     --m_suspendScreenUpdates;
     BlackBerry::Platform::userInterfaceThreadMessageClient()->syncToCurrentMessage();
 
+    if (op == BackingStore::None)
+        return;
 #if USE(ACCELERATED_COMPOSITING)
     // This will also blit since we set the OSDS flag above.
     m_webPage->d->commitRootLayerIfNeeded();
@@ -530,6 +532,8 @@ void BackingStorePrivate::renderJob()
 {
     if (!shouldPerformRenderJobs())
         return;
+
+    instrumentBeginFrame();
 
 #if DEBUG_BACKINGSTORE
     BlackBerry::Platform::logAlways(BlackBerry::Platform::LogLevelCritical, "BackingStorePrivate::renderJob");
