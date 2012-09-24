@@ -1,3 +1,310 @@
+2012-09-24  Yury Semikhatsky  <yurys@chromium.org>
+
+        Unreviewed, rolling out r122243.
+        http://trac.webkit.org/changeset/129243
+        https://bugs.webkit.org/show_bug.cgi?id=97441
+
+        WebFilterOperationsTest.saveAndRestore added in the change is failing.
+
+        * tests/FilterOperationsTest.cpp:
+
+2012-09-23  Keishi Hattori  <keishi@webkit.org>
+
+        Add suggestionPicker to CalendarPicker
+        https://bugs.webkit.org/show_bug.cgi?id=97201
+
+        Reviewed by Kent Tamura.
+
+        * src/DateTimeChooserImpl.cpp:
+        (WebKit::DateTimeChooserImpl::writeDocument): Add js/css for SuggestionPicker to page picker. Add highlight color to args.
+
+2012-09-21  Kenichi Ishibashi  <bashi@chromium.org>
+
+        [Chromium] Use OpenTypeVerticalData on Linux
+        https://bugs.webkit.org/show_bug.cgi?id=97277
+
+        Reviewed by Tony Chang.
+
+        * features.gypi: Enable OPENTYPE_VERTICAL on linux and android.
+
+2012-09-21  Dirk Pranke  <dpranke@chromium.org>
+
+        Roll Chromium DEPS to r158095 to pick up typo fix in test_expectations.txt
+
+        Unreviewed, rolled DEPS.
+
+        * DEPS:
+
+2012-09-21  Dirk Pranke  <dpranke@chromium.org>
+
+        Roll Chromium DEPS to r158060
+
+        Unreviewed, rolled DEPS.
+
+        * DEPS:
+
+2012-09-21  Chris Rogers  <crogers@google.com>
+
+        Add Web Audio support for deprecated/legacy APIs
+        https://bugs.webkit.org/show_bug.cgi?id=97050
+
+        Reviewed by Eric Carlson.
+
+        * features.gypi:
+
+2012-09-21  Mark Pilgrim  <pilgrim@chromium.org>
+
+        [Chromium] remove getFontFamilyForCharacters from PlatformSupport
+        https://bugs.webkit.org/show_bug.cgi?id=96282
+
+        Reviewed by Tony Chang.
+
+        Migrating away from PlatformSupport. getFontFamilyForCharacters is
+        moved to FontCache.h and overridden by the two platforms that
+        need it (Chromium Linux and Blackberry). New files for the overrides.
+        Part of a larger refactoring series. See tracking bug 82948.
+
+        * src/PlatformSupport.cpp:
+        (WebCore):
+
+2012-09-21  Dana Jansens  <danakj@chromium.org>
+
+        [chromium] Add setters to WebFilterOperation for IPC pickling
+        https://bugs.webkit.org/show_bug.cgi?id=97147
+
+        Reviewed by James Robinson.
+
+        * tests/FilterOperationsTest.cpp:
+        (WebKit):
+        (WebKit::TEST):
+
+2012-09-21  Tony Chang  <tony@chromium.org>
+
+        [chromium] Unreviewed, remove duplicate section of WebKit.gyp pointed out by Nico.
+
+        * WebKit.gyp:
+
+2012-09-21  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
+2012-09-21  Sami Kyostila  <skyostil@chromium.org>
+
+        [chromium] Add test for ScrollingCoordinatorChromium
+        https://bugs.webkit.org/show_bug.cgi?id=96657
+
+        Reviewed by James Robinson.
+
+        Add tests for ScrollingCoordinatorChromium. These tests mainly verify that
+        fast (non-main thread) scrolling is enabled when necessary and that a proper
+        compositing layer structure is created for fixed position and accelerated
+        scrolling layers.
+
+        Tests: ScrollingCoordinatorChromiumTest.fastScrollingByDefault
+               ScrollingCoordinatorChromiumTest.fastScrollingForFixedPosition
+               ScrollingCoordinatorChromiumTest.nonFastScrollableRegion
+               ScrollingCoordinatorChromiumTest.wheelEventHandler
+               ScrollingCoordinatorChromiumTest.touchOverflowScrolling
+
+        * WebKit.gypi:
+        * tests/ScrollingCoordinatorChromiumTest.cpp: Added.
+        (WebKit):
+        (MockWebViewClient):
+        (ScrollingCoordinatorChromiumTest):
+        (WebKit::ScrollingCoordinatorChromiumTest::ScrollingCoordinatorChromiumTest):
+        (WebKit::ScrollingCoordinatorChromiumTest::createCompositedWebViewImpl):
+        (WebKit::ScrollingCoordinatorChromiumTest::registerMockedHttpURLLoad):
+        (WebKit::ScrollingCoordinatorChromiumTest::getRootScrollLayer):
+        (WebKit::TEST_F):
+        * tests/data/fixed_position.html: Added.
+        * tests/data/non_fast_scrollable.html: Added.
+        * tests/data/touch_overflow_scrolling.html: Added.
+        * tests/data/wheel_event_handler.html: Added.
+
+2012-09-20  Peter Beverloo  <peter@chromium.org>
+
+        Leverage Chromium's code to set up FIFOs for Chromium Android layout tests
+        https://bugs.webkit.org/show_bug.cgi?id=97227
+
+        Reviewed by Tony Chang.
+
+        Remove all fifo-related code together with the io_stream_forwarder_android
+        target defined in WebKitUnitTests.gyp.
+
+        * WebKitUnitTests.gyp:
+        * tests/ForwardIOStreamsAndroid.cpp: Removed.
+        * tests/ForwardIOStreamsAndroid.h: Removed.
+        * tests/RunAllTests.cpp:
+        (main):
+
+2012-09-21  Peter Beverloo  <peter@chromium.org>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
+2012-09-21  Keishi Hattori  <keishi@webkit.org>
+
+        Add datalist suggestions into DateTimeChooserParameters
+        https://bugs.webkit.org/show_bug.cgi?id=97292
+
+        Reviewed by Kent Tamura.
+
+        * src/DateTimeChooserImpl.cpp:
+        (WebKit::DateTimeChooserImpl::writeDocument): Add the necessary parameters for SuggestionPicker.
+
+2012-09-20  Tony Chang  <tony@chromium.org>
+
+        [chromium] Unreviewed build fix. webkit_unit_tests have global constructors.
+
+        * WebKitUnitTests.gyp: Remove -Wglobal-constructors.
+
+2012-09-20  Tony Chang  <tony@chromium.org>
+
+        [chromium] Enable more clang warnings
+        https://bugs.webkit.org/show_bug.cgi?id=97257
+
+        Reviewed by James Robinson.
+
+        * WebKit.gyp: Add -Wglobal-constructors. Don't add -Wunused-parameter because many of our API interfaces have named parameters with empty implementations.
+        * WebKitUnitTests.gyp: Add -Wglobal-constructors and -Wunused-parameter.
+
+2012-09-20  David Grogan  <dgrogan@chromium.org>
+
+        Fix IndexedDB unit tests
+        https://bugs.webkit.org/show_bug.cgi?id=97149
+
+        Reviewed by Tony Chang.
+
+        * tests/IDBDatabaseBackendTest.cpp:
+        Specify a desired version of -1 so that no version change transaction
+        is run.
+
+2012-09-20  Dirk Pranke  <dpranke@chromium.org>
+
+        roll Chromium to r157829.
+
+        Unreviewed, deps change.
+
+        * DEPS:
+
+2012-09-20  Nate Chapin  <japhet@chromium.org>
+
+        Unreviewed, chromium win build fix.
+        Remove spurious reference to the non-existent
+        tests/LayerPainterChromium.h in WebKit.gypi.
+
+        * WebKit.gypi:
+
+2012-09-20  James Robinson  <jamesr@chromium.org>
+
+        [chromium] Remove unused copy of chromium compositor implementation files
+        https://bugs.webkit.org/show_bug.cgi?id=97255
+
+        Reviewed by Adam Barth.
+
+        * WebKit.gyp:
+        * WebKit.gypi:
+        * WebKitUnitTests.gyp:
+        * src/WebAnimationCurveCommon.cpp: Removed.
+        * src/WebAnimationCurveCommon.h: Removed.
+        * src/WebAnimationImpl.cpp: Removed.
+        * src/WebAnimationImpl.h: Removed.
+        * src/WebContentLayerImpl.cpp: Removed.
+        * src/WebContentLayerImpl.h: Removed.
+        * src/WebExternalTextureLayerImpl.cpp: Removed.
+        * src/WebExternalTextureLayerImpl.h: Removed.
+        * src/WebFloatAnimationCurveImpl.cpp: Removed.
+        * src/WebFloatAnimationCurveImpl.h: Removed.
+        * src/WebIOSurfaceLayerImpl.cpp: Removed.
+        * src/WebIOSurfaceLayerImpl.h: Removed.
+        * src/WebImageLayerImpl.cpp: Removed.
+        * src/WebImageLayerImpl.h: Removed.
+        * src/WebLayerImpl.cpp: Removed.
+        * src/WebLayerImpl.h: Removed.
+        * src/WebLayerTreeViewImpl.cpp: Removed.
+        * src/WebLayerTreeViewImpl.h: Removed.
+        * src/WebScrollbarLayerImpl.cpp: Removed.
+        * src/WebScrollbarLayerImpl.h: Removed.
+        * src/WebSolidColorLayerImpl.cpp: Removed.
+        * src/WebSolidColorLayerImpl.h: Removed.
+        * src/WebToCCInputHandlerAdapter.cpp: Removed.
+        * src/WebToCCInputHandlerAdapter.h: Removed.
+        * src/WebTransformAnimationCurveImpl.cpp: Removed.
+        * src/WebTransformAnimationCurveImpl.h: Removed.
+        * src/WebVideoLayerImpl.cpp: Removed.
+        * src/WebVideoLayerImpl.h: Removed.
+        * tests/CCActiveAnimationTest.cpp: Removed.
+        * tests/CCAnimationTestCommon.cpp: Removed.
+        * tests/CCAnimationTestCommon.h: Removed.
+        * tests/CCDamageTrackerTest.cpp: Removed.
+        * tests/CCDelayBasedTimeSourceTest.cpp: Removed.
+        * tests/CCDrawQuadTest.cpp: Removed.
+        * tests/CCFrameRateControllerTest.cpp: Removed.
+        * tests/CCGeometryTestUtils.cpp: Removed.
+        * tests/CCGeometryTestUtils.h: Removed.
+        * tests/CCHeadsUpDisplayTest.cpp: Removed.
+        * tests/CCKeyframedAnimationCurveTest.cpp: Removed.
+        * tests/CCLayerAnimationControllerTest.cpp: Removed.
+        * tests/CCLayerImplTest.cpp: Removed.
+        * tests/CCLayerIteratorTest.cpp: Removed.
+        * tests/CCLayerQuadTest.cpp: Removed.
+        * tests/CCLayerSorterTest.cpp: Removed.
+        * tests/CCLayerTestCommon.cpp: Removed.
+        * tests/CCLayerTestCommon.h: Removed.
+        * tests/CCLayerTreeHostCommonTest.cpp: Removed.
+        * tests/CCLayerTreeHostImplTest.cpp: Removed.
+        * tests/CCLayerTreeHostTest.cpp: Removed.
+        * tests/CCMathUtilTest.cpp: Removed.
+        * tests/CCOcclusionTrackerTest.cpp: Removed.
+        * tests/CCOcclusionTrackerTestCommon.h: Removed.
+        * tests/CCPrioritizedTextureTest.cpp: Removed.
+        * tests/CCQuadCullerTest.cpp: Removed.
+        * tests/CCRenderPassTest.cpp: Removed.
+        * tests/CCRenderSurfaceFiltersTest.cpp: Removed.
+        * tests/CCRenderSurfaceTest.cpp: Removed.
+        * tests/CCRendererGLTest.cpp: Removed.
+        * tests/CCResourceProviderTest.cpp: Removed.
+        * tests/CCSchedulerStateMachineTest.cpp: Removed.
+        * tests/CCSchedulerTest.cpp: Removed.
+        * tests/CCSchedulerTestCommon.h: Removed.
+        * tests/CCScopedTextureTest.cpp: Removed.
+        * tests/CCScrollbarAnimationControllerLinearFadeTest.cpp: Removed.
+        * tests/CCSolidColorLayerImplTest.cpp: Removed.
+        * tests/CCTestCommon.h: Removed.
+        * tests/CCTextureUpdateControllerTest.cpp: Removed.
+        * tests/CCThreadTaskTest.cpp: Removed.
+        * tests/CCThreadedTest.cpp: Removed.
+        * tests/CCThreadedTest.h: Removed.
+        * tests/CCTiledLayerImplTest.cpp: Removed.
+        * tests/CCTiledLayerTestCommon.cpp: Removed.
+        * tests/CCTiledLayerTestCommon.h: Removed.
+        * tests/CCTimerTest.cpp: Removed.
+        * tests/ContentLayerChromiumTest.cpp: Removed.
+        * tests/FakeCCLayerTreeHostClient.h: Removed.
+        * tests/FakeGraphicsContext3DTest.cpp: Removed.
+        * tests/FakeWebScrollbarThemeGeometry.h: Removed.
+        * tests/FloatQuadTest.cpp: Removed.
+        * tests/GraphicsLayerChromiumTest.cpp:
+        * tests/ImageLayerChromiumTest.cpp:
+        * tests/LayerChromiumTest.cpp: Removed.
+        * tests/MockCCQuadCuller.h: Removed.
+        * tests/ScrollbarLayerChromiumTest.cpp: Removed.
+        * tests/TextureCopierTest.cpp: Removed.
+        * tests/TextureLayerChromiumTest.cpp: Removed.
+        * tests/ThrottledTextureUploaderTest.cpp: Removed.
+        * tests/TiledLayerChromiumTest.cpp: Removed.
+        * tests/TreeSynchronizerTest.cpp: Removed.
+        * tests/WebAnimationTest.cpp: Removed.
+        * tests/WebFloatAnimationCurveTest.cpp: Removed.
+        * tests/WebLayerTest.cpp: Removed.
+        * tests/WebLayerTreeViewTest.cpp: Removed.
+        * tests/WebTransformAnimationCurveTest.cpp: Removed.
+        * tests/WebTransformOperationsTest.cpp: Removed.
+        * tests/WebTransformationMatrixTest.cpp: Removed.
+
 2012-09-20  Tommy Widenflycht  <tommyw@google.com>
 
         MediaStream API: Extend UserMediaRequest with a ownerDocument method

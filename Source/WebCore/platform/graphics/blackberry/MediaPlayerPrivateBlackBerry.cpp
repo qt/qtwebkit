@@ -21,6 +21,7 @@
 #if ENABLE(VIDEO)
 #include "MediaPlayerPrivateBlackBerry.h"
 
+#include "AuthenticationChallengeManager.h"
 #include "CookieManager.h"
 #include "Credential.h"
 #include "CredentialStorage.h"
@@ -114,6 +115,7 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer* player)
     , m_userDrivenSeekTimer(this, &MediaPlayerPrivate::userDrivenSeekTimerFired)
     , m_lastSeekTime(0)
     , m_lastSeekTimePending(false)
+    , m_isAuthenticationChallenging(false)
     , m_waitMetadataTimer(this, &MediaPlayerPrivate::waitMetadataTimerFired)
     , m_waitMetadataPopDialogCounter(0)
 {
@@ -121,6 +123,9 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer* player)
 
 MediaPlayerPrivate::~MediaPlayerPrivate()
 {
+    if (m_isAuthenticationChallenging)
+        AuthenticationChallengeManager::instance()->cancelAuthenticationChallenge(this);
+
     if (isFullscreen()) {
         m_webCorePlayer->mediaPlayerClient()->mediaPlayerExitFullscreen();
     }
@@ -151,6 +156,7 @@ void MediaPlayerPrivate::load(const String& url)
     }
 
     void* tabId = m_webCorePlayer->mediaPlayerClient()->mediaPlayerHostWindow()->platformPageClient();
+    int playerID = m_webCorePlayer->mediaPlayerClient()->mediaPlayerHostWindow()->platformPageClient()->playerID();
 
     deleteGuardedObject(m_platformPlayer);
 #if USE(ACCELERATED_COMPOSITING)
@@ -163,9 +169,9 @@ void MediaPlayerPrivate::load(const String& url)
     if (!url.isEmpty())
         cookiePairs = cookieManager().getCookie(KURL(ParsedURLString, url.utf8().data()), WithHttpOnlyCookies);
     if (!cookiePairs.isEmpty() && cookiePairs.utf8().data())
-        m_platformPlayer->load(modifiedUrl.utf8().data(), m_webCorePlayer->userAgent().utf8().data(), cookiePairs.utf8().data());
+        m_platformPlayer->load(playerID, modifiedUrl.utf8().data(), m_webCorePlayer->userAgent().utf8().data(), cookiePairs.utf8().data());
     else
-        m_platformPlayer->load(modifiedUrl.utf8().data(), m_webCorePlayer->userAgent().utf8().data(), 0);
+        m_platformPlayer->load(playerID, modifiedUrl.utf8().data(), m_webCorePlayer->userAgent().utf8().data(), 0);
 }
 
 void MediaPlayerPrivate::cancelLoad()
@@ -400,7 +406,7 @@ void MediaPlayerPrivate::resizeSourceDimensions()
         return;
 
     // If we have an HTMLVideoElement but the source has no video, then we need to resize the media element.
-    if (!hasVideo()) {
+    if (!hasVideo() && PlatformPlayer::MediaOK == m_platformPlayer->error()) {
         LayoutRect rect = m_webCorePlayer->mediaPlayerClient()->mediaPlayerContentBoxRect();
 
         static const int playbookMinAudioElementWidth = 300;
@@ -709,12 +715,18 @@ void MediaPlayerPrivate::onAuthenticationNeeded(MMRAuthChallenge& authChallenge)
         return;
     }
 
-    if (frameView() && frameView()->hostWindow())
-        frameView()->hostWindow()->platformPageClient()->authenticationChallenge(url, protectionSpace, credential, this);
+    m_isAuthenticationChallenging = true;
+    AuthenticationChallengeManager::instance()->authenticationChallenge(url,
+                                                                        protectionSpace,
+                                                                        credential,
+                                                                        this,
+                                                                        m_webCorePlayer->mediaPlayerClient()->mediaPlayerHostWindow()->platformPageClient());
 }
 
 void MediaPlayerPrivate::notifyChallengeResult(const KURL& url, const ProtectionSpace& protectionSpace, AuthenticationChallengeResult result, const Credential& credential)
 {
+    m_isAuthenticationChallenging = false;
+
     if (result != AuthenticationChallengeSuccess || !url.isValid())
         return;
 

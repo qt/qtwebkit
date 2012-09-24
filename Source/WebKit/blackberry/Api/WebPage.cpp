@@ -25,7 +25,6 @@
 #include "BackForwardController.h"
 #include "BackForwardListImpl.h"
 #include "BackingStoreClient.h"
-#include "BackingStoreCompositingSurface.h"
 #include "BackingStore_p.h"
 #if ENABLE(BATTERY_STATUS)
 #include "BatteryClientBlackBerry.h"
@@ -428,6 +427,8 @@ WebPagePrivate::WebPagePrivate(WebPage* webPage, WebPageClient* client, const In
         BlackBerry::Platform::DeviceInfo::instance();
         defaultUserAgent();
     }
+
+    AuthenticationChallengeManager::instance()->pageCreated(this);
 }
 
 WebPage::WebPage(WebPageClient* client, const WebString& pageGroupName, const Platform::IntRect& rect)
@@ -439,6 +440,7 @@ WebPage::WebPage(WebPageClient* client, const WebString& pageGroupName, const Pl
 
 WebPagePrivate::~WebPagePrivate()
 {
+    AuthenticationChallengeManager::instance()->pageDeleted(this);
     // Hand the backingstore back to another owner if necessary.
     m_webPage->setVisible(false);
     if (BackingStorePrivate::currentBackingStoreOwner() == m_webPage)
@@ -1130,10 +1132,6 @@ void WebPagePrivate::setLoadState(LoadState state)
             // Update cursor status.
             updateCursor();
 
-#if USE(ACCELERATED_COMPOSITING)
-            // Don't render compositing contents from previous page.
-            resetCompositingSurface();
-#endif
             break;
         }
     case Finished:
@@ -2215,18 +2213,19 @@ bool WebPagePrivate::isActive() const
     return m_client->isActive();
 }
 
-void WebPagePrivate::authenticationChallenge(const KURL& url, const ProtectionSpace& protectionSpace, const Credential& inputCredential, AuthenticationChallengeClient* client)
+void WebPagePrivate::authenticationChallenge(const KURL& url, const ProtectionSpace& protectionSpace, const Credential& inputCredential)
 {
     WebString username;
     WebString password;
+    AuthenticationChallengeManager* authmgr = AuthenticationChallengeManager::instance();
 
 #if !defined(PUBLIC_BUILD) || !PUBLIC_BUILD
     if (m_dumpRenderTree) {
         Credential credential(inputCredential, inputCredential.persistence());
         if (m_dumpRenderTree->didReceiveAuthenticationChallenge(credential))
-            client->notifyChallengeResult(url, protectionSpace, AuthenticationChallengeSuccess, credential);
+            authmgr->notifyChallengeResult(url, protectionSpace, AuthenticationChallengeSuccess, credential);
         else
-            client->notifyChallengeResult(url, protectionSpace, AuthenticationChallengeCancelled, inputCredential);
+            authmgr->notifyChallengeResult(url, protectionSpace, AuthenticationChallengeCancelled, inputCredential);
         return;
     }
 #endif
@@ -2247,9 +2246,9 @@ void WebPagePrivate::authenticationChallenge(const KURL& url, const ProtectionSp
 #endif
 
     if (isConfirmed)
-        client->notifyChallengeResult(url, protectionSpace, AuthenticationChallengeSuccess, credential);
+        authmgr->notifyChallengeResult(url, protectionSpace, AuthenticationChallengeSuccess, credential);
     else
-        client->notifyChallengeResult(url, protectionSpace, AuthenticationChallengeCancelled, inputCredential);
+        authmgr->notifyChallengeResult(url, protectionSpace, AuthenticationChallengeCancelled, inputCredential);
 }
 
 PageClientBlackBerry::SaveCredentialType WebPagePrivate::notifyShouldSaveCredential(bool isNew)
@@ -3241,6 +3240,7 @@ void WebPage::setVisible(bool visible)
         return;
 
     d->setVisible(visible);
+    AuthenticationChallengeManager::instance()->pageVisibilityChanged(d, visible);
 
     if (!visible) {
         d->suspendBackingStore();
@@ -3541,8 +3541,6 @@ void WebPagePrivate::suspendBackingStore()
 
         return;
     }
-
-    resetCompositingSurface();
 #endif
 }
 
@@ -3632,9 +3630,6 @@ void WebPagePrivate::resizeSurfaceIfNeeded()
             Platform::createMethodCallMessage(&WebPagePrivate::resizeSurfaceIfNeeded, this));
         return;
     }
-
-    if (m_pendingOrientation != -1)
-        SurfacePool::globalSurfacePool()->notifyScreenRotated();
 
     m_client->resizeSurfaceIfNeeded();
 }
@@ -5688,14 +5683,11 @@ void WebPagePrivate::rootLayerCommitTimerFired(Timer<WebPagePrivate>*)
     // backing store is never necessary, because the backing store draws
     // nothing.
     if (!compositorDrawsRootLayer()) {
-        bool isSingleTargetWindow = SurfacePool::globalSurfacePool()->compositingSurface()
-            || m_backingStore->d->isOpenGLCompositing();
-
         // If we are doing direct rendering and have a single rendering target,
         // committing is equivalent to a one shot drawing synchronization.
         // We need to re-render the web page, re-render the layers, and
         // then blit them on top of the re-rendered web page.
-        if (isSingleTargetWindow && m_backingStore->d->shouldDirectRenderingToWindow())
+        if (m_backingStore->d->isOpenGLCompositing() && m_backingStore->d->shouldDirectRenderingToWindow())
             setNeedsOneShotDrawingSynchronization();
 
         if (needsOneShotDrawingSynchronization()) {
@@ -5710,19 +5702,6 @@ void WebPagePrivate::rootLayerCommitTimerFired(Timer<WebPagePrivate>*)
     }
 
     commitRootLayerIfNeeded();
-}
-
-void WebPagePrivate::resetCompositingSurface()
-{
-    if (!Platform::userInterfaceThreadMessageClient()->isCurrentThread()) {
-        Platform::userInterfaceThreadMessageClient()->dispatchMessage(
-            Platform::createMethodCallMessage(
-                &WebPagePrivate::resetCompositingSurface, this));
-        return;
-    }
-
-    if (m_compositor)
-        m_compositor->setLastCompositingResults(LayerRenderingResults());
 }
 
 void WebPagePrivate::setRootLayerWebKitThread(Frame* frame, LayerWebKitThread* layer)
@@ -5763,12 +5742,7 @@ void WebPagePrivate::setRootLayerCompositingThread(LayerCompositingThread* layer
         return;
     }
 
-    if (!layer) {
-        // Keep the compositor around, a single web page will frequently enter
-        // and leave compositing mode many times. Instead we destroy it when
-        // navigating to a new page.
-        resetCompositingSurface();
-    } else if (!m_compositor)
+    if (layer && !m_compositor)
         createCompositor();
 
     // Don't ASSERT(m_compositor) here because setIsAcceleratedCompositingActive(true)

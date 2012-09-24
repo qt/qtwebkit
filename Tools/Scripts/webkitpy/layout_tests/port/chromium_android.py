@@ -56,6 +56,9 @@ COMMAND_LINE_FILE = DEVICE_SOURCE_ROOT_DIR + 'chrome-native-tests-command-line'
 DEVICE_DRT_DIR = DEVICE_SOURCE_ROOT_DIR + 'drt/'
 DEVICE_FORWARDER_PATH = DEVICE_DRT_DIR + 'forwarder'
 
+# Path on the device where the test framework will create the fifo pipes.
+DEVICE_FIFO_PATH = '/data/data/org.chromium.native_test/files/'
+
 DRT_APP_PACKAGE = 'org.chromium.native_test'
 DRT_ACTIVITY_FULL_NAME = DRT_APP_PACKAGE + '/.ChromeNativeTestActivity'
 DRT_APP_CACHE_DIR = DEVICE_DRT_DIR + 'cache/'
@@ -311,9 +314,9 @@ class ChromiumAndroidDriver(driver.Driver):
     def __init__(self, port, worker_number, pixel_tests, no_timeout=False):
         super(ChromiumAndroidDriver, self).__init__(port, worker_number, pixel_tests, no_timeout)
         self._cmd_line = None
-        self._in_fifo_path = DEVICE_DRT_DIR + 'DumpRenderTree.in'
-        self._out_fifo_path = DEVICE_DRT_DIR + 'DumpRenderTree.out'
-        self._err_fifo_path = DEVICE_DRT_DIR + 'DumpRenderTree.err'
+        self._in_fifo_path = DEVICE_FIFO_PATH + 'stdin.fifo'
+        self._out_fifo_path = DEVICE_FIFO_PATH + 'test.fifo'
+        self._err_fifo_path = DEVICE_FIFO_PATH + 'stderr.fifo'
         self._read_stdout_process = None
         self._read_stderr_process = None
         self._forwarder_process = None
@@ -510,11 +513,7 @@ class ChromiumAndroidDriver(driver.Driver):
         return self._run_adb_command(['shell', 'ls', full_file_path]).strip() == full_file_path
 
     def _drt_cmd_line(self, pixel_tests, per_test_args):
-        return driver.Driver.cmd_line(self, pixel_tests, per_test_args) + [
-            '--in-fifo=' + self._in_fifo_path,
-            '--out-fifo=' + self._out_fifo_path,
-            '--err-fifo=' + self._err_fifo_path,
-        ]
+        return driver.Driver.cmd_line(self, pixel_tests, per_test_args) + ['--create-stdin-fifo', '--separate-stderr-fifo']
 
     @staticmethod
     def _loop_with_timeout(condition, timeout_secs):
@@ -530,7 +529,9 @@ class ChromiumAndroidDriver(driver.Driver):
                 self._file_exists_on_device(self._err_fifo_path))
 
     def _remove_all_pipes(self):
-        self._run_adb_command(['shell', 'rm', self._in_fifo_path, self._out_fifo_path, self._err_fifo_path])
+        for file in [self._in_fifo_path, self._out_fifo_path, self._err_fifo_path]:
+            self._run_adb_command(['shell', 'rm', file])
+
         return (not self._file_exists_on_device(self._in_fifo_path) and
                 not self._file_exists_on_device(self._out_fifo_path) and
                 not self._file_exists_on_device(self._err_fifo_path))
@@ -653,14 +654,16 @@ class ChromiumAndroidDriver(driver.Driver):
             self._forwarder_process.kill()
             self._forwarder_process = None
 
-        if not ChromiumAndroidDriver._loop_with_timeout(self._remove_all_pipes, DRT_START_STOP_TIMEOUT_SECS):
-            raise AssertionError('Failed to remove fifo files. May be locked.')
+        if self._has_setup:
+            if not ChromiumAndroidDriver._loop_with_timeout(self._remove_all_pipes, DRT_START_STOP_TIMEOUT_SECS):
+                raise AssertionError('Failed to remove fifo files. May be locked.')
 
     def _command_from_driver_input(self, driver_input):
         command = super(ChromiumAndroidDriver, self)._command_from_driver_input(driver_input)
         if command.startswith('/'):
             # Convert the host file path to a device file path. See comment of
             # DEVICE_LAYOUT_TESTS_DIR for details.
+            # FIXME: what happens if command lies outside of the layout_tests_dir on the host?
             command = DEVICE_LAYOUT_TESTS_DIR + self._port.relative_test_filename(command)
         return command
 

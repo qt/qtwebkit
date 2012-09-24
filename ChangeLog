@@ -1,3 +1,56 @@
+2012-09-24  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Fix build with latest Qt 5
+
+        Reviewed by Tor Arne Vestbø.
+
+        Define MODULE_BASE_DIR before loading qt_module.prf, which now calls syncqt. MODULE_BASE_DIR is
+        passed as last parameter (source dir) to syncqt now, so set it to the directory that contains
+        sync.profile.
+
+        * Source/api.pri:
+
+2012-09-23  Keishi Hattori  <keishi@webkit.org>
+
+        Add suggestionPicker to CalendarPicker
+        https://bugs.webkit.org/show_bug.cgi?id=97201
+
+        Reviewed by Kent Tamura.
+
+        * ManualTests/forms/calendar-picker.html: Added tests for SuggestionPicker.
+
+2012-09-21  Ami Fischman  <fischman@chromium.org>
+
+        HTMLMediaElement isn't garbage collected between document reloads
+        https://bugs.webkit.org/show_bug.cgi?id=97020
+
+        Reviewed by Eric Carlson.
+
+        Manual test added: ManualTests/audio-freed-during-reload.html
+
+        * ManualTests/audio-freed-during-reload.html:
+
+2012-09-21  Chris Rogers  <crogers@google.com>
+
+        Add Web Audio support for deprecated/legacy APIs
+        https://bugs.webkit.org/show_bug.cgi?id=97050
+
+        Reviewed by Eric Carlson.
+
+        * Source/cmake/WebKitFeatures.cmake:
+
+2012-09-21  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Bail out when trying to build WebKit with Qt != 5
+
+        Reviewed by Tor Arne Vestbø.
+
+        Moved check for Qt version out of default_pre into top-level WebKit.pro,
+        because we never reach default_pre.prf due to the lack of .qmake.conf support
+        in older versions of Qt/QMake.
+
+        * WebKit.pro:
+
 2012-09-20  Simon Hausmann  <simon.hausmann@digia.com>
 
         [Qt] QtWebKit module header includes private dependencies

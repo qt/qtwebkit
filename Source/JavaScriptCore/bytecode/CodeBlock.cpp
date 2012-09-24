@@ -532,8 +532,8 @@ void CodeBlock::dump(ExecState* exec)
         static_cast<unsigned long>(instructions().size() * sizeof(Instruction)),
         this, codeTypeToString(codeType()), m_numParameters, m_numCalleeRegisters,
         m_numVars);
-    if (m_numCapturedVars)
-        dataLog("; %d captured var(s)", m_numCapturedVars);
+    if (m_symbolTable->captureCount())
+        dataLog("; %d captured var(s)", m_symbolTable->captureCount());
     if (usesArguments()) {
         dataLog(
             "; uses arguments, in r%d, r%d",
@@ -873,8 +873,11 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             break;
         }
         case op_check_has_instance: {
-            int base = (++it)->u.operand;
-            dataLog("[%4d] check_has_instance\t\t %s", location, registerName(exec, base).data());
+            int r0 = (++it)->u.operand;
+            int r1 = (++it)->u.operand;
+            int r2 = (++it)->u.operand;
+            int offset = (++it)->u.operand;
+            dataLog("[%4d] check_has_instance\t\t %s, %s, %s, %d(->%d)", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data(), offset, location + offset);
             dumpBytecodeCommentAndNewLine(location);
             break;
         }
@@ -882,8 +885,7 @@ void CodeBlock::dump(ExecState* exec, const Vector<Instruction>::const_iterator&
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int r2 = (++it)->u.operand;
-            int r3 = (++it)->u.operand;
-            dataLog("[%4d] instanceof\t\t %s, %s, %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data(), registerName(exec, r3).data());
+            dataLog("[%4d] instanceof\t\t %s, %s, %s", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
             dumpBytecodeCommentAndNewLine(location);
             break;
         }
@@ -1707,7 +1709,6 @@ CodeBlock::CodeBlock(CopyParsedBlockTag, CodeBlock& other)
     , m_heap(other.m_heap)
     , m_numCalleeRegisters(other.m_numCalleeRegisters)
     , m_numVars(other.m_numVars)
-    , m_numCapturedVars(other.m_numCapturedVars)
     , m_isConstructor(other.m_isConstructor)
     , m_ownerExecutable(*other.m_globalData, other.m_ownerExecutable.get(), other.m_ownerExecutable.get())
     , m_globalData(other.m_globalData)
@@ -1773,7 +1774,6 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, CodeType codeType, JSGlo
     , m_heap(&m_globalObject->globalData().heap)
     , m_numCalleeRegisters(0)
     , m_numVars(0)
-    , m_numCapturedVars(0)
     , m_isConstructor(isConstructor)
     , m_numParameters(0)
     , m_ownerExecutable(globalObject->globalData(), ownerExecutable, ownerExecutable)

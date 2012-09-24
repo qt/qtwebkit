@@ -154,6 +154,7 @@ RenderLayer::RenderLayer(RenderBoxModelObject* renderer)
     , m_indirectCompositingReason(NoIndirectCompositingReason)
 #endif
     , m_containsDirtyOverlayScrollbars(false)
+    , m_updatingMarqueePosition(false)
 #if !ASSERT_DISABLED
     , m_layerListMutationAllowed(true)
 #endif
@@ -435,8 +436,13 @@ void RenderLayer::updateLayerPositions(LayoutPoint* offsetFromRoot, UpdateLayerP
 #endif
         
     // With all our children positioned, now update our marquee if we need to.
-    if (m_marquee)
+    if (m_marquee) {
+        // FIXME: would like to use TemporaryChange<> but it doesn't work with bitfields.
+        bool oldUpdatingMarqueePosition = m_updatingMarqueePosition;
+        m_updatingMarqueePosition = true;
         m_marquee->updateMarqueePosition();
+        m_updatingMarqueePosition = oldUpdatingMarqueePosition;
+    }
 
     if (offsetFromRoot)
         *offsetFromRoot = oldOffsetFromRoot;
@@ -542,8 +548,12 @@ void RenderLayer::updateLayerPositionsAfterScroll(UpdateLayerPositionsAfterScrol
     // of an object, thus RenderReplica will still repaint itself properly as the layer position was
     // updated above.
 
-    if (m_marquee)
+    if (m_marquee) {
+        bool oldUpdatingMarqueePosition = m_updatingMarqueePosition;
+        m_updatingMarqueePosition = true;
         m_marquee->updateMarqueePosition();
+        m_updatingMarqueePosition = oldUpdatingMarqueePosition;
+    }
 }
 
 #if ENABLE(CSS_COMPOSITING)
@@ -1717,7 +1727,13 @@ void RenderLayer::scrollTo(int x, int y)
         view->updateWidgetPositions();
     }
 
-    updateCompositingLayersAfterScroll();
+    if (!m_updatingMarqueePosition) {
+        // Avoid updating compositing layers if, higher on the stack, we're already updating layer
+        // positions. Updating layer positions requires a full walk of up-to-date RenderLayers, and
+        // in this case we're still updating their positions; we'll update compositing layers later
+        // when that completes.
+        updateCompositingLayersAfterScroll();
+    }
 
     RenderBoxModelObject* repaintContainer = renderer()->containerForRepaint();
     Frame* frame = renderer()->frame();
@@ -3114,12 +3130,15 @@ void RenderLayer::paintLayerContents(RenderLayer* rootLayer, GraphicsContext* co
     updateLayerListsIfNeeded();
 
     // Apply clip-path to context.
+    bool hasClipPath = false;
     RenderStyle* style = renderer()->style();
     if (renderer()->hasClipPath() && !context->paintingDisabled() && style) {
         ASSERT(style->clipPath());
         if (style->clipPath()->getOperationType() == ClipPathOperation::SHAPE) {
+            hasClipPath = true;
+            context->save();
             ShapeClipPathOperation* clipPath = static_cast<ShapeClipPathOperation*>(style->clipPath());
-            transparencyLayerContext->clipPath(clipPath->path(calculateLayerBounds(this, rootLayer, 0)), clipPath->windRule());
+            context->clipPath(clipPath->path(calculateLayerBounds(this, rootLayer, 0)), clipPath->windRule());
         }
     }
 
@@ -3289,6 +3308,9 @@ void RenderLayer::paintLayerContents(RenderLayer* rootLayer, GraphicsContext* co
         context->restore();
         m_usedTransparency = false;
     }
+
+    if (hasClipPath)
+        context->restore();
 }
 
 void RenderLayer::paintList(Vector<RenderLayer*>* list, RenderLayer* rootLayer, GraphicsContext* context,

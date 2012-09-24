@@ -48,7 +48,7 @@ public:
     }
 
     TextLayout(RenderText* text, const Font& font, float xPos)
-        : m_font(fontWithNoWordSpacing(font))
+        : m_font(font)
         , m_run(constructTextRun(text, font, xPos))
         , m_controller(adoptPtr(new ComplexTextController(&m_font, m_run, true)))
     {
@@ -58,19 +58,14 @@ public:
     {
         m_controller->advance(from, 0, ByWholeGlyphs);
         float beforeWidth = m_controller->runWidthSoFar();
+        if (m_font.wordSpacing() && from && Font::treatAsSpace(m_run[from]))
+            beforeWidth += m_font.wordSpacing();
         m_controller->advance(from + len, 0, ByWholeGlyphs);
         float afterWidth = m_controller->runWidthSoFar();
         return afterWidth - beforeWidth;
     }
 
 private:
-    static Font fontWithNoWordSpacing(const Font& originalFont)
-    {
-        Font font(originalFont);
-        font.setWordSpacing(0);
-        return font;
-    }
-
     static TextRun constructTextRun(RenderText* text, const Font& font, float xPos)
     {
         TextRun run = RenderBlock::constructTextRun(text, font, text->characters(), text->textLength(), text->style());
@@ -580,8 +575,14 @@ void ComplexTextController::adjustGlyphsAndAdvances()
                 nextCh = *(m_complexTextRuns[r + 1]->characters() + m_complexTextRuns[r + 1]->indexAt(0));
 
             bool treatAsSpace = Font::treatAsSpace(ch);
-            CGGlyph glyph = treatAsSpace ? fontData->spaceGlyph() : glyphs[i];
-            CGSize advance = treatAsSpace ? CGSizeMake(spaceWidth, advances[i].height) : advances[i];
+            CGGlyph glyph = glyphs[i];
+            CGSize advance = advances[i];
+            // FIXME: We should find a way to substitute spaces for characters that are treated as spaces
+            // before handing them off to Core Text, so that kerning can be applied as if they were spaces.
+            if (treatAsSpace && ch != ' ') {
+                glyph = fontData->spaceGlyph();
+                advance.width = spaceWidth;
+            }
 
             if (ch == '\t' && m_run.allowTabs())
                 advance.width = m_font.tabWidth(*fontData, m_run.tabSize(), m_run.xPos() + m_totalWidth + widthSinceLastCommit);

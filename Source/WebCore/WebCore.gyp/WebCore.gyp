@@ -46,8 +46,6 @@
     # binary and increasing the speed of gdb.
     'enable_svg%': 1,
 
-    'use_libcc_for_compositor%': 0,
-
     'enable_wexit_time_destructors': 1,
 
     'use_harfbuzz_ng%': 0,
@@ -361,9 +359,9 @@
     }],  # condition OS == "mac"
     ['clang==1', {
       'target_defaults': {
-        'cflags': ['-Wglobal-constructors'],
+        'cflags': ['-Wglobal-constructors', '-Wunused-parameter'],
         'xcode_settings': {
-          'WARNING_CFLAGS': ['-Wglobal-constructors'],
+          'WARNING_CFLAGS': ['-Wglobal-constructors', '-Wunused-parameter'],
         },
       },
     }],
@@ -948,6 +946,8 @@
           'inputs': [
             '../Resources/pagepopups/calendarPicker.css',
             '../Resources/pagepopups/calendarPicker.js',
+            '../Resources/pagepopups/suggestionPicker.css',
+            '../Resources/pagepopups/suggestionPicker.js',
           ],
           'outputs': [
             '<(SHARED_INTERMEDIATE_DIR)/webkit/CalendarPicker.h',
@@ -1669,6 +1669,8 @@
             ['include', 'platform/graphics/harfbuzz/FontPlatformDataHarfBuzz\\.cpp$'],
             ['include', 'platform/graphics/harfbuzz/HarfBuzzSkia\\.cpp$'],
             ['include', 'platform/graphics/harfbuzz/HarfBuzzShaperBase\\.(cpp|h)$'],
+            ['include', 'platform/graphics/opentype/OpenTypeTypes\\.h$'],
+            ['include', 'platform/graphics/opentype/OpenTypeVerticalData\\.(cpp|h)$'],
             ['include', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
           ],
         }, { # use_x11==0
@@ -1887,6 +1889,8 @@
             ['include', 'platform/graphics/harfbuzz/FontPlatformDataHarfBuzz\\.cpp$'],
             ['include', 'platform/graphics/harfbuzz/HarfBuzzSkia\\.cpp$'],
             ['include', 'platform/graphics/harfbuzz/HarfBuzzShaperBase\\.cpp$'],
+            ['include', 'platform/graphics/opentype/OpenTypeTypes\\.h$'],
+            ['include', 'platform/graphics/opentype/OpenTypeVerticalData\\.(cpp|h)$'],
             ['exclude', 'platform/graphics/skia/FontCacheSkia\\.cpp$'],
             ['include', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
           ],
@@ -1908,19 +1912,6 @@
       ],
       'sources': [
         '<@(webcore_platform_geometry_files)',
-      ],
-    },
-    {
-      'target_name': 'webcore_chromium_compositor',
-      'type': 'static_library',
-      'dependencies': [
-        'webcore_prerequisites',
-      ],
-      'defines': [
-        'WEBKIT_IMPLEMENTATION=1',
-      ],
-      'sources': [
-        '<@(webcore_chromium_compositor_files)',
       ],
     },
     # The *NEON.cpp files fail to compile when -mthumb is passed. Force
@@ -2210,11 +2201,6 @@
             'webcore_svg',
           ],
         }],
-        ['use_libcc_for_compositor==0', {
-          'dependencies': [
-            'webcore_chromium_compositor'
-          ],
-        }]
       ],
     },
     {

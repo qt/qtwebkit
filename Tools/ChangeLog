@@ -1,8 +1,508 @@
+2012-09-24  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Fix build with latest Qt 5
+
+        Reviewed by Tor Arne Vestbø.
+
+        The variables for syncqt handling are now set in api.pri, but let's add a comment here that we can
+        remove them from default_pre.prf once we're past Qt 5 beta2.
+
+        * qmake/mkspecs/features/default_pre.prf:
+
+2012-09-22  Dominic Mazzoni  <dmazzoni@google.com>
+
+        AX: Layout tests would be easier to write if AccessibilityController could find an element by id
+        https://bugs.webkit.org/show_bug.cgi?id=97301
+
+        Reviewed by Chris Fleizach.
+
+        Adds a new accessibleElementById method to AccessibilityController, to make it
+        easier to write cross-platform layout tests.
+
+        Implemented for Chromium and for Mac (DRT and WKTR).
+
+        * DumpRenderTree/AccessibilityController.cpp:
+        (getAccessibleElementByIdCallback):
+        (AccessibilityController::getJSClass):
+        * DumpRenderTree/AccessibilityController.h:
+        (AccessibilityController):
+        * DumpRenderTree/DumpRenderTree.xcodeproj/project.pbxproj:
+        * DumpRenderTree/chromium/TestRunner/AccessibilityControllerChromium.cpp:
+        (AccessibilityController::AccessibilityController):
+        (AccessibilityController::findAccessibleElementByIdRecursive):
+        (AccessibilityController::getAccessibleElementById):
+        (AccessibilityController::accessibleElementByIdGetterCallback):
+        * DumpRenderTree/chromium/TestRunner/AccessibilityControllerChromium.h:
+        (AccessibilityController):
+        * DumpRenderTree/gtk/AccessibilityControllerGtk.cpp:
+        (AccessibilityController::accessibleElementById):
+        * DumpRenderTree/mac/AccessibilityCommonMac.h: added
+        * DumpRenderTree/mac/AccessibilityCommonMac.mm: added
+        (+[NSString stringWithJSStringRef:]):
+        (-[NSString createJSStringRef]):
+        * DumpRenderTree/mac/AccessibilityControllerMac.mm:
+        (findAccessibleObjectById):
+        (AccessibilityController::accessibleElementById):
+        * DumpRenderTree/mac/AccessibilityUIElementMac.mm:
+        * DumpRenderTree/win/AccessibilityControllerWin.cpp:
+        (AccessibilityController::accessibleElementById):
+        * WebKitTestRunner/InjectedBundle/AccessibilityController.cpp:
+        (WTR::AccessibilityController::accessibleElementById):
+        * WebKitTestRunner/InjectedBundle/AccessibilityController.h:
+        (AccessibilityController):
+        * WebKitTestRunner/InjectedBundle/Bindings/AccessibilityController.idl:
+        * WebKitTestRunner/InjectedBundle/mac/AccessibilityCommonMac.h: added
+        * WebKitTestRunner/InjectedBundle/mac/AccessibilityCommonMac.mm: added
+        (+[NSString stringWithJSStringRef:]):
+        (-[NSString createJSStringRef]):
+        * WebKitTestRunner/InjectedBundle/mac/AccessibilityControllerMac.mm:
+        (WTR::findAccessibleObjectById):
+        (WTR):
+        (WTR::AccessibilityController::accessibleElementById):
+        * WebKitTestRunner/InjectedBundle/mac/AccessibilityUIElementMac.mm:
+        * WebKitTestRunner/WebKitTestRunner.xcodeproj/project.pbxproj:
+
+2012-09-22  Zan Dobersek  <zandobersek@gmail.com>
+
+        Unexpected reftest passes are only reported when pixel testing is enabled
+        https://bugs.webkit.org/show_bug.cgi?id=97242
+
+        Reviewed by Dirk Pranke.
+
+        LayoutTestRunner should know whether the finished test it's handling is
+        a reftest. This is necessary when updating result summary for reftests
+        when pixel testing is not enabled - in these circumstances an unexpectedly
+        passing reftest was not reported as such due to pixel testing then being
+        determined by searching for reftest failures in failures list, which were
+        not found in an empty failure list of a passing test. Now the TestResult
+        objects have a member variable indicating the test is a reftest whenever
+        that's the case.
+
+        * Scripts/webkitpy/layout_tests/controllers/layout_test_runner.py:
+        (LayoutTestRunner._update_summary_with_result):
+        * Scripts/webkitpy/layout_tests/controllers/layout_test_runner_unittest.py:
+        (LayoutTestRunnerTests.test_update_summary_with_result):
+        * Scripts/webkitpy/layout_tests/controllers/single_test_runner.py:
+        (SingleTestRunner.run):
+        (SingleTestRunner._run_reftest):
+        * Scripts/webkitpy/layout_tests/models/test_results.py:
+        (TestResult.__init__):
+
+2012-09-21  Sam Weinig  <sam@webkit.org>
+
+        WebProcess XPC services need have their environment set without disrupting all other XPC services
+        https://bugs.webkit.org/show_bug.cgi?id=95161
+
+        Reviewed by Anders Carlsson.
+
+        Remove setting the __XPC_* environment variables.
+
+        * Scripts/webkitdirs.pm:
+        (setUpGuardMallocIfNeeded):
+        (runMacWebKitApp):
+        (execMacWebKitAppForDebugging):
+
+2012-09-21  Dirk Pranke  <dpranke@chromium.org>
+
+        Fix typo in additional-platform-directory patch just landed
+        https://bugs.webkit.org/show_bug.cgi?id=97380
+        
+        Unreviewed, build fix.
+
+        * Scripts/webkitpy/layout_tests/port/base.py:
+        (Port.relative_test_filename):
+        (Port.relative_perf_test_filename):
+
+2012-09-21  Dirk Pranke  <dpranke@chromium.org>
+
+        nrwt: don't require additional-platform-directory to be an abspath or live under LayoutTests
+        https://bugs.webkit.org/show_bug.cgi?id=97380
+
+        Reviewed by Ojan Vafai.
+
+        There doesn't seem to be a good reason for this restriction and
+        it's useful to be able to point to directories outside the
+        checkout for results (e.g., for local failures due to a 10.7.4
+        install ;).
+
+        * Scripts/webkitpy/layout_tests/port/base.py:
+        (Port.relative_test_filename):
+        (Port.relative_perf_test_filename):
+        * Scripts/webkitpy/layout_tests/port/chromium_android.py:
+        (ChromiumAndroidDriver._command_from_driver_input):
+        * Scripts/webkitpy/layout_tests/run_webkit_tests.py:
+        (_set_up_derived_options):
+        * Scripts/webkitpy/layout_tests/run_webkit_tests_integrationtest.py:
+        (MainTest.test_additional_platform_directory):
+
+2012-09-21  Dirk Pranke  <dpranke@chromium.org>
+
+        webkitpy: drop support for old TestExpectations syntax
+        https://bugs.webkit.org/show_bug.cgi?id=97364
+
+        Reviewed by Ryosuke Niwa.
+
+        * Scripts/webkitpy/layout_tests/models/test_expectations.py:
+        (TestExpectationParser._collect_matching_tests):
+        (TestExpectationParser):
+        (TestExpectationParser._tokenize_line):
+        * Scripts/webkitpy/layout_tests/models/test_expectations_unittest.py:
+        (SkippedTests.test_skipped_entry_dont_exist):
+        (ExpectationSyntaxTests.assert_tokenize_exp):
+        (ExpectationSyntaxTests.test_bare_name):
+        (ExpectationSyntaxTests.test_bare_name_and_bugs):
+        (ExpectationSyntaxTests.test_comments):
+        (ExpectationSyntaxTests.test_config_modifiers):
+        (ExpectationSyntaxTests.test_unknown_config):
+        (ExpectationSyntaxTests.test_unknown_expectation):
+        (ExpectationSyntaxTests.test_skip):
+        (ExpectationSyntaxTests.test_slow):
+        (ExpectationSyntaxTests.test_wontfix):
+        (ExpectationSyntaxTests.test_blank_line):
+        (ExpectationSyntaxTests.test_warnings):
+        (RebaseliningTest.test_no_get_rebaselining_failures):
+
+2012-09-21  Simon Fraser  <simon.fraser@apple.com>
+
+        Improve WTR unresponsiveness output a little
+        https://bugs.webkit.org/show_bug.cgi?id=97370
+
+        Reviewed by Timothy Horton.
+
+        Distinguish between conditions that already set the errorMessage,
+        and unresponsiveness due to slow about:blank loads when WTR
+        reports unresponsiveness.
+
+        * WebKitTestRunner/TestInvocation.cpp:
+        (WTR::TestInvocation::invoke):
+
+2012-09-21  Chris Rogers  <crogers@google.com>
+
+        Add Web Audio support for deprecated/legacy APIs
+        https://bugs.webkit.org/show_bug.cgi?id=97050
+
+        Reviewed by Eric Carlson.
+
+        * Scripts/webkitperl/FeatureList.pm:
+
+2012-09-21  Dirk Pranke  <dpranke@chromium.org>
+
+        webkitpy: update remaining tests to use the new expectation syntax
+        https://bugs.webkit.org/show_bug.cgi?id=97362
+
+        Reviewed by Ojan Vafai.
+
+        This patch updates all the unit tests that were still using the
+        old TestExpectations syntax to use the new syntax *except* for
+        the tests that were specifically testing that we parsed the old
+        syntax correctly.
+
+        Also, a block of tests for the new syntax were duplicated, so
+        I've deleted the duplicate.
+
+        Note that the old syntax is still supported so this change should
+        produce no visible changes.
+
+        * Scripts/webkitpy/layout_tests/models/test_expectations_unittest.py:
+        (MiscTests.test_multiple_results):
+        (MiscTests.test_category_expectations):
+        (MiscTests.test_error_on_different_platform):
+        (MiscTests.test_error_on_different_build_type):
+        (MiscTests.test_overrides):
+        (MiscTests.test_overrides__directory):
+        (MiscTests.test_overrides__duplicate):
+        (MiscTests.test_more_specific_override_resets_skip):
+        (SkippedTests.check):
+        (SkippedTests.test_duplicate_skipped_test_fails_lint):
+        (SkippedTests.test_skipped_file_overrides_expectations):
+        (SkippedTests.test_skipped_dir_overrides_expectations):
+        (SkippedTests.test_skipped_file_overrides_overrides):
+        (SkippedTests.test_skipped_dir_overrides_overrides):
+        (ExpectationSyntaxTests.disabled_test_missing_expectation):
+        (ExpectationSyntaxTests.disabled_test_missing_colon):
+        (ExpectationSyntaxTests.disabled_test_too_many_colons):
+        (ExpectationSyntaxTests.disabled_test_too_many_equals_signs):
+        (ExpectationSyntaxTests):
+        (ExpectationSyntaxTests.test_unrecognized_expectation):
+        (ExpectationSyntaxTests.test_macro):
+        (SemanticTests.test_bug_format):
+        (SemanticTests.test_bad_bugid):
+        (SemanticTests.test_missing_bugid):
+        (SemanticTests.test_slow_and_timeout):
+        (SemanticTests.test_rebaseline):
+        (test_missing_file):
+        (test_ambiguous):
+        (test_more_modifiers):
+        (test_order_in_file):
+        (test_macro_overrides):
+        (OldExpectationParserTests):
+        (OldExpectationParserTests._tokenize):
+        (OldExpectationParserTests.test_tokenize_extra_colon):
+        (OldExpectationParserTests.test_tokenize_missing_equal):
+        (OldExpectationParserTests.test_tokenize_extra_equal):
+        * Scripts/webkitpy/layout_tests/run_webkit_tests_integrationtest.py:
+        (MainTest.test_skip_failing_tests):
+        (MainTest.test_additional_expectations):
+        * Scripts/webkitpy/style/checkers/test_expectations_unittest.py:
+        (TestExpectationsTestCase.test_valid_expectations):
+        (TestExpectationsTestCase.test_invalid_expectations):
+        (TestExpectationsTestCase.test_tab):
+
+2012-09-21  Benjamin Poulain  <bpoulain@apple.com>
+
+        [WK2] Add basic testing support for Geolocation
+        https://bugs.webkit.org/show_bug.cgi?id=97278
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Update the Geolocation testing to use the proper API in the UIProcess.
+
+        * WebKitTestRunner/CMakeLists.txt:
+        * WebKitTestRunner/GNUmakefile.am:
+
+        * WebKitTestRunner/GeolocationProviderMock.cpp: Added.
+        (WTR::startUpdatingCallback):
+        (WTR::stopUpdatingCallback):
+        (WTR::GeolocationProviderMock::GeolocationProvierMock):
+        (WTR::GeolocationProviderMock::setMockGeolocationPosition):
+        (WTR::GeolocationProviderMock::startUpdating):
+        (WTR::GeolocationProviderMock::stopUpdating):
+        (GeolocationProviderMock):
+        The GeolocationProvider store the location update and deliver them as needed.
+
+        WebCore GeolocationController do not support asynchronous update on start/stop. This is not
+        a problem in this case because all the messages between the WebProcess and the UIProcess are
+        asynchronous. Because of this, unlike GeolocationClientMock, we do not use a timer for event
+        delivery.
+
+        * WebKitTestRunner/InjectedBundle/Bindings/TestRunner.idl:
+        * WebKitTestRunner/InjectedBundle/InjectedBundle.cpp:
+        (WTR::InjectedBundle::setGeolocationPermission):
+        (WTR::InjectedBundle::setMockGeolocationPosition):
+        * WebKitTestRunner/InjectedBundle/InjectedBundle.h:
+        (InjectedBundle):
+        * WebKitTestRunner/InjectedBundle/TestRunner.cpp:
+        (WTR::TestRunner::setGeolocationPermission):
+        (WTR::TestRunner::setMockGeolocationPosition):
+        From the InjectedBundle, we now pass the information to the UIProcess so that
+        GeolocationProvider and the TestController can respond appropriately.
+
+        * WebKitTestRunner/InjectedBundle/TestRunner.h:
+        (TestRunner):
+        * WebKitTestRunner/Target.pri:
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::TestController):
+        (WTR::decidePolicyForGeolocationPermissionRequest):
+        (WTR::TestController::createOtherPage):
+        (WTR::TestController::initialize):
+        (WTR::TestController::setMockGeolocationPosition):
+        * WebKitTestRunner/TestController.h:
+        (TestController):
+        (WTR::TestController::setGeolocationPermission):
+        (WTR::TestController::isGeolocationPermissionAllowed):
+        * WebKitTestRunner/TestInvocation.cpp:
+        (WTR::TestInvocation::didReceiveMessageFromInjectedBundle):
+        * WebKitTestRunner/WebKitTestRunner.xcodeproj/project.pbxproj:
+        * WebKitTestRunner/win/WebKitTestRunner.vcproj:
+
+2012-09-21  Joanmarie Diggs  <jdiggs@igalia.com>
+
+        REGRESSION (r127882): accessibility/spinbutton-value.html failing on GTK
+        https://bugs.webkit.org/show_bug.cgi?id=96196
+
+        Reviewed by Martin Robinson.
+
+        The "regression" is that a new test was added but the support was missing
+        in the Gtk port for spin buttons.
+
+        * DumpRenderTree/gtk/AccessibilityUIElementGtk.cpp:
+        (AccessibilityUIElement::valueDescription): Updated the FIXME comment to
+        indicate that this cannot be implemented until it is implemented in ATK.
+        URL of the newly-filed ATK bug included for reference.
+
+2012-09-21  Dirk Pranke  <dpranke@chromium.org>
+
+        Fix test_skip_and_wontfix failure
+        https://bugs.webkit.org/show_bug.cgi?id=97225
+
+        Unreviewed, build fix.
+
+        * Scripts/webkitpy/layout_tests/models/test_expectations_unittest.py:
+        (SemanticTests.test_skip_and_wontfix):
+
+2012-09-21  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Implement ViewState methods in PageClientImpl in WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=97202
+
+        Reviewed by Martin Robinson.
+
+        * WebKitTestRunner/gtk/PlatformWebViewGtk.cpp:
+        (WTR::PlatformWebView::focus): Focus the view.
+
+2012-09-21  Sudarsana Nagineni  <sudarsana.nagineni@intel.com>
+
+        [WTR] Memory leaks in InjectedBundleController::initialize()
+        https://bugs.webkit.org/show_bug.cgi?id=97329
+
+        Reviewed by Alexey Proskuryakov.
+
+        Fix leaks in InjectedBundleController::initialize() by adopting
+        strings created with WKStringCreateWithUTF8CString().
+
+        * TestWebKitAPI/InjectedBundleController.cpp:
+        (TestWebKitAPI::InjectedBundleController::initialize):
+
+2012-09-21  Marcelo Lira  <marcelo.lira@openbossa.org>
+
+        [Qt][WK2] Removed duplicated code from EventSenderProxy::keyDown
+        https://bugs.webkit.org/show_bug.cgi?id=97235
+
+        Reviewed by Luiz Agostini.
+
+        * WebKitTestRunner/qt/EventSenderProxyQt.cpp:
+        (WTR::EventSenderProxy::keyDown):
+
+2012-09-21  Gergely Kis  <gergely@homejinni.com>
+
+        Add MIPS build slave to build.webkit.org
+        https://bugs.webkit.org/show_bug.cgi?id=96713
+
+        Reviewed by Csaba Osztrogonác.
+
+        Added a build slave for MIPS, and enabled a builder for 
+        Qt Linux MIPS32R2 little-endian release build.
+
+        * BuildSlaveSupport/build.webkit.org-config/config.json:
+
+2012-09-21  Peter Beverloo  <peter@chromium.org>
+
+        [Chromium] Switch back to a fixed fifo path for Android
+        https://bugs.webkit.org/show_bug.cgi?id=97230
+
+        Reviewed by Tony Chang.
+
+        Because not all external storage cards will be formated using a file
+        system that supports named pipes, Chromium has been changed to creating
+        the pipes in a temporary folder on the internal storage. Adapt this in
+        WebKit so we can continue to run layout tests.
+
+        This also includes an *unreviewed* fix for a breakage in the webkitpy
+        tests I made in r129221. Two lines and related to this code, so I decided
+        to include it in this change.
+
+        * Scripts/webkitpy/layout_tests/port/chromium_android.py:
+        (ChromiumAndroidDriver.__init__):
+        (ChromiumAndroidDriver._setup_test):
+        (ChromiumAndroidDriver._update_version):
+
+2012-09-20  Peter Beverloo  <peter@chromium.org>
+
+        Leverage Chromium's code to set up FIFOs for Chromium Android layout tests
+        https://bugs.webkit.org/show_bug.cgi?id=97227
+
+        Reviewed by Tony Chang.
+
+        We switched Chromium to using FIFOs in order to achieve better consistency,
+        which was done by Marcus in r157541. Remove all custom WebKit code in
+        favor of Chromium's implementation.
+
+        Remove more FIFO code in the test runner itself, including the code in
+        DumpRenderTree that invoked it. We can now switch to Chromium's brand
+        new FIFO-creating code, which is being set-up for all test targets build
+        for Android, including DumpRenderTree, TestWebKitAPI and webkit_unit_tests.
+
+        This also changes the ChromiumAndroidDriver._remove_all_pipes method to
+        delete the files individually. "rm" would fail if one of the earlier files
+        does not exist, and the "-f" argument doesn't seem to be reliable.
+
+        * DumpRenderTree/DumpRenderTree.gyp/DumpRenderTree.gyp:
+        * DumpRenderTree/chromium/TestShellAndroid.cpp:
+        (platformInit):
+        * Scripts/webkitpy/layout_tests/port/chromium_android.py:
+        (ChromiumAndroidDriver.__init__):
+        (ChromiumAndroidDriver._setup_test):
+        (ChromiumAndroidDriver._get_external_storage):
+        (ChromiumAndroidDriver._drt_cmd_line):
+        (ChromiumAndroidDriver._remove_all_pipes):
+        (ChromiumAndroidDriver.stop):
+        * TestWebKitAPI/TestWebKitAPI.gyp/TestWebKitAPI.gyp:
+
+2012-09-21  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [WK2][WKTR] EventSender needs to implement scheduleAsynchronousClick
+        https://bugs.webkit.org/show_bug.cgi?id=97326
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Implement scheduleAsynchronousClick() in WebKitTestRunner's
+        EventSender by sending a "MouseDown" and a "MouseUp" message
+        asynchronously to the WebProcess.
+
+        * WebKitTestRunner/InjectedBundle/Bindings/EventSendingController.idl:
+        * WebKitTestRunner/InjectedBundle/EventSendingController.cpp:
+        (WTR::createMouseMessageBody):
+        (WTR):
+        (WTR::EventSendingController::mouseDown):
+        (WTR::EventSendingController::mouseUp):
+        (WTR::EventSendingController::scheduleAsynchronousClick):
+        * WebKitTestRunner/InjectedBundle/EventSendingController.h:
+        (EventSendingController):
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::didReceiveMessageFromInjectedBundle):
+
+2012-09-21  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Error out early if we don't have ICU available
+
+        Reviewed by Tor Arne Vestbø.
+
+        * qmake/mkspecs/features/configure.prf:
+
+2012-09-21  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Bail out when trying to build WebKit with Qt != 5
+
+        Reviewed by Tor Arne Vestbø.
+
+        Moved check for Qt version out of default_pre into top-level WebKit.pro,
+        because we never reach default_pre.prf due to the lack of .qmake.conf support
+        in older versions of Qt/QMake.
+
+        * qmake/mkspecs/features/default_pre.prf:
+
+2012-09-21  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        WebKitTestRunner needs to print frame load delegate information
+        https://bugs.webkit.org/show_bug.cgi?id=42705
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Added missing dumping from WTR::InjectedBundlePage::didFailLoadWithErrorForFrame.
+
+        * WebKitTestRunner/InjectedBundle/InjectedBundlePage.cpp:
+        (WTR::InjectedBundlePage::didFailLoadWithErrorForFrame):
+
+2012-09-21  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] EventSender should mimic CTRL+o emacs shortcut
+        https://bugs.webkit.org/show_bug.cgi?id=97224
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Add support for mimicking CTRL+o emacs shortcut in EFL's
+        EventSender in DumpRenderTree and WebKitTestRunner.
+
+        * DumpRenderTree/efl/EventSender.cpp:
+        (sendKeyDown):
+        * WebKitTestRunner/efl/EventSenderProxyEfl.cpp:
+        (WTR::EventSenderProxy::keyDown):
+
 2012-09-21  Simon Hausmann  <simon.hausmann@digia.com>
 
         [Qt] Re-fix clean builds
 
-        Reviewed by NOBODY (OOPS!).
+        Reviewed by Tor Arne Vestbø.
 
         Re-introduce the sanitization for LIBS when creating a module to use
         LIBS_PRIVATE and otherwise do _not_ use LIBS_PRIVATE. We decided to
@@ -13,6 +513,106 @@
 
         * qmake/mkspecs/features/default_post.prf:
         * qmake/mkspecs/features/functions.prf:
+
+2012-09-20  Simon Fraser  <simon.fraser@apple.com>
+
+        Comment out a failing webkitpy unit test until Dirk can fix it.
+
+        * Scripts/webkitpy/layout_tests/models/test_expectations_unittest.py:
+        (SemanticTests.test_skip_and_wontfix):
+
+2012-09-20  Dirk Pranke  <dpranke@chromium.org>
+
+        make Skip, WontFix be the only expectations on a line
+        https://bugs.webkit.org/show_bug.cgi?id=97225
+
+        Reviewed by Ojan Vafai.
+
+        It is now incorrect in the new syntax to have a line like:
+
+            foo.html [ WontFix Crash ]
+
+        This will generate a lint warning and be treated as an invalid
+        line. Fixing this caused a whole bunch of unit tests to need updating
+        to no longer be marked as WontFix :). Also, this patch adjusts
+        the warnings so that missing Bug() identifiers will cause lint
+        warnings but will *not* cause the line to be treated as invalid.
+        Fixing these issues also revealed that test_hung_thread was no
+        longer testing the right logic, so I adjusted the timeouts in
+        test.py to make that test work again.
+
+        * Scripts/webkitpy/layout_tests/controllers/layout_test_runner.py:
+        (Worker._run_test_in_another_thread):
+        * Scripts/webkitpy/layout_tests/controllers/manager_unittest.py:
+        (ResultSummaryTest.test_summarized_results_wontfix):
+        * Scripts/webkitpy/layout_tests/models/test_expectations.py:
+        (TestExpectationParser._parse_modifiers):
+        (TestExpectationParser._tokenize_line_using_new_format):
+        (TestExpectationLine.is_invalid):
+        * Scripts/webkitpy/layout_tests/models/test_expectations_unittest.py:
+        (BasicTests.test_basic):
+        (test_get_test_set):
+        (test_parse_warning):
+        (test_pixel_tests_flag):
+        (SemanticTests.test_missing_bugid):
+        (SemanticTests):
+        (SemanticTests.test_skip_and_wontfix):
+        * Scripts/webkitpy/layout_tests/port/test.py:
+        (TestDriver.run_test):
+        * Scripts/webkitpy/layout_tests/run_webkit_tests_integrationtest.py:
+        (MainTest.test_hung_thread):
+        * Scripts/webkitpy/tool/commands/queries_unittest.py:
+        (PrintExpectationsTest.test_basic):
+        (PrintExpectationsTest.test_multiple):
+        (PrintExpectationsTest.test_full):
+        (PrintExpectationsTest.test_exclude):
+        (PrintExpectationsTest.test_csv):
+
+2012-09-20  Lucas Forschler  <lforschler@apple.com>
+
+        Unreviewed.  Start running tests on the mac-ews.
+        
+        * Scripts/webkitpy/tool/commands/earlywarningsystem.py:
+        (MacEWS):
+
+2012-09-20  Tony Chang  <tony@chromium.org>
+
+        [chromium] Enable more clang warnings
+        https://bugs.webkit.org/show_bug.cgi?id=97257
+
+        Reviewed by James Robinson.
+
+        * DumpRenderTree/DumpRenderTree.gyp/DumpRenderTree.gyp: Add -Wunused-parameter. Don't add -Wglobal-constructors because
+        there are lots of violations in these files.
+
+2012-09-19  Ryosuke Niwa  <rniwa@webkit.org>
+
+        run-perf-tests should record individual value instead of statistics
+        https://bugs.webkit.org/show_bug.cgi?id=97155
+
+        Reviewed by Hajime Morita.
+
+        Parse the list of individual value reported by tests and include them as "values".
+        We strip "values" from the output JSON when uploading it to the perf-o-matic
+        since it doesn't know how to parse "values" or ignore it.
+
+        * Scripts/webkitpy/performance_tests/perftest.py:
+        (PerfTest):
+        (PerfTest.parse_output): Parse and report "values".
+        (PageLoadingPerfTest.run): Report indivisual page loading time in "values".
+        * Scripts/webkitpy/performance_tests/perftest_unittest.py:
+        (MainTest.test_parse_output):
+        (MainTest.test_parse_output_with_failing_line):
+        (TestPageLoadingPerfTest.test_run):
+        * Scripts/webkitpy/performance_tests/perftestsrunner.py:
+        (PerfTestsRunner._generate_and_show_results): Strip "values" from each result
+        until we update perf-o-matic.
+        * Scripts/webkitpy/performance_tests/perftestsrunner_unittest.py:
+        (test_run_memory_test):
+        (test_run_with_json_output):
+        (test_run_with_description):
+        (test_run_with_slave_config_json):
+        (test_run_with_multiple_repositories):
 
 2012-09-20  Simon Hausmann  <simon.hausmann@digia.com>
 

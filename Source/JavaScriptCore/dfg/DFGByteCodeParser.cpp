@@ -467,8 +467,11 @@ private:
             numArguments = m_inlineStackTop->m_codeBlock->numParameters();
         for (unsigned argument = numArguments; argument-- > 1;)
             flush(argumentToOperand(argument));
-        for (unsigned local = m_inlineStackTop->m_codeBlock->m_numCapturedVars; local--;)
+        for (int local = 0; local < m_inlineStackTop->m_codeBlock->m_numVars; ++local) {
+            if (!m_inlineStackTop->m_codeBlock->isCaptured(local))
+                continue;
             flush(local);
+        }
     }
 
     // Get an operand, and perform a ToInt32/ToNumber conversion on it.
@@ -2049,14 +2052,13 @@ bool ByteCodeParser::parseBlock(unsigned limit)
         }
 
         case op_check_has_instance:
-            addToGraph(CheckHasInstance, get(currentInstruction[1].u.operand));
+            addToGraph(CheckHasInstance, get(currentInstruction[3].u.operand));
             NEXT_OPCODE(op_check_has_instance);
 
         case op_instanceof: {
             NodeIndex value = get(currentInstruction[2].u.operand);
-            NodeIndex baseValue = get(currentInstruction[3].u.operand);
-            NodeIndex prototype = get(currentInstruction[4].u.operand);
-            set(currentInstruction[1].u.operand, addToGraph(InstanceOf, value, baseValue, prototype));
+            NodeIndex prototype = get(currentInstruction[3].u.operand);
+            set(currentInstruction[1].u.operand, addToGraph(InstanceOf, value, prototype));
             NEXT_OPCODE(op_instanceof);
         }
             
@@ -2263,8 +2265,9 @@ bool ByteCodeParser::parseBlock(unsigned limit)
             int dst = currentInstruction[1].u.operand;
             int slot = currentInstruction[2].u.operand;
             int depth = currentInstruction[3].u.operand;
-            NodeIndex getScopeChain = addToGraph(GetScopeChain, OpInfo(depth));
-            NodeIndex getScopedVar = addToGraph(GetScopedVar, OpInfo(slot), OpInfo(prediction), getScopeChain);
+            NodeIndex getScope = addToGraph(GetScope, OpInfo(depth));
+            NodeIndex getScopeRegisters = addToGraph(GetScopeRegisters, getScope);
+            NodeIndex getScopedVar = addToGraph(GetScopedVar, OpInfo(slot), OpInfo(prediction), getScopeRegisters);
             set(dst, getScopedVar);
             NEXT_OPCODE(op_get_scoped_var);
         }
@@ -2272,8 +2275,9 @@ bool ByteCodeParser::parseBlock(unsigned limit)
             int slot = currentInstruction[1].u.operand;
             int depth = currentInstruction[2].u.operand;
             int source = currentInstruction[3].u.operand;
-            NodeIndex getScopeChain = addToGraph(GetScopeChain, OpInfo(depth));
-            addToGraph(PutScopedVar, OpInfo(slot), getScopeChain, get(source));
+            NodeIndex getScope = addToGraph(GetScope, OpInfo(depth));
+            NodeIndex getScopeRegisters = addToGraph(GetScopeRegisters, getScope);
+            addToGraph(PutScopedVar, OpInfo(slot), getScope, getScopeRegisters, get(source));
             NEXT_OPCODE(op_put_scoped_var);
         }
         case op_get_by_id:
@@ -2714,6 +2718,7 @@ bool ByteCodeParser::parseBlock(unsigned limit)
         case op_call_varargs: {
             ASSERT(m_inlineStackTop->m_inlineCallFrame);
             ASSERT(currentInstruction[3].u.operand == m_inlineStackTop->m_codeBlock->argumentsRegister());
+            ASSERT(!m_inlineStackTop->m_codeBlock->symbolTable()->slowArguments());
             // It would be cool to funnel this into handleCall() so that it can handle
             // inlining. But currently that won't be profitable anyway, since none of the
             // uses of call_varargs will be inlineable. So we set this up manually and
@@ -3282,10 +3287,10 @@ void ByteCodeParser::parseCodeBlock()
     CodeBlock* codeBlock = m_inlineStackTop->m_codeBlock;
     
 #if DFG_ENABLE(DEBUG_VERBOSE)
-    dataLog("Parsing code block %p. codeType = %s, numCapturedVars = %u, needsFullScopeChain = %s, needsActivation = %s, isStrictMode = %s\n",
+    dataLog("Parsing code block %p. codeType = %s, captureCount = %u, needsFullScopeChain = %s, needsActivation = %s, isStrictMode = %s\n",
             codeBlock,
             codeTypeToString(codeBlock->codeType()),
-            codeBlock->m_numCapturedVars,
+            codeBlock->symbolTable()->captureCount(),
             codeBlock->needsFullScopeChain()?"true":"false",
             codeBlock->ownerExecutable()->needsActivation()?"true":"false",
             codeBlock->ownerExecutable()->isStrictMode()?"true":"false");

@@ -78,6 +78,7 @@
       'ENABLE_LEGACY_CSS_VENDOR_PREFIXES=0',
       'ENABLE_LEGACY_VIEWPORT_ADAPTION=1',
       'ENABLE_LEGACY_VENDOR_PREFIXES=0',
+      'ENABLE_LEGACY_WEB_AUDIO=1',
       'ENABLE_LEGACY_WEBKIT_BLOB_BUILDER=1',
       'ENABLE_LINK_PREFETCH=1',
       'ENABLE_LINK_PRERENDER=1',
@@ -202,7 +203,7 @@
           'WTF_USE_WEBAUDIO_FFMPEG=1',
         ],
       }],
-      ['OS=="win"', {
+      ['OS=="win" or use_x11==1', {
         'feature_defines': [
           'ENABLE_OPENTYPE_VERTICAL=1',
         ],

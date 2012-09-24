@@ -127,6 +127,7 @@
 #include "PointerLockController.h"
 #include "PopStateEvent.h"
 #include "ProcessingInstruction.h"
+#include "QualifiedName.h"
 #include "RegisteredEventListener.h"
 #include "RenderArena.h"
 #include "RenderNamedFlowThread.h"
@@ -5768,6 +5769,10 @@ void Document::setFullScreenRendererBackgroundColor(Color backgroundColor)
     
 void Document::fullScreenChangeDelayTimerFired(Timer<Document>*)
 {
+    // Since we dispatch events in this function, it's possible that the
+    // document will be detached and GC'd. We protect it here to make sure we
+    // can finish the function successfully.
+    RefPtr<Document> protectDocument(this);
     Deque<RefPtr<Node> > changeQueue;
     m_fullScreenChangeEventTargetQueue.swap(changeQueue);
 
@@ -5775,6 +5780,9 @@ void Document::fullScreenChangeDelayTimerFired(Timer<Document>*)
         RefPtr<Node> node = changeQueue.takeFirst();
         if (!node)
             node = documentElement();
+        // The dispatchEvent below may have blown away our documentElement.
+        if (!node)
+            continue;
 
         // If the element was removed from our tree, also message the documentElement. Since we may
         // have a document hierarchy, check that node isn't in another document.
@@ -5791,6 +5799,9 @@ void Document::fullScreenChangeDelayTimerFired(Timer<Document>*)
         RefPtr<Node> node = errorQueue.takeFirst();
         if (!node)
             node = documentElement();
+        // The dispatchEvent below may have blown away our documentElement.
+        if (!node)
+            continue;
         
         // If the element was removed from our tree, also message the documentElement. Since we may
         // have a document hierarchy, check that node isn't in another document.
@@ -6304,23 +6315,16 @@ PassRefPtr<UndoManager> Document::undoManager()
 #endif
 
 class ImmutableAttributeDataCacheKey {
-    WTF_MAKE_FAST_ALLOCATED;
 public:
-    ImmutableAttributeDataCacheKey()
-        : m_localName(0)
-        , m_attributes(0)
-        , m_attributeCount(0)
-    { }
-
-    ImmutableAttributeDataCacheKey(const AtomicString& localName, const Attribute* attributes, unsigned attributeCount)
-        : m_localName(localName.impl())
+    ImmutableAttributeDataCacheKey(const QualifiedName& tagName, const Attribute* attributes, unsigned attributeCount)
+        : m_tagQName(tagName)
         , m_attributes(attributes)
         , m_attributeCount(attributeCount)
     { }
 
     bool operator!=(const ImmutableAttributeDataCacheKey& other) const
     {
-        if (m_localName != other.m_localName)
+        if (m_tagQName != other.m_tagQName)
             return true;
         if (m_attributeCount != other.m_attributeCount)
             return true;
@@ -6330,16 +6334,21 @@ public:
     unsigned hash() const
     {
         unsigned attributeHash = StringHasher::hashMemory(m_attributes, m_attributeCount * sizeof(Attribute));
-        return WTF::pairIntHash(m_localName->existingHash(), attributeHash);
+        return WTF::pairIntHash(m_tagQName.localName().impl()->existingHash(), attributeHash);
     }
 
 private:
-    AtomicStringImpl* m_localName;
+    QualifiedName m_tagQName;
     const Attribute* m_attributes;
     unsigned m_attributeCount;
 };
 
 struct ImmutableAttributeDataCacheEntry {
+    ImmutableAttributeDataCacheEntry(const ImmutableAttributeDataCacheKey& k, PassRefPtr<ElementAttributeData> v)
+        : key(k)
+        , value(v)
+    { }
+
     ImmutableAttributeDataCacheKey key;
     RefPtr<ElementAttributeData> value;
 };
@@ -6348,7 +6357,7 @@ PassRefPtr<ElementAttributeData> Document::cachedImmutableAttributeData(const El
 {
     ASSERT(!attributes.isEmpty());
 
-    ImmutableAttributeDataCacheKey cacheKey(element->localName(), attributes.data(), attributes.size());
+    ImmutableAttributeDataCacheKey cacheKey(element->tagQName(), attributes.data(), attributes.size());
     unsigned cacheHash = cacheKey.hash();
 
     ImmutableAttributeDataCache::iterator cacheIterator = m_immutableAttributeDataCache.add(cacheHash, nullptr).iterator;
@@ -6364,11 +6373,7 @@ PassRefPtr<ElementAttributeData> Document::cachedImmutableAttributeData(const El
     if (!cacheHash || cacheIterator->second)
         return attributeData.release();
 
-    OwnPtr<ImmutableAttributeDataCacheEntry> newEntry = adoptPtr(new ImmutableAttributeDataCacheEntry);
-    newEntry->key = ImmutableAttributeDataCacheKey(element->localName(), const_cast<const ElementAttributeData*>(attributeData.get())->attributeItem(0), attributeData->length());
-    newEntry->value = attributeData;
-
-    cacheIterator->second = newEntry.release();
+    cacheIterator->second = adoptPtr(new ImmutableAttributeDataCacheEntry(ImmutableAttributeDataCacheKey(element->tagQName(), attributeData->immutableAttributeArray(), attributeData->length()), attributeData));
 
     return attributeData.release();
 }

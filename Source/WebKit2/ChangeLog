@@ -1,3 +1,391 @@
+2012-09-24  KwangYong Choi  <ky0.choi@samsung.com>
+
+        [EFL][WK2] Invalid featuring of INPUT_TYPE_COLOR in test_ewk2_view.
+        https://bugs.webkit.org/show_bug.cgi?id=97430
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        The tests of ewk_view_context_get and ewk_view_feed_touch_event are not related to
+        INPUT_TYPE_COLOR. These tests should be moved to outside of INPUT_TYPE_COLOR block.
+
+        * UIProcess/API/efl/tests/test_ewk2_view.cpp:
+        (TEST_F):
+
+2012-09-23  Seokju Kwon  <seokju.kwon@samsung.com>
+
+        [EFL][WK2] Add setting to toggle developer extensions
+        https://bugs.webkit.org/show_bug.cgi?id=96974
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        This is required to allow the user to inspect pages. (Web inspector)
+
+        * UIProcess/API/efl/ewk_settings.cpp:
+        (ewk_settings_developer_extras_enabled_set):
+        (ewk_settings_developer_extras_enabled_get):
+        * UIProcess/API/efl/ewk_settings.h:
+        * UIProcess/API/efl/tests/test_ewk2_settings.cpp:
+        (TEST_F):
+
+2012-09-23  Byungwoo Lee  <bw80.lee@gmail.com>
+
+        Fix build warnings : -Wunused-parameter, -Wparentheses, -Wuninitialized.
+        https://bugs.webkit.org/show_bug.cgi?id=97306
+
+        Reviewed by Benjamin Poulain.
+
+        Fix build warning about -Wunused-parameter on Connection.cpp,
+        WKEinaSharedString.cpp, ewk_view_loader_client.cpp, WebPage.cpp by
+        using ASSERT_UNUSED() macro or removing parameter name.
+        Fix build warning about -Wuninitialized on WebEventFactory.cpp by
+        continueing the loop at the default switch case not to use the
+        uninitialized variable.
+
+        * Platform/CoreIPC/Connection.cpp:
+        (CoreIPC::Connection::waitForSyncReply):
+        * Shared/efl/WebEventFactory.cpp:
+        (WebKit::WebEventFactory::createWebTouchEvent):
+        * UIProcess/API/cpp/efl/WKEinaSharedString.cpp:
+        (WKEinaSharedString::WKEinaSharedString):
+        * UIProcess/API/efl/ewk_view_loader_client.cpp:
+        (didSameDocumentNavigationForFrame):
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::SandboxExtensionTracker::beginLoad):
+
+2012-09-22  Sam Weinig  <sam@webkit.org>
+
+        Install WebProcess XPC services into the right places
+        https://bugs.webkit.org/show_bug.cgi?id=97385
+
+        Reviewed by Anders Carlsson.
+
+        * Configurations/WebProcessService.xcconfig:
+        Update INSTALL_PATH to go into WebKit2.framework/Versions/A/XPCServices.
+
+        * Configurations/WebProcessServiceForWebKitDevelopment.xcconfig:
+        Since this config file is almost identical to WebProcessService.xcconfig,
+        just #include it and change the one thing that is different, the INFOPLIST_FILE
+        
+        * WebKit2.xcodeproj/project.pbxproj:
+        Follow XPC procedure and copy the services into the right place, WebKit2.framework/Versions/A/XPCServices
+        in all builds except production builds where it is not necessary. Also add a symlink like everyone else
+        does.
+
+2012-09-22  Sam Weinig  <sam@webkit.org>
+
+        Allow setting a custom path to where the plug-in sandbox profiles are being kept
+        https://bugs.webkit.org/show_bug.cgi?id=97399
+
+        Reviewed by Anders Carlsson.
+
+        Add a new default to allow controlling where to look for plug-in sandbox profiles
+        called "PlugInSandboxProfileDirectoryPath".
+
+        * PluginProcess/mac/PluginProcessMac.mm:
+        (WebKit::initializeSandbox):
+        Use the passed in sandboxProfileDirectoryPath instead of hard coding /usr/share/sandbox/.
+
+        (WebKit::PluginProcess::platformInitialize):
+        * Shared/Plugins/PluginProcessCreationParameters.cpp:
+        (WebKit::PluginProcessCreationParameters::encode):
+        (WebKit::PluginProcessCreationParameters::decode):
+        * Shared/Plugins/PluginProcessCreationParameters.h:
+        (PluginProcessCreationParameters):
+        * UIProcess/Plugins/mac/PluginProcessProxyMac.mm:
+        (WebKit::PluginProcessProxy::platformInitializePluginProcess):
+        Grab the sandboxProfileDirectoryPath from standardUserDefaults and pass it to
+        the plug-in.
+
+2012-09-21  Sam Weinig  <sam@webkit.org>
+
+        Fix the Lion and Snow Leopard builds.
+
+        * UIProcess/Launcher/mac/ProcessLauncherMac.mm:
+        (WebKit::connectToWebProcessServiceForWebKitDevelopment):
+        (WebKit::createWebProcessServiceForWebKitDevelopment):
+        (WebKit::createWebProcessService):
+
+2012-09-21  Sam Weinig  <sam@webkit.org>
+
+        WebProcess XPC services need have their environment set without disrupting all other XPC services
+        https://bugs.webkit.org/show_bug.cgi?id=95161
+
+        Reviewed by Anders Carlsson.
+
+        Replace the WebKit2Service with two new XPC services, the WebProcessService, which is only used
+        when installed on the system, and the WebProcessServiceForWebKitDevelopment which is used at all
+        other times. We need both services because XPC can't in general be configured to have a custom
+        environment at runtime, and thus WebProcessServiceForWebKitDevelopment has the ability to re-exec
+        itself into a desired state. That capability is rather undesirable for installed usage, where we
+        don't want to allow arbitrary changes to the environment of the service, which would allow breaking
+        the App Sandbox.
+
+        * Configurations/WebProcessService.xcconfig: Copied from Source/WebKit2/Configurations/WebKit2Service.xcconfig.
+        * Configurations/WebProcessServiceForWebKitDevelopment.xcconfig: Renamed from Source/WebKit2/Configurations/WebKit2Service.xcconfig.
+        Add new configuration files.
+
+        * Platform/mac/WorkQueueMac.cpp:
+        (WorkQueue::registerMachPortEventHandler):
+        (WorkQueue::unregisterMachPortEventHandler):
+        Add helpful assertions. Without them, we confusingly crash a bit later in HashTable code.
+
+        * UIProcess/Launcher/mac/ProcessLauncherMac.mm:
+        (WebKit::addDYLDEnvironmentAdditions):
+        Factor out environment additions to this helper function.
+
+        (WebKit::connectToWebProcessServiceForWebKitDevelopment):
+        (WebKit::createWebProcessServiceForWebKitDevelopment):
+        Add functionality to setup the webkit development service via re-exec.
+
+        (WebKit::createWebProcessService):
+        Add functionality to connect to the installed WebProcess service.
+        
+        (WebKit::createProcess):
+        Factor out posix_spawn based launching into this helper function.
+
+        (WebKit::ProcessLauncher::launchProcess):
+        Call the correct process creation function based on launch data and install state.
+
+        * WebKit2.xcodeproj/project.pbxproj:
+        Add new files to the project.
+
+        * WebProcess/mac/WebProcessServiceEntryPoints.h: Renamed from Source/WebKit2/WebProcess/mac/WebProcessXPCServiceMain.h.
+        * WebProcess/mac/WebProcessServiceEntryPoints.mm: Renamed from Source/WebKit2/WebProcess/mac/WebProcessXPCServiceMain.mm.
+        (WebKit::WebProcessServiceEventHandler):
+        (WebProcessServiceMain):
+        (InitializeWebProcessForWebProcessServiceForWebKitDevelopment):
+        Rename to WebProcessServiceEntryPoints since this is now used for both the WebProcessService and the 
+        WebProcessServiceForWebKitDevelopment.
+    
+        * WebProcessService/Info.plist: Copied from Source/WebKit2/WebKit2Service/Info.plist.
+        * WebProcessService/WebProcessServiceMain.mm: Renamed from Source/WebKit2/WebKit2Service/MainMacService.mm.
+        Add main for the WebProcessService which just calls into the WebProcessServiceEntryPoints in WebKit2.framework.
+
+        * WebProcessServiceForWebKitDevelopment/Info.plist: Renamed from Source/WebKit2/WebKit2Service/Info.plist.
+        * WebProcessServiceForWebKitDevelopment/WebProcessServiceForWebKitDevelopmentMain.mm: Added.
+        Add main for the WebProcessServiceForWebKitDevelopment, which can't just call directly into WebProcessServiceEntryPoints
+        as the framework path might not be set up correctly. This is also where we re-exec ourselves when required.
+
+2012-09-21  Anders Carlsson  <andersca@apple.com>
+
+        Fix WebKit2 sandbox profile.
+
+        Instead of using #pragmas, just disable all warnings in DerivedSources.make. I suspect
+        that passing -traditional to the preprocessor disables support for #pragmas but I'm afraid
+        to change it to something else.
+
+        * DerivedSources.make:
+        * WebProcess/com.apple.WebProcess.sb.in:
+
+2012-09-21  Benjamin Poulain  <bpoulain@apple.com>
+
+        fast/dom/Geolocation/disconnected-frame.html test asserts
+        https://bugs.webkit.org/show_bug.cgi?id=97376
+
+        Reviewed by Alexey Proskuryakov.
+
+        In GeolocationPermissionRequestManager::cancelRequestForGeolocation, we access an iterator
+        after its value has been removed from the table.
+        There are two problems with that:
+        -The iterator is no longer valid after the container has been modified.
+        -If it was the last element, the table has been freed and the iterator points to deleted memory.
+
+        We solve the issue by keeping a copy of the ID. We could have inverted the order of the calls
+        but that would make the issue less visible for future change.
+
+        Testing covered by fast/dom/Geolocation/disconnected-frame.html.
+
+        * WebProcess/Geolocation/GeolocationPermissionRequestManager.cpp:
+        (WebKit::GeolocationPermissionRequestManager::cancelRequestForGeolocation):
+
+2012-09-21  Sam Weinig  <sam@webkit.org>
+
+        REGRESSION (r120361) Warnings while preprocessing com.apple.WebProcess.sb.in
+        https://bugs.webkit.org/show_bug.cgi?id=91079
+        <rdar://problem/12332660>
+
+        Reviewed by Anders Carlsson.
+
+        * WebProcess/com.apple.WebProcess.sb.in:
+        Add pragma to ignore the invalid preprocessor warnings.
+
+2012-09-21  Chris Rogers  <crogers@google.com>
+
+        Add Web Audio support for deprecated/legacy APIs
+        https://bugs.webkit.org/show_bug.cgi?id=97050
+
+        Reviewed by Eric Carlson.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-09-21  Benjamin Poulain  <bpoulain@apple.com>
+
+        [WK2] Add basic testing support for Geolocation
+        https://bugs.webkit.org/show_bug.cgi?id=97278
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * Shared/API/c/WKNumber.h: Fix an unfortunate copy-paste :)
+
+        * WebProcess/InjectedBundle/API/c/WKBundle.cpp:
+        * WebProcess/InjectedBundle/API/c/WKBundlePrivate.h:
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        * WebProcess/InjectedBundle/InjectedBundle.h:
+        (InjectedBundle):
+        Remove the code forcing the Geolocation permissions. It was working around the normal
+        Geolocation code and updating all the GeolocationController, which is a terrible idea.
+
+2012-09-21  Alexey Proskuryakov  <ap@apple.com>
+
+        [WK2] Make Web Inspector work in multiple web process mode
+        https://bugs.webkit.org/show_bug.cgi?id=97354
+
+        Reviewed by Timothy Hatcher.
+
+        * UIProcess/mac/WebInspectorProxyMac.mm: (WebKit::WebInspectorProxy::platformCreateInspectorPage):
+        Tell WKView that it's related to original page, making inspector page be in the same process.
+
+2012-09-21  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Implement ViewState methods in PageClientImpl in WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=97202
+
+        Reviewed by Martin Robinson.
+
+        Implement isViewWindowActive(), isViewFocused(), isViewVisible()
+        and isViewInWindow() in PageClientImpl.
+
+        * GNUmakefile.list.am: Add new files to compilation.
+        * UIProcess/API/C/gtk/WKView.cpp:
+        (WKViewSetFocus): New private method used by WTR to focus the
+        WebView.
+        * UIProcess/API/C/gtk/WKViewPrivate.h: Added.
+        * UIProcess/API/gtk/PageClientImpl.cpp:
+        (WebKit::PageClientImpl::isViewWindowActive): Return
+        webkitWebViewBaseIsInWindowActive().
+        (WebKit::PageClientImpl::isViewFocused): Return
+        webkitWebViewBaseIsFocused().
+        (WebKit::PageClientImpl::isViewVisible): Return
+        webkitWebViewBaseIsVisible().
+        (WebKit::PageClientImpl::isViewInWindow): Return
+        webkitWebViewBaseIsInWindow().
+        * UIProcess/API/gtk/WebKitWebViewBase.cpp:
+        (webkitWebViewBaseNotifyResizerSize): Updated to not receive the
+        window as parameter since it's now saved in the instance struct.
+        (toplevelWindowResizeGripVisibilityChanged): Update to
+        webkitWebViewBaseNotifyResizerSize() API change.
+        (toplevelWindowFocusInEvent): Update ViewWindowIsActive flag and
+        notify the WebPageProxy if it changed.
+        (toplevelWindowFocusOutEvent): Ditto.
+        (webkitWebViewBaseSetToplevelOnScreenWindow): Set the toplevel
+        on-screen window where the view is currently added and notify
+        WebPageProxy if it changed.
+        (webkitWebViewBaseRealize): Call
+        webkitWebViewBaseSetToplevelOnScreenWindow() if the view has been
+        added to an on-screen window.
+        (webkitWebViewBaseFinalize): Reset the toplevel on-screen window
+        to make sure all signals are disconnected when the view is
+        destroyed.
+        (webkit_web_view_base_init): Remove unneeded initialization.
+        (resizeWebKitWebViewBaseFromAllocation): Update to
+        webkitWebViewBaseNotifyResizerSize() API change.
+        (webkitWebViewBaseMap): Update ViewIsVisible flag and notify
+        WebPageProxy if it changed.
+        (webkitWebViewBaseUnmap): Ditto.
+        (webkitWebViewBaseFocusInEvent): Call webkitWebViewBaseSetFocus()
+        passing true to focus the view.
+        (webkitWebViewBaseFocusOutEvent): Call webkitWebViewBaseSetFocus()
+        passing false to unfocus the view.
+        (webkitWebViewBaseParentSet): Reset the toplevel on-screen window
+        if the view is re-parented.
+        (webkit_web_view_base_class_init): Add implementations for map and
+        parent-set virtual functions.
+        (webkitWebViewBaseSetFocus): Update the ViewIsFocused and notify
+        WebPageProxy if it changed.
+        (webkitWebViewBaseIsInWindowActive):
+        (webkitWebViewBaseIsFocused):
+        (webkitWebViewBaseIsVisible):
+        (webkitWebViewBaseIsInWindow):
+        * UIProcess/API/gtk/WebKitWebViewBasePrivate.h:
+        * UIProcess/API/gtk/tests/TestWebKitWebView.cpp:
+        (testWebViewMouseTarget): Use a GTK_WINDOW_TOPLEVEL instead of
+        POPUP for this test to make sure the view receives focus change
+        events.
+
+2012-09-21  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Add WebKitWebView:is-loading property to WebKit2 GTK+ API
+        https://bugs.webkit.org/show_bug.cgi?id=97330
+
+        Reviewed by Xan Lopez.
+
+        WebKitWebView:is-loading property allows to monitor when the view
+        is loading something without having to deal with load-changed
+        signal and all the details of the load status. This also allows to
+        know when a new load is started before it goes to STARTED status.
+
+        * UIProcess/API/gtk/WebKitWebView.cpp:
+        (webkitWebViewGetProperty): Implement getter for is-loading
+        property.
+        (webkit_web_view_class_init): Add is-loading property.
+        (webkitWebViewSetIsLoading): Set whether web view is loading a
+        page and emit notify signal if the is-loading property has
+        changed. Also update the active URI when a new load operation has
+        started.
+        (webkitWebViewEmitLoadChanged): Set is-loading to FALSE when load
+        finishes.
+        (webkitWebViewLoadFailed): Set is-loading to FALSE when load fails.
+        (webkit_web_view_load_uri): Set is-loading to TRUE.
+        (webkit_web_view_load_html): Ditto.
+        (webkit_web_view_load_alternate_html): Ditto.
+        (webkit_web_view_load_plain_text): Ditto.
+        (webkit_web_view_load_request): Ditto.
+        (webkit_web_view_reload): Ditto.
+        (webkit_web_view_reload_bypass_cache): Ditto.
+        (webkit_web_view_is_loading): Return whether the view is loading a
+        page.
+        (webkit_web_view_go_back): Set is-loading to TRUE.
+        (webkit_web_view_go_forward): Ditto.
+        (webkit_web_view_go_to_back_forward_list_item): Ditto.
+        * UIProcess/API/gtk/WebKitWebView.h:
+        * UIProcess/API/gtk/docs/webkit2gtk-sections.txt: Add new symbol.
+        * UIProcess/API/gtk/tests/LoadTrackingTest.cpp:
+        (loadChangedCallback):
+        (loadFailedCallback):
+        * UIProcess/API/gtk/tests/TestLoaderClient.cpp:
+        (testWebViewIsLoading):
+        (beforeAll):
+
+2012-09-20  Eunmi Lee  <eunmi15.lee@samsung.com>
+
+        [EFL][WK2] Add API to feed touch event.
+        https://bugs.webkit.org/show_bug.cgi?id=96903
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        The applications will use this API to feed touch event to the view
+        when they want to generate touch event from their own event processor.
+        WTR also will use this API to generate touch event with multiple touch
+        points for passing test cases of touch event in the WebKit2/EFL.
+
+        * PlatformEfl.cmake:
+        * UIProcess/API/efl/EWebKit2.h:
+        * UIProcess/API/efl/ewk_view.cpp:
+        (ewk_view_feed_touch_event):
+        * UIProcess/API/efl/ewk_view.h:
+        * UIProcess/API/efl/tests/test_ewk2_view.cpp:
+        (TEST_F):
+
+2012-09-20  Patrick Gansterer  <paroga@webkit.org>
+
+        Add String::numberToStringFixedWidth()
+        https://bugs.webkit.org/show_bug.cgi?id=96330
+
+        Reviewed by Benjamin Poulain.
+
+        * win/WebKit2.def:
+        * win/WebKit2CFLite.def:
+
 2012-09-17  Jon Lee  <jonlee@apple.com>
 
         Safari 6 notifications' onclick handlers can't call window.open()

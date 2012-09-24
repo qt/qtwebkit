@@ -25,6 +25,7 @@
 #include <EWebKit2.h>
 #include <Ecore.h>
 #include <Eina.h>
+#include <Evas.h>
 #include <gtest/gtest.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
@@ -714,6 +715,7 @@ TEST_F(EWK2UnitTestBase, ewk_view_color_picker_color_set)
         ecore_main_loop_iterate();
     evas_object_smart_callback_del(webView(), "input,type,color,request", onColorPickerDone);
 }
+#endif // ENABLE(INPUT_TYPE_COLOR)
 
 TEST_F(EWK2UnitTestBase, ewk_view_context_get)
 {
@@ -721,4 +723,29 @@ TEST_F(EWK2UnitTestBase, ewk_view_context_get)
     ASSERT_TRUE(context);
     ASSERT_EQ(context, ewk_view_context_get(webView()));
 }
-#endif // ENABLE(INPUT_TYPE_COLOR)
+
+TEST_F(EWK2UnitTestBase, ewk_view_feed_touch_event)
+{
+    Eina_List* points = 0;
+    Ewk_Touch_Point point1 = { 0, 0, 0, EVAS_TOUCH_POINT_DOWN };
+    Ewk_Touch_Point point2 = { 1, 0, 0, EVAS_TOUCH_POINT_DOWN };
+    points = eina_list_append(points, &point1);
+    points = eina_list_append(points, &point2);
+    ASSERT_TRUE(ewk_view_feed_touch_event(webView(), EWK_TOUCH_START, points, evas_key_modifier_get(evas_object_evas_get(webView()))));
+
+    point1.state = EVAS_TOUCH_POINT_STILL;
+    point2.x = 100;
+    point2.y = 100;
+    point2.state = EVAS_TOUCH_POINT_MOVE;
+    ASSERT_TRUE(ewk_view_feed_touch_event(webView(), EWK_TOUCH_MOVE, points, evas_key_modifier_get(evas_object_evas_get(webView()))));
+
+    point2.state = EVAS_TOUCH_POINT_UP;
+    ASSERT_TRUE(ewk_view_feed_touch_event(webView(), EWK_TOUCH_END, points, evas_key_modifier_get(evas_object_evas_get(webView()))));
+    points = eina_list_remove(points, &point2);
+
+    point1.state = EVAS_TOUCH_POINT_CANCEL;
+    ASSERT_TRUE(ewk_view_feed_touch_event(webView(), EWK_TOUCH_CANCEL, points, evas_key_modifier_get(evas_object_evas_get(webView()))));
+    points = eina_list_remove(points, &point1);
+
+    eina_list_free(points);
+}

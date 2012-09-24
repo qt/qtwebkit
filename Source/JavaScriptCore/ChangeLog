@@ -1,3 +1,595 @@
+2012-09-23  Geoffrey Garen  <ggaren@apple.com>
+
+        PutScopedVar should not be marked as clobbering the world
+        https://bugs.webkit.org/show_bug.cgi?id=97416
+
+        Reviewed by Filip Pizlo.
+
+        No performance change.
+
+        PutScopedVar doesn't have arbitrary side-effects, so it shouldn't be marked
+        as such.
+
+        * dfg/DFGNodeType.h:
+        (DFG):
+
+2012-09-23  Geoffrey Garen  <ggaren@apple.com>
+
+        I accidentally the whole 32-bit :(.
+
+        Unbreak the DFG in 32-bit with the 32-bit path I forgot in my last patch.
+
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+
+2012-09-23  Byungwoo Lee  <bw80.lee@gmail.com>
+
+        Fix build warnings : -Wunused-parameter, -Wparentheses, -Wuninitialized.
+        https://bugs.webkit.org/show_bug.cgi?id=97306
+
+        Reviewed by Benjamin Poulain.
+
+        Fix build warning about -Wunused-parameter on MachineStackMarker.cpp,
+        LLIntSlowPaths.cpp, DatePrototype.cpp, Options.cpp by using
+        UNUSED_PARAM() macro or remove parameter name.
+
+        * heap/MachineStackMarker.cpp:
+        (JSC::pthreadSignalHandlerSuspendResume):
+        * llint/LLIntSlowPaths.cpp:
+        (JSC::LLInt::entryOSR):
+        * runtime/DatePrototype.cpp:
+        (JSC::formatLocaleDate):
+        * runtime/Options.cpp:
+        (JSC::computeNumberOfGCMarkers):
+
+2012-09-23  Gavin Barraclough  <barraclough@apple.com>
+
+        Sorting a non-array creates propreties (spec-violation)
+        https://bugs.webkit.org/show_bug.cgi?id=25477
+
+        Reviewed by Oliver Hunt.
+
+        We're just calling get() to get properties, which is converting missing properties to
+        undefined. Hole values should be retained, and moved to the end of the array.
+
+        * runtime/ArrayPrototype.cpp:
+        (JSC::getOrHole):
+            - Helper function, returns JSValue() instead of undefined for missing properties.
+        (JSC::arrayProtoFuncSort):
+            - Implemented per 15.4.4.11, see comments above.
+
+2012-09-23  Geoffrey Garen  <ggaren@apple.com>
+
+        CSE for access to closure variables (get_/put_scoped_var)
+        https://bugs.webkit.org/show_bug.cgi?id=97414
+
+        Reviewed by Oliver Hunt.
+
+        I separated loading a scope from loading its storage pointer, so we can
+        CSE the storage pointer load. Then, I copied the global var CSE and adjusted
+        it for closure vars.
+
+        * dfg/DFGAbstractState.cpp:
+        (JSC::DFG::AbstractState::execute): Renamed GetScopeChain => GetScope to
+        reflect renames from a few weeks ago.
+
+        Added a case for the storage pointer load, similar to object storage pointer load.
+
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::parseBlock): Added an independent node for
+        the storage pointer.
+
+        * dfg/DFGCSEPhase.cpp:
+        (JSC::DFG::CSEPhase::scopedVarLoadElimination):
+        (CSEPhase):
+        (JSC::DFG::CSEPhase::scopedVarStoreElimination):
+        (JSC::DFG::CSEPhase::getScopeLoadElimination):
+        (JSC::DFG::CSEPhase::getScopeRegistersLoadElimination):
+        (JSC::DFG::CSEPhase::setLocalStoreElimination):
+        (JSC::DFG::CSEPhase::performNodeCSE): Copied globalVarLoad/StoreElimination
+        and adapted the same logic to closure vars.
+
+        * dfg/DFGNode.h:
+        (JSC::DFG::Node::hasScopeChainDepth):
+        (JSC::DFG::Node::scope):
+        (Node):
+        * dfg/DFGNodeType.h:
+        (DFG): GetScopedVar and GetGlobalVar are no longer MustGenerate. I'm not
+        sure why they ever were. But these are simple load operations so, if they're
+        unused, they're truly dead.
+
+        * dfg/DFGPredictionPropagationPhase.cpp:
+        (JSC::DFG::PredictionPropagationPhase::propagate):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile): Updated for renames and split-out
+        node for getting the storage pointer.
+
+2012-09-21  Geoffrey Garen  <ggaren@apple.com>
+
+        Unreviewed, rolled out a line I committed by accident.
+
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::execute):
+
+2012-09-21  Geoffrey Garen  <ggaren@apple.com>
+
+        Optimized closures that capture arguments
+        https://bugs.webkit.org/show_bug.cgi?id=97358
+
+        Reviewed by Oliver Hunt.
+
+        Previously, the activation object was responsible for capturing all
+        arguments in a way that was convenient for the arguments object. Now,
+        we move all captured variables into a contiguous region in the stack,
+        allocate an activation for exactly that size, and make the arguments
+        object responsible for knowing all the places to which arguments could
+        have moved.
+
+        This seems like the right tradeoff because
+
+            (a) Closures are common and long-lived, so we want them to be small.
+
+            (b) Our primary strategy for optimizing the arguments object is to make
+            it go away. If you're allocating arguments objects, you're already having
+            a bad time.
+
+            (c) It's common to use either the arguments object or named argument
+            closure, but not both.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dump):
+        (JSC::CodeBlock::CodeBlock):
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::argumentsRegister):
+        (JSC::CodeBlock::activationRegister):
+        (JSC::CodeBlock::isCaptured):
+        (JSC::CodeBlock::argumentIndexAfterCapture): m_numCapturedVars is gone
+        now -- we have an explicit range instead.
+
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::BytecodeGenerator): Move captured arguments
+        into the captured region of local variables for space efficiency. Record
+        precise data about where they moved for the sake of the arguments object.
+
+        Some of this data was previously wrong, but it didn't cause any problems
+        because the arguments weren't actually moving.
+
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::flushArgumentsAndCapturedVariables): Don't
+        assume that captured vars are in any particular location -- always ask
+        the CodeBlock. This is better encapsulation.
+
+        (JSC::DFG::ByteCodeParser::parseCodeBlock):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile): I rename things sometimes.
+
+        * runtime/Arguments.cpp:
+        (JSC::Arguments::tearOff): Account for a particularly nasty edge case.
+
+        (JSC::Arguments::didTearOffActivation): Don't allocate our slow arguments
+        data on tear-off. We need to allocate it eagerly instead, since we need
+        to know about displaced, captured arguments during access before tear-off.
+
+        * runtime/Arguments.h:
+        (JSC::Arguments::allocateSlowArguments):
+        (JSC::Arguments::argument): Tell our slow arguments array where all arguments
+        are, even if they are not captured. This simplifies some things, so we don't
+        have to account explicitly for the full matrix of (not torn off, torn off)
+        * (captured, not captured).
+
+        (JSC::Arguments::finishCreation): Allocate our slow arguments array eagerly
+        because we need to know about displaced, captured arguments during access
+        before tear-off.
+
+        * runtime/Executable.cpp:
+        (JSC::FunctionExecutable::FunctionExecutable):
+        (JSC::FunctionExecutable::compileForCallInternal):
+        (JSC::FunctionExecutable::compileForConstructInternal):
+        * runtime/Executable.h:
+        (JSC::FunctionExecutable::parameterCount):
+        (FunctionExecutable):
+        * runtime/JSActivation.cpp:
+        (JSC::JSActivation::visitChildren):
+        * runtime/JSActivation.h:
+        (JSActivation):
+        (JSC::JSActivation::create):
+        (JSC::JSActivation::JSActivation):
+        (JSC::JSActivation::registerOffset):
+        (JSC::JSActivation::tearOff):
+        (JSC::JSActivation::allocationSize):
+        (JSC::JSActivation::isValid): This is really the point of the patch. All
+        the pointer math in Activations basically boils away, since we always
+        copy a contiguous region of captured variables now.
+
+        * runtime/SymbolTable.h:
+        (JSC::SlowArgument::SlowArgument):
+        (SlowArgument):
+        (SharedSymbolTable):
+        (JSC::SharedSymbolTable::captureCount):
+        (JSC::SharedSymbolTable::SharedSymbolTable): AllOfTheThings capture mode
+        is gone now -- that's the point of the patch. indexIfCaptured gets renamed
+        to index because we always have an index, even if not captured. (The only
+        time when the index is meaningless is when we're Deleted.)
+
+2012-09-21  Gavin Barraclough  <barraclough@apple.com>
+
+        Eeeep - broke early boyer in bug#97382
+        https://bugs.webkit.org/show_bug.cgi?id=97383
+
+        Rubber stamped by Sam Weinig.
+
+        missed a child3 -> child2!
+
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compileInstanceOf):
+
+2012-09-21  Gavin Barraclough  <barraclough@apple.com>
+
+        Unreviewed windows build fix.
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.def:
+
+2012-09-21  Gavin Barraclough  <barraclough@apple.com>
+
+        Pedantic test in Mozilla's JavaScript test suite fails. function-001.js function-001-n.js
+        https://bugs.webkit.org/show_bug.cgi?id=27219
+
+        Reviewed by Sam Weinig.
+
+        These tests are just wrong.
+        See ECMA 262 A.5, FunctionDelcaration does not require a semicolon.
+
+        * tests/mozilla/expected.html:
+        * tests/mozilla/js1_2/function/function-001-n.js:
+        * tests/mozilla/js1_3/Script/function-001-n.js:
+        * tests/mozilla/js1_3/regress/function-001-n.js:
+
+2012-09-21  Gavin Barraclough  <barraclough@apple.com>
+
+        Remove redundant argument to op_instanceof
+        https://bugs.webkit.org/show_bug.cgi?id=97382
+
+        Reviewed by Geoff Garen.
+
+        No longer needed after my last change.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dump):
+        * bytecode/Opcode.h:
+        (JSC):
+        (JSC::padOpcodeName):
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::emitInstanceOf):
+        * bytecompiler/BytecodeGenerator.h:
+        (BytecodeGenerator):
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::InstanceOfNode::emitBytecode):
+        * dfg/DFGAbstractState.cpp:
+        (JSC::DFG::AbstractState::execute):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::parseBlock):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compileInstanceOf):
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::privateExecute):
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_instanceof):
+        (JSC::JIT::emitSlow_op_instanceof):
+        * jit/JITOpcodes32_64.cpp:
+        (JSC::JIT::emit_op_instanceof):
+        (JSC::JIT::emitSlow_op_instanceof):
+        * jit/JITStubs.cpp:
+        (JSC::DEFINE_STUB_FUNCTION):
+        * llint/LLIntSlowPaths.cpp:
+        (JSC::LLInt::LLINT_SLOW_PATH_DECL):
+        * llint/LowLevelInterpreter32_64.asm:
+        * llint/LowLevelInterpreter64.asm:
+
+2012-09-21  Gavin Barraclough  <barraclough@apple.com>
+
+        Unreviewed windows build fix.
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.def:
+
+2012-09-21  Gavin Barraclough  <barraclough@apple.com>
+
+        instanceof should not get the prototype for non-default HasInstance
+        https://bugs.webkit.org/show_bug.cgi?id=68656
+
+        Reviewed by Oliver Hunt.
+
+        Instanceof is currently implemented as a sequance of three opcodes:
+            check_has_instance
+            get_by_id(prototype)
+            op_instanceof
+        There are three interesting types of base value that instanceof can be applied to:
+            (A) Objects supporting default instanceof behaviour (functions, other than those created with bind)
+            (B) Objects overriding the default instancecof behaviour with a custom one (API objects, bound functions)
+            (C) Values that do not respond to the [[HasInstance]] trap.
+        Currently check_has_instance handles case (C), leaving the op_instanceof opcode to handle (A) & (B). There are
+        two problems with this apporach. Firstly, this is suboptimal for case (A), since we have to check for
+        hasInstance support twice (once in check_has_instance, then for default behaviour in op_instanceof). Secondly,
+        this means that in cases (B) we also perform the get_by_id, which is both suboptimal and an observable spec
+        violation.
+
+        The fix here is to move handing of non-default instanceof (cases (B)) to the check_has_instance op, leaving
+        op_instanceof to handle only cases (A).
+
+        * API/JSCallbackObject.h:
+        (JSCallbackObject):
+        * API/JSCallbackObjectFunctions.h:
+        (JSC::::customHasInstance):
+        * API/JSValueRef.cpp:
+        (JSValueIsInstanceOfConstructor):
+            - renamed hasInstance to customHasInstance
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dump):
+            - added additional parameters to check_has_instance opcode
+        * bytecode/Opcode.h:
+        (JSC):
+        (JSC::padOpcodeName):
+            - added additional parameters to check_has_instance opcode
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::emitCheckHasInstance):
+            - added additional parameters to check_has_instance opcode
+        * bytecompiler/BytecodeGenerator.h:
+        (BytecodeGenerator):
+            - added additional parameters to check_has_instance opcode
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::InstanceOfNode::emitBytecode):
+            - added additional parameters to check_has_instance opcode
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::parseBlock):
+            - added additional parameters to check_has_instance opcode
+        * interpreter/Interpreter.cpp:
+        (JSC::isInvalidParamForIn):
+        (JSC::Interpreter::privateExecute):
+            - Add handling for non-default instanceof to op_check_has_instance
+        * jit/JITInlineMethods.h:
+        (JSC::JIT::emitArrayProfilingSiteForBytecodeIndex):
+            - Fixed no-LLInt no_DFG build
+        * jit/JITOpcodes.cpp:
+        (JSC::JIT::emit_op_check_has_instance):
+        (JSC::JIT::emitSlow_op_check_has_instance):
+            - check for ImplementsDefaultHasInstance, handle additional arguments to op_check_has_instance.
+        (JSC::JIT::emit_op_instanceof):
+        (JSC::JIT::emitSlow_op_instanceof):
+            - no need to check for ImplementsDefaultHasInstance.
+        * jit/JITOpcodes32_64.cpp:
+        (JSC::JIT::emit_op_check_has_instance):
+        (JSC::JIT::emitSlow_op_check_has_instance):
+            - check for ImplementsDefaultHasInstance, handle additional arguments to op_check_has_instance.
+        (JSC::JIT::emit_op_instanceof):
+        (JSC::JIT::emitSlow_op_instanceof):
+            - no need to check for ImplementsDefaultHasInstance.
+        * jit/JITStubs.cpp:
+        (JSC::DEFINE_STUB_FUNCTION):
+        * jit/JITStubs.h:
+            - Add handling for non-default instanceof to op_check_has_instance
+        * llint/LLIntSlowPaths.cpp:
+        (JSC::LLInt::LLINT_SLOW_PATH_DECL):
+        * llint/LowLevelInterpreter32_64.asm:
+        * llint/LowLevelInterpreter64.asm:
+            - move check for ImplementsDefaultHasInstance, handle additional arguments to op_check_has_instance.
+        * runtime/ClassInfo.h:
+        (MethodTable):
+        (JSC):
+            - renamed hasInstance to customHasInstance
+        * runtime/CommonSlowPaths.h:
+        (CommonSlowPaths):
+            - removed opInstanceOfSlow (this was whittled down to one function call!)
+        * runtime/JSBoundFunction.cpp:
+        (JSC::JSBoundFunction::customHasInstance):
+        * runtime/JSBoundFunction.h:
+        (JSBoundFunction):
+            - renamed hasInstance to customHasInstance, reimplemented.
+        * runtime/JSCell.cpp:
+        (JSC::JSCell::customHasInstance):
+        * runtime/JSCell.h:
+        (JSCell):
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::hasInstance):
+        (JSC):
+        (JSC::JSObject::defaultHasInstance):
+        * runtime/JSObject.h:
+        (JSObject):
+
+2012-09-21  Filip Pizlo  <fpizlo@apple.com>
+
+        Unreviewed, fix ARM build.
+
+        * assembler/MacroAssemblerARMv7.h:
+        (JSC::MacroAssemblerARMv7::store8):
+        (MacroAssemblerARMv7):
+        * offlineasm/armv7.rb:
+
+2012-09-21  Filip Pizlo  <fpizlo@apple.com>
+
+        REGRESSION (r128400): Opening Google Web Fonts page hangs or crashes
+        https://bugs.webkit.org/show_bug.cgi?id=97328
+
+        Reviewed by Mark Hahnenberg.
+
+        It's a bad idea to emit stub code that reallocates property storage when we're in indexed
+        storage mode. DFGRepatch.cpp knew this and had the appropriate check in one of the places,
+        but it didn't have it in all of the places.
+        
+        This change also adds some more handy disassembly support, which I used to find the bug.
+
+        * assembler/LinkBuffer.h:
+        (JSC):
+        * dfg/DFGRepatch.cpp:
+        (JSC::DFG::generateProtoChainAccessStub):
+        (JSC::DFG::tryCacheGetByID):
+        (JSC::DFG::tryBuildGetByIDList):
+        (JSC::DFG::emitPutReplaceStub):
+        (JSC::DFG::emitPutTransitionStub):
+        (JSC::DFG::tryCachePutByID):
+        * jit/JITStubRoutine.h:
+        (JSC):
+
+2012-09-21  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG CSE assumes that a holy PutByVal does not interfere with GetArrayLength, when it clearly does
+        https://bugs.webkit.org/show_bug.cgi?id=97373
+
+        Reviewed by Mark Hahnenberg.
+
+        * dfg/DFGCSEPhase.cpp:
+        (JSC::DFG::CSEPhase::pureCSE):
+        (JSC::DFG::CSEPhase::getArrayLengthElimination):
+        (JSC::DFG::CSEPhase::putStructureStoreElimination):
+        (JSC::DFG::CSEPhase::performNodeCSE):
+        * dfg/DFGGraph.h:
+        (Graph):
+
+2012-09-21  Chris Rogers  <crogers@google.com>
+
+        Add Web Audio support for deprecated/legacy APIs
+        https://bugs.webkit.org/show_bug.cgi?id=97050
+
+        Reviewed by Eric Carlson.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-09-21  Gavin Barraclough  <barraclough@apple.com>
+
+        Global Math object should be configurable but isn't
+        https://bugs.webkit.org/show_bug.cgi?id=55343
+
+        Reviewed by Oliver Hunt.
+
+        This has no performance impact.
+
+        * runtime/JSGlobalObject.cpp:
+        (JSC::JSGlobalObject::reset):
+            - Make 'Math' a regular property.
+
+2012-09-21  Chao-ying Fu  <fu@mips.com>
+
+        Add MIPS or32 function
+        https://bugs.webkit.org/show_bug.cgi?id=97157
+
+        Reviewed by Gavin Barraclough.
+
+        Add a missing or32 function.
+
+        * assembler/MacroAssemblerMIPS.h:
+        (JSC::MacroAssemblerMIPS::or32): New function.
+        (MacroAssemblerMIPS):
+
+2012-09-20  Filip Pizlo  <fpizlo@apple.com>
+
+        CHECK_ARRAY_CONSISTENCY isn't being used or tested, so we should remove it
+        https://bugs.webkit.org/show_bug.cgi?id=97260
+
+        Rubber stamped by Geoffrey Garen.
+        
+        Supporting it will become difficult as we add more indexing types. It makes more
+        sense to kill, especially since we don't appear to use it or test it, ever.
+
+        * runtime/ArrayConventions.h:
+        (JSC):
+        * runtime/ArrayPrototype.cpp:
+        (JSC::arrayProtoFuncSplice):
+        * runtime/ArrayStorage.h:
+        (JSC::ArrayStorage::copyHeaderFromDuringGC):
+        (ArrayStorage):
+        * runtime/FunctionPrototype.cpp:
+        (JSC::functionProtoFuncBind):
+        * runtime/JSArray.cpp:
+        (JSC::createArrayButterflyInDictionaryIndexingMode):
+        (JSC::JSArray::setLength):
+        (JSC::JSArray::pop):
+        (JSC::JSArray::push):
+        (JSC::JSArray::sortNumeric):
+        (JSC::JSArray::sort):
+        (JSC::JSArray::compactForSorting):
+        * runtime/JSArray.h:
+        (JSArray):
+        (JSC::createArrayButterfly):
+        (JSC::JSArray::tryCreateUninitialized):
+        (JSC::constructArray):
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::putByIndex):
+        (JSC::JSObject::createArrayStorage):
+        (JSC::JSObject::deletePropertyByIndex):
+        (JSC):
+        * runtime/JSObject.h:
+        (JSC::JSObject::initializeIndex):
+        (JSObject):
+
+2012-09-20  Mark Lam  <mark.lam@apple.com>
+
+        Fixed a missing semicolon in the C++ llint backend.
+        https://bugs.webkit.org/show_bug.cgi?id=97252.
+
+        Reviewed by Geoff Garen.
+
+        * offlineasm/cloop.rb:
+
+2012-09-20  Geoffrey Garen  <ggaren@apple.com>
+
+        Refactored the interpreter and JIT so they don't dictate closure layout
+        https://bugs.webkit.org/show_bug.cgi?id=97221
+
+        Reviewed by Oliver Hunt.
+
+        Capture may change the location of an argument for space efficiency. This
+        patch removes static assumptions about argument location from the interpreter
+        and JIT.
+
+        * bytecode/CodeBlock.h:
+        (JSC::CodeBlock::argumentIndexAfterCapture):
+        (JSC::ExecState::argumentAfterCapture): Factored out a helper function
+        so the compiler could share this logic.
+
+        * bytecompiler/NodesCodegen.cpp:
+        (JSC::BracketAccessorNode::emitBytecode): Don't emit optimized bracket
+        access on arguments if a parameter has been captured by name. This case is
+        rare and, where I've seen it in the wild, the optimization mostly failed
+        anyway due to arguments escape, so I didn't feel like writing and testing
+        five copies of the code that would handle it in the baseline engines.
+
+        The DFG can still synthesize this optimization even if we don't emit the
+        optimized bytecode for it.
+
+        * dfg/DFGArgumentsSimplificationPhase.cpp:
+        (JSC::DFG::ArgumentsSimplificationPhase::run):
+        * dfg/DFGAssemblyHelpers.h:
+        (JSC::DFG::AssemblyHelpers::symbolTableFor):
+        (AssemblyHelpers): Use the right helper function to account for the fact
+        that a parameter may have been captured by name and moved.
+
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::parseBlock): ASSERT that we haven't inlined
+        a .apply on captured arguments. Once we do start inlining such things,
+        we'll need to do a little bit of math here to get them right.
+
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile): Added support for bracket access on
+        an arguments object where arguments have also been captured by name. We
+        load the true index of the argument from a side vector. Arguments elision
+        is very powerful in the DFG, so I wanted to keep it working, even in this
+        rare case.
+
+        * interpreter/Interpreter.cpp:
+        (JSC::loadVarargs): Use the right helper function to account for the fact
+        that a parameter may have been captured by name and moved.
+
+        * jit/JITCall.cpp:
+        (JSC::JIT::compileLoadVarargs):
+        * jit/JITCall32_64.cpp:
+        (JSC::JIT::compileLoadVarargs): Don't use the inline copy loop if some
+        of our arguments have moved, since it would copy stale values. (We still
+        optimize the actual call, and elide the arguments object.)
+
 2012-09-20  Gabor Rapcsanyi  <rgabor@webkit.org>
 
         [Qt] r129045 broke the ARM build

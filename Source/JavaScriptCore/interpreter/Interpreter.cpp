@@ -131,14 +131,6 @@ static NEVER_INLINE bool isInvalidParamForIn(CallFrame* callFrame, JSValue value
     exceptionData = createInvalidParamError(callFrame, "in" , value);
     return true;
 }
-
-static NEVER_INLINE bool isInvalidParamForInstanceOf(CallFrame* callFrame, JSValue value, JSValue& exceptionData)
-{
-    if (value.isObject() && asObject(value)->structure()->typeInfo().implementsHasInstance())
-        return false;
-    exceptionData = createInvalidParamError(callFrame, "instanceof" , value);
-    return true;
-}
 #endif
 
 JSValue eval(CallFrame* callFrame)
@@ -202,7 +194,7 @@ CallFrame* loadVarargs(CallFrame* callFrame, RegisterFile* registerFile, JSValue
         newCallFrame->setArgumentCountIncludingThis(argumentCountIncludingThis);
         newCallFrame->setThisValue(thisValue);
         for (size_t i = 0; i < callFrame->argumentCount(); ++i)
-            newCallFrame->setArgument(i, callFrame->argument(i));
+            newCallFrame->setArgument(i, callFrame->argumentAfterCapture(i));
         return newCallFrame;
     }
 
@@ -2401,14 +2393,32 @@ JSValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
            JSC API*). Raises an exception if register constructor is not
            an valid parameter for instanceof.
         */
-        int base = vPC[1].u.operand;
+        int dst = vPC[1].u.operand;
+        int value = vPC[2].u.operand;
+        int base = vPC[3].u.operand;
+        int target = vPC[4].u.operand;
+
         JSValue baseVal = callFrame->r(base).jsValue();
 
-        if (isInvalidParamForInstanceOf(callFrame, baseVal, exceptionValue))
-            goto vm_throw;
+        if (baseVal.isObject()) {
+            TypeInfo info = asObject(baseVal)->structure()->typeInfo();
+            if (info.implementsDefaultHasInstance()) {
+                vPC += OPCODE_LENGTH(op_check_has_instance);
+                NEXT_INSTRUCTION();
+            }
+            if (info.implementsHasInstance()) {
+                JSValue baseVal = callFrame->r(base).jsValue();
+                bool result = asObject(baseVal)->methodTable()->customHasInstance(asObject(baseVal), callFrame, callFrame->r(value).jsValue());
+                CHECK_FOR_EXCEPTION();
+                callFrame->uncheckedR(dst) = jsBoolean(result);
 
-        vPC += OPCODE_LENGTH(op_check_has_instance);
-        NEXT_INSTRUCTION();
+                vPC += target;
+                NEXT_INSTRUCTION();
+            }
+        }
+
+        exceptionValue = createInvalidParamError(callFrame, "instanceof" , baseVal);
+        goto vm_throw;
     }
     DEFINE_OPCODE(op_instanceof) {
         /* instanceof dst(r) value(r) constructor(r) constructorProto(r)
@@ -2425,14 +2435,9 @@ JSValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         */
         int dst = vPC[1].u.operand;
         int value = vPC[2].u.operand;
-        int base = vPC[3].u.operand;
-        int baseProto = vPC[4].u.operand;
+        int baseProto = vPC[3].u.operand;
 
-        JSValue baseVal = callFrame->r(base).jsValue();
-
-        ASSERT(!isInvalidParamForInstanceOf(callFrame, baseVal, exceptionValue));
-
-        bool result = asObject(baseVal)->methodTable()->hasInstance(asObject(baseVal), callFrame, callFrame->r(value).jsValue(), callFrame->r(baseProto).jsValue());
+        bool result = JSObject::defaultHasInstance(callFrame, callFrame->r(value).jsValue(), callFrame->r(baseProto).jsValue());
         CHECK_FOR_EXCEPTION();
         callFrame->uncheckedR(dst) = jsBoolean(result);
 

@@ -347,7 +347,9 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
         res, out, err, user = logging_run(['--run-singly', '--time-out-ms=50',
                                           'failures/expected/hang.html'],
                                           tests_included=True)
-        self.assertEqual(res, 0)
+        # Note that hang.html is marked as WontFix and all WontFix tests are
+        # expected to Pass, so that actually running them generates an "unexpected" error.
+        self.assertEqual(res, 1)
         self.assertNotEmpty(out)
         self.assertNotEmpty(err)
 
@@ -472,7 +474,7 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
         # This tests that we skip both known failing and known flaky tests. Because there are
         # no known flaky tests in the default test_expectations, we add additional expectations.
         host = MockHost()
-        host.filesystem.write_text_file('/tmp/overrides.txt', 'BUGX : passes/image.html = IMAGE PASS\n')
+        host.filesystem.write_text_file('/tmp/overrides.txt', 'Bug(x) passes/image.html [ ImageOnlyFailure Pass ]\n')
 
         batches = get_tests_run(['--skip-failing-tests', '--additional-expectations', '/tmp/overrides.txt'], host=host)
         has_passes_text = False
@@ -849,13 +851,11 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
         self.assertTrue(passing_run(['--additional-platform-directory', '/tmp/foo']))
         self.assertTrue(passing_run(['--additional-platform-directory', '/tmp/../foo']))
         self.assertTrue(passing_run(['--additional-platform-directory', '/tmp/foo', '--additional-platform-directory', '/tmp/bar']))
-
-        res, buildbot_output, regular_output, user = logging_run(['--additional-platform-directory', 'foo'])
-        self.assertContains(regular_output, '--additional-platform-directory=foo is ignored since it is not absolute\n')
+        self.assertTrue(passing_run(['--additional-platform-directory', 'foo']))
 
     def test_additional_expectations(self):
         host = MockHost()
-        host.filesystem.write_text_file('/tmp/overrides.txt', 'BUGX : failures/unexpected/mismatch.html = IMAGE\n')
+        host.filesystem.write_text_file('/tmp/overrides.txt', 'Bug(x) failures/unexpected/mismatch.html [ ImageOnlyFailure ]\n')
         self.assertTrue(passing_run(['--additional-expectations', '/tmp/overrides.txt', 'failures/unexpected/mismatch.html'],
                                      tests_included=True, host=host))
 

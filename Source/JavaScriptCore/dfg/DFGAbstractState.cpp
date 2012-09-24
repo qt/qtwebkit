@@ -1262,11 +1262,17 @@ bool AbstractState::execute(unsigned indexInBlock)
         forNode(nodeIndex).set(SpecFunction);
         break;
             
-    case GetScopeChain:
+    case GetScope:
         node.setCanExit(false);
         forNode(nodeIndex).set(SpecCellOther);
         break;
-            
+
+    case GetScopeRegisters:
+        node.setCanExit(false);
+        forNode(node.child1()).filter(SpecCell);
+        forNode(nodeIndex).clear(); // The result is not a JS value.
+        break;
+
     case GetScopedVar:
         node.setCanExit(false);
         forNode(nodeIndex).makeTop();
@@ -1477,7 +1483,7 @@ bool AbstractState::execute(unsigned indexInBlock)
         // Again, sadly, we don't propagate the fact that we've done InstanceOf
         if (!(m_graph[node.child1()].prediction() & ~SpecCell) && !(forNode(node.child1()).m_type & ~SpecCell))
             forNode(node.child1()).filter(SpecCell);
-        forNode(node.child3()).filter(SpecCell);
+        forNode(node.child2()).filter(SpecCell);
         forNode(nodeIndex).set(SpecBoolean);
         break;
             
