@@ -21,7 +21,6 @@
 #if ENABLE(VIDEO)
 #include "MediaPlayerPrivateBlackBerry.h"
 
-#include "AuthenticationChallengeManager.h"
 #include "CookieManager.h"
 #include "Credential.h"
 #include "CredentialStorage.h"
@@ -115,7 +114,6 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer* player)
     , m_userDrivenSeekTimer(this, &MediaPlayerPrivate::userDrivenSeekTimerFired)
     , m_lastSeekTime(0)
     , m_lastSeekTimePending(false)
-    , m_isAuthenticationChallenging(false)
     , m_waitMetadataTimer(this, &MediaPlayerPrivate::waitMetadataTimerFired)
     , m_waitMetadataPopDialogCounter(0)
 {
@@ -123,9 +121,6 @@ MediaPlayerPrivate::MediaPlayerPrivate(MediaPlayer* player)
 
 MediaPlayerPrivate::~MediaPlayerPrivate()
 {
-    if (m_isAuthenticationChallenging)
-        AuthenticationChallengeManager::instance()->cancelAuthenticationChallenge(this);
-
     if (isFullscreen()) {
         m_webCorePlayer->mediaPlayerClient()->mediaPlayerExitFullscreen();
     }
@@ -352,13 +347,16 @@ void MediaPlayerPrivate::paint(GraphicsContext* context, const IntRect& rect)
         return;
 
 #if USE(ACCELERATED_COMPOSITING)
-    // Only process paint calls coming via the accelerated compositing code
-    // path, where we get called with a null graphics context. See
-    // LayerCompositingThread::drawTextures(). Ignore calls from the regular
-    // rendering path.
-    if (!context)
-        m_platformPlayer->notifyOutputUpdate(BlackBerry::Platform::IntRect(rect.x(), rect.y(), rect.width(), rect.height()));
-    return;
+    if (supportsAcceleratedRendering()) {
+        // Only process paint calls coming via the accelerated compositing code
+        // path, where we get called with a null graphics context. See
+        // LayerCompositingThread::drawTextures(). Ignore calls from the regular
+        // rendering path.
+        if (!context)
+            m_platformPlayer->notifyOutputUpdate(BlackBerry::Platform::IntRect(rect.x(), rect.y(), rect.width(), rect.height()));
+
+        return;
+    }
 #endif
 
     paintCurrentFrameInContext(context, rect);
@@ -545,7 +543,7 @@ void MediaPlayerPrivate::updateStates()
             m_showBufferingImage = false;
             m_mediaIsBuffering = false;
             // Create platform layer for video (create hole punch rect).
-            if (!m_platformLayer)
+            if (!m_platformLayer && supportsAcceleratedRendering())
                 m_platformLayer = VideoLayerWebKitThread::create(m_webCorePlayer);
 #endif
             break;
@@ -715,18 +713,12 @@ void MediaPlayerPrivate::onAuthenticationNeeded(MMRAuthChallenge& authChallenge)
         return;
     }
 
-    m_isAuthenticationChallenging = true;
-    AuthenticationChallengeManager::instance()->authenticationChallenge(url,
-                                                                        protectionSpace,
-                                                                        credential,
-                                                                        this,
-                                                                        m_webCorePlayer->mediaPlayerClient()->mediaPlayerHostWindow()->platformPageClient());
+    if (frameView() && frameView()->hostWindow())
+        frameView()->hostWindow()->platformPageClient()->authenticationChallenge(url, protectionSpace, credential, this);
 }
 
 void MediaPlayerPrivate::notifyChallengeResult(const KURL& url, const ProtectionSpace& protectionSpace, AuthenticationChallengeResult result, const Credential& credential)
 {
-    m_isAuthenticationChallenging = false;
-
     if (result != AuthenticationChallengeSuccess || !url.isValid())
         return;
 
@@ -829,6 +821,13 @@ bool MediaPlayerPrivate::isElementPaused() const
 bool MediaPlayerPrivate::isTabVisible() const
 {
     return m_webCorePlayer->mediaPlayerClient()->mediaPlayerHostWindow()->platformPageClient()->isVisible();
+}
+
+bool MediaPlayerPrivate::supportsAcceleratedRendering() const
+{
+    if (m_platformPlayer)
+        return m_platformPlayer->supportsAcceleratedRendering();
+    return false;
 }
 
 #if USE(ACCELERATED_COMPOSITING)

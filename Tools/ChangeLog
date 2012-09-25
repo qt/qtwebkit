@@ -1,3 +1,266 @@
+2012-09-25  Xiaobo Wang  <xbwang@torchmobile.com.cn>
+
+        [BlackBerry] [DRT] fast/forms/textarea-live-pseudo-selectors.html failed
+        https://bugs.webkit.org/show_bug.cgi?id=97189
+
+        Reviewed by Rob Buis.
+
+        Translate ASCII key code to BlackBerry key code for BACKSPACE and DELETE key.
+
+        * DumpRenderTree/blackberry/EventSender.cpp:
+        (keyDownCallback):
+
+2012-09-25  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [WK2][WTR] WTR bundle client loads binary data as text
+        https://bugs.webkit.org/show_bug.cgi?id=97532
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        WTR::InjectedBundlePage::decidePolicyForResponse now checks response MIME type
+        and returns WKBundlePagePolicyActionPassThrough if it cannot be shown.
+
+        * WebKitTestRunner/InjectedBundle/InjectedBundlePage.cpp:
+        (WTR::InjectedBundlePage::decidePolicyForResponse):
+
+2012-09-25  Zan Dobersek  <zandobersek@gmail.com>
+
+        Unreviewed, another test case adjustment after r129459. Python 2.7 doesn't
+        seem to be a requirement yet so the assertDictEqual method is not yet available
+        on all builders. Assert that the empty dictionary length equals 0 instead.
+
+        * Scripts/webkitpy/layout_tests/controllers/manager_unittest.py:
+        (ResultSummaryTest.test_interpret_test_failures):
+
+2012-09-24  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Fix build with latest Qt 5
+        https://bugs.webkit.org/show_bug.cgi?id=97479
+
+        Reviewed by Tor Arne Vestbø.
+
+        The variables for syncqt handling are now set in api.pri, but let's add a comment here that we can
+        remove them from default_pre.prf once we're past Qt 5 beta2.
+
+        * qmake/mkspecs/features/default_pre.prf:
+
+2012-09-25  Zan Dobersek  <zandobersek@gmail.com>
+
+        Unreviewed, adjusting the test cases after r129459. The JSON data
+        for reftests now contains the 'reftest_type' key and no more 'is_reftest'
+        or 'is_mismatch_reftest' keys.
+
+        * Scripts/webkitpy/layout_tests/run_webkit_tests_integrationtest.py:
+        (EndToEndTest.test_reftest_with_two_notrefs):
+
+2012-09-24  Zan Dobersek  <zandobersek@gmail.com>
+
+        Unexpected reftest passes are only reported when pixel testing is enabled in results.html as well
+        https://bugs.webkit.org/show_bug.cgi?id=97426
+
+        Reviewed by Ojan Vafai.
+
+        The 'is_reftest' member of the TestResult class has been replaced by the reftest_type
+        member which is a set containing either '!=', '==', both or none if the test represented
+        by the object is not a reftest.
+
+        When summarizing results, the test dictionary is updated to contain the 'reftest_type' key
+        if the test is a reftest. The value of this key is a list of all the reftest types of this test.
+
+        The test failure interpretation method has been refactored, it now reports only
+        missing results of various formats and image diff percent in case of image or
+        reftest mismatch.
+
+        Unit tests have been modified accordingly.
+
+        * Scripts/webkitpy/layout_tests/controllers/layout_test_runner.py:
+        (LayoutTestRunner._update_summary_with_result):
+        * Scripts/webkitpy/layout_tests/controllers/layout_test_runner_unittest.py:
+        (LayoutTestRunnerTests.test_update_summary_with_result):
+        * Scripts/webkitpy/layout_tests/controllers/manager.py:
+        (interpret_test_failures):
+        (summarize_results):
+        * Scripts/webkitpy/layout_tests/controllers/manager_unittest.py:
+        (ResultSummaryTest.test_interpret_test_failures):
+        * Scripts/webkitpy/layout_tests/controllers/single_test_runner.py:
+        (SingleTestRunner.run):
+        (SingleTestRunner._run_reftest):
+        * Scripts/webkitpy/layout_tests/models/test_results.py:
+        (TestResult.__init__):
+        * Scripts/webkitpy/layout_tests/run_webkit_tests_integrationtest.py:
+        (EndToEndTest.test_reftest_with_two_notrefs):
+
+2012-09-24  Sam Weinig  <sam@webkit.org>
+
+        Use NSUserDefaults rather than an environment variable to control whether to use an XPC Service for the WebProcess
+        https://bugs.webkit.org/show_bug.cgi?id=97514
+
+        Reviewed by Anders Carlsson.
+
+        * Scripts/webkitdirs.pm:
+        (argumentsForRunAndDebugMacWebKitApp):
+        Push "-WebKit2UseXPCServiceForWebProcess YES" as arguments when --use-web-process-xpc-service
+        is provided to set the user default. Move adding of @ARGV to after custom additions as calling
+        shouldUseXPCServiceForWebProcess() can change @ARGV.
+
+        (runMacWebKitApp):
+        (execMacWebKitAppForDebugging):
+        Stop setting the WEBKIT_USE_XPC_SERVICE_FOR_WEB_PROCESS environment variable.
+
+2012-09-24  Laszlo Gombos  <l.gombos@samsung.com>
+
+        [GTK][EFL] Make sure cairo is built with fontconfig support
+        https://bugs.webkit.org/show_bug.cgi?id=97513
+
+        Reviewed by Martin Robinson.
+
+        The GTK and EFL port of WebKit requires a version of cairo that is built with fontconfig support. 
+
+        * efl/jhbuild.modules:
+        * gtk/jhbuild.modules:
+
+2012-09-24  Benjamin Poulain  <bpoulain@apple.com>
+
+        Fix Geolocation error reporting in the test support
+        https://bugs.webkit.org/show_bug.cgi?id=97386
+
+        Reviewed by Sam Weinig.
+        The TestRunner was exposing internal implementation details of
+        the Geolocation object through setMockGeolocationError().
+
+        In practice, only the error code PositionUnavailable is supported
+        or even implemented.
+
+        Exposing setMockGeolocationError() does not make sense for WebKit2 as
+        passing generic errors from the UIProcess is a bad idea. This is the
+        opportunity to clean TestRunner and prepare and interface suitable for WebKit2.
+
+        * DumpRenderTree/TestRunner.cpp:
+        (setMockGeolocationPositionUnavailableErrorCallback):
+        (TestRunner::staticFunctions):
+        * DumpRenderTree/TestRunner.h:
+        (TestRunner):
+        * DumpRenderTree/blackberry/TestRunnerBlackBerry.cpp:
+        (TestRunner::setMockGeolocationPositionUnavailableError):
+        * DumpRenderTree/chromium/DRTTestRunner.cpp:
+        (DRTTestRunner::DRTTestRunner):
+        (DRTTestRunner::setMockGeolocationPositionUnavailableError):
+        * DumpRenderTree/chromium/DRTTestRunner.h:
+        (DRTTestRunner):
+        * DumpRenderTree/efl/TestRunnerEfl.cpp:
+        (TestRunner::setMockGeolocationPositionUnavailableError):
+        * DumpRenderTree/gtk/TestRunnerGtk.cpp:
+        (TestRunner::setMockGeolocationPositionUnavailableError):
+        * DumpRenderTree/mac/MockGeolocationProvider.h:
+        * DumpRenderTree/mac/MockGeolocationProvider.mm:
+        (-[MockGeolocationProvider dealloc]):
+        (-[MockGeolocationProvider resetError]):
+        (-[MockGeolocationProvider setPosition:]):
+        (-[MockGeolocationProvider setPositionUnavailableErrorWithMessage:]):
+        (-[MockGeolocationProvider lastPosition]):
+        (-[MockGeolocationProvider timerFired]):
+        * DumpRenderTree/mac/TestRunnerMac.mm:
+        (TestRunner::setMockGeolocationPositionUnavailableError):
+        * DumpRenderTree/qt/TestRunnerQt.cpp:
+        (TestRunner::setMockGeolocationPositionUnavailableError):
+        * DumpRenderTree/qt/TestRunnerQt.h:
+        (TestRunner):
+        * DumpRenderTree/win/TestRunnerWin.cpp:
+        (TestRunner::setMockGeolocationPositionUnavailableError):
+        * DumpRenderTree/wx/TestRunnerWx.cpp:
+        (TestRunner::setMockGeolocationPositionUnavailableError):
+
+2012-09-24  Nikhil Bansal  <n.bansal@samsung.com>
+
+        [EFL][WK2] TestRunner needs touch events support.
+        https://bugs.webkit.org/show_bug.cgi?id=96465
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Simulate touch events in WebkitTestRunner for touch related
+        layout tests. This patch uses ewk_view_feed_touch_event() to
+        generate touch events.
+
+        * WebKitTestRunner/EventSenderProxy.h:
+        (EventSenderProxy):
+        * WebKitTestRunner/efl/EventSenderProxyEfl.cpp:
+        (WTR):
+        (WTR::setEvasModifiers):
+        (WTR::EventSenderProxy::EventSenderProxy):
+        (WTR::EventSenderProxy::~EventSenderProxy):
+        (WTR::EventSenderProxy::sendTouchEvent):
+        (WTR::EventSenderProxy::addTouchPoint):
+        (WTR::EventSenderProxy::updateTouchPoint):
+        (WTR::EventSenderProxy::setTouchModifier):
+        (WTR::EventSenderProxy::touchStart):
+        (WTR::EventSenderProxy::touchMove):
+        (WTR::EventSenderProxy::touchEnd):
+        (WTR::EventSenderProxy::touchCancel):
+        (WTR::EventSenderProxy::clearTouchPoints):
+        (WTR::EventSenderProxy::releaseTouchPoint):
+        (WTR::EventSenderProxy::cancelTouchPoint):
+
+2012-09-24  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [WK2] TestRunner does not support overridePreference with value "0"
+        https://bugs.webkit.org/show_bug.cgi?id=97457
+
+        Reviewed by Alexey Proskuryakov.
+
+        testRunner.overridePreference() was marked as taking a boolean
+        in argument in testRunner.idl even though the test cases are
+        passing strings to it. The current code works if the test
+        case wants to enable a setting and therefore passes "1" string.
+        However, if the test wants to disable a setting and passes "0"
+        string, the current code also evaluates this to true causing
+        certain test cases to fail.
+
+        The argument to testRunner.overridePreference() is now of string
+        type and a function has been added to convert the string passed
+        by the test to a boolean value.
+
+        * WebKitTestRunner/InjectedBundle/Bindings/TestRunner.idl:
+        * WebKitTestRunner/InjectedBundle/TestRunner.cpp:
+        (WTR::toBool):
+        (WTR):
+        (WTR::TestRunner::overridePreference):
+        * WebKitTestRunner/InjectedBundle/TestRunner.h:
+        (TestRunner):
+
+2012-09-24  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r129343.
+        http://trac.webkit.org/changeset/129343
+        https://bugs.webkit.org/show_bug.cgi?id=97479
+
+        It broke the build (Requested by Ossy_NIGHT on #webkit).
+
+        * qmake/mkspecs/features/default_pre.prf:
+
+2012-09-24  Zan Dobersek  <zandobersek@gmail.com>
+
+        [Gtk] Unskip the Shadow DOM layout tests
+        https://bugs.webkit.org/show_bug.cgi?id=90776
+
+        Reviewed by Ryosuke Niwa.
+
+        Enable Shadow DOM through DumpRenderTreeSupport when resetting defaults in between tests.
+
+        * DumpRenderTree/gtk/DumpRenderTree.cpp:
+        (resetDefaultsToConsistentValues):
+
+2012-09-24  Zan Dobersek  <zandobersek@gmail.com>
+
+        REGRESSION (r129211-r129218): http/tests/loading/redirect-with-no-location-crash.html failing on GTK Linux 64-bit Release WK2 (Tests)
+        https://bugs.webkit.org/show_bug.cgi?id=97404
+
+        Reviewed by Philippe Normand.
+
+        Print out the 'didReceiveTitle' information when dumping frame load callbacks.
+
+        * DumpRenderTree/gtk/DumpRenderTree.cpp:
+        (webViewTitleChanged):
+
 2012-09-24  Simon Hausmann  <simon.hausmann@digia.com>
 
         [Qt] Fix build with latest Qt 5

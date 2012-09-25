@@ -124,6 +124,7 @@
 #include "VibrationClientBlackBerry.h"
 #endif
 #include "VisiblePosition.h"
+#include "WebCookieJar.h"
 #if ENABLE(WEBDOM)
 #include "WebDOMDocument.h"
 #endif
@@ -349,6 +350,7 @@ WebPagePrivate::WebPagePrivate(WebPage* webPage, WebPageClient* client, const In
     , m_mainFrame(0) // Initialized by init.
     , m_currentContextNode(0)
     , m_webSettings(0) // Initialized by init.
+    , m_cookieJar(0)
     , m_visible(false)
     , m_activationState(ActivationActive)
     , m_shouldResetTilesWhenShown(false)
@@ -427,8 +429,6 @@ WebPagePrivate::WebPagePrivate(WebPage* webPage, WebPageClient* client, const In
         BlackBerry::Platform::DeviceInfo::instance();
         defaultUserAgent();
     }
-
-    AuthenticationChallengeManager::instance()->pageCreated(this);
 }
 
 WebPage::WebPage(WebPageClient* client, const WebString& pageGroupName, const Platform::IntRect& rect)
@@ -440,7 +440,6 @@ WebPage::WebPage(WebPageClient* client, const WebString& pageGroupName, const Pl
 
 WebPagePrivate::~WebPagePrivate()
 {
-    AuthenticationChallengeManager::instance()->pageDeleted(this);
     // Hand the backingstore back to another owner if necessary.
     m_webPage->setVisible(false);
     if (BackingStorePrivate::currentBackingStoreOwner() == m_webPage)
@@ -448,6 +447,9 @@ WebPagePrivate::~WebPagePrivate()
 
     delete m_webSettings;
     m_webSettings = 0;
+
+    delete m_cookieJar;
+    m_cookieJar = 0;
 
     delete m_backingStoreClient;
     m_backingStoreClient = 0;
@@ -2213,19 +2215,18 @@ bool WebPagePrivate::isActive() const
     return m_client->isActive();
 }
 
-void WebPagePrivate::authenticationChallenge(const KURL& url, const ProtectionSpace& protectionSpace, const Credential& inputCredential)
+void WebPagePrivate::authenticationChallenge(const KURL& url, const ProtectionSpace& protectionSpace, const Credential& inputCredential, AuthenticationChallengeClient* client)
 {
     WebString username;
     WebString password;
-    AuthenticationChallengeManager* authmgr = AuthenticationChallengeManager::instance();
 
 #if !defined(PUBLIC_BUILD) || !PUBLIC_BUILD
     if (m_dumpRenderTree) {
         Credential credential(inputCredential, inputCredential.persistence());
         if (m_dumpRenderTree->didReceiveAuthenticationChallenge(credential))
-            authmgr->notifyChallengeResult(url, protectionSpace, AuthenticationChallengeSuccess, credential);
+            client->notifyChallengeResult(url, protectionSpace, AuthenticationChallengeSuccess, credential);
         else
-            authmgr->notifyChallengeResult(url, protectionSpace, AuthenticationChallengeCancelled, inputCredential);
+            client->notifyChallengeResult(url, protectionSpace, AuthenticationChallengeCancelled, inputCredential);
         return;
     }
 #endif
@@ -2246,9 +2247,9 @@ void WebPagePrivate::authenticationChallenge(const KURL& url, const ProtectionSp
 #endif
 
     if (isConfirmed)
-        authmgr->notifyChallengeResult(url, protectionSpace, AuthenticationChallengeSuccess, credential);
+        client->notifyChallengeResult(url, protectionSpace, AuthenticationChallengeSuccess, credential);
     else
-        authmgr->notifyChallengeResult(url, protectionSpace, AuthenticationChallengeCancelled, inputCredential);
+        client->notifyChallengeResult(url, protectionSpace, AuthenticationChallengeCancelled, inputCredential);
 }
 
 PageClientBlackBerry::SaveCredentialType WebPagePrivate::notifyShouldSaveCredential(bool isNew)
@@ -3191,6 +3192,14 @@ WebSettings* WebPage::settings() const
     return d->m_webSettings;
 }
 
+WebCookieJar* WebPage::cookieJar() const
+{
+    if (!d->m_cookieJar)
+        d->m_cookieJar = new WebCookieJar();
+
+    return d->m_cookieJar;
+}
+
 bool WebPage::isVisible() const
 {
     return d->m_visible;
@@ -3240,7 +3249,6 @@ void WebPage::setVisible(bool visible)
         return;
 
     d->setVisible(visible);
-    AuthenticationChallengeManager::instance()->pageVisibilityChanged(d, visible);
 
     if (!visible) {
         d->suspendBackingStore();

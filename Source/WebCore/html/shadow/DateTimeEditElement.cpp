@@ -450,26 +450,19 @@ void DateTimeEditElement::updateUIState()
     }
 }
 
+String DateTimeEditElement::value() const
+{
+    if (!m_editControlOwner)
+        return emptyString();
+    return m_editControlOwner->formatDateTimeFieldsState(valueAsDateTimeFieldsState());
+}
+
 DateTimeFieldsState DateTimeEditElement::valueAsDateTimeFieldsState() const
 {
     DateTimeFieldsState dateTimeFieldsState;
     for (size_t fieldIndex = 0; fieldIndex < m_fields.size(); ++fieldIndex)
         m_fields[fieldIndex]->populateDateTimeFieldsState(dateTimeFieldsState);
     return dateTimeFieldsState;
-}
-
-double DateTimeEditElement::valueAsDouble() const
-{
-    double value = 0;
-
-    for (size_t fieldIndex = 0; fieldIndex < m_fields.size(); ++fieldIndex) {
-        const DateTimeFieldElement* const field = m_fields[fieldIndex];
-        if (!field->hasValue())
-            return std::numeric_limits<double>::quiet_NaN();
-        value += field->valueAsDouble();
-    }
-
-    return value;
 }
 
 } // namespace WebCore

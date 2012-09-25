@@ -64,8 +64,7 @@ public:
     virtual void clearFrontend();
     virtual void restore();
 
-    bool enabled() { return m_enabled; }
-
+    ScriptObject wrapCanvas2DRenderingContextForInstrumentation(const ScriptObject&);
 #if ENABLE(WEBGL)
     ScriptObject wrapWebGLRenderingContextForInstrumentation(const ScriptObject&);
 #endif
@@ -90,7 +89,6 @@ private:
     Page* m_inspectedPage;
     InjectedScriptManager* m_injectedScriptManager;
     InspectorFrontend::Canvas* m_frontend;
-    bool m_enabled;
 };
 
 } // namespace WebCore

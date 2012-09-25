@@ -1,3 +1,320 @@
+2012-09-25  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [WK2][WTR] WTR bundle client loads binary data as text
+        https://bugs.webkit.org/show_bug.cgi?id=97532
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Added WKBundlePageCanShowMIMEType() function to WKBundlePage private API.
+        This function is put to WKBundlePage to keep consistency with WebKit::WebPageProxy::canShowMIMEType().
+        Actually it does not need anything from page.
+
+        * WebProcess/InjectedBundle/API/c/WKBundlePage.cpp:
+        (WKBundlePageCanShowMIMEType):
+        * WebProcess/InjectedBundle/API/c/WKBundlePagePrivate.h:
+
+2012-09-25  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Don't use the C API internally in WebKitWebView
+        https://bugs.webkit.org/show_bug.cgi?id=96767
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Using the C++ classes directly instead of the C API wrappers we
+        avoid a lot of toImpl/toAPI casts, string conversions and
+        allocations. The code is also a lot simpler and easier to read.
+
+        * UIProcess/API/gtk/WebKitContextMenuClient.cpp:
+        (getContextMenuFromProposedMenu):
+        * UIProcess/API/gtk/WebKitResourceLoadClient.cpp:
+        (didInitiateLoadForResource):
+        * UIProcess/API/gtk/WebKitUIClient.cpp:
+        (createNewPage):
+        (runJavaScriptPrompt):
+        (mouseDidMoveOverElement):
+        (printFrame):
+        * UIProcess/API/gtk/WebKitURIRequest.cpp:
+        (webkitURIRequestCreateForResourceRequest):
+        (webkitURIRequestGetResourceRequest):
+        * UIProcess/API/gtk/WebKitURIRequestPrivate.h:
+        * UIProcess/API/gtk/WebKitWebView.cpp:
+        (allowModalDialogsChanged):
+        (zoomTextOnlyChanged):
+        (webkitWebViewSetSettings):
+        (webkitWebViewConstructed):
+        (webkitWebViewUpdateURI):
+        (webkitWebViewCreateNewPage):
+        (webkitWebViewRunJavaScriptPrompt):
+        (webkitWebViewMouseTargetChanged):
+        (webkitWebViewPrintFrame):
+        (webkitWebViewResourceLoadStarted):
+        (webkitWebViewPopulateContextMenu):
+        (webkit_web_view_load_uri):
+        (webkit_web_view_load_html):
+        (webkit_web_view_load_alternate_html):
+        (webkit_web_view_load_plain_text):
+        (webkit_web_view_load_request):
+        (webkit_web_view_reload):
+        (webkit_web_view_reload_bypass_cache):
+        (webkit_web_view_stop_loading):
+        (webkit_web_view_go_back):
+        (webkit_web_view_can_go_back):
+        (webkit_web_view_go_forward):
+        (webkit_web_view_can_go_forward):
+        (webkit_web_view_get_custom_charset):
+        (webkit_web_view_set_custom_charset):
+        (webkit_web_view_go_to_back_forward_list_item):
+        (webkit_web_view_set_settings):
+        (webkit_web_view_set_zoom_level):
+        (webkit_web_view_get_zoom_level):
+        (webkit_web_view_can_execute_editing_command):
+        (webkit_web_view_execute_editing_command):
+        (webkit_web_view_run_javascript):
+        (webkit_web_view_get_inspector):
+        (webkit_web_view_can_show_mime_type):
+        (ViewSaveAsyncData):
+        (getContentsAsMHTMLDataCallback):
+        (webkit_web_view_save):
+        (webkit_web_view_save_finish):
+        (webkit_web_view_save_to_file):
+        * UIProcess/API/gtk/WebKitWebViewBase.cpp:
+        (webkitWebViewBaseCreate):
+        (webkitWebViewBaseCreateWebPage):
+        * UIProcess/API/gtk/WebKitWebViewBasePrivate.h:
+        * UIProcess/API/gtk/WebKitWebViewPrivate.h:
+
+2012-09-24  Bo Liu  <boliu@chromium.org>
+
+        Reland "Add in-place reload behavior to ImagesEnabled setting" with optimizations
+        https://bugs.webkit.org/show_bug.cgi?id=97055
+
+        Reviewed by Adam Barth.
+
+        Relanding 128780, 128676, 128645. Was reverted in 128914 due to
+        performance regression in Chromium.
+
+        New changes in addition to previously reverted patches:
+
+        Refactored CachedResource::requestResource, loadResource, and
+        revalidateResource. Moved CachedResource::load method to end of
+        requestResource so there is one place where load is called for all
+        resources.
+
+        Added a enum parameter for requestResource and
+        determineRevalidationPolicy so that FrameLoaderClient::allowImage call
+        do not need to be called multiple times.
+
+        Removed CachedImage::load call in requestImage so it is not called
+        twice.
+
+        Removed unnecessary Frame.h includes in CachedResource and
+        CachedImage.
+
+        Removed dead load() method declaration in CachedImage.
+
+        Updated text expectation for two image-permissions tests to reflect
+        the removed calls to allowImage.
+
+        * win/WebKit2.def:
+
+2012-09-24  Sam Weinig  <sam@webkit.org>
+
+        WKProcessGroup can't load injected bundle with file URL
+        <rdar://problem/12322774>
+        https://bugs.webkit.org/show_bug.cgi?id=97520
+
+        Reviewed by Anders Carlsson.
+
+        * UIProcess/API/mac/WKProcessGroup.mm:
+        (-[WKProcessGroup initWithInjectedBundleURL:]):
+        Fix typo. We need to pass the string as path, not as a URL.
+
+2012-09-24  Sam Weinig  <sam@webkit.org>
+
+        Use NSUserDefaults rather than an environment variable to control whether to use an XPC Service for the WebProcess
+        https://bugs.webkit.org/show_bug.cgi?id=97514
+
+        Reviewed by Anders Carlsson.
+
+        * GNUmakefile.list.am:
+        * PlatformEfl.cmake:
+        * Target.pri:
+        Add new files.
+
+        * UIProcess/Launcher/ProcessLauncher.h:
+        * UIProcess/WebProcessProxy.cpp:
+        (WebKit::WebProcessProxy::connect):
+        Move platform specific launch options to a new function, platformConnect.
+
+        * UIProcess/WebProcessProxy.h:
+        * UIProcess/efl/WebProcessProxyEfl.cpp: Added.
+        Move Efl specific launch options here.
+ 
+        (WebKit::WebProcessProxy::platformConnect):
+        * UIProcess/gtk/WebProcessProxyGtk.cpp: Added.
+        Add stub.
+
+        (WebKit::WebProcessProxy::platformConnect):
+        * UIProcess/mac/WebProcessProxyMac.mm:
+        (WebKit::WebProcessProxy::platformConnect):
+        Move Mac specific launch option setting here, and switch from
+        using an environment variable to NSUserDefaults.
+
+        * UIProcess/qt/WebProcessProxyQt.cpp: Added.
+        (WebKit::WebProcessProxy::platformConnect):
+        Add stub.
+
+        * UIProcess/win/WebProcessProxyWin.cpp:
+        (WebKit::WebProcessProxy::platformConnect):
+        Add stub.
+
+2012-09-24  Laszlo Gombos  <l.gombos@samsung.com>
+
+        [GTK][EFL] Remove cairo prefix from include statements
+        https://bugs.webkit.org/show_bug.cgi?id=97509
+
+        Reviewed by Gyuyoung Kim.
+
+        Make the build system consistent by always assuming that directory 
+        that includes the cairo headers is included in the include path.
+
+        * UIProcess/cairo/BackingStoreCairo.cpp:
+        * WebProcess/Plugins/Netscape/x11/NetscapePluginX11.cpp:
+
+2012-09-24  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r129388.
+        http://trac.webkit.org/changeset/129388
+        https://bugs.webkit.org/show_bug.cgi?id=97477
+
+        Caused an assertion in a WebKit2 unit test (Requested by
+        abarth on #webkit).
+
+        * win/WebKit2.def:
+
+2012-09-24  Simon Pena  <spena@igalia.com>
+
+        [GTK] Add Select All method to WebKit2 GTK+ API
+        https://bugs.webkit.org/show_bug.cgi?id=97460
+
+        Reviewed by Martin Robinson.
+
+        Following the same approach used when added Cut, Copy and Paste,
+        the Select All method is added to the WebKit2 GTK+ API.
+
+        This introduces a new macro in the WebKitEditingCommands,
+        updates the documentation, and includes a new unit test.
+
+        * UIProcess/API/gtk/WebKitEditingCommands.h: Add a new macro for
+        the Select All command.
+        * UIProcess/API/gtk/docs/webkit2gtk-sections.txt: Include the Select All
+        command in the documentation.
+        * UIProcess/API/gtk/tests/TestWebViewEditor.cpp: Cover the new command
+        with a unit test.
+        (testWebViewEditorSelectAll):
+        (beforeAll):
+
+2012-09-24  Bo Liu  <boliu@chromium.org>
+
+        Reland "Add in-place reload behavior to ImagesEnabled setting" with optimizations
+        https://bugs.webkit.org/show_bug.cgi?id=97055
+
+        Reviewed by Adam Barth.
+
+        Relanding 128780, 128676, 128645. Was reverted in 128914 due to
+        performance regression in Chromium.
+
+        New changes in addition to previously reverted patches:
+
+        Refactored CachedResource::requestResource, loadResource, and
+        revalidateResource. Moved CachedResource::load method to end of
+        requestResource so there is one place where load is called for all
+        resources.
+
+        Added a enum parameter for requestResource and
+        determineRevalidationPolicy so that FrameLoaderClient::allowImage call
+        do not need to be called multiple times.
+
+        Removed CachedImage::load call in requestImage so it is not called
+        twice.
+
+        Removed unnecessary Frame.h includes in CachedResource and
+        CachedImage.
+
+        Removed dead load() method declaration in CachedImage.
+
+        Updated text expectation for two image-permissions tests to reflect
+        the removed calls to allowImage.
+
+        * win/WebKit2.def:
+
+2012-09-24  Joone Hur  <joone.hur@intel.com>, Gustavo Noronha Silva  <gustavo.noronha@collabora.com>
+
+        [GTK] Implement GraphicsLayer using Clutter
+        https://bugs.webkit.org/show_bug.cgi?id=73767
+
+        Reviewed by Martin Robinson.
+
+        Fixed link errors by adding Clutter library and header to WebKit2 build.
+
+        * GNUmakefile.am:
+
+2012-09-24  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] WebKitWebView:is-loading is not updated when the is loaded is started by link clicked navigation action
+        https://bugs.webkit.org/show_bug.cgi?id=97458
+
+        Reviewed by Xan Lopez.
+
+        WebKitWebView:is-loading is set to TRUE when the load is started
+        by using the API. We want to make sure that both URI and
+        is-loading are updated before load-started is emitted, so we can
+        update both right before emitting load-started.
+
+        * UIProcess/API/gtk/WebKitWebView.cpp:
+        (webkitWebViewEmitLoadChanged): Update both uri and is-loading
+        properties before emitting load-changed signal with
+        WEBKIT_LOAD_STARTED.
+        (webkit_web_view_load_uri): Don't call
+        webkitWebViewSetIsLoading().
+        (webkit_web_view_load_html): Ditto.
+        (webkit_web_view_load_alternate_html): Ditto.
+        (webkit_web_view_load_plain_text): Ditto.
+        (webkit_web_view_load_request): Ditto.
+        (webkit_web_view_reload): Ditto.
+        (webkit_web_view_reload_bypass_cache): Ditto.
+        (webkit_web_view_go_back): Ditto.
+        (webkit_web_view_go_forward): Ditto.
+        (webkit_web_view_go_to_back_forward_list_item): Ditto.
+
+2012-09-24  Byungwoo Lee  <bw80.lee@samsung.com>
+
+        [EFL][WK2] Change the install path for libewk2UnitTestInjectedBundleSample.so.
+        https://bugs.webkit.org/show_bug.cgi?id=97302
+
+        Reviewed by Gyuyoung Kim.
+
+        libewk2UnitTestInjectedBundleSample.so file is created under the
+        Source directory.
+        Change install directory for the library to under the build directory.
+
+        * PlatformEfl.cmake:
+        * UIProcess/API/efl/tests/UnitTestUtils/EWK2UnitTestEnvironment.cpp:
+        (EWK2UnitTest::EWK2UnitTestEnvironment::injectedBundleSample):
+
+2012-09-24  Vivek Galatage  <vivekgalatage@gmail.com>
+
+        Web Inspector: implement testing harness for pure protocol tests.
+        https://bugs.webkit.org/show_bug.cgi?id=90675
+
+        Reviewed by Yury Semikhatsky.
+
+        Adding the export symbol definitions required on Apple Windows and WinCairo
+        ports to support Inspector Protocol testing harness.
+
+        * win/WebKit2.def:
+        * win/WebKit2CFLite.def:
+
 2012-09-24  KwangYong Choi  <ky0.choi@samsung.com>
 
         [EFL][WK2] Invalid featuring of INPUT_TYPE_COLOR in test_ewk2_view.

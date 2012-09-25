@@ -77,6 +77,7 @@ class InPageSearchManager;
 class InputHandler;
 class SelectionHandler;
 class TouchEventHandler;
+class WebCookieJar;
 class WebPageClient;
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -201,7 +202,7 @@ public:
     virtual int showAlertDialog(WebPageClient::AlertType atype);
     virtual bool isActive() const;
     virtual bool isVisible() const { return m_visible; }
-    virtual void authenticationChallenge(const WebCore::KURL&, const WebCore::ProtectionSpace&, const WebCore::Credential&);
+    virtual void authenticationChallenge(const WebCore::KURL&, const WebCore::ProtectionSpace&, const WebCore::Credential&, WebCore::AuthenticationChallengeClient*);
     virtual SaveCredentialType notifyShouldSaveCredential(bool);
     virtual void syncProxyCredential(const WebCore::Credential&);
 
@@ -469,6 +470,7 @@ public:
     WebCore::Frame* m_mainFrame;
     RefPtr<WebCore::Node> m_currentContextNode;
     WebSettings* m_webSettings;
+    WebCookieJar* m_cookieJar;
     OwnPtr<WebTapHighlight> m_tapHighlight;
     WebSelectionOverlay* m_selectionOverlay;
 

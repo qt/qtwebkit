@@ -1,3 +1,121 @@
+2012-09-21  Ilya Tikhonovsky  <loislo@chromium.org>
+
+        Web Inspector: extract Vector instrumentation from core NMI code into MemoryInstrumentationVector.h header.
+        https://bugs.webkit.org/show_bug.cgi?id=96650
+
+        Reviewed by Vsevolod Vlasov.
+
+        Test for instrumented vector.
+
+        * tests/MemoryInstrumentationTest.cpp:
+        (WebCore::InstrumentedOwner::InstrumentedOwner):
+        (WebCore::TEST):
+        (WebCore):
+
+2012-09-24  Benjamin Poulain  <bpoulain@apple.com>
+
+        Fix Geolocation error reporting in the test support
+        https://bugs.webkit.org/show_bug.cgi?id=97386
+
+        Reviewed by Sam Weinig.
+
+        * public/WebGeolocationClientMock.h:
+        (WebGeolocationClientMock):
+        * src/WebGeolocationClientMock.cpp:
+        (WebKit::WebGeolocationClientMock::setMockGeolocationPositionUnavailableError):
+
+2012-09-24  Kent Tamura  <tkent@chromium.org>
+
+        [Chromium] Implement ValidationMessageClient for Chromium
+        https://bugs.webkit.org/show_bug.cgi?id=97167
+
+        Reviewed by Hajime Morita.
+
+        Introduce ValidationMessageClientImpl. However actual popup
+        implementation should be done in WebViewClient.
+
+        * WebKit.gyp: Add ValidationMessageClientImpl.{cpp,h}.
+        * public/WebViewClient.h:
+        (WebKit::WebViewClient::showValidationMessage): Added.
+        (WebKit::WebViewClient::hideValidationMessage): Added.
+        * src/ValidationMessageClientImpl.cpp: Added.
+        (WebKit::ValidationMessageClientImpl::ValidationMessageClientImpl):
+        (WebKit::ValidationMessageClientImpl::create):
+        (WebKit::ValidationMessageClientImpl::~ValidationMessageClientImpl):
+        Make sure that a popup is closed.
+        (WebKit::ValidationMessageClientImpl::showValidationMessage):
+        Implementataion of ValidationMessageClient::showValidationMessage.
+        minimumSecondToShowValidationMessage and secondPerCharacter are same as
+        the corresponding values in the current Shadow DOM implementation.
+        (WebKit::ValidationMessageClientImpl::hideValidationMessage):
+        Implementataion of ValidationMessageClient::hideValidationMessage.
+        (WebKit::ValidationMessageClientImpl::isValidationMessageVisible):
+        Implementataion of ValidationMessageClient::isValidationMessageVisible.
+        (WebKit::ValidationMessageClientImpl::hideCurrentValidationMessage):
+        This is a callback function for the timer.
+        * src/ValidationMessageClientImpl.h: Added.
+
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::WebViewImpl):
+         - Initialize m_validationMessage.
+         - Add a comment for PageClients.
+        * src/WebViewImpl.h:
+        Add m_validationMessage.
+
+2012-09-24  Mihai Parparita  <mihaip@chromium.org>
+
+        [Chromium] Remove WebRuntimeFeatures::{enablePushState,isPushStateEnabled}
+        https://bugs.webkit.org/show_bug.cgi?id=97506
+
+        Reviewed by Adam Barth.
+
+        These methods have been no-ops since r127674. All Chromium code that
+        called them was removed with http://crrev.com/155205.
+
+        * public/WebRuntimeFeatures.h:
+        (WebRuntimeFeatures):
+        * src/WebRuntimeFeatures.cpp:
+
+2012-09-24  Mark Pilgrim  <pilgrim@chromium.org>
+
+        [Chromium][Mac] Remove loadFont from PlatformSupport
+        https://bugs.webkit.org/show_bug.cgi?id=97360
+
+        Reviewed by Adam Barth.
+
+        Part of a refactoring series. See tracking bug 82948.
+
+        * src/PlatformSupport.cpp:
+        (WebCore):
+
+2012-09-24  Tony Chang  <tony@chromium.org>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
+2012-09-24  Dana Jansens  <danakj@chromium.org>
+
+        [chromium] Add setters to WebFilterOperation for IPC pickling
+        https://bugs.webkit.org/show_bug.cgi?id=97147
+
+        Reviewed by James Robinson.
+
+        * tests/FilterOperationsTest.cpp:
+        (WebKit):
+        (WebKit::TEST):
+
+2012-09-24  Patrick Gansterer  <paroga@webkit.org>
+
+        Remove remaining WTF_DEPRECATED_STRING_OPERATORS from cpp files
+        https://bugs.webkit.org/show_bug.cgi?id=97412
+
+        Reviewed by Adam Barth.
+
+        * src/WebPageSerializerImpl.cpp:
+        (WebKit::WebPageSerializerImpl::openTagToString): Replaced operator+= with StringBuilder::append().
+        (WebKit::WebPageSerializerImpl::endTagToString): Ditto.
+
 2012-09-24  Yury Semikhatsky  <yurys@chromium.org>
 
         Unreviewed, rolling out r122243.

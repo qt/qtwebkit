@@ -1,3 +1,263 @@
+2012-09-24  Gavin Barraclough  <barraclough@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=97530
+        Regression, freeze applied to numeric properties of non-array objects
+
+        Reviewed by Filip Pizlo.
+
+        Object.freeze has a fast implementation in JSObject, but this hasn't been updated to take into account numeric properties in butterflies.
+        For now, just fall back to the generic implementation if the object has numeric properties.
+
+        * runtime/ObjectConstructor.cpp:
+        (JSC::objectConstructorFreeze):
+            - fallback if the object has a non-zero indexed property vector length.
+
+2012-09-24  Gavin Barraclough  <barraclough@apple.com>
+
+        Bug in numeric accessors on global environment
+        https://bugs.webkit.org/show_bug.cgi?id=97526
+
+        Reviewed by Geoff Garen.
+
+        I've hit this assert in test262 in browser, but haven't yet worked out how to repro in a test case :-/
+        The sparsemap is failing to map back from the global object to the window shell.
+        A test case would need to resolve a numeric property name against the global environment.
+
+        (JSC::SparseArrayEntry::get):
+        (JSC::SparseArrayEntry::put):
+            - Add missing toThisObject calls.
+
+2012-09-24  Filip Pizlo  <fpizlo@apple.com>
+
+        SerializedScriptValue isn't aware of indexed storage, but should be
+        https://bugs.webkit.org/show_bug.cgi?id=97515
+        <rdar://problem/12361874>
+
+        Reviewed by Sam Weinig.
+
+        Export a method that WebCore now uses.
+
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.def:
+        * runtime/JSObject.h:
+        (JSObject):
+
+2012-09-24  Gavin Barraclough  <barraclough@apple.com>
+
+        Remove JSObject::unwrappedGlobalObject(), JSObject::unwrappedObject()
+        https://bugs.webkit.org/show_bug.cgi?id=97519
+
+        Reviewed by Geoff Garen.
+
+        unwrappedGlobalObject() was only needed because globalObject() doesn't always return a helpful result -
+        specifically for WebCore's window shell the structure's globalObject is set to null. We can fix this by
+        simply keeping the structure up to date as the window navigates, obviating the need for this function.
+
+        The only other use of unwrappedObject() came from globalFuncEval(), and this can be trivially removed
+        by flipping the way we perform this globalObject check (which we may also be able to remove!) - instead
+        of getting the globalObject from the provided this value & comparing to the expected globalObject, we
+        can get the this value from the expected globalObject, and compare to that provided.
+
+        * runtime/JSGlobalObject.cpp:
+            - Call globalObject() instead of unwrappedGlobalObject().
+        * runtime/JSGlobalObjectFunctions.cpp:
+        (JSC::globalFuncEval):
+            - Changed to compare this object values, instead of globalObjects -
+              this means we only need to be able to map globalObject -> this,
+              and not vice versa.
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::allowsAccessFrom):
+        (JSC::JSObject::createInheritorID):
+            - Call globalObject() instead of unwrappedGlobalObject().
+        * runtime/JSObject.h:
+        (JSObject):
+            - Removed unwrappedGlobalObject(), unwrappedObject().
+
+2012-09-24  Mark Lam  <mark.lam@apple.com>
+
+        Deleting the classic interpreter and cleaning up some build options.
+        https://bugs.webkit.org/show_bug.cgi?id=96969.
+
+        Reviewed by Geoffrey Garen.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dump):
+        (JSC::CodeBlock::finalizeUnconditionally):
+        (JSC::CodeBlock::stronglyVisitStrongReferences):
+        (JSC):
+        * bytecode/Instruction.h:
+        (JSC::Instruction::Instruction):
+        * interpreter/AbstractPC.cpp:
+        (JSC::AbstractPC::AbstractPC):
+        * interpreter/AbstractPC.h:
+        (AbstractPC):
+        * interpreter/CallFrame.h:
+        (ExecState):
+        * interpreter/Interpreter.cpp:
+        (JSC):
+        (JSC::Interpreter::Interpreter):
+        (JSC::Interpreter::~Interpreter):
+        (JSC::Interpreter::initialize):
+        (JSC::Interpreter::isOpcode):
+        (JSC::Interpreter::unwindCallFrame):
+        (JSC::getLineNumberForCallFrame):
+        (JSC::getCallerInfo):
+        (JSC::getSourceURLFromCallFrame):
+        (JSC::Interpreter::execute):
+        (JSC::Interpreter::executeCall):
+        (JSC::Interpreter::executeConstruct):
+        (JSC::Interpreter::retrieveArgumentsFromVMCode):
+        (JSC::Interpreter::retrieveCallerFromVMCode):
+        (JSC::Interpreter::retrieveLastCaller):
+        * interpreter/Interpreter.h:
+        (JSC::Interpreter::getOpcodeID):
+        (Interpreter):
+        * jit/ExecutableAllocatorFixedVMPool.cpp:
+        (JSC::FixedVMPoolExecutableAllocator::FixedVMPoolExecutableAllocator):
+        * offlineasm/asm.rb:
+        * offlineasm/offsets.rb:
+        * runtime/Executable.cpp:
+        (JSC::EvalExecutable::compileInternal):
+        (JSC::ProgramExecutable::compileInternal):
+        (JSC::FunctionExecutable::compileForCallInternal):
+        (JSC::FunctionExecutable::compileForConstructInternal):
+        * runtime/Executable.h:
+        (JSC::NativeExecutable::create):
+        (NativeExecutable):
+        (JSC::NativeExecutable::finishCreation):
+        * runtime/JSGlobalData.cpp:
+        (JSC):
+        (JSC::JSGlobalData::JSGlobalData):
+        (JSC::JSGlobalData::getHostFunction):
+        * runtime/JSGlobalData.h:
+        (JSGlobalData):
+        (JSC::JSGlobalData::canUseJIT):
+        (JSC::JSGlobalData::canUseRegExpJIT):
+        * runtime/Options.cpp:
+        (JSC::Options::initialize):
+
+2012-09-24  Filip Pizlo  <fpizlo@apple.com>
+
+        Nested try/finally should not confuse the finally unpopper in BytecodeGenerator::emitComplexJumpScopes
+        https://bugs.webkit.org/show_bug.cgi?id=97508
+        <rdar://problem/12361132>
+
+        Reviewed by Sam Weinig.
+
+        We're reusing some vector for multiple iterations of a loop, but we were forgetting to clear its
+        contents from one iteration to the next. Hence if you did multiple iterations of finally unpopping
+        (like in a nested try/finally and a jump out of both of them) then you'd get a corrupted try
+        context stack afterwards.
+
+        * bytecompiler/BytecodeGenerator.cpp:
+        (JSC::BytecodeGenerator::emitComplexJumpScopes):
+
+2012-09-24  Filip Pizlo  <fpizlo@apple.com>
+
+        ValueToInt32 bool case does bad things to registers
+        https://bugs.webkit.org/show_bug.cgi?id=97505
+        <rdar://problem/12356331>
+
+        Reviewed by Mark Hahnenberg.
+
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::compileValueToInt32):
+
+2012-09-24  Mark Lam  <mark.lam@apple.com>
+
+        Add cloopDo instruction for debugging the llint C++ backend.
+        https://bugs.webkit.org/show_bug.cgi?id=97502.
+
+        Reviewed by Geoffrey Garen.
+
+        * offlineasm/cloop.rb:
+        * offlineasm/instructions.rb:
+        * offlineasm/parser.rb:
+
+2012-09-24  Filip Pizlo  <fpizlo@apple.com>
+
+        JSArray::putByIndex asserts with readonly property on prototype
+        https://bugs.webkit.org/show_bug.cgi?id=97435
+        <rdar://problem/12357084>
+
+        Reviewed by Geoffrey Garen.
+
+        Boy, there were some problems:
+        
+        - putDirectIndex() should know that it can set the index quickly even if it's a hole and we're
+          in SlowPut mode, since that's the whole point of PutDirect.
+        
+        - We should have a fast path for putByIndex().
+        
+        - The LiteralParser should not use push(), since that may throw if we're having a bad time.
+
+        * interpreter/Interpreter.cpp:
+        (JSC::eval):
+        * runtime/JSObject.h:
+        (JSC::JSObject::putByIndexInline):
+        (JSObject):
+        (JSC::JSObject::putDirectIndex):
+        * runtime/LiteralParser.cpp:
+        (JSC::::parse):
+
+2012-09-24  Mark Lam  <mark.lam@apple.com>
+
+        Added a missing "if VALUE_PROFILER" around an access to ArrayProfile record.
+        https://bugs.webkit.org/show_bug.cgi?id=97496.
+
+        Reviewed by Filip Pizlo.
+
+        * llint/LowLevelInterpreter32_64.asm:
+        * llint/LowLevelInterpreter64.asm:
+
+2012-09-24  Geoffrey Garen  <ggaren@apple.com>
+
+        Inlined activation tear-off in the DFG
+        https://bugs.webkit.org/show_bug.cgi?id=97487
+
+        Reviewed by Filip Pizlo.
+
+        * dfg/DFGOperations.cpp:
+        * dfg/DFGOperations.h: Activation tear-off is always inlined now, so I
+        removed its out-of-line implementation.
+
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile): Inlined the variable copy and update
+        of JSVariableObject::m_registers. This usually turns into < 10 instructions,
+        which is close to pure win as compared to the operation function call.
+
+        * runtime/JSActivation.h:
+        (JSActivation):
+        (JSC::JSActivation::registersOffset):
+        (JSC::JSActivation::tearOff):
+        (JSC::JSActivation::isTornOff):
+        (JSC):
+        (JSC::JSActivation::storageOffset):
+        (JSC::JSActivation::storage): Tiny bit of refactoring so the JIT can
+        share the pointer math helper functions we use internally.
+
+2012-09-24  Balazs Kilvady  <kilvadyb@homejinni.com>
+
+        MIPS: store8 functions added to MacroAssembler.
+
+        MIPS store8 functions
+        https://bugs.webkit.org/show_bug.cgi?id=97243
+
+        Reviewed by Oliver Hunt.
+
+        Add MIPS store8 functions.
+
+        * assembler/MIPSAssembler.h:
+        (JSC::MIPSAssembler::lhu): New function.
+        (MIPSAssembler):
+        (JSC::MIPSAssembler::sb): New function.
+        (JSC::MIPSAssembler::sh): New function.
+        * assembler/MacroAssemblerMIPS.h:
+        (JSC::MacroAssemblerMIPS::store8): New function.
+        (MacroAssemblerMIPS):
+        (JSC::MacroAssemblerMIPS::store16): New function.
+
 2012-09-23  Geoffrey Garen  <ggaren@apple.com>
 
         PutScopedVar should not be marked as clobbering the world

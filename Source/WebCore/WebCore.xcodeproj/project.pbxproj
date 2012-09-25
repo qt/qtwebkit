@@ -76,8 +76,6 @@
 		033A6A7E147E07E700509B36 /* HTMLPropertiesCollection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 033A6A7D147E07E700509B36 /* HTMLPropertiesCollection.cpp */; };
 		033A6A81147E088600509B36 /* JSHTMLPropertiesCollection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 033A6A80147E088600509B36 /* JSHTMLPropertiesCollection.cpp */; };
 		033A6A83147E08A600509B36 /* JSHTMLPropertiesCollection.h in Headers */ = {isa = PBXBuildFile; fileRef = 033A6A82147E08A600509B36 /* JSHTMLPropertiesCollection.h */; };
-		052BFCE9128ABF1500FD338D /* GeolocationClientMock.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 052BFCE8128ABF1500FD338D /* GeolocationClientMock.cpp */; };
-		052BFCEB128ABF2100FD338D /* GeolocationClientMock.h in Headers */ = {isa = PBXBuildFile; fileRef = 052BFCEA128ABF2100FD338D /* GeolocationClientMock.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		0562F9461573ECEB0031CA16 /* WebKitCSSSVGDocumentValue.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 0562F9441573ECEB0031CA16 /* WebKitCSSSVGDocumentValue.cpp */; };
 		0562F9471573ECEB0031CA16 /* WebKitCSSSVGDocumentValue.h in Headers */ = {isa = PBXBuildFile; fileRef = 0562F9451573ECEB0031CA16 /* WebKitCSSSVGDocumentValue.h */; };
 		0562F9611573F88F0031CA16 /* PlatformLayer.h in Headers */ = {isa = PBXBuildFile; fileRef = 0562F9601573F88F0031CA16 /* PlatformLayer.h */; settings = {ATTRIBUTES = (Private, ); }; };
@@ -6141,6 +6139,8 @@
 		E4778B80115A581A00B5D372 /* JSCustomEvent.h in Headers */ = {isa = PBXBuildFile; fileRef = E4778B7E115A581A00B5D372 /* JSCustomEvent.h */; };
 		E47B4BE80E71241600038854 /* CachedResourceHandle.h in Headers */ = {isa = PBXBuildFile; fileRef = E47B4BE60E71241600038854 /* CachedResourceHandle.h */; settings = {ATTRIBUTES = (Private, ); }; };
 		E47B4BE90E71241600038854 /* CachedResourceHandle.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E47B4BE70E71241600038854 /* CachedResourceHandle.cpp */; };
+		E47E276516036ED200EE2AFB /* DocumentStyleSheetCollection.h in Headers */ = {isa = PBXBuildFile; fileRef = E47E276416036ED200EE2AFB /* DocumentStyleSheetCollection.h */; settings = {ATTRIBUTES = (Private, ); }; };
+		E47E276816036EDC00EE2AFB /* DocumentStyleSheetCollection.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E47E276716036EDC00EE2AFB /* DocumentStyleSheetCollection.cpp */; };
 		E4946EAE156E64DD00D3297F /* StyleRuleImport.cpp in Sources */ = {isa = PBXBuildFile; fileRef = E4946EAC156E64DD00D3297F /* StyleRuleImport.cpp */; };
 		E4946EAF156E64DD00D3297F /* StyleRuleImport.h in Headers */ = {isa = PBXBuildFile; fileRef = E4946EAD156E64DD00D3297F /* StyleRuleImport.h */; };
 		E49BD9FA131FD2ED003C56F0 /* CSSValuePool.h in Headers */ = {isa = PBXBuildFile; fileRef = E49BD9F9131FD2ED003C56F0 /* CSSValuePool.h */; };
@@ -7088,8 +7088,6 @@
 		033A6A7F147E07F900509B36 /* HTMLPropertiesCollection.idl */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = HTMLPropertiesCollection.idl; sourceTree = "<group>"; };
 		033A6A80147E088600509B36 /* JSHTMLPropertiesCollection.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = JSHTMLPropertiesCollection.cpp; sourceTree = "<group>"; };
 		033A6A82147E08A600509B36 /* JSHTMLPropertiesCollection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = JSHTMLPropertiesCollection.h; sourceTree = "<group>"; };
-		052BFCE8128ABF1500FD338D /* GeolocationClientMock.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; name = GeolocationClientMock.cpp; path = mock/GeolocationClientMock.cpp; sourceTree = "<group>"; };
-		052BFCEA128ABF2100FD338D /* GeolocationClientMock.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = GeolocationClientMock.h; path = mock/GeolocationClientMock.h; sourceTree = "<group>"; };
 		0562F9441573ECEB0031CA16 /* WebKitCSSSVGDocumentValue.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = WebKitCSSSVGDocumentValue.cpp; sourceTree = "<group>"; };
 		0562F9451573ECEB0031CA16 /* WebKitCSSSVGDocumentValue.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WebKitCSSSVGDocumentValue.h; sourceTree = "<group>"; };
 		0562F9601573F88F0031CA16 /* PlatformLayer.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PlatformLayer.h; sourceTree = "<group>"; };
@@ -13520,6 +13518,8 @@
 		E4778B7E115A581A00B5D372 /* JSCustomEvent.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = JSCustomEvent.h; sourceTree = "<group>"; };
 		E47B4BE60E71241600038854 /* CachedResourceHandle.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CachedResourceHandle.h; sourceTree = "<group>"; };
 		E47B4BE70E71241600038854 /* CachedResourceHandle.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = CachedResourceHandle.cpp; sourceTree = "<group>"; };
+		E47E276416036ED200EE2AFB /* DocumentStyleSheetCollection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = DocumentStyleSheetCollection.h; sourceTree = "<group>"; };
+		E47E276716036EDC00EE2AFB /* DocumentStyleSheetCollection.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = DocumentStyleSheetCollection.cpp; sourceTree = "<group>"; };
 		E4946EAC156E64DD00D3297F /* StyleRuleImport.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = StyleRuleImport.cpp; sourceTree = "<group>"; };
 		E4946EAD156E64DD00D3297F /* StyleRuleImport.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StyleRuleImport.h; sourceTree = "<group>"; };
 		E49BD9F9131FD2ED003C56F0 /* CSSValuePool.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CSSValuePool.h; sourceTree = "<group>"; };
@@ -15461,8 +15461,6 @@
 			children = (
 				59309A1011F4AE5800250603 /* DeviceOrientationClientMock.cpp */,
 				59309A1211F4AE6A00250603 /* DeviceOrientationClientMock.h */,
-				052BFCE8128ABF1500FD338D /* GeolocationClientMock.cpp */,
-				052BFCEA128ABF2100FD338D /* GeolocationClientMock.h */,
 				0FE71403142170B800DB33BA /* ScrollbarThemeMock.cpp */,
 				0FE71404142170B800DB33BA /* ScrollbarThemeMock.h */,
 			);
@@ -21671,6 +21669,8 @@
 				14947FFC12F80CD200A0F631 /* DocumentOrderedMap.h */,
 				A8C2280D11D4A59700D5A7D3 /* DocumentParser.cpp */,
 				BCCFBAE70B5152ED0001F1D7 /* DocumentParser.h */,
+				E47E276716036EDC00EE2AFB /* DocumentStyleSheetCollection.cpp */,
+				E47E276416036ED200EE2AFB /* DocumentStyleSheetCollection.h */,
 				86D982F6125C154000AD9E3D /* DocumentTiming.h */,
 				A8185F3209765765005826D9 /* DocumentType.cpp */,
 				A8185F3109765765005826D9 /* DocumentType.h */,
@@ -22275,6 +22275,7 @@
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E47E276516036ED200EE2AFB /* DocumentStyleSheetCollection.h in Headers */,
 				97BC69DB1505F076001B74AC /* AbstractDatabase.h in Headers */,
 				41E1B1D10FF5986900576B3B /* AbstractWorker.h in Headers */,
 				29A8122E0FBB9C1D00510293 /* AccessibilityARIAGridCell.h in Headers */,
@@ -23521,7 +23522,6 @@
 				0720B0A114D3323500642955 /* GenericEventQueue.h in Headers */,
 				9746AF2414F4DDE6003E7A70 /* Geolocation.h in Headers */,
 				BC56CB2310D5AC8000A77C64 /* GeolocationClient.h in Headers */,
-				052BFCEB128ABF2100FD338D /* GeolocationClientMock.h in Headers */,
 				9746AF2714F4DDE6003E7A70 /* GeolocationController.h in Headers */,
 				9746AF2814F4DDE6003E7A70 /* GeolocationError.h in Headers */,
 				9746AF2914F4DDE6003E7A70 /* GeolocationPosition.h in Headers */,
@@ -26753,7 +26753,6 @@
 				2D481F03146B5C6500AA7834 /* GeneratorGeneratedImage.cpp in Sources */,
 				0720B0A014D3323500642955 /* GenericEventQueue.cpp in Sources */,
 				9746AF2314F4DDE6003E7A70 /* Geolocation.cpp in Sources */,
-				052BFCE9128ABF1500FD338D /* GeolocationClientMock.cpp in Sources */,
 				9746AF2614F4DDE6003E7A70 /* GeolocationController.cpp in Sources */,
 				0720B0A014D3323500642956 /* GestureEvent.cpp in Sources */,
 				B2C3DA6D0D006CD600EF6F26 /* GlyphPageTreeNode.cpp in Sources */,
@@ -28668,6 +28667,7 @@
 				E1BE512D0CF6C512002EA959 /* XSLTUnicodeSort.cpp in Sources */,
 				977E2E0E12F0FC9C00C13379 /* XSSAuditor.cpp in Sources */,
 				FD537352137B651800008DCE /* ZeroPole.cpp in Sources */,
+				E47E276816036EDC00EE2AFB /* DocumentStyleSheetCollection.cpp in Sources */,
 				4F1D11BF15FF37200026E908 /* PlatformMemoryInstrumentation.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
