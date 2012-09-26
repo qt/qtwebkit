@@ -2285,6 +2285,11 @@ void FrameLoader::setOriginalURLForDownloadRequest(ResourceRequest& request)
     }
 }
 
+void FrameLoader::didLayout(LayoutMilestones milestones)
+{
+    m_client->dispatchDidLayout(milestones);
+}
+
 void FrameLoader::didFirstLayout()
 {
     if (m_frame->page() && isBackForwardLoadType(m_loadType))
@@ -2292,18 +2297,6 @@ void FrameLoader::didFirstLayout()
 
     if (m_stateMachine.committedFirstRealDocumentLoad() && !m_stateMachine.isDisplayingInitialEmptyDocument() && !m_stateMachine.firstLayoutDone())
         m_stateMachine.advanceTo(FrameLoaderStateMachine::FirstLayoutDone);
-
-    m_client->dispatchDidFirstLayout();
-}
-
-void FrameLoader::didFirstVisuallyNonEmptyLayout()
-{
-    m_client->dispatchDidFirstVisuallyNonEmptyLayout();
-}
-
-void FrameLoader::didNewFirstVisuallyNonEmptyLayout()
-{
-    m_client->dispatchDidNewFirstVisuallyNonEmptyLayout();
 }
 
 void FrameLoader::frameLoadCompleted()

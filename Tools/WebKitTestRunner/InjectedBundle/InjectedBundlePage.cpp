@@ -328,7 +328,8 @@ InjectedBundlePage::InjectedBundlePage(WKBundlePageRef page)
         didFinishProgress, // didFinishProgress
         0, // shouldForceUniversalAccessFromLocalURL
         didReceiveIntentForFrame, // didReceiveIntentForFrame
-        registerIntentServiceForFrame // registerIntentServiceForFrame
+        registerIntentServiceForFrame, // registerIntentServiceForFrame
+        0, // didLayout
     };
     WKBundlePageSetPageLoaderClient(m_page, &loaderClient);
 
@@ -742,6 +743,8 @@ void InjectedBundlePage::didStartProvisionalLoadForFrame(WKBundleFrameRef frame)
     if (!InjectedBundle::shared().isTestRunning())
         return;
 
+    platformDidStartProvisionalLoadForFrame(frame);
+
     if (InjectedBundle::shared().testRunner()->shouldDumpFrameLoadCallbacks()) {
         dumpFrameDescriptionSuitableForTestResult(frame);
         InjectedBundle::shared().stringBuilder()->appendLiteral(" - didStartProvisionalLoadForFrame\n");
@@ -1147,9 +1150,6 @@ static inline bool isHTTPOrHTTPSScheme(WKStringRef scheme)
 
 WKURLRequestRef InjectedBundlePage::willSendRequestForFrame(WKBundlePageRef, WKBundleFrameRef frame, uint64_t identifier, WKURLRequestRef request, WKURLResponseRef response)
 {
-    if (InjectedBundle::shared().isTestRunning() && InjectedBundle::shared().testRunner()->willSendRequestReturnsNull())
-        return 0;
-
     if (InjectedBundle::shared().isTestRunning()
         && InjectedBundle::shared().testRunner()->shouldDumpResourceLoadCallbacks()) {
         dumpResourceURL(identifier);
@@ -1158,6 +1158,15 @@ WKURLRequestRef InjectedBundlePage::willSendRequestForFrame(WKBundlePageRef, WKB
         InjectedBundle::shared().stringBuilder()->appendLiteral(" redirectResponse ");
         dumpResponseDescriptionSuitableForTestResult(response);
         InjectedBundle::shared().stringBuilder()->append('\n');
+    }
+
+    if (InjectedBundle::shared().isTestRunning() && InjectedBundle::shared().testRunner()->willSendRequestReturnsNull())
+        return 0;
+
+    WKRetainPtr<WKURLRef> redirectURL = adoptWK(WKURLResponseCopyURL(response));
+    if (InjectedBundle::shared().isTestRunning() && InjectedBundle::shared().testRunner()->willSendRequestReturnsNullOnRedirect() && redirectURL) {
+        InjectedBundle::shared().stringBuilder()->appendLiteral("Returning null for this redirect\n");
+        return 0;
     }
 
     WKRetainPtr<WKURLRef> url = adoptWK(WKURLRequestCopyURL(request));
@@ -1862,5 +1871,11 @@ void InjectedBundlePage::dumpBackForwardList()
 
     InjectedBundle::shared().stringBuilder()->appendLiteral("===============================================\n");
 }
+
+#if !PLATFORM(MAC)
+void InjectedBundlePage::platformDidStartProvisionalLoadForFrame(WKBundleFrameRef)
+{
+}
+#endif
 
 } // namespace WTR

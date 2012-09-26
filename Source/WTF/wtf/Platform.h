@@ -698,7 +698,6 @@
 #define HAVE_LANGINFO_H 1
 #define HAVE_MMAP 1
 #define HAVE_MERGESORT 1
-#define HAVE_SBRK 1
 #define HAVE_STRINGS_H 1
 #define HAVE_SYS_PARAM_H 1
 #define HAVE_SYS_TIME_H 1
@@ -739,7 +738,6 @@
 #define HAVE_MMAP 1
 #define HAVE_MADV_FREE_REUSE 1
 #define HAVE_MADV_FREE 1
-#define HAVE_SBRK 1
 #define HAVE_STRINGS_H 1
 #define HAVE_SYS_PARAM_H 1
 #define HAVE_SYS_TIME_H 1
@@ -749,7 +747,6 @@
 
 #define HAVE_ERRNO_H 1
 #define HAVE_NMAP 1
-#define HAVE_SBRK 1
 #define HAVE_STRINGS_H 1
 #define HAVE_SYS_PARAM_H 1
 #define HAVE_SYS_TIME_H 1
@@ -761,7 +758,6 @@
 #define HAVE_ERRNO_H 1
 #define HAVE_LANGINFO_H 1
 #define HAVE_MMAP 1
-#define HAVE_SBRK 1
 #define HAVE_STRINGS_H 1
 #define HAVE_SYS_PARAM_H 1
 #define HAVE_SYS_TIME_H 1
@@ -916,7 +912,7 @@
 #define ENABLE_LLINT 1
 #endif
 
-#if !defined(ENABLE_DFG_JIT) && ENABLE(JIT)
+#if !defined(ENABLE_DFG_JIT) && ENABLE(JIT) && !COMPILER(MSVC)
 /* Enable the DFG JIT on X86 and X86_64.  Only tested on Mac and GNU/Linux. */
 #if (CPU(X86) || CPU(X86_64)) && (PLATFORM(MAC) || OS(LINUX))
 #define ENABLE_DFG_JIT 1
@@ -929,6 +925,22 @@
 #if CPU(ARM_TRADITIONAL)
 #define ENABLE_DFG_JIT 1
 #endif
+#endif
+
+/* If the jit is not available, enable the LLInt C Loop: */
+#if !ENABLE(JIT)
+#undef ENABLE_LLINT        /* Undef so that we can redefine it. */
+#undef ENABLE_LLINT_C_LOOP /* Undef so that we can redefine it. */
+#undef ENABLE_DFG_JIT      /* Undef so that we can redefine it. */
+#define ENABLE_LLINT 1
+#define ENABLE_LLINT_C_LOOP 1
+#define ENABLE_DFG_JIT 0
+#endif
+
+/* Do a sanity check to make sure that we at least have one execution engine in
+   use: */
+#if !(ENABLE(JIT) || ENABLE(LLINT))
+#error You have to have at least one execution model enabled to build JSC
 #endif
 
 /* Profiling of types and values used by JIT code. DFG_JIT depends on it, but you
@@ -951,19 +963,6 @@
    set ENABLE_SAMPLING_COUNTERS to 1. */
 #if !defined(ENABLE_WRITE_BARRIER_PROFILING)
 #define ENABLE_WRITE_BARRIER_PROFILING 0
-#endif
-
-/* If the jit and classic interpreter is not available, enable the LLInt C Loop: */
-#if !ENABLE(JIT)
-    #define ENABLE_LLINT 1
-    #define ENABLE_LLINT_C_LOOP 1
-    #define ENABLE_DFG_JIT 0
-#endif
-
-/* Do a sanity check to make sure that we at least have one execution engine in
-   use: */
-#if !(ENABLE(JIT) || ENABLE(LLINT))
-#error You have to have at least one execution model enabled to build JSC
 #endif
 
 /* Configure the JIT */

@@ -1,3 +1,120 @@
+2012-09-25  Genevieve Mak  <gmak@rim.com>
+
+        Fat Fingers doesn't work on non-scrollable pages.
+        PR #209609
+        https://bugs.webkit.org/show_bug.cgi?id=97607
+
+        Reviewed by Antonio Gomes.
+
+        Only bypass Fat Fingers and use the actual touch point if its specifically
+        requested and the page has a mouse move listener or if using the Touch Event
+        Mode meta-tag.
+
+        * WebKitSupport/TouchEventHandler.cpp:
+        (BlackBerry::WebKit::TouchEventHandler::handleTouchPoint):
+
+2012-09-25  Rob Buis  <rbuis@rim.com>
+
+        [BlackBerry] Make COMPUTED_GOTO part of the HAVE section
+        https://bugs.webkit.org/show_bug.cgi?id=97600
+
+        Reviewed by Yong Li.
+
+        Also get rid of COMPUTED_GOTO_INTERPRETER and add COMPUTED_GOTO_OPCODES.
+
+        * WebCoreSupport/AboutDataEnableFeatures.in:
+        * WebCoreSupport/AboutDataHaveFeatures.in:
+
+2012-09-25  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Suspend the backingstore while adjusting the view on input field focus.
+        https://bugs.webkit.org/show_bug.cgi?id=97595
+
+        Reviewed by Antonio Gomes.
+
+        PR 188751.
+
+        Avoid jumpiness when both a scroll and zoom are required to
+        move an input field into focus by suspending the backingstore.
+
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::ensureFocusTextElementVisible):
+
+2012-09-25  Pratik Solanki  <psolanki@apple.com>
+
+        Remove HAVE_SBRK since we never set use_sbrk to true
+        https://bugs.webkit.org/show_bug.cgi?id=97525
+        <rdar://problem/12363601>
+
+        Reviewed by Geoffrey Garen.
+
+        * WebCoreSupport/AboutDataHaveFeatures.in: Remove SBRK from list.
+
+2012-09-25  Beth Dakin  <bdakin@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=95397
+        Need to merge didFirstVisuallyNonEmptyLayout and 
+        didNewFirstVisuallyNonEmptyLayout
+        -and corresponding-
+        <rdar://problem/10791680>
+
+        Reviewed by Sam Weinig.
+
+        Remove dispatchDidFirstLayout, 
+        dispatchDidFirstVisuallyNonEmptyLayout, and 
+        dispatchDidNewFirstVisuallyNonEmptyLayout. Their functionality 
+        is now replaced by dispatchDidLayout(LayoutMilestoneOptions)
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::dispatchDidLayout):
+        * WebCoreSupport/FrameLoaderClientBlackBerry.h:
+        (FrameLoaderClientBlackBerry):
+
+        It is now necessary to opt into getting any of the 
+        "layout milestone" notifications.
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::init):
+
+2012-09-25  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] When zooming into an input field take the current zoom level into account.
+        https://bugs.webkit.org/show_bug.cgi?id=97594
+
+        Reviewed by Antonio Gomes.
+
+        PR 188751.
+
+        Perform the zoom action prior to scroll to avoid breaking scrolling
+        rules.  Take the current scale into account when calculating the
+        zoom factor.
+
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::ensureFocusTextElementVisible):
+
+2012-09-25  Nima Ghanavatian  <nghanavatian@rim.com>
+
+        [BlackBerry] Handling required for multiple consecutive whitespace
+        https://bugs.webkit.org/show_bug.cgi?id=97575
+
+        Reviewed by Rob Buis.
+
+        PR211670
+        Need specific handling in the case where we have multiple
+        consecutive whitespaces which exceeds our character limit. This
+        breaks some of the functionality employed with the visible_units
+        methods used here to tranverse the text.
+
+        Internally reviewed by Mike Fenton.
+
+        * WebKitSupport/DOMSupport.cpp:
+        (BlackBerry::WebKit::DOMSupport::trimWhitespaceFromRange):
+        (DOMSupport):
+        (BlackBerry::WebKit::DOMSupport::isEmptyRangeOrAllSpaces):
+        * WebKitSupport/DOMSupport.h:
+        (WebCore):
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::spellCheckBlock):
+        (BlackBerry::WebKit::InputHandler::getRangeForSpellCheckWithFineGranularity):
+
 2012-09-24  Mark Lam  <mark.lam@apple.com>
 
         Deleting the classic interpreter and cleaning up some build options.

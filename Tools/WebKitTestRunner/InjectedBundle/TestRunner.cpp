@@ -87,6 +87,7 @@ TestRunner::TestRunner()
     , m_testRepaint(false)
     , m_testRepaintSweepHorizontally(false)
     , m_willSendRequestReturnsNull(false)
+    , m_willSendRequestReturnsNullOnRedirect(false)
     , m_shouldStopProvisionalFrameLoads(false)
     , m_policyDelegateEnabled(false)
     , m_policyDelegatePermissive(false)
@@ -782,6 +783,12 @@ void TestRunner::setGeolocationPermission(bool enabled)
 void TestRunner::setMockGeolocationPosition(double latitude, double longitude, double accuracy)
 {
     InjectedBundle::shared().setMockGeolocationPosition(latitude, longitude, accuracy);
+}
+
+void TestRunner::setMockGeolocationPositionUnavailableError(JSStringRef message)
+{
+    WKRetainPtr<WKStringRef> messageWK = toWK(message);
+    InjectedBundle::shared().setMockGeolocationPositionUnavailableError(messageWK.get());
 }
 
 bool TestRunner::callShouldCloseOnWebView()

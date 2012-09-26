@@ -321,6 +321,11 @@ double WKBundlePageGetBackingScaleFactor(WKBundlePageRef pageRef)
     return toImpl(pageRef)->deviceScaleFactor();
 }
 
+void WKBundlePageListenForLayoutMilestones(WKBundlePageRef pageRef, WKLayoutMilestones milestones)
+{
+    toImpl(pageRef)->listenForLayoutMilestones(toLayoutMilestones(milestones));
+}
+
 void WKBundlePageDeliverIntentToFrame(WKBundlePageRef pageRef, WKBundleFrameRef frameRef, WKBundleIntentRef intentRef)
 {
 #if ENABLE(WEB_INTENTS)
@@ -370,9 +375,10 @@ WKRenderLayerRef WKBundlePageCopyRenderLayerTree(WKBundlePageRef pageRef)
     return toAPI(WebRenderLayer::create(toImpl(pageRef)).leakRef());
 }
 
-void WKBundlePageSetPaintedObjectsCounterThreshold(WKBundlePageRef page, uint64_t threshold)
+void WKBundlePageSetPaintedObjectsCounterThreshold(WKBundlePageRef, uint64_t)
 {
-    toImpl(page)->setPaintedObjectsCounterThreshold(threshold);
+    // FIXME: This function is only still here to keep open source Mac builds building.
+    // We should remove it as soon as we can.
 }
 
 void WKBundlePageSetTracksRepaints(WKBundlePageRef pageRef, bool trackRepaints)
@@ -425,6 +431,9 @@ bool WKBundlePageCanShowMIMEType(WKBundlePageRef, WKStringRef mimeTypeRef)
         return true;
 
     if (MIMETypeRegistry::isSupportedImageMIMEType(mimeType))
+        return true;
+
+    if (MIMETypeRegistry::isSupportedMediaMIMEType(mimeType))
         return true;
 
     if (mimeType.startsWith("text/", false))

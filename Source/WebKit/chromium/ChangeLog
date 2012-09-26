@@ -1,3 +1,119 @@
+2012-09-25  Alpha Lam  <hclam@chromium.org>
+
+        Unreviewed. Roll DEPS for Chromium.
+
+        * DEPS:
+
+2012-09-25  Beth Dakin  <bdakin@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=95397
+        Need to merge didFirstVisuallyNonEmptyLayout and 
+        didNewFirstVisuallyNonEmptyLayout
+        -and corresponding-
+        <rdar://problem/10791680>
+
+        Reviewed by Sam Weinig.
+
+        Remove dispatchDidFirstLayout, 
+        dispatchDidFirstVisuallyNonEmptyLayout, and 
+        dispatchDidNewFirstVisuallyNonEmptyLayout. Their functionality 
+        is now replaced by dispatchDidLayout(LayoutMilestoneOptions)
+        * src/FrameLoaderClientImpl.cpp:
+        (WebKit::FrameLoaderClientImpl::dispatchDidLayout):
+        * src/FrameLoaderClientImpl.h:
+        (FrameLoaderClientImpl):
+
+        It is now necessary to opt into getting any of the 
+        "layout milestone" notifications.
+        * src/WebHelperPluginImpl.cpp:
+        (WebKit::WebHelperPluginImpl::initPage):
+        * src/WebPagePopupImpl.cpp:
+        (WebKit::WebPagePopupImpl::initPage):
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::WebViewImpl):
+
+2012-09-25  Joshua Bell  <jsbell@chromium.org>
+
+        IndexedDB: One transaction coordinator per database
+        https://bugs.webkit.org/show_bug.cgi?id=97501
+
+        Reviewed by Tony Chang.
+
+        Remove obsolete argument.
+
+        * tests/IDBDatabaseBackendTest.h:
+
+2012-09-25  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r129517.
+        http://trac.webkit.org/changeset/129517
+        https://bugs.webkit.org/show_bug.cgi?id=97582
+
+        Link errors in chromium (Requested by alecf on #webkit).
+
+        * public/WebUserMediaRequest.h:
+        (WebUserMediaRequest):
+        * src/WebUserMediaRequest.cpp:
+
+2012-09-25  Dominic Mazzoni  <dmazzoni@google.com>
+
+        AX: Chromium doesn't pass accessibility text range and line number tests
+        https://bugs.webkit.org/show_bug.cgi?id=97246
+
+        Reviewed by Chris Fleizach.
+
+        Use improved implementation of AccessibilityRenderObject::lineBreaks
+        and implement methods to get the line number of the selection and
+        to set the text range.
+
+        Enables four existing tests to pass on Chromium:
+        Tests: accessibility/textarea-insertion-point-line-number.html
+               accessibility/textarea-line-for-index.html
+               accessibility/textarea-selected-text-range.html
+               accessibility/textbox-role-reports-selection.html
+
+        * public/WebAccessibilityObject.h:
+        (WebAccessibilityObject):
+        * src/WebAccessibilityObject.cpp:
+        (WebKit::WebAccessibilityObject::selectionEndLineNumber):
+        (WebKit):
+        (WebKit::WebAccessibilityObject::selectionStartLineNumber):
+        (WebKit::WebAccessibilityObject::setSelectedTextRange):
+        (WebKit::WebAccessibilityObject::lineBreaks):
+
+2012-09-25  Tommy Widenflycht  <tommyw@google.com>
+
+        MediaStream API: Update getUserMedia to match the latest specification
+        https://bugs.webkit.org/show_bug.cgi?id=97540
+
+        Reviewed by Adam Barth.
+
+        http://dev.w3.org/2011/webrtc/editor/getusermedia.html#navigatorusermedia
+        Navigator.getUserMedia is changed so that the audio and video members can either
+        be a bool or a constraints object.
+
+        * public/WebUserMediaRequest.h:
+        (WebKit):
+        (WebUserMediaRequest):
+        * src/WebUserMediaRequest.cpp:
+        (WebKit::WebUserMediaRequest::audioConstraints):
+        (WebKit):
+        (WebKit::WebUserMediaRequest::videoConstraints):
+
+2012-09-24  Andrey Kosyakov  <caseq@chromium.org>
+
+        [chromium] adding a page overlay causes endless update loop when accelerated compositing is used
+        https://bugs.webkit.org/show_bug.cgi?id=97466
+
+        Reviewed by James Robinson.
+
+        Do not update overlays in composite() -- doing so ultimately causes invalidation
+        of the view, hence another update and another call do composite(). Overlays should be
+        updated only when their content changes.
+
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::composite):
+
 2012-09-21  Ilya Tikhonovsky  <loislo@chromium.org>
 
         Web Inspector: extract Vector instrumentation from core NMI code into MemoryInstrumentationVector.h header.

@@ -1,3 +1,545 @@
+2012-09-25  Raphael Kubo da Costa  <raphael.kubo.da.costa@intel.com>
+
+        [DRT][WTR] Support overriding the 'WebKitDisplayImagesKey' preference
+        https://bugs.webkit.org/show_bug.cgi?id=96883
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::overrideBoolPreferenceForTestRunner): Add
+        support for changing
+        WebPreferencesKey::loadsImagesAutomaticallyKey().
+
+2012-09-25  Dan Bernstein  <mitz@apple.com>
+
+        Try to fix non-Mac builds.
+
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::updatePreferences):
+
+2012-09-25  Dan Bernstein  <mitz@apple.com>
+
+        WebKit2 part of <rdar://problem/11455228> [mac] Stop using screen fonts
+        https://bugs.webkit.org/show_bug.cgi?id=97620
+
+        Reviewed by John Sullivan.
+
+        * Shared/WebPreferencesStore.h:
+        (WebKit): Changed the default value of the screenFontSubstitutionEnabled preference to false.
+        * Shared/WebProcessCreationParameters.cpp:
+        (WebKit::WebProcessCreationParameters::WebProcessCreationParameters): Added an initializer for
+        the new shouldForceScreenFontSubstitution data member.
+        (WebKit::WebProcessCreationParameters::encode): Added encoding of shouldForceScreenFontSubstitution.
+        (WebKit::WebProcessCreationParameters::decode): Added decoding of shouldForceScreenFontSubstitution.
+        * Shared/WebProcessCreationParameters.h:
+        (WebProcessCreationParameters): Added shouldForceScreenFontSubstitution boolean data member.
+        * UIProcess/mac/WebContextMac.mm:
+        (WebKit::WebContext::platformInitializeWebProcess): Added code to set shouldForceScreenFontSubstitution
+        in the process creation parameters to the value of the NSFontDefaultScreenFontSubstitutionEnabled user
+        defaults key.
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::updatePreferences): Changed to enable screen font substitution also if
+        shouldForceScreenFontSubstitution() is true.
+        * WebProcess/WebProcess.h:
+        (WebKit::WebProcess::shouldForceScreenFontSubstitution): Added this getter.
+        (WebProcess): Added m_shouldForceScreenFontSubstitution boolean data member.
+        * WebProcess/mac/WebProcessMac.mm:
+        (WebKit::WebProcess::platformInitializeWebProcess): Added initialization of
+        m_shouldForceScreenFontSubstitution from the creation parameters.
+
+2012-09-25  Alexey Proskuryakov  <ap@apple.com>
+
+        Get rid of WebContext::m_pendingMessagesToPostToInjectedBundle
+        https://bugs.webkit.org/show_bug.cgi?id=94368
+
+        Reviewed by Anders Carlsson.
+
+        It doesn't appear to be of any use.
+
+        * UIProcess/WebContext.cpp:
+        (WebKit::WebContext::createNewWebProcess):
+        (WebKit::WebContext::postMessageToInjectedBundle):
+        * UIProcess/WebContext.h:
+
+2012-09-24  Simon Fraser  <simon.fraser@apple.com>
+
+        <rdar://problem/12351906> Have DumpRenderTree and WebKitTestRunner crash logs show which test crashed
+
+        Reviewed by Mark Rowe.
+
+        Use a new WebKitSytemInterface function to add data to crash logs about which 
+        test was running when the crash happened.
+
+        * WebProcess/WebCoreSupport/mac/WebSystemInterface.mm:
+        (InitWebCoreSystemInterface):  Hook up the function pointer for [wk|WK]SetCrashReportApplicationSpecificInformation.
+
+2012-09-25  Beth Dakin  <bdakin@apple.com>
+
+        Build fix. I removed this function as a part of 
+        https://bugs.webkit.org/show_bug.cgi?id=95397 but it is
+        still needed for nightlies and open source builds.
+
+        * WebProcess/InjectedBundle/API/c/WKBundlePage.cpp:
+        (WKBundlePageSetPaintedObjectsCounterThreshold):
+        * WebProcess/InjectedBundle/API/c/WKBundlePagePrivate.h:
+
+2012-09-25  Beth Dakin  <bdakin@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=95397
+        Need to merge didFirstVisuallyNonEmptyLayout and 
+        didNewFirstVisuallyNonEmptyLayout
+        -and corresponding-
+        <rdar://problem/10791680>
+
+        Reviewed by Sam Weinig.
+
+        The new API has two parts. First, the client has to opt into which 
+        layout milestones they are interested in hearing about using 
+        WKPageListenForLayoutMilestones or 
+        WKBundlePageListenForLayoutMilestones(). Then, WebKit will call 
+        the didLayout(WKLayoutMilestones) callback on the appropriate 
+        clients when the specified layout milestones have fired. didLayout 
+        takes the WKLayoutMilestones bit mask, which will indicate which 
+        milestones have fired since it is possible for two to fire at the 
+        same time.
+
+        Define WKLayoutMilestoneOptions.
+        * Shared/API/c/WKPageLoadTypes.h:
+
+        Define conversions between WKLayoutMilestoneOptions and 
+        WebCore::LayoutMilestoneOptions
+        * Shared/API/c/WKSharedAPICast.h:
+        (WebKit::toWKLayoutMilestoneOptions):
+        (WebKit):
+        (WebKit::toLayoutMilestoneOptions):
+
+        New API.
+        * UIProcess/API/C/WKPage.cpp:
+        (WKPageListenForLayoutMilestones):
+        * UIProcess/API/C/WKPage.h:
+        * UIProcess/WebLoaderClient.cpp:
+        (WebKit::WebLoaderClient::didLayout):
+        (WebKit):
+        * UIProcess/WebLoaderClient.h:
+        (WebLoaderClient):
+
+        didFirstLayoutForFrame, didFirstVisuallyNonEmptyLayoutForFrame, 
+        and didNewFirstVisuallyNonEmptyLayout are now implemented with 
+        didLayout under the hood. So if those old callbacks have been 
+        defined, be sure to add the appropriate layout milestones here for 
+        backwards-compatibility.
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::initializeLoaderClient):
+
+        New API.
+        (WebKit::WebPageProxy::listenForLayoutMilestones):
+        (WebKit):
+        (WebKit::WebPageProxy::didLayout):
+        * UIProcess/WebPageProxy.h:
+        (WebPageProxy):
+        * UIProcess/WebPageProxy.messages.in:
+
+        New API. And remove the now-unnecessary 
+        WKBundlePageSetPaintedObjectsCounterThreshold. 
+        * WebProcess/InjectedBundle/API/c/WKBundlePage.cpp:
+        (WKBundlePageListenForLayoutMilestones):
+        * WebProcess/InjectedBundle/API/c/WKBundlePage.h:
+        * WebProcess/InjectedBundle/API/c/WKBundlePagePrivate.h:
+
+        New API.
+        * WebProcess/InjectedBundle/InjectedBundlePageLoaderClient.cpp:
+        (WebKit::InjectedBundlePageLoaderClient::didNewFirstVisuallyNonEmptyLayout):
+        (WebKit):
+        (WebKit::InjectedBundlePageLoaderClient::didLayout):
+        * WebProcess/InjectedBundle/InjectedBundlePageLoaderClient.h:
+        (InjectedBundlePageLoaderClient):
+
+        Remove dispatchDidFirstLayout, 
+        dispatchDidFirstVisuallyNonEmptyLayout, and 
+        dispatchDidNewFirstVisuallyNonEmptyLayout. They are now replaced 
+        by dispatchDidLayout(LayoutMilestoneOptions)
+        * WebProcess/WebCoreSupport/WebFrameLoaderClient.cpp:
+        (WebKit::WebFrameLoaderClient::dispatchDidLayout):
+        * WebProcess/WebCoreSupport/WebFrameLoaderClient.h:
+        (WebFrameLoaderClient):
+
+        didFirstLayoutForFrame, didFirstVisuallyNonEmptyLayoutForFrame, 
+        and didNewFirstVisuallyNonEmptyLayout are now implemented with 
+        didLayout under the hood. So if those old callbacks have been 
+        defined, be sure to add the appropriate layout milestones here for 
+        backwards-compatibility.
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::initializeInjectedBundleLoaderClient):
+        (WebKit):
+
+        Call into WebCore to set the layout milestones.
+        (WebKit::WebPage::listenForLayoutMilestones):
+        * WebProcess/WebPage/WebPage.h:
+        (WebPage):
+        * WebProcess/WebPage/WebPage.messages.in:
+
+        Account for the new member of PageLoadClient.
+        * WebProcess/qt/QtBuiltinBundlePage.cpp:
+        (WebKit::QtBuiltinBundlePage::QtBuiltinBundlePage):
+
+2012-09-25  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK][EFL] Disk cache is never dumped to disk in WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=97583
+
+        Reviewed by Martin Robinson.
+
+        The problem is that WebProcess::platformTerminate(), where the
+        cache is currently dumped, is not called when the web process
+        finishes because the UI process closes the connection. The cache
+        is created and loaded in the main() so it can also be flushed and
+        dumped there, so that we also make sure it's always called when
+        the process finishes normally when the main loop quits.
+
+        * WebProcess/efl/WebProcessMainEfl.cpp:
+        (WebKit::WebProcessMainEfl): Flush and dump the disk cache when
+        the main loop returns.
+        * WebProcess/gtk/WebProcessMainGtk.cpp:
+        (WebKit::WebProcessMainGtk): Ditto.
+        * WebProcess/soup/WebProcessSoup.cpp:
+        (WebKit::WebProcess::platformTerminate): Do not flush and dump
+        the disk cache.
+
+2012-09-25  Benjamin Poulain  <bpoulain@apple.com>
+
+        Add missing support for Geolocation tests on WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=97518
+
+        Reviewed by Sam Weinig.
+
+        The existing API for reporting error does not support passing and error message.
+
+        The interface UIProcess<->WebProcess is changed to take an error message, the
+        existing API now pass a null String, and the new function
+        WKGeolocationManagerProviderDidFailToDeterminePositionWithErrorMessage() provide
+        the extended support with error message.
+
+        * UIProcess/API/C/WKGeolocationManager.cpp:
+        (WKGeolocationManagerProviderDidFailToDeterminePositionWithErrorMessage):
+        * UIProcess/API/C/WKGeolocationManager.h:
+        * UIProcess/WebGeolocationManagerProxy.cpp:
+        (WebKit::WebGeolocationManagerProxy::providerDidFailToDeterminePosition):
+        * UIProcess/WebGeolocationManagerProxy.h:
+        (WebGeolocationManagerProxy):
+        * WebProcess/Geolocation/WebGeolocationManager.cpp:
+        (WebKit::WebGeolocationManager::didFailToDeterminePosition):
+        * WebProcess/Geolocation/WebGeolocationManager.h:
+        (WebGeolocationManager):
+        * WebProcess/Geolocation/WebGeolocationManager.messages.in:
+
+2012-09-25  Akash Vaswani  <avaswani@apple.com>
+
+        Crash after clicking in plugin at kauaiexplorer.com
+        <rdar://problem/11525987/> and https://bugs.webkit.org/show_bug.cgi?id=90925
+
+        Reviewed by Sam Weinig.
+
+        Bug: Clicking the plugin to navigate away from the page caused the browser to crash.
+             This is because it is possible for a beforeunload handler to destroy the plugin
+             while it is still needed. In this case the handler set visibility to "none" and
+             then accessed a property on the plugin script object. This forced a layout
+             that destroyed the plugin.
+        Fix: Protecting PluginView objects until they are no longer required.
+             This was done by adding a RefPtr at the beginning of performURLRequest() 
+
+        * WebProcess/Plugins/PluginView.cpp:
+        (WebKit::PluginView::performURLRequest):
+
+2012-09-25  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Don't kill automatically the web process when the ui process finishes
+        https://bugs.webkit.org/show_bug.cgi?id=97580
+
+        Reviewed by Martin Robinson.
+
+        We use prctl(PR_SET_PDEATHSIG, SIGKILL); in linux to make sure the
+        web process is killed when the UI process finishes. This is not
+        needed any more since now the web process stops the main loop when
+        the connection with the UI process is closed in
+        WebProcess::didClose(). This approach is better because it works
+        for any platform and makes the web process finish normally from
+        main().
+
+        * UIProcess/Launcher/gtk/ProcessLauncherGtk.cpp:
+        (WebKit::childSetupFunction): Don't call prctl(PR_SET_PDEATHSIG,
+        SIGKILL) in the child process.
+
+2012-09-25  Benjamin Poulain  <benjamin@webkit.org>
+
+        Build fix, GeolocationClientMock should not be included by WebProcess InjectedBundle
+
+        Unreviewed.
+
+        The patch r129252 removes the dependencies on GeolocationClientMock, r129444 removes
+        GeolocationClientMock from the Mac port. The #include breaks new Mac build.
+
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+
+2012-09-25  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] PageViewportController: Consolidate positionRangeForViewportAtScale and boundPosition
+        https://bugs.webkit.org/show_bug.cgi?id=97222
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Those methods are used together everywhere, merge them into a single
+        clampViewportToContents method.
+
+        * UIProcess/PageViewportController.cpp:
+        (WebKit::PageViewportController::innerBoundedViewportScale):
+        (WebKit::PageViewportController::outerBoundedViewportScale):
+        (WebKit::PageViewportController::clampViewportToContents):
+        (WebKit):
+        (WebKit::PageViewportController::pageDidRequestScroll):
+        (WebKit::PageViewportController::syncVisibleContents):
+        * UIProcess/PageViewportController.h:
+        (PageViewportController):
+        (WebKit):
+        * UIProcess/qt/PageViewportControllerClientQt.cpp:
+        (WebKit::PageViewportControllerClientQt::focusEditableArea):
+        (WebKit::PageViewportControllerClientQt::zoomToAreaGestureEnded):
+        (WebKit::PageViewportControllerClientQt::nearestValidVisibleContentsRect):
+
+2012-09-25  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] Unify the PageViewportController<->Client interface regarding positions
+        https://bugs.webkit.org/show_bug.cgi?id=97220
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        - Make sure that css units are used for all position arguments
+        - Make sure that all positions represent the viewport relatively to the contents
+          rather than the other way around
+        - Delay clamping the viewport to the contents size in the controller rather than in the client
+
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewFlickablePrivate::updateViewportSize):
+        * UIProcess/PageViewportController.cpp:
+        (WebKit::PageViewportController::pageDidRequestScroll):
+        (WebKit::PageViewportController::didChangeViewportSize):
+        (WebKit::PageViewportController::didChangeContentsVisibility):
+        (WebKit::PageViewportController::syncVisibleContents):
+        (WebKit::PageViewportController::positionRangeForViewportAtScale):
+        * UIProcess/PageViewportController.h:
+        (PageViewportController):
+        * UIProcess/PageViewportControllerClient.h:
+        (PageViewportControllerClient):
+        * UIProcess/qt/PageViewportControllerClientQt.cpp:
+        (WebKit::PageViewportControllerClientQt::animateContentRectVisible):
+        (WebKit::PageViewportControllerClientQt::focusEditableArea):
+        (WebKit::PageViewportControllerClientQt::zoomToAreaGestureEnded):
+        (WebKit::PageViewportControllerClientQt::nearestValidVisibleContentsRect):
+        (WebKit::PageViewportControllerClientQt::setViewportPosition):
+        (WebKit::PageViewportControllerClientQt::updateViewportController):
+        * UIProcess/qt/PageViewportControllerClientQt.h:
+        (PageViewportControllerClientQt):
+
+2012-09-25  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] Make sure that desktop pages honour the devicePixelRatio
+        https://bugs.webkit.org/show_bug.cgi?id=97215
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        The desktopWidth given to computeViewportAttributes is expected to be pixel-ratio adjusted already.
+        We need to make sure that the viewport size is divided by the pixel ratio to prevent
+        the equivalent of a 1.0 devicePixelRatio to be in effect once viewportSize.width() is larger
+        than layoutFallbackWidth.
+
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::sendViewportAttributesChanged):
+
+2012-09-25  Simon Pena  <spena@igalia.com>
+
+        [GTK] Add Undo / Redo method to WebKit2 GTK+ API
+        https://bugs.webkit.org/show_bug.cgi?id=97553
+
+        Reviewed by Martin Robinson.
+
+        Add the macros for Undo / Redo support, and include them
+        in the documentation.
+
+        * UIProcess/API/gtk/WebKitEditingCommands.h:
+        * UIProcess/API/gtk/docs/webkit2gtk-sections.txt:
+
+2012-09-25  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] Abstract as much devicePixelRatio logic as possible behind PageViewportController
+        https://bugs.webkit.org/show_bug.cgi?id=97214
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Currently the client is required to multiply the scales it receives each bime by the
+        devicePixelRatio. This shouldn't be required since essentially, the only places that the
+        devicePixelRatio should be in use, is to adjust the layout size, multiply the base scale
+        and for scale constants.
+
+        Other related changes:
+        - Make sure that the controller and it's client are only exchanging effective scales
+         (cssScale * devicePixelRatio)
+        - Remove members duplicating m_rawAttributes values
+        - Use a separate member for the minimum scale to fit the page, separate from the viewport arguments
+        - Make sure that the minimum scale to fit is adjusted if the contents size isn't
+          updated after the viewport attributes changed
+        - Make the scale conversion functions private to discourage this logic from spreading in the client
+
+        * UIProcess/PageViewportController.cpp:
+        (WebKit::PageViewportController::PageViewportController):
+        (WebKit::PageViewportController::innerBoundedViewportScale):
+        (WebKit::PageViewportController::outerBoundedViewportScale):
+        (WebKit):
+        (WebKit::PageViewportController::devicePixelRatio):
+        (WebKit::PageViewportController::didChangeContentsSize):
+        (WebKit::PageViewportController::didChangeViewportAttributes):
+        (WebKit::PageViewportController::resumeContent):
+        (WebKit::PageViewportController::updateMinimumScaleToFit):
+        * UIProcess/PageViewportController.h:
+        (PageViewportController):
+        (WebKit::PageViewportController::minimumContentsScale):
+        (WebKit::PageViewportController::maximumContentsScale):
+        (WebKit::PageViewportController::currentContentsScale):
+        (WebKit::PageViewportController::fromViewportScale):
+        (WebKit::PageViewportController::toViewportScale):
+        * UIProcess/qt/PageViewportControllerClientQt.cpp:
+        (WebKit::PageViewportControllerClientQt::focusEditableArea):
+        (WebKit::PageViewportControllerClientQt::zoomToAreaGestureEnded):
+        (WebKit::PageViewportControllerClientQt::nearestValidVisibleContentsRect):
+        (WebKit::PageViewportControllerClientQt::setContentsRectToNearestValidBounds):
+        (WebKit::PageViewportControllerClientQt::pinchGestureRequestUpdate):
+
+2012-09-25  Simon Pena  <spena@igalia.com>
+
+        [GTK] Fix typo in accessing union field in a GdkEvent in a WebKit2 unit test
+        https://bugs.webkit.org/show_bug.cgi?id=97564
+
+        Reviewed by Martin Robinson.
+
+        In the WebViewTest::moveMouseTo method, the wrong field in
+        a union was being accessed in a GdkEvent: instead of the button
+        field, we were supposed to act on the motion one. This patch
+        fixes the typo.
+
+        * UIProcess/API/gtk/tests/WebViewTest.cpp:
+        (WebViewTest::mouseMoveTo):
+
+2012-09-25  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Don't use the C API internally in WebKitFindController
+        https://bugs.webkit.org/show_bug.cgi?id=96775
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Using the C++ classes directly instead of the C API wrappers we
+        avoid a lot of toImpl/toAPI casts, string conversions and
+        allocations. The code is also a lot simpler and easier to read.
+
+        * UIProcess/API/gtk/WebKitFindController.cpp:
+        (getPage):
+        (webkitFindControllerConstructed):
+        (webKitFindControllerPerform):
+        (webkit_find_controller_search_next):
+        (webkit_find_controller_search_previous):
+        (webkit_find_controller_search_finish):
+
+2012-09-25  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] Apply the devicePixelRatio as soon as possible
+        https://bugs.webkit.org/show_bug.cgi?id=97211
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Having to wait for the contents size to apply the devicePixelRatio can
+        be problematic since the devicePixelRatio affects the layout width, which
+        then affects the contents size.
+
+        Fix the initial issue that this was working around by preventing the
+        early return if useFixedLayout() is true.
+
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewPrivate::QQuickWebViewPrivate):
+        (QQuickWebViewFlickablePrivate::didChangeContentsSize):
+        (QQuickWebViewExperimental::devicePixelRatio):
+        (QQuickWebViewExperimental::setDevicePixelRatio):
+        * UIProcess/API/qt/qquickwebview_p_p.h:
+        (QQuickWebViewPrivate::didChangeContentsSize):
+        (QQuickWebViewPrivate):
+        * UIProcess/DrawingAreaProxyImpl.cpp:
+        (WebKit::DrawingAreaProxyImpl::sendUpdateBackingStoreState):
+
+2012-09-25  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] Don't render at scale 1.0 when doing a pinch-zoom out
+        https://bugs.webkit.org/show_bug.cgi?id=97212
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        When the user starts pinching this creates extra rendering that is bound to the
+        page size and can be considerably big, reducing performance and peaking the tile
+        memory usage.
+
+        Fixing this might require a different approach that we could experiment with.
+
+        * UIProcess/qt/PageViewportControllerClientQt.cpp:
+        (WebKit::PageViewportControllerClientQt::animateContentRectVisible):
+        (WebKit::PageViewportControllerClientQt::pinchGestureRequestUpdate):
+
+2012-09-25  Michael Brüning  <michael.bruning@digia.com>
+
+        [Qt][WK2] Focus out is not handled properly
+        https://bugs.webkit.org/show_bug.cgi?id=96997
+
+        Reviewed by Simon Hausmann.
+
+        Adds a handler for QQuickWebView::itemChange event that is sent to
+        QQuickItems when their focus has been changed to replace focusOutEvent.
+
+        This fixes the problem because the focus has been updated when
+        itemChange is called, while it is not yet update when focusOutEvent
+        is called.
+
+        * UIProcess/API/qt/qquickwebview.cpp: Removed focusOutEvent.
+        (QQuickWebView::itemChange): Added in place of focusOutEvent.
+        * UIProcess/API/qt/qquickwebview_p.h:
+        * UIProcess/qt/QtWebPageEventHandler.cpp:
+        (WebKit::QtWebPageEventHandler::handleFocusLost): Renamed from handleFocusOutEvent, parameter removed.
+        * UIProcess/qt/QtWebPageEventHandler.h:
+        (QtWebPageEventHandler):
+
+2012-09-25  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [WK2] Supported media MIME types are not included to the list of shown MIME types.
+        https://bugs.webkit.org/show_bug.cgi?id=97552
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Added supported media MIME types to the list of shown MIME types in order to fix
+        media tests regression after r129479.
+
+        * UIProcess/WebPageProxy.cpp:
+        (WebKit::WebPageProxy::canShowMIMEType):
+        * WebProcess/InjectedBundle/API/c/WKBundlePage.cpp:
+        (WKBundlePageCanShowMIMEType):
+
+2012-09-25  KwangYong Choi  <ky0.choi@samsung.com>
+
+        [EFL][WK2] Added hideColorPicker test case
+        https://bugs.webkit.org/show_bug.cgi?id=97522
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Added a test case for removing input element during color picker is shown.
+
+        * UIProcess/API/efl/tests/test_ewk2_view.cpp:
+        (setColorPickerColor):
+        (showColorPicker):
+        (hideColorPicker):
+        (TEST_F):
+
 2012-09-25  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
 
         [WK2][WTR] WTR bundle client loads binary data as text

@@ -1,3 +1,64 @@
+2012-09-26  Gavin Barraclough  <barraclough@apple.com>
+
+        String.localeCompare should normalize input
+        https://bugs.webkit.org/show_bug.cgi?id=97639
+
+        Reviewed by Filip Pizlo.
+
+        From the spec: "It is strongly recommended that this function treat Strings that are
+        canonically equivalent according to the Unicode standard as identical (in other words,
+        compare the Strings as if they had both been converted to Normalised Form C or D first).
+        It is also recommended that this function not honour Unicode compatibility equivalences
+        or decompositions."
+
+        * wtf/unicode/icu/CollatorICU.cpp:
+        (WTF::Collator::createCollator):
+            - Enable normalization.
+
+2012-09-25  Cosmin Truta  <ctruta@rim.com>
+
+        [BlackBerry] Enable LLInt
+        https://bugs.webkit.org/show_bug.cgi?id=97604
+
+        Reviewed by Yong Li.
+
+        Set the prefix of LOCAL_LABEL_STRING to ".L" on QNX.
+
+        * wtf/InlineASM.h:
+
+2012-09-25  Patrick Gansterer  <paroga@webkit.org>
+
+        Do not enable DFG JIT for COMPILER(MSVC).
+
+        The current code does not support MSVC inline assembler, so disable it for now.
+
+        * wtf/Platform.h:
+
+2012-09-25  Pratik Solanki  <psolanki@apple.com>
+
+        Remove HAVE_SBRK since we never set use_sbrk to true
+        https://bugs.webkit.org/show_bug.cgi?id=97525
+        <rdar://problem/12363601>
+
+        Reviewed by Geoffrey Garen.
+
+        The code under HAVE(SBRK) has not been used since 2005. We use mmap not sbrk for FastMalloc
+        not sbrk. We can just remove the define and move all of this code inside #ifndef
+        WTF_CHANGES.
+
+        * wtf/Platform.h:
+        * wtf/TCSystemAlloc.cpp:
+        (TCMalloc_SystemAlloc):
+
+2012-09-25  Mark Lam  <mark.lam@apple.com>
+
+        #undef some symbols before redefining them.
+        https://bugs.webkit.org/show_bug.cgi?id=97568.
+
+        Reviewed by Michael Saboff.
+
+        * wtf/Platform.h:
+
 2012-09-21  Ilya Tikhonovsky  <loislo@chromium.org>
 
         Web Inspector: extract Vector instrumentation from core NMI code into MemoryInstrumentationVector.h header.

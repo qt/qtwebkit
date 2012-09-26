@@ -38,7 +38,7 @@ class RenderQuote;
 class RenderLayerCompositor;
 #endif
 
-#if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
+#if ENABLE(CSS_SHADERS) && USE(3D_GRAPHICS)
 class CustomFilterGlobalContext;
 #endif
 
@@ -176,7 +176,7 @@ public:
     bool usesCompositing() const;
 #endif
 
-#if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
+#if ENABLE(CSS_SHADERS) && USE(3D_GRAPHICS)
     CustomFilterGlobalContext* customFilterGlobalContext();
 #endif
 
@@ -223,7 +223,11 @@ private:
     {
         // We push LayoutState even if layoutState is disabled because it stores layoutDelta too.
         if (!doingFullRepaint() || m_layoutState->isPaginated() || renderer->hasColumns() || renderer->inRenderFlowThread()
-            || m_layoutState->lineGrid() || (renderer->style()->lineGrid() != RenderStyle::initialLineGrid() && renderer->isBlockFlow())) {
+            || m_layoutState->lineGrid() || (renderer->style()->lineGrid() != RenderStyle::initialLineGrid() && renderer->isBlockFlow())
+#if ENABLE(CSS_EXCLUSIONS)
+            || (renderer->isRenderBlock() && toRenderBlock(renderer)->wrapShapeInfo())
+#endif
+            ) {
             m_layoutState = new (renderArena()) LayoutState(m_layoutState, renderer, offset, pageHeight, pageHeightChanged, colInfo);
             return true;
         }
@@ -295,7 +299,7 @@ private:
 #if USE(ACCELERATED_COMPOSITING)
     OwnPtr<RenderLayerCompositor> m_compositor;
 #endif
-#if ENABLE(CSS_SHADERS) && ENABLE(WEBGL)
+#if ENABLE(CSS_SHADERS) && USE(3D_GRAPHICS)
     OwnPtr<CustomFilterGlobalContext> m_customFilterGlobalContext;
 #endif
     OwnPtr<FlowThreadController> m_flowThreadController;
