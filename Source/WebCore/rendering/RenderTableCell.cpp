@@ -36,20 +36,35 @@
 #include "StyleInheritedData.h"
 #include "TransformState.h"
 
+#if ENABLE(MATHML)
+#include "MathMLElement.h"
+#include "MathMLNames.h"
+#endif
+
 using namespace std;
 
 namespace WebCore {
 
 using namespace HTMLNames;
 
+struct SameSizeAsRenderTableCell : public RenderBlock {
+    unsigned bitfields;
+    int paddings[2];
+};
+
+COMPILE_ASSERT(sizeof(RenderTableCell) == sizeof(SameSizeAsRenderTableCell), RenderTableCell_should_stay_small);
+COMPILE_ASSERT(sizeof(CollapsedBorderValue) == 8, CollapsedBorderValue_should_stay_small);
+
 RenderTableCell::RenderTableCell(Node* node)
     : RenderBlock(node)
     , m_column(unsetColumnIndex)
     , m_cellWidthChanged(false)
-    , m_hasAssociatedTableCellElement(node && (node->hasTagName(tdTag) || node->hasTagName(thTag)))
     , m_intrinsicPaddingBefore(0)
     , m_intrinsicPaddingAfter(0)
 {
+    // We only update the flags when notified of DOM changes in colSpanOrRowSpanChanged()
+    // so we need to set their initial values here in case something asks for colSpan()/rowSpan() before then.
+    updateColAndRowSpanFlags();
 }
 
 void RenderTableCell::willBeRemovedFromTree()
@@ -60,90 +75,86 @@ void RenderTableCell::willBeRemovedFromTree()
     section()->removeCachedCollapsedBorders(this);
 }
 
-unsigned RenderTableCell::colSpan() const
+unsigned RenderTableCell::parseColSpanFromDOM() const
 {
-    if (UNLIKELY(!m_hasAssociatedTableCellElement))
-        return 1;
-
-    return toHTMLTableCellElement(node())->colSpan();
+    ASSERT(node());
+    if (node()->hasTagName(tdTag) || node()->hasTagName(thTag))
+        return toHTMLTableCellElement(node())->colSpan();
+#if ENABLE(MATHML)
+    if (node()->hasTagName(MathMLNames::mtdTag))
+        return toMathMLElement(node())->colSpan();
+#endif
+    return 1;
 }
 
-unsigned RenderTableCell::rowSpan() const
+unsigned RenderTableCell::parseRowSpanFromDOM() const
 {
-    if (UNLIKELY(!m_hasAssociatedTableCellElement))
-        return 1;
+    ASSERT(node());
+    if (node()->hasTagName(tdTag) || node()->hasTagName(thTag))
+        return toHTMLTableCellElement(node())->rowSpan();
+#if ENABLE(MATHML)
+    if (node()->hasTagName(MathMLNames::mtdTag))
+        return toMathMLElement(node())->rowSpan();
+#endif
+    return 1;
+}
 
-    return toHTMLTableCellElement(node())->rowSpan();
+void RenderTableCell::updateColAndRowSpanFlags()
+{
+    // The vast majority of table cells do not have a colspan or rowspan,
+    // so we keep a bool to know if we need to bother reading from the DOM.
+    m_hasColSpan = node() && parseColSpanFromDOM() != 1;
+    m_hasRowSpan = node() && parseRowSpanFromDOM() != 1;
 }
 
 void RenderTableCell::colSpanOrRowSpanChanged()
 {
-    ASSERT(m_hasAssociatedTableCellElement);
     ASSERT(node());
+#if ENABLE(MATHML)
+    ASSERT(node()->hasTagName(tdTag) || node()->hasTagName(thTag) || node()->hasTagName(MathMLNames::mtdTag));
+#else
     ASSERT(node()->hasTagName(tdTag) || node()->hasTagName(thTag));
+#endif
+
+    updateColAndRowSpanFlags();
+
+    // FIXME: I suspect that we could return early here if !m_hasColSpan && !m_hasRowSpan.
 
     setNeedsLayoutAndPrefWidthsRecalc();
     if (parent() && section())
         section()->setNeedsCellRecalc();
 }
 
-LayoutUnit RenderTableCell::logicalHeightForRowSizing() const
+Length RenderTableCell::logicalWidthFromColumns(RenderTableCol* firstColForThisCell, Length widthFromStyle) const
 {
-    LayoutUnit adjustedLogicalHeight = logicalHeight() - (intrinsicPaddingBefore() + intrinsicPaddingAfter());
+    ASSERT(firstColForThisCell && firstColForThisCell == table()->colElement(col()));
+    RenderTableCol* tableCol = firstColForThisCell;
 
-    LayoutUnit styleLogicalHeight = valueForLength(style()->logicalHeight(), 0, view());
-    if (document()->inQuirksMode() || style()->boxSizing() == BORDER_BOX) {
-        // Explicit heights use the border box in quirks mode.
-        // Don't adjust height.
-    } else {
-        // In strict mode, box-sizing: content-box do the right
-        // thing and actually add in the border and padding.
-        LayoutUnit adjustedPaddingBefore = paddingBefore() - intrinsicPaddingBefore();
-        LayoutUnit adjustedPaddingAfter = paddingAfter() - intrinsicPaddingAfter();
-        styleLogicalHeight += adjustedPaddingBefore + adjustedPaddingAfter + borderBefore() + borderAfter();
-    }
+    unsigned colSpanCount = colSpan();
+    int colWidthSum = 0;
+    for (unsigned i = 1; i <= colSpanCount; i++) {
+        Length colWidth = tableCol->style()->logicalWidth();
 
-    return max(styleLogicalHeight, adjustedLogicalHeight);
-}
-
-Length RenderTableCell::styleOrColLogicalWidth() const
-{
-    Length w = style()->logicalWidth();
-    if (!w.isAuto())
-        return w;
-
-    if (RenderTableCol* tableCol = table()->colElement(col())) {
-        unsigned colSpanCount = colSpan();
-
-        Length colWidthSum = Length(0, Fixed);
-        for (unsigned i = 1; i <= colSpanCount; i++) {
-            Length colWidth = tableCol->style()->logicalWidth();
-
-            // Percentage value should be returned only for colSpan == 1.
-            // Otherwise we return original width for the cell.
-            if (!colWidth.isFixed()) {
-                if (colSpanCount > 1)
-                    return w;
-                return colWidth;
-            }
-
-            colWidthSum = Length(colWidthSum.value() + colWidth.value(), Fixed);
-
-            tableCol = tableCol->nextColumn();
-            // If no next <col> tag found for the span we just return what we have for now.
-            if (!tableCol)
-                break;
+        // Percentage value should be returned only for colSpan == 1.
+        // Otherwise we return original width for the cell.
+        if (!colWidth.isFixed()) {
+            if (colSpanCount > 1)
+                return widthFromStyle;
+            return colWidth;
         }
 
-        // Column widths specified on <col> apply to the border box of the cell.
-        // Percentages don't need to be handled since they're always treated this way (even when specified on the cells).
-        // See Bugzilla bug 8126 for details.
-        if (colWidthSum.isFixed() && colWidthSum.value() > 0)
-            colWidthSum = Length(max(0.0f, colWidthSum.value() - borderAndPaddingLogicalWidth()), Fixed);
-        return colWidthSum;
+        colWidthSum += colWidth.value();
+        tableCol = tableCol->nextColumn();
+        // If no next <col> tag found for the span we just return what we have for now.
+        if (!tableCol)
+            break;
     }
 
-    return w;
+    // Column widths specified on <col> apply to the border box of the cell, see bug 8126.
+    // FIXME: Why is border/padding ignored in the negative width case?
+    if (colWidthSum > 0)
+        return Length(max(0, colWidthSum - borderAndPaddingLogicalWidth().ceil()), Fixed);
+    return Length(colWidthSum, Fixed);
 }
 
 void RenderTableCell::computePreferredLogicalWidths()
@@ -166,6 +177,47 @@ void RenderTableCell::computePreferredLogicalWidths()
             // of hiptop.com.
             m_minPreferredLogicalWidth = max<LayoutUnit>(w.value(), m_minPreferredLogicalWidth);
     }
+}
+
+void RenderTableCell::computeIntrinsicPadding(int rowHeight)
+{
+    int oldIntrinsicPaddingBefore = intrinsicPaddingBefore();
+    int oldIntrinsicPaddingAfter = intrinsicPaddingAfter();
+    int logicalHeightWithoutIntrinsicPadding = pixelSnappedLogicalHeight() - oldIntrinsicPaddingBefore - oldIntrinsicPaddingAfter;
+
+    int intrinsicPaddingBefore = 0;
+    switch (style()->verticalAlign()) {
+    case SUB:
+    case SUPER:
+    case TEXT_TOP:
+    case TEXT_BOTTOM:
+    case LENGTH:
+    case BASELINE: {
+        LayoutUnit baseline = cellBaselinePosition();
+        if (baseline > borderBefore() + paddingBefore())
+            intrinsicPaddingBefore = section()->rowBaseline(rowIndex()) - (baseline - oldIntrinsicPaddingBefore);
+        break;
+    }
+    case TOP:
+        break;
+    case MIDDLE:
+        intrinsicPaddingBefore = (rowHeight - logicalHeightWithoutIntrinsicPadding) / 2;
+        break;
+    case BOTTOM:
+        intrinsicPaddingBefore = rowHeight - logicalHeightWithoutIntrinsicPadding;
+        break;
+    case BASELINE_MIDDLE:
+        break;
+    }
+
+    int intrinsicPaddingAfter = rowHeight - logicalHeightWithoutIntrinsicPadding - intrinsicPaddingBefore;
+    setIntrinsicPaddingBefore(intrinsicPaddingBefore);
+    setIntrinsicPaddingAfter(intrinsicPaddingAfter);
+
+    // FIXME: Changing an intrinsic padding shouldn't trigger a relayout as it only shifts the cell inside the row but
+    // doesn't change the logical height.
+    if (intrinsicPaddingBefore != oldIntrinsicPaddingBefore || intrinsicPaddingAfter != oldIntrinsicPaddingAfter)
+        setNeedsLayout(true, MarkOnlyThis);
 }
 
 void RenderTableCell::updateLogicalWidth()
@@ -247,7 +299,7 @@ LayoutSize RenderTableCell::offsetFromContainer(RenderObject* o, const LayoutPoi
     return offset;
 }
 
-LayoutRect RenderTableCell::clippedOverflowRectForRepaint(RenderBoxModelObject* repaintContainer) const
+LayoutRect RenderTableCell::clippedOverflowRectForRepaint(RenderLayerModelObject* repaintContainer) const
 {
     // If the table grid is dirty, we cannot get reliable information about adjoining cells,
     // so we ignore outside borders. This should not be a problem because it means that
@@ -298,7 +350,7 @@ LayoutRect RenderTableCell::clippedOverflowRectForRepaint(RenderBoxModelObject* 
     return r;
 }
 
-void RenderTableCell::computeRectForRepaint(RenderBoxModelObject* repaintContainer, LayoutRect& r, bool fixed) const
+void RenderTableCell::computeRectForRepaint(RenderLayerModelObject* repaintContainer, LayoutRect& r, bool fixed) const
 {
     if (repaintContainer == this)
         return;

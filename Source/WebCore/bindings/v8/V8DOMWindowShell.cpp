@@ -433,8 +433,9 @@ void V8DOMWindowShell::createContext()
 
 bool V8DOMWindowShell::installDOMWindow()
 {
-    DOMWindow* window = m_frame->document()->domWindow();
-    v8::Local<v8::Object> windowWrapper = V8ObjectConstructor::newInstance(V8PerContextData::from(m_context.get())->constructorForType(&V8DOMWindow::info));
+    Document* document = m_frame->document();
+    DOMWindow* window = document->domWindow();
+    v8::Local<v8::Object> windowWrapper = V8ObjectConstructor::newInstance(V8PerContextData::from(m_context.get())->constructorForType(&V8DOMWindow::info, document));
     if (windowWrapper.IsEmpty())
         return false;
 
@@ -611,7 +612,7 @@ void V8DOMWindowShell::setIsolatedWorldSecurityOrigin(PassRefPtr<SecurityOrigin>
 {
     ASSERT(!m_world->isMainWorld());
     // FIXME: Should this be here?
-    if (!m_isolatedWorldShellSecurityOrigin && !context().IsEmpty() && InspectorInstrumentation::hasFrontends()) {
+    if (!m_isolatedWorldShellSecurityOrigin && !context().IsEmpty() && InspectorInstrumentation::runtimeAgentEnabled(m_frame)) {
         v8::HandleScope handleScope;
         ScriptState* scriptState = ScriptState::forContext(v8::Local<v8::Context>::New(context()));
         InspectorInstrumentation::didCreateIsolatedContext(m_frame, scriptState, securityOrigin.get());

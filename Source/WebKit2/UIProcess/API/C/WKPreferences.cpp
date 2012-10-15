@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -296,6 +296,16 @@ void WKPreferencesSetScreenFontSubstitutionEnabled(WKPreferencesRef preferencesR
 bool WKPreferencesGetScreenFontSubstitutionEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->screenFontSubstitutionEnabled();
+}
+
+void WKPreferencesSetCookieEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setCookieEnabled(enabled);
+}
+
+bool WKPreferencesGetCookieEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->cookieEnabled();
 }
 
 void WKPreferencesSetEditableLinkBehavior(WKPreferencesRef preferencesRef, WKEditableLinkBehavior wkBehavior)
@@ -912,4 +922,24 @@ void WKPreferencesSetScrollingPerformanceLoggingEnabled(WKPreferencesRef prefere
 bool WKPreferencesGetScrollingPerformanceLoggingEnabled(WKPreferencesRef preferencesRef)
 {
     return toImpl(preferencesRef)->scrollingPerformanceLoggingEnabled();
+}
+
+void WKPreferencesSetPlugInSnapshottingEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setPlugInSnapshottingEnabled(enabled);
+}
+
+bool WKPreferencesGetPlugInSnapshottingEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->plugInSnapshottingEnabled();
+}
+
+void WKPreferencesSetPDFPluginEnabled(WKPreferencesRef preferencesRef, bool enabled)
+{
+    toImpl(preferencesRef)->setPDFPluginEnabled(enabled);
+}
+
+bool WKPreferencesGetPDFPluginEnabled(WKPreferencesRef preferencesRef)
+{
+    return toImpl(preferencesRef)->pdfPluginEnabled();
 }

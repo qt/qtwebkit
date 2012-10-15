@@ -70,7 +70,7 @@ public:
 
     virtual void initialize(WKContextRef contextRef = 0, WKPageGroupRef pageGroupRef = 0);
 
-    virtual void onComponentComplete();
+    virtual void onComponentComplete() { }
 
     virtual void provisionalLoadDidStart(const WTF::String& url);
     virtual void didReceiveServerRedirectForProvisionalLoad(const WTF::String& url);
@@ -88,8 +88,9 @@ public:
 
     int loadProgress() const { return m_loadProgress; }
     void setNeedsDisplay();
+    void didRenderFrame();
 
-    WebKit::PageViewportController* viewportController() const { return m_pageViewportController.data(); }
+    virtual WebKit::PageViewportController* viewportController() const { return 0; }
     virtual void updateViewportSize() { }
     void updateTouchViewportSize();
 
@@ -130,7 +131,6 @@ public:
     WebCore::IntSize viewSize() const;
     void didReceiveMessageFromNavigatorQtObject(const String& message);
     virtual void pageDidRequestScroll(const QPoint& pos) { }
-    virtual void didChangeContentsSize(const QSize& newSize) { }
     void processDidCrash();
     void didRelaunchProcess();
     PassOwnPtr<WebKit::DrawingAreaProxy> createDrawingAreaProxy();
@@ -172,9 +172,6 @@ protected:
     QScopedPointer<QQuickWebPage> pageView;
     QQuickWebView* q_ptr;
 
-    QScopedPointer<WebKit::PageViewportController> m_pageViewportController;
-    QScopedPointer<WebKit::PageViewportControllerClientQt> m_pageViewportControllerClient;
-
     FlickableAxisLocker axisLocker;
 
     QQmlComponent* alertDialog;
@@ -190,6 +187,7 @@ protected:
 
     QList<QUrl> userScripts;
 
+    bool m_betweenLoadCommitAndFirstFrame;
     bool m_useDefaultContentItemSize;
     bool m_navigatorQtObjectEnabled;
     bool m_renderToOffscreenBuffer;
@@ -220,11 +218,15 @@ public:
     virtual void onComponentComplete();
 
     virtual void didChangeViewportProperties(const WebCore::ViewportAttributes&);
+    virtual WebKit::PageViewportController* viewportController() const { return m_pageViewportController.data(); }
     virtual void updateViewportSize();
 
     virtual void pageDidRequestScroll(const QPoint& pos);
-    virtual void didChangeContentsSize(const QSize& newSize);
     virtual void handleMouseEvent(QMouseEvent*);
+
+private:
+    QScopedPointer<WebKit::PageViewportController> m_pageViewportController;
+    QScopedPointer<WebKit::PageViewportControllerClientQt> m_pageViewportControllerClient;
 };
 
 #endif // qquickwebview_p_p_h

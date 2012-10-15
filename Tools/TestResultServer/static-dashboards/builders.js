@@ -179,17 +179,17 @@ function isChromiumContentShellTestRunner(builder)
 
 function isChromiumWebkitTipOfTreeTestRunner(builder)
 {
-    return builder.indexOf('Webkit') != -1 && builder.indexOf('Builder') == -1 && builder.indexOf('(deps)') == -1 && builder.indexOf('ASAN') == -1;
+    return builder.indexOf('WebKit') != -1 && builder.indexOf('Builder') == -1 && builder.indexOf('(deps)') == -1 && builder.indexOf('ASAN') == -1;
 }
 
 function isChromiumWebkitDepsTestRunner(builder)
 {
-    return builder.indexOf('Webkit') != -1 && builder.indexOf('Builder') == -1 && builder.indexOf('(deps)') != -1;
+    return builder.indexOf('WebKit') != -1 && builder.indexOf('Builder') == -1 && builder.indexOf('(deps)') != -1;
 }
 
 function isChromiumDepsGTestRunner(builder)
 {
-    return builder.indexOf('Tests') != -1 && builder.indexOf('Chrome Frame') == -1;
+    return (builder.indexOf('Tests') != -1 || builder.indexOf('Sync') != -1) && builder.indexOf('Chrome Frame') == -1;
 }
 
 function isChromiumDepsCrosGTestRunner(builder)
@@ -200,7 +200,7 @@ function isChromiumDepsCrosGTestRunner(builder)
 function isChromiumTipOfTreeGTestRunner(builder)
 {
     return !isChromiumTipOfTreeGpuTestRunner(builder) && builder.indexOf('Builder') == -1 && builder.indexOf('Perf') == -1 &&
-         builder.indexOf('Webkit') == -1 && builder.indexOf('Valgrind') == -1 && builder.indexOf('Chrome Frame') == -1;
+         builder.indexOf('WebKit') == -1 && builder.indexOf('Valgrind') == -1 && builder.indexOf('Chrome Frame') == -1;
 }
 
 function isChromiumDepsAVTestRunner(builder)
@@ -281,6 +281,7 @@ function loadBuildersList(groupName, testType) {
         break;
    
     case 'test_shell_tests':
+    case 'webkit_unit_tests':
         switch(groupName) {
         case '@ToT - chromium.org':
             var builderGroup = new BuilderGroup(BuilderGroup.TOT_WEBKIT);

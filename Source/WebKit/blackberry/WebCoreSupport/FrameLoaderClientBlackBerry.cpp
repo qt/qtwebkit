@@ -219,18 +219,20 @@ void FrameLoaderClientBlackBerry::dispatchDecidePolicyForNavigationAction(FrameP
         // Let the client have a chance to say whether this navigation should be ignored or not.
         NetworkRequest platformRequest;
         request.initializePlatformRequest(platformRequest, cookiesEnabled());
-        if (platformRequest.getTargetType() == NetworkRequest::TargetIsUnknown)
-            platformRequest.setTargetType(isMainFrame() ? NetworkRequest::TargetIsMainFrame : NetworkRequest::TargetIsSubframe);
+        if (!platformRequest.getUrlRef().empty()) { // Some invalid URLs will result in empty URL in platformRequest
+            if (platformRequest.getTargetType() == NetworkRequest::TargetIsUnknown)
+                platformRequest.setTargetType(isMainFrame() ? NetworkRequest::TargetIsMainFrame : NetworkRequest::TargetIsSubframe);
 
-        if (!m_webPagePrivate->m_client->acceptNavigationRequest(platformRequest, BlackBerry::Platform::NavigationType(action.type()))) {
-            decision = PolicyIgnore;
-            if (isMainFrame()) {
-                if (action.type() == NavigationTypeFormSubmitted || action.type() == NavigationTypeFormResubmitted)
-                    m_frame->loader()->resetMultipleFormSubmissionProtection();
+            if (!m_webPagePrivate->m_client->acceptNavigationRequest(platformRequest, BlackBerry::Platform::NavigationType(action.type()))) {
+                decision = PolicyIgnore;
+                if (isMainFrame()) {
+                    if (action.type() == NavigationTypeFormSubmitted || action.type() == NavigationTypeFormResubmitted)
+                        m_frame->loader()->resetMultipleFormSubmissionProtection();
 
-                if (action.type() == NavigationTypeLinkClicked && url.hasFragmentIdentifier()) {
-                    ResourceRequest emptyRequest;
-                    m_frame->loader()->activeDocumentLoader()->setLastCheckedRequest(emptyRequest);
+                    if (action.type() == NavigationTypeLinkClicked && url.hasFragmentIdentifier()) {
+                        ResourceRequest emptyRequest;
+                        m_frame->loader()->activeDocumentLoader()->setLastCheckedRequest(emptyRequest);
+                    }
                 }
             }
         }
@@ -430,7 +432,7 @@ void FrameLoaderClientBlackBerry::transitionToCommittedForNewPage()
 
     // In Frame::createView, Frame's FrameView object is set to 0 and recreated.
     // This operation is not atomic, and an attempt to blit contents might happen
-    // in the backing store from another thread (see BackingStorePrivate::blitContents method),
+    // in the backing store from another thread (see BackingStorePrivate::blitVisibleContents method),
     // so we suspend and resume screen update to make sure we do not get a invalid FrameView
     // state.
     BackingStoreClient* backingStoreClientForFrame = m_webPagePrivate->backingStoreClientForFrame(m_frame);
@@ -483,8 +485,8 @@ bool FrameLoaderClientBlackBerry::canShowMIMEType(const String& mimeTypeIn) cons
     String mimeType = MIMETypeRegistry::getNormalizedMIMEType(mimeTypeIn);
 
     // FIXME: Seems no other port checks empty MIME type in this function. Should we do that?
-    return MIMETypeRegistry::isSupportedImageMIMEType(mimeType) || MIMETypeRegistry::isSupportedNonImageMIMEType(mimeType)
-        || MIMETypeRegistry::isSupportedMediaMIMEType(mimeType) || WebSettings::isSupportedObjectMIMEType(mimeType)
+    return MIMETypeRegistry::canShowMIMEType(mimeType)
+        || WebSettings::isSupportedObjectMIMEType(mimeType)
         || (mimeType == "application/x-shockwave-flash");
 }
 

@@ -33,8 +33,8 @@
 #include "AudioDestination.h"
 #include "AudioIOCallback.h"
 #include "AudioSourceProvider.h"
-#include "platform/WebAudioDevice.h"
-#include "platform/WebVector.h"
+#include <public/WebAudioDevice.h>
+#include <public/WebVector.h>
 
 namespace WebKit { class WebAudioDevice; }
 

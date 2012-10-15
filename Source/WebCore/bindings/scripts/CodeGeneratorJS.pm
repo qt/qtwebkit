@@ -391,7 +391,7 @@ sub GenerateGetOwnPropertySlotBody
 
     my @getOwnPropertySlotImpl = ();
 
-    if ($interfaceName eq "NamedNodeMap" or $interfaceName eq "HTMLCollection" or $interfaceName eq "HTMLAllCollection") {
+    if ($interfaceName eq "NamedNodeMap" or $interfaceName eq "HTMLCollection" or $interfaceName eq "HTMLAllCollection" or $interfaceName eq "HTMLPropertiesCollection") {
         push(@getOwnPropertySlotImpl, "    ${namespaceMaybe}JSValue proto = thisObject->prototype();\n");
         push(@getOwnPropertySlotImpl, "    if (proto.isObject() && jsCast<${namespaceMaybe}JSObject*>(asObject(proto))->hasProperty(exec, propertyName))\n");
         push(@getOwnPropertySlotImpl, "        return false;\n\n");
@@ -483,7 +483,7 @@ sub GenerateGetOwnPropertyDescriptorBody
         push(@implContent, "        return false;\n");
     }
     
-    if ($interfaceName eq "NamedNodeMap" or $interfaceName eq "HTMLCollection" or $interfaceName eq "HTMLAllCollection") {
+    if ($interfaceName eq "NamedNodeMap" or $interfaceName eq "HTMLCollection" or $interfaceName eq "HTMLAllCollection" or $interfaceName eq "HTMLPropertiesCollection") {
         push(@getOwnPropertyDescriptorImpl, "    ${namespaceMaybe}JSValue proto = thisObject->prototype();\n");
         push(@getOwnPropertyDescriptorImpl, "    if (proto.isObject() && jsCast<${namespaceMaybe}JSObject*>(asObject(proto))->hasProperty(exec, propertyName))\n");
         push(@getOwnPropertyDescriptorImpl, "        return false;\n\n");
@@ -742,6 +742,7 @@ sub GenerateHeader
         push(@headerContent, "    {\n");
         push(@headerContent, "        $className* ptr = new (NotNull, JSC::allocateCell<$className>(globalData.heap)) ${className}(globalData, structure, impl, windowShell);\n");
         push(@headerContent, "        ptr->finishCreation(globalData, windowShell);\n");
+        push(@headerContent, "        globalData.heap.addFinalizer(ptr, destroy);\n");
         push(@headerContent, "        return ptr;\n");
         push(@headerContent, "    }\n\n");
     } elsif ($dataNode->extendedAttributes->{"IsWorkerContext"}) {
@@ -749,6 +750,7 @@ sub GenerateHeader
         push(@headerContent, "    {\n");
         push(@headerContent, "        $className* ptr = new (NotNull, JSC::allocateCell<$className>(globalData.heap)) ${className}(globalData, structure, impl);\n");
         push(@headerContent, "        ptr->finishCreation(globalData);\n");
+        push(@headerContent, "        globalData.heap.addFinalizer(ptr, destroy);\n");
         push(@headerContent, "        return ptr;\n");
         push(@headerContent, "    }\n\n");
     } elsif ($dataNode->extendedAttributes->{"MasqueradesAsUndefined"}) {
@@ -768,6 +770,10 @@ sub GenerateHeader
         push(@headerContent, "        ptr->finishCreation(globalObject->globalData());\n");
         push(@headerContent, "        return ptr;\n");
         push(@headerContent, "    }\n\n");
+    }
+
+    if ($interfaceName eq "DOMWindow" || $dataNode->extendedAttributes->{"IsWorkerContext"}) {
+        push(@headerContent, "    static const bool needsDestruction = false;\n\n");
     }
 
     # Prototype
@@ -1268,12 +1274,15 @@ sub GenerateParametersCheckExpression
         my $type = $codeGenerator->StripModule($parameter->type);
 
         # Only DOMString or wrapper types are checked.
-        # For DOMString, Null, Undefined and any Object are accepted too, as
-        # these are acceptable values for a DOMString argument (any Object can
-        # be converted to a string via .toString).
+        # For DOMString with StrictTypeChecking only Null, Undefined and Object
+        # are accepted for compatibility. Otherwise, no restrictions are made to
+        # match the non-overloaded behavior.
+        # FIXME: Implement WebIDL overload resolution algorithm.
         if ($codeGenerator->IsStringType($type)) {
-            push(@andExpression, "(${value}.isUndefinedOrNull() || ${value}.isString() || ${value}.isObject())");
-            $usedArguments{$parameterIndex} = 1;
+            if ($parameter->extendedAttributes->{"StrictTypeChecking"}) {
+                push(@andExpression, "(${value}.isUndefinedOrNull() || ${value}.isString() || ${value}.isObject())");
+                $usedArguments{$parameterIndex} = 1;
+            }
         } elsif ($parameter->extendedAttributes->{"Callback"}) {
             # For Callbacks only checks if the value is null or object.
             push(@andExpression, "(${value}.isNull() || ${value}.isFunction())");
@@ -1308,6 +1317,7 @@ sub GenerateFunctionParametersCheck
     my @orExpression = ();
     my $numParameters = 0;
     my @neededArguments = ();
+    my $hasVariadic = 0;
     my $numMandatoryParams = @{$function->parameters};
 
     foreach my $parameter (@{$function->parameters}) {
@@ -1317,11 +1327,17 @@ sub GenerateFunctionParametersCheck
             push(@neededArguments, @usedArguments);
             $numMandatoryParams--;
         }
+        if ($parameter->isVariadic) {
+            $hasVariadic = 1;
+            last;
+        }
         $numParameters++;
     }
-    my ($expression, @usedArguments) = GenerateParametersCheckExpression($numParameters, $function);
-    push(@orExpression, $expression);
-    push(@neededArguments, @usedArguments);
+    if (!$hasVariadic) {
+        my ($expression, @usedArguments) = GenerateParametersCheckExpression($numParameters, $function);
+        push(@orExpression, $expression);
+        push(@neededArguments, @usedArguments);
+    }
     return ($numMandatoryParams, join(" || ", @orExpression), @neededArguments);
 }
 
@@ -1403,8 +1419,6 @@ sub GenerateImplementation
 
     push(@implContent, "\nusing namespace JSC;\n\n");
     push(@implContent, "namespace WebCore {\n\n");
-
-    push(@implContent, "ASSERT_CLASS_FITS_IN_CELL($className);\n");
 
     my $numAttributes = GenerateAttributesHashTable($object, $dataNode);
 
@@ -1754,10 +1768,8 @@ sub GenerateImplementation
             push(@implContent, "    ${className}* thisObject = jsCast<${className}*>(cell);\n");
             push(@implContent, "    ASSERT_GC_OBJECT_INHERITS(thisObject, &s_info);\n");
 
-            # This attempts to sink the somewhat expensive int-to-string conversion that happens when we create PropertyName
-            # to the point where we actually need it. In particular, when we generate this method for classes that can
-            # attempt their indexed getter first, we try to ensure that if that getter succeeds then we don't pay for the
-            # creation of the PropertyName.
+            # Sink the int-to-string conversion that happens when we create a PropertyName
+            # to the point where we actually need it.
             my $generatedPropertyName = 0;
             my $propertyNameGeneration = sub {
                 if ($generatedPropertyName) {
@@ -1767,22 +1779,6 @@ sub GenerateImplementation
                 $generatedPropertyName = 1;
             };
             
-            my $manualLookupGetterGeneration = sub {
-                my $requiresManualLookup = $dataNode->extendedAttributes->{"IndexedGetter"} || $dataNode->extendedAttributes->{"NamedGetter"};
-                if ($requiresManualLookup) {
-                    push(@implContent, "    const HashEntry* entry = ${className}Table.entry(exec, propertyName);\n");
-                    push(@implContent, "    if (entry) {\n");
-                    push(@implContent, "        slot.setCustom(thisObject, entry->propertyGetter());\n");
-                    push(@implContent, "        return true;\n");
-                    push(@implContent, "    }\n");
-                }
-            };
-            
-            if ($dataNode->extendedAttributes->{"NamedGetter"} && !$dataNode->extendedAttributes->{"CustomNamedGetter"}) {
-                &$propertyNameGeneration();
-                &$manualLookupGetterGeneration();
-            }
-
             if ($dataNode->extendedAttributes->{"IndexedGetter"} || $dataNode->extendedAttributes->{"NumericIndexedGetter"}) {
                 if (IndexGetterReturnsStrings($implClassName)) {
                     push(@implContent, "    if (index <= MAX_ARRAY_INDEX) {\n");
@@ -1805,11 +1801,6 @@ sub GenerateImplementation
                 push(@implContent, "        return true;\n");
                 push(@implContent, "    }\n");
                 $implIncludes{"wtf/text/AtomicString.h"} = 1;
-            }
-                
-            if ($dataNode->extendedAttributes->{"CustomNamedGetter"}) {
-                &$propertyNameGeneration();
-                &$manualLookupGetterGeneration();
             }
             
             if ($dataNode->extendedAttributes->{"JSCustomGetOwnPropertySlotAndDescriptor"}) {
@@ -2588,7 +2579,7 @@ sub GenerateCallWith
         push(@callWithArgs, "scriptArguments");
     }
     if ($codeGenerator->ExtendedAttributeContains($callWith, "CallStack")) {
-        push(@$outputArray, "    RefPtr<ScriptCallStack> callStack(createScriptCallStackForInspector(exec));\n");
+        push(@$outputArray, "    RefPtr<ScriptCallStack> callStack(createScriptCallStackForConsole(exec));\n");
         $implIncludes{"ScriptCallStack.h"} = 1;
         $implIncludes{"ScriptCallStackFactory.h"} = 1;
         push(@callWithArgs, "callStack");
@@ -2604,7 +2595,7 @@ sub GenerateArgumentsCountCheck
 
     my $numMandatoryParams = @{$function->parameters};
     foreach my $param (reverse(@{$function->parameters})) {
-        if ($param->extendedAttributes->{"Optional"}) {
+        if ($param->extendedAttributes->{"Optional"} or $param->isVariadic) {
             $numMandatoryParams--;
         } else {
             last;
@@ -2707,13 +2698,38 @@ sub GenerateParametersCheck
                 push(@$outputArray, "    RefPtr<$argType> $name = ${callbackClassName}::create(asObject(exec->argument($argsIndex)), castedThis->globalObject());\n");
             }
         } elsif ($parameter->extendedAttributes->{"Clamp"}) {
-                my $nativeValue = "${name}NativeValue";
-                push(@$outputArray, "    $argType $name = 0;\n");
-                push(@$outputArray, "    double $nativeValue = exec->argument($argsIndex).toNumber(exec);\n");
+            my $nativeValue = "${name}NativeValue";
+            push(@$outputArray, "    $argType $name = 0;\n");
+            push(@$outputArray, "    double $nativeValue = exec->argument($argsIndex).toNumber(exec);\n");
+            push(@$outputArray, "    if (exec->hadException())\n");
+            push(@$outputArray, "        return JSValue::encode(jsUndefined());\n\n");
+            push(@$outputArray, "    if (!isnan($nativeValue))\n");
+            push(@$outputArray, "        $name = clampTo<$argType>($nativeValue);\n\n");
+        } elsif ($parameter->isVariadic) {
+            my $nativeElementType;
+            if ($argType eq "DOMString") {
+                $nativeElementType = "String";
+            } else {
+                $nativeElementType = GetNativeType($argType);
+                if ($nativeElementType =~ />$/) {
+                    $nativeElementType .= " ";
+                }
+            }
+
+            if (!IsNativeType($argType)) {
+                push(@$outputArray, "    Vector<$nativeElementType> $name;\n");
+                push(@$outputArray, "    for (unsigned i = $argsIndex; i < exec->argumentCount(); ++i) {\n");
+                push(@$outputArray, "        if (!exec->argument(i).inherits(&JS${argType}::s_info))\n");
+                push(@$outputArray, "            return throwVMTypeError(exec);\n");
+                push(@$outputArray, "        $name.append(to$argType(exec->argument(i)));\n");
+                push(@$outputArray, "    }\n")
+            } else {
+                push(@$outputArray, "    Vector<$nativeElementType> $name = toNativeArguments<$nativeElementType>(exec, $argsIndex);\n");
+                # Check if the type conversion succeeded.
                 push(@$outputArray, "    if (exec->hadException())\n");
-                push(@$outputArray, "        return JSValue::encode(jsUndefined());\n\n");
-                push(@$outputArray, "    if (!isnan($nativeValue))\n");
-                push(@$outputArray, "        $name = clampTo<$argType>($nativeValue);\n\n");
+                push(@$outputArray, "        return JSValue::encode(jsUndefined());\n");
+            }
+
         } else {
             # If the "StrictTypeChecking" extended attribute is present, and the argument's type is an
             # interface type, then if the incoming value does not implement that interface, a TypeError

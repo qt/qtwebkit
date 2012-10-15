@@ -1,3 +1,184 @@
+2012-10-13  Jakob Petsovits  <jpetsovits@rim.com>
+
+        [BlackBerry] Fetch blit rects from a viewport accessor
+        https://bugs.webkit.org/show_bug.cgi?id=98581
+        RIM PR 173292
+
+        Reviewed by George Staikos.
+        Internally reviewed by Arvid Nilsson.
+
+        Add new ViewportAccessor files to the build.
+        See Source/WebKit/blackberry/ChangeLog for the
+        verbose commit message.
+
+        * PlatformBlackBerry.cmake:
+
+2012-10-12  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r131189.
+        http://trac.webkit.org/changeset/131189
+        https://bugs.webkit.org/show_bug.cgi?id=99187
+
+        Made inspector http tests crash on WK2. (Requested by rakuco
+        on #webkit).
+
+        * PlatformEfl.cmake:
+
+2012-10-12  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Share resources installed for inspector
+        https://bugs.webkit.org/show_bug.cgi?id=98991
+
+        Reviewed by Gyuyoung Kim.
+
+        * PlatformEfl.cmake:
+        Extracted build scripts which install resources to WebKit/PlatformEfl.cmake.
+
+2012-10-11  Chris Guan  <chris.guan@torchmobile.com.cn>
+
+        [Blackberry] makes NavigatorContentUtils work
+        https://bugs.webkit.org/show_bug.cgi?id=99022
+
+        Reviewed by Rob Buis.
+
+        Because r126735 renamed RegisterProtocolHandler API to NavigatorContentUtils, So we
+        need add Modules/navigatorcontentutils into WebKit_INCLUDE_DIRECTORIES.
+
+        * PlatformBlackBerry.cmake:
+
+2012-10-10  Konrad Piascik  <kpiascik@rim.com>
+
+        [BlackBerry] Install inspector files into staging directory.
+        https://bugs.webkit.org/show_bug.cgi?id=98930
+
+        Reviewed by Rob Buis.
+
+        Internally reviewed by Ming Xie.
+        Install the web inspector resources into the staging directory to make it easier to flash to device.
+
+        * PlatformBlackBerry.cmake:
+
+2012-10-09  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Fix build with QtMultimedia
+
+        Reviewed by Tor Arne Vestbø.
+
+        * WebKit1.pri: WK1 needs QtMultimediaWidgets for QVideoWidget and friends.
+
+2012-10-08  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Make RenderThemeQStyle/ScrollbarThemeQStyle compile without QStyle/QtWidgets
+        https://bugs.webkit.org/show_bug.cgi?id=98268
+
+        Reviewed by Tor Arne Vestbø.
+
+        * WebKit1.pro: Add new files to the build.
+
+2012-10-04  Rob Buis  <rbuis@rim.com>
+
+        [BlackBerry] Sync up CMake files
+        https://bugs.webkit.org/show_bug.cgi?id=98442
+
+        Reviewed by Gyuyoung Kim.
+
+        Amongst others use InspectorOverlayBlackBerry.
+
+        * PlatformBlackBerry.cmake:
+
+2012-10-05  Simon Hausmann  <simon.hausmann@digia.com>
+
+        Unreviewed, rolling out r130495.
+        http://trac.webkit.org/changeset/130495
+        https://bugs.webkit.org/show_bug.cgi?id=98268
+
+        Made WK2 tests crash....
+
+        * WebKit1.pro:
+
+2012-10-05  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Make RenderThemeQStyle/ScrollbarThemeQStyle compile without QStyle/QtWidgets
+        https://bugs.webkit.org/show_bug.cgi?id=98268
+
+        Reviewed by Tor Arne Vestbø.
+
+        * WebKit1.pro: Add new files to the build.
+
+2012-10-04  Konrad Piascik  <kpiascik@rim.com>
+
+        [BlackBerry] Update how we compile inspector front-end javascript.
+        https://bugs.webkit.org/show_bug.cgi?id=98413
+
+        Reviewed by Rob Buis.
+
+        No longer cat all JavaScript together, instead use the lazy init and
+        only append our custom changes script to the end of inspectorBB.html.
+
+        * PlatformBlackBerry.cmake:
+
+2012-10-03  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Default.edj should be generated although ENABLE_WEBKIT disabled.
+        https://bugs.webkit.org/show_bug.cgi?id=97753
+
+        Reviewed by Laszlo Gombos.
+
+        default.edj is used in both webkit/efl and webkit2/efl.
+        However, it has been generated only when ENABLE_WEBKIT is enabled.
+
+        This patch separates the script which generates default.edj
+        from source/webkit/platformefl.cmake.
+
+        * PlatformEfl.cmake: Extracted codes which is related to default.edj.
+
+2012-10-03  Otto Derek Cheung  <otcheung@rim.com>
+
+        [BlackBerry] Implementing the NetworkInfo API for BB port
+        https://bugs.webkit.org/show_bug.cgi?id=98273
+
+        Reviewed by Rob Buis.
+
+        Adding new classes to support NetworkInfo API in the
+        BlackBerry Port.
+
+        * PlatformBlackBerry.cmake:
+
+2012-10-02  Krzysztof Czech  <k.czech@samsung.com>
+
+        [EFL] Add file EWKTestEnvironment.cpp to build system.
+        https://bugs.webkit.org/show_bug.cgi?id=94925
+
+        Reviewed by Gyuyoung Kim.
+
+        Change is related to modifications in wk1 unit tests.
+
+        * PlatformEfl.cmake:
+
+2012-09-27  Anders Carlsson  <andersca@apple.com>
+
+        Get rid of more unused WK1 plug-in code
+        https://bugs.webkit.org/show_bug.cgi?id=97835
+
+        Reviewed by Mark Rowe.
+
+        Remove WebNetscapeDeprecatedFunctions.c and WebNetscapeDeprecatedFunctions.h from the Xcode project.
+
+        * WebKit.xcodeproj/project.pbxproj:
+
+2012-09-27  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][CMAKE] Default theme files are outdated in PlatformEfl.cmake
+        https://bugs.webkit.org/show_bug.cgi?id=97769
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Update Default theme files in PlatformEfl.cmake so that
+        changes to those files are properly picked up by CMake
+        when building incrementally.
+
+        * PlatformEfl.cmake:
+
 2012-09-24  Arvid Nilsson  <anilsson@rim.com>
 
         [BlackBerry] Add cookie database API

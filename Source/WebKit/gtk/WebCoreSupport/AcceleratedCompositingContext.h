@@ -58,13 +58,16 @@ public:
 
     // GraphicsLayerClient
     virtual void notifyAnimationStarted(const WebCore::GraphicsLayer*, double time);
-    virtual void notifySyncRequired(const WebCore::GraphicsLayer*);
+    virtual void notifyFlushRequired(const WebCore::GraphicsLayer*);
     virtual void paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext&, WebCore::GraphicsLayerPaintingPhase, const WebCore::IntRect& rectToPaint);
     virtual bool showDebugBorders(const WebCore::GraphicsLayer*) const;
     virtual bool showRepaintCounter(const WebCore::GraphicsLayer*) const;
 
     void initialize();
-    void compositeLayersToContext();
+
+    enum CompositePurpose { ForResize, NotForResize };
+    void compositeLayersToContext(CompositePurpose = NotForResize);
+
     void flushAndRenderLayers();
     bool flushPendingLayerChanges();
     void scrollNonCompositedContents(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset);

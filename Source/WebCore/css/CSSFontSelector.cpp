@@ -285,7 +285,7 @@ void CSSFontSelector::addFontFaceRule(const StyleRuleFontFace* fontFaceRule)
         if (familyName.isEmpty())
             continue;
 
-        OwnPtr<Vector<RefPtr<CSSFontFace> > >& familyFontFaces = m_fontFaces.add(familyName, nullptr).iterator->second;
+        OwnPtr<Vector<RefPtr<CSSFontFace> > >& familyFontFaces = m_fontFaces.add(familyName, nullptr).iterator->value;
         if (!familyFontFaces) {
             familyFontFaces = adoptPtr(new Vector<RefPtr<CSSFontFace> >);
 
@@ -350,7 +350,7 @@ void CSSFontSelector::fontCacheInvalidated()
     dispatchInvalidationCallbacks();
 }
 
-static FontData* fontDataForGenericFamily(Document* document, const FontDescription& fontDescription, const AtomicString& familyName)
+static PassRefPtr<FontData> fontDataForGenericFamily(Document* document, const FontDescription& fontDescription, const AtomicString& familyName)
 {
     if (!document || !document->frame())
         return 0;
@@ -465,7 +465,7 @@ static inline bool compareFontFaces(CSSFontFace* first, CSSFontFace* second)
     return false;
 }
 
-FontData* CSSFontSelector::getFontData(const FontDescription& fontDescription, const AtomicString& familyName)
+PassRefPtr<FontData> CSSFontSelector::getFontData(const FontDescription& fontDescription, const AtomicString& familyName)
 {
     if (m_fontFaces.isEmpty()) {
         if (familyName.startsWith("-webkit-"))
@@ -487,13 +487,13 @@ FontData* CSSFontSelector::getFontData(const FontDescription& fontDescription, c
         return fontDataForGenericFamily(m_document, fontDescription, familyName);
     }
 
-    OwnPtr<HashMap<unsigned, RefPtr<CSSSegmentedFontFace> > >& segmentedFontFaceCache = m_fonts.add(family, nullptr).iterator->second;
+    OwnPtr<HashMap<unsigned, RefPtr<CSSSegmentedFontFace> > >& segmentedFontFaceCache = m_fonts.add(family, nullptr).iterator->value;
     if (!segmentedFontFaceCache)
         segmentedFontFaceCache = adoptPtr(new HashMap<unsigned, RefPtr<CSSSegmentedFontFace> >);
 
     FontTraitsMask traitsMask = fontDescription.traitsMask();
 
-    RefPtr<CSSSegmentedFontFace>& face = segmentedFontFaceCache->add(traitsMask, 0).iterator->second;
+    RefPtr<CSSSegmentedFontFace>& face = segmentedFontFaceCache->add(traitsMask, 0).iterator->value;
     if (!face) {
         face = CSSSegmentedFontFace::create(this);
 

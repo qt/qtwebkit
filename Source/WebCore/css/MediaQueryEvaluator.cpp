@@ -28,9 +28,11 @@
 #include "config.h"
 #include "MediaQueryEvaluator.h"
 
+#include "CSSAspectRatioValue.h"
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "CSSPrimitiveValue.h"
+#include "CSSValueKeywords.h"
 #include "CSSValueList.h"
 #include "FloatRect.h"
 #include "Frame.h"
@@ -171,29 +173,6 @@ bool MediaQueryEvaluator::eval(const MediaQuerySet* querySet, StyleResolver* sty
     return result;
 }
 
-static bool parseAspectRatio(CSSValue* value, int& h, int& v)
-{
-    if (value->isValueList()) {
-        CSSValueList* valueList = static_cast<CSSValueList*>(value);
-        if (valueList->length() == 3) {
-            CSSValue* i0 = valueList->itemWithoutBoundsCheck(0);
-            CSSValue* i1 = valueList->itemWithoutBoundsCheck(1);
-            CSSValue* i2 = valueList->itemWithoutBoundsCheck(2);
-            if (i0->isPrimitiveValue() && static_cast<CSSPrimitiveValue*>(i0)->isNumber()
-                && i1->isPrimitiveValue() && static_cast<CSSPrimitiveValue*>(i1)->isString()
-                && i2->isPrimitiveValue() && static_cast<CSSPrimitiveValue*>(i2)->isNumber()) {
-                String str = static_cast<CSSPrimitiveValue*>(i1)->getStringValue();
-                if (!str.isNull() && str.length() == 1 && str[0] == '/') {
-                    h = static_cast<CSSPrimitiveValue*>(i0)->getIntValue(CSSPrimitiveValue::CSS_NUMBER);
-                    v = static_cast<CSSPrimitiveValue*>(i2)->getIntValue(CSSPrimitiveValue::CSS_NUMBER);
-                    return true;
-                }
-            }
-        }
-    }
-    return false;
-}
-
 template<typename T>
 bool compareValue(T a, T b, MediaFeaturePrefix op)
 {
@@ -205,6 +184,16 @@ bool compareValue(T a, T b, MediaFeaturePrefix op)
     case NoPrefix:
         return a == b;
     }
+    return false;
+}
+
+static bool compareAspectRatioValue(CSSValue* value, int width, int height, MediaFeaturePrefix op)
+{
+    if (value->isAspectRatioValue()) {
+        CSSAspectRatioValue* aspectRatio = static_cast<CSSAspectRatioValue*>(value);
+        return compareValue(width * static_cast<int>(aspectRatio->denominatorValue()), height * static_cast<int>(aspectRatio->numeratorValue()), op);
+    }
+
     return false;
 }
 
@@ -243,29 +232,25 @@ static bool monochromeMediaFeatureEval(CSSValue* value, RenderStyle* style, Fram
 
 static bool orientationMediaFeatureEval(CSSValue* value, RenderStyle*, Frame* frame, MediaFeaturePrefix)
 {
-    // A missing parameter should fail
-    if (!value)
-        return false;
-
     FrameView* view = frame->view();
     int width = view->layoutWidth();
     int height = view->layoutHeight();
-    if (width > height) // Square viewport is portrait
-        return "landscape" == static_cast<CSSPrimitiveValue*>(value)->getStringValue();
-    return "portrait" == static_cast<CSSPrimitiveValue*>(value)->getStringValue();
+    if (value && value->isPrimitiveValue()) {
+        const int id = static_cast<CSSPrimitiveValue*>(value)->getIdent();
+        if (width > height) // Square viewport is portrait.
+            return CSSValueLandscape == id;
+        return CSSValuePortrait == id;
+    }
+
+    // Expression (orientation) evaluates to true if width and height >= 0.
+    return height >= 0 && width >= 0;
 }
 
 static bool aspect_ratioMediaFeatureEval(CSSValue* value, RenderStyle*, Frame* frame, MediaFeaturePrefix op)
 {
     if (value) {
         FrameView* view = frame->view();
-        int width = view->layoutWidth();
-        int height = view->layoutHeight();
-        int h = 0;
-        int v = 0;
-        if (parseAspectRatio(value, h, v))
-            return v != 0 && compareValue(width * v, height * h, op);
-        return false;
+        return compareAspectRatioValue(value, view->layoutWidth(), view->layoutHeight(), op);
     }
 
     // ({,min-,max-}aspect-ratio)
@@ -277,11 +262,7 @@ static bool device_aspect_ratioMediaFeatureEval(CSSValue* value, RenderStyle*, F
 {
     if (value) {
         FloatRect sg = screenRect(frame->page()->mainFrame()->view());
-        int h = 0;
-        int v = 0;
-        if (parseAspectRatio(value, h, v))
-            return v != 0  && compareValue(static_cast<int>(sg.width()) * v, static_cast<int>(sg.height()) * h, op);
-        return false;
+        return compareAspectRatioValue(value, static_cast<int>(sg.width()), static_cast<int>(sg.height()), op);
     }
 
     // ({,min-,max-}device-aspect-ratio)
@@ -534,7 +515,32 @@ static bool view_modeMediaFeatureEval(CSSValue* value, RenderStyle*, Frame* fram
     UNUSED_PARAM(op);
     if (!value)
         return true;
-    return Page::stringToViewMode(static_cast<CSSPrimitiveValue*>(value)->getStringValue()) == frame->page()->viewMode();
+
+    const int viewModeCSSKeywordID = static_cast<CSSPrimitiveValue*>(value)->getIdent();
+    const Page::ViewMode viewMode = frame->page()->viewMode();
+    bool result = false;
+    switch (viewMode) {
+    case Page::ViewModeWindowed:
+        result = viewModeCSSKeywordID == CSSValueWindowed;
+        break;
+    case Page::ViewModeFloating:
+        result = viewModeCSSKeywordID == CSSValueFloating;
+        break;
+    case Page::ViewModeFullscreen:
+        result = viewModeCSSKeywordID == CSSValueFullscreen;
+        break;
+    case Page::ViewModeMaximized:
+        result = viewModeCSSKeywordID == CSSValueMaximized;
+        break;
+    case Page::ViewModeMinimized:
+        result = viewModeCSSKeywordID == CSSValueMinimized;
+        break;
+    default:
+        result = false;
+        break;
+    }
+
+    return result;
 }
 
 enum PointerDeviceType { TouchPointer, MousePointer, NoPointer, UnknownPointer };
@@ -591,10 +597,10 @@ static bool pointerMediaFeatureEval(CSSValue* value, RenderStyle*, Frame* frame,
     if (!value->isPrimitiveValue())
         return false;
 
-    String str = static_cast<CSSPrimitiveValue*>(value)->getStringValue();
-    return (pointer == NoPointer && str == "none")
-        || (pointer == TouchPointer && str == "coarse")
-        || (pointer == MousePointer && str == "fine");
+    const int id = static_cast<CSSPrimitiveValue*>(value)->getIdent();
+    return (pointer == NoPointer && id == CSSValueNone)
+        || (pointer == TouchPointer && id == CSSValueCoarse)
+        || (pointer == MousePointer && id == CSSValueFine);
 }
 
 static void createFunctionMap()

@@ -248,7 +248,7 @@ bool DOMWindow::dispatchAllPendingBeforeUnloadEvents()
     Vector<RefPtr<DOMWindow> > windows;
     DOMWindowSet::iterator end = set.end();
     for (DOMWindowSet::iterator it = set.begin(); it != end; ++it)
-        windows.append(it->first);
+        windows.append(it->key);
 
     size_t size = windows.size();
     for (size_t i = 0; i < size; ++i) {
@@ -290,7 +290,7 @@ void DOMWindow::dispatchAllPendingUnloadEvents()
     Vector<RefPtr<DOMWindow> > windows;
     DOMWindowSet::iterator end = set.end();
     for (DOMWindowSet::iterator it = set.begin(); it != end; ++it)
-        windows.append(it->first);
+        windows.append(it->key);
 
     size_t size = windows.size();
     for (size_t i = 0; i < size; ++i) {
@@ -834,7 +834,7 @@ void DOMWindow::postMessage(PassRefPtr<SerializedScriptValue> message, const Mes
 
     // Capture stack trace only when inspector front-end is loaded as it may be time consuming.
     RefPtr<ScriptCallStack> stackTrace;
-    if (InspectorInstrumentation::hasFrontends())
+    if (InspectorInstrumentation::consoleAgentEnabled(sourceDocument))
         stackTrace = createScriptCallStack(ScriptCallStack::maxCallStackSizeToCapture, true);
 
     // Schedule the message.
@@ -1533,17 +1533,17 @@ void DOMWindow::clearInterval(int timeoutId)
 }
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
-int DOMWindow::webkitRequestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback> callback)
+int DOMWindow::requestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback> callback)
 {
     if (Document* d = document())
-        return d->webkitRequestAnimationFrame(callback);
+        return d->requestAnimationFrame(callback);
     return 0;
 }
 
-void DOMWindow::webkitCancelAnimationFrame(int id)
+void DOMWindow::cancelAnimationFrame(int id)
 {
     if (Document* d = document())
-        d->webkitCancelAnimationFrame(id);
+        d->cancelAnimationFrame(id);
 }
 #endif
 

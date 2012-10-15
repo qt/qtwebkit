@@ -54,6 +54,7 @@
 #include <WebCore/JSRange.h>
 #include <WebCore/Page.h>
 #include <WebCore/RenderTreeAsText.h>
+#include <WebCore/ResourceBuffer.h>
 #include <WebCore/SecurityOrigin.h>
 #include <WebCore/TextIterator.h>
 #include <WebCore/TextResourceDecoder.h>
@@ -296,7 +297,7 @@ String WebFrame::source() const
     DocumentLoader* documentLoader = m_coreFrame->loader()->activeDocumentLoader();
     if (!documentLoader)
         return String();
-    RefPtr<SharedBuffer> mainResourceData = documentLoader->mainResourceData();
+    RefPtr<ResourceBuffer> mainResourceData = documentLoader->mainResourceData();
     if (!mainResourceData)
         return String();
     return decoder->encoding().decode(mainResourceData->data(), mainResourceData->size());
@@ -513,7 +514,7 @@ String WebFrame::layerTreeAsText() const
     if (!m_coreFrame)
         return "";
 
-    return m_coreFrame->layerTreeAsText();
+    return m_coreFrame->layerTreeAsText(0);
 }
 
 unsigned WebFrame::pendingUnloadCount() const

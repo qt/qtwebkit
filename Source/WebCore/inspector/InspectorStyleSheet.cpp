@@ -497,6 +497,8 @@ PassRefPtr<TypeBuilder::CSS::CSSStyle> InspectorStyle::styleWithProperties() con
     RefPtr<Array<TypeBuilder::CSS::ShorthandEntry> > shorthandEntries = Array<TypeBuilder::CSS::ShorthandEntry>::create();
     HashMap<String, RefPtr<TypeBuilder::CSS::CSSProperty> > propertyNameToPreviousActiveProperty;
     HashSet<String> foundShorthands;
+    String previousPriority;
+    String previousStatus;
 
     for (Vector<InspectorStyleProperty>::iterator it = properties.begin(), itEnd = properties.end(); it != itEnd; ++it) {
         const CSSPropertySourceData& propertyEntry = it->sourceData;
@@ -532,11 +534,20 @@ PassRefPtr<TypeBuilder::CSS::CSSStyle> InspectorStyle::styleWithProperties() con
                 String canonicalPropertyName = propertyId ? getPropertyNameString(propertyId) : name;
                 HashMap<String, RefPtr<TypeBuilder::CSS::CSSProperty> >::iterator activeIt = propertyNameToPreviousActiveProperty.find(canonicalPropertyName);
                 if (activeIt != propertyNameToPreviousActiveProperty.end()) {
-                    if (propertyEntry.parsedOk)
-                        shouldInactivate = true;
-                    else {
+                    if (propertyEntry.parsedOk) {
+                        bool successPriority = activeIt->value->getString(TypeBuilder::CSS::CSSProperty::Priority, &previousPriority);
+                        bool successStatus = activeIt->value->getString(TypeBuilder::CSS::CSSProperty::Status, &previousStatus);
+                        if (successStatus && previousStatus != "inactive") {
+                            if (propertyEntry.important || !successPriority) // Priority not set == "not important".
+                                shouldInactivate = true;
+                            else if (status == TypeBuilder::CSS::CSSProperty::Status::Active) {
+                                // Inactivate a non-important property following the same-named important property.
+                                status = TypeBuilder::CSS::CSSProperty::Status::Inactive;
+                            }
+                        }
+                    } else {
                         bool previousParsedOk;
-                        bool success = activeIt->second->getBoolean(TypeBuilder::CSS::CSSProperty::ParsedOk, &previousParsedOk);
+                        bool success = activeIt->value->getBoolean(TypeBuilder::CSS::CSSProperty::ParsedOk, &previousParsedOk);
                         if (success && !previousParsedOk)
                             shouldInactivate = true;
                     }
@@ -544,7 +555,7 @@ PassRefPtr<TypeBuilder::CSS::CSSStyle> InspectorStyle::styleWithProperties() con
                     propertyNameToPreviousActiveProperty.set(canonicalPropertyName, property);
 
                 if (shouldInactivate) {
-                    activeIt->second->setStatus(TypeBuilder::CSS::CSSProperty::Status::Inactive);
+                    activeIt->value->setStatus(TypeBuilder::CSS::CSSProperty::Status::Inactive);
                     propertyNameToPreviousActiveProperty.set(canonicalPropertyName, property);
                 }
             } else {
@@ -1057,7 +1068,7 @@ PassRefPtr<InspectorStyle> InspectorStyleSheet::inspectorStyleForId(const Inspec
         RefPtr<InspectorStyle> inspectorStyle = InspectorStyle::create(id, style, this);
         return inspectorStyle.release();
     }
-    return it->second;
+    return it->value;
 }
 
 void InspectorStyleSheet::rememberInspectorStyle(RefPtr<InspectorStyle> inspectorStyle)

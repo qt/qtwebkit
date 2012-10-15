@@ -63,7 +63,6 @@
 #include "Page.h"
 #include "PagePopupDriver.h"
 #include "PlatformScreen.h"
-#include "PlatformSupport.h"
 #include "PopupContainer.h"
 #include "PopupMenuChromium.h"
 #include "RenderWidget.h"
@@ -90,16 +89,16 @@
 #include "WebPopupMenuImpl.h"
 #include "WebPopupMenuInfo.h"
 #include "WebPopupType.h"
-#include "platform/WebRect.h"
 #include "WebSettings.h"
 #include "WebTextDirection.h"
-#include "platform/WebURLRequest.h"
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
 #include "WebWindowFeatures.h"
 #include "WindowFeatures.h"
 #include "WrappedResourceRequest.h"
 #include <public/Platform.h>
+#include <public/WebRect.h>
+#include <public/WebURLRequest.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/text/StringConcatenate.h>
@@ -918,7 +917,7 @@ void ChromeClientImpl::attachRootGraphicsLayer(Frame* frame, GraphicsLayer* grap
     m_webView->setRootGraphicsLayer(graphicsLayer);
 }
 
-void ChromeClientImpl::scheduleCompositingLayerSync()
+void ChromeClientImpl::scheduleCompositingLayerFlush()
 {
     m_webView->scheduleCompositingLayerSync();
 }
@@ -1121,7 +1120,7 @@ bool ChromeClientImpl::isPointerLocked()
 #endif
 
 #if ENABLE(WIDGET_REGION)
-void ChromeClientImpl::dashboardRegionsChanged()
+void ChromeClientImpl::annotatedRegionsChanged()
 {
     WebViewClient* client = m_webView->client();
     if (client)

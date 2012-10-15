@@ -70,7 +70,11 @@ DrawingAreaImpl::DrawingAreaImpl(WebPage* webPage, const WebPageCreationParamete
 {
     if (webPage->corePage()->settings()->acceleratedDrawingEnabled() || webPage->corePage()->settings()->forceCompositingMode())
         m_alwaysUseCompositing = true;
-        
+
+#if USE(COORDINATED_GRAPHICS)
+    m_alwaysUseCompositing = true;
+#endif
+
     if (m_alwaysUseCompositing)
         enterAcceleratedCompositingMode(0);
 }
@@ -303,6 +307,14 @@ void DrawingAreaImpl::layerHostDidFlushLayers()
 #endif
 }
 
+GraphicsLayerFactory* DrawingAreaImpl::graphicsLayerFactory()
+{
+    if (m_layerTreeHost)
+        return m_layerTreeHost->graphicsLayerFactory();
+
+    return 0;
+}
+
 void DrawingAreaImpl::setRootCompositingLayer(GraphicsLayer* graphicsLayer)
 {
     // FIXME: Instead of using nested if statements, we should keep a compositing state
@@ -343,7 +355,7 @@ void DrawingAreaImpl::setRootCompositingLayer(GraphicsLayer* graphicsLayer)
     }
 }
 
-void DrawingAreaImpl::scheduleCompositingLayerSync()
+void DrawingAreaImpl::scheduleCompositingLayerFlush()
 {
     if (!m_layerTreeHost)
         return;

@@ -296,7 +296,7 @@ void DumpRenderTreeSupportEfl::addUserScript(const Evas_Object* ewkView, const S
     DRT_SUPPRT_PAGE_GET_OR_RETURN(ewkView, page);
 
     page->group().addUserScriptToWorld(WebCore::mainThreadNormalWorld(), sourceCode, WebCore::KURL(),
-                                       nullptr, nullptr, runAtStart ? WebCore::InjectAtDocumentStart : WebCore::InjectAtDocumentEnd,
+                                       Vector<String>(), Vector<String>(), runAtStart ? WebCore::InjectAtDocumentStart : WebCore::InjectAtDocumentEnd,
                                        allFrames ? WebCore::InjectInAllFrames : WebCore::InjectInTopFrameOnly);
 }
 
@@ -311,7 +311,7 @@ void DumpRenderTreeSupportEfl::addUserStyleSheet(const Evas_Object* ewkView, con
 {
     DRT_SUPPRT_PAGE_GET_OR_RETURN(ewkView, page);
 
-    page->group().addUserStyleSheetToWorld(WebCore::mainThreadNormalWorld(), sourceCode, WebCore::KURL(), nullptr, nullptr, allFrames ? WebCore::InjectInAllFrames : WebCore::InjectInTopFrameOnly);
+    page->group().addUserStyleSheetToWorld(WebCore::mainThreadNormalWorld(), sourceCode, WebCore::KURL(), Vector<String>(), Vector<String>(), allFrames ? WebCore::InjectInAllFrames : WebCore::InjectInTopFrameOnly);
 }
 
 void DumpRenderTreeSupportEfl::clearUserStyleSheets(const Evas_Object* ewkView)
@@ -485,7 +485,7 @@ void DumpRenderTreeSupportEfl::evaluateScriptInIsolatedWorld(const Evas_Object* 
     else {
         WTF::HashMap<int, RefPtr<WebCore::DOMWrapperWorld > >::const_iterator it = worldMap.find(worldID);
         if (it != worldMap.end())
-            scriptWorld = (*it).second;
+            scriptWorld = (*it).value;
         else {
             scriptWorld = WebCore::ScriptController::createWorld();
             worldMap.set(worldID, scriptWorld);
@@ -568,11 +568,16 @@ void DumpRenderTreeSupportEfl::setSerializeHTTPLoads(bool enabled)
     WebCore::resourceLoadScheduler()->setSerialLoadingEnabled(enabled);
 }
 
+void DumpRenderTreeSupportEfl::setShouldTrackVisitedLinks(bool shouldTrack)
+{
+    WebCore::PageGroup::setShouldTrackVisitedLinks(shouldTrack);
+}
+
 void DumpRenderTreeSupportEfl::sendWebIntentResponse(Ewk_Intent_Request* request, JSStringRef response)
 {
 #if ENABLE(WEB_INTENTS)
     String responseString = response->string();
-    if (responseString.isNull())
+    if (responseString.isEmpty())
         ewk_intent_request_failure_post(request, WebCore::SerializedScriptValue::create(String::fromUTF8("ERROR")));
     else
         ewk_intent_request_result_post(request, WebCore::SerializedScriptValue::create(String(responseString.impl())));

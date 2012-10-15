@@ -110,6 +110,8 @@ public:
     void setMinimumTimerInterval(double seconds); // Interval specified in seconds.
     void setSpatialNavigationEnabled(bool);
     void setTabKeyCyclesThroughElements(bool);
+    void setSerializeHTTPLoads();
+    void dispatchPendingLoadRequests();
 
     // Special DOM functions.
     JSValueRef computedStyleIncludingVisitedInfo(JSValueRef element);
@@ -129,9 +131,6 @@ public:
     bool pauseAnimationAtTimeOnElementWithId(JSStringRef animationName, double time, JSStringRef elementId);
     bool pauseTransitionAtTimeOnElementWithId(JSStringRef propertyName, double time, JSStringRef elementId);
     void suspendAnimations();
-    
-    // Compositing testing.
-    JSRetainPtr<JSStringRef> layerTreeAsText() const;
     
     // UserContent testing.
     void addUserScript(JSStringRef source, bool runAtStart, bool allFrames);
@@ -251,7 +250,7 @@ public:
 
     // Geolocation.
     void setGeolocationPermission(bool);
-    void setMockGeolocationPosition(double latitude, double longitude, double accuracy);
+    void setMockGeolocationPosition(double latitude, double longitude, double accuracy, JSValueRef altitude, JSValueRef altitudeAccuracy, JSValueRef heading, JSValueRef speed);
     void setMockGeolocationPositionUnavailableError(JSStringRef message);
 
     JSRetainPtr<JSStringRef> platformName();

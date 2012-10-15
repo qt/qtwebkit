@@ -38,7 +38,7 @@
 #include <wtf/text/StringHash.h>
 
 // Enable this to add a light red wash over the visible portion of Tiled Layers, as computed
-// by syncCompositingState().
+// by flushCompositingState().
 // #define VISIBLE_TILE_WASH
 
 namespace WebCore {
@@ -131,8 +131,8 @@ public:
 
     void recursiveCommitChanges(const TransformState&, float pageScaleFactor = 1, const FloatPoint& positionRelativeToBase = FloatPoint(), bool affectedByPageScale = false);
 
-    virtual void syncCompositingState(const FloatRect&);
-    virtual void syncCompositingStateForThisLayerOnly();
+    virtual void flushCompositingState(const FloatRect&);
+    virtual void flushCompositingStateForThisLayerOnly();
 
     virtual TiledBacking* tiledBacking() OVERRIDE;
 
@@ -153,7 +153,7 @@ private:
     virtual CompositingCoordinatesOrientation platformCALayerContentsOrientation() const { return contentsOrientation(); }
     virtual void platformCALayerPaintContents(GraphicsContext&, const IntRect& clip);
     virtual bool platformCALayerShowDebugBorders() const { return showDebugBorders(); }
-    virtual bool platformCALayerShowRepaintCounter() const { return showRepaintCounter(); }
+    virtual bool platformCALayerShowRepaintCounter(PlatformCALayer*) const;
     virtual int platformCALayerIncrementRepaintCount() { return incrementRepaintCount(); }
 
     virtual bool platformCALayerContentsOpaque() const { return contentsOpaque(); }
@@ -228,8 +228,12 @@ private:
 
     virtual void setReplicatedByLayer(GraphicsLayer*);
 
+    virtual void getDebugBorderInfo(Color&, float& width) const;
+    virtual void dumpAdditionalProperties(TextStream&, int indent, LayerTreeAsTextBehavior) const;
+
     void computePixelAlignment(float pixelAlignmentScale, const FloatPoint& positionRelativeToBase,
         FloatPoint& position, FloatSize&, FloatPoint3D& anchorPoint, FloatSize& alignmentOffset) const;
+    void computeVisibleRect(TransformState&);
 
     // Used to track the path down the tree for replica layers.
     struct ReplicaState {
@@ -391,6 +395,7 @@ private:
 #ifdef VISIBLE_TILE_WASH
     RefPtr<PlatformCALayer> m_visibleTileWashLayer;
 #endif
+    FloatRect m_visibleRect;
     
     enum ContentsLayerPurpose {
         NoContentsLayer = 0,
@@ -403,6 +408,7 @@ private:
     ContentsLayerPurpose m_contentsLayerPurpose;
     bool m_contentsLayerHasBackgroundColor : 1;
     bool m_allowTiledLayer : 1;
+    bool m_isPageTileCacheLayer : 1;
 
     RetainPtr<CGImageRef> m_uncorrectedContentsImage;
     RetainPtr<CGImageRef> m_pendingContentsImage;

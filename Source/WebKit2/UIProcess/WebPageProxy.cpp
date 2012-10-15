@@ -34,7 +34,6 @@
 #include "DrawingAreaProxy.h"
 #include "EventDispatcherMessages.h"
 #include "FindIndicator.h"
-#include "InjectedBundleMessageKinds.h"
 #include "Logging.h"
 #include "MessageID.h"
 #include "NativeWebKeyboardEvent.h"
@@ -106,6 +105,10 @@
 
 #if PLATFORM(GTK)
 #include "ArgumentCodersGtk.h"
+#endif
+
+#if USE(SOUP)
+#include "WebSoupRequestManagerProxy.h"
 #endif
 
 #ifndef NDEBUG
@@ -220,6 +223,8 @@ WebPageProxy::WebPageProxy(PageClient* pageClient, PassRefPtr<WebProcessProxy> p
     , m_canShortCircuitHorizontalWheelEvents(true)
     , m_mainFrameIsPinnedToLeftSide(false)
     , m_mainFrameIsPinnedToRightSide(false)
+    , m_mainFrameIsPinnedToTopSide(false)
+    , m_mainFrameIsPinnedToBottomSide(false)
     , m_pageCount(0)
     , m_renderTreeSize(0)
     , m_shouldSendEventsSynchronously(false)
@@ -229,6 +234,10 @@ WebPageProxy::WebPageProxy(PageClient* pageClient, PassRefPtr<WebProcessProxy> p
     , m_visibilityState(PageVisibilityStateVisible)
 #endif
 {
+#if ENABLE(PAGE_VISIBILITY_API)
+    if (!m_isVisible)
+        m_visibilityState = PageVisibilityStateHidden;
+#endif
 #ifndef NDEBUG
     webPageProxyCounter.increment();
 #endif
@@ -275,6 +284,21 @@ bool WebPageProxy::isValid()
         return false;
 
     return m_isValid;
+}
+
+PassRefPtr<ImmutableArray> WebPageProxy::relatedPages() const
+{
+    Vector<WebPageProxy*> pages = m_process->pages();
+    ASSERT(pages.contains(this));
+
+    Vector<RefPtr<APIObject> > result;
+    result.reserveCapacity(pages.size() - 1);
+    for (size_t i = 0; i < pages.size(); ++i) {
+        if (pages[i] != this)
+            result.append(pages[i]);
+    }
+
+    return ImmutableArray::adopt(result);
 }
 
 void WebPageProxy::initializeLoaderClient(const WKPageLoaderClient* loadClient)
@@ -342,10 +366,13 @@ void WebPageProxy::initializeContextMenuClient(const WKPageContextMenuClient* cl
 void WebPageProxy::reattachToWebProcess()
 {
     ASSERT(!isValid());
+    ASSERT(m_process);
+    ASSERT(!m_process->isValid());
+    ASSERT(!m_process->isLaunching());
 
     m_isValid = true;
 
-    m_process = m_process->context()->relaunchProcessIfNecessary();
+    m_process = m_process->context()->createNewWebProcess();
     m_process->addExistingWebPage(this, m_pageID);
 
     initializeWebPage();
@@ -388,6 +415,8 @@ void WebPageProxy::initializeWebPage()
 
 #if ENABLE(PAGE_VISIBILITY_API)
     m_process->send(Messages::WebPage::SetVisibilityState(m_visibilityState, /* isInitialState */ true), m_pageID);
+#elif ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
+    m_process->send(Messages::WebPage::SetVisibilityState(m_isVisible ? PageVisibilityStateVisible : PageVisibilityStateHidden, /* isInitialState */ true), m_pageID);
 #endif
 }
 
@@ -448,6 +477,8 @@ void WebPageProxy::close()
 
     m_mainFrameIsPinnedToLeftSide = false;
     m_mainFrameIsPinnedToRightSide = false;
+    m_mainFrameIsPinnedToTopSide = false;
+    m_mainFrameIsPinnedToBottomSide = false;
 
     m_visibleScrollerThumbRect = IntRect();
 
@@ -745,17 +776,8 @@ String WebPageProxy::committedURL() const
 
 bool WebPageProxy::canShowMIMEType(const String& mimeType) const
 {
-    if (MIMETypeRegistry::isSupportedNonImageMIMEType(mimeType))
+    if (MIMETypeRegistry::canShowMIMEType(mimeType))
         return true;
-
-    if (MIMETypeRegistry::isSupportedImageMIMEType(mimeType))
-        return true;
-
-    if (MIMETypeRegistry::isSupportedMediaMIMEType(mimeType))
-        return true;
-
-    if (mimeType.startsWith("text/", false))
-        return !MIMETypeRegistry::isUnsupportedTextMIMEType(mimeType);
 
     String newMimeType = mimeType;
     PluginModuleInfo plugin = m_process->context()->pluginInfoStore().findPlugin(newMimeType, KURL());
@@ -839,6 +861,11 @@ void WebPageProxy::viewStateDidChange(ViewStateFlags flags)
                 // stop the unresponsiveness timer here.
                 m_process->responsivenessTimer()->stop();
             }
+
+#if ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING) && !ENABLE(PAGE_VISIBILITY_API)
+            PageVisibilityState visibilityState = m_isVisible ? PageVisibilityStateVisible : PageVisibilityStateHidden;
+            m_process->send(Messages::WebPage::SetVisibilityState(visibilityState, false), m_pageID);
+#endif
         }
     }
 
@@ -861,7 +888,7 @@ void WebPageProxy::viewStateDidChange(ViewStateFlags flags)
 #if ENABLE(PAGE_VISIBILITY_API)
     PageVisibilityState visibilityState = PageVisibilityStateHidden;
 
-    if (m_pageClient->isViewVisible())
+    if (m_isVisible)
         visibilityState = PageVisibilityStateVisible;
 
     if (visibilityState != m_visibilityState) {
@@ -935,6 +962,14 @@ void WebPageProxy::setViewportSize(const IntSize& size)
         return;
 
     m_process->send(Messages::WebPage::SetViewportSize(size), m_pageID);
+}
+
+void WebPageProxy::commitPageTransitionViewport()
+{
+    if (!isValid())
+        return;
+
+    process()->send(Messages::WebPage::CommitPageTransitionViewport(), m_pageID);
 }
 #endif
 
@@ -2066,6 +2101,8 @@ void WebPageProxy::didCommitLoadForFrame(uint64_t frameID, const String& mimeTyp
             // any wheel events and dispatch them to the WKView when necessary.
             m_mainFrameIsPinnedToLeftSide = true;
             m_mainFrameIsPinnedToRightSide = true;
+            m_mainFrameIsPinnedToTopSide = true;
+            m_mainFrameIsPinnedToBottomSide = true;
         }
         m_pageClient->didCommitLoadForMainFrame(frameHasCustomRepresentation);
     }
@@ -2704,41 +2741,6 @@ void WebPageProxy::setMediaVolume(float volume)
     m_process->send(Messages::WebPage::SetMediaVolume(volume), m_pageID);    
 }
 
-#if PLATFORM(QT)
-void WebPageProxy::didFindZoomableArea(const IntPoint& target, const IntRect& area)
-{
-    m_pageClient->didFindZoomableArea(target, area);
-}
-
-void WebPageProxy::findZoomableAreaForPoint(const IntPoint& point, const IntSize& area)
-{
-    if (!isValid())
-        return;
-
-    m_process->send(Messages::WebPage::FindZoomableAreaForPoint(point, area), m_pageID);
-}
-
-void WebPageProxy::didReceiveMessageFromNavigatorQtObject(const String& contents)
-{
-    m_pageClient->didReceiveMessageFromNavigatorQtObject(contents);
-}
-
-void WebPageProxy::authenticationRequiredRequest(const String& hostname, const String& realm, const String& prefilledUsername, String& username, String& password)
-{
-    m_pageClient->handleAuthenticationRequiredRequest(hostname, realm, prefilledUsername, username, password);
-}
-
-void WebPageProxy::proxyAuthenticationRequiredRequest(const String& hostname, uint16_t port, const String& prefilledUsername, String& username, String& password)
-{
-    m_pageClient->handleProxyAuthenticationRequiredRequest(hostname, port, prefilledUsername, username, password);
-}
-
-void WebPageProxy::certificateVerificationRequest(const String& hostname, bool& ignoreErrors)
-{
-    m_pageClient->handleCertificateVerificationRequest(hostname, ignoreErrors);
-}
-#endif // PLATFORM(QT).
-
 #if PLATFORM(QT) || PLATFORM(EFL)
 void WebPageProxy::handleDownloadRequest(DownloadProxy* download)
 {
@@ -2962,8 +2964,7 @@ NativeWebMouseEvent* WebPageProxy::currentlyProcessedMouseDownEvent()
 
 void WebPageProxy::postMessageToInjectedBundle(const String& messageName, APIObject* messageBody)
 {
-    // FIXME: We should consider returning false from this function if the messageBody cannot be encoded.
-    process()->deprecatedSend(InjectedBundleMessage::PostMessageToPage, m_pageID, CoreIPC::In(messageName, WebContextUserMessageEncoder(messageBody)));
+    process()->send(Messages::WebPage::PostInjectedBundleMessage(messageName, WebContextUserMessageEncoder(messageBody)), m_pageID);
 }
 
 #if PLATFORM(GTK)
@@ -3615,6 +3616,8 @@ void WebPageProxy::processDidCrash()
 
     m_mainFrameIsPinnedToLeftSide = false;
     m_mainFrameIsPinnedToRightSide = false;
+    m_mainFrameIsPinnedToTopSide = false;
+    m_mainFrameIsPinnedToBottomSide = false;
 
     m_visibleScrollerThumbRect = IntRect();
 
@@ -3863,10 +3866,12 @@ void WebPageProxy::didChangeScrollbarsForMainFrame(bool hasHorizontalScrollbar, 
     m_pageClient->didChangeScrollbarsForMainFrame();
 }
 
-void WebPageProxy::didChangeScrollOffsetPinningForMainFrame(bool pinnedToLeftSide, bool pinnedToRightSide)
+void WebPageProxy::didChangeScrollOffsetPinningForMainFrame(bool pinnedToLeftSide, bool pinnedToRightSide, bool pinnedToTopSide, bool pinnedToBottomSide)
 {
     m_mainFrameIsPinnedToLeftSide = pinnedToLeftSide;
     m_mainFrameIsPinnedToRightSide = pinnedToRightSide;
+    m_mainFrameIsPinnedToTopSide = pinnedToTopSide;
+    m_mainFrameIsPinnedToBottomSide = pinnedToBottomSide;
 }
 
 void WebPageProxy::didChangePageCount(unsigned pageCount)
@@ -4102,5 +4107,12 @@ void WebPageProxy::dictationAlternatives(uint64_t dictationContext, Vector<Strin
 #endif
 
 #endif // PLATFORM(MAC)
+
+#if USE(SOUP)
+void WebPageProxy::didReceiveURIRequest(String uriString, uint64_t requestID)
+{
+    m_process->context()->soupRequestManagerProxy()->didReceiveURIRequest(uriString, this, requestID);
+}
+#endif
 
 } // namespace WebKit

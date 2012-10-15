@@ -118,6 +118,7 @@ public:
     virtual void clearDeviceOrientationOverride(ErrorString*);
     virtual void canOverrideDeviceOrientation(ErrorString*, bool*);
     virtual void setTouchEmulationEnabled(ErrorString*, bool);
+    virtual void setCompositingBordersVisible(ErrorString*, bool);
 
     // Geolocation override helpers.
     GeolocationPosition* overrideGeolocationPosition(GeolocationPosition*);
@@ -159,6 +160,9 @@ private:
 #if ENABLE(TOUCH_EVENTS)
     void updateTouchEventEmulationInPage(bool);
 #endif
+
+    static bool mainResourceContent(Frame*, bool withBase64Encode, String* result);
+    static bool dataContent(const char* data, unsigned size, const String& textEncodingName, bool withBase64Encode, String* result);
 
     PassRefPtr<TypeBuilder::Page::Frame> buildObjectForFrame(Frame*);
     PassRefPtr<TypeBuilder::Page::FrameResourceTree> buildObjectForFrameTree(Frame*);

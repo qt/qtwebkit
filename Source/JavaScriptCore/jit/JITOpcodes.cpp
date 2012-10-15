@@ -76,11 +76,11 @@ PassRefPtr<ExecutableMemoryHandle> JIT::privateCompileCTIMachineTrampolines(JSGl
 
     // Finish canonical initialization before JS function call.
     loadPtr(Address(regT0, OBJECT_OFFSETOF(JSFunction, m_scope)), regT1);
-    emitPutCellToCallFrameHeader(regT1, RegisterFile::ScopeChain);
+    emitPutCellToCallFrameHeader(regT1, JSStack::ScopeChain);
 
     // Also initialize ReturnPC for use by lazy linking and exceptions.
     preserveReturnAddressAfterCall(regT3);
-    emitPutToCallFrameHeader(regT3, RegisterFile::ReturnPC);
+    emitPutToCallFrameHeader(regT3, JSStack::ReturnPC);
     
     storePtr(callFrameRegister, &m_globalData->topCallFrame);
     restoreArgumentReference();
@@ -96,11 +96,11 @@ PassRefPtr<ExecutableMemoryHandle> JIT::privateCompileCTIMachineTrampolines(JSGl
 
     // Finish canonical initialization before JS function call.
     loadPtr(Address(regT0, OBJECT_OFFSETOF(JSFunction, m_scope)), regT1);
-    emitPutCellToCallFrameHeader(regT1, RegisterFile::ScopeChain);
+    emitPutCellToCallFrameHeader(regT1, JSStack::ScopeChain);
 
     // Also initialize ReturnPC for use by lazy linking and exeptions.
     preserveReturnAddressAfterCall(regT3);
-    emitPutToCallFrameHeader(regT3, RegisterFile::ReturnPC);
+    emitPutToCallFrameHeader(regT3, JSStack::ReturnPC);
     
     storePtr(callFrameRegister, &m_globalData->topCallFrame);
     restoreArgumentReference();
@@ -116,7 +116,7 @@ PassRefPtr<ExecutableMemoryHandle> JIT::privateCompileCTIMachineTrampolines(JSGl
 
     // Finish canonical initialization before JS function call.
     loadPtr(Address(regT0, OBJECT_OFFSETOF(JSFunction, m_scope)), regT1);
-    emitPutCellToCallFrameHeader(regT1, RegisterFile::ScopeChain);
+    emitPutCellToCallFrameHeader(regT1, JSStack::ScopeChain);
 
     loadPtr(Address(regT0, OBJECT_OFFSETOF(JSFunction, m_executable)), regT2);
     Jump hasCodeBlock1 = branch32(GreaterThanOrEqual, Address(regT2, OBJECT_OFFSETOF(FunctionExecutable, m_numParametersForCall)), TrustedImm32(0));
@@ -139,7 +139,7 @@ PassRefPtr<ExecutableMemoryHandle> JIT::privateCompileCTIMachineTrampolines(JSGl
 
     // Finish canonical initialization before JS function call.
     loadPtr(Address(regT0, OBJECT_OFFSETOF(JSFunction, m_scope)), regT1);
-    emitPutCellToCallFrameHeader(regT1, RegisterFile::ScopeChain);
+    emitPutCellToCallFrameHeader(regT1, JSStack::ScopeChain);
 
     loadPtr(Address(regT0, OBJECT_OFFSETOF(JSFunction, m_executable)), regT2);
     Jump hasCodeBlock2 = branch32(GreaterThanOrEqual, Address(regT2, OBJECT_OFFSETOF(FunctionExecutable, m_numParametersForConstruct)), TrustedImm32(0));
@@ -156,37 +156,37 @@ PassRefPtr<ExecutableMemoryHandle> JIT::privateCompileCTIMachineTrampolines(JSGl
 
     callSlowCase.link(this);
     // Finish canonical initialization before JS function call.
-    emitGetFromCallFrameHeaderPtr(RegisterFile::CallerFrame, regT2);
-    emitGetFromCallFrameHeaderPtr(RegisterFile::ScopeChain, regT2, regT2);
-    emitPutCellToCallFrameHeader(regT2, RegisterFile::ScopeChain);
+    emitGetFromCallFrameHeaderPtr(JSStack::CallerFrame, regT2);
+    emitGetFromCallFrameHeaderPtr(JSStack::ScopeChain, regT2, regT2);
+    emitPutCellToCallFrameHeader(regT2, JSStack::ScopeChain);
 
     // Also initialize ReturnPC and CodeBlock, like a JS function would.
     preserveReturnAddressAfterCall(regT3);
-    emitPutToCallFrameHeader(regT3, RegisterFile::ReturnPC);
-    emitPutImmediateToCallFrameHeader(0, RegisterFile::CodeBlock);
+    emitPutToCallFrameHeader(regT3, JSStack::ReturnPC);
+    emitPutImmediateToCallFrameHeader(0, JSStack::CodeBlock);
 
     storePtr(callFrameRegister, &m_globalData->topCallFrame);
     restoreArgumentReference();
     Call callCallNotJSFunction = call();
-    emitGetFromCallFrameHeaderPtr(RegisterFile::CallerFrame, callFrameRegister);
+    emitGetFromCallFrameHeaderPtr(JSStack::CallerFrame, callFrameRegister);
     restoreReturnAddressBeforeReturn(regT3);
     ret();
 
     constructSlowCase.link(this);
     // Finish canonical initialization before JS function call.
-    emitGetFromCallFrameHeaderPtr(RegisterFile::CallerFrame, regT2);
-    emitGetFromCallFrameHeaderPtr(RegisterFile::ScopeChain, regT2, regT2);
-    emitPutCellToCallFrameHeader(regT2, RegisterFile::ScopeChain);
+    emitGetFromCallFrameHeaderPtr(JSStack::CallerFrame, regT2);
+    emitGetFromCallFrameHeaderPtr(JSStack::ScopeChain, regT2, regT2);
+    emitPutCellToCallFrameHeader(regT2, JSStack::ScopeChain);
 
     // Also initialize ReturnPC and CodeBlock, like a JS function would.
     preserveReturnAddressAfterCall(regT3);
-    emitPutToCallFrameHeader(regT3, RegisterFile::ReturnPC);
-    emitPutImmediateToCallFrameHeader(0, RegisterFile::CodeBlock);
+    emitPutToCallFrameHeader(regT3, JSStack::ReturnPC);
+    emitPutImmediateToCallFrameHeader(0, JSStack::CodeBlock);
 
     storePtr(callFrameRegister, &m_globalData->topCallFrame);
     restoreArgumentReference();
     Call callConstructNotJSFunction = call();
-    emitGetFromCallFrameHeaderPtr(RegisterFile::CallerFrame, callFrameRegister);
+    emitGetFromCallFrameHeaderPtr(JSStack::CallerFrame, callFrameRegister);
     restoreReturnAddressBeforeReturn(regT3);
     ret();
 
@@ -231,18 +231,18 @@ JIT::Label JIT::privateCompileCTINativeCall(JSGlobalData* globalData, bool isCon
 
     Label nativeCallThunk = align();
     
-    emitPutImmediateToCallFrameHeader(0, RegisterFile::CodeBlock);
+    emitPutImmediateToCallFrameHeader(0, JSStack::CodeBlock);
     storePtr(callFrameRegister, &m_globalData->topCallFrame);
 
 #if CPU(X86_64)
     // Load caller frame's scope chain into this callframe so that whatever we call can
     // get to its global data.
-    emitGetFromCallFrameHeaderPtr(RegisterFile::CallerFrame, regT0);
-    emitGetFromCallFrameHeaderPtr(RegisterFile::ScopeChain, regT1, regT0);
-    emitPutCellToCallFrameHeader(regT1, RegisterFile::ScopeChain);
+    emitGetFromCallFrameHeaderPtr(JSStack::CallerFrame, regT0);
+    emitGetFromCallFrameHeaderPtr(JSStack::ScopeChain, regT1, regT0);
+    emitPutCellToCallFrameHeader(regT1, JSStack::ScopeChain);
 
     peek(regT1);
-    emitPutToCallFrameHeader(regT1, RegisterFile::ReturnPC);
+    emitPutToCallFrameHeader(regT1, JSStack::ReturnPC);
 
     // Calling convention:      f(edi, esi, edx, ecx, ...);
     // Host function signature: f(ExecState*);
@@ -250,7 +250,7 @@ JIT::Label JIT::privateCompileCTINativeCall(JSGlobalData* globalData, bool isCon
 
     subPtr(TrustedImm32(16 - sizeof(void*)), stackPointerRegister); // Align stack after call.
 
-    emitGetFromCallFrameHeaderPtr(RegisterFile::Callee, X86Registers::esi);
+    emitGetFromCallFrameHeaderPtr(JSStack::Callee, X86Registers::esi);
     loadPtr(Address(X86Registers::esi, OBJECT_OFFSETOF(JSFunction, m_executable)), X86Registers::r9);
     move(regT0, callFrameRegister); // Eagerly restore caller frame register to avoid loading from stack.
     call(Address(X86Registers::r9, executableOffsetToFunction));
@@ -260,18 +260,18 @@ JIT::Label JIT::privateCompileCTINativeCall(JSGlobalData* globalData, bool isCon
 #elif CPU(ARM)
     // Load caller frame's scope chain into this callframe so that whatever we call can
     // get to its global data.
-    emitGetFromCallFrameHeaderPtr(RegisterFile::CallerFrame, regT2);
-    emitGetFromCallFrameHeaderPtr(RegisterFile::ScopeChain, regT1, regT2);
-    emitPutCellToCallFrameHeader(regT1, RegisterFile::ScopeChain);
+    emitGetFromCallFrameHeaderPtr(JSStack::CallerFrame, regT2);
+    emitGetFromCallFrameHeaderPtr(JSStack::ScopeChain, regT1, regT2);
+    emitPutCellToCallFrameHeader(regT1, JSStack::ScopeChain);
 
     preserveReturnAddressAfterCall(regT3); // Callee preserved
-    emitPutToCallFrameHeader(regT3, RegisterFile::ReturnPC);
+    emitPutToCallFrameHeader(regT3, JSStack::ReturnPC);
 
     // Calling convention:      f(r0 == regT0, r1 == regT1, ...);
     // Host function signature: f(ExecState*);
     move(callFrameRegister, ARMRegisters::r0);
 
-    emitGetFromCallFrameHeaderPtr(RegisterFile::Callee, ARMRegisters::r1);
+    emitGetFromCallFrameHeaderPtr(JSStack::Callee, ARMRegisters::r1);
     move(regT2, callFrameRegister); // Eagerly restore caller frame register to avoid loading from stack.
     loadPtr(Address(ARMRegisters::r1, OBJECT_OFFSETOF(JSFunction, m_executable)), regT2);
     call(Address(regT2, executableOffsetToFunction));
@@ -281,12 +281,12 @@ JIT::Label JIT::privateCompileCTINativeCall(JSGlobalData* globalData, bool isCon
 #elif CPU(MIPS)
     // Load caller frame's scope chain into this callframe so that whatever we call can
     // get to its global data.
-    emitGetFromCallFrameHeaderPtr(RegisterFile::CallerFrame, regT0);
-    emitGetFromCallFrameHeaderPtr(RegisterFile::ScopeChain, regT1, regT0);
-    emitPutCellToCallFrameHeader(regT1, RegisterFile::ScopeChain);
+    emitGetFromCallFrameHeaderPtr(JSStack::CallerFrame, regT0);
+    emitGetFromCallFrameHeaderPtr(JSStack::ScopeChain, regT1, regT0);
+    emitPutCellToCallFrameHeader(regT1, JSStack::ScopeChain);
 
     preserveReturnAddressAfterCall(regT3); // Callee preserved
-    emitPutToCallFrameHeader(regT3, RegisterFile::ReturnPC);
+    emitPutToCallFrameHeader(regT3, JSStack::ReturnPC);
 
     // Calling convention:      f(a0, a1, a2, a3);
     // Host function signature: f(ExecState*);
@@ -299,7 +299,7 @@ JIT::Label JIT::privateCompileCTINativeCall(JSGlobalData* globalData, bool isCon
     move(callFrameRegister, MIPSRegisters::a0);
 
     // Call
-    emitGetFromCallFrameHeaderPtr(RegisterFile::Callee, MIPSRegisters::a2);
+    emitGetFromCallFrameHeaderPtr(JSStack::Callee, MIPSRegisters::a2);
     loadPtr(Address(MIPSRegisters::a2, OBJECT_OFFSETOF(JSFunction, m_executable)), regT2);
     move(regT0, callFrameRegister); // Eagerly restore caller frame register to avoid loading from stack.
     call(Address(regT2, executableOffsetToFunction));
@@ -382,7 +382,7 @@ void JIT::emit_op_end(Instruction* currentInstruction)
 {
     ASSERT(returnValueRegister != callFrameRegister);
     emitGetVirtualRegister(currentInstruction[1].u.operand, returnValueRegister);
-    restoreReturnAddressBeforeReturn(Address(callFrameRegister, RegisterFile::ReturnPC * static_cast<int>(sizeof(Register))));
+    restoreReturnAddressBeforeReturn(Address(callFrameRegister, JSStack::ReturnPC * static_cast<int>(sizeof(Register))));
     ret();
 }
 
@@ -583,10 +583,10 @@ void JIT::emit_op_ret(Instruction* currentInstruction)
     emitGetVirtualRegister(currentInstruction[1].u.operand, returnValueRegister);
 
     // Grab the return address.
-    emitGetFromCallFrameHeaderPtr(RegisterFile::ReturnPC, regT1);
+    emitGetFromCallFrameHeaderPtr(JSStack::ReturnPC, regT1);
 
     // Restore our caller's "r".
-    emitGetFromCallFrameHeaderPtr(RegisterFile::CallerFrame, callFrameRegister);
+    emitGetFromCallFrameHeaderPtr(JSStack::CallerFrame, callFrameRegister);
 
     // Return.
     restoreReturnAddressBeforeReturn(regT1);
@@ -606,10 +606,10 @@ void JIT::emit_op_ret_object_or_this(Instruction* currentInstruction)
     Jump notObject = emitJumpIfNotObject(regT2);
 
     // Grab the return address.
-    emitGetFromCallFrameHeaderPtr(RegisterFile::ReturnPC, regT1);
+    emitGetFromCallFrameHeaderPtr(JSStack::ReturnPC, regT1);
 
     // Restore our caller's "r".
-    emitGetFromCallFrameHeaderPtr(RegisterFile::CallerFrame, callFrameRegister);
+    emitGetFromCallFrameHeaderPtr(JSStack::CallerFrame, callFrameRegister);
 
     // Return.
     restoreReturnAddressBeforeReturn(regT1);
@@ -621,10 +621,10 @@ void JIT::emit_op_ret_object_or_this(Instruction* currentInstruction)
     emitGetVirtualRegister(currentInstruction[2].u.operand, returnValueRegister);
 
     // Grab the return address.
-    emitGetFromCallFrameHeaderPtr(RegisterFile::ReturnPC, regT1);
+    emitGetFromCallFrameHeaderPtr(JSStack::ReturnPC, regT1);
 
     // Restore our caller's "r".
-    emitGetFromCallFrameHeaderPtr(RegisterFile::CallerFrame, callFrameRegister);
+    emitGetFromCallFrameHeaderPtr(JSStack::CallerFrame, callFrameRegister);
 
     // Return.
     restoreReturnAddressBeforeReturn(regT1);
@@ -798,11 +798,11 @@ void JIT::emit_op_jneq_null(Instruction* currentInstruction)
 void JIT::emit_op_jneq_ptr(Instruction* currentInstruction)
 {
     unsigned src = currentInstruction[1].u.operand;
-    JSCell* ptr = currentInstruction[2].u.jsCell.get();
+    Special::Pointer ptr = currentInstruction[2].u.specialPointer;
     unsigned target = currentInstruction[3].u.operand;
     
     emitGetVirtualRegister(src, regT0);
-    addJump(branchPtr(NotEqual, regT0, TrustedImmPtr(JSValue::encode(JSValue(ptr)))), target);            
+    addJump(branchPtr(NotEqual, regT0, TrustedImmPtr(actualPointerFor(m_codeBlock, ptr))), target);
 }
 
 void JIT::emit_op_eq(Instruction* currentInstruction)
@@ -1285,7 +1285,7 @@ void JIT::emit_op_convert_this(Instruction* currentInstruction)
 
 void JIT::emit_op_create_this(Instruction* currentInstruction)
 {
-    emitGetFromCallFrameHeaderPtr(RegisterFile::Callee, regT0);
+    emitGetFromCallFrameHeaderPtr(JSStack::Callee, regT0);
     loadPtr(Address(regT0, JSFunction::offsetOfCachedInheritorID()), regT2);
     addSlowCase(branchTestPtr(Zero, regT2));
     
@@ -1509,7 +1509,7 @@ void JIT::emit_op_get_arguments_length(Instruction* currentInstruction)
     int dst = currentInstruction[1].u.operand;
     int argumentsRegister = currentInstruction[2].u.operand;
     addSlowCase(branchTestPtr(NonZero, addressFor(argumentsRegister)));
-    emitGetFromCallFrameHeader32(RegisterFile::ArgumentCount, regT0);
+    emitGetFromCallFrameHeader32(JSStack::ArgumentCount, regT0);
     sub32(TrustedImm32(1), regT0);
     emitFastArithReTagImmediate(regT0, regT0);
     emitPutVirtualRegister(dst, regT0);
@@ -1539,7 +1539,7 @@ void JIT::emit_op_get_argument_by_val(Instruction* currentInstruction)
     addSlowCase(emitJumpIfNotImmediateInteger(regT1));
     add32(TrustedImm32(1), regT1);
     // regT1 now contains the integer index of the argument we want, including this
-    emitGetFromCallFrameHeader32(RegisterFile::ArgumentCount, regT2);
+    emitGetFromCallFrameHeader32(JSStack::ArgumentCount, regT2);
     addSlowCase(branch32(AboveOrEqual, regT1, regT2));
 
     neg32(regT1);
@@ -1565,7 +1565,7 @@ void JIT::emitSlow_op_get_argument_by_val(Instruction* currentInstruction, Vecto
     emitPutVirtualRegister(unmodifiedArgumentsRegister(arguments));
     
     skipArgumentsCreation.link(this);
-    JITStubCall stubCall(this, cti_op_get_by_val);
+    JITStubCall stubCall(this, cti_op_get_by_val_generic);
     stubCall.addArgument(arguments, regT2);
     stubCall.addArgument(property, regT2);
     stubCall.callWithValueProfiling(dst);
@@ -1577,7 +1577,7 @@ void JIT::emit_op_resolve_global_dynamic(Instruction* currentInstruction)
 {
     int skip = currentInstruction[5].u.operand;
     
-    emitGetFromCallFrameHeaderPtr(RegisterFile::ScopeChain, regT0);
+    emitGetFromCallFrameHeaderPtr(JSStack::ScopeChain, regT0);
     
     bool checkTopLevel = m_codeBlock->codeType() == FunctionCode && m_codeBlock->needsFullScopeChain();
     ASSERT(skip || !checkTopLevel);
@@ -1661,7 +1661,8 @@ void JIT::emit_op_new_func_exp(Instruction* currentInstruction)
 void JIT::emit_op_new_array(Instruction* currentInstruction)
 {
     int length = currentInstruction[3].u.operand;
-    if (CopiedSpace::isOversize(Butterfly::totalSize(0, 0, true, ArrayStorage::sizeFor(length)))) {
+    if (m_codeBlock->globalObject()->isHavingABadTime()
+        || CopiedSpace::isOversize(Butterfly::totalSize(0, 0, true, ArrayStorage::sizeFor(length)))) {
         JITStubCall stubCall(this, cti_op_new_array);
         stubCall.addArgument(TrustedImm32(currentInstruction[2].u.operand));
         stubCall.addArgument(TrustedImm32(currentInstruction[3].u.operand));
@@ -1680,8 +1681,10 @@ void JIT::emitSlow_op_new_array(Instruction* currentInstruction, Vector<SlowCase
     // If the allocation would be oversize, we will already make the proper stub call above in 
     // emit_op_new_array.
     int length = currentInstruction[3].u.operand;
-    if (CopiedSpace::isOversize(Butterfly::totalSize(0, 0, true, ArrayStorage::sizeFor(length))))
+    if (m_codeBlock->globalObject()->isHavingABadTime()
+        || CopiedSpace::isOversize(Butterfly::totalSize(0, 0, true, ArrayStorage::sizeFor(length))))
         return;
+    linkSlowCase(iter); // We're having a bad time.
     linkSlowCase(iter); // Not enough space in CopiedSpace for storage.
     linkSlowCase(iter); // Not enough space in MarkedSpace for cell.
 

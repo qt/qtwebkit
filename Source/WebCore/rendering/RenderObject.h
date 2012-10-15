@@ -3,7 +3,7 @@
  *           (C) 2000 Antti Koivisto (koivisto@kde.org)
  *           (C) 2000 Dirk Mueller (mueller@kde.org)
  *           (C) 2004 Allan Sandfeld Jensen (kde@carewolf.com)
- * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2012 Apple Inc. All rights reserved.
  * Copyright (C) 2009 Google Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -60,6 +60,7 @@ class RenderBlock;
 class RenderFlowThread;
 class RenderGeometryMap;
 class RenderLayer;
+class RenderLayerModelObject;
 class RenderNamedFlowThread;
 class RenderTable;
 class RenderTheme;
@@ -109,31 +110,39 @@ enum PlaceGeneratedRunInFlag {
     DoNotPlaceGeneratedRunIn
 };
 
-enum MapLocalToContainerMode {
+enum MapCoordinatesMode {
     IsFixed = 1 << 0,
     UseTransforms = 1 << 1,
     ApplyContainerFlip = 1 << 2,
     SnapOffsetForTransforms = 1 << 3
 };
-typedef unsigned MapLocalToContainerFlags;
+typedef unsigned MapCoordinatesFlags;
 
 const int caretWidth = 1;
 
 #if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
-struct DashboardRegionValue {
-    bool operator==(const DashboardRegionValue& o) const
+struct AnnotatedRegionValue {
+    bool operator==(const AnnotatedRegionValue& o) const
     {
+#if ENABLE(DASHBOARD_SUPPORT)
         return type == o.type && bounds == o.bounds && clip == o.clip && label == o.label;
+#else // ENABLE(WIDGET_REGION)
+        return draggable == o.draggable && bounds == o.bounds;
+#endif
     }
-    bool operator!=(const DashboardRegionValue& o) const
+    bool operator!=(const AnnotatedRegionValue& o) const
     {
         return !(*this == o);
     }
 
-    String label;
     LayoutRect bounds;
+#if ENABLE(DASHBOARD_SUPPORT)
+    String label;
     LayoutRect clip;
     int type;
+#else // ENABLE(WIDGET_REGION)
+    bool draggable;
+#endif
 };
 #endif
 
@@ -327,6 +336,7 @@ public:
     virtual bool isFrameSet() const { return false; }
     virtual bool isImage() const { return false; }
     virtual bool isInlineBlockOrInlineTable() const { return false; }
+    virtual bool isLayerModelObject() const { return false; }
     virtual bool isListBox() const { return false; }
     virtual bool isListItem() const { return false; }
     virtual bool isListMarker() const { return false; }
@@ -335,6 +345,7 @@ public:
 #if ENABLE(METER_ELEMENT)
     virtual bool isMeter() const { return false; }
 #endif
+    virtual bool isSnapshottedPlugIn() const { return false; }
 #if ENABLE(PROGRESS_ELEMENT)
     virtual bool isProgress() const { return false; }
 #endif
@@ -610,7 +621,7 @@ public:
     // Returns the object containing this one. Can be different from parent for positioned elements.
     // If repaintContainer and repaintContainerSkipped are not null, on return *repaintContainerSkipped
     // is true if the renderer returned is an ancestor of repaintContainer.
-    RenderObject* container(const RenderBoxModelObject* repaintContainer = 0, bool* repaintContainerSkipped = 0) const;
+    RenderObject* container(const RenderLayerModelObject* repaintContainer = 0, bool* repaintContainerSkipped = 0) const;
 
     virtual RenderObject* hoverAncestor() const { return parent(); }
 
@@ -664,8 +675,8 @@ public:
     virtual void updateFromElement() { }
 
 #if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
-    virtual void addDashboardRegions(Vector<DashboardRegionValue>&);
-    void collectDashboardRegions(Vector<DashboardRegionValue>&);
+    virtual void addAnnotatedRegions(Vector<AnnotatedRegionValue>&);
+    void collectAnnotatedRegions(Vector<AnnotatedRegionValue>&);
 #endif
 
     bool isComposited() const;
@@ -696,19 +707,19 @@ public:
     RenderBlock* containingBlock() const;
 
     // Convert the given local point to absolute coordinates
-    // FIXME: Temporary. If useTransforms is true, take transforms into account. Eventually localToAbsolute() will always be transform-aware.
-    FloatPoint localToAbsolute(const FloatPoint& localPoint = FloatPoint(), bool fixed = false, bool useTransforms = false) const;
-    FloatPoint absoluteToLocal(const FloatPoint&, bool fixed = false, bool useTransforms = false) const;
+    // FIXME: Temporary. If UseTransforms is true, take transforms into account. Eventually localToAbsolute() will always be transform-aware.
+    FloatPoint localToAbsolute(const FloatPoint& localPoint = FloatPoint(), MapCoordinatesFlags = 0) const;
+    FloatPoint absoluteToLocal(const FloatPoint&, MapCoordinatesFlags = 0) const;
 
     // Convert a local quad to absolute coordinates, taking transforms into account.
-    FloatQuad localToAbsoluteQuad(const FloatQuad& quad, bool fixed = false, bool* wasFixed = 0) const
+    FloatQuad localToAbsoluteQuad(const FloatQuad& quad, MapCoordinatesFlags mode = 0, bool* wasFixed = 0) const
     {
-        return localToContainerQuad(quad, 0, false, fixed, wasFixed);
+        return localToContainerQuad(quad, 0, mode, wasFixed);
     }
 
     // Convert a local quad into the coordinate system of container, taking transforms into account.
-    FloatQuad localToContainerQuad(const FloatQuad&, RenderBoxModelObject* repaintContainer, bool snapOffsetForTransforms = true, bool fixed = false, bool* wasFixed = 0) const;
-    FloatPoint localToContainerPoint(const FloatPoint&, RenderBoxModelObject* repaintContainer, bool snapOffsetForTransforms = true, bool fixed = false, bool* wasFixed = 0) const;
+    FloatQuad localToContainerQuad(const FloatQuad&, RenderLayerModelObject* repaintContainer, MapCoordinatesFlags = 0, bool* wasFixed = 0) const;
+    FloatPoint localToContainerPoint(const FloatPoint&, RenderLayerModelObject* repaintContainer, MapCoordinatesFlags = 0, bool* wasFixed = 0) const;
 
     // Return the offset from the container() renderer (excluding transforms). In multi-column layout,
     // different offsets apply at different points, so return the offset that applies to the given point.
@@ -736,7 +747,7 @@ public:
     virtual LayoutUnit maxPreferredLogicalWidth() const { return 0; }
 
     RenderStyle* style() const { return m_style.get(); }
-    RenderStyle* firstLineStyle() const { return document()->styleSheetCollection()->usesFirstLineRules() ? firstLineStyleSlowCase() : style(); }
+    RenderStyle* firstLineStyle() const { return document()->styleSheetCollection()->usesFirstLineRules() ? cachedFirstLineStyle() : style(); }
     RenderStyle* style(bool firstLine) const { return firstLine ? firstLineStyle() : style(); }
 
     // Used only by Element::pseudoStyleCacheIsInvalid to get a first line style based off of a
@@ -751,13 +762,13 @@ public:
 
     void getTextDecorationColors(int decorations, Color& underline, Color& overline, Color& linethrough, bool quirksMode = false, bool firstlineStyle = false);
 
-    // Return the RenderBox in the container chain which is responsible for painting this object, or 0
+    // Return the RenderLayerModelObject in the container chain which is responsible for painting this object, or 0
     // if painting is root-relative. This is the container that should be passed to the 'forRepaint'
     // methods.
-    RenderBoxModelObject* containerForRepaint() const;
+    RenderLayerModelObject* containerForRepaint() const;
     // Actually do the repaint of rect r for this object which has been computed in the coordinate space
     // of repaintContainer. If repaintContainer is 0, repaint via the view.
-    void repaintUsingContainer(RenderBoxModelObject* repaintContainer, const IntRect&, bool immediate = false) const;
+    void repaintUsingContainer(RenderLayerModelObject* repaintContainer, const IntRect&, bool immediate = false) const;
     
     // Repaint the entire object.  Called when, e.g., the color of a border changes, or when a border
     // style changes.
@@ -767,7 +778,7 @@ public:
     void repaintRectangle(const LayoutRect&, bool immediate = false) const;
 
     // Repaint only if our old bounds and new bounds are different. The caller may pass in newBounds and newOutlineBox if they are known.
-    bool repaintAfterLayoutIfNeeded(RenderBoxModelObject* repaintContainer, const LayoutRect& oldBounds, const LayoutRect& oldOutlineBox, const LayoutRect* newBoundsPtr = 0, const LayoutRect* newOutlineBoxPtr = 0);
+    bool repaintAfterLayoutIfNeeded(RenderLayerModelObject* repaintContainer, const LayoutRect& oldBounds, const LayoutRect& oldOutlineBox, const LayoutRect* newBoundsPtr = 0, const LayoutRect* newOutlineBoxPtr = 0);
 
     // Repaint only if the object moved.
     virtual void repaintDuringLayoutIfMoved(const LayoutRect&);
@@ -784,8 +795,8 @@ public:
         return clippedOverflowRectForRepaint(0);
     }
     IntRect pixelSnappedAbsoluteClippedOverflowRect() const;
-    virtual LayoutRect clippedOverflowRectForRepaint(RenderBoxModelObject* repaintContainer) const;
-    virtual LayoutRect rectWithOutlineForRepaint(RenderBoxModelObject* repaintContainer, LayoutUnit outlineWidth) const;
+    virtual LayoutRect clippedOverflowRectForRepaint(RenderLayerModelObject* repaintContainer) const;
+    virtual LayoutRect rectWithOutlineForRepaint(RenderLayerModelObject* repaintContainer, LayoutUnit outlineWidth) const;
 
     // Given a rect in the object's coordinate space, compute a rect suitable for repainting
     // that rect in view coordinates.
@@ -795,8 +806,8 @@ public:
     }
     // Given a rect in the object's coordinate space, compute a rect suitable for repainting
     // that rect in the coordinate space of repaintContainer.
-    virtual void computeRectForRepaint(RenderBoxModelObject* repaintContainer, LayoutRect&, bool fixed = false) const;
-    virtual void computeFloatRectForRepaint(RenderBoxModelObject* repaintContainer, FloatRect& repaintRect, bool fixed = false) const;
+    virtual void computeRectForRepaint(RenderLayerModelObject* repaintContainer, LayoutRect&, bool fixed = false) const;
+    virtual void computeFloatRectForRepaint(RenderLayerModelObject* repaintContainer, FloatRect& repaintRect, bool fixed = false) const;
 
     // If multiple-column layout results in applying an offset to the given point, add the same
     // offset to the given size.
@@ -838,7 +849,7 @@ public:
     // A single rectangle that encompasses all of the selected objects within this object.  Used to determine the tightest
     // possible bounding box for the selection.
     LayoutRect selectionRect(bool clipToVisibleContent = true) { return selectionRectForRepaint(0, clipToVisibleContent); }
-    virtual LayoutRect selectionRectForRepaint(RenderBoxModelObject* /*repaintContainer*/, bool /*clipToVisibleContent*/ = true) { return LayoutRect(); }
+    virtual LayoutRect selectionRectForRepaint(RenderLayerModelObject* /*repaintContainer*/, bool /*clipToVisibleContent*/ = true) { return LayoutRect(); }
 
     virtual bool canBeSelectionLeaf() const { return false; }
     bool hasSelectedChildren() const { return selectionState() != SelectionNone; }
@@ -906,12 +917,12 @@ public:
 
     // Map points and quads through elements, potentially via 3d transforms. You should never need to call these directly; use
     // localToAbsolute/absoluteToLocal methods instead.
-    virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, TransformState&, MapLocalToContainerFlags mode = ApplyContainerFlip, bool* wasFixed = 0) const;
-    virtual void mapAbsoluteToLocalPoint(bool fixed, bool useTransforms, TransformState&) const;
+    virtual void mapLocalToContainer(RenderLayerModelObject* repaintContainer, TransformState&, MapCoordinatesFlags = ApplyContainerFlip, bool* wasFixed = 0) const;
+    virtual void mapAbsoluteToLocalPoint(MapCoordinatesFlags, TransformState&) const;
 
     // Pushes state onto RenderGeometryMap about how to map coordinates from this renderer to its container, or ancestorToStopAt (whichever is encountered first).
     // Returns the renderer which was mapped to (container or ancestorToStopAt).
-    virtual const RenderObject* pushMappingToContainer(const RenderBoxModelObject* ancestorToStopAt, RenderGeometryMap&) const;
+    virtual const RenderObject* pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap&) const;
     
     bool shouldUseTransformFromContainer(const RenderObject* container) const;
     void getTransformFromContainer(const RenderObject* container, const LayoutSize& offsetInContainer, TransformationMatrix&) const;
@@ -955,7 +966,7 @@ protected:
     virtual void willBeDestroyed();
     void arenaDelete(RenderArena*, void* objectBase);
 
-    virtual LayoutRect outlineBoundsForRepaint(RenderBoxModelObject* /*repaintContainer*/, LayoutPoint* /*cachedOffsetToRepaintContainer*/ = 0) const { return LayoutRect(); }
+    virtual LayoutRect outlineBoundsForRepaint(RenderLayerModelObject* /*repaintContainer*/, LayoutPoint* /*cachedOffsetToRepaintContainer*/ = 0) const { return LayoutRect(); }
 
     virtual bool canBeReplacedWithInlineRunIn() const;
 
@@ -963,7 +974,7 @@ protected:
     virtual void willBeRemovedFromTree();
 
 private:
-    RenderStyle* firstLineStyleSlowCase() const;
+    RenderStyle* cachedFirstLineStyle() const;
     StyleDifference adjustStyleDifference(StyleDifference, unsigned contextSensitiveProperties) const;
 
     Color selectionColor(int colorProperty) const;

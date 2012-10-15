@@ -22,6 +22,7 @@
 #ifndef MarkedBlock_h
 #define MarkedBlock_h
 
+#include "BlockAllocator.h"
 #include "CardSet.h"
 #include "HeapBlock.h"
 
@@ -52,6 +53,7 @@ namespace JSC {
     
     class Heap;
     class JSCell;
+    class MarkedAllocator;
 
     typedef uintptr_t Bits;
 
@@ -112,7 +114,8 @@ namespace JSC {
             ReturnType m_count;
         };
 
-        static MarkedBlock* create(const PageAllocationAligned&, Heap*, size_t cellSize, bool cellsNeedDestruction, bool onlyContainsStructures);
+        enum DestructorType { None, ImmortalStructure, Normal };
+        static MarkedBlock* create(DeadBlock*, MarkedAllocator*, size_t cellSize, DestructorType);
 
         static bool isAtomAligned(const void*);
         static MarkedBlock* blockFor(const void*);
@@ -120,6 +123,7 @@ namespace JSC {
         
         void lastChanceToFinalize();
 
+        MarkedAllocator* allocator() const;
         Heap* heap() const;
         JSGlobalData* globalData() const;
         WeakSet& weakSet();
@@ -143,8 +147,7 @@ namespace JSC {
         bool isEmpty();
 
         size_t cellSize();
-        bool cellsNeedDestruction();
-        bool onlyContainsStructures();
+        DestructorType destructorType();
 
         size_t size();
         size_t capacity();
@@ -194,15 +197,15 @@ namespace JSC {
         static const size_t atomAlignmentMask = atomSize - 1; // atomSize must be a power of two.
 
         enum BlockState { New, FreeListed, Allocated, Marked };
-        template<bool destructorCallNeeded> FreeList sweepHelper(SweepMode = SweepOnly);
+        template<DestructorType> FreeList sweepHelper(SweepMode = SweepOnly);
 
         typedef char Atom[atomSize];
 
-        MarkedBlock(const PageAllocationAligned&, Heap*, size_t cellSize, bool cellsNeedDestruction, bool onlyContainsStructures);
+        MarkedBlock(Region*, MarkedAllocator*, size_t cellSize, DestructorType);
         Atom* atoms();
         size_t atomNumber(const void*);
         void callDestructor(JSCell*);
-        template<BlockState, SweepMode, bool destructorCallNeeded> FreeList specializedSweep();
+        template<BlockState, SweepMode, DestructorType> FreeList specializedSweep();
         
 #if ENABLE(GGC)
         CardSet<bytesPerCard, blockSize> m_cards;
@@ -215,8 +218,8 @@ namespace JSC {
 #else
         WTF::Bitmap<atomsPerBlock, WTF::BitmapNotAtomic> m_marks;
 #endif
-        bool m_cellsNeedDestruction;
-        bool m_onlyContainsStructures;
+        DestructorType m_destructorType;
+        MarkedAllocator* m_allocator;
         BlockState m_state;
         WeakSet m_weakSet;
     };
@@ -259,6 +262,11 @@ namespace JSC {
 
         clearMarks();
         sweep();
+    }
+
+    inline MarkedAllocator* MarkedBlock::allocator() const
+    {
+        return m_allocator;
     }
 
     inline Heap* MarkedBlock::heap() const
@@ -326,14 +334,9 @@ namespace JSC {
         return m_atomsPerCell * atomSize;
     }
 
-    inline bool MarkedBlock::cellsNeedDestruction()
+    inline MarkedBlock::DestructorType MarkedBlock::destructorType()
     {
-        return m_cellsNeedDestruction; 
-    }
-
-    inline bool MarkedBlock::onlyContainsStructures()
-    {
-        return m_onlyContainsStructures;
+        return m_destructorType; 
     }
 
     inline size_t MarkedBlock::size()
@@ -343,7 +346,7 @@ namespace JSC {
 
     inline size_t MarkedBlock::capacity()
     {
-        return allocation().size();
+        return region()->blockSize();
     }
 
     inline size_t MarkedBlock::atomNumber(const void* p)

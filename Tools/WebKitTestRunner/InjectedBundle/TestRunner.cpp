@@ -123,11 +123,12 @@ void TestRunner::dumpAsText(bool dumpPixels)
     m_dumpPixels = dumpPixels;
 }
 
-// FIXME: Needs a full implementation see https://bugs.webkit.org/show_bug.cgi?id=42546
 void TestRunner::setCustomPolicyDelegate(bool enabled, bool permissive)
 {
     m_policyDelegateEnabled = enabled;
     m_policyDelegatePermissive = permissive;
+
+    InjectedBundle::shared().setCustomPolicyDelegate(enabled, permissive);
 }
 
 void TestRunner::waitForPolicyDelegate()
@@ -191,13 +192,6 @@ void TestRunner::suspendAnimations()
 {
     WKBundleFrameRef mainFrame = WKBundlePageGetMainFrame(InjectedBundle::shared().page()->page());
     WKBundleFrameSuspendAnimations(mainFrame);
-}
-
-JSRetainPtr<JSStringRef> TestRunner::layerTreeAsText() const
-{
-    WKBundleFrameRef mainFrame = WKBundlePageGetMainFrame(InjectedBundle::shared().page()->page());
-    WKRetainPtr<WKStringRef> text(AdoptWK, WKBundleFrameCopyLayerTreeAsText(mainFrame));
-    return toJS(text);
 }
 
 void TestRunner::addUserScript(JSStringRef source, bool runAtStart, bool allFrames)
@@ -489,8 +483,8 @@ unsigned TestRunner::worldIDForWorld(WKBundleScriptWorldRef world)
 {
     WorldMap::const_iterator end = worldMap().end();
     for (WorldMap::const_iterator it = worldMap().begin(); it != end; ++it) {
-        if (it->second == world)
-            return it->first;
+        if (it->value == world)
+            return it->key;
     }
 
     return 0;
@@ -504,7 +498,7 @@ void TestRunner::evaluateScriptInIsolatedWorld(JSContextRef context, unsigned wo
     if (!worldID)
         world.adopt(WKBundleScriptWorldCreateWorld());
     else {
-        WKRetainPtr<WKBundleScriptWorldRef>& worldSlot = worldMap().add(worldID, 0).iterator->second;
+        WKRetainPtr<WKBundleScriptWorldRef>& worldSlot = worldMap().add(worldID, 0).iterator->value;
         if (!worldSlot)
             worldSlot.adopt(WKBundleScriptWorldCreateWorld());
         world = worldSlot;
@@ -749,6 +743,16 @@ void TestRunner::setTabKeyCyclesThroughElements(bool enabled)
     WKBundleSetTabKeyCyclesThroughElements(InjectedBundle::shared().bundle(), InjectedBundle::shared().page()->page(), enabled);
 }
 
+void TestRunner::setSerializeHTTPLoads()
+{
+    WKBundleSetSerialLoadingEnabled(InjectedBundle::shared().bundle(), true);
+}
+
+void TestRunner::dispatchPendingLoadRequests()
+{
+    WKBundleDispatchPendingLoadRequests(InjectedBundle::shared().bundle());
+}
+
 void TestRunner::grantWebNotificationPermission(JSStringRef origin)
 {
     WKRetainPtr<WKStringRef> originWK = toWK(origin);
@@ -780,9 +784,40 @@ void TestRunner::setGeolocationPermission(bool enabled)
     InjectedBundle::shared().setGeolocationPermission(enabled);
 }
 
-void TestRunner::setMockGeolocationPosition(double latitude, double longitude, double accuracy)
+void TestRunner::setMockGeolocationPosition(double latitude, double longitude, double accuracy, JSValueRef jsAltitude, JSValueRef jsAltitudeAccuracy, JSValueRef jsHeading, JSValueRef jsSpeed)
 {
-    InjectedBundle::shared().setMockGeolocationPosition(latitude, longitude, accuracy);
+    WKBundleFrameRef mainFrame = WKBundlePageGetMainFrame(InjectedBundle::shared().page()->page());
+    JSContextRef context = WKBundleFrameGetJavaScriptContext(mainFrame);
+
+    bool providesAltitude = false;
+    double altitude = 0.;
+    if (!JSValueIsUndefined(context, jsAltitude)) {
+        providesAltitude = true;
+        altitude = JSValueToNumber(context, jsAltitude, 0);
+    }
+
+    bool providesAltitudeAccuracy = false;
+    double altitudeAccuracy = 0.;
+    if (!JSValueIsUndefined(context, jsAltitudeAccuracy)) {
+        providesAltitudeAccuracy = true;
+        altitudeAccuracy = JSValueToNumber(context, jsAltitudeAccuracy, 0);
+    }
+
+    bool providesHeading = false;
+    double heading = 0.;
+    if (!JSValueIsUndefined(context, jsHeading)) {
+        providesHeading = true;
+        heading = JSValueToNumber(context, jsHeading, 0);
+    }
+
+    bool providesSpeed = false;
+    double speed = 0.;
+    if (!JSValueIsUndefined(context, jsSpeed)) {
+        providesSpeed = true;
+        speed = JSValueToNumber(context, jsSpeed, 0);
+    }
+
+    InjectedBundle::shared().setMockGeolocationPosition(latitude, longitude, accuracy, providesAltitude, altitude, providesAltitudeAccuracy, altitudeAccuracy, providesHeading, heading, providesSpeed, speed);
 }
 
 void TestRunner::setMockGeolocationPositionUnavailableError(JSStringRef message)

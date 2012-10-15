@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -44,6 +44,7 @@
 #include "WebFrame.h"
 #include "WebFrameNetworkingContext.h"
 #include "WebFullScreenManager.h"
+#include "WebIconDatabaseMessages.h"
 #include "WebNavigationDataStore.h"
 #include "WebPage.h"
 #include "WebPageProxyMessages.h"
@@ -67,6 +68,7 @@
 #include <WebCore/Page.h>
 #include <WebCore/PluginData.h>
 #include <WebCore/ProgressTracker.h>
+#include <WebCore/ResourceBuffer.h>
 #include <WebCore/ResourceError.h>
 #include <WebCore/Settings.h>
 #include <WebCore/UIEventWithKeyState.h>
@@ -91,6 +93,7 @@ namespace WebKit {
 WebFrameLoaderClient::WebFrameLoaderClient(WebFrame* frame)
     : m_frame(frame)
     , m_hasSentResponseToPluginView(false)
+    , m_didCompletePageTransitionAlready(false)
     , m_frameHasCustomRepresentation(false)
     , m_frameCameFromPageCache(false)
 {
@@ -393,7 +396,7 @@ void WebFrameLoaderClient::dispatchWillClose()
 
 void WebFrameLoaderClient::dispatchDidReceiveIcon()
 {
-    notImplemented();
+    WebProcess::shared().connection()->send(Messages::WebIconDatabase::DidReceiveIconForPageURL(m_frame->url()), 0);
 }
 
 void WebFrameLoaderClient::dispatchDidStartProvisionalLoad()
@@ -562,8 +565,10 @@ void WebFrameLoaderClient::dispatchDidLayout(LayoutMilestones milestones)
         webPage->send(Messages::WebPageProxy::DidFirstLayoutForFrame(m_frame->frameID(), InjectedBundleUserMessageEncoder(userData.get())));
 
         if (m_frame == m_frame->page()->mainWebFrame()) {
-            if (!webPage->corePage()->settings()->suppressesIncrementalRendering())
-                webPage->drawingArea()->setLayerTreeStateIsFrozen(false);
+            if (!webPage->corePage()->settings()->suppressesIncrementalRendering() && !m_didCompletePageTransitionAlready) {
+                webPage->didCompletePageTransition();
+                m_didCompletePageTransitionAlready = true;
+            }
         }
     
 #if USE(TILED_BACKING_STORE)
@@ -894,7 +899,7 @@ void WebFrameLoaderClient::finishedLoading(DocumentLoader* loader)
             if (!webPage)
                 return;
 
-            RefPtr<SharedBuffer> mainResourceData = loader->mainResourceData();
+            RefPtr<ResourceBuffer> mainResourceData = loader->mainResourceData();
             CoreIPC::DataReference dataReference(reinterpret_cast<const uint8_t*>(mainResourceData ? mainResourceData->data() : 0), mainResourceData ? mainResourceData->size() : 0);
             
             webPage->send(Messages::WebPageProxy::DidFinishLoadingDataForCustomRepresentation(loader->response().suggestedFilename(), dataReference));
@@ -1120,12 +1125,15 @@ String WebFrameLoaderClient::generatedMIMETypeForURLScheme(const String& /*URLSc
 
 void WebFrameLoaderClient::frameLoadCompleted()
 {
+    // Note: Can be called multiple times.
     WebPage* webPage = m_frame->page();
     if (!webPage)
         return;
 
-    if (m_frame == m_frame->page()->mainWebFrame())
-        webPage->drawingArea()->setLayerTreeStateIsFrozen(false);
+    if (m_frame == m_frame->page()->mainWebFrame() && !m_didCompletePageTransitionAlready) {
+        webPage->didCompletePageTransition();
+        m_didCompletePageTransitionAlready = true;
+    }
 }
 
 void WebFrameLoaderClient::saveViewStateToItem(HistoryItem*)
@@ -1138,10 +1146,9 @@ void WebFrameLoaderClient::restoreViewState()
     // Inform the UI process of the scale factor.
     double scaleFactor = m_frame->coreFrame()->loader()->history()->currentItem()->pageScaleFactor();
 
-    // A scale factor of 0.0 means the history item actually has the "default scale factor" of 1.0.
-    if (!scaleFactor)
-        scaleFactor = 1.0;
-    m_frame->page()->send(Messages::WebPageProxy::PageScaleFactorDidChange(scaleFactor));
+    // A scale factor of 0 means the history item has the default scale factor, thus we do not need to update it.
+    if (scaleFactor)
+        m_frame->page()->send(Messages::WebPageProxy::PageScaleFactorDidChange(scaleFactor));
 
     // FIXME: This should not be necessary. WebCore should be correctly invalidating
     // the view on restores from the back/forward cache.
@@ -1155,8 +1162,10 @@ void WebFrameLoaderClient::provisionalLoadStarted()
     if (!webPage)
         return;
 
-    if (m_frame == m_frame->page()->mainWebFrame())
-        webPage->drawingArea()->setLayerTreeStateIsFrozen(true);
+    if (m_frame == m_frame->page()->mainWebFrame()) {
+        webPage->didStartPageTransition();
+        m_didCompletePageTransitionAlready = false;
+    }
 }
 
 void WebFrameLoaderClient::didFinishLoad()
@@ -1206,7 +1215,7 @@ void WebFrameLoaderClient::transitionToCommittedFromCachedFrame(CachedFrame*)
     bool isMainFrame = webPage->mainWebFrame() == m_frame;
     
     const ResourceResponse& response = m_frame->coreFrame()->loader()->documentLoader()->response();
-    m_frameHasCustomRepresentation = isMainFrame && WebProcess::shared().shouldUseCustomRepresentationForResponse(response);
+    m_frameHasCustomRepresentation = isMainFrame && webPage->shouldUseCustomRepresentationForResponse(response);
     m_frameCameFromPageCache = true;
 }
 
@@ -1220,7 +1229,7 @@ void WebFrameLoaderClient::transitionToCommittedForNewPage()
     IntRect currentVisibleContentBounds = m_frame->visibleContentBounds();
 
     const ResourceResponse& response = m_frame->coreFrame()->loader()->documentLoader()->response();
-    m_frameHasCustomRepresentation = isMainFrame && WebProcess::shared().shouldUseCustomRepresentationForResponse(response);
+    m_frameHasCustomRepresentation = isMainFrame && webPage->shouldUseCustomRepresentationForResponse(response);
     m_frameCameFromPageCache = false;
 
     m_frame->coreFrame()->createView(webPage->size(), backgroundColor, /* transparent */ false, IntSize(), shouldUseFixedLayout);
@@ -1342,6 +1351,16 @@ PassRefPtr<Widget> WebFrameLoaderClient::createPlugin(const IntSize&, HTMLPlugIn
         return 0;
     
     return PluginView::create(pluginElement, plugin.release(), parameters);
+}
+
+void WebFrameLoaderClient::recreatePlugin(Widget* widget)
+{
+    ASSERT(widget && widget->isPluginViewBase());
+    ASSERT(m_frame->page());
+
+    PluginView* pluginView = static_cast<PluginView*>(widget);
+    RefPtr<Plugin> plugin = m_frame->page()->createPlugin(m_frame, pluginView->pluginElement(), pluginView->initialParameters());
+    pluginView->recreateAndInitialize(plugin.release());
 }
 
 void WebFrameLoaderClient::redirectDataToPlugin(Widget* pluginWidget)
@@ -1515,10 +1534,6 @@ RemoteAXObjectRef WebFrameLoaderClient::accessibilityRemoteObject()
     return m_frame->page()->accessibilityRemoteObject();
 }
     
-#if ENABLE(MAC_JAVA_BRIDGE)
-jobject WebFrameLoaderClient::javaApplet(NSView*) { return 0; }
-#endif
-
 NSCachedURLResponse* WebFrameLoaderClient::willCacheResponse(DocumentLoader*, unsigned long identifier, NSCachedURLResponse* response) const
 {
     WebPage* webPage = m_frame->page();

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -188,6 +188,7 @@ private:
                                           const String& referrer, bool allowsScrolling, int marginWidth, int marginHeight) OVERRIDE;
     
     virtual PassRefPtr<WebCore::Widget> createPlugin(const WebCore::IntSize&, WebCore::HTMLPlugInElement*, const WebCore::KURL&, const Vector<String>&, const Vector<String>&, const String&, bool loadManually) OVERRIDE;
+    virtual void recreatePlugin(WebCore::Widget*) OVERRIDE;
     virtual void redirectDataToPlugin(WebCore::Widget* pluginWidget) OVERRIDE;
     
     virtual PassRefPtr<WebCore::Widget> createJavaAppletWidget(const WebCore::IntSize&, WebCore::HTMLAppletElement*, const WebCore::KURL& baseURL, const Vector<String>& paramNames, const Vector<String>& paramValues) OVERRIDE;
@@ -216,9 +217,6 @@ private:
 #if PLATFORM(MAC)
     virtual RemoteAXObjectRef accessibilityRemoteObject() OVERRIDE;
     
-#if ENABLE(MAC_JAVA_BRIDGE)
-    virtual jobject javaApplet(NSView*) OVERRIDE;
-#endif
     virtual NSCachedURLResponse* willCacheResponse(WebCore::DocumentLoader*, unsigned long identifier, NSCachedURLResponse*) const OVERRIDE;
 #endif
 #if PLATFORM(WIN) && USE(CFNETWORK)
@@ -244,6 +242,7 @@ private:
     WebFrame* m_frame;
     RefPtr<PluginView> m_pluginView;
     bool m_hasSentResponseToPluginView;
+    bool m_didCompletePageTransitionAlready;
     bool m_frameHasCustomRepresentation;
     bool m_frameCameFromPageCache;
 };

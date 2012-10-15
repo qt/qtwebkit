@@ -29,19 +29,17 @@
 
 """Run Inspector's perf tests in perf mode."""
 
+import os
 import json
 import logging
 import optparse
-import re
-import sys
 import time
 
 from webkitpy.common import find_files
+from webkitpy.common.checkout.scm.detection import SCMDetector
 from webkitpy.common.host import Host
 from webkitpy.common.net.file_uploader import FileUploader
-from webkitpy.layout_tests.views import printing
 from webkitpy.performance_tests.perftest import PerfTestFactory
-from webkitpy.performance_tests.perftest import ReplayPerfTest
 
 
 _log = logging.getLogger(__name__)
@@ -65,7 +63,7 @@ class PerfTestsRunner(object):
         else:
             self._host = Host()
             self._port = self._host.port_factory.get(self._options.platform, self._options)
-        self._host._initialize_scm()
+        self._host.initialize_scm()
         self._webkit_base_dir_len = len(self._port.webkit_base())
         self._base_path = self._port.perf_tests_dir()
         self._results = {}
@@ -73,6 +71,9 @@ class PerfTestsRunner(object):
 
     @staticmethod
     def _parse_args(args=None):
+        def _expand_path(option, opt_str, value, parser):
+            path = os.path.expandvars(os.path.expanduser(value))
+            setattr(parser.values, option.dest, path)
         perf_option_list = [
             optparse.make_option('--debug', action='store_const', const='Debug', dest="configuration",
                 help='Set the configuration to Debug'),
@@ -98,15 +99,12 @@ class PerfTestsRunner(object):
                 help="Pause before running the tests to let user attach a performance monitor."),
             optparse.make_option("--no-results", action="store_false", dest="generate_results", default=True,
                 help="Do no generate results JSON and results page."),
-            optparse.make_option("--output-json-path",
+            optparse.make_option("--output-json-path", action='callback', callback=_expand_path, type="str",
                 help="Path to generate a JSON file at; may contain previous results if it already exists."),
             optparse.make_option("--reset-results", action="store_true",
                 help="Clears the content in the generated JSON file before adding the results."),
-            optparse.make_option("--slave-config-json-path",
+            optparse.make_option("--slave-config-json-path", action='callback', callback=_expand_path, type="str",
                 help="Only used on bots. Path to a slave configuration file."),
-            optparse.make_option("--source-json-path", dest="slave_config_json_path",
-                # FIXME: Remove this option once build.webkit.org is updated to use --slave-config-json-path.
-                help="Deprecated. Overrides --slave-config-json-path."),
             optparse.make_option("--description",
                 help="Add a description to the output JSON file if one is generated"),
             optparse.make_option("--no-show-results", action="store_false", default=True, dest="show_results",
@@ -181,11 +179,6 @@ class PerfTestsRunner(object):
 
     def _generate_and_show_results(self):
         options = self._options
-        if options.test_results_server:
-            # Remove this code once build.webkit.org started using --no-show-results and --reset-results
-            options.reset_results = True
-            options.show_results = False
-
         output_json_path = self._output_json_path()
         output = self._generate_results_dict(self._timestamp, options.description, options.platform, options.builder_name, options.build_number)
 
@@ -213,7 +206,8 @@ class PerfTestsRunner(object):
         if description:
             contents['description'] = description
         for (name, path) in self._port.repository_paths():
-            contents[name + '-revision'] = self._host.scm().svn_revision(path)
+            scm = SCMDetector(self._host.filesystem, self._host.executive).detect_scm_system(path) or self._host.scm()
+            contents[name + '-revision'] = scm.svn_revision(path)
 
         # FIXME: Add --branch or auto-detect the branch we're in
         for key, value in {'timestamp': int(timestamp), 'branch': self._default_branch, 'platform': platform,

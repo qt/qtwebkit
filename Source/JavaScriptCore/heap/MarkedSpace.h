@@ -34,8 +34,6 @@
 #include <wtf/Noncopyable.h>
 #include <wtf/Vector.h>
 
-#define ASSERT_CLASS_FITS_IN_CELL(class) COMPILE_ASSERT(sizeof(class) <= MarkedSpace::maxCellSize, class_fits_in_cell)
-
 namespace JSC {
 
 class Heap;
@@ -68,19 +66,17 @@ struct Capacity : MarkedBlock::CountFunctor {
 class MarkedSpace {
     WTF_MAKE_NONCOPYABLE(MarkedSpace);
 public:
-    static const size_t maxCellSize = 2048;
-
     MarkedSpace(Heap*);
     ~MarkedSpace();
     void lastChanceToFinalize();
 
     MarkedAllocator& firstAllocator();
     MarkedAllocator& allocatorFor(size_t);
-    MarkedAllocator& allocatorFor(MarkedBlock*);
-    MarkedAllocator& destructorAllocatorFor(size_t);
-    void* allocateWithDestructor(size_t);
+    MarkedAllocator& immortalStructureDestructorAllocatorFor(size_t);
+    MarkedAllocator& normalDestructorAllocatorFor(size_t);
+    void* allocateWithNormalDestructor(size_t);
+    void* allocateWithImmortalStructureDestructor(size_t);
     void* allocateWithoutDestructor(size_t);
-    void* allocateStructure(size_t);
  
     void resetAllocators();
 
@@ -131,12 +127,12 @@ private:
     struct Subspace {
         FixedArray<MarkedAllocator, preciseCount> preciseAllocators;
         FixedArray<MarkedAllocator, impreciseCount> impreciseAllocators;
+        MarkedAllocator largeAllocator;
     };
 
-    Subspace m_destructorSpace;
+    Subspace m_normalDestructorSpace;
+    Subspace m_immortalStructureDestructorSpace;
     Subspace m_normalSpace;
-    MarkedAllocator m_largeAllocator;
-    MarkedAllocator m_structureAllocator;
 
     Heap* m_heap;
     MarkedBlockSet m_blocks;
@@ -186,28 +182,27 @@ inline MarkedAllocator& MarkedSpace::allocatorFor(size_t bytes)
         return m_normalSpace.preciseAllocators[(bytes - 1) / preciseStep];
     if (bytes <= impreciseCutoff)
         return m_normalSpace.impreciseAllocators[(bytes - 1) / impreciseStep];
-    return m_largeAllocator;
+    return m_normalSpace.largeAllocator;
 }
 
-inline MarkedAllocator& MarkedSpace::allocatorFor(MarkedBlock* block)
-{
-    if (block->onlyContainsStructures())
-        return m_structureAllocator;
-
-    if (block->cellsNeedDestruction())
-        return destructorAllocatorFor(block->cellSize());
-
-    return allocatorFor(block->cellSize());
-}
-
-inline MarkedAllocator& MarkedSpace::destructorAllocatorFor(size_t bytes)
+inline MarkedAllocator& MarkedSpace::immortalStructureDestructorAllocatorFor(size_t bytes)
 {
     ASSERT(bytes);
     if (bytes <= preciseCutoff)
-        return m_destructorSpace.preciseAllocators[(bytes - 1) / preciseStep];
+        return m_immortalStructureDestructorSpace.preciseAllocators[(bytes - 1) / preciseStep];
     if (bytes <= impreciseCutoff)
-        return m_normalSpace.impreciseAllocators[(bytes - 1) / impreciseStep];
-    return m_largeAllocator;
+        return m_immortalStructureDestructorSpace.impreciseAllocators[(bytes - 1) / impreciseStep];
+    return m_immortalStructureDestructorSpace.largeAllocator;
+}
+
+inline MarkedAllocator& MarkedSpace::normalDestructorAllocatorFor(size_t bytes)
+{
+    ASSERT(bytes);
+    if (bytes <= preciseCutoff)
+        return m_normalDestructorSpace.preciseAllocators[(bytes - 1) / preciseStep];
+    if (bytes <= impreciseCutoff)
+        return m_normalDestructorSpace.impreciseAllocators[(bytes - 1) / impreciseStep];
+    return m_normalDestructorSpace.largeAllocator;
 }
 
 inline void* MarkedSpace::allocateWithoutDestructor(size_t bytes)
@@ -215,30 +210,33 @@ inline void* MarkedSpace::allocateWithoutDestructor(size_t bytes)
     return allocatorFor(bytes).allocate(bytes);
 }
 
-inline void* MarkedSpace::allocateWithDestructor(size_t bytes)
+inline void* MarkedSpace::allocateWithImmortalStructureDestructor(size_t bytes)
 {
-    return destructorAllocatorFor(bytes).allocate(bytes);
+    return immortalStructureDestructorAllocatorFor(bytes).allocate(bytes);
 }
 
-inline void* MarkedSpace::allocateStructure(size_t bytes)
+inline void* MarkedSpace::allocateWithNormalDestructor(size_t bytes)
 {
-    return m_structureAllocator.allocate(bytes);
+    return normalDestructorAllocatorFor(bytes).allocate(bytes);
 }
 
 template <typename Functor> inline typename Functor::ReturnType MarkedSpace::forEachBlock(Functor& functor)
 {
     for (size_t i = 0; i < preciseCount; ++i) {
         m_normalSpace.preciseAllocators[i].forEachBlock(functor);
-        m_destructorSpace.preciseAllocators[i].forEachBlock(functor);
+        m_normalDestructorSpace.preciseAllocators[i].forEachBlock(functor);
+        m_immortalStructureDestructorSpace.preciseAllocators[i].forEachBlock(functor);
     }
 
     for (size_t i = 0; i < impreciseCount; ++i) {
         m_normalSpace.impreciseAllocators[i].forEachBlock(functor);
-        m_destructorSpace.impreciseAllocators[i].forEachBlock(functor);
+        m_normalDestructorSpace.impreciseAllocators[i].forEachBlock(functor);
+        m_immortalStructureDestructorSpace.impreciseAllocators[i].forEachBlock(functor);
     }
 
-    m_largeAllocator.forEachBlock(functor);
-    m_structureAllocator.forEachBlock(functor);
+    m_normalSpace.largeAllocator.forEachBlock(functor);
+    m_normalDestructorSpace.largeAllocator.forEachBlock(functor);
+    m_immortalStructureDestructorSpace.largeAllocator.forEachBlock(functor);
 
     return functor.returnValue();
 }

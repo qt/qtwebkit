@@ -87,6 +87,9 @@ public:
     bool hasScrollingLayer() const { return m_scrollingLayer; }
     GraphicsLayer* scrollingLayer() const { return m_scrollingLayer.get(); }
     GraphicsLayer* scrollingContentsLayer() const { return m_scrollingContentsLayer.get(); }
+
+    void attachToScrollingCoordinator();
+    uint64_t scrollLayerID() const { return m_scrollLayerID; }
     
     bool hasMaskLayer() const { return m_maskLayer != 0; }
 
@@ -133,11 +136,12 @@ public:
     void updateAfterWidgetResize();
     void positionOverflowControlsLayers(const IntSize& offsetFromRoot);
 
+    bool usingTileCache() const { return m_usingTiledCacheLayer; }
+
     // GraphicsLayerClient interface
     virtual bool shouldUseTileCache(const GraphicsLayer*) const;
-    virtual bool usingTileCache(const GraphicsLayer*) const { return m_usingTiledCacheLayer; }
     virtual void notifyAnimationStarted(const GraphicsLayer*, double startTime);
-    virtual void notifySyncRequired(const GraphicsLayer*);
+    virtual void notifyFlushRequired(const GraphicsLayer*);
 
     virtual void paintContents(const GraphicsLayer*, GraphicsContext&, GraphicsLayerPaintingPhase, const IntRect& clip);
 
@@ -180,7 +184,7 @@ private:
     
     PassOwnPtr<GraphicsLayer> createGraphicsLayer(const String&);
 
-    RenderBoxModelObject* renderer() const { return m_owningLayer->renderer(); }
+    RenderLayerModelObject* renderer() const { return m_owningLayer->renderer(); }
     RenderLayerCompositor* compositor() const { return m_owningLayer->compositor(); }
 
     void updateInternalHierarchy();
@@ -192,6 +196,8 @@ private:
     bool requiresVerticalScrollbarLayer() const;
     bool requiresScrollCornerLayer() const;
     bool updateScrollingLayers(bool scrollingLayers);
+
+    void detachFromScrollingCoordinator();
 
     GraphicsLayerPaintingPhase paintingPhaseForPrimaryLayer() const;
     
@@ -255,6 +261,8 @@ private:
 
     OwnPtr<GraphicsLayer> m_scrollingLayer; // only used if the layer is using composited scrolling.
     OwnPtr<GraphicsLayer> m_scrollingContentsLayer; // only used if the layer is using composited scrolling.
+
+    uint64_t m_scrollLayerID;
 
     IntRect m_compositedBounds;
 

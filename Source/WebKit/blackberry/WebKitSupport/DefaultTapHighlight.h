@@ -50,11 +50,12 @@ public:
     virtual void draw(const Platform::IntRectRegion&, int red, int green, int blue, int alpha, bool hideAfterScroll);
     virtual void hide();
 
+    virtual bool isVisible() const { return m_visible; }
     virtual bool shouldHideAfterScroll() const { return m_shouldHideAfterScroll; }
 
     // GraphicsLayerClient
     virtual void notifyAnimationStarted(const WebCore::GraphicsLayer*, double time) { }
-    virtual void notifySyncRequired(const WebCore::GraphicsLayer*);
+    virtual void notifyFlushRequired(const WebCore::GraphicsLayer*);
     virtual void paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext&, WebCore::GraphicsLayerPaintingPhase, const WebCore::IntRect& inClip);
     virtual bool showDebugBorders(const WebCore::GraphicsLayer*) const;
     virtual bool showRepaintCounter(const WebCore::GraphicsLayer*) const;

@@ -1,3 +1,299 @@
+2012-10-10  Brady Eidson  <beidson@apple.com>
+
+        Switch ResourceLoader::resourceData() from SharedBuffer to ResourceBuffer
+        https://bugs.webkit.org/show_bug.cgi?id=98976
+
+        Reviewed by Anders Carlsson.
+
+        * webkit/webkitwebdatasource.cpp:
+        (webkit_web_data_source_get_data):
+
+2012-10-10  Jon Lee  <jonlee@apple.com>
+
+        [WK2] Activate plugins when user clicks on snapshot
+        https://bugs.webkit.org/show_bug.cgi?id=98328
+        <rdar://problem/12426681>
+
+        Reviewed by Brady Eidson.
+
+        * WebCoreSupport/FrameLoaderClientGtk.h:
+        (WebKit::FrameLoaderClient::recreatePlugin): Stub implementation of recreatePlugin().
+
+2012-10-10  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r130853.
+        http://trac.webkit.org/changeset/130853
+        https://bugs.webkit.org/show_bug.cgi?id=98873
+
+        The rollout was incorrect (Requested by zdobersek on #webkit).
+
+        * webkit/webkitwebview.cpp:
+        (resizeWebViewFromAllocation):
+        (webkit_web_view_size_allocate):
+        (webkitWebViewMap):
+
+2012-10-09  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r130838.
+        http://trac.webkit.org/changeset/130838
+        https://bugs.webkit.org/show_bug.cgi?id=98860
+
+        The patch is causing X errors (=> crashes) on GTK 64-bit
+        Release builder (Requested by zdobersek on #webkit).
+
+        * webkit/webkitwebview.cpp:
+        (resizeWebViewFromAllocation):
+        (webkit_web_view_size_allocate):
+        (webkitWebViewMap):
+
+2012-10-09  Daniel Drake  <dsd@laptop.org>
+
+        [GTK] Plugins don't display
+        https://bugs.webkit.org/show_bug.cgi?id=98789
+
+        Reviewed by Martin Robinson.
+
+        Fix a recent regression where plugin content was not being displayed.
+        Bringing webkit_web_view_size_allocate in line with the WebKit2
+        equivalent solves the issue.
+
+        * webkit/webkitwebview.cpp:
+        (resizeWebViewFromAllocation): pass allocation request to children
+        even when the allocation size does not change.
+        (webkit_web_view_size_allocate): don't bail too early if the
+        allocation size does not change.
+
+2012-10-07  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        Rename first/second to key/value in HashMap iterators
+        https://bugs.webkit.org/show_bug.cgi?id=82784
+
+        Reviewed by Eric Seidel.
+
+        * WebCoreSupport/PlatformStrategiesGtk.cpp:
+        (PlatformStrategiesGtk::getPluginInfo):
+        * webkit/webkitfavicondatabase.cpp:
+        (webkitFaviconDatabaseImportFinished):
+        * webkit/webkitwebplugin.cpp:
+        (webkit_web_plugin_get_mimetypes):
+
+2012-10-04  Simon Fraser  <simon.fraser@apple.com>
+
+        Final part of "sync" to "flush" renaming
+        https://bugs.webkit.org/show_bug.cgi?id=98430
+
+        Reviewed by Tim Horton.
+
+        Change method names on GraphicsLayer and GraphicsLayerClient that
+        refer to "sync" to use the term "flush" instead, to be consistent
+        with the rest of the code.
+
+        * WebCoreSupport/AcceleratedCompositingContext.h:
+        (AcceleratedCompositingContext):
+        * WebCoreSupport/AcceleratedCompositingContextCairo.cpp:
+        (WebKit::AcceleratedCompositingContext::attachRootGraphicsLayer):
+        (WebKit::AcceleratedCompositingContext::resizeRootLayer):
+        (WebKit::AcceleratedCompositingContext::syncLayersNow):
+        (WebKit::AcceleratedCompositingContext::notifyFlushRequired):
+        * WebCoreSupport/AcceleratedCompositingContextClutter.cpp:
+        (WebKit::AcceleratedCompositingContext::flushPendingLayerChanges):
+        (WebKit::AcceleratedCompositingContext::notifyFlushRequired):
+        * WebCoreSupport/AcceleratedCompositingContextGL.cpp:
+        (WebKit::AcceleratedCompositingContext::flushPendingLayerChanges):
+        (WebKit::AcceleratedCompositingContext::notifyFlushRequired):
+
+2012-10-04  Simon Fraser  <simon.fraser@apple.com>
+
+        Standardize on "flush" terminology for compositing layer flushing/syncing
+        https://bugs.webkit.org/show_bug.cgi?id=98321
+
+        Reviewed by Simon Fraser.
+
+        Rename compositing-related methods that refer to "syncing" to instead
+        refer to "flushing".
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::scheduleCompositingLayerFlush):
+        * WebCoreSupport/ChromeClientGtk.h:
+        (ChromeClient):
+
+2012-10-02  Anders Carlsson  <andersca@apple.com>
+
+        Change most GraphicsLayer::create calls to use the version that takes a GraphicsLayerFactory
+        https://bugs.webkit.org/show_bug.cgi?id=98217
+
+        Reviewed by Andreas Kling.
+
+        * WebCoreSupport/AcceleratedCompositingContextGL.cpp:
+        (WebKit::AcceleratedCompositingContext::initialize):
+
+2012-10-02  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Add API to get the web view that initiated a custom URI request to WebKit2 GTK+
+        https://bugs.webkit.org/show_bug.cgi?id=97895
+
+        Reviewed by Martin Robinson.
+
+        * WebCoreSupport/FrameNetworkingContextGtk.cpp:
+        (WebKit::FrameNetworkingContextGtk::initiatingPageID): Stub
+        implementation.
+        * WebCoreSupport/FrameNetworkingContextGtk.h:
+        (FrameNetworkingContextGtk): Added.
+
+2012-10-02  Adrian Perez de Castro  <aperez@igalia.com>
+
+        [GTK] Value not returned warning with geolocation disabled
+        https://bugs.webkit.org/show_bug.cgi?id=98148
+
+        Reviewed by Xan Lopez.
+
+        With geolocation disabled in the build, return a sensible value from
+        DumpRenderTreeSupportGtk::numberOfPendingGeolocationPermissionRequests.
+        This also avoids a compiler warning.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::numberOfPendingGeolocationPermissionRequests):
+
+2012-10-01  Brady Eidson  <beidson@apple.com>
+
+        Remove the Safari 2 -> Safari 3 icon database import code.
+        https://bugs.webkit.org/show_bug.cgi?id=98113
+
+        Reviewed by Maciej Stachowiak.
+
+        Nuke the performImport() IconDatabaseClient method.
+
+        * webkit/webkitfavicondatabase.cpp:
+        (IconDatabaseClientGtk):
+
+2012-10-01  Arnaud Renevier  <a.renevier@sisa.samsung.com>
+
+        [Gtk] crash when accelerated composition is turned off
+        https://bugs.webkit.org/show_bug.cgi?id=98099
+
+        Reviewed by Martin Robinson.
+
+        frame->view()->updateLayoutAndStyleIfNeededRecursive() may reset root
+        compositing layer in flushAndRenderLayers. So, we check if compositing
+        is enabled afterwards, and return if it is not.
+
+        This bug is handled by LayoutTests/compositing/toggle-compositing.html
+
+        * WebCoreSupport/AcceleratedCompositingContextGL.cpp:
+        (WebKit::AcceleratedCompositingContext::flushAndRenderLayers):
+
+2012-10-01  Claudio Saavedra  <csaavedra@igalia.com>
+
+        [GTK] Save original uri for downloaded files
+        https://bugs.webkit.org/show_bug.cgi?id=95188
+
+        Reviewed by Carlos Garcia Campos.
+
+        gvfs stores metadata locally, and this information can later be
+        used by file management applications. Based on a patch by
+        Alexander Larsson <alexl@redhat.com>.
+
+        * webkit/webkitdownload.cpp:
+        (webkit_download_open_stream_for_uri): Save the download-uri as
+        file metadata.
+
+2012-10-01  Claudio Saavedra  <csaavedra@igalia.com>
+
+        [GTK] WebKitDownload: use more of GOwnPtr/GRefPtr
+        https://bugs.webkit.org/show_bug.cgi?id=98009
+
+        Reviewed by Carlos Garcia Campos.
+
+        Use more GOwnPtr/GRefPtr in WebKitDownload
+
+        * webkit/webkitdownload.cpp:
+        (webkit_download_open_stream_for_uri): Use GRefPtr
+        for a GFile and GOwnPtr for GError.
+        (webkit_download_set_destination_uri): Ditto.
+        (webkit_download_received_data): Use GOwnPtr for GError.
+
+2012-09-28  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        Code inside FrameLoaderClient::canShowMIMEType() implementations can be shared among different WK ports
+        https://bugs.webkit.org/show_bug.cgi?id=97547
+
+        Reviewed by Adam Barth.
+
+        Newly added WebCore::MIMETypeRegistry::canShowMIMEType() function is used
+        inside WebKit::FrameLoaderClient::canShowMIMEType().
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::canShowMIMEType):
+
+2012-09-28  Huang Dongsung  <luxtella@company100.net>
+
+        [GTK] Enable CSS Shaders layout LayoutTests on GTK+
+        https://bugs.webkit.org/show_bug.cgi?id=97821
+
+        Reviewed by Martin Robinson.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::setCSSCustomFilterEnabled): Pass through to Settings object.
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        (DumpRenderTreeSupportGtk):
+
+2012-09-27  Allan Sandfeld Jensen  <allan.jensen@digia.com>
+
+        Unify event handling of middle mouse button.
+        https://bugs.webkit.org/show_bug.cgi?id=97690
+
+        Reviewed by Tony Chang.
+
+        Remove port specific handling of middle mouse button press.
+
+        * WebCoreSupport/EditorClientGtk.cpp:
+        (WebKit::EditorClient::supportsGlobalSelection):
+        * WebCoreSupport/EditorClientGtk.h:
+        (EditorClient):
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_button_press_event):
+
+2012-09-26  Gustavo Noronha Silva  <gns@gnome.org>
+
+        Unreviewed build fix after 129707.
+
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_forward_context_menu_event):
+
+2012-09-26  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Use XDamage to simplify RedirectedXCompositeWindow
+        https://bugs.webkit.org/show_bug.cgi?id=97267
+
+        Reviewed by Alejandro G. Castro.
+
+        Use XDamage to queue redraws of the widget when redirecting accelerated compositing
+        to an offscreen window. This allows removing a finicky timer-based approach, improves
+        performance, and allows simplifying things greatly.
+
+        * GNUmakefile.am: Add the XDamage CFLAGS and LIBS.
+        * WebCoreSupport/AcceleratedCompositingContext.h:
+        (AcceleratedCompositingContext): Change the signature of compositeLayersToContext
+        to accept an enum that explains the composite purpose.
+        * WebCoreSupport/AcceleratedCompositingContextGL.cpp:
+        (WebKit::redirectedWindowDamagedCallback): Added.
+        (WebKit::AcceleratedCompositingContext::initialize): Handle the situation where
+        the RedirectedXCompositeWindow returns a null pointer.
+        (WebKit::AcceleratedCompositingContext::enabled): Ditto.
+        (WebKit::AcceleratedCompositingContext::renderLayersToWindow): Remove the code handling
+        the usable size of the RedirectedXCompositeWindow. The usable size is now always equal
+        to the size.
+        (WebKit::AcceleratedCompositingContext::compositeLayersToContext): When drawing for a
+        resize, first clear the entire context. Remove the double swap-buffer, as it's no
+        longer necessary.
+        (WebKit::AcceleratedCompositingContext::setRootCompositingLayer): Handle the case that
+        the redirected window is null.
+        (WebKit::AcceleratedCompositingContext::resizeRootLayer): Instead of doing another
+        immediate layer flush, just recomposite the current layer state and schedule a new
+        flush. This should make resizing faster.
+        (WebKit::AcceleratedCompositingContext::flushAndRenderLayers): We no longer need to
+        queue a redraw, unless we want to force one.
+
 2012-09-26  Zan Dobersek  <zandobersek@gmail.com>
 
         [GTK] Enable some of the unstable CSS features

@@ -91,7 +91,7 @@ float Font::getGlyphsAndAdvancesForComplexText(const TextRun& run, int from, int
 
     if (run.rtl()) {
         initialAdvance = controller.totalWidth() + controller.finalRoundingWidth() - afterWidth;
-        for (int i = 0, end = glyphBuffer.size() - 1; i < glyphBuffer.size() / 2; ++i, --end)
+        for (int i = 0, end = glyphBuffer.size() - 1; i < end; ++i, --end)
             glyphBuffer.swap(i, end);
     } else
         initialAdvance = beforeWidth;
@@ -189,21 +189,21 @@ const SimpleFontData* Font::fontDataForCombiningCharacterSequence(const UChar* c
             if (simpleFontData->platformData().orientation() == Vertical) {
                 if (isCJKIdeographOrSymbol(baseCharacter) && !simpleFontData->hasVerticalGlyphs()) {
                     variant = BrokenIdeographVariant;
-                    simpleFontData = simpleFontData->brokenIdeographFontData();
+                    simpleFontData = simpleFontData->brokenIdeographFontData().get();
                 } else if (m_fontDescription.textOrientation() == TextOrientationVerticalRight) {
-                    SimpleFontData* verticalRightFontData = simpleFontData->verticalRightOrientationFontData();
+                    SimpleFontData* verticalRightFontData = simpleFontData->verticalRightOrientationFontData().get();
                     Glyph verticalRightGlyph = verticalRightFontData->glyphForCharacter(baseCharacter);
                     if (verticalRightGlyph == baseCharacterGlyphData.glyph)
                         simpleFontData = verticalRightFontData;
                 } else {
-                    SimpleFontData* uprightFontData = simpleFontData->uprightOrientationFontData();
+                    SimpleFontData* uprightFontData = simpleFontData->uprightOrientationFontData().get();
                     Glyph uprightGlyph = uprightFontData->glyphForCharacter(baseCharacter);
                     if (uprightGlyph != baseCharacterGlyphData.glyph)
                         simpleFontData = uprightFontData;
                 }
             }
         } else {
-            if (const SimpleFontData* variantFontData = simpleFontData->variantFontData(m_fontDescription, variant))
+            if (const SimpleFontData* variantFontData = simpleFontData->variantFontData(m_fontDescription, variant).get())
                 simpleFontData = variantFontData;
         }
 

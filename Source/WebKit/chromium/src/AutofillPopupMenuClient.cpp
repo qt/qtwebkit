@@ -44,8 +44,8 @@
 #include "WebNode.h"
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
-#include "platform/WebString.h"
-#include "platform/WebVector.h"
+#include <public/WebString.h>
+#include <public/WebVector.h>
 
 using namespace WebCore;
 

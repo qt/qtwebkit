@@ -123,6 +123,7 @@ SET(WebKit2_SOURCES
     Platform/CoreIPC/BinarySemaphore.cpp
     Platform/CoreIPC/Connection.cpp
     Platform/CoreIPC/DataReference.cpp
+    Platform/CoreIPC/MessageReceiverMap.cpp
 
     PluginProcess/PluginControllerProxy.cpp
     PluginProcess/PluginCreationParameters.cpp
@@ -495,6 +496,8 @@ SET(WebKit2_MESSAGES_IN_FILES
     PluginProcess/PluginProcess.messages.in
     PluginProcess/WebProcessConnection.messages.in
 
+    Shared/WebConnection.messages.in
+
     Shared/Plugins/NPObjectMessageReceiver.messages.in
 
     UIProcess/DrawingAreaProxy.messages.in
@@ -559,6 +562,7 @@ SET(WebKit2_MESSAGES_IN_FILES
     WebProcess/WebPage/EventDispatcher.messages.in
     WebProcess/WebPage/WebInspector.messages.in
     WebProcess/WebPage/WebPage.messages.in
+    WebProcess/WebPage/WebPageGroupProxy.messages.in
 
     WebProcess/WebPage/CoordinatedGraphics/LayerTreeCoordinator.messages.in
 )

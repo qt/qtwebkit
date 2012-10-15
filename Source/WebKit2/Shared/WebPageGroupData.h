@@ -26,11 +26,14 @@
 #ifndef WebPageGroupData_h
 #define WebPageGroupData_h
 
+#include <WebCore/UserScript.h>
+#include <WebCore/UserStyleSheet.h>
+#include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
 namespace CoreIPC {
-    class ArgumentDecoder;
-    class ArgumentEncoder;
+class ArgumentDecoder;
+class ArgumentEncoder;
 }
 
 namespace WebKit {
@@ -43,6 +46,9 @@ struct WebPageGroupData {
     uint64_t pageGroupID;
     bool visibleToInjectedBundle;
     bool visibleToHistoryClient;
+
+    Vector<WebCore::UserStyleSheet> userStyleSheets;
+    Vector<WebCore::UserScript> userScripts;
 };
 
 } // namespace WebKit

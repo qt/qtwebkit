@@ -29,7 +29,7 @@
 #include "CachedResourceClient.h"
 #include "CachedResourceClientWalker.h"
 #include "CachedResourceLoader.h"
-#include "SharedBuffer.h"
+#include "ResourceBuffer.h"
 #include "SubresourceLoader.h"
 #include "WebCoreMemoryInstrumentation.h"
 #include <wtf/PassRefPtr.h>
@@ -42,7 +42,7 @@ CachedRawResource::CachedRawResource(ResourceRequest& resourceRequest)
 {
 }
 
-void CachedRawResource::data(PassRefPtr<SharedBuffer> data, bool allDataReceived)
+void CachedRawResource::data(PassRefPtr<ResourceBuffer> data, bool allDataReceived)
 {
     CachedResourceHandle<CachedRawResource> protect(this);
     if (data) {
@@ -153,8 +153,8 @@ bool CachedRawResource::canReuse(const ResourceRequest& newRequest) const
 
     HTTPHeaderMap::const_iterator end = newHeaders.end();
     for (HTTPHeaderMap::const_iterator i = newHeaders.begin(); i != end; ++i) {
-        AtomicString headerName = i->first;
-        if (i->second != oldHeaders.get(headerName))
+        AtomicString headerName = i->key;
+        if (i->value != oldHeaders.get(headerName))
             return false;
     }
     return true;

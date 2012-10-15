@@ -79,9 +79,9 @@
       'ENABLE_LEGACY_VIEWPORT_ADAPTION=1',
       'ENABLE_LEGACY_VENDOR_PREFIXES=0',
       'ENABLE_LEGACY_WEB_AUDIO=1',
-      'ENABLE_LEGACY_WEBKIT_BLOB_BUILDER=1',
       'ENABLE_LINK_PREFETCH=1',
       'ENABLE_LINK_PRERENDER=1',
+      'ENABLE_MATHML=1',
       'ENABLE_MEDIA_SOURCE=1',
       'ENABLE_MEDIA_STATISTICS=1',
       'ENABLE_METER_ELEMENT=1',
@@ -120,7 +120,6 @@
       'ENABLE_WORKERS=1',
       'ENABLE_XHR_RESPONSE_BLOB=1',
       'ENABLE_XSLT=1',
-      'SK_SUPPORT_HINTING_SCALE_FACTOR',
       'WTF_USE_LEVELDB=1',
       'WTF_USE_BUILTIN_UTF8_CODEC=1',
       # WTF_USE_DYNAMIC_ANNOTATIONS=1 may be defined in build/common.gypi
@@ -141,7 +140,6 @@
       'enable_touch_events%': 1,
       'enable_touch_icon_loading%' : 0,
       'enable_mutation_observers%': 1,
-      'use_harfbuzz_ng%': 0,
     },
     'use_accelerated_compositing%': '<(use_accelerated_compositing)',
     'enable_skia_text%': '<(enable_skia_text)',
@@ -177,7 +175,7 @@
           'ENABLE_DATALIST_ELEMENT=1',
           'ENABLE_INPUT_SPEECH=1',
           'ENABLE_INPUT_TYPE_COLOR=1',
-          'ENABLE_INPUT_TYPE_TIME_MULTIPLE_FIELDS=1',
+          'ENABLE_INPUT_MULTIPLE_FIELDS_UI=1',
           'ENABLE_JAVASCRIPT_I18N_API=1',
           'ENABLE_LEGACY_NOTIFICATIONS=1',
           'ENABLE_MEDIA_CAPTURE=0',
@@ -224,9 +222,14 @@
           'WTF_USE_SKIA_ON_MAC_CHROMIUM=1',
         ],
       }],
-      ['use_harfbuzz_ng==1', {
+      ['use_x11==1', {
         'feature_defines': [
           'WTF_USE_HARFBUZZ_NG=1',
+        ],
+      }],
+      ['chromeos==1', {
+        'feature_defines': [
+          'SK_SUPPORT_HINTING_SCALE_FACTOR',
         ],
       }],
     ],

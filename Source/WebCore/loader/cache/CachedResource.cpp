@@ -37,13 +37,15 @@
 #include "KURL.h"
 #include "Logging.h"
 #include "PurgeableBuffer.h"
+#include "ResourceBuffer.h"
 #include "ResourceHandle.h"
 #include "ResourceLoadScheduler.h"
-#include "SharedBuffer.h"
 #include "SubresourceLoader.h"
 #include "WebCoreMemoryInstrumentation.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/MathExtras.h>
+#include <wtf/MemoryInstrumentationHashCountedSet.h>
+#include <wtf/MemoryInstrumentationHashSet.h>
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/CString.h>
@@ -247,7 +249,7 @@ void CachedResource::checkNotify()
         c->notifyFinished(this);
 }
 
-void CachedResource::data(PassRefPtr<SharedBuffer>, bool allDataReceived)
+void CachedResource::data(PassRefPtr<ResourceBuffer>, bool allDataReceived)
 {
     if (!allDataReceived)
         return;
@@ -446,7 +448,7 @@ void CachedResource::removeClient(CachedResourceClient* client)
             // "no-store: ... MUST make a best-effort attempt to remove the information from volatile storage as promptly as possible"
             // "... History buffers MAY store such responses as part of their normal operation."
             // We allow non-secure content to be reused in history, but we do not allow secure content to be reused.
-            if (protocolIs(url(), "https"))
+            if (url().protocolIs("https"))
                 memoryCache()->remove(this);
         } else
             memoryCache()->prune();
@@ -611,8 +613,8 @@ void CachedResource::switchClientsToRevalidatedResource()
     Vector<CachedResourceClient*> clientsToMove;
     HashCountedSet<CachedResourceClient*>::iterator end2 = m_clients.end();
     for (HashCountedSet<CachedResourceClient*>::iterator it = m_clients.begin(); it != end2; ++it) {
-        CachedResourceClient* client = it->first;
-        unsigned count = it->second;
+        CachedResourceClient* client = it->key;
+        unsigned count = it->value;
         while (count) {
             clientsToMove.append(client);
             --count;
@@ -646,9 +648,9 @@ void CachedResource::updateResponseAfterRevalidation(const ResourceResponse& val
     HTTPHeaderMap::const_iterator end = newHeaders.end();
     for (HTTPHeaderMap::const_iterator it = newHeaders.begin(); it != end; ++it) {
         // Don't allow 304 response to update content headers, these can't change but some servers send wrong values.
-        if (it->first.startsWith(contentHeaderPrefix, false))
+        if (it->key.startsWith(contentHeaderPrefix, false))
             continue;
-        m_response.setHTTPHeaderField(it->first, it->second);
+        m_response.setHTTPHeaderField(it->key, it->value);
     }
 }
 
@@ -753,7 +755,7 @@ bool CachedResource::makePurgeable(bool purgeable)
     if (!m_purgeableData->makePurgeable(false))
         return false; 
 
-    m_data = SharedBuffer::adoptPurgeableBuffer(m_purgeableData.release());
+    m_data = ResourceBuffer::adoptSharedBuffer(SharedBuffer::adoptPurgeableBuffer(m_purgeableData.release()));
     return true;
 }
 
@@ -804,7 +806,7 @@ void CachedResource::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CachedResource);
     info.addMember(m_resourceRequest);
-    info.addHashSet(m_clients);
+    info.addMember(m_clients);
     info.addMember(m_accept);
     info.addMember(m_loader);
     info.addMember(m_response);
@@ -817,7 +819,7 @@ void CachedResource::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addMember(m_owningCachedResourceLoader);
     info.addMember(m_resourceToRevalidate);
     info.addMember(m_proxyResource);
-    info.addInstrumentedHashSet(m_handlesToRevalidate);
+    info.addMember(m_handlesToRevalidate);
 
     if (m_purgeableData && !m_purgeableData->wasPurged())
         info.addRawBuffer(m_purgeableData.get(), m_purgeableData->size());

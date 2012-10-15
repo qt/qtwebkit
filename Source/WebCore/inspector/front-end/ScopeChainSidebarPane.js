@@ -112,16 +112,18 @@ WebInspector.ScopeChainSidebarPane.prototype = {
             section.editInSelectedCallFrameWhenPaused = true;
             section.pane = this;
 
-            if (!foundLocalScope || scope.type === "local" || title in this._expandedSections)
+            if (scope.type === "global")
+                section.expanded = false;
+            else if (!foundLocalScope || scope.type === "local" || title in this._expandedSections)
                 section.expanded = true;
 
             this._sections.push(section);
             this.bodyElement.appendChild(section.element);
         }
-    }
-}
+    },
 
-WebInspector.ScopeChainSidebarPane.prototype.__proto__ = WebInspector.SidebarPane.prototype;
+    __proto__: WebInspector.SidebarPane.prototype
+}
 
 /**
  * @constructor
@@ -180,7 +182,7 @@ WebInspector.ScopeVariableTreeElement.prototype = {
 
         this._propertyPath = result;
         return result;
-    }
-}
+    },
 
-WebInspector.ScopeVariableTreeElement.prototype.__proto__ = WebInspector.ObjectPropertyTreeElement.prototype;
+    __proto__: WebInspector.ObjectPropertyTreeElement.prototype
+}

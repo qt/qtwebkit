@@ -49,9 +49,14 @@ public:
     bool isShadowBoundary() const;
     bool isActive() const;
 
+    PassRefPtr<NodeList> distributedNodes() const;
+
     virtual const AtomicString& select() const = 0;
     virtual bool isSelectValid() const = 0;
     virtual bool doesSelectFromHostChildren() const = 0;
+
+    bool resetStyleInheritance() const;
+    void setResetStyleInheritance(bool);
 
     virtual void attach();
     virtual void detach();
@@ -75,6 +80,7 @@ protected:
 
 private:
     ContentDistribution m_distribution;
+    bool m_shouldResetStyleInheritance : 1;
 };
 
 inline bool isInsertionPoint(const Node* node)

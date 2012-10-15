@@ -27,45 +27,102 @@
 #include "config.h"
 #include "RedirectedXCompositeWindow.h"
 
-#if USE(GLX)
-#include "GLContextGLX.h"
-#include <GL/glx.h>
+#if PLATFORM(X11)
 #include <X11/extensions/Xcomposite.h>
+#include <X11/extensions/Xdamage.h>
 #include <cairo-xlib.h>
 #include <gdk/gdkx.h>
 #include <glib.h>
 #include <gtk/gtk.h>
+#include <wtf/HashMap.h>
 
 namespace WebCore {
 
+typedef HashMap<Window, RedirectedXCompositeWindow*> WindowHashMap;
+static WindowHashMap& getWindowHashMap()
+{
+    DEFINE_STATIC_LOCAL(WindowHashMap, windowHashMap, ());
+    return windowHashMap;
+}
+
+static int gDamageEventBase;
+static GdkFilterReturn filterXDamageEvent(GdkXEvent* gdkXEvent, GdkEvent* event, void*)
+{
+    XEvent* xEvent = static_cast<XEvent*>(gdkXEvent);
+    if (xEvent->type != gDamageEventBase + XDamageNotify)
+        return GDK_FILTER_CONTINUE;
+
+    XDamageNotifyEvent* damageEvent = reinterpret_cast<XDamageNotifyEvent*>(xEvent);
+    WindowHashMap& windowHashMap = getWindowHashMap();
+    WindowHashMap::iterator i = windowHashMap.find(damageEvent->drawable);
+    if (i == windowHashMap.end())
+        return GDK_FILTER_CONTINUE;
+
+    i->value->callDamageNotifyCallback();
+    XDamageSubtract(GDK_DISPLAY_XDISPLAY(gdk_display_get_default()), damageEvent->damage, None, None);
+    return GDK_FILTER_REMOVE;
+}
+
+static bool supportsXDamageAndXComposite()
+{
+    static bool initialized = false;
+    static bool hasExtensions = false;
+
+    if (initialized)
+        return hasExtensions;
+
+    initialized = true;
+
+    int errorBase;
+    Display* display = GDK_DISPLAY_XDISPLAY(gdk_display_get_default());
+    if (!XDamageQueryExtension(display, &gDamageEventBase, &errorBase))
+        return false;
+
+    int eventBase;
+    if (!XCompositeQueryExtension(display, &eventBase, &errorBase))
+        return false;
+
+    // We need to support XComposite version 0.2.
+    int major, minor;
+    XCompositeQueryVersion(display, &major, &minor);
+    if (major < 0 || (!major && minor < 2))
+        return false;
+
+    hasExtensions = true;
+    return true;
+}
+
 PassOwnPtr<RedirectedXCompositeWindow> RedirectedXCompositeWindow::create(const IntSize& size)
 {
-    return adoptPtr(new RedirectedXCompositeWindow(size));
+    return supportsXDamageAndXComposite() ? adoptPtr(new RedirectedXCompositeWindow(size)) : nullptr;
 }
 
 RedirectedXCompositeWindow::RedirectedXCompositeWindow(const IntSize& size)
-    : m_usableSize(size)
+    : m_size(size)
     , m_window(0)
     , m_parentWindow(0)
     , m_pixmap(0)
     , m_surface(0)
-    , m_pendingResizeSourceId(0)
     , m_needsNewPixmapAfterResize(false)
+    , m_damage(0)
+    , m_damageNotifyCallback(0)
+    , m_damageNotifyData(0)
 {
-    Display* display = GLContextGLX::sharedDisplay();
+    Display* display = GLContext::sharedX11Display();
+    Screen* screen = DefaultScreenOfDisplay(display);
 
     // This is based on code from Chromium: src/content/common/gpu/image_transport_surface_linux.cc
     XSetWindowAttributes windowAttributes;
     windowAttributes.override_redirect = True;
     m_parentWindow = XCreateWindow(display,
-                                   RootWindow(display, DefaultScreen(display)),
-                                   -100, -100, 1, 1,
-                                   0,
-                                   CopyFromParent,
-                                   InputOutput,
-                                   CopyFromParent,
-                                   CWOverrideRedirect,
-                                   &windowAttributes);
+        RootWindowOfScreen(screen),
+        WidthOfScreen(screen) + 1, 0, 1, 1,
+        0,
+        CopyFromParent,
+        InputOutput,
+        CopyFromParent,
+        CWOverrideRedirect,
+        &windowAttributes);
     XMapWindow(display, m_parentWindow);
 
     windowAttributes.event_mask = StructureNotifyMask;
@@ -81,6 +138,10 @@ RedirectedXCompositeWindow::RedirectedXCompositeWindow(const IntSize& size)
                              &windowAttributes);
     XMapWindow(display, m_window);
 
+    if (getWindowHashMap().isEmpty())
+        gdk_window_add_filter(0, reinterpret_cast<GdkFilterFunc>(filterXDamageEvent), 0);
+    getWindowHashMap().add(m_window, this);
+
     while (1) {
         XEvent event;
         XWindowEvent(display, m_window, StructureNotifyMask, &event);
@@ -88,58 +149,34 @@ RedirectedXCompositeWindow::RedirectedXCompositeWindow(const IntSize& size)
             break;
     }
     XSelectInput(display, m_window, NoEventMask);
-
     XCompositeRedirectWindow(display, m_window, CompositeRedirectManual);
-
-    resize(size);
+    m_damage = XDamageCreate(display, m_window, XDamageReportNonEmpty);
 }
 
 RedirectedXCompositeWindow::~RedirectedXCompositeWindow()
 {
-    Display* display = GLContextGLX::sharedDisplay();
-    if (m_window)
-        XDestroyWindow(display, m_window);
-    if (m_parentWindow)
-        XDestroyWindow(display, m_parentWindow);
+    ASSERT(m_damage);
+    ASSERT(m_window);
+    ASSERT(m_parentWindow);
+
+    getWindowHashMap().remove(m_window);
+    if (getWindowHashMap().isEmpty())
+        gdk_window_remove_filter(0, reinterpret_cast<GdkFilterFunc>(filterXDamageEvent), 0);
+
+    Display* display = GLContext::sharedX11Display();
+    XDamageDestroy(display, m_damage);
+    XDestroyWindow(display, m_window);
+    XDestroyWindow(display, m_parentWindow);
     cleanupPixmapAndPixmapSurface();
-
-    if (m_pendingResizeSourceId)
-        g_source_remove(m_pendingResizeSourceId);
-}
-
-gboolean RedirectedXCompositeWindow::resizeLaterCallback(RedirectedXCompositeWindow* window)
-{
-    window->resizeLater();
-    return FALSE;
-}
-
-void RedirectedXCompositeWindow::resizeLater()
-{
-    m_usableSize = m_size;
-    m_pendingResizeSourceId = 0;
 }
 
 void RedirectedXCompositeWindow::resize(const IntSize& size)
 {
-    // When enlarging a redirected window, for the first render, the newly exposed areas seem
-    // to contain uninitialized memory on Intel drivers. To avoid rendering artifacts while
-    // resizing, we wait to render those new areas until after a short timeout. Thus, the
-    // "usable size" of the window is smaller than the actual size of the window for the first
-    // render.
-    m_usableSize = size.shrunkTo(m_usableSize);
-    if (m_usableSize.width() < size.width() || m_usableSize.height() < size.height()) { // The window is growing.
-        // We're being very conservative here. Instead of risking drawing artifacts while doing continuous
-        // opaque resizing, we err on the side of having more undrawn areas.
-        if (m_pendingResizeSourceId)
-            g_source_remove(m_pendingResizeSourceId);
-        m_pendingResizeSourceId = g_timeout_add(0, reinterpret_cast<GSourceFunc>(resizeLaterCallback), this);
-    }
-
-    Display* display = GLContextGLX::sharedDisplay();
+    Display* display = GLContext::sharedX11Display();
     XResizeWindow(display, m_window, size.width(), size.height());
 
     XFlush(display);
-    glXWaitX();
+    context()->waitNative();
 
     // This swap is based on code in Chromium. It tries to work-around a bug in the Intel drivers
     // where a swap is necessary to ensure the front and back buffers are properly resized.
@@ -216,6 +253,12 @@ cairo_surface_t* RedirectedXCompositeWindow::cairoSurfaceForWidget(GtkWidget* wi
     return m_surface.get();
 }
 
+void RedirectedXCompositeWindow::callDamageNotifyCallback()
+{
+    if (m_damageNotifyCallback)
+        m_damageNotifyCallback(m_damageNotifyData);
+}
+
 } // namespace WebCore
 
-#endif // USE(GLX)
+#endif // PLATFORM(X11)

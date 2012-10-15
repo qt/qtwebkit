@@ -43,7 +43,7 @@ LayoutState::LayoutState(LayoutState* prev, RenderBox* renderer, const LayoutSiz
     , m_renderer(renderer)
 #endif
 #if ENABLE(CSS_EXCLUSIONS)
-    , m_wrapShapeInfo(0)
+    , m_exclusionShapeInsideInfo(0)
 #endif
 {
     ASSERT(m_next);
@@ -51,7 +51,7 @@ LayoutState::LayoutState(LayoutState* prev, RenderBox* renderer, const LayoutSiz
     bool fixed = renderer->isOutOfFlowPositioned() && renderer->style()->position() == FixedPosition;
     if (fixed) {
         // FIXME: This doesn't work correctly with transforms.
-        FloatPoint fixedOffset = renderer->view()->localToAbsolute(FloatPoint(), true);
+        FloatPoint fixedOffset = renderer->view()->localToAbsolute(FloatPoint(), IsFixed);
         m_paintOffset = LayoutSize(fixedOffset.x(), fixedOffset.y()) + offset;
     } else
         m_paintOffset = prev->m_paintOffset + offset;
@@ -112,9 +112,9 @@ LayoutState::LayoutState(LayoutState* prev, RenderBox* renderer, const LayoutSiz
 
 #if ENABLE(CSS_EXCLUSIONS)
     if (renderer->isRenderBlock()) {
-        m_wrapShapeInfo = toRenderBlock(renderer)->wrapShapeInfo();
-        if (!m_wrapShapeInfo)
-            m_wrapShapeInfo = m_next->m_wrapShapeInfo;
+        m_exclusionShapeInsideInfo = toRenderBlock(renderer)->exclusionShapeInsideInfo();
+        if (!m_exclusionShapeInsideInfo)
+            m_exclusionShapeInsideInfo = m_next->m_exclusionShapeInsideInfo;
     }
 #endif
 
@@ -144,11 +144,11 @@ LayoutState::LayoutState(RenderObject* root)
     , m_renderer(root)
 #endif
 #if ENABLE(CSS_EXCLUSIONS)
-    , m_wrapShapeInfo(0)
+    , m_exclusionShapeInsideInfo(0)
 #endif
 {
     RenderObject* container = root->container();
-    FloatPoint absContentPoint = container->localToAbsolute(FloatPoint(), false, true);
+    FloatPoint absContentPoint = container->localToAbsolute(FloatPoint(), UseTransforms | SnapOffsetForTransforms);
     m_paintOffset = LayoutSize(absContentPoint.x(), absContentPoint.y());
 
     if (container->hasOverflowClip()) {

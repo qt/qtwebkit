@@ -22,6 +22,7 @@
 #include "ewk_context.h"
 
 #include "BatteryProvider.h"
+#include "NetworkInfoProvider.h"
 #include "VibrationProvider.h"
 #include "WKAPICast.h"
 #include "WKContextSoup.h"
@@ -30,6 +31,7 @@
 #include "WKString.h"
 #include "WebContext.h"
 #include "ewk_context_download_client_private.h"
+#include "ewk_context_history_client_private.h"
 #include "ewk_context_private.h"
 #include "ewk_context_request_manager_client_private.h"
 #include "ewk_cookie_manager_private.h"
@@ -67,6 +69,9 @@ struct _Ewk_Context {
 #if ENABLE(BATTERY_STATUS)
     RefPtr<BatteryProvider> batteryProvider;
 #endif
+#if ENABLE(NETWORK_INFO)
+    RefPtr<NetworkInfoProvider> networkInfoProvider;
+#endif
 #if ENABLE(VIBRATION)
     RefPtr<VibrationProvider> vibrationProvider;
 #endif
@@ -75,20 +80,25 @@ struct _Ewk_Context {
     WKRetainPtr<WKSoupRequestManagerRef> requestManager;
     URLSchemeHandlerMap urlSchemeHandlers;
 
+    Ewk_Context_History_Client historyClient;
+
     _Ewk_Context(WKRetainPtr<WKContextRef> contextRef)
         : __ref(1)
         , context(contextRef)
         , cookieManager(0)
         , requestManager(WKContextGetSoupRequestManager(contextRef.get()))
+        , historyClient()
     {
 #if ENABLE(BATTERY_STATUS)
-        WKBatteryManagerRef wkBatteryManager = WKContextGetBatteryManager(contextRef.get());
-        batteryProvider = BatteryProvider::create(wkBatteryManager);
+        batteryProvider = BatteryProvider::create(context.get());
+#endif
+
+#if ENABLE(NETWORK_INFO)
+        networkInfoProvider = NetworkInfoProvider::create(context.get());
 #endif
 
 #if ENABLE(VIBRATION)
-        WKVibrationRef wkVibrationRef = WKContextGetVibration(contextRef.get());
-        vibrationProvider = VibrationProvider::create(wkVibrationRef);
+        vibrationProvider = VibrationProvider::create(context.get());
 #endif
 
 #if ENABLE(MEMORY_SAMPLER)
@@ -103,6 +113,7 @@ struct _Ewk_Context {
 #endif
         ewk_context_request_manager_client_attach(this);
         ewk_context_download_client_attach(this);
+        ewk_context_history_client_attach(this);
     }
 
     ~_Ewk_Context()
@@ -113,7 +124,7 @@ struct _Ewk_Context {
         HashMap<uint64_t, Ewk_Download_Job*>::iterator it = downloadJobs.begin();
         HashMap<uint64_t, Ewk_Download_Job*>::iterator end = downloadJobs.end();
         for ( ; it != end; ++it)
-            ewk_download_job_unref(it->second);
+            ewk_download_job_unref(it->value);
     }
 };
 
@@ -255,7 +266,7 @@ Ewk_Context* ewk_context_new_with_injected_bundle_path(const char* path)
     return new Ewk_Context(adoptWK(WKContextCreateWithInjectedBundlePath(pathRef.get())));
 }
 
-Eina_Bool ewk_context_uri_scheme_register(Ewk_Context* ewkContext, const char* scheme, Ewk_Url_Scheme_Request_Cb callback, void* userData)
+Eina_Bool ewk_context_url_scheme_register(Ewk_Context* ewkContext, const char* scheme, Ewk_Url_Scheme_Request_Cb callback, void* userData)
 {
     EINA_SAFETY_ON_NULL_RETURN_VAL(ewkContext, false);
     EINA_SAFETY_ON_NULL_RETURN_VAL(scheme, false);
@@ -275,4 +286,32 @@ void ewk_context_vibration_client_callbacks_set(Ewk_Context* ewkContext, Ewk_Vib
 #if ENABLE(VIBRATION)
     ewkContext->vibrationProvider->setVibrationClientCallbacks(vibrate, cancel, data);
 #endif
+}
+
+void ewk_context_history_callbacks_set(Ewk_Context* ewkContext, Ewk_History_Navigation_Cb navigate, Ewk_History_Client_Redirection_Cb clientRedirect, Ewk_History_Server_Redirection_Cb serverRedirect, Ewk_History_Title_Update_Cb titleUpdate, Ewk_History_Populate_Visited_Links_Cb populateVisitedLinks, void* data)
+{
+    EINA_SAFETY_ON_NULL_RETURN(ewkContext);
+
+    ewkContext->historyClient.navigate_func = navigate;
+    ewkContext->historyClient.client_redirect_func = clientRedirect;
+    ewkContext->historyClient.server_redirect_func = serverRedirect;
+    ewkContext->historyClient.title_update_func = titleUpdate;
+    ewkContext->historyClient.populate_visited_links_func = populateVisitedLinks;
+    ewkContext->historyClient.user_data = data;
+}
+
+const Ewk_Context_History_Client* ewk_context_history_client_get(const Ewk_Context* ewkContext)
+{
+    EINA_SAFETY_ON_NULL_RETURN_VAL(ewkContext, 0);
+
+    return &ewkContext->historyClient;
+}
+
+void ewk_context_visited_link_add(Ewk_Context* ewkContext, const char* visitedURL)
+{
+    EINA_SAFETY_ON_NULL_RETURN(ewkContext);
+    EINA_SAFETY_ON_NULL_RETURN(visitedURL);
+
+    WKRetainPtr<WKStringRef> wkVisitedURL(AdoptWK, WKStringCreateWithUTF8CString(visitedURL));
+    WKContextAddVisitedLink(ewkContext->context.get(), wkVisitedURL.get());
 }

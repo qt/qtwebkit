@@ -37,26 +37,12 @@ namespace JSC {
 
 class Heap;
 
-struct CopyFunctor : public MarkedBlock::VoidFunctor {
-    CopyFunctor(Vector<MarkedBlock*>& blocks) 
-        : m_index(0) 
-        , m_blocks(blocks)
-    {
-    }
-
-    void operator()(MarkedBlock* block) { m_blocks[m_index++] = block; }
-
-    size_t m_index;
-    Vector<MarkedBlock*>& m_blocks;
-};
-
 class IncrementalSweeper : public HeapTimer {
 public:
     static IncrementalSweeper* create(Heap*);
-    void startSweeping(const HashSet<MarkedBlock*>& blockSnapshot);
+    void startSweeping(Vector<MarkedBlock*>&);
     virtual void doWork();
     void sweepNextBlock();
-    bool structuresCanBeSwept();
     void willFinishSweeping();
 
 private:
@@ -72,13 +58,12 @@ private:
     void cancelTimer();
     
     unsigned m_currentBlockToSweepIndex;
-    Vector<MarkedBlock*> m_blocksToSweep;
+    Vector<MarkedBlock*>& m_blocksToSweep;
 #else
     
     IncrementalSweeper(JSGlobalData*);
     
 #endif
-    bool m_structuresCanBeSwept;
 };
 
 } // namespace JSC

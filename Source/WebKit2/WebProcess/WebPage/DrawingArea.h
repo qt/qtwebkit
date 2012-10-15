@@ -41,6 +41,7 @@ namespace CoreIPC {
 
 namespace WebCore {
     class GraphicsLayer;
+    class GraphicsLayerFactory;
 }
 
 namespace WebKit {
@@ -87,8 +88,9 @@ public:
     virtual void updatePreferences(const WebPreferencesStore&) { }
 
 #if USE(ACCELERATED_COMPOSITING)
+    virtual WebCore::GraphicsLayerFactory* graphicsLayerFactory() { return 0; }
     virtual void setRootCompositingLayer(WebCore::GraphicsLayer*) = 0;
-    virtual void scheduleCompositingLayerSync() = 0;
+    virtual void scheduleCompositingLayerFlush() = 0;
 #endif
 
 #if USE(COORDINATED_GRAPHICS)

@@ -35,6 +35,7 @@
 
 #include "CustomFilterArrayParameter.h"
 #include "CustomFilterCompiledProgram.h"
+#include "CustomFilterConstants.h"
 #include "CustomFilterGlobalContext.h"
 #include "CustomFilterMesh.h"
 #include "CustomFilterNumberParameter.h"
@@ -224,7 +225,7 @@ bool FECustomFilter::programNeedsInputTexture() const
 
 bool FECustomFilter::applyShader()
 {
-    Uint8ClampedArray* dstPixelArray = createUnmultipliedImageResult();
+    Uint8ClampedArray* dstPixelArray = m_validatedProgram->programInfo().programType() == PROGRAM_TYPE_BLENDS_ELEMENT_TEXTURE ? createPremultipliedImageResult() : createUnmultipliedImageResult();
     if (!dstPixelArray)
         return false;
 
@@ -299,7 +300,8 @@ bool FECustomFilter::createMultisampleBuffer()
     m_triedMultisampleBuffer = true;
 
     Extensions3D* extensions = m_context->getExtensions();
-    if (!extensions 
+    if (!extensions
+        || !extensions->maySupportMultisampling()
         || !extensions->supports("GL_ANGLE_framebuffer_multisample")
         || !extensions->supports("GL_ANGLE_framebuffer_blit")
         || !extensions->supports("GL_OES_rgb8_rgba8"))
@@ -568,18 +570,6 @@ void FECustomFilter::bindProgramAndBuffers(Platform3DObject inputTexture)
     
     m_context->bindBuffer(GraphicsContext3D::ARRAY_BUFFER, m_mesh->verticesBufferObject());
     m_context->bindBuffer(GraphicsContext3D::ELEMENT_ARRAY_BUFFER, m_mesh->elementsBufferObject());
-
-    // FIXME: Ideally, these should be public members of CustomFilterMesh.
-    // https://bugs.webkit.org/show_bug.cgi?id=94755
-    static const unsigned PositionAttribSize = 4;
-    static const unsigned TexAttribSize = 2;
-    static const unsigned MeshAttribSize = 2;
-    static const unsigned TriangleAttribSize = 3;
-
-    static const unsigned PositionAttribOffset = 0;
-    static const unsigned TexAttribOffset = PositionAttribOffset + PositionAttribSize * sizeof(float);
-    static const unsigned MeshAttribOffset = TexAttribOffset + TexAttribSize * sizeof(float);
-    static const unsigned TriangleAttribOffset = MeshAttribOffset + MeshAttribSize * sizeof(float);
 
     bindVertexAttribute(m_compiledProgram->positionAttribLocation(), PositionAttribSize, PositionAttribOffset);
     bindVertexAttribute(m_compiledProgram->texAttribLocation(), TexAttribSize, TexAttribOffset);

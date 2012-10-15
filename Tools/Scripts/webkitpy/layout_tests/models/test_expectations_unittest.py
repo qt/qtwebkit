@@ -179,8 +179,7 @@ class MiscTests(Base):
                 "Bug(rniwa) disabled-test.html-disabled [ ImageOnlyFailure ]", is_lint_mode=True)
             self.assertFalse(True, "ParseError wasn't raised")
         except ParseError, e:
-            warnings = ("expectations:1 Test lacks BUG modifier. failures/expected/text.html\n"
-                        "expectations:1 Unrecognized modifier 'foo' failures/expected/text.html\n"
+            warnings = ("expectations:1 Unrecognized modifier 'foo' failures/expected/text.html\n"
                         "expectations:2 Path does not exist. non-existent-test.html")
             self.assertEqual(str(e), warnings)
 
@@ -372,7 +371,9 @@ class SemanticTests(Base):
 
     def test_missing_bugid(self):
         self.parse_exp('failures/expected/text.html [ Failure ]')
-        self.assertTrue(self._exp.has_warnings())
+        self.assertFalse(self._exp.has_warnings())
+
+        self._port.warn_if_bug_missing_in_test_expectations = lambda: True
 
         self.parse_exp('failures/expected/text.html [ Failure ]')
         line = self._exp._model.get_expectation_line('failures/expected/text.html')
@@ -512,8 +513,22 @@ class RebaseliningTest(Base):
                           'Bug(z) failures/expected/crash.html [ Crash ]\n',
                           'Bug(x0) failures/expected/image.html [ Crash ]\n')
 
+        # Ensure that we don't modify unrelated lines, even if we could rewrite them.
+        # i.e., the second line doesn't get rewritten to "Bug(y) failures/expected/skip.html"
+        self.assertRemove('Bug(x) failures/expected/text.html [ Failure Rebaseline ]\n'
+                          'Bug(Y) failures/expected/image.html [ Skip   ]\n'
+                          'Bug(z) failures/expected/crash.html\n',
+                          '',
+                          ['failures/expected/text.html'],
+                          'Bug(Y) failures/expected/image.html [ Skip   ]\n'
+                          'Bug(z) failures/expected/crash.html\n',
+                          '')
 
-    def test_no_get_rebaselining_failures(self):
+    def test_get_rebaselining_failures(self):
+        # Make sure we find a test as needing a rebaseline even if it is not marked as a failure.
+        self.parse_exp('Bug(x) failures/expected/text.html [ Rebaseline ]\n')
+        self.assertEqual(len(self._exp.get_rebaselining_failures()), 1)
+
         self.parse_exp(self.get_basic_expectations())
         self.assertEqual(len(self._exp.get_rebaselining_failures()), 0)
 

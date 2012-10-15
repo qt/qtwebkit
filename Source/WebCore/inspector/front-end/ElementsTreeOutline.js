@@ -586,10 +586,10 @@ WebInspector.ElementsTreeOutline.prototype = {
                 newTreeItem.expand();
         }
         return newTreeItem;
-    }
-}
+    },
 
-WebInspector.ElementsTreeOutline.prototype.__proto__ = TreeOutline.prototype;
+    __proto__: TreeOutline.prototype
+}
 
 /**
  * @interface
@@ -647,10 +647,10 @@ WebInspector.ElementsTreeOutline.PseudoStateDecorator.prototype = {
         if (descendantCount === 1)
             return WebInspector.UIString("%d descendant with forced state", descendantCount);
         return WebInspector.UIString("%d descendants with forced state", descendantCount);
-    }
-}
+    },
 
-WebInspector.ElementsTreeOutline.PseudoStateDecorator.prototype.__proto__ = WebInspector.ElementsTreeOutline.ElementDecorator.prototype;
+    __proto__: WebInspector.ElementsTreeOutline.ElementDecorator.prototype
+}
 
 /**
  * @constructor
@@ -1387,6 +1387,8 @@ WebInspector.ElementsTreeElement.prototype = {
                 event.consume(true);
         }
 
+        initialValue = this._convertWhitespaceToEntities(initialValue);
+
         this._htmlEditElement = document.createElement("div");
         this._htmlEditElement.className = "source-code elements-tree-editor";
         this._htmlEditElement.textContent = initialValue;
@@ -1857,6 +1859,9 @@ WebInspector.ElementsTreeElement.prototype = {
         if (!firstChild || firstChild.nodeType() !== Node.TEXT_NODE)
             return null;
 
+        if (node.hasShadowRoots())
+            return null;
+
         var sibling = firstChild.nextSibling;
         return sibling ? null : firstChild;
     },
@@ -1985,10 +1990,10 @@ WebInspector.ElementsTreeElement.prototype = {
         
         var node = /** @type {WebInspector.DOMNode} */ this.representedObject;
         WebInspector.RemoteObject.resolveNode(node, "", scrollIntoViewCallback);
-    }
-}
+    },
 
-WebInspector.ElementsTreeElement.prototype.__proto__ = TreeElement.prototype;
+    __proto__: TreeElement.prototype
+}
 
 /**
  * @constructor

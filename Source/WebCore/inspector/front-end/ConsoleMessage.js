@@ -447,6 +447,11 @@ WebInspector.ConsoleMessageImpl.prototype = {
             return obj.description;
         }
 
+        function styleFormatter(obj)
+        {
+            formattedResult.setAttribute("style", obj.description);
+        }
+
         // Firebug uses %o for formatting objects.
         formatters.o = parameterFormatter.bind(this, false);
         formatters.s = valueFormatter;
@@ -455,15 +460,18 @@ WebInspector.ConsoleMessageImpl.prototype = {
         formatters.i = valueFormatter;
         formatters.d = valueFormatter;
 
+        // Firebug uses %c for styling the message.
+        formatters.c = styleFormatter;
+
         // Support %O to force object formatting, instead of the type-based %o formatting.
         formatters.O = parameterFormatter.bind(this, true);
 
         function append(a, b)
         {
-            if (!(b instanceof Node))
-                a.appendChild(WebInspector.linkifyStringAsFragment(b.toString()));
-            else
+            if (b instanceof Node)
                 a.appendChild(b);
+            else if (b)
+                a.appendChild(WebInspector.linkifyStringAsFragment(b.toString()));
             return a;
         }
 
@@ -687,6 +695,8 @@ WebInspector.ConsoleMessageImpl.prototype = {
                 return false;
             var l = this._stackTrace;
             var r = msg._stackTrace;
+            if (l.length !== r.length) 
+                return false;
             for (var i = 0; i < l.length; i++) {
                 if (l[i].url !== r[i].url ||
                     l[i].functionName !== r[i].functionName ||
@@ -716,7 +726,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
     clone: function()
     {
         return WebInspector.ConsoleMessage.create(this.source, this.level, this._messageText, this.type, this.url, this.line, this.repeatCount, this._parameters, this._stackTrace, this._request ? this._request.requestId : undefined, this._isOutdated);
-    }
-}
+    },
 
-WebInspector.ConsoleMessageImpl.prototype.__proto__ = WebInspector.ConsoleMessage.prototype;
+    __proto__: WebInspector.ConsoleMessage.prototype
+}

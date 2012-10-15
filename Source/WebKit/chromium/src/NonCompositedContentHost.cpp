@@ -32,6 +32,7 @@
 #include "GraphicsLayer.h"
 #include "GraphicsLayerChromium.h"
 #include "PlatformContextSkia.h"
+#include "Settings.h"
 #include "WebViewImpl.h"
 #include <public/WebContentLayer.h>
 #include <public/WebFloatPoint.h>
@@ -43,12 +44,12 @@ NonCompositedContentHost::NonCompositedContentHost(WebViewImpl* webView)
     , m_opaque(true)
     , m_showDebugBorders(false)
 {
-    m_graphicsLayer = WebCore::GraphicsLayer::create(this);
+    m_graphicsLayer = WebCore::GraphicsLayer::create(0, this);
 #ifndef NDEBUG
     m_graphicsLayer->setName("non-composited content");
 #endif
     m_graphicsLayer->setDrawsContent(true);
-    m_graphicsLayer->setAppliesPageScale(true);
+    m_graphicsLayer->setAppliesPageScale(!m_webView->page()->settings()->applyPageScaleFactorInCompositor());
     WebContentLayer* layer = static_cast<WebCore::GraphicsLayerChromium*>(m_graphicsLayer.get())->contentLayer();
     layer->setUseLCDText(true);
     layer->layer()->setOpaque(true);
@@ -165,7 +166,7 @@ void NonCompositedContentHost::notifyAnimationStarted(const WebCore::GraphicsLay
     // Intentionally left empty since we don't support animations on the non-composited content.
 }
 
-void NonCompositedContentHost::notifySyncRequired(const WebCore::GraphicsLayer*)
+void NonCompositedContentHost::notifyFlushRequired(const WebCore::GraphicsLayer*)
 {
     m_webView->scheduleCompositingLayerSync();
 }

@@ -26,7 +26,7 @@
 #ifndef DateTimeNumericFieldElement_h
 #define DateTimeNumericFieldElement_h
 
-#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
+#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
 #include "DateTimeFieldElement.h"
 
 namespace WebCore {
@@ -45,14 +45,18 @@ protected:
     struct Range {
         Range(int minimum, int maximum);
         int clampValue(int) const;
+        bool isInRange(int) const;
 
         int maximum;
         int minimum;
     };
 
-    DateTimeNumericFieldElement(Document*, FieldOwner&, int minimum, int maximum);
+    DateTimeNumericFieldElement(Document*, FieldOwner&, int minimum, int maximum, const String& placeholder);
 
     int clampValue(int value) const { return m_range.clampValue(value); }
+    virtual int clampValueForHardLimits(int) const;
+    virtual int defaultValueForStepDown() const;
+    virtual int defaultValueForStepUp() const;
     const Range& range() const { return m_range; }
 
     // DateTimeFieldElement functions.
@@ -64,6 +68,9 @@ protected:
     virtual String visibleValue() const OVERRIDE FINAL;
 
 private:
+    // Element function.
+    virtual PassRefPtr<RenderStyle> customStyleForRenderer() OVERRIDE;
+
     // DateTimeFieldElement functions.
     virtual void didBlur() OVERRIDE FINAL;
     virtual void handleKeyboardEvent(KeyboardEvent*) OVERRIDE FINAL;
@@ -72,7 +79,11 @@ private:
     virtual void stepUp() OVERRIDE FINAL;
     virtual String value() const OVERRIDE FINAL;
 
+    String formatValue(int) const;
+    Localizer& localizerForOwner() const;
+
     DOMTimeStamp m_lastDigitCharTime;
+    const String m_placeholder;
     const Range m_range;
     int m_value;
     bool m_hasValue;

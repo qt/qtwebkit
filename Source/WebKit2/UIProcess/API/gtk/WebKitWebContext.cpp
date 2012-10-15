@@ -20,10 +20,10 @@
 #include "config.h"
 #include "WebKitWebContext.h"
 
-#include "WebContext.h"
 #include "WebKitCookieManagerPrivate.h"
 #include "WebKitDownloadClient.h"
 #include "WebKitDownloadPrivate.h"
+#include "WebKitFaviconDatabasePrivate.h"
 #include "WebKitGeolocationProvider.h"
 #include "WebKitPluginPrivate.h"
 #include "WebKitPrivate.h"
@@ -32,7 +32,9 @@
 #include "WebKitTextChecker.h"
 #include "WebKitURISchemeRequestPrivate.h"
 #include "WebKitWebContextPrivate.h"
+#include "WebResourceCacheManagerProxy.h"
 #include <WebCore/FileSystem.h>
+#include <WebCore/IconDatabase.h>
 #include <WebCore/Language.h>
 #include <wtf/HashMap.h>
 #include <wtf/OwnPtr.h>
@@ -41,8 +43,6 @@
 #include <wtf/gobject/GOwnPtr.h>
 #include <wtf/gobject/GRefPtr.h>
 #include <wtf/text/CString.h>
-
-using namespace WebKit;
 
 enum {
     DOWNLOAD_STARTED,
@@ -93,11 +93,12 @@ typedef HashMap<String, RefPtr<WebKitURISchemeHandler> > URISchemeHandlerMap;
 typedef HashMap<uint64_t, GRefPtr<WebKitURISchemeRequest> > URISchemeRequestMap;
 
 struct _WebKitWebContextPrivate {
-    WKRetainPtr<WKContextRef> context;
+    RefPtr<WebContext> context;
 
     GRefPtr<WebKitCookieManager> cookieManager;
+    GRefPtr<WebKitFaviconDatabase> faviconDatabase;
     GRefPtr<WebKitSecurityManager> securityManager;
-    WKRetainPtr<WKSoupRequestManagerRef> requestManager;
+    RefPtr<WebSoupRequestManagerProxy> requestManager;
     URISchemeHandlerMap uriSchemeHandlers;
     URISchemeRequestMap uriSchemeRequests;
 #if ENABLE(GEOLOCATION)
@@ -106,6 +107,7 @@ struct _WebKitWebContextPrivate {
 #if ENABLE(SPELLCHECK)
     OwnPtr<WebKitTextChecker> textChecker;
 #endif
+    CString faviconDatabaseDirectory;
 };
 
 static guint signals[LAST_SIGNAL] = { 0, };
@@ -152,17 +154,20 @@ static void webkit_web_context_class_init(WebKitWebContextClass* webContextClass
 static gpointer createDefaultWebContext(gpointer)
 {
     static GRefPtr<WebKitWebContext> webContext = adoptGRef(WEBKIT_WEB_CONTEXT(g_object_new(WEBKIT_TYPE_WEB_CONTEXT, NULL)));
-    webContext->priv->context = WKContextCreate();
-    webContext->priv->requestManager = WKContextGetSoupRequestManager(webContext->priv->context.get());
-    WKContextSetCacheModel(webContext->priv->context.get(), kWKCacheModelPrimaryWebBrowser);
+    WebKitWebContextPrivate* priv = webContext->priv;
+
+    priv->context = WebContext::create(String());
+    priv->requestManager = webContext->priv->context->soupRequestManagerProxy();
+    priv->context->setCacheModel(CacheModelPrimaryWebBrowser);
+
     attachDownloadClientToContext(webContext.get());
     attachRequestManagerClientToContext(webContext.get());
+
 #if ENABLE(GEOLOCATION)
-    WKGeolocationManagerRef wkGeolocationManager = WKContextGetGeolocationManager(webContext->priv->context.get());
-    webContext->priv->geolocationProvider = WebKitGeolocationProvider::create(wkGeolocationManager);
+    priv->geolocationProvider = WebKitGeolocationProvider::create(toAPI(priv->context->geolocationManagerProxy()));
 #endif
 #if ENABLE(SPELLCHECK)
-    webContext->priv->textChecker = WebKitTextChecker::create();
+    priv->textChecker = WebKitTextChecker::create();
 #endif
     return webContext.get();
 }
@@ -206,26 +211,26 @@ WebKitWebContext* webkit_web_context_get_default(void)
  */
 void webkit_web_context_set_cache_model(WebKitWebContext* context, WebKitCacheModel model)
 {
-    WKCacheModel cacheModel;
+    CacheModel cacheModel;
 
     g_return_if_fail(WEBKIT_IS_WEB_CONTEXT(context));
 
     switch (model) {
     case WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER:
-        cacheModel = kWKCacheModelDocumentViewer;
+        cacheModel = CacheModelDocumentViewer;
         break;
     case WEBKIT_CACHE_MODEL_WEB_BROWSER:
-        cacheModel = kWKCacheModelPrimaryWebBrowser;
+        cacheModel = CacheModelPrimaryWebBrowser;
         break;
     case WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER:
-        cacheModel = kWKCacheModelDocumentBrowser;
+        cacheModel = CacheModelDocumentBrowser;
         break;
     default:
         g_assert_not_reached();
     }
-    WebKitWebContextPrivate* priv = context->priv;
-    if (cacheModel != WKContextGetCacheModel(priv->context.get()))
-        WKContextSetCacheModel(priv->context.get(), cacheModel);
+
+    if (cacheModel != context->priv->context->cacheModel())
+        context->priv->context->setCacheModel(cacheModel);
 }
 
 /**
@@ -242,13 +247,12 @@ WebKitCacheModel webkit_web_context_get_cache_model(WebKitWebContext* context)
 {
     g_return_val_if_fail(WEBKIT_IS_WEB_CONTEXT(context), WEBKIT_CACHE_MODEL_WEB_BROWSER);
 
-    WebKitWebContextPrivate* priv = context->priv;
-    switch (WKContextGetCacheModel(priv->context.get())) {
-    case kWKCacheModelDocumentViewer:
+    switch (context->priv->context->cacheModel()) {
+    case CacheModelDocumentViewer:
         return WEBKIT_CACHE_MODEL_DOCUMENT_VIEWER;
-    case kWKCacheModelPrimaryWebBrowser:
+    case CacheModelPrimaryWebBrowser:
         return WEBKIT_CACHE_MODEL_WEB_BROWSER;
-    case kWKCacheModelDocumentBrowser:
+    case CacheModelDocumentBrowser:
         return WEBKIT_CACHE_MODEL_DOCUMENT_BROWSER;
     default:
         g_assert_not_reached();
@@ -268,11 +272,10 @@ void webkit_web_context_clear_cache(WebKitWebContext* context)
 {
     g_return_if_fail(WEBKIT_IS_WEB_CONTEXT(context));
 
-    WebKitWebContextPrivate* priv = context->priv;
-    WKResourceCacheManagerClearCacheForAllOrigins(WKContextGetResourceCacheManager(priv->context.get()), WKResourceCachesToClearAll);
+    context->priv->context->resourceCacheManagerProxy()->clearCacheForAllOrigins(AllResourceCaches);
 }
 
-typedef HashMap<WKDownloadRef, GRefPtr<WebKitDownload> > DownloadsMap;
+typedef HashMap<DownloadProxy*, GRefPtr<WebKitDownload> > DownloadsMap;
 
 static DownloadsMap& downloadsMap()
 {
@@ -295,12 +298,9 @@ WebKitDownload* webkit_web_context_download_uri(WebKitWebContext* context, const
     g_return_val_if_fail(WEBKIT_IS_WEB_CONTEXT(context), 0);
     g_return_val_if_fail(uri, 0);
 
-    WebKitWebContextPrivate* priv = context->priv;
-    WKRetainPtr<WKURLRef> wkURL(AdoptWK, WKURLCreateWithUTF8CString(uri));
-    WKRetainPtr<WKURLRequestRef> wkRequest(AdoptWK, WKURLRequestCreateWithWKURL(wkURL.get()));
-    WKRetainPtr<WKDownloadRef> wkDownload = WKContextDownloadURLRequest(priv->context.get(), wkRequest.get());
-    WebKitDownload* download = webkitDownloadCreate(wkDownload.get());
-    downloadsMap().set(wkDownload.get(), download);
+    DownloadProxy* downloadProxy = context->priv->context->download(0, WebCore::ResourceRequest(String::fromUTF8(uri)));
+    WebKitDownload* download = webkitDownloadCreate(toAPI(downloadProxy));
+    downloadsMap().set(downloadProxy, download);
     return download;
 }
 
@@ -318,9 +318,105 @@ WebKitCookieManager* webkit_web_context_get_cookie_manager(WebKitWebContext* con
 
     WebKitWebContextPrivate* priv = context->priv;
     if (!priv->cookieManager)
-        priv->cookieManager = adoptGRef(webkitCookieManagerCreate(WKContextGetCookieManager(priv->context.get())));
+        priv->cookieManager = adoptGRef(webkitCookieManagerCreate(toAPI(priv->context->cookieManagerProxy())));
 
     return priv->cookieManager.get();
+}
+
+static void ensureFaviconDatabase(WebKitWebContext* context)
+{
+    WebKitWebContextPrivate* priv = context->priv;
+    if (priv->faviconDatabase)
+        return;
+
+    priv->faviconDatabase = adoptGRef(webkitFaviconDatabaseCreate(priv->context->iconDatabase()));
+}
+
+/**
+ * webkit_web_context_set_favicon_database_directory:
+ * @context: a #WebKitWebContext
+ * @path: (allow-none): an absolute path to the icon database
+ * directory or %NULL to use the defaults
+ *
+ * Set the directory path to be used to store the favicons database
+ * for @context on disk. Passing %NULL as @path means using the
+ * default directory for the platform (see g_get_user_data_dir()).
+ *
+ * Calling this method also means enabling the favicons database for
+ * its use from the applications, so that's why it's expected to be
+ * called only once. Further calls for the same instance of
+ * #WebKitWebContext won't cause any effect.
+ */
+void webkit_web_context_set_favicon_database_directory(WebKitWebContext* context, const gchar* path)
+{
+    g_return_if_fail(WEBKIT_IS_WEB_CONTEXT(context));
+
+    WebKitWebContextPrivate* priv = context->priv;
+    WebIconDatabase* iconDatabase = priv->context->iconDatabase();
+    if (iconDatabase->isOpen())
+        return;
+
+    ensureFaviconDatabase(context);
+
+    // Use default if 0 is passed as parameter.
+    String directoryPath = WebCore::filenameToString(path);
+    priv->faviconDatabaseDirectory = directoryPath.isEmpty()
+        ? priv->context->iconDatabasePath().utf8()
+        : directoryPath.utf8();
+
+    // Build the full path to the icon database file on disk.
+    GOwnPtr<gchar> faviconDatabasePath(g_build_filename(priv->faviconDatabaseDirectory.data(),
+                                                        WebCore::IconDatabase::defaultDatabaseFilename().utf8().data(),
+                                                        NULL));
+
+    // Setting the path will cause the icon database to be opened.
+    priv->context->setIconDatabasePath(WebCore::filenameToString(faviconDatabasePath.get()));
+}
+
+/**
+ * webkit_web_context_get_favicon_database_directory:
+ * @context: a #WebKitWebContext
+ *
+ * Get the directory path being used to store the favicons database
+ * for @context, or %NULL if
+ * webkit_web_context_set_favicon_database_directory() hasn't been
+ * called yet.
+ *
+ * This function will always return the same path after having called
+ * webkit_web_context_set_favicon_database_directory() for the first
+ * time.
+ *
+ * Returns: (transfer none): the path of the directory of the favicons
+ * database associated with @context, or %NULL.
+ */
+const gchar* webkit_web_context_get_favicon_database_directory(WebKitWebContext *context)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_CONTEXT(context), 0);
+
+    WebKitWebContextPrivate* priv = context->priv;
+    if (priv->faviconDatabaseDirectory.isNull())
+        return 0;
+
+    return priv->faviconDatabaseDirectory.data();
+}
+
+/**
+ * webkit_web_context_get_favicon_database:
+ * @context: a #WebKitWebContext
+ *
+ * Get the #WebKitFaviconDatabase associated with @context.
+ *
+ * To initialize the database you need to call
+ * webkit_web_context_set_favicon_database_directory().
+ *
+ * Returns: (transfer none): the #WebKitFaviconDatabase of @context.
+ */
+WebKitFaviconDatabase* webkit_web_context_get_favicon_database(WebKitWebContext* context)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_CONTEXT(context), 0);
+
+    ensureFaviconDatabase(context);
+    return context->priv->faviconDatabase.get();
 }
 
 /**
@@ -354,7 +450,7 @@ void webkit_web_context_set_additional_plugins_directory(WebKitWebContext* conte
     g_return_if_fail(WEBKIT_IS_WEB_CONTEXT(context));
     g_return_if_fail(directory);
 
-    toImpl(context->priv->context.get())->setAdditionalPluginsDirectory(WebCore::filenameToString(directory));
+    context->priv->context->setAdditionalPluginsDirectory(WebCore::filenameToString(directory));
 }
 
 struct GetPluginsAsyncData {
@@ -365,7 +461,7 @@ WEBKIT_DEFINE_ASYNC_DATA_STRUCT(GetPluginsAsyncData)
 static void webkitWebContextGetPluginThread(GSimpleAsyncResult* result, GObject* object, GCancellable*)
 {
     GetPluginsAsyncData* data = static_cast<GetPluginsAsyncData*>(g_simple_async_result_get_op_res_gpointer(result));
-    data->plugins = toImpl(WEBKIT_WEB_CONTEXT(object)->priv->context.get())->pluginInfoStore().plugins();
+    data->plugins = WEBKIT_WEB_CONTEXT(object)->priv->context->pluginInfoStore().plugins();
 }
 
 /**
@@ -472,8 +568,7 @@ void webkit_web_context_register_uri_scheme(WebKitWebContext* context, const cha
 
     RefPtr<WebKitURISchemeHandler> handler = adoptRef(new WebKitURISchemeHandler(callback, userData, destroyNotify));
     context->priv->uriSchemeHandlers.set(String::fromUTF8(scheme), handler.get());
-    WKRetainPtr<WKStringRef> wkScheme(AdoptWK, WKStringCreateWithUTF8CString(scheme));
-    WKSoupRequestManagerRegisterURIScheme(context->priv->requestManager.get(), wkScheme.get());
+    context->priv->requestManager->registerURIScheme(String::fromUTF8(scheme));
 }
 
 /**
@@ -587,20 +682,20 @@ void webkit_web_context_set_preferred_languages(WebKitWebContext* context, const
     WebCore::languageDidChange();
 }
 
-WebKitDownload* webkitWebContextGetOrCreateDownload(WKDownloadRef wkDownload)
+WebKitDownload* webkitWebContextGetOrCreateDownload(DownloadProxy* downloadProxy)
 {
-    GRefPtr<WebKitDownload> download = downloadsMap().get(wkDownload);
+    GRefPtr<WebKitDownload> download = downloadsMap().get(downloadProxy);
     if (download)
         return download.get();
 
-    download = adoptGRef(webkitDownloadCreate(wkDownload));
-    downloadsMap().set(wkDownload, download.get());
+    download = adoptGRef(webkitDownloadCreate(toAPI(downloadProxy)));
+    downloadsMap().set(downloadProxy, download.get());
     return download.get();
 }
 
-void webkitWebContextRemoveDownload(WKDownloadRef wkDownload)
+void webkitWebContextRemoveDownload(DownloadProxy* downloadProxy)
 {
-    downloadsMap().remove(wkDownload);
+    downloadsMap().remove(downloadProxy);
 }
 
 void webkitWebContextDownloadStarted(WebKitWebContext* context, WebKitDownload* download)
@@ -608,14 +703,14 @@ void webkitWebContextDownloadStarted(WebKitWebContext* context, WebKitDownload* 
     g_signal_emit(context, signals[DOWNLOAD_STARTED], 0, download);
 }
 
-WKContextRef webkitWebContextGetWKContext(WebKitWebContext* context)
+WebContext* webkitWebContextGetContext(WebKitWebContext* context)
 {
     g_assert(WEBKIT_IS_WEB_CONTEXT(context));
 
     return context->priv->context.get();
 }
 
-WKSoupRequestManagerRef webkitWebContextGetRequestManager(WebKitWebContext* context)
+WebSoupRequestManagerProxy* webkitWebContextGetRequestManager(WebKitWebContext* context)
 {
     return context->priv->requestManager.get();
 }

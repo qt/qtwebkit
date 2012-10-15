@@ -33,8 +33,8 @@
 
 #include "FontRenderingMode.h"
 #include "Settings.h"
-#include "platform/WebString.h"
-#include "platform/WebURL.h"
+#include <public/WebString.h>
+#include <public/WebURL.h>
 #include <wtf/UnusedParam.h>
 
 #if defined(OS_WIN)
@@ -54,6 +54,7 @@ WebSettingsImpl::WebSettingsImpl(Settings* settings)
     , m_viewportEnabled(false)
     , m_applyDefaultDeviceScaleFactorInCompositor(false)
     , m_gestureTapHighlightEnabled(true)
+    , m_autoZoomFocusedNodeToLegibleScale(false)
     , m_defaultTileSize(WebSize(256, 256))
     , m_maxUntiledLayerSize(WebSize(512, 512))
 {
@@ -138,6 +139,16 @@ bool WebSettingsImpl::deviceSupportsTouch()
 void WebSettingsImpl::setApplyDefaultDeviceScaleFactorInCompositor(bool applyDefaultDeviceScaleFactorInCompositor)
 {
     m_applyDefaultDeviceScaleFactorInCompositor = applyDefaultDeviceScaleFactorInCompositor;
+}
+
+void WebSettingsImpl::setApplyPageScaleFactorInCompositor(bool applyPageScaleFactorInCompositor)
+{
+    m_settings->setApplyPageScaleFactorInCompositor(applyPageScaleFactorInCompositor);
+}
+
+void WebSettingsImpl::setAutoZoomFocusedNodeToLegibleScale(bool autoZoomFocusedNodeToLegibleScale)
+{
+    m_autoZoomFocusedNodeToLegibleScale = autoZoomFocusedNodeToLegibleScale;
 }
 
 void WebSettingsImpl::setTextAutosizingEnabled(bool enabled)
@@ -651,6 +662,11 @@ void WebSettingsImpl::setCookieEnabled(bool enabled)
 void WebSettingsImpl::setGestureTapHighlightEnabled(bool enableHighlight)
 {
     m_gestureTapHighlightEnabled = enableHighlight;
+}
+
+bool WebSettingsImpl::applyPageScaleFactorInCompositor() const
+{
+    return m_settings->applyPageScaleFactorInCompositor();
 }
 
 } // namespace WebKit

@@ -63,6 +63,7 @@
 #include "RegExpObject.h"
 #include "RegExpPrototype.h"
 #include "Register.h"
+#include "RepatchBuffer.h"
 #include "SamplingTool.h"
 #include "Strong.h"
 #include <wtf/StdLibExtras.h>
@@ -224,7 +225,7 @@ COMPILE_ASSERT(offsetof(struct JITStackFrame, code) == 0x50, JITStackFrame_code_
 
 extern "C" {
 
-    __declspec(naked) EncodedJSValue ctiTrampoline(void* code, RegisterFile*, CallFrame*, void* /*unused1*/, void* /*unused2*/, JSGlobalData*)
+    __declspec(naked) EncodedJSValue ctiTrampoline(void* code, JSStack*, CallFrame*, void* /*unused1*/, void* /*unused2*/, JSGlobalData*)
     {
         __asm {
             push ebp;
@@ -285,7 +286,7 @@ extern "C" {
 #define STACK_LENGTH               104
 #elif CPU(SH4)
 #define SYMBOL_STRING(name) #name
-/* code (r4), RegisterFile* (r5), CallFrame* (r6), void* unused1 (r7), void* unused2(sp), JSGlobalData (sp)*/
+/* code (r4), JSStack* (r5), CallFrame* (r6), void* unused1 (r7), void* unused2(sp), JSGlobalData (sp)*/
 
 asm volatile (
 ".text\n"
@@ -458,7 +459,7 @@ SYMBOL_STRING(ctiTrampoline) ":" "\n"
     "move  $16,$6       # set callFrameRegister" "\n"
     "li    $17,512      # set timeoutCheckRegister" "\n"
     "move  $25,$4       # move executableAddress to t9" "\n"
-    "sw    $5," STRINGIZE_VALUE_OF(REGISTER_FILE_OFFSET) "($29) # store registerFile to current stack" "\n"
+    "sw    $5," STRINGIZE_VALUE_OF(REGISTER_FILE_OFFSET) "($29) # store JSStack to current stack" "\n"
     "lw    $9," STRINGIZE_VALUE_OF(STACK_LENGTH + 20) "($29)    # load globalData from previous stack" "\n"
     "jalr  $25" "\n"
     "sw    $9," STRINGIZE_VALUE_OF(GLOBAL_DATA_OFFSET) "($29)   # store globalData to current stack" "\n"
@@ -659,7 +660,7 @@ SYMBOL_STRING(ctiOpThrowNotCaught) ":" "\n"
 
 #elif COMPILER(RVCT) && CPU(ARM_THUMB2)
 
-__asm EncodedJSValue ctiTrampoline(void*, RegisterFile*, CallFrame*, void* /*unused1*/, void* /*unused2*/, JSGlobalData*)
+__asm EncodedJSValue ctiTrampoline(void*, JSStack*, CallFrame*, void* /*unused1*/, void* /*unused2*/, JSGlobalData*)
 {
     PRESERVE8
     sub sp, sp, # FIRST_STACK_ARGUMENT
@@ -727,7 +728,7 @@ __asm void ctiOpThrowNotCaught()
 
 #elif COMPILER(RVCT) && CPU(ARM_TRADITIONAL)
 
-__asm EncodedJSValue ctiTrampoline(void*, RegisterFile*, CallFrame*, void* /*unused1*/, void* /*unused2*/, JSGlobalData*)
+__asm EncodedJSValue ctiTrampoline(void*, JSStack*, CallFrame*, void* /*unused1*/, void* /*unused2*/, JSGlobalData*)
 {
     ARM
     stmdb sp!, {r1-r3}
@@ -796,7 +797,7 @@ JITThunks::JITThunks(JSGlobalData* globalData)
     ASSERT(OBJECT_OFFSETOF(struct JITStackFrame, preservedR10) == PRESERVED_R10_OFFSET);
     ASSERT(OBJECT_OFFSETOF(struct JITStackFrame, preservedR11) == PRESERVED_R11_OFFSET);
 
-    ASSERT(OBJECT_OFFSETOF(struct JITStackFrame, registerFile) == REGISTER_FILE_OFFSET);
+    ASSERT(OBJECT_OFFSETOF(struct JITStackFrame, stack) == REGISTER_FILE_OFFSET);
     // The fifth argument is the first item already on the stack.
     ASSERT(OBJECT_OFFSETOF(struct JITStackFrame, unused1) == FIRST_STACK_ARGUMENT);
 
@@ -815,7 +816,7 @@ JITThunks::JITThunks(JSGlobalData* globalData)
     ASSERT(OBJECT_OFFSETOF(struct JITStackFrame, preservedS2) == PRESERVED_S2_OFFSET);
     ASSERT(OBJECT_OFFSETOF(struct JITStackFrame, preservedReturnAddress) == PRESERVED_RETURN_ADDRESS_OFFSET);
     ASSERT(OBJECT_OFFSETOF(struct JITStackFrame, thunkReturnAddress) == THUNK_RETURN_ADDRESS_OFFSET);
-    ASSERT(OBJECT_OFFSETOF(struct JITStackFrame, registerFile) == REGISTER_FILE_OFFSET);
+    ASSERT(OBJECT_OFFSETOF(struct JITStackFrame, stack) == REGISTER_FILE_OFFSET);
     ASSERT(OBJECT_OFFSETOF(struct JITStackFrame, globalData) == GLOBAL_DATA_OFFSET);
 
 #endif
@@ -1049,7 +1050,7 @@ static NEVER_INLINE void returnToThrowTrampoline(JSGlobalData* globalData, Retur
     } while (0)
 
 // Helper function for JIT stubs that may throw an exception in the middle of
-// processing a function call. This function rolls back the register file to
+// processing a function call. This function rolls back the stack to
 // our caller, so exception processing can proceed from a valid state.
 template<typename T> static T throwExceptionFromOpCall(JITStackFrame& jitStackFrame, CallFrame* newCallFrame, ReturnAddressPtr& returnAddressSlot)
 {
@@ -1359,12 +1360,12 @@ DEFINE_STUB_FUNCTION(int, timeout_check)
     return timeoutChecker.ticksUntilNextCheck();
 }
 
-DEFINE_STUB_FUNCTION(void*, register_file_check)
+DEFINE_STUB_FUNCTION(void*, stack_check)
 {
     STUB_INIT_STACK_FRAME(stackFrame);
     CallFrame* callFrame = stackFrame.callFrame;
 
-    if (UNLIKELY(!stackFrame.registerFile->grow(&callFrame->registers()[callFrame->codeBlock()->m_numCalleeRegisters])))
+    if (UNLIKELY(!stackFrame.stack->grow(&callFrame->registers()[callFrame->codeBlock()->m_numCalleeRegisters])))
         return throwExceptionFromOpCall<void*>(stackFrame, callFrame, STUB_RETURN_ADDRESS, createStackOverflowError(callFrame->callerFrame()));
 
     return callFrame;
@@ -2191,7 +2192,7 @@ DEFINE_STUB_FUNCTION(void*, op_call_arityCheck)
 
     CallFrame* callFrame = stackFrame.callFrame;
 
-    CallFrame* newCallFrame = CommonSlowPaths::arityCheckFor(callFrame, stackFrame.registerFile, CodeForCall);
+    CallFrame* newCallFrame = CommonSlowPaths::arityCheckFor(callFrame, stackFrame.stack, CodeForCall);
     if (!newCallFrame)
         return throwExceptionFromOpCall<void*>(stackFrame, callFrame, STUB_RETURN_ADDRESS, createStackOverflowError(callFrame->callerFrame()));
 
@@ -2204,7 +2205,7 @@ DEFINE_STUB_FUNCTION(void*, op_construct_arityCheck)
 
     CallFrame* callFrame = stackFrame.callFrame;
 
-    CallFrame* newCallFrame = CommonSlowPaths::arityCheckFor(callFrame, stackFrame.registerFile, CodeForConstruct);
+    CallFrame* newCallFrame = CommonSlowPaths::arityCheckFor(callFrame, stackFrame.stack, CodeForConstruct);
     if (!newCallFrame)
         return throwExceptionFromOpCall<void*>(stackFrame, callFrame, STUB_RETURN_ADDRESS, createStackOverflowError(callFrame->callerFrame()));
 
@@ -2414,6 +2415,30 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_construct_NotJSConstruct)
     return returnValue;
 }
 
+static JSValue getByVal(
+    CallFrame* callFrame, JSValue baseValue, JSValue subscript, ReturnAddressPtr returnAddress)
+{
+    if (LIKELY(baseValue.isCell() && subscript.isString())) {
+        if (JSValue result = baseValue.asCell()->fastGetOwnProperty(callFrame, asString(subscript)->value(callFrame)))
+            return result;
+    }
+
+    if (subscript.isUInt32()) {
+        uint32_t i = subscript.asUInt32();
+        if (isJSString(baseValue) && asString(baseValue)->canGetIndex(i)) {
+            ctiPatchCallByReturnAddress(callFrame->codeBlock(), returnAddress, FunctionPtr(cti_op_get_by_val_string));
+            return asString(baseValue)->getIndex(callFrame, i);
+        }
+        return baseValue.get(callFrame, i);
+    }
+
+    if (isName(subscript))
+        return baseValue.get(callFrame, jsCast<NameInstance*>(subscript.asCell())->privateName());
+
+    Identifier property(callFrame, subscript.toString(callFrame)->value(callFrame));
+    return baseValue.get(callFrame, property);
+}
+
 DEFINE_STUB_FUNCTION(EncodedJSValue, op_get_by_val)
 {
     STUB_INIT_STACK_FRAME(stackFrame);
@@ -2423,35 +2448,56 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_get_by_val)
     JSValue baseValue = stackFrame.args[0].jsValue();
     JSValue subscript = stackFrame.args[1].jsValue();
     
-    if (LIKELY(baseValue.isCell() && subscript.isString())) {
-        if (JSValue result = baseValue.asCell()->fastGetOwnProperty(callFrame, asString(subscript)->value(callFrame))) {
-            CHECK_FOR_EXCEPTION();
-            return JSValue::encode(result);
+    if (baseValue.isObject() && subscript.isInt32()) {
+        // See if it's worth optimizing this at all.
+        JSObject* object = asObject(baseValue);
+        bool didOptimize = false;
+
+        unsigned bytecodeOffset = callFrame->bytecodeOffsetForNonDFGCode();
+        ASSERT(bytecodeOffset);
+        ByValInfo& byValInfo = callFrame->codeBlock()->getByValInfo(bytecodeOffset - 1);
+        ASSERT(!byValInfo.stubRoutine);
+        
+        if (hasOptimizableIndexing(object->structure())) {
+            // Attempt to optimize.
+            JITArrayMode arrayMode = jitArrayModeForStructure(object->structure());
+            if (arrayMode != byValInfo.arrayMode) {
+                JIT::compileGetByVal(&callFrame->globalData(), callFrame->codeBlock(), &byValInfo, STUB_RETURN_ADDRESS, arrayMode);
+                didOptimize = true;
+            }
+        }
+        
+        if (!didOptimize) {
+            // If we take slow path more than 10 times without patching then make sure we
+            // never make that mistake again. Or, if we failed to patch and we have some object
+            // that intercepts indexed get, then don't even wait until 10 times. For cases
+            // where we see non-index-intercepting objects, this gives 10 iterations worth of
+            // opportunity for us to observe that the get_by_val may be polymorphic.
+            if (++byValInfo.slowPathCount >= 10
+                || object->structure()->typeInfo().interceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero()) {
+                // Don't ever try to optimize.
+                RepatchBuffer repatchBuffer(callFrame->codeBlock());
+                repatchBuffer.relinkCallerToFunction(STUB_RETURN_ADDRESS, FunctionPtr(cti_op_get_by_val_generic));
+            }
         }
     }
+    
+    JSValue result = getByVal(callFrame, baseValue, subscript, STUB_RETURN_ADDRESS);
+    CHECK_FOR_EXCEPTION();
+    return JSValue::encode(result);
+}
+    
+DEFINE_STUB_FUNCTION(EncodedJSValue, op_get_by_val_generic)
+{
+    STUB_INIT_STACK_FRAME(stackFrame);
 
-    if (subscript.isUInt32()) {
-        uint32_t i = subscript.asUInt32();
-        if (isJSString(baseValue) && asString(baseValue)->canGetIndex(i)) {
-            ctiPatchCallByReturnAddress(callFrame->codeBlock(), STUB_RETURN_ADDRESS, FunctionPtr(cti_op_get_by_val_string));
-            JSValue result = asString(baseValue)->getIndex(callFrame, i);
-            CHECK_FOR_EXCEPTION();
-            return JSValue::encode(result);
-        }
-        JSValue result = baseValue.get(callFrame, i);
-        CHECK_FOR_EXCEPTION();
-        return JSValue::encode(result);
-    }
+    CallFrame* callFrame = stackFrame.callFrame;
 
-    if (isName(subscript)) {
-        JSValue result = baseValue.get(callFrame, jsCast<NameInstance*>(subscript.asCell())->privateName());
-        CHECK_FOR_EXCEPTION();
-        return JSValue::encode(result);
-    }
-
-    Identifier property(callFrame, subscript.toString(callFrame)->value(callFrame));
-    JSValue result = baseValue.get(callFrame, property);
-    CHECK_FOR_EXCEPTION_AT_END();
+    JSValue baseValue = stackFrame.args[0].jsValue();
+    JSValue subscript = stackFrame.args[1].jsValue();
+    
+    JSValue result = getByVal(callFrame, baseValue, subscript, STUB_RETURN_ADDRESS);
+    CHECK_FOR_EXCEPTION();
     return JSValue::encode(result);
 }
     
@@ -2502,23 +2548,14 @@ DEFINE_STUB_FUNCTION(EncodedJSValue, op_sub)
     return JSValue::encode(result);
 }
 
-DEFINE_STUB_FUNCTION(void, op_put_by_val)
+static void putByVal(CallFrame* callFrame, JSValue baseValue, JSValue subscript, JSValue value)
 {
-    STUB_INIT_STACK_FRAME(stackFrame);
-
-    CallFrame* callFrame = stackFrame.callFrame;
-    JSGlobalData* globalData = stackFrame.globalData;
-
-    JSValue baseValue = stackFrame.args[0].jsValue();
-    JSValue subscript = stackFrame.args[1].jsValue();
-    JSValue value = stackFrame.args[2].jsValue();
-
     if (LIKELY(subscript.isUInt32())) {
         uint32_t i = subscript.asUInt32();
         if (baseValue.isObject()) {
             JSObject* object = asObject(baseValue);
             if (object->canSetIndexQuickly(i))
-                object->setIndexQuickly(*globalData, i, value);
+                object->setIndexQuickly(callFrame->globalData(), i, value);
             else
                 object->methodTable()->putByIndex(object, callFrame, i, value, callFrame->codeBlock()->isStrictMode());
         } else
@@ -2528,11 +2565,73 @@ DEFINE_STUB_FUNCTION(void, op_put_by_val)
         baseValue.put(callFrame, jsCast<NameInstance*>(subscript.asCell())->privateName(), value, slot);
     } else {
         Identifier property(callFrame, subscript.toString(callFrame)->value(callFrame));
-        if (!stackFrame.globalData->exception) { // Don't put to an object if toString threw an exception.
+        if (!callFrame->globalData().exception) { // Don't put to an object if toString threw an exception.
             PutPropertySlot slot(callFrame->codeBlock()->isStrictMode());
             baseValue.put(callFrame, property, value, slot);
         }
     }
+}
+
+DEFINE_STUB_FUNCTION(void, op_put_by_val)
+{
+    STUB_INIT_STACK_FRAME(stackFrame);
+
+    CallFrame* callFrame = stackFrame.callFrame;
+
+    JSValue baseValue = stackFrame.args[0].jsValue();
+    JSValue subscript = stackFrame.args[1].jsValue();
+    JSValue value = stackFrame.args[2].jsValue();
+
+    if (baseValue.isObject() && subscript.isInt32()) {
+        // See if it's worth optimizing at all.
+        JSObject* object = asObject(baseValue);
+        bool didOptimize = false;
+
+        unsigned bytecodeOffset = callFrame->bytecodeOffsetForNonDFGCode();
+        ASSERT(bytecodeOffset);
+        ByValInfo& byValInfo = callFrame->codeBlock()->getByValInfo(bytecodeOffset - 1);
+        ASSERT(!byValInfo.stubRoutine);
+        
+        if (hasOptimizableIndexing(object->structure())) {
+            // Attempt to optimize.
+            JITArrayMode arrayMode = jitArrayModeForStructure(object->structure());
+            if (arrayMode != byValInfo.arrayMode) {
+                JIT::compilePutByVal(&callFrame->globalData(), callFrame->codeBlock(), &byValInfo, STUB_RETURN_ADDRESS, arrayMode);
+                didOptimize = true;
+            }
+        }
+
+        if (!didOptimize) {
+            // If we take slow path more than 10 times without patching then make sure we
+            // never make that mistake again. Or, if we failed to patch and we have some object
+            // that intercepts indexed get, then don't even wait until 10 times. For cases
+            // where we see non-index-intercepting objects, this gives 10 iterations worth of
+            // opportunity for us to observe that the get_by_val may be polymorphic.
+            if (++byValInfo.slowPathCount >= 10
+                || object->structure()->typeInfo().interceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero()) {
+                // Don't ever try to optimize.
+                RepatchBuffer repatchBuffer(callFrame->codeBlock());
+                repatchBuffer.relinkCallerToFunction(STUB_RETURN_ADDRESS, FunctionPtr(cti_op_put_by_val_generic));
+            }
+        }
+    }
+    
+    putByVal(callFrame, baseValue, subscript, value);
+
+    CHECK_FOR_EXCEPTION_AT_END();
+}
+
+DEFINE_STUB_FUNCTION(void, op_put_by_val_generic)
+{
+    STUB_INIT_STACK_FRAME(stackFrame);
+
+    CallFrame* callFrame = stackFrame.callFrame;
+
+    JSValue baseValue = stackFrame.args[0].jsValue();
+    JSValue subscript = stackFrame.args[1].jsValue();
+    JSValue value = stackFrame.args[2].jsValue();
+    
+    putByVal(callFrame, baseValue, subscript, value);
 
     CHECK_FOR_EXCEPTION_AT_END();
 }
@@ -2582,12 +2681,12 @@ DEFINE_STUB_FUNCTION(void*, op_load_varargs)
     STUB_INIT_STACK_FRAME(stackFrame);
 
     CallFrame* callFrame = stackFrame.callFrame;
-    RegisterFile* registerFile = stackFrame.registerFile;
+    JSStack* stack = stackFrame.stack;
     JSValue thisValue = stackFrame.args[0].jsValue();
     JSValue arguments = stackFrame.args[1].jsValue();
     int firstFreeRegister = stackFrame.args[2].int32();
 
-    CallFrame* newCallFrame = loadVarargs(callFrame, registerFile, thisValue, arguments, firstFreeRegister);
+    CallFrame* newCallFrame = loadVarargs(callFrame, stack, thisValue, arguments, firstFreeRegister);
     if (!newCallFrame)
         VM_THROW_EXCEPTION();
     return newCallFrame;
@@ -3423,8 +3522,8 @@ MacroAssemblerCodeRef JITThunks::ctiStub(JSGlobalData* globalData, ThunkGenerato
 {
     CTIStubMap::AddResult entry = m_ctiStubMap.add(generator, MacroAssemblerCodeRef());
     if (entry.isNewEntry)
-        entry.iterator->second = generator(globalData);
-    return entry.iterator->second;
+        entry.iterator->value = generator(globalData);
+    return entry.iterator->value;
 }
 
 NativeExecutable* JITThunks::hostFunctionStub(JSGlobalData* globalData, NativeFunction function, NativeFunction constructor)

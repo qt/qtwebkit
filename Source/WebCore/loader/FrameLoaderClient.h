@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011, 2012 Apple Inc. All rights reserved.
  * Copyright (C) 2012 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -96,6 +96,9 @@ namespace WebCore {
     class ResourceLoader;
     class ResourceRequest;
     class ResourceResponse;
+#if ENABLE(MEDIA_STREAM)
+    class RTCPeerConnectionHandler;
+#endif
     class SecurityOrigin;
     class SharedBuffer;
     class SocketStreamHandle;
@@ -259,6 +262,7 @@ namespace WebCore {
 
         virtual PassRefPtr<Frame> createFrame(const KURL& url, const String& name, HTMLFrameOwnerElement* ownerElement, const String& referrer, bool allowsScrolling, int marginWidth, int marginHeight) = 0;
         virtual PassRefPtr<Widget> createPlugin(const IntSize&, HTMLPlugInElement*, const KURL&, const Vector<String>&, const Vector<String>&, const String&, bool loadManually) = 0;
+        virtual void recreatePlugin(Widget*) = 0;
         virtual void redirectDataToPlugin(Widget* pluginWidget) = 0;
 
         virtual PassRefPtr<Widget> createJavaAppletWidget(const IntSize&, HTMLAppletElement*, const KURL& baseURL, const Vector<String>& paramNames, const Vector<String>& paramValues) = 0;
@@ -290,9 +294,6 @@ namespace WebCore {
 #if PLATFORM(MAC)
         // Allow an accessibility object to retrieve a Frame parent if there's no PlatformWidget.
         virtual RemoteAXObjectRef accessibilityRemoteObject() = 0;
-#if ENABLE(JAVA_BRIDGE)
-        virtual jobject javaApplet(NSView*) { return 0; }
-#endif
         virtual NSCachedURLResponse* willCacheResponse(DocumentLoader*, unsigned long identifier, NSCachedURLResponse*) const = 0;
 #endif
 #if PLATFORM(WIN) && USE(CFNETWORK)
@@ -344,6 +345,10 @@ namespace WebCore {
         virtual void dispatchWillDisconnectDOMWindowExtensionFromGlobalObject(DOMWindowExtension*) { }
         virtual void dispatchDidReconnectDOMWindowExtensionToGlobalObject(DOMWindowExtension*) { }
         virtual void dispatchWillDestroyGlobalObjectForDOMWindowExtension(DOMWindowExtension*) { }
+
+#if ENABLE(MEDIA_STREAM)
+        virtual void dispatchWillStartUsingPeerConnectionHandler(RTCPeerConnectionHandler*) { }
+#endif
     };
 
 } // namespace WebCore

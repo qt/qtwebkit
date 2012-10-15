@@ -265,11 +265,11 @@ z-index
 #if defined(ENABLE_CSS_BOX_DECORATION_BREAK) && ENABLE_CSS_BOX_DECORATION_BREAK
 -webkit-box-decoration-break
 #endif
-#if defined(ENABLE_CSS_FILTERS) && ENABLE_CSS_FILTERS
--webkit-filter
-#endif
 #if defined(ENABLE_CSS_COMPOSITING) && ENABLE_CSS_COMPOSITING
 -webkit-blend-mode
+#endif
+#if defined(ENABLE_CSS_FILTERS) && ENABLE_CSS_FILTERS
+-webkit-filter
 #endif
 -webkit-align-content
 -webkit-align-items
@@ -409,7 +409,7 @@ z-index
 -webkit-dashboard-region
 #endif
 #if defined(ENABLE_WIDGET_REGION) && ENABLE_WIDGET_REGION
--webkit-widget-region
+-webkit-app-region
 #endif
 #if defined(ENABLE_ACCELERATED_OVERFLOW_SCROLLING) && ENABLE_ACCELERATED_OVERFLOW_SCROLLING
 -webkit-overflow-scrolling

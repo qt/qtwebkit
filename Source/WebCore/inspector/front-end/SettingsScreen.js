@@ -107,10 +107,10 @@ WebInspector.SettingsScreen.prototype = {
     {
         this._onHide();
         WebInspector.HelpScreen.prototype.willHide.call(this);
-    }
-}
+    },
 
-WebInspector.SettingsScreen.prototype.__proto__ = WebInspector.HelpScreen.prototype;
+    __proto__: WebInspector.HelpScreen.prototype
+}
 
 /**
  * @constructor
@@ -236,10 +236,10 @@ WebInspector.SettingsTab.prototype = {
         fieldsetElement.appendChild(element);
         p.appendChild(fieldsetElement);
         return p;
-    }
-}
+    },
 
-WebInspector.SettingsTab.prototype.__proto__ = WebInspector.View.prototype;
+    __proto__: WebInspector.View.prototype
+}
 
 /**
  * @constructor
@@ -250,8 +250,6 @@ WebInspector.GenericSettingsTab = function()
     WebInspector.SettingsTab.call(this);
 
     var p = this._appendSection();
-    if (Preferences.showDockToRight)
-        p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Dock to right"), WebInspector.settings.dockToRight));
     if (Preferences.exposeDisableCache)
         p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Disable cache"), WebInspector.settings.cacheDisabled));
     var disableJSElement = this._createCheckboxSetting(WebInspector.UIString("Disable JavaScript"), WebInspector.settings.javaScriptDisabled);
@@ -268,6 +266,7 @@ WebInspector.GenericSettingsTab = function()
         [ WebInspector.Color.Format.HSL, "HSL: hsl(300, 80%, 90%)" ] ], WebInspector.settings.colorFormat));
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show user agent styles"), WebInspector.settings.showUserAgentStyles));
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Word wrap"), WebInspector.settings.domWordWrap));
+    p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show Shadow DOM"), WebInspector.settings.showShadowDOM));
 
     p = this._appendSection(WebInspector.UIString("Rendering"));
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show paint rectangles"), WebInspector.settings.showPaintRects));
@@ -332,10 +331,10 @@ WebInspector.GenericSettingsTab.prototype = {
     {
         // We need to manually update the checkbox state, since enabling JavaScript in the page can actually uncover the "forbidden" state.
         PageAgent.setScriptExecutionDisabled(WebInspector.settings.javaScriptDisabled.get(), this._updateScriptDisabledCheckbox.bind(this));
-    }
-}
+    },
 
-WebInspector.GenericSettingsTab.prototype.__proto__ = WebInspector.SettingsTab.prototype;
+    __proto__: WebInspector.SettingsTab.prototype
+}
 
 /**
  * @constructor
@@ -862,10 +861,10 @@ WebInspector.UserAgentSettingsTab.prototype = {
         this._gammaElement = this._createInput(cellElement, "device-orientation-override-gamma", String(deviceOrientation.gamma), this._applyDeviceOrientationUserInput.bind(this));
 
         return fieldsetElement;
-    }
-}
+    },
 
-WebInspector.UserAgentSettingsTab.prototype.__proto__ = WebInspector.SettingsTab.prototype;
+    __proto__: WebInspector.SettingsTab.prototype
+}
 
 /**
  * @constructor
@@ -917,10 +916,10 @@ WebInspector.ExperimentsSettingsTab.prototype = {
         label.appendChild(document.createTextNode(WebInspector.UIString(experiment.title)));
         p.appendChild(label);
         return p;
-    }
-}
+    },
 
-WebInspector.ExperimentsSettingsTab.prototype.__proto__ = WebInspector.SettingsTab.prototype;
+    __proto__: WebInspector.SettingsTab.prototype
+}
 
 /**
  * @constructor

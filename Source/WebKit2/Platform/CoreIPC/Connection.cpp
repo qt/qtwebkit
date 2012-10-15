@@ -102,12 +102,12 @@ PassRefPtr<Connection::SyncMessageState> Connection::SyncMessageState::getOrCrea
     SyncMessageStateMap::AddResult result = syncMessageStateMap().add(runLoop, 0);
 
     if (!result.isNewEntry) {
-        ASSERT(result.iterator->second);
-        return result.iterator->second;
+        ASSERT(result.iterator->value);
+        return result.iterator->value;
     }
 
     RefPtr<SyncMessageState> syncMessageState = adoptRef(new SyncMessageState(runLoop));
-    result.iterator->second = syncMessageState.get();
+    result.iterator->value = syncMessageState.get();
 
     return syncMessageState.release();
 }
@@ -203,7 +203,6 @@ Connection::Connection(Identifier identifier, bool isServer, Client* client, Run
     , m_inDispatchMessageCount(0)
     , m_inDispatchMessageMarkedDispatchWhenWaitingForSyncReplyCount(0)
     , m_didReceiveInvalidMessage(false)
-    , m_defaultSyncMessageTimeout(NoTimeout)
     , m_syncMessageState(SyncMessageState::getOrCreate(clientRunLoop))
     , m_shouldWaitForSyncReplies(true)
 {
@@ -284,13 +283,6 @@ void Connection::markCurrentlyDispatchedMessageAsInvalid()
     m_didReceiveInvalidMessage = true;
 }
 
-void Connection::setDefaultSyncMessageTimeout(double defaultSyncMessageTimeout)
-{
-    ASSERT(defaultSyncMessageTimeout != DefaultTimeout);
-
-    m_defaultSyncMessageTimeout = defaultSyncMessageTimeout;
-}
-
 PassOwnPtr<ArgumentEncoder> Connection::createSyncMessageArgumentEncoder(uint64_t destinationID, uint64_t& syncRequestID)
 {
     OwnPtr<ArgumentEncoder> argumentEncoder = ArgumentEncoder::create(destinationID);
@@ -362,10 +354,10 @@ PassOwnPtr<ArgumentDecoder> Connection::waitForMessage(MessageID messageID, uint
         MutexLocker locker(m_waitForMessageMutex);
 
         HashMap<std::pair<unsigned, uint64_t>, ArgumentDecoder*>::iterator it = m_waitForMessageMap.find(messageAndDestination);
-        if (it->second) {
+        if (it->value) {
             // FIXME: m_waitForMessageMap should really hold OwnPtrs to
             // ArgumentDecoders, but HashMap doesn't currently support OwnPtrs.
-            OwnPtr<ArgumentDecoder> arguments = adoptPtr(it->second);
+            OwnPtr<ArgumentDecoder> arguments = adoptPtr(it->value);
             m_waitForMessageMap.remove(it);
             
             return arguments.release();
@@ -427,9 +419,6 @@ PassOwnPtr<ArgumentDecoder> Connection::sendSyncMessage(MessageID messageID, uin
 
 PassOwnPtr<ArgumentDecoder> Connection::waitForSyncReply(uint64_t syncRequestID, double timeout, unsigned syncSendFlags)
 {
-    if (timeout == DefaultTimeout)
-        timeout = m_defaultSyncMessageTimeout;
-
     // Use a really long timeout.
     if (timeout == NoTimeout)
         timeout = 1e10;
@@ -481,10 +470,6 @@ PassOwnPtr<ArgumentDecoder> Connection::waitForSyncReply(uint64_t syncRequestID,
 #endif
         
     }
-
-    // We timed out.
-    if (m_client)
-        m_client->syncMessageSendTimedOut(this);
 
     return nullptr;
 }
@@ -539,8 +524,8 @@ void Connection::processIncomingMessage(MessageID messageID, PassOwnPtr<Argument
         
         HashMap<std::pair<unsigned, uint64_t>, ArgumentDecoder*>::iterator it = m_waitForMessageMap.find(std::make_pair(messageID.toInt(), incomingMessage.destinationID()));
         if (it != m_waitForMessageMap.end()) {
-            it->second = incomingMessage.releaseArguments().leakPtr();
-            ASSERT(it->second);
+            it->value = incomingMessage.releaseArguments().leakPtr();
+            ASSERT(it->value);
         
             m_waitForMessageCondition.signal();
             return;
@@ -668,6 +653,15 @@ void Connection::enqueueIncomingMessage(IncomingMessage& incomingMessage)
     m_clientRunLoop->dispatch(WTF::bind(&Connection::dispatchOneMessage, this));
 }
 
+void Connection::dispatchMessage(MessageID messageID, ArgumentDecoder* argumentDecoder)
+{
+    // Try the message receiver map first.
+    if (m_messageReceiverMap.dispatchMessage(this, messageID, argumentDecoder))
+        return;
+
+    m_client->didReceiveMessage(this, messageID, argumentDecoder);
+}
+
 void Connection::dispatchMessage(IncomingMessage& message)
 {
     OwnPtr<ArgumentDecoder> arguments = message.releaseArguments();
@@ -688,7 +682,7 @@ void Connection::dispatchMessage(IncomingMessage& message)
     if (message.messageID().isSync())
         dispatchSyncMessage(message.messageID(), arguments.get());
     else
-        m_client->didReceiveMessage(this, message.messageID(), arguments.get());
+        dispatchMessage(message.messageID(), arguments.get());
 
     m_didReceiveInvalidMessage |= arguments->isInvalid();
     m_inDispatchMessageCount--;

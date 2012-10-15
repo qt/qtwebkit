@@ -184,7 +184,7 @@ inline Frame::Frame(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoader
         setTiledBackingStoreEnabled(page->settings()->tiledBackingStoreEnabled());
 #endif
     } else {
-        page->incrementFrameCount();
+        page->incrementSubframeCount();
 
         // Make sure we will not end up with two frames referencing the same owner element.
         Frame*& contentFrameSlot = ownerElement->m_contentFrame;
@@ -579,7 +579,7 @@ void Frame::injectUserScripts(UserScriptInjectionTime injectionTime)
         return;
     UserScriptMap::const_iterator end = userScripts->end();
     for (UserScriptMap::const_iterator it = userScripts->begin(); it != end; ++it)
-        injectUserScriptsForWorld(it->first.get(), *it->second, injectionTime);
+        injectUserScriptsForWorld(it->key.get(), *it->value, injectionTime);
 }
 
 void Frame::injectUserScriptsForWorld(DOMWrapperWorld* world, const UserScriptVector& userScripts, UserScriptInjectionTime injectionTime)
@@ -704,7 +704,7 @@ void Frame::disconnectOwnerElement()
             doc->clearAXObjectCache();
         m_ownerElement->m_contentFrame = 0;
         if (m_page)
-            m_page->decrementFrameCount();
+            m_page->decrementSubframeCount();
     }
     m_ownerElement = 0;
 }
@@ -876,7 +876,7 @@ Color Frame::tiledBackingStoreBackgroundColor() const
 }
 #endif
 
-String Frame::layerTreeAsText(bool showDebugInfo) const
+String Frame::layerTreeAsText(LayerTreeFlags flags) const
 {
 #if USE(ACCELERATED_COMPOSITING)
     document()->updateLayout();
@@ -884,9 +884,9 @@ String Frame::layerTreeAsText(bool showDebugInfo) const
     if (!contentRenderer())
         return String();
 
-    return contentRenderer()->compositor()->layerTreeAsText(showDebugInfo);
+    return contentRenderer()->compositor()->layerTreeAsText(flags);
 #else
-    UNUSED_PARAM(showDebugInfo);
+    UNUSED_PARAM(flags);
     return String();
 #endif
 }
@@ -956,8 +956,9 @@ float Frame::frameScaleFactor() const
     Page* page = this->page();
 
     // Main frame is scaled with respect to he container but inner frames are not scaled with respect to the main frame.
-    if (!page || page->mainFrame() != this)
+    if (!page || page->mainFrame() != this || page->settings()->applyPageScaleFactorInCompositor())
         return 1;
+
     return page->pageScaleFactor();
 }
 

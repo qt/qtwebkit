@@ -29,7 +29,7 @@
 namespace CoreIPC {
 
 enum MessageClass {
-    MessageClassReserved = 0,
+    MessageClassInvalid = 0,
 
     // Messages sent by Core IPC.
     MessageClassCoreIPC,
@@ -37,7 +37,6 @@ enum MessageClass {
     // Messages sent by the UI process to the web process.
     MessageClassAuthenticationManager,
     MessageClassDrawingArea,
-    MessageClassInjectedBundle,
     MessageClassLayerTreeCoordinator,
     MessageClassWebApplicationCacheManager,
     MessageClassWebBatteryManagerProxy,
@@ -52,6 +51,7 @@ enum MessageClass {
     MessageClassWebNetworkInfoManagerProxy,
     MessageClassWebNotificationManager,
     MessageClassWebPage,
+    MessageClassWebPageGroupProxy,
     MessageClassWebProcess,
     MessageClassWebResourceCacheManager,
     MessageClassEventDispatcher,
@@ -65,6 +65,7 @@ enum MessageClass {
     MessageClassLayerTreeCoordinatorProxy,
     MessageClassWebApplicationCacheManagerProxy,
     MessageClassWebBatteryManager,
+    MessageClassWebConnection,
     MessageClassWebContext,
     MessageClassWebContextLegacy,
     MessageClassWebCookieManagerProxy,
@@ -104,6 +105,9 @@ enum MessageClass {
 
     // NPObject messages sent by both the plug-in process and the web process.
     MessageClassNPObjectMessageReceiver,
+    
+    // Messages sent by the UI process to the network process.
+    MessageClassNetworkProcess,
 };
 
 template<typename> struct MessageKindTraits { };
@@ -179,6 +183,11 @@ public:
 
     bool shouldDispatchMessageWhenWaitingForSyncReply() const { return getFlags() & DispatchMessageWhenWaitingForSyncReply; }
     bool isSync() const { return getFlags() & SyncMessage; }
+
+    MessageClass messageClass() const
+    {
+        return static_cast<MessageClass>(getClass());
+    }
 
 private:
     static inline unsigned stripMostSignificantBit(unsigned value)

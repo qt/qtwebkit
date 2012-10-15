@@ -77,12 +77,6 @@ void WebContext::platformInitializeWebProcess(WebProcessCreationParameters& para
 {
     parameters.presenterApplicationPid = getpid();
 
-    if (!omitPDFSupport()) {
-        // We want to use a PDF view in the UI process for PDF MIME types.
-        HashSet<String, CaseFoldingHash> mimeType = pdfAndPostScriptMIMETypes();
-        parameters.mimeTypesWithCustomRepresentation.appendRange(mimeType.begin(), mimeType.end());
-    }
-
     parameters.parentProcessName = [[NSProcessInfo processInfo] processName];    
 
     RetainPtr<CFStringRef> cachePath(AdoptCF, WKCopyFoundationCacheDirectory());
@@ -100,10 +94,7 @@ void WebContext::platformInitializeWebProcess(WebProcessCreationParameters& para
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
     parameters.shouldForceScreenFontSubstitution = [[NSUserDefaults standardUserDefaults] boolForKey:@"NSFontDefaultScreenFontSubstitutionEnabled"];
 #endif
-
-#if ENABLE(PLUGIN_PROCESS)
-    parameters.disablePluginProcessMessageTimeout = [[NSUserDefaults standardUserDefaults] boolForKey:@"WebKitDisablePluginProcessMessageTimeout"];
-#endif
+    parameters.shouldEnableKerningAndLigaturesByDefault = [[NSUserDefaults standardUserDefaults] boolForKey:@"WebKitKerningAndLigaturesEnabledByDefault"];
 
 #if USE(ACCELERATED_COMPOSITING) && HAVE(HOSTED_CORE_ANIMATION)
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070

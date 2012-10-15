@@ -29,7 +29,6 @@
 
 #include "PlatformExportMacros.h"
 #include <runtime/JSGlobalObject.h>
-#include <runtime/JSGlobalThis.h>
 
 
 namespace WebCore {
@@ -52,7 +51,7 @@ namespace WebCore {
         JSDOMGlobalObject(JSC::JSGlobalData&, JSC::Structure*, PassRefPtr<DOMWrapperWorld>, const JSC::GlobalObjectMethodTable* = 0);
         static void destroy(JSC::JSCell*);
         void finishCreation(JSC::JSGlobalData&);
-        void finishCreation(JSC::JSGlobalData&, JSC::JSGlobalThis*);
+        void finishCreation(JSC::JSGlobalData&, JSC::JSObject*);
 
     public:
         JSDOMStructureMap& structures() { return m_structures; }
@@ -93,7 +92,7 @@ namespace WebCore {
         JSC::JSObject* constructor = ConstructorClass::create(exec, ConstructorClass::createStructure(exec->globalData(), const_cast<JSDOMGlobalObject*>(globalObject), globalObject->objectPrototype()), const_cast<JSDOMGlobalObject*>(globalObject));
         ASSERT(!const_cast<JSDOMGlobalObject*>(globalObject)->constructors().contains(&ConstructorClass::s_info));
         JSC::WriteBarrier<JSC::JSObject> temp;
-        const_cast<JSDOMGlobalObject*>(globalObject)->constructors().add(&ConstructorClass::s_info, temp).iterator->second.set(exec->globalData(), globalObject, constructor);
+        const_cast<JSDOMGlobalObject*>(globalObject)->constructors().add(&ConstructorClass::s_info, temp).iterator->value.set(exec->globalData(), globalObject, constructor);
         return constructor;
     }
 

@@ -30,6 +30,9 @@ webkit_web_context_set_cache_model
 webkit_web_context_clear_cache
 webkit_web_context_download_uri
 webkit_web_context_get_cookie_manager
+webkit_web_context_get_favicon_database
+webkit_web_context_set_favicon_database_directory
+webkit_web_context_get_favicon_database_directory
 webkit_web_context_get_security_manager
 webkit_web_context_set_additional_plugins_directory
 webkit_web_context_get_plugins
@@ -98,6 +101,7 @@ webkit_web_view_set_custom_charset
 webkit_web_view_get_back_forward_list
 webkit_web_view_go_to_back_forward_list_item
 webkit_web_view_get_uri
+webkit_web_view_get_favicon
 webkit_web_view_set_settings
 webkit_web_view_get_settings
 webkit_web_view_get_window_properties
@@ -111,6 +115,8 @@ webkit_web_view_get_inspector
 webkit_web_view_get_javascript_global_context
 webkit_web_view_run_javascript
 webkit_web_view_run_javascript_finish
+webkit_web_view_run_javascript_from_gresource
+webkit_web_view_run_javascript_from_gresource_finish
 webkit_web_view_can_show_mime_type
 webkit_web_view_save
 webkit_web_view_save_finish
@@ -291,6 +297,8 @@ webkit_settings_set_enable_page_cache
 webkit_settings_get_user_agent
 webkit_settings_set_user_agent
 webkit_settings_set_user_agent_with_application_details
+webkit_settings_get_enable_smooth_scrolling
+webkit_settings_set_enable_smooth_scrolling
 
 <SUBSECTION Standard>
 WebKitSettingsClass
@@ -602,6 +610,31 @@ webkit_javascript_error_quark
 </SECTION>
 
 <SECTION>
+<FILE>WebKitFaviconDatabase</FILE>
+WebKitFaviconDatabase
+WEBKIT_FAVICON_DATABASE_ERROR
+WebKitFaviconDatabaseError
+webkit_favicon_database_get_favicon
+webkit_favicon_database_get_favicon_finish
+webkit_favicon_database_get_favicon_uri
+webkit_favicon_database_clear
+
+<SUBSECTION Standard>
+WebKitFaviconDatabaseClass
+WEBKIT_TYPE_FAVICON_DATABASE
+WEBKIT_FAVICON_DATABASE
+WEBKIT_IS_FAVICON_DATABASE
+WEBKIT_FAVICON_DATABASE_CLASS
+WEBKIT_IS_FAVICON_DATABASE_CLASS
+WEBKIT_FAVICON_DATABASE_GET_CLASS
+
+<SUBSECTION Private>
+WebKitFaviconDatabasePrivate
+webkit_favicon_database_get_type
+webkit_favicon_database_error_quark
+</SECTION>
+
+<SECTION>
 <FILE>WebKitFileChooserRequest</FILE>
 WebKitFileChooserRequest
 webkit_file_chooser_request_get_mime_types
@@ -745,6 +778,7 @@ WebKitURISchemeRequest
 webkit_uri_scheme_request_get_scheme
 webkit_uri_scheme_request_get_uri
 webkit_uri_scheme_request_get_path
+webkit_uri_scheme_request_get_web_view
 webkit_uri_scheme_request_finish
 
 <SUBSECTION Standard>
