@@ -42,6 +42,8 @@
 
 namespace JSC {
 
+ASSERT_CLASS_FITS_IN_CELL(ArrayPrototype);
+
 static EncodedJSValue JSC_HOST_CALL arrayProtoFuncToString(ExecState*);
 static EncodedJSValue JSC_HOST_CALL arrayProtoFuncToLocaleString(ExecState*);
 static EncodedJSValue JSC_HOST_CALL arrayProtoFuncConcat(ExecState*);
@@ -192,8 +194,7 @@ static unsigned argumentClampedIndexFromStartOrEnd(ExecState* exec, int argument
 // currentCount) will be shifted to the left or right as appropriate; in the
 // case of shift this must be removing values, in the case of unshift this
 // must be introducing new values.
-template<JSArray::ShiftCountMode shiftCountMode>
-void shift(ExecState* exec, JSObject* thisObj, unsigned header, unsigned currentCount, unsigned resultCount, unsigned length)
+static inline void shift(ExecState* exec, JSObject* thisObj, unsigned header, unsigned currentCount, unsigned resultCount, unsigned length)
 {
     ASSERT(currentCount > resultCount);
     unsigned count = currentCount - resultCount;
@@ -201,9 +202,9 @@ void shift(ExecState* exec, JSObject* thisObj, unsigned header, unsigned current
     ASSERT(header <= length);
     ASSERT(currentCount <= (length - header));
 
-    if (isJSArray(thisObj)) {
+    if (!header && isJSArray(thisObj)) {
         JSArray* array = asArray(thisObj);
-        if (array->length() == length && asArray(thisObj)->shiftCount<shiftCountMode>(exec, header, count))
+        if (array->length() == length && asArray(thisObj)->shiftCount(exec, count))
             return;
     }
 
@@ -230,8 +231,7 @@ void shift(ExecState* exec, JSObject* thisObj, unsigned header, unsigned current
         }
     }
 }
-template<JSArray::ShiftCountMode shiftCountMode>
-void unshift(ExecState* exec, JSObject* thisObj, unsigned header, unsigned currentCount, unsigned resultCount, unsigned length)
+static inline void unshift(ExecState* exec, JSObject* thisObj, unsigned header, unsigned currentCount, unsigned resultCount, unsigned length)
 {
     ASSERT(resultCount > currentCount);
     unsigned count = resultCount - currentCount;
@@ -245,12 +245,12 @@ void unshift(ExecState* exec, JSObject* thisObj, unsigned header, unsigned curre
         return;
     }
 
-    if (isJSArray(thisObj)) {
+    if (!header && isJSArray(thisObj)) {
         JSArray* array = asArray(thisObj);
-        if (array->length() == length && array->unshiftCount<shiftCountMode>(exec, header, count))
+        if (array->length() == length && asArray(thisObj)->unshiftCount(exec, count))
             return;
     }
-    
+
     for (unsigned k = length - currentCount; k > header; --k) {
         unsigned from = k + currentCount - 1;
         unsigned to = k + resultCount - 1;
@@ -526,7 +526,7 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncPush(ExecState* exec)
         array->push(exec, exec->argument(0));
         return JSValue::encode(jsNumber(array->length()));
     }
-    
+
     JSObject* thisObj = thisValue.toObject(exec);
     unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
     if (exec->hadException())
@@ -544,7 +544,6 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncPush(ExecState* exec)
         if (exec->hadException())
             return JSValue::encode(jsUndefined());
     }
-    
     JSValue newLength(static_cast<int64_t>(length) + static_cast<int64_t>(exec->argumentCount()));
     putProperty(exec, thisObj, exec->propertyNames().length, newLength);
     return JSValue::encode(newLength);
@@ -601,7 +600,7 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncShift(ExecState* exec)
         result = jsUndefined();
     } else {
         result = thisObj->get(exec, 0);
-        shift<JSArray::ShiftCountForShift>(exec, thisObj, 0, 1, 0, length);
+        shift(exec, thisObj, 0, 1, 0, length);
         if (exec->hadException())
             return JSValue::encode(jsUndefined());
         putProperty(exec, thisObj, exec->propertyNames().length, jsNumber(length - 1));
@@ -656,7 +655,7 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncSort(ExecState* exec)
     CallData callData;
     CallType callType = getCallData(function, callData);
 
-    if (thisObj->classInfo() == &JSArray::s_info && !asArray(thisObj)->hasSparseMap() && !shouldUseSlowPut(thisObj->structure()->indexingType())) {
+    if (thisObj->classInfo() == &JSArray::s_info && !asArray(thisObj)->inSparseIndexingMode() && !shouldUseSlowPut(thisObj->structure()->indexingType())) {
         if (isNumericCompareFunction(exec, callType, callData))
             asArray(thisObj)->sortNumeric(exec, function, callType, callData);
         else if (callType != CallTypeNone)
@@ -731,7 +730,7 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncSplice(ExecState* exec)
     unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
     if (exec->hadException())
         return JSValue::encode(jsUndefined());
-    
+
     if (!exec->argumentCount())
         return JSValue::encode(constructEmptyArray(exec));
 
@@ -763,11 +762,11 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncSplice(ExecState* exec)
 
     unsigned additionalArgs = std::max<int>(exec->argumentCount() - 2, 0);
     if (additionalArgs < deleteCount) {
-        shift<JSArray::ShiftCountForSplice>(exec, thisObj, begin, deleteCount, additionalArgs, length);
+        shift(exec, thisObj, begin, deleteCount, additionalArgs, length);
         if (exec->hadException())
             return JSValue::encode(jsUndefined());
     } else if (additionalArgs > deleteCount) {
-        unshift<JSArray::ShiftCountForSplice>(exec, thisObj, begin, deleteCount, additionalArgs, length);
+        unshift(exec, thisObj, begin, deleteCount, additionalArgs, length);
         if (exec->hadException())
             return JSValue::encode(jsUndefined());
     }
@@ -792,7 +791,7 @@ EncodedJSValue JSC_HOST_CALL arrayProtoFuncUnShift(ExecState* exec)
 
     unsigned nrArgs = exec->argumentCount();
     if (nrArgs) {
-        unshift<JSArray::ShiftCountForShift>(exec, thisObj, 0, 0, nrArgs, length);
+        unshift(exec, thisObj, 0, 0, nrArgs, length);
         if (exec->hadException())
             return JSValue::encode(jsUndefined());
     }

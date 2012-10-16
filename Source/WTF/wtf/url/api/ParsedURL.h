@@ -54,16 +54,10 @@ public:
 
     // Return a URL component or a null String if the component is undefined for the URL.
     WTF_EXPORT_PRIVATE String scheme() const;
-    WTF_EXPORT_PRIVATE bool hasStandardScheme() const;
-
     WTF_EXPORT_PRIVATE String username() const;
     WTF_EXPORT_PRIVATE String password() const;
     WTF_EXPORT_PRIVATE String host() const;
-
-    WTF_EXPORT_PRIVATE bool hasPort() const;
     WTF_EXPORT_PRIVATE String port() const;
-    WTF_EXPORT_PRIVATE void removePort();
-
     WTF_EXPORT_PRIVATE String path() const;
     WTF_EXPORT_PRIVATE String query() const;
 
@@ -71,10 +65,11 @@ public:
     WTF_EXPORT_PRIVATE String fragment() const;
     WTF_EXPORT_PRIVATE ParsedURL withoutFragment() const;
 
-
     WTF_EXPORT_PRIVATE String baseAsString() const;
 
-    const URLString& spec() const { return m_spec; }
+    const URLString& spec() { return m_spec; }
+
+    WTF_EXPORT_PRIVATE void reportMemoryUsage(MemoryObjectInfo*) const;
 
 #ifndef NDEBUG
     WTF_EXPORT_PRIVATE void print() const;

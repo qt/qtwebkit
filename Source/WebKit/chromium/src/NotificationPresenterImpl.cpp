@@ -41,7 +41,7 @@
 #include "WebNotification.h"
 #include "WebNotificationPermissionCallback.h"
 #include "WebNotificationPresenter.h"
-#include <public/WebURL.h>
+#include "platform/WebURL.h"
 
 #include <wtf/PassRefPtr.h>
 

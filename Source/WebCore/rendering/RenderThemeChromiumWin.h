@@ -100,8 +100,6 @@ namespace WebCore {
         virtual bool paintProgressBar(RenderObject*, const PaintInfo&, const IntRect&);
 #endif
 
-        virtual bool shouldOpenPickerWithF4Key() const OVERRIDE;
-
     protected:
         virtual double caretBlinkIntervalInternal() const;
 

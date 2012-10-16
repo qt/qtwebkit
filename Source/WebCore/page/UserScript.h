@@ -29,20 +29,18 @@
 #include "KURL.h"
 #include "UserContentTypes.h"
 #include "UserScriptTypes.h"
+#include <wtf/OwnPtr.h>
+#include <wtf/PassOwnPtr.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
 
 class UserScript {
-    WTF_MAKE_FAST_ALLOCATED;
+    WTF_MAKE_NONCOPYABLE(UserScript); WTF_MAKE_FAST_ALLOCATED;
 public:
-    UserScript()
-        : m_injectionTime(InjectAtDocumentStart)
-        , m_injectedFrames(InjectInAllFrames)
-    {
-    }
-
-    UserScript(const String& source, const KURL& url, const Vector<String>& whitelist, const Vector<String>& blacklist, UserScriptInjectionTime injectionTime, UserContentInjectedFrames injectedFrames)
+    UserScript(const String& source, const KURL& url,
+               PassOwnPtr<Vector<String> > whitelist, PassOwnPtr<Vector<String> > blacklist,
+               UserScriptInjectionTime injectionTime, UserContentInjectedFrames injectedFrames)
         : m_source(source)
         , m_url(url)
         , m_whitelist(whitelist)
@@ -54,16 +52,16 @@ public:
 
     const String& source() const { return m_source; }
     const KURL& url() const { return m_url; }
-    const Vector<String>& whitelist() const { return m_whitelist; }
-    const Vector<String>& blacklist() const { return m_blacklist; }
+    const Vector<String>* whitelist() const { return m_whitelist.get(); }
+    const Vector<String>* blacklist() const { return m_blacklist.get(); }
     UserScriptInjectionTime injectionTime() const { return m_injectionTime; }
     UserContentInjectedFrames injectedFrames() const { return m_injectedFrames; }
 
 private:
     String m_source;
     KURL m_url;
-    Vector<String> m_whitelist;
-    Vector<String> m_blacklist;
+    OwnPtr<Vector<String> > m_whitelist;
+    OwnPtr<Vector<String> > m_blacklist;
     UserScriptInjectionTime m_injectionTime;
     UserContentInjectedFrames m_injectedFrames;
 };

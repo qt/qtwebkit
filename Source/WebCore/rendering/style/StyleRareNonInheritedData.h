@@ -57,7 +57,7 @@ class StyleTransformData;
 class ContentData;
 struct LengthSize;
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
 struct StyleDashboardRegion;
 #endif
 
@@ -102,11 +102,8 @@ public:
     Length m_perspectiveOriginY;
 
     LineClampValue lineClamp; // An Apple extension.
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
     Vector<StyleDashboardRegion> m_dashboardRegions;
-#endif
-#if ENABLE(WIDGET_REGION)
-    DraggableRegionMode m_draggableRegionMode;
 #endif
 
     DataRef<StyleDeprecatedFlexibleBoxData> m_deprecatedFlexibleBox; // Flexible box properties
@@ -137,8 +134,8 @@ public:
 
     LengthSize m_pageSize;
 
-    RefPtr<BasicShape> m_shapeInside;
-    RefPtr<BasicShape> m_shapeOutside;
+    RefPtr<BasicShape> m_wrapShapeInside;
+    RefPtr<BasicShape> m_wrapShapeOutside;
     Length m_wrapMargin;
     Length m_wrapPadding;
 

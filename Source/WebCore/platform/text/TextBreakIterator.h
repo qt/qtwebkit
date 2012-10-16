@@ -38,7 +38,6 @@ namespace WebCore {
     TextBreakIterator* cursorMovementIterator(const UChar*, int length);
 
     TextBreakIterator* wordBreakIterator(const UChar*, int length);
-    TextBreakIterator* acquireLineBreakIterator(const LChar*, int length, const AtomicString& locale);
     TextBreakIterator* acquireLineBreakIterator(const UChar*, int length, const AtomicString& locale);
     void releaseLineBreakIterator(TextBreakIterator*);
     TextBreakIterator* sentenceBreakIterator(const UChar*, int length);
@@ -57,13 +56,9 @@ namespace WebCore {
 
 class LazyLineBreakIterator {
 public:
-    LazyLineBreakIterator()
-        : m_iterator(0)
-    {
-    }
-
-    LazyLineBreakIterator(String string, const AtomicString& locale = AtomicString())
+    LazyLineBreakIterator(const UChar* string = 0, int length = 0, const AtomicString& locale = AtomicString())
         : m_string(string)
+        , m_length(length)
         , m_locale(locale)
         , m_iterator(0)
     {
@@ -75,31 +70,30 @@ public:
             releaseLineBreakIterator(m_iterator);
     }
 
-    String string() const { return m_string; }
+    const UChar* string() const { return m_string; }
+    int length() const { return m_length; }
 
     TextBreakIterator* get()
     {
-        if (!m_iterator) {
-            if (m_string.is8Bit())
-                m_iterator = acquireLineBreakIterator(m_string.characters8(), m_string.length(), m_locale);
-            else
-                m_iterator = acquireLineBreakIterator(m_string.characters16(), m_string.length(), m_locale);
-        }
+        if (!m_iterator)
+            m_iterator = acquireLineBreakIterator(m_string, m_length, m_locale);
         return m_iterator;
     }
 
-    void reset(String string, const AtomicString& locale)
+    void reset(const UChar* string, int length, const AtomicString& locale)
     {
         if (m_iterator)
             releaseLineBreakIterator(m_iterator);
 
         m_string = string;
+        m_length = length;
         m_locale = locale;
         m_iterator = 0;
     }
 
 private:
-    String m_string;
+    const UChar* m_string;
+    int m_length;
     AtomicString m_locale;
     TextBreakIterator* m_iterator;
 };

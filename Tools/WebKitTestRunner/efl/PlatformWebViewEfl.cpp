@@ -28,9 +28,11 @@ using namespace WebKit;
 
 namespace WTR {
 
+static bool useX11Window = false;
+
 static Ecore_Evas* initEcoreEvas()
 {
-    Ecore_Evas* ecoreEvas = ecore_evas_new(0, 0, 0, 800, 600, 0);
+    Ecore_Evas* ecoreEvas = useX11Window ? ecore_evas_new(0, 0, 0, 800, 600, 0) : ecore_evas_buffer_new(800, 600);
     if (!ecoreEvas)
         return 0;
 
@@ -74,18 +76,16 @@ void PlatformWebView::focus()
 
 WKRect PlatformWebView::windowFrame()
 {
-    int x, y, width, height;
-
-    Ecore_Evas* ee = ecore_evas_ecore_evas_get(evas_object_evas_get(m_view));
-    ecore_evas_request_geometry_get(ee, &x, &y, &width, &height);
+    Evas_Coord x, y, width, height;
+    evas_object_geometry_get(m_view, &x, &y, &width, &height);
 
     return WKRectMake(x, y, width, height);
 }
 
 void PlatformWebView::setWindowFrame(WKRect frame)
 {
-    Ecore_Evas* ee = ecore_evas_ecore_evas_get(evas_object_evas_get(m_view));
-    ecore_evas_move_resize(ee, frame.origin.x, frame.origin.y, frame.size.width, frame.size.height);
+    evas_object_move(m_view, frame.origin.x, frame.origin.y);
+    resizeTo(frame.size.width, frame.size.height);
 }
 
 void PlatformWebView::addChromeInputField()

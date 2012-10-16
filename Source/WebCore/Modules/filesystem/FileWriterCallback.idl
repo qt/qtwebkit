@@ -28,9 +28,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=FILE_SYSTEM,
-    Callback
-] interface FileWriterCallback {
-    boolean handleEvent(in FileWriter fileWriter);
-};
+module fileapi {
+    interface [
+        Conditional=FILE_SYSTEM,
+        Callback
+    ] FileWriterCallback {
+        boolean handleEvent(in FileWriter fileWriter);
+    };
+}

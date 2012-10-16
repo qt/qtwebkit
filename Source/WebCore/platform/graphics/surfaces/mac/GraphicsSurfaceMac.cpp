@@ -64,13 +64,18 @@ static uint32_t createTexture(IOSurfaceRef handle)
 
 struct GraphicsSurfacePrivate {
 public:
-    GraphicsSurfacePrivate(const GraphicsSurfaceToken& token)
+    GraphicsSurfacePrivate(uint64_t token)
         : m_token(token)
         , m_frontBufferTexture(0)
         , m_backBufferTexture(0)
     {
-        m_frontBuffer = IOSurfaceLookup(m_token.frontBufferHandle);
-        m_backBuffer = IOSurfaceLookup(m_token.backBufferHandle);
+        // The token contains the IOSurfaceID of the fist surface/buffer in the first 32 Bit
+        // and the IOSurfaceID of the second surface/buffer in the second 32 Bit.
+        uint32_t frontBuffer = token >> 32;
+        uint32_t backBuffer = token & 0xffff;
+
+        m_frontBuffer = IOSurfaceLookup(frontBuffer);
+        m_backBuffer = IOSurfaceLookup(backBuffer);
     }
 
     GraphicsSurfacePrivate(const IntSize& size, GraphicsSurface::Flags flags)
@@ -114,7 +119,11 @@ public:
         m_frontBuffer = IOSurfaceCreate(dict);
         m_backBuffer = IOSurfaceCreate(dict);
 
-        m_token = GraphicsSurfaceToken(IOSurfaceGetID(m_frontBuffer), IOSurfaceGetID(m_backBuffer));
+        uint64_t token = IOSurfaceGetID(m_frontBuffer);
+        token <<= 32;
+        token |= IOSurfaceGetID(m_backBuffer);
+
+        m_token = token;
     }
 
     ~GraphicsSurfacePrivate()
@@ -140,7 +149,7 @@ public:
         return IOSurfaceGetID(m_frontBuffer);
     }
 
-    GraphicsSurfaceToken token() const
+    uint64_t token() const
     {
         return m_token;
     }
@@ -176,10 +185,10 @@ private:
     PlatformGraphicsSurface m_backBuffer;
     uint32_t m_frontBufferTexture;
     uint32_t m_backBufferTexture;
-    GraphicsSurfaceToken m_token;
+    uint64_t m_token;
 };
 
-GraphicsSurfaceToken GraphicsSurface::platformExport()
+uint64_t GraphicsSurface::platformExport()
 {
     return m_private->token();
 }
@@ -267,7 +276,7 @@ PassRefPtr<GraphicsSurface> GraphicsSurface::platformCreate(const IntSize& size,
     return surface;
 }
 
-PassRefPtr<GraphicsSurface> GraphicsSurface::platformImport(const IntSize& size, Flags flags, const GraphicsSurfaceToken& token)
+PassRefPtr<GraphicsSurface> GraphicsSurface::platformImport(const IntSize& size, Flags flags, uint64_t token)
 {
     // We currently disable support for CopyToTexture on Mac, because this is used for single buffered Tiles.
     // The single buffered nature of this requires a call to glFlush, as described in platformCopyToTexture.

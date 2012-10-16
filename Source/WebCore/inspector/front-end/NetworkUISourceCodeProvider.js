@@ -38,7 +38,6 @@ WebInspector.NetworkUISourceCodeProvider = function(workspace)
     WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.ResourceAdded, this._resourceAdded, this);
     this._workspace.addEventListener(WebInspector.Workspace.Events.ProjectWillReset, this._projectWillReset, this);
     this._workspace.addEventListener(WebInspector.Workspace.Events.ProjectDidReset, this._projectDidReset, this);
-    WebInspector.debuggerModel.addEventListener(WebInspector.DebuggerModel.Events.ParsedScriptSource, this._parsedScriptSource, this);
 
     this._uiSourceCodeForResource = {};
 }
@@ -62,29 +61,6 @@ WebInspector.NetworkUISourceCodeProvider.prototype = {
     /**
      * @param {WebInspector.Event} event
      */
-    _parsedScriptSource: function(event)
-    {
-        var script = /** @type {WebInspector.Script} */ event.data;
-        if (!script.hasSourceURL && !script.isContentScript)
-            return;
-        if (!script.sourceURL)
-            return;
-        // Filter out embedder injected content scripts.
-        if (script.isContentScript && !script.hasSourceURL) {
-            var parsedURL = new WebInspector.ParsedURL(script.sourceURL);
-            if (!parsedURL.host)
-                return;
-        }
-        if (this._uiSourceCodeForResource[script.sourceURL])
-            return;
-        var uiSourceCode = new WebInspector.JavaScriptSource(script.sourceURL, script, true);
-        this._uiSourceCodeForResource[script.sourceURL] = uiSourceCode;
-        this._workspace.project().addUISourceCode(uiSourceCode);
-    },
-
-    /**
-     * @param {WebInspector.Event} event
-     */
     _resourceAdded: function(event)
     {
         var resource = /** @type {WebInspector.Resource} */ event.data;
@@ -96,10 +72,10 @@ WebInspector.NetworkUISourceCodeProvider.prototype = {
             uiSourceCode = new WebInspector.StyleSource(resource);
             break;
         case WebInspector.resourceTypes.Document:
-            uiSourceCode = new WebInspector.JavaScriptSource(resource.url, resource, false);
+            uiSourceCode = new WebInspector.JavaScriptSource(resource.url, resource, resource, false);
             break;
         case WebInspector.resourceTypes.Script:
-            uiSourceCode = new WebInspector.JavaScriptSource(resource.url, resource, true);
+            uiSourceCode = new WebInspector.JavaScriptSource(resource.url, resource, resource, true);
             break;
         }
         if (uiSourceCode) {

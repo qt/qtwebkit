@@ -45,7 +45,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-void MarkupAccumulator::appendCharactersReplacingEntities(StringBuilder& result, const String& source, unsigned offset, unsigned length, EntityMask entityMask)
+void appendCharactersReplacingEntities(StringBuilder& result, const UChar* content, size_t length, EntityMask entityMask)
 {
     DEFINE_STATIC_LOCAL(const String, ampReference, (ASCIILiteral("&amp;")));
     DEFINE_STATIC_LOCAL(const String, ltReference, (ASCIILiteral("&lt;")));
@@ -61,42 +61,18 @@ void MarkupAccumulator::appendCharactersReplacingEntities(StringBuilder& result,
         { noBreakSpace, nbspReference, EntityNbsp },
     };
 
-    if (!(offset + length))
-        return;
-
-    ASSERT(offset + length <= source.length());
-
-    if (source.is8Bit()) {
-        const LChar* text = source.characters8() + offset;
-
-        size_t positionAfterLastEntity = 0;
-        for (size_t i = 0; i < length; ++i) {
-            for (size_t entityIndex = 0; entityIndex < WTF_ARRAY_LENGTH(entityMaps); ++entityIndex) {
-                if (text[i] == entityMaps[entityIndex].entity && entityMaps[entityIndex].mask & entityMask) {
-                    result.append(text + positionAfterLastEntity, i - positionAfterLastEntity);
-                    result.append(entityMaps[entityIndex].reference);
-                    positionAfterLastEntity = i + 1;
-                    break;
-                }
+    size_t positionAfterLastEntity = 0;
+    for (size_t i = 0; i < length; ++i) {
+        for (size_t m = 0; m < WTF_ARRAY_LENGTH(entityMaps); ++m) {
+            if (content[i] == entityMaps[m].entity && entityMaps[m].mask & entityMask) {
+                result.append(content + positionAfterLastEntity, i - positionAfterLastEntity);
+                result.append(entityMaps[m].reference);
+                positionAfterLastEntity = i + 1;
+                break;
             }
         }
-        result.append(text + positionAfterLastEntity, length - positionAfterLastEntity);
-    } else {
-        const UChar* text = source.characters16() + offset;
-
-        size_t positionAfterLastEntity = 0;
-        for (size_t i = 0; i < length; ++i) {
-            for (size_t entityIndex = 0; entityIndex < WTF_ARRAY_LENGTH(entityMaps); ++entityIndex) {
-                if (text[i] == entityMaps[entityIndex].entity && entityMaps[entityIndex].mask & entityMask) {
-                    result.append(text + positionAfterLastEntity, i - positionAfterLastEntity);
-                    result.append(entityMaps[entityIndex].reference);
-                    positionAfterLastEntity = i + 1;
-                    break;
-                }
-            }
-        }
-        result.append(text + positionAfterLastEntity, length - positionAfterLastEntity);
     }
+    result.append(content + positionAfterLastEntity, length - positionAfterLastEntity);
 }
 
 MarkupAccumulator::MarkupAccumulator(Vector<Node*>* nodes, EAbsoluteURLs resolveUrlsMethod, const Range* range)
@@ -198,7 +174,7 @@ void MarkupAccumulator::concatenateMarkup(StringBuilder& result)
 
 void MarkupAccumulator::appendAttributeValue(StringBuilder& result, const String& attribute, bool documentIsHTML)
 {
-    appendCharactersReplacingEntities(result, attribute, 0, attribute.length(),
+    appendCharactersReplacingEntities(result, attribute.characters(), attribute.length(),
         documentIsHTML ? EntityMaskInHTMLAttributeValue : EntityMaskInAttributeValue);
 }
 
@@ -234,21 +210,22 @@ void MarkupAccumulator::appendQuotedURLAttributeValue(StringBuilder& result, con
 
 void MarkupAccumulator::appendNodeValue(StringBuilder& result, const Node* node, const Range* range, EntityMask entityMask)
 {
-    const String str = node->nodeValue();
-    unsigned length = str.length();
-    unsigned start = 0;
+    String str = node->nodeValue();
+    const UChar* characters = str.characters();
+    size_t length = str.length();
 
     if (range) {
         ExceptionCode ec;
         if (node == range->endContainer(ec))
             length = range->endOffset(ec);
         if (node == range->startContainer(ec)) {
-            start = range->startOffset(ec);
+            size_t start = range->startOffset(ec);
+            characters += start;
             length -= start;
         }
     }
 
-    appendCharactersReplacingEntities(result, str, start, length, entityMask);
+    appendCharactersReplacingEntities(result, characters, length, entityMask);
 }
 
 bool MarkupAccumulator::shouldAddNamespaceElement(const Element* element)

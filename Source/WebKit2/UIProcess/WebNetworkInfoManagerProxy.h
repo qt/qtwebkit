@@ -29,16 +29,22 @@
 #if ENABLE(NETWORK_INFO)
 
 #include "APIObject.h"
-#include "MessageReceiver.h"
+#include "MessageID.h"
 #include "WebNetworkInfoProvider.h"
 #include <wtf/Forward.h>
+
+namespace CoreIPC {
+class ArgumentDecoder;
+class ArgumentEncoder;
+class Connection;
+}
 
 namespace WebKit {
 
 class WebContext;
 class WebNetworkInfo;
 
-class WebNetworkInfoManagerProxy : public APIObject, private CoreIPC::MessageReceiver {
+class WebNetworkInfoManagerProxy : public APIObject {
 public:
     static const Type APIType = TypeNetworkInfoManager;
 
@@ -52,18 +58,17 @@ public:
 
     void providerDidChangeNetworkInformation(const WTF::AtomicString& eventType, WebNetworkInfo*);
 
+    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, WTF::OwnPtr<CoreIPC::ArgumentEncoder>&);
+
 private:
     explicit WebNetworkInfoManagerProxy(WebContext*);
 
     virtual Type type() const { return APIType; }
 
-    // CoreIPC::MessageReceiver
-    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*) OVERRIDE;
-    virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&) OVERRIDE;
-
     // Implemented in generated WebNetworkInfoManagerProxyMessageReceiver.cpp
     void didReceiveWebNetworkInfoManagerProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-    void didReceiveSyncWebNetworkInfoManagerProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
+    void didReceiveSyncWebNetworkInfoManagerProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, WTF::OwnPtr<CoreIPC::ArgumentEncoder>&);
 
     void startUpdating();
     void stopUpdating();

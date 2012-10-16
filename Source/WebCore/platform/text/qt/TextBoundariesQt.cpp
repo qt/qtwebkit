@@ -26,12 +26,12 @@
  */
 
 #include "config.h"
-#include "TextBoundaries.h"
 
+#include "TextBoundaries.h"
 #include "NotImplemented.h"
 
-#include <QChar>
 #include <QString>
+#include <QChar>
 
 #include <QDebug>
 #include <stdio.h>

@@ -390,11 +390,6 @@ AM_PATH_GLIB_2_0($GLIB_REQUIRED_VERSION, :, :, gmodule gobject gthread gio)
 if test -z "$GLIB_GENMARSHAL" || test -z "$GLIB_MKENUMS"; then
    AC_MSG_ERROR([You need the GLib dev tools in your path])
 fi
-
-# GResources
-GLIB_COMPILE_RESOURCES=`$PKG_CONFIG --variable glib_compile_resources gio-2.0`
-AC_SUBST(GLIB_COMPILE_RESOURCES)
-
 GLIB_GSETTINGS
 
 # Check and identify which unicode backend to use
@@ -552,84 +547,11 @@ AC_ARG_ENABLE(unstable_features,
               [],[enable_unstable_features="no"])
 AC_MSG_RESULT([$enable_unstable_features])
 
-found_opengl=no
-AC_ARG_ENABLE(glx,
-              AC_HELP_STRING([--enable-glx], [enable support for GLX [default=auto]]),
-              [], [enable_glx="auto"])
-AC_ARG_ENABLE(egl,
-              AC_HELP_STRING([--enable-egl], [enable support for EGL [default=auto]]),
-              [], [enable_egl="auto"])
-AC_ARG_ENABLE(gles2,
-              AC_HELP_STRING([--enable-gles2], [enable support for OpenGL ES 2 [default=auto]]),
-              [], [enable_gles2="auto"])
-
-have_glx=no
-AC_CHECK_HEADERS([GL/glx.h], [have_glx="yes"], [have_glx="no"])
-AC_MSG_CHECKING([whether to enable GLX support])
-if test "$enable_glx" != "no"; then
-   if test "$have_glx" = "no"; then
-      if test "$enable_glx" = "yes"; then
-         AC_MSG_ERROR([--enable-glx specified, but not available])
-      else
-         enable_glx=no
-      fi
-   elif test "$enable_gles2" != "yes"; then
-      enable_glx=yes
-   fi
-fi
-AC_MSG_RESULT([$enable_glx])
-
-have_egl=no
-AC_CHECK_HEADERS([EGL/egl.h], [have_egl="yes"], [have_egl="no"])
-AC_MSG_CHECKING([whether to enable EGL support])
-if test "$enable_egl" != "no"; then
-   if test "$have_egl" = "no"; then
-      if test "$enable_egl" = "yes"; then
-         AC_MSG_ERROR([--enable-egl specified, but not available])
-      else
-         enable_egl=no
-      fi
-   else
-      enable_egl=yes
-   fi
-fi
-AC_MSG_RESULT([$enable_egl])
-
-have_gles2=no
-AC_CHECK_HEADERS([GLES2/gl2.h], [have_gles2="yes"], [have_gles2="no"])
-AC_MSG_CHECKING([whether to use OpenGL ES 2 support])
-if test "$enable_glx" = "yes"; then
-   if test "$enable_gles2" = "yes"; then
-      AC_MSG_ERROR([Cannot enable OpenGL ES 2 support with GLX])
-   else
-      enable_gles2=no
-   fi
-fi
-if test "$enable_egl" = "no"; then
-   if test "$enable_gles2" = "yes"; then
-      AC_MSG_ERROR([Cannot enable OpenGL ES 2 support without EGL])
-   else
-      enable_gles2=no
-   fi
-fi
-if test "$enable_gles2" != "no"; then
-   if test "$have_gles2" = "no"; then
-      if test "$enable_gles2" = "yes"; then
-         AC_MSG_ERROR([--enable-gles2 specified, but not available])
-      else
-         enable_gles2=no
-      fi
-   else
-      enable_gles2=yes
-      found_opengl=yes
-   fi
-fi
-AC_MSG_RESULT([$enable_gles2])
-
-if test "$enable_gles2" != "yes"; then
+found_opengl="no"
+if test "$with_target" = "x11"; then
     AC_CHECK_HEADERS([GL/gl.h], [found_opengl="yes"], [])
+    AC_CHECK_HEADERS([GL/glx.h], [], [found_opengl="no"])
 fi
-
 AC_MSG_CHECKING([which GPU acceleration backend to use])
 AC_ARG_WITH(acceleration_backend,
             AC_HELP_STRING([--with-acceleration-backend=@<:@opengl/clutter/none@:>@],
@@ -645,11 +567,8 @@ AC_MSG_RESULT([$with_acceleration_backend])
 
 if test "$with_acceleration_backend" = "opengl"; then
     PKG_CHECK_MODULES([XCOMPOSITE], [xcomposite]);
-    PKG_CHECK_MODULES([XDAMAGE], [xdamage]);
     AC_SUBST(XCOMPOSITE_CFLAGS)
     AC_SUBST(XCOMPOSITE_LIBS)
-    AC_SUBST(XDAMAGE_CFLAGS)
-    AC_SUBST(XDAMAGE_LIBS)
 fi
 
 # OpenGL is turned on by default (along with WebGL and accelerated compositing), but if
@@ -1004,7 +923,7 @@ if test "$enable_video" = "yes" || test "$enable_web_audio" = "yes"; then
    AC_SUBST([GSTREAMER_LIBS])
 fi
 
-acceleration_backend_description=$with_acceleration_backend
+
 if test "$with_acceleration_backend" = "clutter"; then
    PKG_CHECK_MODULES(CLUTTER, clutter-1.0 >= $CLUTTER_REQUIRED_VERSION)
    PKG_CHECK_MODULES([CLUTTER_GTK],
@@ -1017,22 +936,7 @@ if test "$with_acceleration_backend" = "clutter"; then
 fi
 
 if test "$with_acceleration_backend" = "opengl"; then
-   if test "$enable_gles2" = "yes"; then
-    acceleration_backend_description+= "(gles2"
-    OPENGL_LIBS="-lGLESv2"
-   else
-    acceleration_backend_description+="(gl"
-    OPENGL_LIBS="-lGL"
-   fi
-   if test "$enable_egl" = "yes"; then
-    acceleration_backend_description+=", egl"
-    OPENGL_LIBS+=" -lEGL"
-   fi
-   if test "$enable_glx" = "yes"; then
-    acceleration_backend_description+=", glx"
-   fi
-   OPENGL_LIBS+=" -ldl"
-   acceleration_backend_description+=")"
+    OPENGL_LIBS="-lGL -ldl"
 fi
 AC_SUBST([OPENGL_LIBS])
 
@@ -1141,10 +1045,8 @@ AM_CONDITIONAL([USE_TEXTURE_MAPPER_GL], [test "$enable_accelerated_compositing" 
 AM_CONDITIONAL([USE_CLUTTER], [test "$with_acceleration_backend" = "clutter"])
 
 # These are the same now, but they will soon be separate.
+AM_CONDITIONAL([USE_GLX], [test "$with_acceleration_backend" = "opengl"])
 AM_CONDITIONAL([USE_OPENGL], [test "$with_acceleration_backend" = "opengl"])
-AM_CONDITIONAL([USE_EGL], [test "$enable_egl" = "yes"])
-AM_CONDITIONAL([USE_GLES2], [test "$enable_gles2" = "yes"])
-AM_CONDITIONAL([USE_GLX], [test "$enable_glx" = "yes"])
 
 # IndexedDB implies LevelDB, but other features may one day require LevelDB.
 AM_CONDITIONAL([ENABLE_INDEXED_DATABASE],[test "$enable_indexed_database" = "yes"])
@@ -1223,7 +1125,7 @@ Build configuration:
  Unicode backend                                          : $with_unicode_backend
  Font backend                                             : $with_font_backend
  Optimized memory allocator                               : $enable_fast_malloc
- Accelerated rendering backend                            : $acceleration_backend_description
+ Accelerated rendering backend                            : $with_acceleration_backend
 
 Features:
 =======

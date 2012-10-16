@@ -36,7 +36,6 @@ public:
         , m_lineGap(0)
         , m_lineSpacing(0)
         , m_xHeight(0)
-        , m_hasXHeight(false)
     {
     }
 
@@ -73,14 +72,7 @@ public:
     void setLineSpacing(float lineSpacing) { m_lineSpacing = lineSpacing; }
 
     float xHeight() const { return m_xHeight; }
-    void setXHeight(float xHeight) 
-    { 
-        m_xHeight = xHeight;
-        m_hasXHeight = true;
-    }
-
-    bool hasXHeight() const { return m_hasXHeight && m_xHeight > 0; }
-    void setHasXHeight(bool hasXHeight) { m_hasXHeight = hasXHeight; }
+    void setXHeight(float xHeight) { m_xHeight = xHeight; }
 
     // Integer variants of certain metrics, used for HTML rendering.
     int ascent(FontBaseline baselineType = AlphabeticBaseline) const
@@ -121,7 +113,6 @@ private:
         m_lineGap = 0;
         m_lineSpacing = 0;
         m_xHeight = 0;
-        m_hasXHeight = false;
     }
 
     unsigned m_unitsPerEm;
@@ -130,7 +121,6 @@ private:
     float m_lineGap;
     float m_lineSpacing;
     float m_xHeight;
-    bool m_hasXHeight;
 };
 
 static inline float scaleEmToUnits(float x, unsigned unitsPerEm)

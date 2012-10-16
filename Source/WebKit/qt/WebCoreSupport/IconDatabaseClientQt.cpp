@@ -53,6 +53,11 @@ IconDatabaseClientQt::~IconDatabaseClientQt()
 {
 }
 
+bool IconDatabaseClientQt::performImport()
+{
+    return true;
+}
+
 void IconDatabaseClientQt::didRemoveAllIcons()
 {
 }

@@ -212,12 +212,12 @@ WKStringRef WKBundlePageCopyRenderTreeExternalRepresentation(WKBundlePageRef pag
 
 void WKBundlePageExecuteEditingCommand(WKBundlePageRef pageRef, WKStringRef name, WKStringRef argument)
 {
-    toImpl(pageRef)->executeEditingCommand(toWTFString(name), toWTFString(argument));
+    toImpl(pageRef)->executeEditingCommand(toImpl(name)->string(), toImpl(argument)->string());
 }
 
 bool WKBundlePageIsEditingCommandEnabled(WKBundlePageRef pageRef, WKStringRef name)
 {
-    return toImpl(pageRef)->isEditingCommandEnabled(toWTFString(name));
+    return toImpl(pageRef)->isEditingCommandEnabled(toImpl(name)->string());
 }
 
 void WKBundlePageClearMainFrameName(WKBundlePageRef pageRef)
@@ -277,7 +277,7 @@ void WKBundlePageUninstallPageOverlay(WKBundlePageRef pageRef, WKBundlePageOverl
 
 bool WKBundlePageHasLocalDataForURL(WKBundlePageRef pageRef, WKURLRef urlRef)
 {
-    return toImpl(pageRef)->hasLocalDataForURL(WebCore::KURL(WebCore::KURL(), toWTFString(urlRef)));
+    return toImpl(pageRef)->hasLocalDataForURL(WebCore::KURL(WebCore::KURL(), toImpl(urlRef)->string()));
 }
 
 bool WKBundlePageCanHandleRequest(WKURLRequestRef requestRef)
@@ -287,7 +287,7 @@ bool WKBundlePageCanHandleRequest(WKURLRequestRef requestRef)
 
 bool WKBundlePageFindString(WKBundlePageRef pageRef, WKStringRef target, WKFindOptions findOptions)
 {
-    return toImpl(pageRef)->findStringFromInjectedBundle(toWTFString(target), toFindOptions(findOptions));
+    return toImpl(pageRef)->findStringFromInjectedBundle(toImpl(target)->string(), toFindOptions(findOptions));
 }
 
 WKImageRef WKBundlePageCreateSnapshotWithOptions(WKBundlePageRef pageRef, WKRect rect, WKSnapshotOptions options)
@@ -403,7 +403,7 @@ WKArrayRef WKBundlePageCopyTrackedRepaintRects(WKBundlePageRef pageRef)
 
 void WKBundlePageSetComposition(WKBundlePageRef pageRef, WKStringRef text, int from, int length)
 {
-    toImpl(pageRef)->setCompositionForTesting(toWTFString(text), from, length);
+    toImpl(pageRef)->setCompositionForTesting(toImpl(text)->string(), from, length);
 }
 
 bool WKBundlePageHasComposition(WKBundlePageRef pageRef)
@@ -418,12 +418,26 @@ void WKBundlePageConfirmComposition(WKBundlePageRef pageRef)
 
 void WKBundlePageConfirmCompositionWithText(WKBundlePageRef pageRef, WKStringRef text)
 {
-    toImpl(pageRef)->confirmCompositionForTesting(toWTFString(text));
+    toImpl(pageRef)->confirmCompositionForTesting(toImpl(text)->string());
 }
 
 bool WKBundlePageCanShowMIMEType(WKBundlePageRef, WKStringRef mimeTypeRef)
 {
-    const String mimeType = toWTFString(mimeTypeRef);
+    using WebCore::MIMETypeRegistry;
 
-    return WebCore::MIMETypeRegistry::canShowMIMEType(mimeType);
+    const WTF::String mimeType = toImpl(mimeTypeRef)->string();
+
+    if (MIMETypeRegistry::isSupportedNonImageMIMEType(mimeType))
+        return true;
+
+    if (MIMETypeRegistry::isSupportedImageMIMEType(mimeType))
+        return true;
+
+    if (MIMETypeRegistry::isSupportedMediaMIMEType(mimeType))
+        return true;
+
+    if (mimeType.startsWith("text/", false))
+        return !MIMETypeRegistry::isUnsupportedTextMIMEType(mimeType);
+
+    return false;
 }

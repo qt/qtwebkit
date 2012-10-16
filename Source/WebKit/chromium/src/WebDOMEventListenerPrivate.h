@@ -31,7 +31,8 @@
 #ifndef WebDOMEventListenerPrivate_h
 #define WebDOMEventListenerPrivate_h
 
-#include <public/WebString.h>
+#include "platform/WebString.h"
+
 #include <wtf/Vector.h>
 
 namespace WebCore {

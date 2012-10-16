@@ -471,8 +471,6 @@ DumpRenderTree::DumpRenderTree()
 
     DumpRenderTreeSupportQt::setDumpRenderTreeModeEnabled(true);
     DumpRenderTreeSupportQt::setInteractiveFormValidationEnabled(webPage(), true);
-    DumpRenderTreeSupportQt::enableMockScrollbars();
-
     QFocusEvent event(QEvent::FocusIn, Qt::ActiveWindowFocusReason);
     QApplication::sendEvent(m_mainView, &event);
 }
@@ -948,23 +946,6 @@ void DumpRenderTree::dump()
             painter.end();
         } else
             image = DumpRenderTreeSupportQt::paintPagesWithBoundaries(mainFrame);
-
-        if (DumpRenderTreeSupportQt::trackRepaintRects(m_page->mainFrame())) {
-            QVector<QRect> repaintRects;
-            DumpRenderTreeSupportQt::getTrackedRepaintRects(m_page->mainFrame(), repaintRects);
-            QImage mask(image.size(), image.format());
-            mask.fill(QColor(0, 0, 0, 0.66 * 255));
-
-            QPainter maskPainter(&mask);
-            maskPainter.setCompositionMode(QPainter::CompositionMode_Source);
-            for (int i = 0; i < repaintRects.size(); ++i)
-                maskPainter.fillRect(repaintRects[i], Qt::transparent);
-
-            QPainter painter(&image);
-            painter.drawImage(image.rect(), mask);
-
-            DumpRenderTreeSupportQt::setTrackRepaintRects(m_page->mainFrame(), false);
-        }
 
         QCryptographicHash hash(QCryptographicHash::Md5);
         for (int row = 0; row < image.height(); ++row)

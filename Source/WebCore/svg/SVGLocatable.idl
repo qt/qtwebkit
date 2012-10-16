@@ -24,19 +24,22 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=SVG,
-    ObjCProtocol,
-    SuppressToJSObject,
-    OmitConstructor
-] interface SVGLocatable {
-    readonly attribute SVGElement nearestViewportElement;
-    readonly attribute SVGElement farthestViewportElement;
+module svg {
 
-    SVGRect   getBBox();
-    SVGMatrix getCTM();
-    SVGMatrix getScreenCTM();
-    SVGMatrix getTransformToElement(in [Optional=DefaultIsUndefined] SVGElement element)
-        raises(SVGException);
-};
+    interface [
+        Conditional=SVG,
+        ObjCProtocol,
+        SuppressToJSObject,
+        OmitConstructor
+    ] SVGLocatable {
+        readonly attribute SVGElement nearestViewportElement;
+        readonly attribute SVGElement farthestViewportElement;
 
+        SVGRect   getBBox();
+        SVGMatrix getCTM();
+        SVGMatrix getScreenCTM();
+        SVGMatrix getTransformToElement(in [Optional=DefaultIsUndefined] SVGElement element)
+            raises(SVGException);
+    };
+
+}

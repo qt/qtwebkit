@@ -33,7 +33,7 @@
 
 namespace JSC {
 
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSScope);
+ASSERT_CLASS_FITS_IN_CELL(JSScope);
 
 void JSScope::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {

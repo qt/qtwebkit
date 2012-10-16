@@ -49,7 +49,6 @@
 #import "MIMETypeRegistry.h"
 #import "Page.h"
 #import "RenderImage.h"
-#import "ResourceBuffer.h"
 #import "Text.h"
 #import "WebCoreNSStringExtras.h"
 #import "WebNSAttributedStringExtras.h"
@@ -261,7 +260,7 @@ void Pasteboard::writeURL(const KURL& url, const String& titleStr, Frame* frame)
 
 static NSFileWrapper* fileWrapperForImage(CachedResource* resource, NSURL *url)
 {
-    ResourceBuffer* coreData = resource->resourceBuffer();
+    SharedBuffer* coreData = resource->data();
     NSData *data = [[[NSData alloc] initWithBytes:coreData->data() length:coreData->size()] autorelease];
     NSFileWrapper *wrapper = [[[NSFileWrapper alloc] initRegularFileWithContents:data] autorelease];
     String coreMIMEType = resource->response().mimeType();

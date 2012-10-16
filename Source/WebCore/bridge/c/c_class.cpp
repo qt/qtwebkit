@@ -70,23 +70,28 @@ CClass* CClass::classForIsA(NPClass* isa)
     return aClass;
 }
 
-Method* CClass::methodNamed(PropertyName propertyName, Instance* instance) const
+MethodList CClass::methodsNamed(PropertyName propertyName, Instance* instance) const
 {
     String name(propertyName.publicName());
     
-    if (Method* method = _methods.get(name.impl()))
-        return method;
+    MethodList methodList;
+
+    Method* method = _methods.get(name.impl());
+    if (method) {
+        methodList.append(method);
+        return methodList;
+    }
 
     NPIdentifier ident = _NPN_GetStringIdentifier(name.ascii().data());
     const CInstance* inst = static_cast<const CInstance*>(instance);
     NPObject* obj = inst->getObject();
     if (_isa->hasMethod && _isa->hasMethod(obj, ident)){
-        Method* method = new CMethod(ident); // deleted in the CClass destructor
-        _methods.set(name.impl(), method);
-        return method;
+        Method* aMethod = new CMethod(ident); // deleted in the CClass destructor
+        _methods.set(name.impl(), aMethod);
+        methodList.append(aMethod);
     }
     
-    return 0;
+    return methodList;
 }
 
 Field* CClass::fieldNamed(PropertyName propertyName, Instance* instance) const

@@ -67,9 +67,8 @@ ImageGStreamer::ImageGStreamer(GstBuffer* buffer, GstCaps* caps)
 #if G_BYTE_ORDER == G_LITTLE_ENDIAN
     image.invertPixels(invertMode);
 #endif
-    QPixmap* surface = new QPixmap;
-    surface->convertFromImage(image);
-    m_image = BitmapImage::create(surface);
+
+    m_image = BitmapImage::create(new QImage(image));
 
 #ifdef GST_API_VERSION_1
     if (GstVideoCropMeta* cropMeta = gst_buffer_get_video_crop_meta(buffer))

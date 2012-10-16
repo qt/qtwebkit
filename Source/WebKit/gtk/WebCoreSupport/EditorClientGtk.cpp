@@ -560,13 +560,4 @@ bool EditorClient::spellingUIIsShowing()
     return false;
 }
 
-bool EditorClient::supportsGlobalSelection()
-{
-#if PLATFORM(X11)
-    return true;
-#else
-    return false;
-#endif
-}
-
 }

@@ -580,18 +580,13 @@ void BitmapImage::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addMember(m_source);
     info.addMember(m_frameTimer);
     info.addMember(m_frames);
-}
-
-void FrameData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
+    for (unsigned i = 0; i < m_frameCount; ++i) {
 #if OS(WINCE) && !PLATFORM(QT)
-    info.addRawBuffer(m_frame.get(), m_frameBytes);
-#elif USE(SKIA)
-    info.addMember(m_frame);
+        info.addRawBuffer(m_frames[i].m_frame.get(), m_frames[i].m_frameBytes);
 #else
-    info.addRawBuffer(m_frame, m_frameBytes);
+        info.addRawBuffer(m_frames[i].m_frame, m_frames[i].m_frameBytes);
 #endif
+    }
 }
 
 }

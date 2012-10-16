@@ -34,7 +34,6 @@ HEADERS += \
     BloomFilter.h \
     BoundsCheckedPointer.h \
     BumpPointerAllocator.h \
-    ByteOrder.h \
     CheckedArithmetic.h \
     Compiler.h \
     CryptographicallyRandomNumber.h \
@@ -88,13 +87,6 @@ HEADERS += \
     MD5.h \
     MediaTime.h \
     MemoryInstrumentation.h \
-    MemoryInstrumentationArrayBufferView.h \
-    MemoryInstrumentationHashCountedSet.h \
-    MemoryInstrumentationHashMap.h \
-    MemoryInstrumentationHashSet.h \
-    MemoryInstrumentationParsedURL.h \
-    MemoryInstrumentationSequence.h \
-    MemoryInstrumentationString.h \
     MemoryInstrumentationVector.h \
     MessageQueue.h \
     MetaAllocator.h \

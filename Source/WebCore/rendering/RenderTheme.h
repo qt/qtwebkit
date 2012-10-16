@@ -35,7 +35,6 @@
 
 namespace WebCore {
 
-class CSSStyleSheet;
 class Element;
 class FileList;
 class HTMLInputElement;
@@ -47,7 +46,7 @@ class RenderMeter;
 #if ENABLE(PROGRESS_ELEMENT)
 class RenderProgress;
 #endif
-class RenderSnapshottedPlugIn;
+class CSSStyleSheet;
 
 class RenderTheme : public RefCounted<RenderTheme> {
 protected:
@@ -137,11 +136,6 @@ public:
 
     // A method asking if the platform is able to show datalist suggestions for a given input type.
     virtual bool supportsDataListUI(const AtomicString&) const { return false; }
-
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI) && ENABLE(CALENDAR_PICKER)
-    // A method asking if the platform is able to show a calendar picker for a given input type.
-    virtual bool supportsCalendarPicker(const AtomicString&) const { return false; }
-#endif
 
     // Text selection colors.
     Color activeSelectionBackgroundColor() const;
@@ -241,10 +235,6 @@ public:
 
     virtual String fileListDefaultLabel(bool multipleFilesAllowed) const;
     virtual String fileListNameForWidth(const FileList*, const Font&, int width, bool multipleFilesAllowed) const;
-
-    virtual void paintPlugInSnapshotOverlay(RenderSnapshottedPlugIn*, const PaintInfo&, const LayoutPoint&) const { }
-
-    virtual bool shouldOpenPickerWithF4Key() const;
 
 protected:
     // The platform selection color.

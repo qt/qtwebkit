@@ -39,14 +39,15 @@
 
 namespace WebCore {
 
-#if !PLATFORM(CHROMIUM) && !PLATFORM(GTK) && !PLATFORM(BLACKBERRY) && !PLATFORM(EFL)
+#if !PLATFORM(CHROMIUM) && !PLATFORM(GTK) && !PLATFORM(BLACKBERRY)
 bool AsyncFileSystem::isAvailable()
 {
     notImplemented();
     return false;
 }
 
-void AsyncFileSystem::openFileSystem(const String& basePath, const String& storageIdentifier, FileSystemType, bool, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
+// FIXME: Add FileSystemType parameter.
+void AsyncFileSystem::openFileSystem(const String& basePath, const String& storageIdentifier, bool, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
 {
     notImplemented();
     callbacks->didFail(NOT_SUPPORTED_ERR);

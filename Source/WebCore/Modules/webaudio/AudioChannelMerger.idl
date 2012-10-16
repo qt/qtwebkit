@@ -26,7 +26,9 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=WEB_AUDIO
-] interface AudioChannelMerger : AudioNode {
-};
+module audio {
+    interface [
+        Conditional=WEB_AUDIO
+    ] AudioChannelMerger : AudioNode {
+    };
+}

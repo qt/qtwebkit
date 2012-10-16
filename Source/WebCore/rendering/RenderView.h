@@ -77,7 +77,7 @@ public:
 
     FrameView* frameView() const { return m_frameView; }
 
-    virtual void computeRectForRepaint(RenderLayerModelObject* repaintContainer, LayoutRect&, bool fixed = false) const OVERRIDE;
+    virtual void computeRectForRepaint(RenderBoxModelObject* repaintContainer, LayoutRect&, bool fixed = false) const;
     virtual void repaintViewRectangle(const LayoutRect&, bool immediate = false);
     // Repaint the view, and all composited layers that intersect the given absolute rectangle.
     // FIXME: ideally we'd never have to do this, if all repaints are container-relative.
@@ -206,9 +206,9 @@ public:
     bool hasRenderCounters() { return m_renderCounterCount; }
 
 protected:
-    virtual void mapLocalToContainer(RenderLayerModelObject* repaintContainer, TransformState&, MapCoordinatesFlags = ApplyContainerFlip | SnapOffsetForTransforms, bool* wasFixed = 0) const OVERRIDE;
-    virtual const RenderObject* pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap&) const OVERRIDE;
-    virtual void mapAbsoluteToLocalPoint(MapCoordinatesFlags, TransformState&) const;
+    virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, TransformState&, MapLocalToContainerFlags mode = ApplyContainerFlip | SnapOffsetForTransforms, bool* wasFixed = 0) const OVERRIDE;
+    virtual const RenderObject* pushMappingToContainer(const RenderBoxModelObject* ancestorToStopAt, RenderGeometryMap&) const;
+    virtual void mapAbsoluteToLocalPoint(bool fixed, bool useTransforms, TransformState&) const;
     virtual bool requiresColumns(int desiredColumnCount) const OVERRIDE;
 
 private:
@@ -225,7 +225,7 @@ private:
         if (!doingFullRepaint() || m_layoutState->isPaginated() || renderer->hasColumns() || renderer->inRenderFlowThread()
             || m_layoutState->lineGrid() || (renderer->style()->lineGrid() != RenderStyle::initialLineGrid() && renderer->isBlockFlow())
 #if ENABLE(CSS_EXCLUSIONS)
-            || (renderer->isRenderBlock() && toRenderBlock(renderer)->exclusionShapeInsideInfo())
+            || (renderer->isRenderBlock() && toRenderBlock(renderer)->wrapShapeInfo())
 #endif
             ) {
             m_layoutState = new (renderArena()) LayoutState(m_layoutState, renderer, offset, pageHeight, pageHeightChanged, colInfo);

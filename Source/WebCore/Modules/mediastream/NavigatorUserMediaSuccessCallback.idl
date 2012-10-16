@@ -22,10 +22,12 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=MEDIA_STREAM,
-    Callback
-] interface NavigatorUserMediaSuccessCallback {
-    boolean handleEvent(in LocalMediaStream stream);
-};
+module window {
+    interface [
+        Conditional=MEDIA_STREAM,
+        Callback
+    ] NavigatorUserMediaSuccessCallback {
+        boolean handleEvent(in LocalMediaStream stream);
+    };
 
+}

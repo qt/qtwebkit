@@ -89,7 +89,7 @@ void AcceleratedCompositingContext::attachRootGraphicsLayer(GraphicsLayer* graph
 
     m_textureMapper = TextureMapperImageBuffer::create();
     m_rootTextureMapperLayer->setTextureMapper(m_textureMapper.get());
-    m_rootGraphicsLayer->flushCompositingStateForThisLayerOnly();
+    m_rootGraphicsLayer->syncCompositingStateForThisLayerOnly();
 }
 
 void AcceleratedCompositingContext::scheduleRootLayerRepaint(const IntRect& rect)
@@ -110,7 +110,7 @@ void AcceleratedCompositingContext::resizeRootLayer(const IntSize& size)
     if (!m_rootGraphicsLayer)
         return;
     m_rootGraphicsLayer->setSize(size);
-    m_rootGraphicsLayer->flushCompositingStateForThisLayerOnly();
+    m_rootGraphicsLayer->syncCompositingStateForThisLayerOnly();
 }
 
 static gboolean syncLayersTimeoutCallback(AcceleratedCompositingContext* context)
@@ -135,9 +135,9 @@ void AcceleratedCompositingContext::syncLayersNow()
         core(m_webView)->mainFrame()->view()->layout();
 
     if (m_rootGraphicsLayer)
-        m_rootGraphicsLayer->flushCompositingStateForThisLayerOnly();
+        m_rootGraphicsLayer->syncCompositingStateForThisLayerOnly();
 
-    core(m_webView)->mainFrame()->view()->flushCompositingStateIncludingSubframes();
+    core(m_webView)->mainFrame()->view()->syncCompositingStateIncludingSubframes();
 }
 
 void AcceleratedCompositingContext::syncLayersTimeout()
@@ -158,7 +158,7 @@ void AcceleratedCompositingContext::notifyAnimationStarted(const GraphicsLayer*,
 {
 
 }
-void AcceleratedCompositingContext::notifyFlushRequired(const GraphicsLayer*)
+void AcceleratedCompositingContext::notifySyncRequired(const GraphicsLayer*)
 {
 
 }

@@ -42,97 +42,97 @@ String keyIdentifierForQtKeyCode(int keyCode)
     switch (keyCode) {
     case Qt::Key_Menu:
     case Qt::Key_Alt:
-        return ASCIILiteral("Alt");
+        return "Alt";
     case Qt::Key_Clear:
-        return ASCIILiteral("Clear");
+        return "Clear";
     case Qt::Key_Down:
-        return ASCIILiteral("Down");
+        return "Down";
     case Qt::Key_End:
-        return ASCIILiteral("End");
+        return "End";
     case Qt::Key_Return:
     case Qt::Key_Enter:
-        return ASCIILiteral("Enter");
+        return "Enter";
     case Qt::Key_Execute:
-        return ASCIILiteral("Execute");
+        return "Execute";
     case Qt::Key_F1:
-        return ASCIILiteral("F1");
+        return "F1";
     case Qt::Key_F2:
-        return ASCIILiteral("F2");
+        return "F2";
     case Qt::Key_F3:
-        return ASCIILiteral("F3");
+        return "F3";
     case Qt::Key_F4:
-        return ASCIILiteral("F4");
+        return "F4";
     case Qt::Key_F5:
-        return ASCIILiteral("F5");
+        return "F5";
     case Qt::Key_F6:
-        return ASCIILiteral("F6");
+        return "F6";
     case Qt::Key_F7:
-        return ASCIILiteral("F7");
+        return "F7";
     case Qt::Key_F8:
-        return ASCIILiteral("F8");
+        return "F8";
     case Qt::Key_F9:
-        return ASCIILiteral("F9");
+        return "F9";
     case Qt::Key_F10:
-        return ASCIILiteral("F10");
+        return "F10";
     case Qt::Key_F11:
-        return ASCIILiteral("F11");
+        return "F11";
     case Qt::Key_F12:
-        return ASCIILiteral("F12");
+        return "F12";
     case Qt::Key_F13:
-        return ASCIILiteral("F13");
+        return "F13";
     case Qt::Key_F14:
-        return ASCIILiteral("F14");
+        return "F14";
     case Qt::Key_F15:
-        return ASCIILiteral("F15");
+        return "F15";
     case Qt::Key_F16:
-        return ASCIILiteral("F16");
+        return "F16";
     case Qt::Key_F17:
-        return ASCIILiteral("F17");
+        return "F17";
     case Qt::Key_F18:
-        return ASCIILiteral("F18");
+        return "F18";
     case Qt::Key_F19:
-        return ASCIILiteral("F19");
+        return "F19";
     case Qt::Key_F20:
-        return ASCIILiteral("F20");
+        return "F20";
     case Qt::Key_F21:
-        return ASCIILiteral("F21");
+        return "F21";
     case Qt::Key_F22:
-        return ASCIILiteral("F22");
+        return "F22";
     case Qt::Key_F23:
-        return ASCIILiteral("F23");
+        return "F23";
     case Qt::Key_F24:
-        return ASCIILiteral("F24");
+        return "F24";
     case Qt::Key_Help:
-        return ASCIILiteral("Help");
+        return "Help";
     case Qt::Key_Home:
-        return ASCIILiteral("Home");
+        return "Home";
     case Qt::Key_Insert:
-        return ASCIILiteral("Insert");
+        return "Insert";
     case Qt::Key_Left:
-        return ASCIILiteral("Left");
+        return "Left";
     case Qt::Key_PageDown:
-        return ASCIILiteral("PageDown");
+        return "PageDown";
     case Qt::Key_PageUp:
-        return ASCIILiteral("PageUp");
+        return "PageUp";
     case Qt::Key_Pause:
-        return ASCIILiteral("Pause");
+        return "Pause";
     case Qt::Key_Print:
-        return ASCIILiteral("PrintScreen");
+        return "PrintScreen";
     case Qt::Key_Right:
-        return ASCIILiteral("Right");
+        return "Right";
     case Qt::Key_Select:
-        return ASCIILiteral("Select");
+        return "Select";
     case Qt::Key_Up:
-        return ASCIILiteral("Up");
+        return "Up";
         // Standard says that DEL becomes U+007F.
     case Qt::Key_Delete:
-        return ASCIILiteral("U+007F");
+        return "U+007F";
     case Qt::Key_Backspace:
-        return ASCIILiteral("U+0008");
+        return "U+0008";
     case Qt::Key_Tab:
-        return ASCIILiteral("U+0009");
+        return "U+0009";
     case Qt::Key_Backtab:
-        return ASCIILiteral("U+0009");
+        return "U+0009";
     default:
         return String::format("U+%04X", toupper(keyCode));
     }
@@ -585,11 +585,11 @@ static String keyTextForKeyEvent(const QKeyEvent* event)
     case Qt::Key_Tab:
     case Qt::Key_Backtab:
         if (event->text().isNull())
-            return ASCIILiteral("\t");
+            return "\t";
         break;
     case Qt::Key_Enter:
         if (event->text().isNull())
-            return ASCIILiteral("\r");
+            return "\r";
     }
     return event->text();
 }

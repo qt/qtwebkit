@@ -32,17 +32,13 @@
 #include "Color.h"
 #include "ColorChooserClient.h"
 #include "ColorSuggestionPicker.h"
-#include "FrameView.h"
 #include "IntRect.h"
 #include "LocalizedStrings.h"
 #include "PickerCommon.h"
 #include "WebColorChooser.h"
-#include "WebViewImpl.h"
-#include <public/Platform.h>
-#include <public/WebColor.h>
+#include "platform/WebColor.h"
+#include "platform/WebKitPlatformSupport.h"
 #include <public/WebLocalizedString.h>
-
-using namespace WebCore;
 
 namespace WebKit {
 
@@ -53,11 +49,10 @@ enum ColorPickerPopupAction {
     ColorPickerPopupActionSetValue = 0
 };
 
-ColorChooserUIController::ColorChooserUIController(ChromeClientImpl* chromeClient, ColorChooserClient* client)
+ColorChooserUIController::ColorChooserUIController(ChromeClientImpl* chromeClient, WebCore::ColorChooserClient* client)
     : m_chromeClient(chromeClient)
     , m_client(client)
     , m_popup(0)
-    , m_localizer(Localizer::createDefault())
 {
     if (m_client->shouldShowSuggestions())
         openPopup();
@@ -69,7 +64,7 @@ ColorChooserUIController::~ColorChooserUIController()
 {
 }
 
-void ColorChooserUIController::setSelectedColor(const Color& color)
+void ColorChooserUIController::setSelectedColor(const WebCore::Color& color)
 {
     ASSERT(m_chooser);
     m_chooser->setSelectedColor(static_cast<WebColor>(color.rgb()));
@@ -86,7 +81,7 @@ void ColorChooserUIController::endChooser()
 void ColorChooserUIController::didChooseColor(const WebColor& color)
 {
     ASSERT(m_client);
-    m_client->didChooseColor(Color(static_cast<RGBA32>(color)));
+    m_client->didChooseColor(WebCore::Color(static_cast<WebCore::RGBA32>(color)));
 }
 
 void ColorChooserUIController::didEndChooser()
@@ -96,45 +91,29 @@ void ColorChooserUIController::didEndChooser()
     m_client->didEndChooser();
 }
 
-IntSize ColorChooserUIController::contentSize()
+WebCore::IntSize ColorChooserUIController::contentSize()
 {
-    return IntSize(0, 0);
+    return WebCore::IntSize(0, 0);
 }
 
-void ColorChooserUIController::writeDocument(DocumentWriter& writer)
+void ColorChooserUIController::writeDocument(WebCore::DocumentWriter& writer)
 {
-    Vector<Color> suggestions = m_client->suggestions();
+    Vector<WebCore::Color> suggestions = m_client->suggestions();
     Vector<String> suggestionValues;
     for (unsigned i = 0; i < suggestions.size(); i++)
         suggestionValues.append(suggestions[i].serialized());
-    IntRect anchorRectInScreen = m_chromeClient->rootViewToScreen(m_client->elementRectRelativeToRootView());
-    FrameView* view = static_cast<WebViewImpl*>(m_chromeClient->webView())->page()->mainFrame()->view();
-    IntRect rootViewVisibleContentRect = view->visibleContentRect(true /* include scrollbars */);
-    IntRect rootViewRectInScreen = m_chromeClient->rootViewToScreen(rootViewVisibleContentRect);
     
-    PagePopupClient::addString("<!DOCTYPE html><head><meta charset='UTF-8'><style>\n", writer);
-    writer.addData(pickerCommonCss, sizeof(pickerCommonCss));
-    writer.addData(colorSuggestionPickerCss, sizeof(colorSuggestionPickerCss));
-    PagePopupClient::addString("</style></head><body><div id=main>Loading...</div><script>\n"
+    WebCore::PagePopupClient::addString("<!DOCTYPE html><head><meta charset='UTF-8'><style>\n", writer);
+    writer.addData(WebCore::pickerCommonCss, sizeof(WebCore::pickerCommonCss));
+    writer.addData(WebCore::colorSuggestionPickerCss, sizeof(WebCore::colorSuggestionPickerCss));
+    WebCore::PagePopupClient::addString("</style></head><body><div id=main>Loading...</div><script>\n"
                                       "window.dialogArguments = {\n", writer);
-    PagePopupClient::addProperty("values", suggestionValues, writer);       
-    PagePopupClient::addProperty("otherColorLabel", Platform::current()->queryLocalizedString(WebLocalizedString::OtherColorLabel), writer);
-    addProperty("anchorRectInScreen", anchorRectInScreen, writer);
-    addProperty("rootViewRectInScreen", rootViewRectInScreen, writer);
-#if OS(MAC_OS_X)
-    addProperty("confineToRootView", true, writer);
-#else
-    addProperty("confineToRootView", false, writer);
-#endif
-    PagePopupClient::addString("};\n", writer);
-    writer.addData(pickerCommonJs, sizeof(pickerCommonJs));
-    writer.addData(colorSuggestionPickerJs, sizeof(colorSuggestionPickerJs));
-    PagePopupClient::addString("</script></body>\n", writer);
-}
-
-Localizer& ColorChooserUIController::localizer()
-{
-    return *m_localizer;
+    WebCore::PagePopupClient::addProperty("values", suggestionValues, writer);       
+    WebCore::PagePopupClient::addProperty("otherColorLabel", Platform::current()->queryLocalizedString(WebLocalizedString::OtherColorLabel), writer);
+    WebCore::PagePopupClient::addString("};\n", writer);
+    writer.addData(WebCore::pickerCommonJs, sizeof(WebCore::pickerCommonJs));
+    writer.addData(WebCore::colorSuggestionPickerJs, sizeof(WebCore::colorSuggestionPickerJs));
+    WebCore::PagePopupClient::addString("</script></body>\n", writer);
 }
 
 void ColorChooserUIController::setValueAndClosePopup(int numValue, const String& stringValue)
@@ -142,7 +121,7 @@ void ColorChooserUIController::setValueAndClosePopup(int numValue, const String&
     ASSERT(m_popup);
     ASSERT(m_client);
     if (numValue == ColorPickerPopupActionSetValue)
-        m_client->didChooseColor(Color(stringValue));
+        m_client->didChooseColor(WebCore::Color(stringValue));
     if (numValue == ColorPickerPopupActionChooseOtherColor)
         openColorChooser();
     closePopup();

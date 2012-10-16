@@ -209,6 +209,7 @@ namespace WebCore {
     macro(audioend) \
     macro(result) \
     macro(nomatch) \
+    macro(resultdeleted) \
     macro(start) \
     macro(end) \
     \

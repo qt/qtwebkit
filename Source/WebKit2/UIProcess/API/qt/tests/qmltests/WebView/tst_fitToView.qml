@@ -38,7 +38,6 @@ Item {
 
     TestCase {
         name: "FitToView"
-        when: windowShown
 
         property variant test: webView.experimental.test
 
@@ -70,7 +69,7 @@ Item {
 
         function test_basic() {
             webView.url = webView.content
-            verify(webView.waitForViewportReady())
+            verify(webView.waitForLoadSucceeded())
 
             compare(documentSize(), "480x720")
             compare(test.contentsScale, 1.0)

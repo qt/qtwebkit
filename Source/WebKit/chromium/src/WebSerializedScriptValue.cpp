@@ -32,7 +32,7 @@
 #include "platform/WebSerializedScriptValue.h"
 
 #include "SerializedScriptValue.h"
-#include <public/WebString.h>
+#include "platform/WebString.h"
 
 using namespace WebCore;
 

@@ -192,7 +192,6 @@ inline bool TimerHeapLessThanFunction::operator()(TimerBase* a, TimerBase* b) co
 
 TimerBase::TimerBase()
     : m_nextFireTime(0)
-    , m_unalignedNextFireTime(0)
     , m_repeatInterval(0)
     , m_heapIndex(-1)
 #ifndef NDEBUG
@@ -313,16 +312,12 @@ void TimerBase::heapPopMin()
     ASSERT(this == timerHeap().last());
 }
 
-void TimerBase::setNextFireTime(double newUnalignedTime)
+void TimerBase::setNextFireTime(double newTime)
 {
     ASSERT(m_thread == currentThread());
 
-    if (m_unalignedNextFireTime != newUnalignedTime)
-        m_unalignedNextFireTime = newUnalignedTime;
-
     // Keep heap valid while changing the next-fire time.
     double oldTime = m_nextFireTime;
-    double newTime = alignedFireTime(newUnalignedTime);
     if (oldTime != newTime) {
         m_nextFireTime = newTime;
         static unsigned currentHeapInsertionOrder;
@@ -352,17 +347,6 @@ void TimerBase::fireTimersInNestedEventLoop()
 {
     // Redirect to ThreadTimers.
     threadGlobalData().threadTimers().fireTimersInNestedEventLoop();
-}
-
-void TimerBase::didChangeAlignmentInterval()
-{
-    setNextFireTime(m_unalignedNextFireTime);
-}
-
-double TimerBase::nextUnalignedFireInterval() const
-{
-    ASSERT(isActive());
-    return max(m_unalignedNextFireTime - monotonicallyIncreasingTime(), 0.0);
 }
 
 } // namespace WebCore

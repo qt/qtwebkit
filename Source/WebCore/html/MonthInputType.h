@@ -31,23 +31,18 @@
 #ifndef MonthInputType_h
 #define MonthInputType_h
 
+#include "BaseDateAndTimeInputType.h"
+
 #if ENABLE(INPUT_TYPE_MONTH)
-#include "BaseMultipleFieldsDateAndTimeInputType.h"
 
 namespace WebCore {
 
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
-typedef BaseMultipleFieldsDateAndTimeInputType BaseMonthInputType;
-#else
-typedef BaseDateAndTimeInputType BaseMonthInputType;
-#endif
-
-class MonthInputType : public BaseMonthInputType {
+class MonthInputType : public BaseDateAndTimeInputType {
 public:
     static PassOwnPtr<InputType> create(HTMLInputElement*);
 
 private:
-    MonthInputType(HTMLInputElement* element) : BaseMonthInputType(element) { }
+    MonthInputType(HTMLInputElement* element) : BaseDateAndTimeInputType(element) { }
     virtual const AtomicString& formControlType() const OVERRIDE;
     virtual DateComponents::Type dateType() const OVERRIDE;
     virtual double valueAsDate() const OVERRIDE;
@@ -58,12 +53,6 @@ private:
     virtual bool parseToDateComponentsInternal(const UChar*, unsigned length, DateComponents*) const OVERRIDE;
     virtual bool setMillisecondToDateComponents(double, DateComponents*) const OVERRIDE;
     virtual bool isMonthField() const OVERRIDE;
-
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
-    // BaseMultipleFieldsDateAndTimeInputType functions
-    virtual String formatDateTimeFieldsState(const DateTimeFieldsState&) const OVERRIDE FINAL;
-    virtual void setupLayoutParameters(DateTimeEditElement::LayoutParameters&, const DateComponents&) const OVERRIDE FINAL;
-#endif
 };
 
 } // namespace WebCore

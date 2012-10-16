@@ -30,10 +30,12 @@
 
 #if USE(3D_GRAPHICS)
 
+#include "Extensions3DOpenGL.h"
 #include "GraphicsContext3DPrivate.h"
 #include "Image.h"
 #include "ImageSource.h"
 #include "NotImplemented.h"
+#include "OpenGLShims.h"
 #include "PlatformContextCairo.h"
 #include "RefPtrCairo.h"
 #include "ShaderLang.h"
@@ -41,13 +43,6 @@
 #include <wtf/NotFound.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
-
-#if USE(OPENGL_ES_2)
-#include "Extensions3DOpenGLES.h"
-#else
-#include "Extensions3DOpenGL.h"
-#include "OpenGLShims.h"
-#endif
 
 namespace WebCore {
 
@@ -60,9 +55,7 @@ PassRefPtr<GraphicsContext3D> GraphicsContext3D::create(GraphicsContext3D::Attri
     static bool initialized = false;
     static bool success = true;
     if (!initialized) {
-#if !USE(OPENGL_ES_2)
         success = initializeOpenGLShims();
-#endif
         initialized = true;
     }
     if (!success)
@@ -97,26 +90,26 @@ GraphicsContext3D::GraphicsContext3D(GraphicsContext3D::Attributes attributes, H
         ::glBindTexture(GL_TEXTURE_2D, m_texture);
         ::glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         ::glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        ::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        ::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+        ::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+        ::glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
         ::glBindTexture(GL_TEXTURE_2D, 0);
 
         // Create an FBO.
-        ::glGenFramebuffers(1, &m_fbo);
-        ::glBindFramebuffer(GL_FRAMEBUFFER, m_fbo);
+        ::glGenFramebuffersEXT(1, &m_fbo);
+        ::glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_fbo);
 
         m_boundFBO = m_fbo;
         if (!m_attrs.antialias && (m_attrs.stencil || m_attrs.depth))
-            ::glGenRenderbuffers(1, &m_depthStencilBuffer);
+            ::glGenRenderbuffersEXT(1, &m_depthStencilBuffer);
 
         // Create a multisample FBO.
         if (m_attrs.antialias) {
-            ::glGenFramebuffers(1, &m_multisampleFBO);
-            ::glBindFramebuffer(GL_FRAMEBUFFER, m_multisampleFBO);
+            ::glGenFramebuffersEXT(1, &m_multisampleFBO);
+            ::glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, m_multisampleFBO);
             m_boundFBO = m_multisampleFBO;
-            ::glGenRenderbuffers(1, &m_multisampleColorBuffer);
+            ::glGenRenderbuffersEXT(1, &m_multisampleColorBuffer);
             if (m_attrs.stencil || m_attrs.depth)
-                ::glGenRenderbuffers(1, &m_multisampleDepthStencilBuffer);
+                ::glGenRenderbuffersEXT(1, &m_multisampleDepthStencilBuffer);
         }
     }
 
@@ -136,11 +129,8 @@ GraphicsContext3D::GraphicsContext3D(GraphicsContext3D::Attributes attributes, H
     ANGLEResources.MaxDrawBuffers = 1;
     m_compiler.setResources(ANGLEResources);
 
-#if !USE(OPENGL_ES_2)
     ::glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
     ::glEnable(GL_POINT_SPRITE);
-#endif
-
     ::glClearColor(0, 0, 0, 0);
 }
 
@@ -152,15 +142,20 @@ GraphicsContext3D::~GraphicsContext3D()
     makeContextCurrent();
     ::glDeleteTextures(1, &m_texture);
     if (m_attrs.antialias) {
-        ::glDeleteRenderbuffers(1, &m_multisampleColorBuffer);
+        ::glDeleteRenderbuffersEXT(1, &m_multisampleColorBuffer);
         if (m_attrs.stencil || m_attrs.depth)
-            ::glDeleteRenderbuffers(1, &m_multisampleDepthStencilBuffer);
-        ::glDeleteFramebuffers(1, &m_multisampleFBO);
+            ::glDeleteRenderbuffersEXT(1, &m_multisampleDepthStencilBuffer);
+        ::glDeleteFramebuffersEXT(1, &m_multisampleFBO);
     } else {
         if (m_attrs.stencil || m_attrs.depth)
-            ::glDeleteRenderbuffers(1, &m_depthStencilBuffer);
+            ::glDeleteRenderbuffersEXT(1, &m_depthStencilBuffer);
     }
-    ::glDeleteFramebuffers(1, &m_fbo);
+    ::glDeleteFramebuffersEXT(1, &m_fbo);
+}
+
+void GraphicsContext3D::releaseShaderCompiler()
+{
+    notImplemented();
 }
 
 bool GraphicsContext3D::getImageData(Image* image, unsigned int format, unsigned int type, bool premultiplyAlpha, bool ignoreGammaAndColorProfile, Vector<uint8_t>& outputVector)
@@ -263,11 +258,7 @@ PlatformGraphicsContext3D GraphicsContext3D::platformGraphicsContext3D()
 
 bool GraphicsContext3D::isGLES2Compliant() const
 {
-#if USE(OPENGL_ES_2)
-    return true;
-#else
     return false;
-#endif
 }
 
 #if USE(ACCELERATED_COMPOSITING)

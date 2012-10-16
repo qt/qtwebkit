@@ -53,6 +53,8 @@ const ClassInfo ArrayConstructor::s_info = { "Function", &InternalFunction::s_in
 @end
 */
 
+ASSERT_CLASS_FITS_IN_CELL(ArrayConstructor);
+
 ArrayConstructor::ArrayConstructor(JSGlobalObject* globalObject, Structure* structure)
     : InternalFunction(globalObject, structure)
 {

@@ -23,9 +23,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=INDEXED_DATABASE,
-    CustomToJSObject
-] interface IDBKey {
-    // This space is intentionally left blank.
-};
+module storage {
+
+    interface [
+        Conditional=INDEXED_DATABASE,
+        CustomToJSObject
+    ] IDBKey {
+        // This space is intentionally left blank.
+    };
+}

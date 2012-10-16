@@ -45,6 +45,7 @@ const ClassInfo StringConstructor::s_info = { "Function", &InternalFunction::s_i
 @end
 */
 
+ASSERT_CLASS_FITS_IN_CELL(StringConstructor);
 ASSERT_HAS_TRIVIAL_DESTRUCTOR(StringConstructor);
 
 StringConstructor::StringConstructor(JSGlobalObject* globalObject, Structure* structure)

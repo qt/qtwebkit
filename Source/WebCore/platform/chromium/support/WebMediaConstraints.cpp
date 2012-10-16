@@ -40,18 +40,7 @@ using namespace WebCore;
 
 namespace WebKit {
 
-WebMediaConstraint::WebMediaConstraint(const WebCore::MediaConstraint& other)
-    : m_name(other.m_name)
-    , m_value(other.m_value)
-{
-}
-
 WebMediaConstraints::WebMediaConstraints(const PassRefPtr<MediaConstraints>& constraints)
-    : m_private(constraints)
-{
-}
-
-WebMediaConstraints::WebMediaConstraints(MediaConstraints* constraints)
     : m_private(constraints)
 {
 }
@@ -66,22 +55,27 @@ void WebMediaConstraints::reset()
     m_private.reset();
 }
 
-void WebMediaConstraints::getMandatoryConstraints(WebVector<WebMediaConstraint>& constraints) const
+bool WebMediaConstraints::isNull() const
 {
-    ASSERT(!isNull());
-    Vector<MediaConstraint> mandatoryConstraints;
-    m_private->getMandatoryConstraints(mandatoryConstraints);
-    WebVector<WebMediaConstraint> result(mandatoryConstraints);
-    constraints.swap(result);
+    return m_private.isNull();
 }
 
-void WebMediaConstraints::getOptionalConstraints(WebVector<WebMediaConstraint>& constraints) const
+void WebMediaConstraints::getMandatoryConstraintNames(WebVector<WebString>& names) const
 {
     ASSERT(!isNull());
-    Vector<MediaConstraint> optionalConstraints;
-    m_private->getOptionalConstraints(optionalConstraints);
-    WebVector<WebMediaConstraint> result(optionalConstraints);
-    constraints.swap(result);
+    Vector<String> constraintNames;
+    m_private->getMandatoryConstraintNames(constraintNames);
+    WebVector<WebString> result(constraintNames);
+    names.swap(result);
+}
+
+void WebMediaConstraints::getOptionalConstraintNames(WebVector<WebString>& names) const
+{
+    ASSERT(!isNull());
+    Vector<String> constraintNames;
+    m_private->getOptionalConstraintNames(constraintNames);
+    WebVector<WebString> result(constraintNames);
+    names.swap(result);
 }
 
 bool WebMediaConstraints::getMandatoryConstraintValue(const WebString& name, WebString& value) const

@@ -147,16 +147,17 @@ inline bool needsLineBreakIterator(UChar ch)
     return ch > asciiLineBreakTableLastChar && ch != noBreakSpace;
 }
 
-template<typename CharacterType, bool treatNoBreakSpaceAsBreak>
-static inline int nextBreakablePosition(LazyLineBreakIterator& lazyBreakIterator, const CharacterType* str, unsigned length, int pos)
+template<bool treatNoBreakSpaceAsBreak>
+static inline int nextBreakablePosition(LazyLineBreakIterator& lazyBreakIterator, int pos)
 {
-    int len = static_cast<int>(length);
+    const UChar* str = lazyBreakIterator.string();
+    int len = lazyBreakIterator.length();
     int nextBreak = -1;
 
-    CharacterType lastLastCh = pos > 1 ? str[pos - 2] : 0;
-    CharacterType lastCh = pos > 0 ? str[pos - 1] : 0;
+    UChar lastLastCh = pos > 1 ? str[pos - 2] : 0;
+    UChar lastCh = pos > 0 ? str[pos - 1] : 0;
     for (int i = pos; i < len; i++) {
-        CharacterType ch = str[i];
+        UChar ch = str[i];
 
         if (isBreakableSpace<treatNoBreakSpaceAsBreak>(ch) || shouldBreakAfter(lastLastCh, lastCh, ch))
             return i;
@@ -180,18 +181,12 @@ static inline int nextBreakablePosition(LazyLineBreakIterator& lazyBreakIterator
 
 int nextBreakablePositionIgnoringNBSP(LazyLineBreakIterator& lazyBreakIterator, int pos)
 {
-    String string = lazyBreakIterator.string();
-    if (string.is8Bit())
-        return nextBreakablePosition<LChar, false>(lazyBreakIterator, string.characters8(), string.length(), pos);
-    return nextBreakablePosition<UChar, false>(lazyBreakIterator, string.characters16(), string.length(), pos);
+    return nextBreakablePosition<false>(lazyBreakIterator, pos);
 }
 
 int nextBreakablePosition(LazyLineBreakIterator& lazyBreakIterator, int pos)
 {
-    String string = lazyBreakIterator.string();
-    if (string.is8Bit())
-        return nextBreakablePosition<LChar, true>(lazyBreakIterator, string.characters8(), string.length(), pos);
-    return nextBreakablePosition<UChar, true>(lazyBreakIterator, string.characters16(), string.length(), pos);
+    return nextBreakablePosition<true>(lazyBreakIterator, pos);
 }
 
 } // namespace WebCore

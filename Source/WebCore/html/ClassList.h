@@ -26,16 +26,10 @@
 #define ClassList_h
 
 #include "DOMTokenList.h"
-#include "Element.h"
-#include "HTMLNames.h"
 #include "SpaceSplitString.h"
 #include <wtf/PassOwnPtr.h>
-#include <wtf/Vector.h>
-
 
 namespace WebCore {
-
-using namespace HTMLNames;
 
 class Element;
 
@@ -48,25 +42,29 @@ public:
         return adoptPtr(new ClassList(element));
     }
 
-    virtual void ref() OVERRIDE;
-    virtual void deref() OVERRIDE;
+    virtual void ref();
+    virtual void deref();
 
-    virtual unsigned length() const OVERRIDE;
-    virtual const AtomicString item(unsigned index) const OVERRIDE;
+    virtual unsigned length() const;
+    virtual const AtomicString item(unsigned index) const;
+    virtual bool contains(const AtomicString&, ExceptionCode&) const;
+    virtual void add(const AtomicString&, ExceptionCode&);
+    virtual void remove(const AtomicString&, ExceptionCode&);
+    virtual bool toggle(const AtomicString&, ExceptionCode&);
+    virtual String toString() const;
 
-    virtual Element* element() OVERRIDE { return m_element; }
+    virtual Element* element() { return m_element; }
 
     void reset(const String&);
 
 private:
     ClassList(Element*);
 
-    virtual bool containsInternal(const AtomicString&) const OVERRIDE;
+    void addInternal(const AtomicString&);
+    bool containsInternal(const AtomicString&) const;
+    void removeInternal(const AtomicString&);
 
     const SpaceSplitString& classNames() const;
-
-    virtual AtomicString value() const OVERRIDE { return m_element->getAttribute(classAttr); }
-    virtual void setValue(const AtomicString& value) OVERRIDE { m_element->setAttribute(classAttr, value); }
 
     Element* m_element;
     SpaceSplitString m_classNamesForQuirksMode;

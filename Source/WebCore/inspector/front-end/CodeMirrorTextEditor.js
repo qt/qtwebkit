@@ -378,7 +378,7 @@ WebInspector.CodeMirrorTextEditor.prototype = {
     _toRange: function(start, end)
     {
         return new WebInspector.TextRange(start.line, start.ch, end.line, end.ch);
-    },
-
-    __proto__: WebInspector.View.prototype
+    }
 }
+
+WebInspector.CodeMirrorTextEditor.prototype.__proto__ = WebInspector.View.prototype;

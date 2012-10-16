@@ -42,8 +42,6 @@
 #include "SkTypeface.h"
 #include "SkTypes.h"
 #include "VDMXParser.h"
-#include <unicode/normlzr.h>
-#include <wtf/unicode/Unicode.h>
 
 namespace WebCore {
 
@@ -112,18 +110,16 @@ void SimpleFontData::platformInit()
     m_fontMetrics.setDescent(descent);
 
     float xHeight;
-    if (metrics.fXHeight) {
+    if (metrics.fXHeight)
         xHeight = metrics.fXHeight;
-        m_fontMetrics.setXHeight(xHeight);
-    } else {
-        xHeight = ascent * 0.56; // Best guess from Windows font metrics.
-        m_fontMetrics.setXHeight(xHeight);
-        m_fontMetrics.setHasXHeight(false);
+    else {
+        // hack taken from the Windows port
+        xHeight = ascent * 0.56f;
     }
-
 
     float lineGap = SkScalarToFloat(metrics.fLeading);
     m_fontMetrics.setLineGap(lineGap);
+    m_fontMetrics.setXHeight(xHeight);
     m_fontMetrics.setLineSpacing(lroundf(ascent) + lroundf(descent) + lroundf(lineGap));
 
     if (platformData().orientation() == Vertical && !isTextOrientationFallback()) {
@@ -163,9 +159,6 @@ void SimpleFontData::platformInit()
             }
         }
     }
-
-    if (int unitsPerEm = paint.getTypeface()->getUnitsPerEm())
-        m_fontMetrics.setUnitsPerEm(unitsPerEm);
 }
 
 void SimpleFontData::platformCharWidthInit()
@@ -177,30 +170,30 @@ void SimpleFontData::platformDestroy()
 {
 }
 
-PassRefPtr<SimpleFontData> SimpleFontData::createScaledFontData(const FontDescription& fontDescription, float scaleFactor) const
+PassOwnPtr<SimpleFontData> SimpleFontData::createScaledFontData(const FontDescription& fontDescription, float scaleFactor) const
 {
     const float scaledSize = lroundf(fontDescription.computedSize() * scaleFactor);
-    return SimpleFontData::create(FontPlatformData(m_platformData, scaledSize), isCustomFont(), false);
+    return adoptPtr(new SimpleFontData(FontPlatformData(m_platformData, scaledSize), isCustomFont(), false));
 }
 
-PassRefPtr<SimpleFontData> SimpleFontData::smallCapsFontData(const FontDescription& fontDescription) const
+SimpleFontData* SimpleFontData::smallCapsFontData(const FontDescription& fontDescription) const
 {
     if (!m_derivedFontData)
         m_derivedFontData = DerivedFontData::create(isCustomFont());
     if (!m_derivedFontData->smallCaps)
         m_derivedFontData->smallCaps = createScaledFontData(fontDescription, smallCapsFraction);
 
-    return m_derivedFontData->smallCaps;
+    return m_derivedFontData->smallCaps.get();
 }
 
-PassRefPtr<SimpleFontData> SimpleFontData::emphasisMarkFontData(const FontDescription& fontDescription) const
+SimpleFontData* SimpleFontData::emphasisMarkFontData(const FontDescription& fontDescription) const
 {
     if (!m_derivedFontData)
         m_derivedFontData = DerivedFontData::create(isCustomFont());
     if (!m_derivedFontData->emphasisMark)
         m_derivedFontData->emphasisMark = createScaledFontData(fontDescription, emphasisMarkFraction);
 
-    return m_derivedFontData->emphasisMark;
+    return m_derivedFontData->emphasisMark.get();
 }
 
 bool SimpleFontData::containsCharacters(const UChar* characters, int length) const
@@ -256,33 +249,5 @@ float SimpleFontData::platformWidthForGlyph(Glyph glyph) const
         width = SkScalarRound(width);
     return SkScalarToFloat(width);
 }
-
-#if USE(HARFBUZZ_NG)
-bool SimpleFontData::canRenderCombiningCharacterSequence(const UChar* characters, size_t length) const
-{
-    if (!m_combiningCharacterSequenceSupport)
-        m_combiningCharacterSequenceSupport = adoptPtr(new HashMap<String, bool>);
-
-    WTF::HashMap<String, bool>::AddResult addResult = m_combiningCharacterSequenceSupport->add(String(characters, length), false);
-    if (!addResult.isNewEntry)
-        return addResult.iterator->value;
-
-    UErrorCode error = U_ZERO_ERROR;
-    Vector<UChar, 4> normalizedCharacters(length);
-    int32_t normalizedLength = unorm_normalize(characters, length, UNORM_NFC, UNORM_UNICODE_3_2, &normalizedCharacters[0], length, &error);
-    // Can't render if we have an error or no composition occurred.
-    if (U_FAILURE(error) || (static_cast<size_t>(normalizedLength) == length))
-        return false;
-
-    SkPaint paint;
-    m_platformData.setupPaint(&paint);
-    paint.setTextEncoding(SkPaint::kUTF16_TextEncoding);
-    if (paint.textToGlyphs(&normalizedCharacters[0], normalizedLength * 2, 0)) {
-        addResult.iterator->value = true;
-        return true;
-    }
-    return false;
-}
-#endif
 
 } // namespace WebCore

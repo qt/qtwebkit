@@ -179,6 +179,21 @@ JSValueRef TestRunner::computedStyleIncludingVisitedInfo(JSContextRef context, J
     return JSValueMakeUndefined(context);
 }
 
+JSRetainPtr<JSStringRef> TestRunner::layerTreeAsText() const
+{
+    COMPtr<IWebFramePrivate> framePrivate(Query, frame);
+    if (!framePrivate)
+        return false;
+
+    BSTR textBSTR = 0;
+    HRESULT hr = framePrivate->layerTreeAsText(&textBSTR);
+
+    wstring text(textBSTR, SysStringLen(textBSTR));
+    SysFreeString(textBSTR);
+    JSRetainPtr<JSStringRef> textValueJS(Adopt, JSStringCreateWithCharacters(text.data(), text.length()));
+    return textValueJS;
+}
+
 JSRetainPtr<JSStringRef> TestRunner::markerTextForListItem(JSContextRef context, JSValueRef nodeObject) const
 {
     COMPtr<IWebView> webView;
@@ -399,7 +414,7 @@ void TestRunner::setMockDeviceOrientation(bool canProvideAlpha, double alpha, bo
     // See https://bugs.webkit.org/show_bug.cgi?id=30335.
 }
 
-void TestRunner::setMockGeolocationPosition(double latitude, double longitude, double accuracy, bool providesAltitude, double altitude, bool providesAltitudeAccuracy, double altitudeAccuracy, bool providesHeading, double heading, bool providesSpeed, double speed)
+void TestRunner::setMockGeolocationPosition(double latitude, double longitude, double accuracy)
 {
     // FIXME: Implement for Geolocation layout tests.
     // See https://bugs.webkit.org/show_bug.cgi?id=28264.
@@ -1231,8 +1246,8 @@ unsigned worldIDForWorld(IWebScriptWorld* world)
 {
     WorldMap::const_iterator end = worldMap().end();
     for (WorldMap::const_iterator it = worldMap().begin(); it != end; ++it) {
-        if (it->value == world)
-            return it->key;
+        if (it->second == world)
+            return it->first;
     }
 
     return 0;
@@ -1256,7 +1271,7 @@ void TestRunner::evaluateScriptInIsolatedWorld(unsigned worldID, JSObjectRef glo
         if (FAILED(WebKitCreateInstance(__uuidof(WebScriptWorld), 0, __uuidof(world), reinterpret_cast<void**>(&world))))
             return;
     } else {
-        COMPtr<IWebScriptWorld>& worldSlot = worldMap().add(worldID, 0).iterator->value;
+        COMPtr<IWebScriptWorld>& worldSlot = worldMap().add(worldID, 0).iterator->second;
         if (!worldSlot && FAILED(WebKitCreateInstance(__uuidof(WebScriptWorld), 0, __uuidof(worldSlot), reinterpret_cast<void**>(&worldSlot))))
             return;
         world = worldSlot;

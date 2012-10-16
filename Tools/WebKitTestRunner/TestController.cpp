@@ -93,8 +93,6 @@ TestController::TestController(int argc, const char* argv[])
     , m_beforeUnloadReturnValue(true)
     , m_isGeolocationPermissionSet(false)
     , m_isGeolocationPermissionAllowed(false)
-    , m_policyDelegateEnabled(false)
-    , m_policyDelegatePermissive(false)
 #if PLATFORM(MAC) || PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
     , m_eventSenderProxy(new EventSenderProxy(this))
 #endif
@@ -109,22 +107,35 @@ TestController::~TestController()
 {
 }
 
-static WKRect getWindowFrame(WKPageRef page, const void* clientInfo)
+static WKRect getWindowFrameMainPage(WKPageRef page, const void* clientInfo)
+{
+    PlatformWebView* view = static_cast<TestController*>(const_cast<void*>(clientInfo))->mainWebView();
+    return view->windowFrame();
+}
+
+static void setWindowFrameMainPage(WKPageRef page, WKRect frame, const void* clientInfo)
+{
+    PlatformWebView* view = static_cast<TestController*>(const_cast<void*>(clientInfo))->mainWebView();
+    view->setWindowFrame(frame);
+}
+
+static WKRect getWindowFrameOtherPage(WKPageRef page, const void* clientInfo)
 {
     PlatformWebView* view = static_cast<PlatformWebView*>(const_cast<void*>(clientInfo));
     return view->windowFrame();
 }
 
-static void setWindowFrame(WKPageRef page, WKRect frame, const void* clientInfo)
+static void setWindowFrameOtherPage(WKPageRef page, WKRect frame, const void* clientInfo)
 {
     PlatformWebView* view = static_cast<PlatformWebView*>(const_cast<void*>(clientInfo));
     view->setWindowFrame(frame);
 }
 
-static bool runBeforeUnloadConfirmPanel(WKPageRef page, WKStringRef message, WKFrameRef frame, const void*)
+static bool runBeforeUnloadConfirmPanel(WKPageRef page, WKStringRef message, WKFrameRef frame, const void *clientInfo)
 {
+    TestController* testController = static_cast<TestController*>(const_cast<void*>(clientInfo));
     printf("CONFIRM NAVIGATION: %s\n", toSTD(message).c_str());
-    return TestController::shared().beforeUnloadReturnValue();
+    return testController->beforeUnloadReturnValue();
 }
 
 static unsigned long long exceededDatabaseQuota(WKPageRef, WKFrameRef, WKSecurityOriginRef, WKStringRef, WKStringRef, unsigned long long, unsigned long long, unsigned long long, unsigned long long, const void*)
@@ -152,7 +163,6 @@ static void closeOtherPage(WKPageRef page, const void* clientInfo)
 static void focus(WKPageRef page, const void* clientInfo)
 {
     PlatformWebView* view = static_cast<PlatformWebView*>(const_cast<void*>(clientInfo));
-    view->focus();
     view->setWindowIsKey(true);
 }
 
@@ -164,7 +174,8 @@ static void unfocus(WKPageRef page, const void* clientInfo)
 
 static void decidePolicyForGeolocationPermissionRequest(WKPageRef, WKFrameRef, WKSecurityOriginRef, WKGeolocationPermissionRequestRef permissionRequest, const void* clientInfo)
 {
-    TestController::shared().handleGeolocationPermissionRequest(permissionRequest);
+    TestController* testController = static_cast<TestController*>(const_cast<void*>(clientInfo));
+    testController->handleGeolocationPermissionRequest(permissionRequest);
 }
 
 WKPageRef TestController::createOtherPage(WKPageRef oldPage, WKURLRequestRef, WKDictionaryRef, WKEventModifiers, WKEventMouseButton, const void*)
@@ -199,8 +210,8 @@ WKPageRef TestController::createOtherPage(WKPageRef oldPage, WKURLRequestRef, WK
         0, // setStatusBarIsVisible
         0, // isResizable
         0, // setIsResizable
-        getWindowFrame,
-        setWindowFrame,
+        getWindowFrameOtherPage,
+        setWindowFrameOtherPage,
         runBeforeUnloadConfirmPanel,
         0, // didDraw
         0, // pageDidScroll
@@ -347,13 +358,13 @@ void TestController::initialize(int argc, const char* argv[])
 
     WKPageUIClient pageUIClient = {
         kWKPageUIClientCurrentVersion,
-        m_mainWebView.get(),
+        this,
         0, // createNewPage_deprecatedForUseWithV0
         0, // showPage
         0, // close
         0, // takeFocus
-        focus,
-        unfocus,
+        0, // focus
+        0, // unfocus
         0, // runJavaScriptAlert
         0, // runJavaScriptConfirm
         0, // runJavaScriptPrompt
@@ -370,8 +381,8 @@ void TestController::initialize(int argc, const char* argv[])
         0, // setStatusBarIsVisible
         0, // isResizable
         0, // setIsResizable
-        getWindowFrame,
-        setWindowFrame,
+        getWindowFrameMainPage,
+        setWindowFrameMainPage,
         runBeforeUnloadConfirmPanel,
         0, // didDraw
         0, // pageDidScroll
@@ -434,16 +445,6 @@ void TestController::initialize(int argc, const char* argv[])
         0, // didLayout
     };
     WKPageSetPageLoaderClient(m_mainWebView->page(), &pageLoaderClient);
-
-    WKPagePolicyClient pagePolicyClient = {
-        kWKPagePolicyClientCurrentVersion,
-        this,
-        decidePolicyForNavigationAction,
-        0, // decidePolicyForNewWindowAction
-        decidePolicyForResponse,
-        0, // unableToImplementPolicy
-    };
-    WKPageSetPagePolicyClient(m_mainWebView->page(), &pagePolicyClient);
 }
 
 bool TestController::resetStateToConsistentValues()
@@ -490,7 +491,12 @@ bool TestController::resetStateToConsistentValues()
     WKPreferencesSetArtificialPluginInitializationDelayEnabled(preferences, false);
     WKPreferencesSetTabToLinksEnabled(preferences, false);
     WKPreferencesSetInteractiveFormValidationEnabled(preferences, true);
+
+// [Qt][WK2]REGRESSION(r104881):It broke hundreds of tests
+// FIXME: https://bugs.webkit.org/show_bug.cgi?id=76247
+#if !PLATFORM(QT)
     WKPreferencesSetMockScrollbarsEnabled(preferences, true);
+#endif
 
 #if !PLATFORM(QT)
     static WKStringRef standardFontFamily = WKStringCreateWithUTF8CString("Times");
@@ -526,9 +532,6 @@ bool TestController::resetStateToConsistentValues()
     m_geolocationPermissionRequests.clear();
     m_isGeolocationPermissionSet = false;
     m_isGeolocationPermissionAllowed = false;
-
-    // Reset Custom Policy Delegate.
-    setCustomPolicyDelegate(false, false);
 
     // Reset main page back to about:blank
     m_doneResetting = false;
@@ -1008,9 +1011,9 @@ void TestController::setGeolocationPermission(bool enabled)
     decidePolicyForGeolocationPermissionRequestIfPossible();
 }
 
-void TestController::setMockGeolocationPosition(double latitude, double longitude, double accuracy, bool providesAltitude, double altitude, bool providesAltitudeAccuracy, double altitudeAccuracy, bool providesHeading, double heading, bool providesSpeed, double speed)
+void TestController::setMockGeolocationPosition(double latitude, double longitude, double accuracy)
 {
-    m_geolocationProvider->setPosition(latitude, longitude, accuracy, providesAltitude, altitude, providesAltitudeAccuracy, altitudeAccuracy, providesHeading, heading, providesSpeed, speed);
+    m_geolocationProvider->setPosition(latitude, longitude, accuracy);
 }
 
 void TestController::setMockGeolocationPositionUnavailableError(WKStringRef errorMessage)
@@ -1024,68 +1027,28 @@ void TestController::handleGeolocationPermissionRequest(WKGeolocationPermissionR
     decidePolicyForGeolocationPermissionRequestIfPossible();
 }
 
-void TestController::setCustomPolicyDelegate(bool enabled, bool permissive)
-{
-    m_policyDelegateEnabled = enabled;
-    m_policyDelegatePermissive = permissive;
-}
-
 void TestController::decidePolicyForGeolocationPermissionRequestIfPossible()
 {
     if (!m_isGeolocationPermissionSet)
         return;
 
     for (size_t i = 0; i < m_geolocationPermissionRequests.size(); ++i) {
-        WKGeolocationPermissionRequestRef permissionRequest = m_geolocationPermissionRequests[i].get();
+        WKGeolocationPermissionRequestRef& permissionRequest = m_geolocationPermissionRequests[i];
         if (m_isGeolocationPermissionAllowed)
             WKGeolocationPermissionRequestAllow(permissionRequest);
         else
             WKGeolocationPermissionRequestDeny(permissionRequest);
     }
-    m_geolocationPermissionRequests.clear();
 }
 
-void TestController::decidePolicyForNotificationPermissionRequest(WKPageRef page, WKSecurityOriginRef origin, WKNotificationPermissionRequestRef request, const void*)
+void TestController::decidePolicyForNotificationPermissionRequest(WKPageRef page, WKSecurityOriginRef origin, WKNotificationPermissionRequestRef request, const void* clientInfo)
 {
-    TestController::shared().decidePolicyForNotificationPermissionRequest(page, origin, request);
+    static_cast<TestController*>(const_cast<void*>(clientInfo))->decidePolicyForNotificationPermissionRequest(page, origin, request);
 }
 
 void TestController::decidePolicyForNotificationPermissionRequest(WKPageRef, WKSecurityOriginRef, WKNotificationPermissionRequestRef request)
 {
     WKNotificationPermissionRequestAllow(request);
-}
-
-void TestController::decidePolicyForNavigationAction(WKPageRef, WKFrameRef, WKFrameNavigationType, WKEventModifiers, WKEventMouseButton, WKURLRequestRef, WKFramePolicyListenerRef listener, WKTypeRef, const void* clientInfo)
-{
-    static_cast<TestController*>(const_cast<void*>(clientInfo))->decidePolicyForNavigationAction(listener);
-}
-
-void TestController::decidePolicyForNavigationAction(WKFramePolicyListenerRef listener)
-{
-    if (m_policyDelegateEnabled && !m_policyDelegatePermissive) {
-        WKFramePolicyListenerIgnore(listener);
-        return;
-    }
-
-    WKFramePolicyListenerUse(listener);
-}
-
-void TestController::decidePolicyForResponse(WKPageRef, WKFrameRef frame, WKURLResponseRef response, WKURLRequestRef, WKFramePolicyListenerRef listener, WKTypeRef, const void* clientInfo)
-{
-    static_cast<TestController*>(const_cast<void*>(clientInfo))->decidePolicyForResponse(frame, response, listener);
-}
-
-void TestController::decidePolicyForResponse(WKFrameRef frame, WKURLResponseRef response, WKFramePolicyListenerRef listener)
-{
-    // Even though Response was already checked by WKBundlePagePolicyClient, the check did not include plugins
-    // so we have to re-check again.
-    WKRetainPtr<WKStringRef> wkMIMEType(AdoptWK, WKURLResponseCopyMIMEType(response));
-    if (WKFrameCanShowMIMEType(frame, wkMIMEType.get())) {
-        WKFramePolicyListenerUse(listener);
-        return;
-    }
-
-    WKFramePolicyListenerIgnore(listener);
 }
 
 } // namespace WTR

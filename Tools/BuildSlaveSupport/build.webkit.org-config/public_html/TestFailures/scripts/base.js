@@ -438,11 +438,11 @@ base.relativizeTime = function(time)
 
 base.getURLParameter = function(name)
 {
-    var match = RegExp(name + '=' + '(.+?)(&|$)').exec(location.search);
-    if (!match)
-        return null;
-    return decodeURI(match[1])
+    return decodeURI(
+        (RegExp(name + '=' + '(.+?)(&|$)').exec(location.search)||[,null])[1]
+    );
 }
+
 
 base.underscoredBuilderName = function(builderName)
 {

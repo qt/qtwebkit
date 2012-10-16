@@ -29,7 +29,7 @@
 
 #include "CachedResourceClientWalker.h"
 #include "CachedStyleSheetClient.h"
-#include "ResourceBuffer.h"
+#include "SharedBuffer.h"
 #include "TextResourceDecoder.h"
 #include "WebCoreMemoryInstrumentation.h"
 #include <wtf/Vector.h>
@@ -64,7 +64,7 @@ String CachedXSLStyleSheet::encoding() const
     return m_decoder->encoding().name();
 }
 
-void CachedXSLStyleSheet::data(PassRefPtr<ResourceBuffer> data, bool allDataReceived)
+void CachedXSLStyleSheet::data(PassRefPtr<SharedBuffer> data, bool allDataReceived)
 {
     if (!allDataReceived)
         return;

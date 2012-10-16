@@ -46,10 +46,8 @@ modules = [
         "dependencies": [],
         "sources": [
             "Color.js",
-            "DOMExtension.js",
             "Object.js",
             "ParsedURL.js",
-            "Progress.js",
             "Settings.js",
             "UIString.js",
             "UserMetrics.js",
@@ -86,7 +84,6 @@ modules = [
             "NetworkLog.js",
             "NetworkUISourceCodeProvider.js",
             "PresentationConsoleMessageHelper.js",
-            "RuntimeModel.js",
             "SASSSourceMapping.js",
             "Script.js",
             "ScriptFormatter.js",
@@ -116,6 +113,7 @@ modules = [
         "sources": [
             "Checkbox.js",
             "ContextMenu.js",
+            "DOMExtension.js",
             "DOMSyntaxHighlighter.js",
             "DataGrid.js",
             "DefaultTextEditor.js",
@@ -130,7 +128,7 @@ modules = [
             "PanelEnablerView.js",
             "Placard.js",
             "Popover.js",
-            "ProgressIndicator.js",
+            "ProgressBar.js",
             "PropertiesSection.js",
             "SearchController.js",
             "Section.js",
@@ -172,6 +170,7 @@ modules = [
             "NativeBreakpointsSidebarPane.js",
             "ObjectPopoverHelper.js",
             "ObjectPropertiesSection.js",
+            "RuntimeModel.js",
             "SourceFrame.js",
             "ResourceView.js",
         ]
@@ -225,15 +224,8 @@ modules = [
         ]
     },
     {
-        "name": "workers",
-        "dependencies": ["components"],
-        "sources": [
-            "WorkerManager.js",
-        ]
-    },
-    {
         "name": "scripts",
-        "dependencies": ["components", "workers"],
+        "dependencies": ["components"],
         "sources": [
             "BreakpointsSidebarPane.js",
             "CallStackSidebarPane.js",
@@ -307,6 +299,13 @@ modules = [
         ]
     },
     {
+        "name": "workers",
+        "dependencies": ["components"],
+        "sources": [
+            "WorkerManager.js",
+        ]
+    },
+    {
         "name": "tests",
         "dependencies": ["components"],
         "sources": [
@@ -340,15 +339,7 @@ modules = [
         "name": "host_stub",
         "dependencies": ["ui"],
         "sources": [
-            "InspectorFrontendAPI.js",
             "InspectorFrontendHostStub.js",
-        ]
-    },
-    {
-        "name": "inspector",
-        "dependencies": ["components"],
-        "sources": [
-            "DockController.js",
         ]
     },
 ]

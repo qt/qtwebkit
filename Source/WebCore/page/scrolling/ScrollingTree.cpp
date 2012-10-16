@@ -30,11 +30,10 @@
 
 #include "PlatformWheelEvent.h"
 #include "ScrollingCoordinator.h"
-#include "ScrollingStateTree.h"
 #include "ScrollingThread.h"
 #include "ScrollingTreeNode.h"
+#include "ScrollingTreeState.h"
 #include <wtf/MainThread.h>
-#include <wtf/TemporaryChange.h>
 
 namespace WebCore {
 
@@ -52,7 +51,6 @@ ScrollingTree::ScrollingTree(ScrollingCoordinator* scrollingCoordinator)
     , m_mainFramePinnedToTheLeft(false)
     , m_mainFramePinnedToTheRight(false)
     , m_scrollingPerformanceLoggingEnabled(false)
-    , m_isHandlingProgrammaticScroll(false)
 {
 }
 
@@ -120,24 +118,22 @@ void ScrollingTree::invalidate()
     callOnMainThread(bind(derefScrollingCoordinator, m_scrollingCoordinator.release().leakRef()));
 }
 
-void ScrollingTree::commitNewTreeState(PassOwnPtr<ScrollingStateTree> scrollingStateTree)
+void ScrollingTree::commitNewTreeState(PassOwnPtr<ScrollingTreeState> scrollingTreeState)
 {
     ASSERT(ScrollingThread::isCurrentThread());
 
-    if (scrollingStateTree->rootStateNode()->changedProperties() & (ScrollingStateScrollingNode::WheelEventHandlerCount | ScrollingStateScrollingNode::NonFastScrollableRegion) || scrollingStateTree->rootStateNode()->scrollLayerDidChange()) {
+    if (scrollingTreeState->changedProperties() & (ScrollingTreeState::WheelEventHandlerCount | ScrollingTreeState::NonFastScrollableRegion | ScrollingTreeState::ScrollLayer)) {
         MutexLocker lock(m_mutex);
 
-        if (scrollingStateTree->rootStateNode()->scrollLayerDidChange())
+        if (scrollingTreeState->changedProperties() & ScrollingTreeState::ScrollLayer)
             m_mainFrameScrollPosition = IntPoint();
-        if (scrollingStateTree->rootStateNode()->changedProperties() & ScrollingStateScrollingNode::WheelEventHandlerCount)
-            m_hasWheelEventHandlers = scrollingStateTree->rootStateNode()->wheelEventHandlerCount();
-        if (scrollingStateTree->rootStateNode()->changedProperties() & ScrollingStateScrollingNode::NonFastScrollableRegion)
-            m_nonFastScrollableRegion = scrollingStateTree->rootStateNode()->nonFastScrollableRegion();
+        if (scrollingTreeState->changedProperties() & ScrollingTreeState::WheelEventHandlerCount)
+            m_hasWheelEventHandlers = scrollingTreeState->wheelEventHandlerCount();
+        if (scrollingTreeState->changedProperties() & ScrollingTreeState::NonFastScrollableRegion)
+            m_nonFastScrollableRegion = scrollingTreeState->nonFastScrollableRegion();
     }
-    
-    TemporaryChange<bool> changeHandlingProgrammaticScroll(m_isHandlingProgrammaticScroll, scrollingStateTree->rootStateNode()->requestedScrollPositionRepresentsProgrammaticScroll());
 
-    m_rootNode->update(scrollingStateTree->rootStateNode());
+    m_rootNode->update(scrollingTreeState.get());
 
     updateDebugRootLayer();
 }
@@ -160,7 +156,7 @@ void ScrollingTree::updateMainFrameScrollPosition(const IntPoint& scrollPosition
         m_mainFrameScrollPosition = scrollPosition;
     }
 
-    callOnMainThread(bind(&ScrollingCoordinator::updateMainFrameScrollPosition, m_scrollingCoordinator.get(), scrollPosition, m_isHandlingProgrammaticScroll));
+    callOnMainThread(bind(&ScrollingCoordinator::updateMainFrameScrollPosition, m_scrollingCoordinator.get(), scrollPosition));
 }
 
 IntPoint ScrollingTree::mainFrameScrollPosition()

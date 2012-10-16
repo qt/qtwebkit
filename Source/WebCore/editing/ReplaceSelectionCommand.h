@@ -95,7 +95,6 @@ private:
     bool shouldPerformSmartReplace() const;
     void addSpacesForSmartReplace();
     void completeHTMLReplacement(const Position& lastPositionToSelect);
-    void mergeTextNodesAroundPosition(Position&, Position& positionOnlyToBeUpdated);
 
     bool performTrivialReplace(const ReplacementFragment&);
 

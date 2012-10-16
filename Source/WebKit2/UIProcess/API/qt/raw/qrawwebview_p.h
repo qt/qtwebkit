@@ -47,10 +47,6 @@ QT_END_NAMESPACE
 
 class QRawWebViewPrivate;
 
-namespace WebKit {
-class LayerTreeRenderer;
-}
-
 class QRawWebViewClient {
 public:
     virtual ~QRawWebViewClient() { }
@@ -101,8 +97,6 @@ public:
     void sendTouchEvent(QTouchEvent*);
 
 private:
-    WebKit::LayerTreeRenderer* layerTreeRenderer() const;
-
     QRawWebViewPrivate* d;
 };
 

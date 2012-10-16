@@ -139,7 +139,7 @@ public:
     virtual void reachedMaxAppCacheSize(int64_t spaceNeeded);
     virtual void reachedApplicationCacheOriginQuota(WebCore::SecurityOrigin*, int64_t totalSpaceNeeded);
 #if ENABLE(WIDGET_REGION)
-    virtual void annotatedRegionsChanged();
+    virtual void dashboardRegionsChanged();
 #endif
     virtual bool paintCustomOverhangArea(WebCore::GraphicsContext*, const WebCore::IntRect&, const WebCore::IntRect&, const WebCore::IntRect&);
 #if ENABLE(INPUT_TYPE_COLOR)
@@ -171,7 +171,7 @@ public:
 
     // Sets a flag to specify that the view needs to be updated, so we need
     // to do an eager layout before the drawing.
-    virtual void scheduleCompositingLayerFlush();
+    virtual void scheduleCompositingLayerSync();
 
     virtual CompositingTriggerFlags allowedCompositingTriggers() const;
 #endif

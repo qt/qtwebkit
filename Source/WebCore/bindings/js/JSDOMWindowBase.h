@@ -66,6 +66,7 @@ namespace WebCore {
         static bool javaScriptExperimentsEnabled(const JSC::JSGlobalObject*);
         void printErrorMessage(const String&) const;
 
+        static JSC::JSObject* toThisObject(JSC::JSCell*, JSC::ExecState*);
         JSDOMWindowShell* shell() const;
 
         static JSC::JSGlobalData* commonJSGlobalData();

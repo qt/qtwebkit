@@ -22,9 +22,11 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=WEB_AUDIO&MEDIA_STREAM,
-    JSGenerateToJSObject
-] interface MediaStreamAudioSourceNode : AudioSourceNode {
-    readonly attribute MediaStream mediaStream;
-};
+module audio {
+    interface [
+        Conditional=WEB_AUDIO&MEDIA_STREAM,
+        JSGenerateToJSObject
+    ] MediaStreamAudioSourceNode : AudioSourceNode {
+        readonly attribute MediaStream mediaStream;
+    };
+}

@@ -70,12 +70,10 @@ WebInspector.InspectorFrontendHostStub.prototype = {
 
     requestAttachWindow: function()
     {
-        InspectorFrontendAPI.setAttachedWindow(true);
     },
 
     requestDetachWindow: function()
     {
-        InspectorFrontendAPI.setAttachedWindow(false);
     },
 
     requestSetDockSide: function()
@@ -143,7 +141,9 @@ WebInspector.InspectorFrontendHostStub.prototype = {
 
     save: function(url, content, forceSaveAs)
     {
-        var blob = new Blob([content], { type: "application/octet-stream" });
+        var builder = new WebKitBlobBuilder();
+        builder.append(content);
+        var blob = builder.getBlob("application/octet-stream");
 
         var fr = new FileReader();
         fr.onload = function(e) {
@@ -217,8 +217,6 @@ WebInspector.ClipboardAccessDeniedScreen = function()
     }
 }
 
-WebInspector.ClipboardAccessDeniedScreen.prototype = {
-    __proto__: WebInspector.HelpScreen.prototype
-}
+WebInspector.ClipboardAccessDeniedScreen.prototype.__proto__ = WebInspector.HelpScreen.prototype;
 
 }

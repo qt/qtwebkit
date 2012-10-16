@@ -37,7 +37,6 @@
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
-OBJC_CLASS NSCalendar;
 OBJC_CLASS NSDateFormatter;
 OBJC_CLASS NSLocale;
 
@@ -51,19 +50,17 @@ public:
     static PassOwnPtr<LocaleMac> create(NSLocale*);
     static LocaleMac* currentLocale();
     ~LocaleMac();
-    virtual double parseDateTime(const String&, DateComponents::Type) OVERRIDE;
-    virtual String formatDateTime(const DateComponents&, FormatType = FormatTypeUnspecified) OVERRIDE;
+    double parseDate(const String&);
+    String formatDate(const DateComponents&);
 
 #if ENABLE(CALENDAR_PICKER)
-    virtual String dateFormatText() OVERRIDE;
-    virtual const Vector<String>& monthLabels() OVERRIDE;
-    virtual const Vector<String>& weekDayShortLabels() OVERRIDE;
-    virtual unsigned firstDayOfWeek() OVERRIDE;
-    virtual bool isRTL() OVERRIDE;
+    String dateFormatText();
+    const Vector<String>& monthLabels();
+    const Vector<String>& weekDayShortLabels();
+    unsigned firstDayOfWeek();
 #endif
 
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
-    virtual String dateFormat() OVERRIDE;
+#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
     virtual String timeFormat() OVERRIDE;
     virtual String shortTimeFormat() OVERRIDE;
     virtual const Vector<String>& timeAMPMLabels() OVERRIDE;
@@ -71,21 +68,19 @@ public:
 
 private:
     explicit LocaleMac(NSLocale*);
-    RetainPtr<NSDateFormatter> shortDateFormatter();
+    NSDateFormatter *createShortDateFormatter();
     virtual void initializeLocalizerData() OVERRIDE;
 
     RetainPtr<NSLocale> m_locale;
-    RetainPtr<NSCalendar> m_gregorianCalendar;
 #if ENABLE(CALENDAR_PICKER)
     String m_localizedDateFormatText;
     Vector<String> m_monthLabels;
     Vector<String> m_weekDayShortLabels;
 #endif
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
-    RetainPtr<NSDateFormatter> timeFormatter();
-    RetainPtr<NSDateFormatter> shortTimeFormatter();
+#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
+    NSDateFormatter *createTimeFormatter();
+    NSDateFormatter *createShortTimeFormatter();
 
-    String m_dateFormat;
     String m_localizedTimeFormatText;
     String m_localizedShortTimeFormatText;
     Vector<String> m_timeAMPMLabels;

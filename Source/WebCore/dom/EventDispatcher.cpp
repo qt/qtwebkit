@@ -64,17 +64,19 @@ void EventRelatedTargetAdjuster::adjust(Vector<EventContext>& ancestors)
 {
     Vector<EventTarget*> relatedTargetStack;
     TreeScope* lastTreeScope = 0;
-    for (AncestorChainWalker walker(m_relatedTarget.get()); walker.get(); walker.parent()) {
+    Node* lastNode = 0;
+    for (ComposedShadowTreeParentWalker walker(m_relatedTarget.get()); walker.get(); walker.parentIncludingInsertionPointAndShadowRoot()) {
         Node* node = walker.get();
         if (relatedTargetStack.isEmpty())
             relatedTargetStack.append(node);
-        else if (walker.crossingInsertionPoint())
+        else if (isInsertionPoint(node) && toInsertionPoint(node)->contains(lastNode))
             relatedTargetStack.append(relatedTargetStack.last());
         TreeScope* scope = node->treeScope();
         // Skips adding a node to the map if treeScope does not change. Just for the performance optimization.
         if (scope != lastTreeScope)
             m_relatedTargetMap.add(scope, relatedTargetStack.last());
         lastTreeScope = scope;
+        lastNode = node;
         if (node->isShadowRoot()) {
             ASSERT(!relatedTargetStack.isEmpty());
             relatedTargetStack.removeLast();
@@ -109,7 +111,7 @@ EventTarget* EventRelatedTargetAdjuster::findRelatedTarget(TreeScope* scope)
         parentTreeScopes.append(scope);
         RelatedTargetMap::const_iterator found = m_relatedTargetMap.find(scope);
         if (found != m_relatedTargetMap.end()) {
-            relatedTarget = found->value;
+            relatedTarget = found->second;
             break;
         }
         scope = scope->parentTreeScope();
@@ -121,7 +123,7 @@ EventTarget* EventRelatedTargetAdjuster::findRelatedTarget(TreeScope* scope)
 
 bool EventDispatcher::dispatchEvent(Node* node, PassRefPtr<EventDispatchMediator> mediator)
 {
-    ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
+    ASSERT(!eventDispatchForbidden());
 
     EventDispatcher dispatcher(node);
     return mediator->dispatchEvent(&dispatcher);
@@ -181,15 +183,17 @@ void EventDispatcher::ensureEventAncestors(Event* event)
     bool inDocument = m_node->inDocument();
     bool isSVGElement = m_node->isSVGElement();
     Vector<EventTarget*> targetStack;
-    for (AncestorChainWalker walker(m_node.get()); walker.get(); walker.parent()) {
+    Node* last = 0;
+    for (ComposedShadowTreeParentWalker walker(m_node.get()); walker.get(); walker.parentIncludingInsertionPointAndShadowRoot()) {
         Node* node = walker.get();
         if (targetStack.isEmpty())
             targetStack.append(eventTargetRespectingSVGTargetRules(node));
-        else if (walker.crossingInsertionPoint())
+        else if (isInsertionPoint(node) && toInsertionPoint(node)->contains(last))
             targetStack.append(targetStack.last());
         m_ancestors.append(EventContext(node, eventTargetRespectingSVGTargetRules(node), targetStack.last()));
         if (!inDocument)
             return;
+        last = node;
         if (!node->isShadowRoot())
             continue;
         if (determineDispatchBehavior(event, toShadowRoot(node), targetStack.last()) == StayInsideShadowDOM)
@@ -244,7 +248,7 @@ bool EventDispatcher::dispatchEvent(PassRefPtr<Event> prpEvent)
     ChildNodesLazySnapshot::takeChildNodesLazySnapshot();
 
     event->setTarget(eventTargetRespectingSVGTargetRules(m_node.get()));
-    ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
+    ASSERT(!eventDispatchForbidden());
     ASSERT(event->target());
     ASSERT(!event->type().isNull()); // JavaScript code can create an event with an empty name, but not null.
     ensureEventAncestors(event.get());

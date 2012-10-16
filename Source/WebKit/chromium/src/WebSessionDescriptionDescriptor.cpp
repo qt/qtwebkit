@@ -32,11 +32,11 @@
 
 #if ENABLE(MEDIA_STREAM)
 
-#include <public/WebSessionDescriptionDescriptor.h>
+#include "platform/WebSessionDescriptionDescriptor.h"
 
 #include "SessionDescriptionDescriptor.h"
-#include <public/WebICECandidateDescriptor.h>
-#include <public/WebString.h>
+#include "platform/WebICECandidateDescriptor.h"
+#include "platform/WebString.h"
 #include <wtf/Vector.h>
 
 using namespace WebCore;

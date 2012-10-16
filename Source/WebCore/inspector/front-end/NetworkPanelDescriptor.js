@@ -48,7 +48,7 @@ WebInspector.NetworkPanelDescriptor.prototype = {
         if (!(target instanceof WebInspector.NetworkRequest))
             return;
         this.panel().appendApplicableItems(contextMenu, target);
-    },
-
-    __proto__: WebInspector.PanelDescriptor.prototype
+    }
 }
+
+WebInspector.NetworkPanelDescriptor.prototype.__proto__ = WebInspector.PanelDescriptor.prototype;

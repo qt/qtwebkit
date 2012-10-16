@@ -18,10 +18,13 @@
  * Boston, MA 02110-1301, USA.
  */
 
-[
-    ObjCProtocol,
-    OmitConstructor
-] interface XPathNSResolver {
-    [TreatReturnedNullStringAs=Null] DOMString lookupNamespaceURI(in [Optional=DefaultIsUndefined] DOMString prefix);
-};
+module xpath {
 
+    interface [
+        ObjCProtocol,
+        OmitConstructor
+    ] XPathNSResolver {
+        [TreatReturnedNullStringAs=Null] DOMString lookupNamespaceURI(in [Optional=DefaultIsUndefined] DOMString prefix);
+    };
+
+}

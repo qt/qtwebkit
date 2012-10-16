@@ -35,7 +35,8 @@
 #include "SecurityOrigin.h"
 #include "StorageAreaProxy.h"
 #include "WebViewImpl.h"
-#include <public/WebURL.h>
+
+#include "platform/WebURL.h"
 #include <wtf/PassOwnPtr.h>
 
 namespace WebKit {

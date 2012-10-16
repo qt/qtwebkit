@@ -33,7 +33,7 @@
 
 #include "DeliveredIntent.h"
 #include "SerializedScriptValue.h"
-#include <public/WebCommon.h>
+#include "platform/WebCommon.h"
 #include <wtf/PassRefPtr.h>
 
 namespace WebKit {

@@ -143,10 +143,10 @@ WebInspector.BottomUpProfileDataGridNode.prototype = {
         // In bottom up mode, our parents are our children since we display an inverted tree.
         // However, we don't want to show the very top parent since it is redundant.
         return !!(profileNode.parent && profileNode.parent.parent);
-    },
-
-    __proto__: WebInspector.ProfileDataGridNode.prototype
+    }
 }
+
+WebInspector.BottomUpProfileDataGridNode.prototype.__proto__ = WebInspector.ProfileDataGridNode.prototype;
 
 /**
  * @constructor
@@ -266,7 +266,8 @@ WebInspector.BottomUpProfileDataGridTree.prototype = {
             this.sort(this.lastComparator, true);
     },
 
-    _sharedPopulate: WebInspector.BottomUpProfileDataGridNode.prototype._sharedPopulate,
-
-    __proto__: WebInspector.ProfileDataGridTree.prototype
+    _sharedPopulate: WebInspector.BottomUpProfileDataGridNode.prototype._sharedPopulate
 }
+
+WebInspector.BottomUpProfileDataGridTree.prototype.__proto__ = WebInspector.ProfileDataGridTree.prototype;
+

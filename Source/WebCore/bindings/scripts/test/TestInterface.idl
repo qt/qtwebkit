@@ -28,12 +28,14 @@
 
 // This IDL file is for testing the bindings code generator and for tracking
 // changes in its ouput.
-[
-    ActiveDOMObject,
-    CustomNamedSetter,
-    Conditional=Condition1|Condition2,
-    CallWith=ScriptExecutionContext,
-    Constructor(in DOMString str1, in [Optional=DefaultIsUndefined] DOMString str2),
-    ConstructorRaisesException
-] interface TestInterface {
-};
+module test {
+    interface [
+        ActiveDOMObject,
+        CustomNamedSetter,
+        Conditional=Condition1|Condition2,
+        CallWith=ScriptExecutionContext,
+        Constructor(in DOMString str1, in [Optional=DefaultIsUndefined] DOMString str2),
+        ConstructorRaisesException
+    ] TestInterface {
+    };
+}

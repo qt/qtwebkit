@@ -57,7 +57,6 @@ class KeyboardEvent;
 class MouseEvent;
 class TouchEvent;
 class TouchPoint;
-class ViewportAccessor;
 }
 
 namespace WebKit {
@@ -138,7 +137,6 @@ public:
     void setHasPendingSurfaceSizeChange();
     void applyPendingOrientationIfNeeded();
 
-    Platform::ViewportAccessor* webkitThreadViewportAccessor() const;
     Platform::IntSize viewportSize() const;
     void setViewportSize(const Platform::IntSize& viewportSize, bool ensureFocusElementVisible = true);
 
@@ -331,9 +329,6 @@ public:
     bool isEnableLocalAccessToAllCookies() const;
     void setEnableLocalAccessToAllCookies(bool);
 
-    void enableDNSPrefetch();
-    void disableDNSPrefetch();
-    bool isDNSPrefetchEnabled() const;
     void enableWebInspector();
     void disableWebInspector();
     bool isWebInspectorEnabled();

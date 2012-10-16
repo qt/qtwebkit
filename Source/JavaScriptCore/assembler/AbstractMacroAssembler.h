@@ -564,7 +564,7 @@ public:
             m_jumps.append(jump);
         }
         
-        void append(const JumpList& other)
+        void append(JumpList& other)
         {
             m_jumps.append(other.m_jumps.begin(), other.m_jumps.size());
         }
@@ -579,7 +579,7 @@ public:
             m_jumps.clear();
         }
         
-        const JumpVector& jumps() const { return m_jumps; }
+        const JumpVector& jumps() { return m_jumps; }
 
     private:
         JumpVector m_jumps;

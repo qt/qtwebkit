@@ -24,7 +24,7 @@
  */
 
 #include "config.h"
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
 #include "DateTimeFieldsState.h"
 
 #include "FormController.h"

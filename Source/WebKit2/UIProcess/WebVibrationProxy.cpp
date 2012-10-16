@@ -40,7 +40,6 @@ PassRefPtr<WebVibrationProxy> WebVibrationProxy::create(WebContext* context)
 WebVibrationProxy::WebVibrationProxy(WebContext* context)
     : m_context(context)
 {
-    m_context->addMessageReceiver(CoreIPC::MessageClassWebVibrationProxy, this);
 }
 
 WebVibrationProxy::~WebVibrationProxy()

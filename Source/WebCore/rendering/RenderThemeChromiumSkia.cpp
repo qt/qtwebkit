@@ -131,13 +131,6 @@ bool RenderThemeChromiumSkia::supportsDataListUI(const AtomicString& type) const
     return RenderThemeChromiumCommon::supportsDataListUI(type);
 }
 
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI) && ENABLE(CALENDAR_PICKER)
-bool RenderThemeChromiumSkia::supportsCalendarPicker(const AtomicString& type) const
-{
-    return RenderThemeChromiumCommon::supportsCalendarPicker(type);
-}
-#endif
-
 #if ENABLE(VIDEO_TRACK)
 bool RenderThemeChromiumSkia::supportsClosedCaptioning() const
 {

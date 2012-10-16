@@ -87,12 +87,6 @@ bool SVGAnimateMotionElement::hasValidAttributeType()
     return false;
 }
 
-bool SVGAnimateMotionElement::hasValidAttributeName()
-{
-    // AnimateMotion does not use attributeName so it is always valid.
-    return true;
-}
-
 bool SVGAnimateMotionElement::isSupportedAttribute(const QualifiedName& attrName)
 {
     DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());

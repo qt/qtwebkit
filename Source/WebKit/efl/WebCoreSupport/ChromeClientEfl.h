@@ -134,7 +134,7 @@ public:
 #if USE(ACCELERATED_COMPOSITING)
     virtual void attachRootGraphicsLayer(Frame*, GraphicsLayer*);
     virtual void setNeedsOneShotDrawingSynchronization();
-    virtual void scheduleCompositingLayerFlush();
+    virtual void scheduleCompositingLayerSync();
     virtual CompositingTriggerFlags allowedCompositingTriggers() const;
 #endif
 

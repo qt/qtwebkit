@@ -26,35 +26,19 @@
 #include "config.h"
 #include "WebPageGroupData.h"
 
-#include "WebCoreArgumentCoders.h"
+#include "ArgumentCoders.h"
+#include "Arguments.h"
 
 namespace WebKit {
 
 void WebPageGroupData::encode(CoreIPC::ArgumentEncoder* encoder) const
 {
-    encoder->encode(identifer);
-    encoder->encode(pageGroupID);
-    encoder->encode(visibleToInjectedBundle);
-    encoder->encode(visibleToHistoryClient);
-    encoder->encode(userStyleSheets);
-    encoder->encode(userScripts);
+    return encoder->encode(CoreIPC::In(identifer, pageGroupID, visibleToInjectedBundle, visibleToHistoryClient));
 }
 
 bool WebPageGroupData::decode(CoreIPC::ArgumentDecoder* decoder, WebPageGroupData& data)
 {
-    if (!decoder->decode(data.identifer))
-        return false;
-    if (!decoder->decode(data.pageGroupID))
-        return false;
-    if (!decoder->decode(data.visibleToInjectedBundle))
-        return false;
-    if (!decoder->decode(data.visibleToHistoryClient))
-        return false;
-    if (!decoder->decode(data.userStyleSheets))
-        return false;
-    if (!decoder->decode(data.userScripts))
-        return false;
-    return true;
+    return decoder->decode(CoreIPC::Out(data.identifer, data.pageGroupID, data.visibleToInjectedBundle, data.visibleToHistoryClient));
 }
 
 } // namespace WebKit

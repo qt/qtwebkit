@@ -392,8 +392,7 @@ bool ChromeClientBlackBerry::runBeforeUnloadConfirmPanel(const String& message, 
 
 void ChromeClientBlackBerry::closeWindowSoon()
 {
-    if (m_webPagePrivate->m_page->openedByDOM())
-        m_webPagePrivate->m_client->scheduleCloseWindow();
+    m_webPagePrivate->m_client->scheduleCloseWindow();
 }
 
 void ChromeClientBlackBerry::setStatusbarText(const String& status)
@@ -819,7 +818,7 @@ void ChromeClientBlackBerry::setNeedsOneShotDrawingSynchronization()
     m_webPagePrivate->setNeedsOneShotDrawingSynchronization();
 }
 
-void ChromeClientBlackBerry::scheduleCompositingLayerFlush()
+void ChromeClientBlackBerry::scheduleCompositingLayerSync()
 {
     m_webPagePrivate->scheduleRootLayerCommit();
 }

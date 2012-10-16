@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003, 2006, 2007, 2008, 2009, 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2003, 2006, 2007, 2008, 2009, 2011 Apple Inc. All rights reserved.
  *           (C) 2006 Graham Dennis (graham.dennis@gmail.com)
  *
  * Redistribution and use in source and binary forms, with or without
@@ -253,12 +253,6 @@ namespace WebCore {
         
         void setMinDOMTimerInterval(double); // Per-page; initialized to default value.
         double minDOMTimerInterval();
-
-        static void setDefaultDOMTimerAlignmentInterval(double);
-        static double defaultDOMTimerAlignmentInterval();
-
-        void setDOMTimerAlignmentInterval(double);
-        double domTimerAlignmentInterval() const;
 
         void setUsesPageCache(bool);
         bool usesPageCache() const { return m_usesPageCache; }
@@ -639,12 +633,6 @@ namespace WebCore {
         void setDiagnosticLoggingEnabled(bool enabled) { m_diagnosticLoggingEnabled = enabled; }
         bool diagnosticLoggingEnabled() const { return m_diagnosticLoggingEnabled; }
 
-        void setApplyPageScaleFactorInCompositor(bool enabled) { m_applyPageScaleFactorInCompositor = enabled; }
-        bool applyPageScaleFactorInCompositor() const { return m_applyPageScaleFactorInCompositor; }
-
-        void setPlugInSnapshottingEnabled(bool enabled) { m_plugInSnapshottingEnabled = enabled; }
-        bool plugInSnapshottingEnabled() const { return m_plugInSnapshottingEnabled; }
-
     private:
         explicit Settings(Page*);
 
@@ -830,12 +818,9 @@ namespace WebCore {
 
         bool m_scrollingPerformanceLoggingEnabled : 1;
 
-        bool m_applyPageScaleFactorInCompositor : 1;
-        bool m_plugInSnapshottingEnabled : 1;
-
         Timer<Settings> m_setImageLoadingSettingsTimer;
         void imageLoadingSettingsTimerFired(Timer<Settings>*);
-
+        
         double m_incrementalRenderingSuppressionTimeoutInSeconds;
 
 #if USE(AVFOUNDATION)

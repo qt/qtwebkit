@@ -45,9 +45,7 @@
 #include "Storage.h"
 #include "StorageArea.h"
 #include "VoidCallback.h"
-#include "WebCoreMemoryInstrumentation.h"
 
-#include <wtf/MemoryInstrumentationHashMap.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
@@ -79,7 +77,7 @@ void InspectorDOMStorageAgent::clearFrontend()
 {
     DOMStorageResourcesMap::iterator domStorageEnd = m_resources.end();
     for (DOMStorageResourcesMap::iterator it = m_resources.begin(); it != domStorageEnd; ++it)
-        it->value->unbind();
+        it->second->unbind();
     m_frontend = 0;
     disable(0);
 }
@@ -98,7 +96,7 @@ void InspectorDOMStorageAgent::enable(ErrorString*)
 
     DOMStorageResourcesMap::iterator resourcesEnd = m_resources.end();
     for (DOMStorageResourcesMap::iterator it = m_resources.begin(); it != resourcesEnd; ++it)
-        it->value->bind(m_frontend);
+        it->second->bind(m_frontend);
 }
 
 void InspectorDOMStorageAgent::disable(ErrorString*)
@@ -167,8 +165,8 @@ String InspectorDOMStorageAgent::storageId(SecurityOrigin* securityOrigin, bool 
     ASSERT(securityOrigin);
     DOMStorageResourcesMap::iterator domStorageEnd = m_resources.end();
     for (DOMStorageResourcesMap::iterator it = m_resources.begin(); it != domStorageEnd; ++it) {
-        if (it->value->isSameOriginAndType(securityOrigin, isLocalStorage))
-            return it->key;
+        if (it->second->isSameOriginAndType(securityOrigin, isLocalStorage))
+            return it->first;
     }
     return String();
 }
@@ -178,14 +176,14 @@ InspectorDOMStorageResource* InspectorDOMStorageAgent::getDOMStorageResourceForI
     DOMStorageResourcesMap::iterator it = m_resources.find(storageId);
     if (it == m_resources.end())
         return 0;
-    return it->value.get();
+    return it->second.get();
 }
 
 void InspectorDOMStorageAgent::didUseDOMStorage(StorageArea* storageArea, bool isLocalStorage, Frame* frame)
 {
     DOMStorageResourcesMap::iterator domStorageEnd = m_resources.end();
     for (DOMStorageResourcesMap::iterator it = m_resources.begin(); it != domStorageEnd; ++it) {
-        if (it->value->isSameOriginAndType(frame->document()->securityOrigin(), isLocalStorage))
+        if (it->second->isSameOriginAndType(frame->document()->securityOrigin(), isLocalStorage))
             return;
     }
 
@@ -216,13 +214,14 @@ void InspectorDOMStorageAgent::clearResources()
     m_resources.clear();
 }
 
-void InspectorDOMStorageAgent::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+size_t InspectorDOMStorageAgent::memoryBytesUsedByStorageCache() const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::InspectorDOMStorageAgent);
-    InspectorBaseAgent<InspectorDOMStorageAgent>::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_resources);
-    info.addMember(m_frontend);
+    size_t size = 0;
+    for (DOMStorageResourcesMap::const_iterator it = m_resources.begin(); it != m_resources.end(); ++it)
+        size += it->second->storageArea()->memoryBytesUsedByCache();
+    return size;
 }
+
 
 } // namespace WebCore
 

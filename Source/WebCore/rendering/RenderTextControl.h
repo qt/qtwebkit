@@ -62,7 +62,7 @@ protected:
     virtual RenderStyle* textBaseStyle() const = 0;
 
     virtual void updateFromElement();
-    virtual void computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop, LogicalExtentComputedValues&) const OVERRIDE;
+    virtual void updateLogicalHeight() OVERRIDE;
     virtual RenderObject* layoutSpecialExcludedChild(bool relayoutChildren);
 
 private:

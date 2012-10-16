@@ -23,13 +23,16 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=SVG&FILTERS
-] interface SVGFEImageElement : SVGElement,
-                                                        SVGURIReference,
-                                                        SVGLangSpace,
-                                                        SVGExternalResourcesRequired,
-                                                        SVGFilterPrimitiveStandardAttributes {
-    readonly attribute SVGAnimatedPreserveAspectRatio preserveAspectRatio;
-};
+module svg {
 
+    interface [
+        Conditional=SVG&FILTERS
+    ] SVGFEImageElement : SVGElement,
+                                                            SVGURIReference,
+                                                            SVGLangSpace,
+                                                            SVGExternalResourcesRequired,
+                                                            SVGFilterPrimitiveStandardAttributes {
+        readonly attribute SVGAnimatedPreserveAspectRatio preserveAspectRatio;
+    };
+
+}

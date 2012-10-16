@@ -350,12 +350,16 @@ static SkFontTableTag reverseByteOrder(uint32_t tableTag)
 
 const OpenTypeVerticalData* FontPlatformData::verticalData() const
 {
+    if (!uniqueID())
+        return 0;
     return fontCache()->getVerticalData(uniqueID(), *this);
 }
 
 PassRefPtr<SharedBuffer> FontPlatformData::openTypeTable(uint32_t table) const
 {
     RefPtr<SharedBuffer> buffer;
+    if (!uniqueID())
+        return buffer.release();
 
     SkFontTableTag tag = reverseByteOrder(table);
     const size_t tableSize = SkFontHost::GetTableSize(uniqueID(), tag);

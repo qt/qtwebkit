@@ -45,7 +45,6 @@
 #include "WorkerThread.h"
 #include <stdio.h>
 #include <wtf/CurrentTime.h>
-#include <wtf/MemoryInstrumentationHashMap.h>
 #include <wtf/MemoryInstrumentationVector.h>
 #include <wtf/TemporaryChange.h>
 #include <wtf/text/CString.h>
@@ -237,6 +236,12 @@ void MemoryCache::pruneLiveResourcesToSize(unsigned targetSize)
             double elapsedTime = currentTime - current->m_lastDecodedAccessTime;
             if (elapsedTime < cMinDelayBeforeLiveDecodedPrune)
                 return;
+
+            // Check to see if the current resource are likely to be used again soon.
+            if (current->likelyToBeUsedSoon()) {
+                current = prev;
+                continue;
+            }
 
             // Destroy our decoded data. This will remove us from 
             // m_liveDecodedResources, and possibly move us to a different LRU 
@@ -536,7 +541,7 @@ void MemoryCache::removeResourcesWithOrigin(SecurityOrigin* origin)
 
     CachedResourceMap::iterator e = m_resources.end();
     for (CachedResourceMap::iterator it = m_resources.begin(); it != e; ++it) {
-        CachedResource* resource = it->value;
+        CachedResource* resource = it->second;
         RefPtr<SecurityOrigin> resourceOrigin = SecurityOrigin::createFromString(resource->url());
         if (!resourceOrigin)
             continue;
@@ -552,7 +557,7 @@ void MemoryCache::getOriginsWithCache(SecurityOriginSet& origins)
 {
     CachedResourceMap::iterator e = m_resources.end();
     for (CachedResourceMap::iterator it = m_resources.begin(); it != e; ++it)
-        origins.add(SecurityOrigin::createFromString(it->value->url()));
+        origins.add(SecurityOrigin::createFromString(it->second->url()));
 }
 
 void MemoryCache::removeFromLiveDecodedResourcesList(CachedResource* resource)
@@ -685,7 +690,7 @@ MemoryCache::Statistics MemoryCache::getStatistics()
     Statistics stats;
     CachedResourceMap::iterator e = m_resources.end();
     for (CachedResourceMap::iterator i = m_resources.begin(); i != e; ++i) {
-        CachedResource* resource = i->value;
+        CachedResource* resource = i->second;
         switch (resource->type()) {
         case CachedResource::ImageResource:
             stats.images.addResource(resource);
@@ -714,7 +719,12 @@ MemoryCache::Statistics MemoryCache::getStatistics()
 void MemoryCache::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::MemoryCacheStructures);
-    info.addMember(m_resources);
+    info.addHashMap(m_resources);
+    CachedResourceMap::const_iterator e = m_resources.end();
+    for (CachedResourceMap::const_iterator i = m_resources.begin(); i != e; ++i) {
+        info.addMember(i->first);
+        info.addMember(i->second);
+    }
     info.addMember(m_allResources);
     info.addMember(m_liveDecodedResources);
 }
@@ -729,7 +739,7 @@ void MemoryCache::setDisabled(bool disabled)
         CachedResourceMap::iterator i = m_resources.begin();
         if (i == m_resources.end())
             break;
-        evict(i->value);
+        evict(i->second);
     }
 }
 

@@ -18,13 +18,16 @@
  * Boston, MA 02110-1301, USA.
  */
 
-interface HTMLStyleElement : HTMLElement {
-    attribute boolean disabled;
-    [Conditional=STYLE_SCOPED, V8EnabledAtRuntime=styleScoped] attribute boolean scoped;
-    [Reflect] attribute DOMString media;
-    [Reflect] attribute DOMString type;
+module html {
 
-    // DOM Level 2 Style
-    readonly attribute StyleSheet sheet;
-};
+    interface HTMLStyleElement : HTMLElement {
+        attribute boolean disabled;
+        attribute [Conditional=STYLE_SCOPED, V8EnabledAtRuntime=styleScoped] boolean scoped;
+        attribute [Reflect] DOMString media;
+        attribute [Reflect] DOMString type;
 
+        // DOM Level 2 Style
+        readonly attribute StyleSheet sheet;
+    };
+
+}

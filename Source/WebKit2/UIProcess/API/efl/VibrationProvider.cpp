@@ -29,7 +29,6 @@
 #if ENABLE(VIBRATION)
 
 #include "WKAPICast.h"
-#include "WKContext.h"
 #include "WKVibration.h"
 #include <Evas.h>
 
@@ -66,18 +65,15 @@ static void cancelVibrationCallback(WKVibrationRef, const void* clientInfo)
     toVibrationProvider(clientInfo)->cancelVibration();
 }
 
-PassRefPtr<VibrationProvider> VibrationProvider::create(WKContextRef wkContext)
+PassRefPtr<VibrationProvider> VibrationProvider::create(WKVibrationRef wkVibrationRef)
 {
-    return adoptRef(new VibrationProvider(wkContext));
+    return adoptRef(new VibrationProvider(wkVibrationRef));
 }
 
-VibrationProvider::VibrationProvider(WKContextRef wkContext)
-    : m_wkContext(wkContext)
+VibrationProvider::VibrationProvider(WKVibrationRef wkVibrationRef)
+    : m_wkVibrationRef(wkVibrationRef)
 {
-    ASSERT(m_wkContext.get());
-
-    WKVibrationRef wkVibration = WKContextGetVibration(m_wkContext.get());
-    ASSERT(wkVibration);
+    ASSERT(wkVibrationRef);
 
     WKVibrationProvider wkVibrationProvider = {
         kWKVibrationProviderCurrentVersion,
@@ -85,15 +81,11 @@ VibrationProvider::VibrationProvider(WKContextRef wkContext)
         vibrateCallback,
         cancelVibrationCallback
     };
-    WKVibrationSetProvider(wkVibration, &wkVibrationProvider);
+    WKVibrationSetProvider(m_wkVibrationRef.get(), &wkVibrationProvider);
 }
 
 VibrationProvider::~VibrationProvider()
 {
-    WKVibrationRef wkVibration = WKContextGetVibration(m_wkContext.get());
-    ASSERT(wkVibration);
-
-    WKVibrationSetProvider(wkVibration, 0);
 }
 
 void VibrationProvider::vibrate(uint64_t vibrationTime)

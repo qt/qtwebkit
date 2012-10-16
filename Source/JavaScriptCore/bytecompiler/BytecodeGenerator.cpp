@@ -230,7 +230,7 @@ bool BytecodeGenerator::addVar(const Identifier& ident, bool isConstant, Registe
     SymbolTable::AddResult result = symbolTable().add(ident.impl(), newEntry);
 
     if (!result.isNewEntry) {
-        r0 = &registerFor(result.iterator->value.getIndex());
+        r0 = &registerFor(result.iterator->second.getIndex());
         return false;
     }
 
@@ -248,8 +248,8 @@ int BytecodeGenerator::addGlobalVar(
         newEntry.attemptToWatch();
     SymbolTable::AddResult result = symbolTable().add(ident.impl(), newEntry);
     if (!result.isNewEntry) {
-        result.iterator->value.notifyWrite();
-        index = result.iterator->value.getIndex();
+        result.iterator->second.notifyWrite();
+        index = result.iterator->second.getIndex();
     }
     return index;
 }
@@ -629,7 +629,7 @@ RegisterID* BytecodeGenerator::resolveCallee(FunctionBodyNode* functionBodyNode)
     if (functionBodyNode->ident().isNull() || !functionBodyNode->functionNameIsInScope())
         return 0;
 
-    m_calleeRegister.setIndex(JSStack::Callee);
+    m_calleeRegister.setIndex(RegisterFile::Callee);
 
     // If non-strict eval is in play, we use a separate object in the scope chain for the callee's name.
     if ((m_codeBlock->usesEval() && !m_codeBlock->isStrictMode()) || m_shouldEmitDebugHooks) {
@@ -1129,7 +1129,7 @@ PassRefPtr<Label> BytecodeGenerator::emitJumpIfNotFunctionCall(RegisterID* cond,
 
     emitOpcode(op_jneq_ptr);
     instructions().append(cond->index());
-    instructions().append(Special::CallFunction);
+    instructions().append(Instruction(*m_globalData, m_codeBlock->ownerExecutable(), m_scope->globalObject()->callFunction()));
     instructions().append(target->bind(begin, instructions().size()));
     return target;
 }
@@ -1140,7 +1140,7 @@ PassRefPtr<Label> BytecodeGenerator::emitJumpIfNotFunctionApply(RegisterID* cond
 
     emitOpcode(op_jneq_ptr);
     instructions().append(cond->index());
-    instructions().append(Special::ApplyFunction);
+    instructions().append(Instruction(*m_globalData, m_codeBlock->ownerExecutable(), m_scope->globalObject()->applyFunction()));
     instructions().append(target->bind(begin, instructions().size()));
     return target;
 }
@@ -1152,7 +1152,7 @@ unsigned BytecodeGenerator::addConstant(const Identifier& ident)
     if (result.isNewEntry)
         m_codeBlock->addIdentifier(Identifier(m_globalData, rep));
 
-    return result.iterator->value;
+    return result.iterator->second;
 }
 
 // We can't hash JSValue(), so we use a dedicated data member to cache it.
@@ -1181,7 +1181,7 @@ RegisterID* BytecodeGenerator::addConstantValue(JSValue v)
         ++m_nextConstantOffset;
         m_codeBlock->addConstant(v);
     } else
-        index = result.iterator->value;
+        index = result.iterator->second;
     return &m_constantPoolRegisters[index];
 }
 
@@ -1327,7 +1327,7 @@ RegisterID* BytecodeGenerator::emitLoad(RegisterID* dst, double number)
     // work correctly with NaN as a key.
     if (isnan(number) || number == HashTraits<double>::emptyValue() || HashTraits<double>::isDeletedValue(number))
         return emitLoad(dst, jsNumber(number));
-    JSValue& valueInMap = m_numberMap.add(number, JSValue()).iterator->value;
+    JSValue& valueInMap = m_numberMap.add(number, JSValue()).iterator->second;
     if (!valueInMap)
         valueInMap = jsNumber(number);
     return emitLoad(dst, valueInMap);
@@ -1335,7 +1335,7 @@ RegisterID* BytecodeGenerator::emitLoad(RegisterID* dst, double number)
 
 RegisterID* BytecodeGenerator::emitLoad(RegisterID* dst, const Identifier& identifier)
 {
-    JSString*& stringInMap = m_stringMap.add(identifier.impl(), 0).iterator->value;
+    JSString*& stringInMap = m_stringMap.add(identifier.impl(), 0).iterator->second;
     if (!stringInMap)
         stringInMap = jsOwnedString(globalData(), identifier.string());
     return emitLoad(dst, JSValue(stringInMap));
@@ -1907,7 +1907,7 @@ unsigned BytecodeGenerator::addConstantBuffer(unsigned length)
 
 JSString* BytecodeGenerator::addStringConstant(const Identifier& identifier)
 {
-    JSString*& stringInMap = m_stringMap.add(identifier.impl(), 0).iterator->value;
+    JSString*& stringInMap = m_stringMap.add(identifier.impl(), 0).iterator->second;
     if (!stringInMap) {
         stringInMap = jsString(globalData(), identifier.string());
         addConstantValue(stringInMap);
@@ -1979,8 +1979,8 @@ RegisterID* BytecodeGenerator::emitLazyNewFunction(RegisterID* dst, FunctionBody
 {
     FunctionOffsetMap::AddResult ptr = m_functionOffsets.add(function, 0);
     if (ptr.isNewEntry)
-        ptr.iterator->value = m_codeBlock->addFunctionDecl(FunctionExecutable::create(*m_globalData, function));
-    return emitNewFunctionInternal(dst, ptr.iterator->value, true);
+        ptr.iterator->second = m_codeBlock->addFunctionDecl(FunctionExecutable::create(*m_globalData, function));
+    return emitNewFunctionInternal(dst, ptr.iterator->second, true);
 }
 
 RegisterID* BytecodeGenerator::emitNewFunctionInternal(RegisterID* dst, unsigned index, bool doNullCheck)
@@ -2065,8 +2065,8 @@ RegisterID* BytecodeGenerator::emitCall(OpcodeID opcodeID, RegisterID* dst, Regi
         emitNode(callArguments.argumentRegister(argument++), n);
 
     // Reserve space for call frame.
-    Vector<RefPtr<RegisterID>, JSStack::CallFrameHeaderSize> callFrame;
-    for (int i = 0; i < JSStack::CallFrameHeaderSize; ++i)
+    Vector<RefPtr<RegisterID>, RegisterFile::CallFrameHeaderSize> callFrame;
+    for (int i = 0; i < RegisterFile::CallFrameHeaderSize; ++i)
         callFrame.append(newTemporary());
 
     if (m_shouldEmitProfileHooks) {
@@ -2182,8 +2182,8 @@ RegisterID* BytecodeGenerator::emitConstruct(RegisterID* dst, RegisterID* func, 
     }
 
     // Reserve space for call frame.
-    Vector<RefPtr<RegisterID>, JSStack::CallFrameHeaderSize> callFrame;
-    for (int i = 0; i < JSStack::CallFrameHeaderSize; ++i)
+    Vector<RefPtr<RegisterID>, RegisterFile::CallFrameHeaderSize> callFrame;
+    for (int i = 0; i < RegisterFile::CallFrameHeaderSize; ++i)
         callFrame.append(newTemporary());
 
     emitExpressionInfo(divot, startOffset, endOffset);

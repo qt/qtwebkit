@@ -78,16 +78,6 @@ using namespace WebCore;
     _tileCache->tileCacheLayerBoundsChanged();
 }
 
-- (void)setOpaque:(BOOL)opaque
-{
-    _tileCache->setTilesOpaque(opaque);
-}
-
-- (BOOL)isOpaque
-{
-    return _tileCache->tilesAreOpaque();
-}
-
 - (void)setNeedsDisplay
 {
     _tileCache->setNeedsDisplay();
@@ -137,8 +127,7 @@ using namespace WebCore;
 
 - (void)setBorderWidth:(CGFloat)borderWidth
 {
-    // Tiles adjoin, so halve the border width.
-    _tileCache->setTileDebugBorderWidth(borderWidth / 2);
+    _tileCache->setTileDebugBorderWidth(borderWidth);
 }
 
 @end

@@ -23,10 +23,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=SCRIPTED_SPEECH,
-    Constructor
-] interface SpeechGrammar {
-    [URL,CallWith=ScriptExecutionContext] attribute DOMString src;
-    attribute float weight;
-};
+module core {
+    interface [
+        Conditional=SCRIPTED_SPEECH,
+        Constructor
+    ] SpeechGrammar {
+        attribute [URL,CallWith=ScriptExecutionContext] DOMString src;
+        attribute float weight;
+    };
+}

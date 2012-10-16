@@ -109,7 +109,6 @@
 #include "Language.h"
 #include "Localizer.h"
 #include "Logging.h"
-#include "MediaCanStartListener.h"
 #include "MediaQueryList.h"
 #include "MediaQueryMatcher.h"
 #include "MouseEventWithHitTestResults.h"
@@ -175,8 +174,6 @@
 #include <wtf/CurrentTime.h>
 #include <wtf/HashFunctions.h>
 #include <wtf/MainThread.h>
-#include <wtf/MemoryInstrumentationHashMap.h>
-#include <wtf/MemoryInstrumentationHashSet.h>
 #include <wtf/MemoryInstrumentationVector.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/StdLibExtras.h>
@@ -462,8 +459,8 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     , m_savedRenderer(0)
     , m_designMode(inherit)
 #if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
-    , m_hasAnnotatedRegions(false)
-    , m_annotatedRegionsDirty(false)
+    , m_hasDashboardRegions(false)
+    , m_dashboardRegionsDirty(false)
 #endif
     , m_createRenderers(true)
     , m_inPageCache(false)
@@ -529,12 +526,7 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
 
     m_markers = adoptPtr(new DocumentMarkerController);
 
-    if (m_frame)
-        m_cachedResourceLoader = m_frame->loader()->activeDocumentLoader()->cachedResourceLoader();
-    if (!m_cachedResourceLoader)
-        m_cachedResourceLoader = CachedResourceLoader::create(0);
-    m_cachedResourceLoader->setDocument(this);
-
+    m_cachedResourceLoader = adoptPtr(new CachedResourceLoader(this));
 #if ENABLE(LINK_PRERENDER)
     m_prerenderer = Prerenderer::create(this);
 #endif
@@ -650,17 +642,14 @@ Document::~Document()
     if (m_elemSheet)
         m_elemSheet->clearOwnerNode();
 
+    deleteCustomFonts();
+
     m_weakReference->clear();
 
     if (m_mediaQueryMatcher)
         m_mediaQueryMatcher->documentDestroyed();
 
     clearStyleResolver(); // We need to destory CSSFontSelector before destroying m_cachedResourceLoader.
-
-    // It's possible for multiple Documents to end up referencing the same CachedResourceLoader (e.g., SVGImages
-    // load the initial empty document and the SVGDocument with the same DocumentLoader).
-    if (m_cachedResourceLoader->document() == this)
-        m_cachedResourceLoader->setDocument(0);
     m_cachedResourceLoader.clear();
 
     // We must call clearRareData() here since a Document class inherits TreeScope
@@ -960,7 +949,9 @@ PassRefPtr<Node> Document::importNode(Node* importedNode, bool deep, ExceptionCo
             ec = NAMESPACE_ERR;
             return 0;
         }
-        RefPtr<Element> newElement = createElement(oldElement->tagQName(), false);
+        RefPtr<Element> newElement = createElement(oldElement->tagQName(), ec);
+        if (ec)
+            return 0;
 
         newElement->cloneDataFromElement(*oldElement);
 
@@ -1148,6 +1139,17 @@ bool Document::cssGridLayoutEnabled() const
 }
 
 #if ENABLE(CSS_REGIONS)
+
+PassRefPtr<WebKitNamedFlow> Document::webkitGetFlowByName(const String& flowName)
+{
+    if (!cssRegionsEnabled() || !renderer())
+        return 0;
+
+    // It's possible to have pending styles not applied that affect the existing flows.
+    updateStyleIfNeeded();
+
+    return namedFlows()->flowByName(flowName);
+}
 
 PassRefPtr<DOMNamedFlowCollection> Document::webkitGetNamedFlows()
 {
@@ -1771,14 +1773,9 @@ void Document::unscheduleStyleRecalc()
     m_pendingStyleRecalcShouldForce = false;
 }
 
-bool Document::hasPendingStyleRecalc() const
+bool Document::isPendingStyleRecalc() const
 {
     return m_styleRecalcTimer.isActive() && !m_inStyleRecalc;
-}
-
-bool Document::hasPendingForcedStyleRecalc() const
-{
-    return m_styleRecalcTimer.isActive() && m_pendingStyleRecalcShouldForce;
 }
 
 void Document::styleRecalcTimerFired(Timer<Document>*)
@@ -1978,6 +1975,20 @@ PassRefPtr<RenderStyle> Document::styleForPage(int pageIndex)
 {
     RefPtr<RenderStyle> style = styleResolver()->styleForPage(pageIndex);
     return style.release();
+}
+
+void Document::registerCustomFont(PassOwnPtr<FontData> fontData)
+{
+    m_customFonts.append(fontData);
+}
+
+void Document::deleteCustomFonts()
+{
+    size_t size = m_customFonts.size();
+    for (size_t i = 0; i < size; ++i)
+        GlyphPageTreeNode::pruneTreeCustomFontData(m_customFonts[i].get());
+
+    m_customFonts.clear();
 }
 
 bool Document::isPageBoxVisible(int pageIndex)
@@ -2673,14 +2684,6 @@ double Document::minimumTimerInterval() const
     return p->settings()->minDOMTimerInterval();
 }
 
-double Document::timerAlignmentInterval() const
-{
-    Page* p = page();
-    if (!p)
-        return ScriptExecutionContext::timerAlignmentInterval();
-    return p->settings()->domTimerAlignmentInterval();
-}
-
 EventTarget* Document::errorEventTarget()
 {
     return domWindow();
@@ -3352,15 +3355,15 @@ void Document::activeChainNodeDetached(Node* node)
 }
 
 #if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
-const Vector<AnnotatedRegionValue>& Document::annotatedRegions() const
+const Vector<DashboardRegionValue>& Document::dashboardRegions() const
 {
-    return m_annotatedRegions;
+    return m_dashboardRegions;
 }
 
-void Document::setAnnotatedRegions(const Vector<AnnotatedRegionValue>& regions)
+void Document::setDashboardRegions(const Vector<DashboardRegionValue>& regions)
 {
-    m_annotatedRegions = regions;
-    setAnnotatedRegionsDirty(false);
+    m_dashboardRegions = regions;
+    setDashboardRegionsDirty(false);
 }
 #endif
 
@@ -3707,7 +3710,7 @@ EventListener* Document::getWindowAttributeEventListener(const AtomicString& eve
 
 void Document::dispatchWindowEvent(PassRefPtr<Event> event,  PassRefPtr<EventTarget> target)
 {
-    ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
+    ASSERT(!eventDispatchForbidden());
     DOMWindow* domWindow = this->domWindow();
     if (!domWindow)
         return;
@@ -3716,7 +3719,7 @@ void Document::dispatchWindowEvent(PassRefPtr<Event> event,  PassRefPtr<EventTar
 
 void Document::dispatchWindowLoadEvent()
 {
-    ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
+    ASSERT(!eventDispatchForbidden());
     DOMWindow* domWindow = this->domWindow();
     if (!domWindow)
         return;
@@ -4066,25 +4069,14 @@ void Document::setInPageCache(bool flag)
     m_inPageCache = flag;
 
     FrameView* v = view();
-    Page* page = this->page();
-
     if (flag) {
         ASSERT(!m_savedRenderer);
         m_savedRenderer = renderer();
         if (v) {
-            // FIXME: There is some scrolling related work that needs to happen whenever a page goes into the
-            // page cache and similar work that needs to occur when it comes out. This is where we do the work
-            // that needs to happen when we enter, and the work that needs to happen when we exit is in
-            // HistoryController::restoreScrollPositionAndViewState(). It can't be here because this function is
-            // called too early on in the process of a page exiting the cache for that work to be possible in this
-            // function. It would be nice if there was more symmetry here.
-            // https://bugs.webkit.org/show_bug.cgi?id=98698
             v->cacheCurrentScrollPosition();
-            if (page && page->mainFrame() == m_frame) {
+            if (page() && page()->mainFrame() == m_frame)
                 v->resetScrollbarsAndClearContentsSize();
-                if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
-                    scrollingCoordinator->clearStateTree();
-            } else
+            else
                 v->resetScrollbars();
         }
         m_styleRecalcTimer.stop();
@@ -4458,10 +4450,10 @@ PassRefPtr<HTMLCollection> Document::windowNamedItems(const AtomicString& name)
 {
     NamedCollectionMap::AddResult result = m_windowNamedItemCollections.add(name, 0);
     if (!result.isNewEntry)
-        return result.iterator->value;
+        return result.iterator->second;
 
     RefPtr<HTMLNameCollection> collection = HTMLNameCollection::create(this, WindowNamedItems, name);
-    result.iterator->value = collection.get();
+    result.iterator->second = collection.get();
     return collection.release();
 }
 
@@ -4469,10 +4461,10 @@ PassRefPtr<HTMLCollection> Document::documentNamedItems(const AtomicString& name
 {
     NamedCollectionMap::AddResult result = m_documentNamedItemCollections.add(name, 0);
     if (!result.isNewEntry)
-        return result.iterator->value;
+        return result.iterator->second;
 
     RefPtr<HTMLNameCollection> collection = HTMLNameCollection::create(this, DocumentNamedItems, name);
-    result.iterator->value = collection.get();
+    result.iterator->second = collection.get();
     return collection.release();
 }
 
@@ -4810,7 +4802,7 @@ CanvasRenderingContext* Document::getCSSCanvasContext(const String& type, const 
 
 HTMLCanvasElement* Document::getCSSCanvasElement(const String& name)
 {
-    RefPtr<HTMLCanvasElement>& element = m_cssCanvasElements.add(name, 0).iterator->value;
+    RefPtr<HTMLCanvasElement>& element = m_cssCanvasElements.add(name, 0).iterator->second;
     if (!element)
         element = HTMLCanvasElement::create(this);
     return element.get();
@@ -5071,17 +5063,9 @@ void Document::requestFullScreenForElement(Element* element, unsigned short flag
         // There is a previously-established user preference, security risk, or platform limitation.
         if (!page() || !page()->settings()->fullScreenEnabled())
             break;
-
-        if (!page()->chrome()->client()->supportsFullScreenForElement(element, flags & Element::ALLOW_KEYBOARD_INPUT)) {
-            // The new full screen API does not accept a "flags" parameter, so fall back to disallowing
-            // keyboard input if the chrome client refuses to allow keyboard input.
-            if (!inLegacyMozillaMode && flags & Element::ALLOW_KEYBOARD_INPUT) {
-                flags &= ~Element::ALLOW_KEYBOARD_INPUT;
-                if (!page()->chrome()->client()->supportsFullScreenForElement(element, false))
-                    break;
-            } else
-                break;
-        }
+        
+        if (!page()->chrome()->client()->supportsFullScreenForElement(element, flags & Element::ALLOW_KEYBOARD_INPUT))
+            break;
 
         // 2. Let doc be element's node document. (i.e. "this")
         Document* currentDoc = this;
@@ -5541,7 +5525,7 @@ void Document::loadEventDelayTimerFired(Timer<Document>*)
 }
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
-int Document::requestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback> callback)
+int Document::webkitRequestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback> callback)
 {
     if (!m_scriptedAnimationController) {
 #if USE(REQUEST_ANIMATION_FRAME_DISPLAY_MONITOR)
@@ -5559,18 +5543,18 @@ int Document::requestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback> ca
     return m_scriptedAnimationController->registerCallback(callback);
 }
 
-void Document::cancelAnimationFrame(int id)
+void Document::webkitCancelAnimationFrame(int id)
 {
     if (!m_scriptedAnimationController)
         return;
     m_scriptedAnimationController->cancelCallback(id);
 }
 
-void Document::serviceScriptedAnimations(double monotonicAnimationStartTime)
+void Document::serviceScriptedAnimations(DOMTimeStamp time)
 {
     if (!m_scriptedAnimationController)
         return;
-    m_scriptedAnimationController->serviceScriptedAnimations(monotonicAnimationStartTime);
+    m_scriptedAnimationController->serviceScriptedAnimations(time);
 }
 #endif
 
@@ -5881,8 +5865,9 @@ void Document::updateHoverActiveState(const HitTestRequest& request, HitTestResu
 void Document::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    ContainerNode::reportMemoryUsage(memoryObjectInfo);
     info.addMember(m_styleResolver);
+    ContainerNode::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_customFonts);
     info.addMember(m_url);
     info.addMember(m_baseURL);
     info.addMember(m_baseURLOverride);
@@ -5891,34 +5876,30 @@ void Document::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addMember(m_firstPartyForCookies);
     info.addMember(m_documentURI);
     info.addMember(m_baseTarget);
-    info.addMember(m_docType);
-    info.addMember(m_implementation);
-    info.addMember(m_elemSheet);
     info.addMember(m_frame);
     info.addMember(m_cachedResourceLoader);
+    info.addMember(m_elemSheet);
     info.addMember(m_styleSheetCollection);
-    info.addMember(m_styleSheetList);
-    info.addMember(m_formController);
-    info.addMember(m_nodeIterators);
-    info.addMember(m_ranges);
+    info.addHashSet(m_nodeIterators);
+    info.addHashSet(m_ranges);
     info.addMember(m_title.string());
     info.addMember(m_rawTitle.string());
     info.addMember(m_xmlEncoding);
     info.addMember(m_xmlVersion);
     info.addMember(m_contentLanguage);
-    info.addMember(m_documentNamedItemCollections);
-    info.addMember(m_windowNamedItemCollections);
-#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
-    info.addMember(m_annotatedRegions);
+    info.addHashMap(m_documentNamedItemCollections);
+    info.addHashMap(m_windowNamedItemCollections);
+#if ENABLE(DASHBOARD_SUPPORT)
+    info.addMember(m_dashboardRegions);
 #endif
-    info.addMember(m_cssCanvasElements);
+    info.addHashMap(m_cssCanvasElements);
     info.addMember(m_iconURLs);
-    info.addMember(m_documentSuspensionCallbackElements);
-    info.addMember(m_mediaVolumeCallbackElements);
-    info.addMember(m_privateBrowsingStateChangedElements);
-    info.addMember(m_elementsByAccessKey);
+    info.addHashSet(m_documentSuspensionCallbackElements);
+    info.addHashSet(m_mediaVolumeCallbackElements);
+    info.addHashSet(m_privateBrowsingStateChangedElements);
+    info.addHashMap(m_elementsByAccessKey);
     info.addMember(m_eventQueue);
-    info.addMember(m_mediaCanStartListeners);
+    info.addHashSet(m_mediaCanStartListeners);
     info.addMember(m_pendingTasks);
 }
 
@@ -5978,19 +5959,19 @@ PassRefPtr<ElementAttributeData> Document::cachedImmutableAttributeData(const El
     unsigned cacheHash = cacheKey.hash();
 
     ImmutableAttributeDataCache::iterator cacheIterator = m_immutableAttributeDataCache.add(cacheHash, nullptr).iterator;
-    if (cacheIterator->value && cacheIterator->value->key != cacheKey)
+    if (cacheIterator->second && cacheIterator->second->key != cacheKey)
         cacheHash = 0;
 
     RefPtr<ElementAttributeData> attributeData;
-    if (cacheHash && cacheIterator->value)
-        attributeData = cacheIterator->value->value;
+    if (cacheHash && cacheIterator->second)
+        attributeData = cacheIterator->second->value;
     else
         attributeData = ElementAttributeData::createImmutable(attributes);
 
-    if (!cacheHash || cacheIterator->value)
+    if (!cacheHash || cacheIterator->second)
         return attributeData.release();
 
-    cacheIterator->value = adoptPtr(new ImmutableAttributeDataCacheEntry(ImmutableAttributeDataCacheKey(element->tagQName(), attributeData->immutableAttributeArray(), attributeData->length()), attributeData));
+    cacheIterator->second = adoptPtr(new ImmutableAttributeDataCacheEntry(ImmutableAttributeDataCacheKey(element->tagQName(), attributeData->immutableAttributeArray(), attributeData->length()), attributeData));
 
     return attributeData.release();
 }
@@ -6000,15 +5981,15 @@ bool Document::haveStylesheetsLoaded() const
     return !m_styleSheetCollection->hasPendingSheets() || m_ignorePendingStylesheets;
 }
 
-Localizer& Document::getCachedLocalizer(const AtomicString& locale)
+Localizer& Document::getLocalizer(const AtomicString& locale)
 {
     AtomicString localeKey = locale;
     if (locale.isEmpty() || !RuntimeEnabledFeatures::langAttributeAwareFormControlUIEnabled())
         localeKey = defaultLanguage();
     LocaleToLocalizerMap::AddResult result = m_localizerCache.add(localeKey, nullptr);
     if (result.isNewEntry)
-        result.iterator->value = Localizer::create(localeKey);
-    return *(result.iterator->value);
+        result.iterator->second = Localizer::create(localeKey);
+    return *(result.iterator->second);
 }
 
 } // namespace WebCore

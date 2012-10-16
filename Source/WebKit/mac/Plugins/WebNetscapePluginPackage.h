@@ -30,6 +30,15 @@
 #import "WebBasePluginPackage.h"
 
 
+#if defined(__ppc__) && !defined(__LP64__)
+#define SUPPORT_CFM
+#endif
+
+typedef enum {
+    WebCFMExecutableType,
+    WebMachOExecutableType
+} WebExecutableType;
+
 @interface WebNetscapePluginPackage : WebBasePluginPackage
 {
     NPPluginFuncs pluginFuncs;
@@ -49,6 +58,12 @@
 #if USE(PLUGIN_HOST_PROCESS)
     cpu_type_t pluginHostArchitecture;
 #endif
+    
+#ifdef SUPPORT_CFM
+    BOOL isBundle;
+    BOOL isCFM;
+    CFragConnectionID connID;
+#endif
 }
 
 // Netscape plug-in packages must be explicitly opened and closed by each plug-in instance.
@@ -56,6 +71,7 @@
 - (void)open;
 - (void)close;
 
+- (WebExecutableType)executableType;
 - (NPPluginFuncs *)pluginFuncs;
 - (NPNetscapeFuncs *)browserFuncs;
 

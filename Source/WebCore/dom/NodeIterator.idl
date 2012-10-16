@@ -18,21 +18,24 @@
  * Boston, MA 02110-1301, USA.
  */
 
-// Introduced in DOM Level 2:
-[
-    JSCustomMarkFunction
-] interface NodeIterator {
-    readonly attribute Node root;
-    readonly attribute unsigned long whatToShow;
-    readonly attribute NodeFilter filter;
-    readonly attribute boolean expandEntityReferences;
-    readonly attribute Node referenceNode;
-    readonly attribute boolean pointerBeforeReferenceNode;
+module traversal {
 
-    [CallWith=ScriptState] Node nextNode() 
-        raises (DOMException);
-    [CallWith=ScriptState] Node previousNode()
-        raises (DOMException);
-    void detach();
-};
+    // Introduced in DOM Level 2:
+    interface [
+        JSCustomMarkFunction
+    ] NodeIterator {
+        readonly attribute Node root;
+        readonly attribute unsigned long whatToShow;
+        readonly attribute NodeFilter filter;
+        readonly attribute boolean expandEntityReferences;
+        readonly attribute Node referenceNode;
+        readonly attribute boolean pointerBeforeReferenceNode;
 
+        [CallWith=ScriptState] Node nextNode() 
+            raises (DOMException);
+        [CallWith=ScriptState] Node previousNode()
+            raises (DOMException);
+        void detach();
+    };
+
+}

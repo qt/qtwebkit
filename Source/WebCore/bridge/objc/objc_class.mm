@@ -95,24 +95,25 @@ static inline void convertJSMethodNameToObjc(const CString& jsName, JSNameConver
     }
 }
 
-Method* ObjcClass::methodNamed(PropertyName propertyName, Instance*) const
+MethodList ObjcClass::methodsNamed(PropertyName propertyName, Instance*) const
 {
     String name(propertyName.publicName());
     if (name.isNull())
-        return 0;
+        return MethodList();
 
-    if (Method* method = m_methodCache.get(name.impl()))
-        return method;
+    MethodList methodList;
+    if (Method* method = m_methodCache.get(name.impl())) {
+        methodList.append(method);
+        return methodList;
+    }
 
     CString jsName = name.ascii();
     JSNameConversionBuffer buffer;
     convertJSMethodNameToObjc(jsName, buffer);
     RetainPtr<CFStringRef> methodName(AdoptCF, CFStringCreateWithCString(NULL, buffer.data(), kCFStringEncodingASCII));
 
-    Method* methodPtr = 0;
     ClassStructPtr thisClass = _isa;
-    
-    while (thisClass && !methodPtr) {
+    while (thisClass && methodList.isEmpty()) {
         unsigned numMethodsInClass = 0;
         MethodStructPtr* objcMethodList = class_copyMethodList(thisClass, &numMethodsInClass);
         for (unsigned i = 0; i < numMethodsInClass; i++) {
@@ -134,7 +135,7 @@ Method* ObjcClass::methodNamed(PropertyName propertyName, Instance*) const
 
             if ((mappedName && [mappedName isEqual:(NSString*)methodName.get()]) || strcmp(objcMethodSelectorName, buffer.data()) == 0) {
                 OwnPtr<Method> method = adoptPtr(new ObjcMethod(thisClass, objcMethodSelector));
-                methodPtr = method.get();
+                methodList.append(method.get());
                 m_methodCache.add(name.impl(), method.release());
                 break;
             }
@@ -143,7 +144,7 @@ Method* ObjcClass::methodNamed(PropertyName propertyName, Instance*) const
         free(objcMethodList);
     }
 
-    return methodPtr;
+    return methodList;
 }
 
 Field* ObjcClass::fieldNamed(PropertyName propertyName, Instance* instance) const

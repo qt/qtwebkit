@@ -48,7 +48,6 @@
 
 #include "FloatConversion.h"
 #include "FloatRect.h"
-#include "GraphicsLayerFactory.h"
 #include "Image.h"
 #include "LayerAnimation.h"
 #include "LayerWebKitThread.h"
@@ -78,14 +77,6 @@ static void setLayerBackgroundColor(LayerWebKitThread& layer, const Color& color
 static void clearLayerBackgroundColor(LayerWebKitThread& layer)
 {
     layer.setBackgroundColor(Color::transparent);
-}
-
-PassOwnPtr<GraphicsLayer> GraphicsLayer::create(GraphicsLayerFactory* factory, GraphicsLayerClient* client)
-{
-    if (!factory)
-        return adoptPtr(new GraphicsLayerBlackBerry(client));
-
-    return factory->createGraphicsLayer(client);
 }
 
 PassOwnPtr<GraphicsLayer> GraphicsLayer::create(GraphicsLayerClient* client)

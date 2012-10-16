@@ -31,6 +31,7 @@
 
 #include "CodeProfiling.h"
 #include <errno.h>
+#include <sys/mman.h>
 #include <unistd.h>
 #include <wtf/MetaAllocator.h>
 #include <wtf/PageReservation.h>

@@ -120,10 +120,10 @@ WebInspector.AuditRules.GzipRule.prototype = {
     _shouldCompress: function(request)
     {
         return request.type.isTextType() && request.parsedURL.host && request.resourceSize !== undefined && request.resourceSize > 150;
-    },
-
-    __proto__: WebInspector.AuditRule.prototype
+    }
 }
+
+WebInspector.AuditRules.GzipRule.prototype.__proto__ = WebInspector.AuditRule.prototype;
 
 /**
  * @constructor
@@ -164,10 +164,10 @@ WebInspector.AuditRules.CombineExternalResourcesRule.prototype = {
 
         summary.value = "There are multiple resources served from same domain. Consider combining them into as few files as possible.";
         callback(result);
-    },
-
-    __proto__: WebInspector.AuditRule.prototype
+    }
 }
+
+WebInspector.AuditRules.CombineExternalResourcesRule.prototype.__proto__ = WebInspector.AuditRule.prototype;
 
 /**
  * @constructor
@@ -177,9 +177,7 @@ WebInspector.AuditRules.CombineJsResourcesRule = function(allowedPerDomain) {
     WebInspector.AuditRules.CombineExternalResourcesRule.call(this, "page-externaljs", "Combine external JavaScript", WebInspector.resourceTypes.Script, "JavaScript", allowedPerDomain);
 }
 
-WebInspector.AuditRules.CombineJsResourcesRule.prototype = {
-    __proto__: WebInspector.AuditRules.CombineExternalResourcesRule.prototype
-}
+WebInspector.AuditRules.CombineJsResourcesRule.prototype.__proto__ = WebInspector.AuditRules.CombineExternalResourcesRule.prototype;
 
 /**
  * @constructor
@@ -189,9 +187,7 @@ WebInspector.AuditRules.CombineCssResourcesRule = function(allowedPerDomain) {
     WebInspector.AuditRules.CombineExternalResourcesRule.call(this, "page-externalcss", "Combine external CSS", WebInspector.resourceTypes.Stylesheet, "CSS", allowedPerDomain);
 }
 
-WebInspector.AuditRules.CombineCssResourcesRule.prototype = {
-    __proto__: WebInspector.AuditRules.CombineExternalResourcesRule.prototype
-}
+WebInspector.AuditRules.CombineCssResourcesRule.prototype.__proto__ = WebInspector.AuditRules.CombineExternalResourcesRule.prototype;
 
 /**
  * @constructor
@@ -229,10 +225,10 @@ WebInspector.AuditRules.MinimizeDnsLookupsRule.prototype = {
 
         summary.value = "The following domains only serve one resource each. If possible, avoid the extra DNS lookups by serving these resources from existing domains.";
         callback(result);
-    },
-
-    __proto__: WebInspector.AuditRule.prototype
+    }
 }
+
+WebInspector.AuditRules.MinimizeDnsLookupsRule.prototype.__proto__ = WebInspector.AuditRule.prototype;
 
 /**
  * @constructor
@@ -305,10 +301,10 @@ WebInspector.AuditRules.ParallelizeDownloadRule.prototype = {
 
         result.violationCount = requestsOnBusiestHost.length;
         callback(result);
-    },
-
-    __proto__: WebInspector.AuditRule.prototype
+    }
 }
+
+WebInspector.AuditRules.ParallelizeDownloadRule.prototype.__proto__ = WebInspector.AuditRule.prototype;
 
 /**
  * The reported CSS rule size is incorrect (parsed != original in WebKit),
@@ -457,10 +453,10 @@ WebInspector.AuditRules.UnusedCssRule.prototype = {
         }
 
         CSSAgent.getAllStyleSheets(allStylesCallback);
-    },
-
-    __proto__: WebInspector.AuditRule.prototype
+    }
 }
+
+WebInspector.AuditRules.UnusedCssRule.prototype.__proto__ = WebInspector.AuditRule.prototype;
 
 /**
  * @constructor
@@ -603,10 +599,10 @@ WebInspector.AuditRules.CacheControlRule.prototype = {
     isCacheableResource: function(request)
     {
         return request.statusCode !== undefined && WebInspector.AuditRules.CacheableResponseCodes[request.statusCode];
-    },
-
-    __proto__: WebInspector.AuditRule.prototype
+    }
 }
+
+WebInspector.AuditRules.CacheControlRule.prototype.__proto__ = WebInspector.AuditRule.prototype;
 
 /**
  * @constructor
@@ -672,10 +668,10 @@ WebInspector.AuditRules.BrowserCacheControlRule.prototype = {
             !this.hasResponseHeader(request, "Set-Cookie") &&
             !this.freshnessLifetimeGreaterThan(request, 11 * WebInspector.AuditRules.CacheControlRule.MillisPerMonth) &&
             this.freshnessLifetimeGreaterThan(request, WebInspector.AuditRules.CacheControlRule.MillisPerMonth);
-    },
-
-    __proto__: WebInspector.AuditRules.CacheControlRule.prototype
+    }
 }
+
+WebInspector.AuditRules.BrowserCacheControlRule.prototype.__proto__ = WebInspector.AuditRules.CacheControlRule.prototype;
 
 /**
  * @constructor
@@ -712,10 +708,10 @@ WebInspector.AuditRules.ProxyCacheControlRule.prototype = {
     _setCookieCacheableCheck: function(request)
     {
         return this.hasResponseHeader(request, "Set-Cookie") && this.isPubliclyCacheable(request);
-    },
-
-    __proto__: WebInspector.AuditRules.CacheControlRule.prototype
+    }
 }
+
+WebInspector.AuditRules.ProxyCacheControlRule.prototype.__proto__ = WebInspector.AuditRules.CacheControlRule.prototype;
 
 /**
  * @constructor
@@ -844,10 +840,10 @@ WebInspector.AuditRules.ImageDimensionsRule.prototype = {
         if (progress.isCanceled())
             return;
         WebInspector.domAgent.requestDocument(onDocumentAvailable);
-    },
-
-    __proto__: WebInspector.AuditRule.prototype
+    }
 }
+
+WebInspector.AuditRules.ImageDimensionsRule.prototype.__proto__ = WebInspector.AuditRule.prototype;
 
 /**
  * @constructor
@@ -934,10 +930,10 @@ WebInspector.AuditRules.CssInHeadRule.prototype = {
         }
 
         WebInspector.domAgent.requestDocument(onDocumentAvailable);
-    },
-
-    __proto__: WebInspector.AuditRule.prototype
+    }
 }
+
+WebInspector.AuditRules.CssInHeadRule.prototype.__proto__ = WebInspector.AuditRule.prototype;
 
 /**
  * @constructor
@@ -1022,10 +1018,10 @@ WebInspector.AuditRules.StylesScriptsOrderRule.prototype = {
         }
 
         WebInspector.domAgent.requestDocument(onDocumentAvailable);
-    },
-
-    __proto__: WebInspector.AuditRule.prototype
+    }
 }
+
+WebInspector.AuditRules.StylesScriptsOrderRule.prototype.__proto__ = WebInspector.AuditRule.prototype;
 
 /**
  * @constructor
@@ -1126,10 +1122,10 @@ WebInspector.AuditRules.CSSRuleBase.prototype = {
     visitProperty: function(styleSheet, property, result)
     {
         // Subclasses can implement.
-    },
-
-    __proto__: WebInspector.AuditRule.prototype
+    }
 }
+
+WebInspector.AuditRules.CSSRuleBase.prototype.__proto__ = WebInspector.AuditRule.prototype;
 
 /**
  * @constructor
@@ -1189,10 +1185,10 @@ WebInspector.AuditRules.VendorPrefixedCSSProperties.prototype = {
             ++result.violationCount;
             this._ruleResult.addSnippet(String.sprintf("\"" + this._webkitPrefix + "%s\" is used, but \"%s\" is supported.", normalPropertyName, normalPropertyName));
         }
-    },
-
-    __proto__: WebInspector.AuditRules.CSSRuleBase.prototype
+    }
 }
+
+WebInspector.AuditRules.VendorPrefixedCSSProperties.prototype.__proto__ = WebInspector.AuditRules.CSSRuleBase.prototype;
 
 /**
  * @constructor
@@ -1242,10 +1238,10 @@ WebInspector.AuditRules.CookieRuleBase.prototype = {
             if (WebInspector.Cookies.cookieMatchesResourceURL(cookie, requests[i].url))
                 callback(requests[i], cookie);
         }
-    },
-
-    __proto__: WebInspector.AuditRule.prototype
+    }
 }
+
+WebInspector.AuditRules.CookieRuleBase.prototype.__proto__ = WebInspector.AuditRule.prototype;
 
 /**
  * @constructor
@@ -1351,10 +1347,10 @@ WebInspector.AuditRules.CookieSizeRule.prototype = {
             entry.addURLs(bigAvgCookieDomains);
             result.violationCount += bigAvgCookieDomains.length;
         }
-    },
-
-    __proto__: WebInspector.AuditRules.CookieRuleBase.prototype
+    }
 }
+
+WebInspector.AuditRules.CookieSizeRule.prototype.__proto__ = WebInspector.AuditRules.CookieRuleBase.prototype;
 
 /**
  * @constructor
@@ -1398,7 +1394,7 @@ WebInspector.AuditRules.StaticCookielessRule.prototype = {
     _collectorCallback: function(matchingResourceData, request, cookie)
     {
         matchingResourceData[request.url] = (matchingResourceData[request.url] || 0) + cookie.size;
-    },
-
-    __proto__: WebInspector.AuditRules.CookieRuleBase.prototype
+    }
 }
+
+WebInspector.AuditRules.StaticCookielessRule.prototype.__proto__ = WebInspector.AuditRules.CookieRuleBase.prototype;

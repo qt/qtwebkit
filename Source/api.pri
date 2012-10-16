@@ -8,7 +8,7 @@
 load(qt_build_config)
 
 TEMPLATE = lib
-TARGET = QtWebKitWidgets
+TARGET = QtWebKit
 
 WEBKIT_DESTDIR = $${ROOT_BUILD_DIR}/lib
 
@@ -24,7 +24,7 @@ build?(webkit2): QMAKE_INTERNAL_INCLUDED_FILES *= WebKit2/Target.pri
 
 use?(3D_GRAPHICS): WEBKIT += angle
 
-MODULE = webkitwidgets
+MODULE = webkit
 
 # This is the canonical list of dependencies for the public API of
 # the QtWebKit library, and will end up in the library's prl file.

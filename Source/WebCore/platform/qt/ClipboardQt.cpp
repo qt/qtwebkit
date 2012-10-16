@@ -48,8 +48,9 @@
 #include <wtf/text/StringHash.h>
 #include <wtf/text/WTFString.h>
 
-#include <QClipboard>
 #include <QGuiApplication>
+#include <QClipboard>
+#include <QImage>
 #include <QList>
 #include <QMimeData>
 #include <QStringList>
@@ -182,13 +183,13 @@ bool ClipboardQt::setData(const String& type, const String& data)
 }
 
 // extensions beyond IE's API
-ListHashSet<String> ClipboardQt::types() const
+HashSet<String> ClipboardQt::types() const
 {
     if (policy() != ClipboardReadable && policy() != ClipboardTypesReadable)
-        return ListHashSet<String>();
+        return HashSet<String>();
 
     ASSERT(m_readableData);
-    ListHashSet<String> result;
+    HashSet<String> result;
     QStringList formats = m_readableData->formats();
     for (int i = 0; i < formats.count(); ++i)
         result.add(formats.at(i));
@@ -243,7 +244,7 @@ DragImageRef ClipboardQt::createDragImage(IntPoint& dragLoc) const
     if (!m_dragImage)
         return 0;
     dragLoc = m_dragLoc;
-    return m_dragImage->image()->nativeImageForCurrentFrame();
+    return new QImage(*m_dragImage->image()->nativeImageForCurrentFrame());
 }
 
 
@@ -273,9 +274,9 @@ void ClipboardQt::declareAndWriteDragImage(Element* element, const KURL& url, co
     CachedImage* cachedImage = getCachedImage(element);
     if (!cachedImage || !cachedImage->imageForRenderer(element->renderer()) || !cachedImage->isLoaded())
         return;
-    QPixmap* pixmap = cachedImage->imageForRenderer(element->renderer())->nativeImageForCurrentFrame();
-    if (pixmap)
-        m_writableData->setImageData(*pixmap);
+    QImage* image = cachedImage->imageForRenderer(element->renderer())->nativeImageForCurrentFrame();
+    if (image)
+        m_writableData->setImageData(*image);
 
     QList<QUrl> urls;
     urls.append(url);

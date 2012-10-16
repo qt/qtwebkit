@@ -73,11 +73,11 @@ WebInspector.ConcatenatedScriptsContentProvider.prototype = {
     },
 
     /**
-     * @return {string}
+     * @return {?string}
      */
     contentURL: function()
     {
-        return "";
+        return null;
     },
 
     /**
@@ -177,14 +177,13 @@ WebInspector.ConcatenatedScriptsContentProvider.prototype = {
         }
 
         return content;
-    },
-
-    __proto__: WebInspector.ContentProvider.prototype
+    }
 }
+
+WebInspector.ConcatenatedScriptsContentProvider.prototype.__proto__ = WebInspector.ContentProvider.prototype;
 
 /**
  * @constructor
- * @param {string} sourceURL
  * @implements {WebInspector.ContentProvider}
  */
 WebInspector.CompilerSourceMappingContentProvider = function(sourceURL)
@@ -194,7 +193,7 @@ WebInspector.CompilerSourceMappingContentProvider = function(sourceURL)
 
 WebInspector.CompilerSourceMappingContentProvider.prototype = {
     /**
-     * @return {string}
+     * @return {?string}
      */
     contentURL: function()
     {
@@ -233,10 +232,10 @@ WebInspector.CompilerSourceMappingContentProvider.prototype = {
     searchInContent: function(query, caseSensitive, isRegex, callback)
     {
         callback([]);
-    },
-
-    __proto__: WebInspector.ContentProvider.prototype
+    }
 }
+
+WebInspector.CompilerSourceMappingContentProvider.prototype.__proto__ = WebInspector.ContentProvider.prototype;
 
 /**
  * @constructor
@@ -254,11 +253,11 @@ WebInspector.StaticContentProvider = function(contentType, content, mimeType)
 
 WebInspector.StaticContentProvider.prototype = {
     /**
-     * @return {string}
+     * @return {?string}
      */
     contentURL: function()
     {
-        return "";
+        return null;
     },
 
     /**
@@ -306,7 +305,7 @@ WebInspector.StaticContentProvider.prototype = {
 
         // searchInContent should call back later.
         window.setTimeout(performSearch.bind(this), 0);
-    },
-
-    __proto__: WebInspector.ContentProvider.prototype
+    }
 }
+
+WebInspector.StaticContentProvider.prototype.__proto__ = WebInspector.ContentProvider.prototype;

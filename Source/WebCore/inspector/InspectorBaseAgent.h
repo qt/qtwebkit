@@ -32,7 +32,6 @@
 #define InspectorBaseAgent_h
 
 #include "InspectorBackendDispatcher.h"
-#include <wtf/Forward.h>
 #include <wtf/Vector.h>
 #include <wtf/text/WTFString.h>
 
@@ -44,7 +43,7 @@ class InstrumentingAgents;
 
 class InspectorBaseAgentInterface {
 public:
-    InspectorBaseAgentInterface(const String&, InstrumentingAgents*, InspectorState*);
+    explicit InspectorBaseAgentInterface(const String& name);
     virtual ~InspectorBaseAgentInterface();
 
     virtual void setFrontend(InspectorFrontend*) { }
@@ -54,13 +53,6 @@ public:
     virtual void discardAgent() { }
 
     String name() { return m_name; }
-
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
-
-protected:
-    InstrumentingAgents* m_instrumentingAgents;
-    InspectorState* m_state;
-
 private:
     String m_name;
 };
@@ -77,9 +69,14 @@ public:
 
 protected:
     InspectorBaseAgent(const String& name, InstrumentingAgents* instrumentingAgents, InspectorState* inspectorState)
-        : InspectorBaseAgentInterface(name, instrumentingAgents, inspectorState)
+        : InspectorBaseAgentInterface(name)
+        , m_instrumentingAgents(instrumentingAgents)
+        , m_state(inspectorState)
     {
     }
+
+    InstrumentingAgents* m_instrumentingAgents;
+    InspectorState* m_state;
 };
 
 } // namespace WebCore

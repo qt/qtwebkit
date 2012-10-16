@@ -232,13 +232,11 @@ static void serverCallback(SoupServer* server, SoupMessage* message, const char*
         return;
     }
 
-    if (g_str_equal(path, "/")) {
-        static const char* responseString = "<html><body>Testing!</body></html>";
-        soup_message_set_status(message, SOUP_STATUS_OK);
-        soup_message_body_append(message->response_body, SOUP_MEMORY_STATIC, responseString, strlen(responseString));
-        soup_message_body_complete(message->response_body);
-    } else
-        soup_message_set_status(message, SOUP_STATUS_NOT_FOUND);
+    soup_message_set_status(message, SOUP_STATUS_OK);
+
+    static const char* responseString = "<html><body>Testing!</body></html>";
+    soup_message_body_append(message->response_body, SOUP_MEMORY_STATIC, responseString, strlen(responseString));
+    soup_message_body_complete(message->response_body);
 }
 
 void beforeAll()

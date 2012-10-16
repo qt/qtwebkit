@@ -173,7 +173,7 @@ public:
     bool needsCellRecalc() const { return m_needsCellRecalc; }
     void setNeedsCellRecalc();
 
-    LayoutUnit rowBaseline(unsigned row) { return m_grid[row].baseline; }
+    LayoutUnit getBaseline(unsigned row) { return m_grid[row].baseline; }
 
     void rowLogicalHeightChanged(unsigned rowIndex);
 

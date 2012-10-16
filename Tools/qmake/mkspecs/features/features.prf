@@ -25,6 +25,9 @@ defineTest(detectFeatures) {
 
     # ------------- Prepare for feature detection -------------
 
+    # Load mobilityconfig if mobility is available
+    load(mobilityconfig, true)
+
     # ---------- Dynamically detect optional features -------------
     #
     # Please note: static feature defaults go in features.pri
@@ -96,7 +99,9 @@ defineTest(detectFeatures) {
     enable?(css_filters):enable?(webgl): WEBKIT_CONFIG += css_shaders
 
     # Geolocation support if QtMobility exists
-    haveQtModule(location): WEBKIT_CONFIG += geolocation
+    contains(MOBILITY_CONFIG, location)|contains(QT_CONFIG, location) {
+        WEBKIT_CONFIG += geolocation
+    }
 
     # Orientation support
     haveQtModule(sensors): WEBKIT_CONFIG += orientation_events device_orientation
@@ -116,7 +121,7 @@ defineTest(detectFeatures) {
         } else {
             CONFIGURE_WARNINGS += "Missing GLib/Gio/GStreamer, disabling media element support"
         }
-    } else: haveQtModule(multimediawidgets) {
+    } else: contains(MOBILITY_CONFIG, multimedia) {
         WEBKIT_CONFIG += video use_qt_multimedia
     }
 

@@ -110,8 +110,7 @@ Node* TreeScope::ancestorInThisScope(Node* node) const
             return node;
         if (!node->isInShadowTree())
             return 0;
-
-        node = node->shadowHost();
+        node = node->shadowAncestorNode();
     }
 
     return 0;
@@ -231,14 +230,16 @@ Node* TreeScope::focusedNode()
     if (!node)
         return 0;
     Vector<Node*> targetStack;
-    for (AncestorChainWalker walker(node); walker.get(); walker.parent()) {
+    Node* last = 0;
+    for (ComposedShadowTreeParentWalker walker(node); walker.get(); walker.parentIncludingInsertionPointAndShadowRoot()) {
         Node* node = walker.get();
         if (targetStack.isEmpty())
             targetStack.append(node);
-        else if (walker.crossingInsertionPoint())
+        else if (isInsertionPoint(node) && toInsertionPoint(node)->contains(last))
             targetStack.append(targetStack.last());
         if (node == rootNode())
             return targetStack.last();
+        last = node;
         if (node->isShadowRoot()) {
             ASSERT(!targetStack.isEmpty());
             targetStack.removeLast();
@@ -281,3 +282,4 @@ TreeScope* commonTreeScope(Node* nodeA, Node* nodeB)
 }
 
 } // namespace WebCore
+

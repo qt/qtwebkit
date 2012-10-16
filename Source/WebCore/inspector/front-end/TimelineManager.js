@@ -75,10 +75,10 @@ WebInspector.TimelineManager.prototype = {
     _stopped: function()
     {
         this.dispatchEventToListeners(WebInspector.TimelineManager.EventTypes.TimelineStopped);
-    },
-
-    __proto__: WebInspector.Object.prototype
+    }
 }
+
+WebInspector.TimelineManager.prototype.__proto__ = WebInspector.Object.prototype;
 
 /**
  * @constructor

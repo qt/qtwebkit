@@ -89,7 +89,6 @@ extern const int GeneralDragHysteresis;
 #endif // ENABLE(DRAG_SUPPORT)
 
 enum HitTestScrollbars { ShouldHitTestScrollbars, DontHitTestScrollbars };
-enum AppendTrailingWhitespace { ShouldAppendTrailingWhitespace, DontAppendTrailingWhitespace };
 
 class EventHandler {
     WTF_MAKE_NONCOPYABLE(EventHandler);
@@ -112,7 +111,6 @@ public:
     void stopAutoscrollTimer(bool rendererIsBeingDestroyed = false);
     RenderObject* autoscrollRenderer() const;
     void updateAutoscrollRenderer();
-    bool autoscrollInProgress() const { return m_autoscrollInProgress; }
 
     void dispatchFakeMouseMoveEventSoon();
     void dispatchFakeMouseMoveEventSoonInQuad(const FloatQuad&);
@@ -162,12 +160,10 @@ public:
     bool handleMouseReleaseEvent(const PlatformMouseEvent&);
     bool handleWheelEvent(const PlatformWheelEvent&);
     void defaultWheelEventHandler(Node*, WheelEvent*);
-    bool handlePasteGlobalSelection(const PlatformMouseEvent&);
 
 #if ENABLE(GESTURE_EVENTS)
     bool handleGestureEvent(const PlatformGestureEvent&);
     bool handleGestureTap(const PlatformGestureEvent&);
-    bool handleGestureLongPress(const PlatformGestureEvent&);
     bool handleGestureScrollUpdate(const PlatformGestureEvent&);
 #endif
 
@@ -243,7 +239,6 @@ private:
 
     bool eventActivatedView(const PlatformMouseEvent&) const;
     bool updateSelectionForMouseDownDispatchingSelectStart(Node*, const VisibleSelection&, TextGranularity);
-    void selectClosestWordFromHitTestResult(const HitTestResult&, AppendTrailingWhitespace);
     void selectClosestWordFromMouseEvent(const MouseEventWithHitTestResults&);
     void selectClosestWordOrLinkFromMouseEvent(const MouseEventWithHitTestResults&);
 

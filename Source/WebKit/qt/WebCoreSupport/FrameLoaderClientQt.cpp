@@ -630,7 +630,13 @@ bool FrameLoaderClientQt::canShowMIMEType(const String& MIMEType) const
 {
     String type = MIMEType;
     type.makeLower();
-    if (MIMETypeRegistry::canShowMIMEType(type))
+    if (MIMETypeRegistry::isSupportedImageMIMEType(type))
+        return true;
+
+    if (MIMETypeRegistry::isSupportedNonImageMIMEType(type))
+        return true;
+
+    if (MIMETypeRegistry::isSupportedMediaMIMEType(type))
         return true;
 
     if (m_frame && m_frame->settings()  && m_frame->settings()->arePluginsEnabled()

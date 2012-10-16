@@ -316,256 +316,76 @@ TEST_F(WebFrameTest, CanOverrideMaximumScaleFactor)
 }
 
 #if ENABLE(GESTURE_EVENTS)
-class DivAutoZoomTestWebViewClient : public WebViewClient {
-    public:
-    virtual WebRect windowRect() OVERRIDE { return m_windowRect; }
-
-    WebRect m_windowRect;
-};
-
-void setScaleAndScrollAndLayout(WebKit::WebView* webView, WebPoint scroll, float scale)
-{
-    webView->setPageScaleFactor(scale, WebPoint(scroll.x, scroll.y));
-    webView->layout();
-}
-
 TEST_F(WebFrameTest, DivAutoZoomParamsTest)
 {
     registerMockedHttpURLLoad("get_scale_for_auto_zoom_into_div_test.html");
 
-    DivAutoZoomTestWebViewClient client;
-    int viewportWidth = 640;
-    int viewportHeight = 480;
-    client.m_windowRect = WebRect(0, 0, viewportWidth, viewportHeight);
-    WebKit::WebView* webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "get_scale_for_auto_zoom_into_div_test.html", true, 0, &client);
-    webView->enableFixedLayoutMode(true);
-    webView->setDeviceScaleFactor(2.0f);
-    webView->resize(WebSize(viewportWidth, viewportHeight));
-    webView->setPageScaleFactorLimits(0.01f, 4);
-    webView->layout();
-
-    WebRect wideDiv(200, 100, 400, 150);
-    WebRect tallDiv(200, 300, 400, 800);
-    WebRect doubleTapPointWide((wideDiv.x + 50) * webView->pageScaleFactor(),
-        (wideDiv.y + 50) * webView->pageScaleFactor(), 0, 0);
-    WebRect doubleTapPointTall((tallDiv.x + 50) * webView->pageScaleFactor(),
-        (tallDiv.y + 50) * webView->pageScaleFactor(), 0, 0);
+    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(FrameTestHelpers::createWebViewAndLoad(m_baseURL + "get_scale_for_auto_zoom_into_div_test.html", true));
+    int pageWidth = 640;
+    int pageHeight = 480;
+    int divPosX = 200;
+    int divPosY = 200;
+    int divWidth = 200;
+    int divHeight = 150;
+    WebRect doubleTapPoint(250, 250, 0, 0);
+    webViewImpl->resize(WebSize(pageWidth, pageHeight));
     float scale;
     WebPoint scroll;
-    bool isAnchor;
 
-    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(webView);
-    // Test double-tap zooming into wide div.
-    webViewImpl->computeScaleAndScrollForHitRect(doubleTapPointWide, WebViewImpl::DoubleTap, scale, scroll, isAnchor);
-    // The div should horizontally fill the screen (modulo margins), and
-    // vertically centered (modulo integer rounding).
-    EXPECT_NEAR(viewportWidth / (float) wideDiv.width, scale, 0.1);
-    EXPECT_NEAR(wideDiv.x * scale, scroll.x, 20);
-    int vScroll = (wideDiv.y + wideDiv.height / 2) * scale - (viewportHeight / 2);
-    EXPECT_NEAR(vScroll, scroll.y, 1);
-    EXPECT_FALSE(isAnchor);
+    // Test for Doubletap scaling
 
-    setScaleAndScrollAndLayout(webViewImpl, scroll, scale);
+    // Tests for zooming in and out without clamping.
+    // Set device scale and scale limits so we dont get clamped.
+    webViewImpl->setDeviceScaleFactor(4);
+    webViewImpl->setPageScaleFactorLimits(0, 4 / webViewImpl->deviceScaleFactor());
 
-    // Test zoom out back to minimum scale.
-    webViewImpl->computeScaleAndScrollForHitRect(doubleTapPointWide, WebViewImpl::DoubleTap, scale, scroll, isAnchor);
-    EXPECT_FLOAT_EQ(webViewImpl->minimumPageScaleFactor(), scale);
-    EXPECT_TRUE(isAnchor);
+    // Test zooming into div.
+    webViewImpl->computeScaleAndScrollForHitRect(doubleTapPoint, WebViewImpl::DoubleTap, scale, scroll);
+    float scaledDivWidth = divWidth * scale;
+    float scaledDivHeight = divHeight * scale;
+    int hScroll = ((divPosX * scale) - ((pageWidth - scaledDivWidth) / 2)) / scale;
+    int vScroll = ((divPosY * scale) - ((pageHeight - scaledDivHeight) / 2)) / scale;
+    EXPECT_NEAR(pageWidth / divWidth, scale, 0.1);
+    EXPECT_EQ(hScroll, scroll.x);
+    EXPECT_EQ(vScroll, scroll.y);
 
-    setScaleAndScrollAndLayout(webViewImpl, WebPoint(0, 0), scale);
+    // Test zoom out to overview scale.
+    webViewImpl->applyScrollAndScale(WebSize(scroll.x, scroll.y), scale / webViewImpl->pageScaleFactor());
+    webViewImpl->computeScaleAndScrollForHitRect(doubleTapPoint, WebViewImpl::DoubleTap, scale, scroll);
+    EXPECT_FLOAT_EQ(1, scale);
+    EXPECT_EQ(WebPoint(0, 0), scroll);
 
-    // Test double-tap zooming into tall div.
-    webViewImpl->computeScaleAndScrollForHitRect(doubleTapPointTall, WebViewImpl::DoubleTap, scale, scroll, isAnchor);
-    // The div should start at the top left of the viewport.
-    EXPECT_NEAR(viewportWidth / (float) tallDiv.width, scale, 0.1);
-    EXPECT_NEAR(tallDiv.x * scale, scroll.x, 20);
-    EXPECT_NEAR(tallDiv.y * scale, scroll.y, 20);
-    EXPECT_FALSE(isAnchor);
+    // Tests for clamped scaling.
+    // Test clamp to device scale:
+    webViewImpl->applyScrollAndScale(WebSize(scroll.x, scroll.y), scale / webViewImpl->pageScaleFactor());
+    webViewImpl->setDeviceScaleFactor(2.5);
+    webViewImpl->computeScaleAndScrollForHitRect(doubleTapPoint, WebViewImpl::DoubleTap, scale, scroll);
+    EXPECT_FLOAT_EQ(2.5, scale);
+
+    // Test clamp to minimum scale:
+    webViewImpl->applyScrollAndScale(WebSize(scroll.x, scroll.y), scale / webViewImpl->pageScaleFactor());
+    webViewImpl->setPageScaleFactorLimits(1.5 / webViewImpl->deviceScaleFactor(), 4 / webViewImpl->deviceScaleFactor());
+    webViewImpl->computeScaleAndScrollForHitRect(doubleTapPoint, WebViewImpl::DoubleTap, scale, scroll);
+    EXPECT_FLOAT_EQ(1.5, scale);
+    EXPECT_EQ(WebPoint(0, 0), scroll);
+
+    // Test clamp to maximum scale:
+    webViewImpl->applyScrollAndScale(WebSize(scroll.x, scroll.y), scale / webViewImpl->pageScaleFactor());
+    webViewImpl->setDeviceScaleFactor(4);
+    webViewImpl->setPageScaleFactorLimits(0, 3 / webViewImpl->deviceScaleFactor());
+    webViewImpl->computeScaleAndScrollForHitRect(doubleTapPoint, WebViewImpl::DoubleTap, scale, scroll);
+    EXPECT_FLOAT_EQ(3, scale);
 
     // Test for Non-doubletap scaling
+    webViewImpl->setPageScaleFactor(1, WebPoint(0, 0));
+    webViewImpl->setDeviceScaleFactor(4);
+    webViewImpl->setPageScaleFactorLimits(0, 4 / webViewImpl->deviceScaleFactor());
     // Test zooming into div.
-    webViewImpl->computeScaleAndScrollForHitRect(WebRect(250, 250, 10, 10), WebViewImpl::FindInPage, scale, scroll, isAnchor);
-    EXPECT_NEAR(viewportWidth / (float) wideDiv.width, scale, 0.1);
-}
+    webViewImpl->computeScaleAndScrollForHitRect(WebRect(250, 250, 10, 10), WebViewImpl::FindInPage, scale, scroll);
+    EXPECT_NEAR(pageWidth / divWidth, scale, 0.1);
 
-void simulateDoubleTap(WebViewImpl* webViewImpl, WebPoint& point, float& scale)
-{
-    WebPoint scaledPoint(static_cast<int>(point.x * webViewImpl->pageScaleFactor()),
-        static_cast<int>(point.y * webViewImpl->pageScaleFactor()));
-    webViewImpl->animateZoomAroundPoint(scaledPoint, WebViewImpl::DoubleTap);
-    webViewImpl->mainFrameImpl()->frameView()->layout();
-    scale = webViewImpl->pageScaleFactor();
-}
-
-TEST_F(WebFrameTest, DivAutoZoomMultipleDivsTest)
-{
-    registerMockedHttpURLLoad("get_multiple_divs_for_auto_zoom_test.html");
-
-    DivAutoZoomTestWebViewClient client;
-    int viewportWidth = 640;
-    int viewportHeight = 480;
-    float doubleTapZoomAlreadyLegibleRatio = 1.2f;
-    client.m_windowRect = WebRect(0, 0, viewportWidth, viewportHeight);
-    WebKit::WebView* webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "get_multiple_divs_for_auto_zoom_test.html", true, 0, &client);
-    webView->enableFixedLayoutMode(true);
-    webView->resize(WebSize(viewportWidth, viewportHeight));
-    webView->setPageScaleFactorLimits(1, 4);
-    webView->layout();
-    webView->setDeviceScaleFactor(1.5f);
-
-    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(webView);
-    webViewImpl->shouldUseAnimateDoubleTapTimeZeroForTesting(true);
-
-    WebRect topDiv(200, 100, 200, 150);
-    WebRect bottomDiv(200, 300, 200, 150);
-    WebPoint topPoint(topDiv.x + 50, topDiv.y + 50);
-    WebPoint bottomPoint(bottomDiv.x + 50, bottomDiv.y + 50);
-    float scale;
-    setScaleAndScrollAndLayout(webViewImpl, WebPoint(0, 0), (webViewImpl->minimumPageScaleFactor()) * (1 + doubleTapZoomAlreadyLegibleRatio) / 2);
-
-    // Test double tap on two different divs
-    // After first zoom, we should go back to minimum page scale with a second double tap.
-    simulateDoubleTap(webViewImpl, topPoint, scale);
-    EXPECT_FLOAT_EQ(webViewImpl->deviceScaleFactor(), scale);
-    simulateDoubleTap(webViewImpl, bottomPoint, scale);
-    EXPECT_FLOAT_EQ(webViewImpl->minimumPageScaleFactor(), scale);
-
-    // If the user pinch zooms after double tap, a second double tap should zoom back to the div.
-    simulateDoubleTap(webViewImpl, topPoint, scale);
-    EXPECT_FLOAT_EQ(webViewImpl->deviceScaleFactor(), scale);
-    webViewImpl->applyScrollAndScale(WebSize(), 0.6f);
-    simulateDoubleTap(webViewImpl, bottomPoint, scale);
-    EXPECT_FLOAT_EQ(webViewImpl->deviceScaleFactor(), scale);
-}
-
-TEST_F(WebFrameTest, DivAutoZoomScaleBoundsTest)
-{
-    registerMockedHttpURLLoad("get_scale_bounds_check_for_auto_zoom_test.html");
-
-    DivAutoZoomTestWebViewClient client;
-    int viewportWidth = 640;
-    int viewportHeight = 480;
-    float doubleTapZoomAlreadyLegibleRatio = 1.2f;
-    client.m_windowRect = WebRect(0, 0, viewportWidth, viewportHeight);
-    WebKit::WebView* webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "get_scale_bounds_check_for_auto_zoom_test.html", true, 0, &client);
-    webView->enableFixedLayoutMode(true);
-    webView->resize(WebSize(viewportWidth, viewportHeight));
-    webView->setPageScaleFactorLimits(1, 4);
-    webView->layout();
-    webView->setDeviceScaleFactor(1.5f);
-
-    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(webView);
-    webViewImpl->shouldUseAnimateDoubleTapTimeZeroForTesting(true);
-    float doubleTapZoomAlreadyLegibleScale = webViewImpl->minimumPageScaleFactor() * doubleTapZoomAlreadyLegibleRatio;
-
-    WebRect div(200, 100, 200, 150);
-    WebPoint doubleTapPoint(div.x + 50, div.y + 50);
-    float scale;
-
-    // Test double tap scale bounds.
-    // minimumPageScale < doubleTapZoomAlreadyLegibleScale < deviceDpiScale
-    setScaleAndScrollAndLayout(webViewImpl, WebPoint(0, 0), (webViewImpl->minimumPageScaleFactor()) * (1 + doubleTapZoomAlreadyLegibleRatio) / 2);
-    simulateDoubleTap(webViewImpl, doubleTapPoint, scale);
-    EXPECT_FLOAT_EQ(webViewImpl->deviceScaleFactor(), scale);
-    simulateDoubleTap(webViewImpl, doubleTapPoint, scale);
-    EXPECT_FLOAT_EQ(webViewImpl->minimumPageScaleFactor(), scale);
-    simulateDoubleTap(webViewImpl, doubleTapPoint, scale);
-    EXPECT_FLOAT_EQ(webViewImpl->deviceScaleFactor(), scale);
-
-    // Zoom in to reset double_tap_zoom_in_effect flag.
-    webViewImpl->applyScrollAndScale(WebSize(), 1.1f);
-    // deviceDpiScale < minimumPageScale < doubleTapZoomAlreadyLegibleScale
-    webViewImpl->setDeviceScaleFactor(0.5f);
-    setScaleAndScrollAndLayout(webViewImpl, WebPoint(0, 0), (webViewImpl->minimumPageScaleFactor()) * (1 + doubleTapZoomAlreadyLegibleRatio) / 2);
-    simulateDoubleTap(webViewImpl, doubleTapPoint, scale);
-    EXPECT_FLOAT_EQ(webViewImpl->minimumPageScaleFactor(), scale);
-    simulateDoubleTap(webViewImpl, doubleTapPoint, scale);
-    EXPECT_FLOAT_EQ(doubleTapZoomAlreadyLegibleScale, scale);
-    simulateDoubleTap(webViewImpl, doubleTapPoint, scale);
-    EXPECT_FLOAT_EQ(webViewImpl->minimumPageScaleFactor(), scale);
-
-    // Zoom in to reset double_tap_zoom_in_effect flag.
-    webViewImpl->applyScrollAndScale(WebSize(), 1.1f);
-    // minimumPageScale < doubleTapZoomAlreadyLegibleScale < deviceDpiScale
-    webViewImpl->setDeviceScaleFactor(1.1f);
-    setScaleAndScrollAndLayout(webViewImpl, WebPoint(0, 0), (webViewImpl->minimumPageScaleFactor()) * (1 + doubleTapZoomAlreadyLegibleRatio) / 2);
-    simulateDoubleTap(webViewImpl, doubleTapPoint, scale);
-    EXPECT_FLOAT_EQ(webViewImpl->minimumPageScaleFactor(), scale);
-    simulateDoubleTap(webViewImpl, doubleTapPoint, scale);
-    EXPECT_FLOAT_EQ(doubleTapZoomAlreadyLegibleScale, scale);
-    simulateDoubleTap(webViewImpl, doubleTapPoint, scale);
-    EXPECT_FLOAT_EQ(webViewImpl->minimumPageScaleFactor(), scale);
-}
-
-// This test depends on code that is compiled conditionally. We likely need to
-// add the proper ifdef when re-enabling it. See
-// https://bugs.webkit.org/show_bug.cgi?id=98558
-TEST_F(WebFrameTest, DISABLED_DivScrollIntoEditableTest)
-{
-    registerMockedHttpURLLoad("get_scale_for_zoom_into_editable_test.html");
-
-    DivAutoZoomTestWebViewClient client;
-    int viewportWidth = 640;
-    int viewportHeight = 480;
-    float leftBoxRatio = 0.3f;
-    int caretPadding = 10;
-    int minReadableCaretHeight = 18;
-    client.m_windowRect = WebRect(0, 0, viewportWidth, viewportHeight);
-    WebKit::WebView* webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "get_scale_for_zoom_into_editable_test.html", true, 0, &client);
-    webView->enableFixedLayoutMode(true);
-    webView->resize(WebSize(viewportWidth, viewportHeight));
-    webView->setPageScaleFactorLimits(1, 10);
-    webView->layout();
-    webView->setDeviceScaleFactor(1.5f);
-    webView->settings()->setAutoZoomFocusedNodeToLegibleScale(true);
-
-    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(webView);
-    webViewImpl->shouldUseAnimateDoubleTapTimeZeroForTesting(true);
-
-    WebRect editBoxWithText(200, 200, 250, 20);
-    WebRect editBoxWithNoText(200, 250, 250, 20);
-
-    // Test scrolling the focused node
-    // The edit box is shorter and narrower than the viewport when legible.
-    setScaleAndScrollAndLayout(webView, WebPoint(0, 0), 1);
-    WebRect rect, caret;
-    webViewImpl->selectionBounds(caret, rect);
-    webView->scrollFocusedNodeIntoRect(rect);
-    // The edit box should be left aligned with a margin for possible label.
-    int hScroll = editBoxWithText.x * webView->pageScaleFactor() - leftBoxRatio * viewportWidth;
-    EXPECT_EQ(hScroll, webView->mainFrame()->scrollOffset().width);
-    int vScroll = editBoxWithText.y * webView->pageScaleFactor() - (viewportHeight - editBoxWithText.height * webView->pageScaleFactor()) / 2;
-    EXPECT_EQ(vScroll, webView->mainFrame()->scrollOffset().height);
-    EXPECT_FLOAT_EQ(webView->deviceScaleFactor() * minReadableCaretHeight / caret.height, webView->pageScaleFactor());
-
-    // The edit box is wider than the viewport when legible.
-    webView->setDeviceScaleFactor(4);
-    setScaleAndScrollAndLayout(webView, WebPoint(0, 0), 1);
-    webViewImpl->selectionBounds(caret, rect);
-    webView->scrollFocusedNodeIntoRect(rect);
-    // The caret should be right aligned since the caret would be offscreen when the edit box is left aligned.
-    hScroll = (caret.x + caret.width) * webView->pageScaleFactor() + caretPadding - viewportWidth;
-    EXPECT_EQ(hScroll, webView->mainFrame()->scrollOffset().width);
-    EXPECT_FLOAT_EQ(webView->deviceScaleFactor() * minReadableCaretHeight / caret.height, webView->pageScaleFactor());
-
-    setScaleAndScrollAndLayout(webView, WebPoint(0, 0), 1);
-    // Move focus to edit box with text.
-    webView->advanceFocus(false);
-    webViewImpl->selectionBounds(caret, rect);
-    webView->scrollFocusedNodeIntoRect(rect);
-    // The edit box should be left aligned.
-    hScroll = editBoxWithNoText.x * webView->pageScaleFactor();
-    EXPECT_EQ(hScroll, webView->mainFrame()->scrollOffset().width);
-    vScroll = editBoxWithNoText.y * webView->pageScaleFactor() - (viewportHeight - editBoxWithNoText.height * webView->pageScaleFactor()) / 2;
-    EXPECT_EQ(vScroll, webView->mainFrame()->scrollOffset().height);
-    EXPECT_FLOAT_EQ(webView->deviceScaleFactor() * minReadableCaretHeight / caret.height, webView->pageScaleFactor());
-
-    // Move focus back to the first edit box.
-    webView->advanceFocus(true);
-    webViewImpl->selectionBounds(caret, rect);
-    // The position should have stayed the same since this box was already on screen with the right scale.
-    EXPECT_EQ(vScroll, webView->mainFrame()->scrollOffset().height);
-    EXPECT_EQ(hScroll, webView->mainFrame()->scrollOffset().width);
+    // Drop any pending fake mouse events from zooming before leaving the test.
+    webViewImpl->page()->mainFrame()->eventHandler()->clear();
 }
 #endif
 
@@ -1080,8 +900,6 @@ TEST_F(WebFrameTest, FindInPageMatchRects)
     WebFrameImpl* mainFrame = static_cast<WebFrameImpl*>(webView->mainFrame());
     EXPECT_TRUE(mainFrame->find(kFindIdentifier, searchText, options, false, 0));
 
-    mainFrame->resetMatchCount();
-
     for (WebFrame* frame = mainFrame; frame; frame = frame->traverseNext(false))
         frame->scopeStringMatches(kFindIdentifier, searchText, options, true);
 
@@ -1169,129 +987,6 @@ TEST_F(WebFrameTest, FindInPageMatchRects)
     webkit_support::RunAllPendingMessages();
     EXPECT_TRUE(mainFrame->findMatchMarkersVersion() != rectsVersion);
 
-    webView->close();
-}
-
-TEST_F(WebFrameTest, FindOnDetachedFrame)
-{
-    registerMockedHttpURLLoad("find_in_page.html");
-    registerMockedHttpURLLoad("find_in_page_frame.html");
-
-    FindUpdateWebFrameClient client;
-    WebView* webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "find_in_page.html", true, &client);
-    webView->resize(WebSize(640, 480));
-    webView->layout();
-    webkit_support::RunAllPendingMessages();
-
-    static const char* kFindString = "result";
-    static const int kFindIdentifier = 12345;
-
-    WebFindOptions options;
-    WebString searchText = WebString::fromUTF8(kFindString);
-    WebFrameImpl* mainFrame = static_cast<WebFrameImpl*>(webView->mainFrame());
-    WebFrameImpl* secondFrame = static_cast<WebFrameImpl*>(mainFrame->traverseNext(false));
-    RefPtr<WebCore::Frame> holdSecondFrame = secondFrame->frame();
-
-    // Detach the frame before finding.
-    EXPECT_TRUE(mainFrame->document().getElementById("frame").remove());
-
-    EXPECT_TRUE(mainFrame->find(kFindIdentifier, searchText, options, false, 0));
-    EXPECT_FALSE(secondFrame->find(kFindIdentifier, searchText, options, false, 0));
-
-    webkit_support::RunAllPendingMessages();
-    EXPECT_FALSE(client.findResultsAreReady());
-
-    mainFrame->resetMatchCount();
-
-    for (WebFrame* frame = mainFrame; frame; frame = frame->traverseNext(false))
-        frame->scopeStringMatches(kFindIdentifier, searchText, options, true);
-
-    webkit_support::RunAllPendingMessages();
-    EXPECT_TRUE(client.findResultsAreReady());
-
-    holdSecondFrame.release();
-    webView->close();
-}
-
-TEST_F(WebFrameTest, FindDetachFrameBeforeScopeStrings)
-{
-    registerMockedHttpURLLoad("find_in_page.html");
-    registerMockedHttpURLLoad("find_in_page_frame.html");
-
-    FindUpdateWebFrameClient client;
-    WebView* webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "find_in_page.html", true, &client);
-    webView->resize(WebSize(640, 480));
-    webView->layout();
-    webkit_support::RunAllPendingMessages();
-
-    static const char* kFindString = "result";
-    static const int kFindIdentifier = 12345;
-
-    WebFindOptions options;
-    WebString searchText = WebString::fromUTF8(kFindString);
-    WebFrameImpl* mainFrame = static_cast<WebFrameImpl*>(webView->mainFrame());
-    WebFrameImpl* secondFrame = static_cast<WebFrameImpl*>(mainFrame->traverseNext(false));
-    RefPtr<WebCore::Frame> holdSecondFrame = secondFrame->frame();
-
-    for (WebFrame* frame = mainFrame; frame; frame = frame->traverseNext(false))
-        EXPECT_TRUE(frame->find(kFindIdentifier, searchText, options, false, 0));
-
-    webkit_support::RunAllPendingMessages();
-    EXPECT_FALSE(client.findResultsAreReady());
-
-    // Detach the frame between finding and scoping.
-    EXPECT_TRUE(mainFrame->document().getElementById("frame").remove());
-
-    mainFrame->resetMatchCount();
-
-    for (WebFrame* frame = mainFrame; frame; frame = frame->traverseNext(false))
-        frame->scopeStringMatches(kFindIdentifier, searchText, options, true);
-
-    webkit_support::RunAllPendingMessages();
-    EXPECT_TRUE(client.findResultsAreReady());
-
-    holdSecondFrame.release();
-    webView->close();
-}
-
-TEST_F(WebFrameTest, FindDetachFrameWhileScopingStrings)
-{
-    registerMockedHttpURLLoad("find_in_page.html");
-    registerMockedHttpURLLoad("find_in_page_frame.html");
-
-    FindUpdateWebFrameClient client;
-    WebView* webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "find_in_page.html", true, &client);
-    webView->resize(WebSize(640, 480));
-    webView->layout();
-    webkit_support::RunAllPendingMessages();
-
-    static const char* kFindString = "result";
-    static const int kFindIdentifier = 12345;
-
-    WebFindOptions options;
-    WebString searchText = WebString::fromUTF8(kFindString);
-    WebFrameImpl* mainFrame = static_cast<WebFrameImpl*>(webView->mainFrame());
-    WebFrameImpl* secondFrame = static_cast<WebFrameImpl*>(mainFrame->traverseNext(false));
-    RefPtr<WebCore::Frame> holdSecondFrame = secondFrame->frame();
-
-    for (WebFrame* frame = mainFrame; frame; frame = frame->traverseNext(false))
-        EXPECT_TRUE(frame->find(kFindIdentifier, searchText, options, false, 0));
-
-    webkit_support::RunAllPendingMessages();
-    EXPECT_FALSE(client.findResultsAreReady());
-
-    mainFrame->resetMatchCount();
-
-    for (WebFrame* frame = mainFrame; frame; frame = frame->traverseNext(false))
-        frame->scopeStringMatches(kFindIdentifier, searchText, options, true);
-
-    // The first scopeStringMatches will have reset the state. Detach before it actually scopes.
-    EXPECT_TRUE(mainFrame->document().getElementById("frame").remove());
-
-    webkit_support::RunAllPendingMessages();
-    EXPECT_TRUE(client.findResultsAreReady());
-
-    holdSecondFrame.release();
     webView->close();
 }
 

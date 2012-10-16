@@ -7,10 +7,6 @@ LIST(APPEND WebKit2_SOURCES
     Platform/CoreIPC/unix/ConnectionUnix.cpp
     Platform/CoreIPC/unix/AttachmentUnix.cpp
 
-    PluginProcess/unix/PluginControllerProxyUnix.cpp
-    PluginProcess/unix/PluginProcessMainUnix.cpp
-    PluginProcess/unix/PluginProcessUnix.cpp
-
     Shared/API/c/cairo/WKImageCairo.cpp
 
     Shared/API/c/gtk/WKGraphicsContextGtk.cpp
@@ -32,8 +28,6 @@ LIST(APPEND WebKit2_SOURCES
 
     UIProcess/DefaultUndoController.cpp
 
-    Shared/Plugins/Netscape/x11/NetscapePluginModuleX11.cpp
-
     UIProcess/API/C/efl/WKView.cpp
     
     UIProcess/API/cpp/efl/WKEinaSharedString.cpp
@@ -50,19 +44,15 @@ LIST(APPEND WebKit2_SOURCES
     UIProcess/API/efl/ewk_back_forward_list_item.cpp
     UIProcess/API/efl/ewk_context.cpp
     UIProcess/API/efl/ewk_context_download_client.cpp
-    UIProcess/API/efl/ewk_context_history_client.cpp
     UIProcess/API/efl/ewk_context_request_manager_client.cpp
     UIProcess/API/efl/ewk_cookie_manager.cpp
     UIProcess/API/efl/ewk_download_job.cpp
-    UIProcess/API/efl/ewk_error.cpp
     UIProcess/API/efl/ewk_form_submission_request.cpp
     UIProcess/API/efl/ewk_intent.cpp
     UIProcess/API/efl/ewk_intent_service.cpp
     UIProcess/API/efl/ewk_main.cpp
-    UIProcess/API/efl/ewk_navigation_data.cpp
     UIProcess/API/efl/ewk_navigation_policy_decision.cpp
     UIProcess/API/efl/ewk_popup_menu_item.cpp
-    UIProcess/API/efl/ewk_resource.cpp
     UIProcess/API/efl/ewk_settings.cpp
     UIProcess/API/efl/ewk_url_request.cpp
     UIProcess/API/efl/ewk_url_response.cpp
@@ -74,6 +64,8 @@ LIST(APPEND WebKit2_SOURCES
     UIProcess/API/efl/ewk_view_policy_client.cpp
     UIProcess/API/efl/ewk_view_resource_load_client.cpp
     UIProcess/API/efl/ewk_view_ui_client.cpp
+    UIProcess/API/efl/ewk_web_error.cpp
+    UIProcess/API/efl/ewk_web_resource.cpp
 
     UIProcess/cairo/BackingStoreCairo.cpp
 
@@ -93,7 +85,6 @@ LIST(APPEND WebKit2_SOURCES
     UIProcess/Launcher/efl/ProcessLauncherEfl.cpp
 
     UIProcess/Plugins/unix/PluginInfoStoreUnix.cpp
-    UIProcess/Plugins/unix/PluginProcessProxyUnix.cpp
 
     WebProcess/Cookies/soup/WebCookieManagerSoup.cpp
     WebProcess/Cookies/soup/WebKitSoupCookieJarSqlite.cpp
@@ -102,10 +93,6 @@ LIST(APPEND WebKit2_SOURCES
     WebProcess/Downloads/soup/DownloadSoup.cpp
 
     WebProcess/InjectedBundle/efl/InjectedBundleEfl.cpp
-
-    WebProcess/Plugins/Netscape/unix/PluginProxyUnix.cpp
-
-    WebProcess/Plugins/Netscape/x11/NetscapePluginX11.cpp
 
     WebProcess/WebCoreSupport/efl/WebContextMenuClientEfl.cpp
     WebProcess/WebCoreSupport/efl/WebEditorClientEfl.cpp
@@ -230,48 +217,24 @@ SET (EWebKit2_HEADERS
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_context.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_cookie_manager.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_download_job.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_error.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_form_submission_request.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_intent.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_intent_service.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_main.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_navigation_data.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_navigation_policy_decision.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_popup_menu_item.h"
-    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_resource.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_settings.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_touch.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_url_request.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_url_response.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_url_scheme_request.h"
     "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_view.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_web_error.h"
+    "${CMAKE_CURRENT_SOURCE_DIR}/UIProcess/API/efl/ewk_web_resource.h"
 )
 
 INSTALL(FILES ${CMAKE_BINARY_DIR}/WebKit2/efl/ewebkit2.pc DESTINATION lib/pkgconfig)
 INSTALL(FILES ${EWebKit2_HEADERS} DESTINATION include/${WebKit2_LIBRARY_NAME}-${PROJECT_VERSION_MAJOR})
-
-IF (ENABLE_PLUGIN_PROCESS)
-    ADD_DEFINITIONS(-DENABLE_PLUGIN_PROCESS=1)
-
-    SET (PluginProcess_EXECUTABLE_NAME PluginProcess)
-    LIST (APPEND PluginProcess_INCLUDE_DIRECTORIES
-        "${WEBKIT2_DIR}/PluginProcess/unix"
-    )
-
-    INCLUDE_DIRECTORIES(${PluginProcess_INCLUDE_DIRECTORIES})
-
-    LIST (APPEND PluginProcess_SOURCES
-        ${WEBKIT2_DIR}/unix/PluginMainUnix.cpp
-    )
-
-    SET(PluginProcess_LIBRARIES
-        ${WebKit2_LIBRARY_NAME}
-    )
-
-    ADD_EXECUTABLE(${PluginProcess_EXECUTABLE_NAME} ${PluginProcess_SOURCES})
-    TARGET_LINK_LIBRARIES(${PluginProcess_EXECUTABLE_NAME} ${PluginProcess_LIBRARIES})
-    INSTALL(TARGETS ${PluginProcess_EXECUTABLE_NAME} DESTINATION "${EXEC_INSTALL_DIR}")
-ENDIF () # ENABLE_PLUGIN_PROCESS
 
 INCLUDE_DIRECTORIES(${THIRDPARTY_DIR}/gtest/include)
 
@@ -325,7 +288,6 @@ TARGET_LINK_LIBRARIES(ewk2UnitTestUtils ${EWK2UnitTests_LIBRARIES})
 SET(EWK2UnitTests_BINARIES
     test_ewk2_back_forward_list
     test_ewk2_context
-    test_ewk2_context_history_callbacks
     test_ewk2_cookie_manager
     test_ewk2_download_job
     test_ewk2_eina_shared_string
@@ -344,7 +306,6 @@ IF (ENABLE_API_TESTS)
     ENDFOREACH ()
 
     ADD_LIBRARY(ewk2UnitTestInjectedBundleSample SHARED ${TEST_INJECTED_BUNDLE_DIR}/injected_bundle_sample.cpp)
-    TARGET_LINK_LIBRARIES(ewk2UnitTestInjectedBundleSample ${WebKit2_LIBRARY_NAME})
 ENDIF ()
 
 IF (ENABLE_INSPECTOR)

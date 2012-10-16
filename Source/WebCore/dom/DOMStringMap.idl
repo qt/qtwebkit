@@ -23,12 +23,15 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    GenerateIsReachable=ImplElementRoot,
-    NamedGetter,
-    CustomDeleteProperty,
-    CustomEnumerateProperty,
-    CustomNamedSetter
-] interface DOMStringMap {
-};
+module core {
 
+    interface [
+        GenerateIsReachable=ImplElementRoot,
+        NamedGetter,
+        CustomDeleteProperty,
+        CustomEnumerateProperty,
+        CustomNamedSetter
+    ] DOMStringMap {
+    };
+
+}

@@ -27,8 +27,9 @@ namespace EWK2UnitTest {
 
 class EWK2UnitTestEnvironment : public ::testing::Environment {
 public:
-    EWK2UnitTestEnvironment();
+    EWK2UnitTestEnvironment(bool useX11Window);
 
+    bool useX11Window() const { return m_useX11Window; }
     const char* defaultTestPageUrl() const;
     const char* defaultTheme() const;
     const char* injectedBundleSample() const;
@@ -41,6 +42,8 @@ public:
 private:
     unsigned int m_defaultWidth;
     unsigned int m_defaultHeight;
+
+    bool m_useX11Window;
 };
 
 } // namespace EWK2UnitTest

@@ -24,15 +24,18 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=SVG,
-    ObjCProtocol,
-    SuppressToJSObject,
-    OmitConstructor
-] interface SVGLangSpace {
-             attribute DOMString xmllang
-                 /*setter raises(DOMException)*/;
-             attribute DOMString xmlspace
-                 /*setter raises(DOMException)*/;
-};
+module svg {
 
+    interface [
+        Conditional=SVG,
+        ObjCProtocol,
+        SuppressToJSObject,
+        OmitConstructor
+    ] SVGLangSpace {
+                 attribute DOMString xmllang
+                     /*setter raises(DOMException)*/;
+                 attribute DOMString xmlspace
+                     /*setter raises(DOMException)*/;
+    };
+
+}

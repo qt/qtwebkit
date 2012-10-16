@@ -36,7 +36,8 @@
 
 #include "WebDevToolsAgentPrivate.h"
 #include "WebPageOverlay.h"
-#include <public/WebSize.h>
+#include "platform/WebSize.h"
+
 #include <wtf/Forward.h>
 #include <wtf/OwnPtr.h>
 
@@ -75,7 +76,7 @@ public:
     virtual void didCreateScriptContext(WebFrameImpl*, int worldId);
     virtual void mainFrameViewCreated(WebFrameImpl*);
     virtual bool metricsOverridden();
-    virtual void webViewResized(const WebSize&);
+    virtual void webViewResized();
 
     // WebDevToolsAgent implementation.
     virtual void attach();
@@ -104,8 +105,6 @@ public:
 
     virtual void overrideDeviceMetrics(int width, int height, float fontScaleFactor, bool fitWindow);
     virtual void autoZoomPageToFitWidth();
-
-    virtual void getAllocatedObjects(HashSet<const void*>&);
 
     int hostId() { return m_hostId; }
 

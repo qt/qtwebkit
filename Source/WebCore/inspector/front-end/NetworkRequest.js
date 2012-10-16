@@ -55,6 +55,7 @@ WebInspector.NetworkRequest = function(requestId, url, documentURL, frameId, loa
     this.receiveHeadersEnd = 0;
 
     this._type = WebInspector.resourceTypes.Other;
+    this._content = undefined;
     this._contentEncoded = false;
     this._pendingContentCallbacks = [];
     this._frames = [];
@@ -578,29 +579,16 @@ WebInspector.NetworkRequest.prototype = {
     },
 
     /**
-     * @return {?string}
-     */
-    queryString: function()
-    {
-        if (this._queryString)
-            return this._queryString;
-        var queryString = this.url.split("?", 2)[1];
-        if (!queryString)
-            return null;
-        this._queryString = queryString.split("#", 2)[0];
-        return this._queryString;
-    },
-
-    /**
      * @return {?Array.<Object>}
      */
     get queryParameters()
     {
         if (this._parsedQueryParameters)
             return this._parsedQueryParameters;
-        var queryString = this.queryString();
+        var queryString = this.url.split("?", 2)[1];
         if (!queryString)
             return null;
+        queryString = queryString.split("#", 2)[0];
         this._parsedQueryParameters = this._parseParameters(queryString);
         return this._parsedQueryParameters;
     },
@@ -688,7 +676,7 @@ WebInspector.NetworkRequest.prototype = {
     },
 
     /**
-     * @return {string}
+     * @return {?string}
      */
     contentURL: function()
     {
@@ -773,28 +761,20 @@ WebInspector.NetworkRequest.prototype = {
     populateImageSource: function(image)
     {
         /**
-         * @this {WebInspector.NetworkRequest}
          * @param {?string} content
          * @param {boolean} contentEncoded
          * @param {string} mimeType
          */
         function onResourceContent(content, contentEncoded, mimeType)
         {
-            var imageSrc = this.asDataURL();
-            if (imageSrc === null)
-                imageSrc = this.url;
-            image.src = imageSrc;
+            const maxDataUrlSize = 1024 * 1024;
+            // If resource content is not available or won't fit a data URL, fall back to using original URL.
+            if (this._content == null || this._content.length > maxDataUrlSize)
+                return this.url;
+            image.src = "data:" + this.mimeType + (this._contentEncoded ? ";base64," : ",") + this._content;
         }
 
         this.requestContent(onResourceContent.bind(this));
-    },
-
-    /**
-     * @return {?string}
-     */
-    asDataURL: function()
-    {
-        return WebInspector.contentAsDataURL(this._content, this.mimeType, this._contentEncoded);
     },
 
     _innerRequestContent: function()
@@ -869,7 +849,7 @@ WebInspector.NetworkRequest.prototype = {
             this._frames.splice(0, 10);
         }
         this._frames.push(object);
-    },
-
-    __proto__: WebInspector.Object.prototype
+    }
 }
+
+WebInspector.NetworkRequest.prototype.__proto__ = WebInspector.Object.prototype;

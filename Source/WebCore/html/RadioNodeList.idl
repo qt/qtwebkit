@@ -23,9 +23,13 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    JSGenerateToJSObject,
-    IndexedGetter,
-] interface RadioNodeList : NodeList {
-    attribute DOMString value;
-};
+module html {
+
+    interface [
+        JSGenerateToJSObject,
+        IndexedGetter,
+    ] RadioNodeList : NodeList {
+        attribute DOMString value;
+    };
+}
+

@@ -34,13 +34,12 @@
 #if ENABLE(PAGE_POPUP)
 
 #include "DocumentWriter.h"
-#include "IntRect.h"
+#include "IntSize.h"
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
 
 class DocumentWriter;
-class Localizer;
 
 class PagePopupClient {
 public:
@@ -52,9 +51,6 @@ public:
     //  - No <select> popups
     //  - window.setValueAndClosePopup(number, string).
     virtual void writeDocument(DocumentWriter&) = 0;
-
-    // Returns a Localizer object associated to the client.
-    virtual Localizer& localizer() = 0;
 
     // This is called by the content HTML of a PagePopup.
     // An implementation of this function should call ChromeClient::closePagePopup().
@@ -69,11 +65,9 @@ public:
     static void addString(const String&, DocumentWriter&);
     static void addJavaScriptString(const String&, DocumentWriter&);
     static void addProperty(const char* name, const String& value, DocumentWriter&);
-    static void addProperty(const char* name, int value, DocumentWriter&);
     static void addProperty(const char* name, unsigned value, DocumentWriter&);
     static void addProperty(const char* name, bool value, DocumentWriter&);
     static void addProperty(const char* name, const Vector<String>& values, DocumentWriter&);
-    static void addProperty(const char* name, const IntRect&, DocumentWriter&);
 };
 
 inline void PagePopupClient::addString(const String& str, DocumentWriter& writer)

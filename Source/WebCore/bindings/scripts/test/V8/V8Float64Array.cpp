@@ -42,7 +42,7 @@
 
 namespace WebCore {
 
-WrapperTypeInfo V8Float64Array::info = { V8Float64Array::GetTemplate, V8Float64Array::derefObject, 0, 0, V8Float64Array::installPerContextPrototypeProperties, &V8ArrayBufferView::info, WrapperTypeObjectPrototype };
+WrapperTypeInfo V8Float64Array::info = { V8Float64Array::GetTemplate, V8Float64Array::derefObject, 0, 0, &V8ArrayBufferView::info, WrapperTypeObjectPrototype };
 
 namespace Float64ArrayV8Internal {
 
@@ -118,7 +118,7 @@ v8::Persistent<v8::FunctionTemplate> V8Float64Array::GetRawTemplate()
     V8PerIsolateData* data = V8PerIsolateData::current();
     V8PerIsolateData::TemplateMap::iterator result = data->rawTemplateMap().find(&info);
     if (result != data->rawTemplateMap().end())
-        return result->value;
+        return result->second;
 
     v8::HandleScope handleScope;
     v8::Persistent<v8::FunctionTemplate> templ = createRawTemplate();
@@ -131,7 +131,7 @@ v8::Persistent<v8::FunctionTemplate> V8Float64Array::GetTemplate()
     V8PerIsolateData* data = V8PerIsolateData::current();
     V8PerIsolateData::TemplateMap::iterator result = data->templateMap().find(&info);
     if (result != data->templateMap().end())
-        return result->value;
+        return result->second;
 
     v8::HandleScope handleScope;
     v8::Persistent<v8::FunctionTemplate> templ =
@@ -169,8 +169,6 @@ v8::Handle<v8::Object> V8Float64Array::wrapSlow(PassRefPtr<Float64Array> impl, v
 
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
-
-    installPerContextProperties(wrapper, impl.get());
     v8::Persistent<v8::Object> wrapperHandle = V8DOMWrapper::setJSWrapperForDOMObject(impl, wrapper, isolate);
     if (!hasDependentLifetime)
         wrapperHandle.MarkIndependent();

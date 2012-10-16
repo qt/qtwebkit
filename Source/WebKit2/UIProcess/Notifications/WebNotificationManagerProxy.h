@@ -27,13 +27,19 @@
 #define WebNotificationManagerProxy_h
 
 #include "APIObject.h"
-#include "MessageReceiver.h"
+#include "MessageID.h"
 #include "WebNotificationProvider.h"
 #include <WebCore/NotificationClient.h>
 #include <wtf/HashMap.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/text/StringHash.h>
+
+namespace CoreIPC {
+class ArgumentDecoder;
+class ArgumentEncoder;
+class Connection;
+}
 
 namespace WebKit {
 
@@ -42,7 +48,7 @@ class WebContext;
 class WebPageProxy;
 class WebSecurityOrigin;
 
-class WebNotificationManagerProxy : public APIObject, private CoreIPC::MessageReceiver {
+class WebNotificationManagerProxy : public APIObject {
 public:
     static const Type APIType = TypeNotificationManager;
     
@@ -62,13 +68,13 @@ public:
     void providerDidUpdateNotificationPolicy(const WebSecurityOrigin*, bool allowed);
     void providerDidRemoveNotificationPolicies(ImmutableArray* origins);
     
+    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+
 private:
     explicit WebNotificationManagerProxy(WebContext*);
     
     virtual Type type() const { return APIType; }
-
-    // CoreIPC::MessageReceiver
-    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*) OVERRIDE;
+    
     void didReceiveWebNotificationManagerProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
     
     // Message handlers

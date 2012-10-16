@@ -103,10 +103,10 @@ WebInspector.FileSystemView.prototype = {
     _delete: function()
     {
         this._directoryTree.selectedTreeElement.deleteEntry();
-    },
-
-    __proto__: WebInspector.SplitView.prototype
+    }
 }
+
+WebInspector.FileSystemView.prototype.__proto__ = WebInspector.SplitView.prototype;
 
 /**
  * @constructor
@@ -227,7 +227,7 @@ WebInspector.FileSystemView.EntryTreeElement.prototype = {
     {
         if (this._entry != this._entry.fileSystem.root)
             this.parent.refresh();
-    },
-
-    __proto__: TreeElement.prototype
+    }
 }
+
+WebInspector.FileSystemView.EntryTreeElement.prototype.__proto__ = TreeElement.prototype;

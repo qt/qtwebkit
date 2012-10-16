@@ -23,8 +23,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=SVG
-] interface SVGAnimateElement : SVGAnimationElement {
-};
+module svg {
+
+    interface [
+        Conditional=SVG
+    ] SVGAnimateElement : SVGAnimationElement {
+    };
+
+}
 

@@ -93,16 +93,16 @@ public:
     }
 #endif
 
-    void emitGetFromCallFrameHeaderPtr(JSStack::CallFrameHeaderEntry entry, GPRReg to)
+    void emitGetFromCallFrameHeaderPtr(RegisterFile::CallFrameHeaderEntry entry, GPRReg to)
     {
         loadPtr(Address(GPRInfo::callFrameRegister, entry * sizeof(Register)), to);
     }
-    void emitPutToCallFrameHeader(GPRReg from, JSStack::CallFrameHeaderEntry entry)
+    void emitPutToCallFrameHeader(GPRReg from, RegisterFile::CallFrameHeaderEntry entry)
     {
         storePtr(from, Address(GPRInfo::callFrameRegister, entry * sizeof(Register)));
     }
 
-    void emitPutImmediateToCallFrameHeader(void* value, JSStack::CallFrameHeaderEntry entry)
+    void emitPutImmediateToCallFrameHeader(void* value, RegisterFile::CallFrameHeaderEntry entry)
     {
         storePtr(TrustedImmPtr(value), Address(GPRInfo::callFrameRegister, entry * sizeof(Register)));
     }
@@ -243,14 +243,33 @@ public:
     }
 #endif
 
-#if USE(JSVALUE32_64)
+#if USE(JSVALUE32_64) && CPU(X86)
     void boxDouble(FPRReg fpr, GPRReg tagGPR, GPRReg payloadGPR)
     {
-        moveDoubleToInts(fpr, payloadGPR, tagGPR);
+        movePackedToInt32(fpr, payloadGPR);
+        rshiftPacked(TrustedImm32(32), fpr);
+        movePackedToInt32(fpr, tagGPR);
     }
     void unboxDouble(GPRReg tagGPR, GPRReg payloadGPR, FPRReg fpr, FPRReg scratchFPR)
     {
-        moveIntsToDouble(payloadGPR, tagGPR, fpr, scratchFPR);
+        jitAssertIsJSDouble(tagGPR);
+        moveInt32ToPacked(payloadGPR, fpr);
+        moveInt32ToPacked(tagGPR, scratchFPR);
+        lshiftPacked(TrustedImm32(32), scratchFPR);
+        orPacked(scratchFPR, fpr);
+    }
+#endif
+
+#if USE(JSVALUE32_64) && CPU(ARM)
+    void boxDouble(FPRReg fpr, GPRReg tagGPR, GPRReg payloadGPR)
+    {
+        m_assembler.vmov(payloadGPR, tagGPR, fpr);
+    }
+    void unboxDouble(GPRReg tagGPR, GPRReg payloadGPR, FPRReg fpr, FPRReg scratchFPR)
+    {
+        jitAssertIsJSDouble(tagGPR);
+        UNUSED_PARAM(scratchFPR);
+        m_assembler.vmov(fpr, payloadGPR, tagGPR);
     }
 #endif
     
@@ -345,6 +364,8 @@ public:
 
     Vector<BytecodeAndMachineOffset>& decodedCodeMapFor(CodeBlock*);
     
+    static const double twoToThe32;
+
 protected:
     JSGlobalData* m_globalData;
     CodeBlock* m_codeBlock;

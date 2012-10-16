@@ -84,8 +84,7 @@ void NotificationPermissionRequestManager::startRequest(SecurityOrigin* origin, 
 {
     NotificationClient::Permission permission = permissionLevel(origin);
     if (permission != NotificationClient::PermissionNotAllowed) {
-        if (callback)
-            callback->handleEvent();
+        callback->handleEvent();
         return;
     }
     

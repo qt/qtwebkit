@@ -28,6 +28,7 @@
 
 #include "Arguments.h"
 #include "ImmutableArray.h"
+#include "InjectedBundleMessageKinds.h"
 #include "InjectedBundleScriptWorld.h"
 #include "InjectedBundleUserMessageCoders.h"
 #include "LayerTreeHost.h"
@@ -60,7 +61,6 @@
 #include <WebCore/PageVisibilityState.h>
 #include <WebCore/PrintContext.h>
 #include <WebCore/ResourceHandle.h>
-#include <WebCore/ResourceLoadScheduler.h>
 #include <WebCore/ScriptController.h>
 #include <WebCore/SecurityOrigin.h>
 #include <WebCore/SecurityPolicy.h>
@@ -426,24 +426,23 @@ bool InjectedBundle::isProcessingUserGesture()
     return ScriptController::processingUserGesture();
 }
 
-static Vector<String> toStringVector(ImmutableArray* patterns)
+static PassOwnPtr<Vector<String> > toStringVector(ImmutableArray* patterns)
 {
-    Vector<String> patternsVector;
-
     if (!patterns)
-        return patternsVector;
+        return nullptr;
 
-    size_t size = patterns->size();
+    size_t size =  patterns->size();
     if (!size)
-        return patternsVector;
+        return nullptr;
 
-    patternsVector.reserveInitialCapacity(size);
+    OwnPtr<Vector<String> > patternsVector = adoptPtr(new Vector<String>);
+    patternsVector->reserveInitialCapacity(size);
     for (size_t i = 0; i < size; ++i) {
         WebString* entry = patterns->at<WebString>(i);
         if (entry)
-            patternsVector.uncheckedAppend(entry->string());
+            patternsVector->uncheckedAppend(entry->string());
     }
-    return patternsVector;
+    return patternsVector.release();
 }
 
 void InjectedBundle::addUserScript(WebPageGroupProxy* pageGroup, InjectedBundleScriptWorld* scriptWorld, const String& source, const String& url, ImmutableArray* whitelist, ImmutableArray* blacklist, WebCore::UserScriptInjectionTime injectionTime, WebCore::UserContentInjectedFrames injectedFrames)
@@ -541,9 +540,46 @@ void InjectedBundle::didReceiveMessageToPage(WebPage* page, const String& messag
     m_client.didReceiveMessageToPage(this, page, messageName, messageBody);
 }
 
+void InjectedBundle::didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
+{
+    switch (messageID.get<InjectedBundleMessage::Kind>()) {
+        case InjectedBundleMessage::PostMessage: {
+            String messageName;            
+            RefPtr<APIObject> messageBody;
+            InjectedBundleUserMessageDecoder messageDecoder(messageBody);
+            if (!arguments->decode(CoreIPC::Out(messageName, messageDecoder)))
+                return;
+
+            didReceiveMessage(messageName, messageBody.get());
+            return;
+        }
+
+        case InjectedBundleMessage::PostMessageToPage: {
+            uint64_t pageID = arguments->destinationID();
+            if (!pageID)
+                return;
+            
+            WebPage* page = WebProcess::shared().webPage(pageID);
+            if (!page)
+                return;
+
+            String messageName;
+            RefPtr<APIObject> messageBody;
+            InjectedBundleUserMessageDecoder messageDecoder(messageBody);
+            if (!arguments->decode(CoreIPC::Out(messageName, messageDecoder)))
+                return;
+
+            didReceiveMessageToPage(page, messageName, messageBody.get());
+            return;
+        }
+    }
+
+    ASSERT_NOT_REACHED();
+}
+
 void InjectedBundle::setPageVisibilityState(WebPage* page, int state, bool isInitialState)
 {
-#if ENABLE(PAGE_VISIBILITY_API) || ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
+#if ENABLE(PAGE_VISIBILITY_API)
     page->corePage()->setVisibilityState(static_cast<PageVisibilityState>(state), isInitialState);
 #endif
 }
@@ -608,16 +644,6 @@ uint64_t InjectedBundle::webNotificationID(JSContextRef jsContext, JSValueRef js
 void InjectedBundle::setTabKeyCyclesThroughElements(WebPage* page, bool enabled)
 {
     page->corePage()->setTabKeyCyclesThroughElements(enabled);
-}
-
-void InjectedBundle::setSerialLoadingEnabled(bool enabled)
-{
-    resourceLoadScheduler()->setSerialLoadingEnabled(enabled);
-}
-
-void InjectedBundle::dispatchPendingLoadRequests()
-{
-    resourceLoadScheduler()->servePendingRequests();
 }
 
 } // namespace WebKit

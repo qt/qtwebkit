@@ -115,13 +115,13 @@ public:
     bool needsFullRepaint() const { return m_doFullRepaint; }
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
-    void serviceScriptedAnimations(double monotonicAnimationStartTime);
+    void serviceScriptedAnimations(DOMTimeStamp);
 #endif
 
 #if USE(ACCELERATED_COMPOSITING)
     void updateCompositingLayersAfterStyleChange();
     void updateCompositingLayersAfterLayout();
-    bool flushCompositingStateForThisFrame(Frame* rootFrameForFlush);
+    bool syncCompositingStateForThisFrame(Frame* rootFrameForSync);
 
     void clearBackingStores();
     void restoreBackingStores();
@@ -131,10 +131,6 @@ public:
     void setNeedsOneShotDrawingSynchronization();
 
     virtual TiledBacking* tiledBacking() OVERRIDE;
-
-    // In the future when any ScrollableArea can have a node in th ScrollingTree, this should
-    // become a virtual function on ScrollableArea.
-    uint64_t scrollLayerID() const;
 #endif
 
     bool hasCompositedContent() const;
@@ -144,8 +140,8 @@ public:
     bool isEnclosedInCompositingLayer() const;
 
     // Only used with accelerated compositing, but outside the #ifdef to make linkage easier.
-    // Returns true if the flush was completed.
-    bool flushCompositingStateIncludingSubframes();
+    // Returns true if the sync was completed.
+    bool syncCompositingStateIncludingSubframes();
 
     // Returns true when a paint with the PaintBehaviorFlattenCompositingLayers flag set gives
     // a faithful representation of the content.
@@ -180,7 +176,7 @@ public:
     virtual IntRect windowResizerRect() const;
 
     virtual void setFixedVisibleContentRect(const IntRect&) OVERRIDE;
-    virtual void setScrollPosition(const IntPoint&) OVERRIDE;
+    void setScrollPosition(const IntPoint&);
     void scrollPositionChangedViaPlatformWidget();
     virtual void repaintFixedElementsAfterScrolling();
     virtual void updateFixedElementsAfterScrolling();
@@ -226,7 +222,7 @@ public:
     bool repaintsDisabled() { return m_disableRepaints > 0; }
 
 #if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
-    void updateAnnotatedRegions();
+    void updateDashboardRegions();
 #endif
     void updateControlTints();
 
@@ -364,9 +360,6 @@ public:
     // distinguish between the two.
     const Pagination& pagination() const;
     void setPagination(const Pagination&);
-    
-    bool inProgrammaticScroll() const { return m_inProgrammaticScroll; }
-    void setInProgrammaticScroll(bool programmaticScroll) { m_inProgrammaticScroll = programmaticScroll; }
 
 protected:
     virtual bool scrollContentsFastPath(const IntSize& scrollDelta, const IntRect& rectToScroll, const IntRect& clipRect);

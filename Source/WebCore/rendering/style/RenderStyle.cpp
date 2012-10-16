@@ -451,14 +451,14 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
         }
 #endif
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
         // If regions change, trigger a relayout to re-calc regions.
         if (rareNonInheritedData->m_dashboardRegions != other->rareNonInheritedData->m_dashboardRegions)
             return StyleDifferenceLayout;
 #endif
 
 #if ENABLE(CSS_EXCLUSIONS)
-        if (rareNonInheritedData->m_shapeInside != other->rareNonInheritedData->m_shapeInside)
+        if (rareNonInheritedData->m_wrapShapeInside != other->rareNonInheritedData->m_wrapShapeInside)
             return StyleDifferenceLayout;
 #endif
     }
@@ -679,7 +679,7 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
         // the parent container. For sure, I will have to revisit this code, but for now I've added this in order 
         // to avoid having diff() == StyleDifferenceEqual where wrap-shapes actually differ.
         // Tracking bug: https://bugs.webkit.org/show_bug.cgi?id=62991
-        if (rareNonInheritedData->m_shapeOutside != other->rareNonInheritedData->m_shapeOutside)
+        if (rareNonInheritedData->m_wrapShapeOutside != other->rareNonInheritedData->m_wrapShapeOutside)
             return StyleDifferenceRepaint;
 
         if (rareNonInheritedData->m_clipPath != other->rareNonInheritedData->m_clipPath)
@@ -1099,7 +1099,7 @@ const AtomicString& RenderStyle::textEmphasisMarkString() const
     return nullAtom;
 }
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
 const Vector<StyleDashboardRegion>& RenderStyle::initialDashboardRegions()
 {
     DEFINE_STATIC_LOCAL(Vector<StyleDashboardRegion>, emptyList, ());
@@ -1307,26 +1307,6 @@ void RenderStyle::getShadowExtent(const ShadowData* shadow, LayoutUnit &top, Lay
     }
 }
 
-LayoutBoxExtent RenderStyle::getShadowInsetExtent(const ShadowData* shadow) const
-{
-    LayoutUnit top = 0;
-    LayoutUnit right = 0;
-    LayoutUnit bottom = 0;
-    LayoutUnit left = 0;
-
-    for ( ; shadow; shadow = shadow->next()) {
-        if (shadow->style() == Normal)
-            continue;
-        int blurAndSpread = shadow->blur() + shadow->spread();
-        top = max<LayoutUnit>(top, shadow->y() + blurAndSpread);
-        right = min<LayoutUnit>(right, shadow->x() - blurAndSpread);
-        bottom = min<LayoutUnit>(bottom, shadow->y() - blurAndSpread);
-        left = max<LayoutUnit>(left, shadow->x() + blurAndSpread);
-    }
-
-    return LayoutBoxExtent(top, right, bottom, left);
-}
-
 void RenderStyle::getShadowHorizontalExtent(const ShadowData* shadow, LayoutUnit &left, LayoutUnit &right) const
 {
     left = 0;
@@ -1430,6 +1410,48 @@ Color RenderStyle::visitedDependentColor(int colorProperty) const
 
     // Take the alpha from the unvisited color, but get the RGB values from the visited color.
     return Color(visitedColor.red(), visitedColor.green(), visitedColor.blue(), unvisitedColor.alpha());
+}
+
+Length RenderStyle::logicalWidth() const
+{
+    if (isHorizontalWritingMode())
+        return width();
+    return height();
+}
+
+Length RenderStyle::logicalHeight() const
+{
+    if (isHorizontalWritingMode())
+        return height();
+    return width();
+}
+
+Length RenderStyle::logicalMinWidth() const
+{
+    if (isHorizontalWritingMode())
+        return minWidth();
+    return minHeight();
+}
+
+Length RenderStyle::logicalMaxWidth() const
+{
+    if (isHorizontalWritingMode())
+        return maxWidth();
+    return maxHeight();
+}
+
+Length RenderStyle::logicalMinHeight() const
+{
+    if (isHorizontalWritingMode())
+        return minHeight();
+    return minWidth();
+}
+
+Length RenderStyle::logicalMaxHeight() const
+{
+    if (isHorizontalWritingMode())
+        return maxHeight();
+    return maxWidth();
 }
 
 const BorderValue& RenderStyle::borderBefore() const

@@ -34,6 +34,7 @@
 #if ENABLE(FILE_SYSTEM)
 
 #include "DOMFileSystem.h"
+#include "PlatformSupport.h"
 #include "ScriptExecutionContext.h"
 #include "SecurityOrigin.h"
 #include "Supplementable.h"

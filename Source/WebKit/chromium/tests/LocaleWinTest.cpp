@@ -87,13 +87,13 @@ protected:
     String formatDate(LCID lcid, int year, int month, int day)
     {
         OwnPtr<LocaleWin> locale = LocaleWin::create(lcid);
-        return locale->formatDateTime(dateComponents(year, month, day));
+        return locale->formatDate(dateComponents(year, month, day));
     }
 
     double parseDate(LCID lcid, const String& dateString)
     {
         OwnPtr<LocaleWin> locale = LocaleWin::create(lcid);
-        return locale->parseDateTime(dateString, DateComponents::Date);
+        return locale->parseDate(dateString);
     }
 
 #if ENABLE(CALENDAR_PICKER)
@@ -120,15 +120,9 @@ protected:
         OwnPtr<LocaleWin> locale = LocaleWin::create(lcid);
         return locale->weekDayShortLabels()[index];
     }
-
-    bool isRTL(LCID lcid)
-    {
-        OwnPtr<LocaleWin> locale = LocaleWin::create(lcid);
-        return locale->isRTL();
-    }
 #endif
 
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
     String timeFormat(LCID lcid)
     {
         OwnPtr<LocaleWin> locale = LocaleWin::create(lcid);
@@ -328,24 +322,9 @@ TEST_F(LocaleWinTest, weekDayShortLabels)
     EXPECT_STREQ("\xE6\xB0\xB4", weekDayShortLabel(JapaneseJP, Wednesday).utf8().data());
     EXPECT_STREQ("\xE5\x9C\x9F", weekDayShortLabel(JapaneseJP, Saturday).utf8().data());
 }
-
-TEST_F(LocaleWinTest, isRTL)
-{
-    EXPECT_TRUE(isRTL(ArabicEG));
-    EXPECT_FALSE(isRTL(EnglishUS));
-}
-
 #endif
 
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
-TEST_F(LocaleWinTest, dateFormat)
-{
-    EXPECT_STREQ("y'-'M'-'d", LocaleWin::dateFormat("y-M-d").utf8().data());
-    EXPECT_STREQ("''yy'-'''MM'''-'dd", LocaleWin::dateFormat("''yy-''MM''-dd").utf8().data());
-    EXPECT_STREQ("yyyy'-''''-'MMM'''''-'dd", LocaleWin::dateFormat("yyyy-''''-MMM''''-dd").utf8().data());
-    EXPECT_STREQ("yyyy'-'''''MMMM'-'dd", LocaleWin::dateFormat("yyyy-''''MMMM-dd").utf8().data());
-}
-
+#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
 TEST_F(LocaleWinTest, timeFormat)
 {
     EXPECT_STREQ("h:mm:ss a", timeFormat(EnglishUS).utf8().data());

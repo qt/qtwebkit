@@ -46,19 +46,17 @@ class SVGSVGElement;
 
 class SMILTimeContainer : public RefCounted<SMILTimeContainer>  {
 public:
-    static PassRefPtr<SMILTimeContainer> create(SVGSVGElement* owner) { return adoptRef(new SMILTimeContainer(owner)); }
-    ~SMILTimeContainer();
+    static PassRefPtr<SMILTimeContainer> create(SVGSVGElement* owner) { return adoptRef(new SMILTimeContainer(owner)); } 
 
-    void schedule(SVGSMILElement*, SVGElement*, const QualifiedName&);
-    void unschedule(SVGSMILElement*, SVGElement*, const QualifiedName&);
-    void notifyIntervalsChanged();
-
+    void schedule(SVGSMILElement*);
+    void unschedule(SVGSMILElement*);
+    
     SMILTime elapsed() const;
 
     bool isActive() const;
     bool isPaused() const;
     bool isStarted() const;
-
+    
     void begin();
     void pause();
     void resume();
@@ -68,14 +66,14 @@ public:
 
 private:
     SMILTimeContainer(SVGSVGElement* owner);
-
+    
     void timerFired(Timer<SMILTimeContainer>*);
     void startTimer(SMILTime fireTime, SMILTime minimumDelay = 0);
     void updateAnimations(SMILTime elapsed, bool seekToTime = false);
     
     void updateDocumentOrderIndexes();
     void sortByPriority(Vector<SVGSMILElement*>& smilElements, SMILTime elapsed);
-
+    
     double m_beginTime;
     double m_pauseTime;
     double m_accumulatedPauseTime;
@@ -85,16 +83,10 @@ private:
     
     Timer<SMILTimeContainer> m_timer;
 
-    typedef pair<SVGElement*, QualifiedName> ElementAttributePair;
-    typedef Vector<SVGSMILElement*> AnimationsVector;
-    typedef HashMap<ElementAttributePair, AnimationsVector* > GroupedAnimationsMap;
-    GroupedAnimationsMap m_scheduledAnimations;
+    typedef HashSet<SVGSMILElement*> TimingElementSet;
+    TimingElementSet m_scheduledAnimations;
 
     SVGSVGElement* m_ownerSVGElement;
-
-#ifndef NDEBUG
-    bool m_preventScheduledAnimationsChanges;
-#endif
 };
 }
 

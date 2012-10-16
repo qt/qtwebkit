@@ -50,9 +50,7 @@ namespace WTF {
         // The needsDestruction flag is used to optimize destruction and rehashing.
         static const bool needsDestruction = true;
 
-        // The starting table size. Can be overridden when we know beforehand that
-        // a hash table will have at least N entries.
-        static const int minimumTableSize = 8;
+        static const int minimumTableSize = 64;
     };
 
     // Default integer traits disallow both 0 and -1 as keys (max value instead of -1 for unsigned).
@@ -165,9 +163,6 @@ namespace WTF {
         return HashTraitsEmptyValueChecker<Traits, Traits::hasIsEmptyValueFunction>::isEmptyValue(value);
     }
 
-// Workaround from Chromium. See https://bugs.webkit.org/show_bug.cgi?id=82784.
-#define WTF_NEW_HASHMAP_ITERATORS_INTERFACE 1
-
     template<typename FirstTraitsArg, typename SecondTraitsArg>
     struct PairHashTraits : GenericHashTraits<std::pair<typename FirstTraitsArg::TraitType, typename SecondTraitsArg::TraitType> > {
         typedef FirstTraitsArg FirstTraits;
@@ -198,20 +193,21 @@ namespace WTF {
         }
 
         KeyValuePair(const KeyTypeArg& key, const ValueTypeArg& value)
-            : key(key)
-            , value(value)
+            : first(key)
+            , second(value)
         {
         }
 
         template <typename OtherKeyType, typename OtherValueType>
         KeyValuePair(const KeyValuePair<OtherKeyType, OtherValueType>& other)
-            : key(other.key)
-            , value(other.value)
+            : first(other.first)
+            , second(other.second)
         {
         }
 
-        KeyTypeArg key;
-        ValueTypeArg value;
+        // TODO: Rename these to key and value. See https://bugs.webkit.org/show_bug.cgi?id=82784.
+        KeyTypeArg first;
+        ValueTypeArg second;
     };
 
     template<typename KeyTraitsArg, typename ValueTraitsArg>
@@ -228,8 +224,8 @@ namespace WTF {
 
         static const int minimumTableSize = KeyTraits::minimumTableSize;
 
-        static void constructDeletedValue(TraitType& slot) { KeyTraits::constructDeletedValue(slot.key); }
-        static bool isDeletedValue(const TraitType& value) { return KeyTraits::isDeletedValue(value.key); }
+        static void constructDeletedValue(TraitType& slot) { KeyTraits::constructDeletedValue(slot.first); }
+        static bool isDeletedValue(const TraitType& value) { return KeyTraits::isDeletedValue(value.first); }
     };
 
     template<typename Key, typename Value>

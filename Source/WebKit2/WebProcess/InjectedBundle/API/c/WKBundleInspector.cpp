@@ -52,7 +52,7 @@ void WKBundleInspectorClose(WKBundleInspectorRef inspectorRef)
 
 void WKBundleInspectorEvaluateScriptForTest(WKBundleInspectorRef inspectorRef, long callID, WKStringRef script)
 {
-    return toImpl(inspectorRef)->evaluateScriptForTest(callID, toWTFString(script));
+    return toImpl(inspectorRef)->evaluateScriptForTest(callID, toImpl(script)->string());
 }
 
 void WKBundleInspectorSetPageProfilingEnabled(WKBundleInspectorRef inspectorRef, bool enabled)

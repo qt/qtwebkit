@@ -10,7 +10,6 @@
       <dep package="fonts"/>
       <dep package="fontconfig"/>
       <dep package="freetype6"/>
-      <dep package="libxml2"/>
       <dep package="gdk-pixbuf"/>
       <dep package="gtk+"/>
       <dep package="glib"/>
@@ -37,8 +36,6 @@
       href="http://cairographics.org"/>
   <repository type="tarball" name="freedesktop.org"
       href="http://www.freedesktop.org"/>
-  <repository type="tarball" name="xmlsoft.org"
-      href="ftp://xmlsoft.org"/>
 
   <autotools id="make" autogen-sh="configure">
     <branch repo="ftp.gnu.org"
@@ -54,10 +51,10 @@
       <dep package="fontconfig"/>
       <dep package="pixman"/>
     </dependencies>
-    <branch module="releases/cairo-1.12.4.tar.xz" version="1.12.4"
+    <branch module="releases/cairo-1.10.2.tar.gz" version="1.10.2"
             repo="cairographics.org"
-            hash="sha256:a467b2e1f04bfd3f848370ce5e82cfe0a7f712bac05a04d133bc34c94f677a28"
-            md5sum="a64bb8774a1e476e5cdd69e635794dfb">
+            hash="sha256:32018c7998358eebc2ad578ff8d8559d34fc80252095f110a572ed23d989fc41"
+            md5sum="f101a9e88b783337b20b2e26dfd26d5f">
     </branch>
   </autotools>
 
@@ -225,13 +222,6 @@
       <dep package="glib"/>
       <dep package="at-spi2-core"/>
     </dependencies>
-  </autotools>
-
-  <autotools id="libxml2">
-    <branch module="/libxml2/libxml2-2.8.0.tar.gz" version="2.8.0"
-            repo="xmlsoft.org"
-            hash="sha256:f2e2d0e322685193d1affec83b21dc05d599e17a7306d7b90de95bb5b9ac622a"
-            md5sum="c62106f02ee00b6437f0fb9d370c1093"/>
   </autotools>
 
 </moduleset>

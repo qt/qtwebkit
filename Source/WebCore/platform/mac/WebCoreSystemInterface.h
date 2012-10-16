@@ -120,9 +120,6 @@ typedef enum {
     wkPatternTilingConstantSpacing
 } wkPatternTiling;
 extern void (*wkCGContextResetClip)(CGContextRef);
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
-extern bool (*wkCGContextDrawsWithCorrectShadowOffsets)(CGContextRef);
-#endif
 extern CGPatternRef (*wkCGPatternCreateWithImageAndTransform)(CGImageRef, CGAffineTransform, int);
 extern CFReadStreamRef (*wkCreateCustomCFReadStream)(void *(*formCreate)(CFReadStreamRef, void *), 
     void (*formFinalize)(CFReadStreamRef, void *), 

@@ -56,21 +56,18 @@ static inline gchar* replaceCharactersForResults(gchar* str)
 AccessibilityUIElement::AccessibilityUIElement(PlatformUIElement element)
     : m_element(element)
 {
-    if (m_element)
-        g_object_ref(m_element);
+    g_object_ref(m_element);
 }
 
 AccessibilityUIElement::AccessibilityUIElement(const AccessibilityUIElement& other)
     : m_element(other.m_element)
 {
-    if (m_element)
-        g_object_ref(m_element);
+    g_object_ref(m_element);
 }
 
 AccessibilityUIElement::~AccessibilityUIElement()
 {
-    if (m_element)
-        g_object_unref(m_element);
+    g_object_unref(m_element);
 }
 
 void AccessibilityUIElement::getLinkedUIElements(Vector<AccessibilityUIElement>& elements)

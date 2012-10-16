@@ -323,7 +323,7 @@ WebInspector.DOMBreakpointsSidebarPane.prototype = {
             }
             pathToBreakpoints[path].push(breakpoint);
         }
-    },
-
-    __proto__: WebInspector.NativeBreakpointsSidebarPane.prototype
+    }
 }
+
+WebInspector.DOMBreakpointsSidebarPane.prototype.__proto__ = WebInspector.NativeBreakpointsSidebarPane.prototype;

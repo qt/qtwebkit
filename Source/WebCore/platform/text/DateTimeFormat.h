@@ -26,7 +26,7 @@
 #ifndef DateTimeFormat_h
 #define DateTimeFormat_h
 
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -57,8 +57,8 @@ public:
         FieldTypeMonthStandAlone = 'L',
 
         // Week: 42
-        FieldTypeWeekOfYear = 'w',
-        FieldTypeWeekOfMonth = 'W',
+        FieldTypeWeekOfYear = 'W',
+        FieldTypeWeekOfMonth = 'w',
 
         // Day: 12
         FieldTypeDayOfMonth = 'd',

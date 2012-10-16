@@ -52,6 +52,7 @@
 
 #define JavaCocoaPluginIdentifier   "com.apple.JavaPluginCocoa"
 #define JavaCarbonPluginIdentifier  "com.apple.JavaAppletPlugin"
+#define JavaCFMPluginFilename       "Java Applet Plugin Enabler"
 
 #define QuickTimeCarbonPluginIdentifier       "com.apple.QuickTime Plugin.plugin"
 #define QuickTimeCocoaPluginIdentifier        "com.apple.quicktime.webplugin"
@@ -136,11 +137,14 @@ static NSString *pathByResolvingSymlinksAndAliases(NSString *thePath)
     path = pathByResolvingSymlinksAndAliases(pluginPath);
     cfBundle.adoptCF(CFBundleCreate(kCFAllocatorDefault, (CFURLRef)[NSURL fileURLWithPath:path]));
 
+#ifndef __ppc__
+    // 32-bit PowerPC is the only platform where non-bundled CFM plugins are supported
     if (!cfBundle) {
         [self release];
         return nil;
     }
-
+#endif
+    
     return self;
 }
 
@@ -351,7 +355,8 @@ static NSString *pathByResolvingSymlinksAndAliases(NSString *thePath)
 - (BOOL)isJavaPlugIn
 {
     const String& bundleIdentifier = [self bundleIdentifier];
-    return bundleIdentifier == JavaCocoaPluginIdentifier || bundleIdentifier == JavaCarbonPluginIdentifier;
+    return bundleIdentifier == JavaCocoaPluginIdentifier || bundleIdentifier == JavaCarbonPluginIdentifier ||
+        equalIgnoringCase(pluginInfo.file, JavaCFMPluginFilename);
 }
 
 static inline void swapIntsInHeader(uint32_t* rawData, size_t length)

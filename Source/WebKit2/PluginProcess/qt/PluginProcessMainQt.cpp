@@ -44,10 +44,10 @@ using namespace WebCore;
 
 namespace WebKit {
 
-static void messageHandler(QtMsgType type, const QMessageLogContext&, const QString& message)
+static void messageHandler(QtMsgType type, const char* message)
 {
     if (type == QtCriticalMsg) {
-        fprintf(stderr, "%s\n", qPrintable(message));
+        fprintf(stderr, "%s\n", message);
         return;
     }
 
@@ -71,7 +71,7 @@ Q_DECL_EXPORT int PluginProcessMain(int argc, char** argv)
 {
     QByteArray suppressOutput = qgetenv("QT_WEBKIT_SUPPRESS_WEB_PROCESS_OUTPUT");
     if (!suppressOutput.isEmpty() && suppressOutput != "0")
-        qInstallMessageHandler(messageHandler);
+        qInstallMsgHandler(messageHandler);
 
     QGuiApplication app(argc, argv);
 

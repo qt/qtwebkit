@@ -27,29 +27,13 @@
 
 #include "WebViewHostOutputSurface.h"
 
-#include <public/WebCompositorSoftwareOutputDevice.h>
 #include <public/WebGraphicsContext3D.h>
 #include <wtf/Assertions.h>
 
 namespace WebKit {
 
-PassOwnPtr<WebViewHostOutputSurface> WebViewHostOutputSurface::create3d(PassOwnPtr<WebKit::WebGraphicsContext3D> context3d)
-{
-    return adoptPtr(new WebViewHostOutputSurface(context3d));
-}
-
-PassOwnPtr<WebViewHostOutputSurface> WebViewHostOutputSurface::createSoftware(PassOwnPtr<WebKit::WebCompositorSoftwareOutputDevice> softwareDevice)
-{
-    return adoptPtr(new WebViewHostOutputSurface(softwareDevice));
-}
-
 WebViewHostOutputSurface::WebViewHostOutputSurface(PassOwnPtr<WebKit::WebGraphicsContext3D> context)
     : m_context(context)
-{
-}
-
-WebViewHostOutputSurface::WebViewHostOutputSurface(PassOwnPtr<WebKit::WebCompositorSoftwareOutputDevice> softwareDevice)
-    : m_softwareDevice(softwareDevice)
 {
 }
 
@@ -59,9 +43,6 @@ WebViewHostOutputSurface::~WebViewHostOutputSurface()
 
 bool WebViewHostOutputSurface::bindToClient(WebCompositorOutputSurfaceClient*)
 {
-    if (!m_context)
-        return true;
-
     return m_context->makeContextCurrent();
 }
 
@@ -73,11 +54,6 @@ const WebKit::WebCompositorOutputSurface::Capabilities& WebViewHostOutputSurface
 WebGraphicsContext3D* WebViewHostOutputSurface::context3D() const
 {
     return m_context.get();
-}
-
-WebCompositorSoftwareOutputDevice* WebViewHostOutputSurface::softwareDevice() const
-{
-    return m_softwareDevice.get();
 }
 
 void WebViewHostOutputSurface::sendFrameToParentCompositor(const WebCompositorFrame&)

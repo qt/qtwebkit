@@ -81,8 +81,6 @@ public:
 
     static SparseArrayValueMap* create(JSGlobalData&);
     
-    static const bool needsDestruction = true;
-    static const bool hasImmortalStructure = true;
     static void destroy(JSCell*);
     
     static Structure* createStructure(JSGlobalData&, JSGlobalObject*, JSValue prototype);

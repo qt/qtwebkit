@@ -1565,7 +1565,7 @@ case 150:
         }
 
         }
-    },
-
-    __proto__: WebInspector.SourceTokenizer.prototype
+    }
 }
+
+WebInspector.SourceCSSTokenizer.prototype.__proto__ = WebInspector.SourceTokenizer.prototype;

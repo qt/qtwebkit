@@ -33,23 +33,19 @@
 
 #include "MockWebRTCPeerConnectionHandler.h"
 
-#include "MockConstraints.h"
 #include <public/WebMediaConstraints.h>
 #include <public/WebRTCPeerConnectionHandlerClient.h>
 #include <public/WebRTCSessionDescription.h>
 #include <public/WebRTCSessionDescriptionRequest.h>
-#include <public/WebRTCStatsRequest.h>
-#include <public/WebRTCStatsResponse.h>
 #include <public/WebRTCVoidRequest.h>
 #include <public/WebString.h>
 #include <public/WebVector.h>
-#include <wtf/DateMath.h>
 
 using namespace WebKit;
 
 class RTCSessionDescriptionRequestSuccededTask : public MethodTask<MockWebRTCPeerConnectionHandler> {
 public:
-    RTCSessionDescriptionRequestSuccededTask(MockWebRTCPeerConnectionHandler* object, const WebRTCSessionDescriptionRequest& request, const WebRTCSessionDescription& result)
+    RTCSessionDescriptionRequestSuccededTask(MockWebRTCPeerConnectionHandler* object, const WebKit::WebRTCSessionDescriptionRequest& request, const WebKit::WebRTCSessionDescription& result)
         : MethodTask<MockWebRTCPeerConnectionHandler>(object)
         , m_request(request)
         , m_result(result)
@@ -62,13 +58,13 @@ public:
     }
 
 private:
-    WebRTCSessionDescriptionRequest m_request;
-    WebRTCSessionDescription m_result;
+    WebKit::WebRTCSessionDescriptionRequest m_request;
+    WebKit::WebRTCSessionDescription m_result;
 };
 
 class RTCSessionDescriptionRequestFailedTask : public MethodTask<MockWebRTCPeerConnectionHandler> {
 public:
-    RTCSessionDescriptionRequestFailedTask(MockWebRTCPeerConnectionHandler* object, const WebRTCSessionDescriptionRequest& request)
+    RTCSessionDescriptionRequestFailedTask(MockWebRTCPeerConnectionHandler* object, const WebKit::WebRTCSessionDescriptionRequest& request)
         : MethodTask<MockWebRTCPeerConnectionHandler>(object)
         , m_request(request)
     {
@@ -80,31 +76,12 @@ public:
     }
 
 private:
-    WebRTCSessionDescriptionRequest m_request;
-};
-
-class RTCStatsRequestSucceededTask : public MethodTask<MockWebRTCPeerConnectionHandler> {
-public:
-    RTCStatsRequestSucceededTask(MockWebRTCPeerConnectionHandler* object, const WebKit::WebRTCStatsRequest& request, const WebKit::WebRTCStatsResponse& response)
-        : MethodTask<MockWebRTCPeerConnectionHandler>(object)
-        , m_request(request)
-        , m_response(response)
-    {
-    }
-
-    virtual void runIfValid() OVERRIDE
-    {
-        m_request.requestSucceeded(m_response);
-    }
-
-private:
-    WebKit::WebRTCStatsRequest m_request;
-    WebKit::WebRTCStatsResponse m_response;
+    WebKit::WebRTCSessionDescriptionRequest m_request;
 };
 
 class RTCVoidRequestTask : public MethodTask<MockWebRTCPeerConnectionHandler> {
 public:
-    RTCVoidRequestTask(MockWebRTCPeerConnectionHandler* object, const WebRTCVoidRequest& request, bool succeeded)
+    RTCVoidRequestTask(MockWebRTCPeerConnectionHandler* object, const WebKit::WebRTCVoidRequest& request, bool succeeded)
         : MethodTask<MockWebRTCPeerConnectionHandler>(object)
         , m_request(request)
         , m_succeeded(succeeded)
@@ -120,7 +97,7 @@ public:
     }
 
 private:
-    WebRTCVoidRequest m_request;
+    WebKit::WebRTCVoidRequest m_request;
     bool m_succeeded;
 };
 
@@ -128,13 +105,48 @@ private:
 
 MockWebRTCPeerConnectionHandler::MockWebRTCPeerConnectionHandler(WebRTCPeerConnectionHandlerClient* client)
     : m_client(client)
-    , m_streamCount(0)
 {
+}
+
+static bool isSupportedConstraint(const WebString& constraint)
+{
+    return constraint == "valid_and_supported_1" || constraint == "valid_and_supported_2";
+}
+
+static bool isValidConstraint(const WebString& constraint)
+{
+    return isSupportedConstraint(constraint) || constraint == "valid_but_unsupported_1" || constraint == "valid_but_unsupported_2";
 }
 
 bool MockWebRTCPeerConnectionHandler::initialize(const WebRTCConfiguration&, const WebMediaConstraints& constraints)
 {
-    return MockConstraints::verifyConstraints(constraints);
+    WebVector<WebString> mandatoryConstraintNames;
+    constraints.getMandatoryConstraintNames(mandatoryConstraintNames);
+    if (mandatoryConstraintNames.size()) {
+        for (size_t i = 0; i < mandatoryConstraintNames.size(); ++i) {
+            if (!isSupportedConstraint(mandatoryConstraintNames[i]))
+                return false;
+            WebString value;
+            constraints.getMandatoryConstraintValue(mandatoryConstraintNames[i], value);
+            if (value != "1")
+                return false;
+        }
+    }
+
+    WebVector<WebString> optionalConstraintNames;
+    constraints.getOptionalConstraintNames(optionalConstraintNames);
+    if (optionalConstraintNames.size()) {
+        for (size_t i = 0; i < optionalConstraintNames.size(); ++i) {
+            if (!isValidConstraint(optionalConstraintNames[i]))
+                return false;
+            WebString value;
+            constraints.getOptionalConstraintValue(optionalConstraintNames[i], value);
+            if (value != "0")
+                return false;
+        }
+    }
+
+    return true;
 }
 
 void MockWebRTCPeerConnectionHandler::createOffer(const WebRTCSessionDescriptionRequest& request, const WebMediaConstraints& constraints)
@@ -200,7 +212,6 @@ bool MockWebRTCPeerConnectionHandler::addICECandidate(const WebRTCICECandidate& 
 
 bool MockWebRTCPeerConnectionHandler::addStream(const WebMediaStreamDescriptor& stream, const WebMediaConstraints&)
 {
-    m_streamCount += 1;
     m_client->didAddRemoteStream(stream);
     m_client->negotiationNeeded();
     return true;
@@ -208,24 +219,8 @@ bool MockWebRTCPeerConnectionHandler::addStream(const WebMediaStreamDescriptor& 
 
 void MockWebRTCPeerConnectionHandler::removeStream(const WebMediaStreamDescriptor& stream)
 {
-    m_streamCount -= 1;
     m_client->didRemoveRemoteStream(stream);
     m_client->negotiationNeeded();
-}
-
-void MockWebRTCPeerConnectionHandler::getStats(const WebRTCStatsRequest& request)
-{
-    WebRTCStatsResponse response = request.createResponse();
-    double currentDate = WTF::jsCurrentTime();
-    for (int i = 0; i < m_streamCount; ++i) {
-        size_t reportIndex = response.addReport();
-        response.addElement(reportIndex, true, currentDate);
-        response.addStatistic(reportIndex, true, "type", "audio");
-        reportIndex = response.addReport();
-        response.addElement(reportIndex, true, currentDate);
-        response.addStatistic(reportIndex, true, "type", "video");
-    }
-    postTask(new RTCStatsRequestSucceededTask(this, request, response));
 }
 
 void MockWebRTCPeerConnectionHandler::stop()

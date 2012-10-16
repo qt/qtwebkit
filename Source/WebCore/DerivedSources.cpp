@@ -485,6 +485,7 @@
 #include "JSWebKitAnimation.cpp"
 #include "JSWebKitAnimationEvent.cpp"
 #include "JSWebKitAnimationList.cpp"
+#include "JSWebKitBlobBuilder.cpp"
 #if ENABLE(CSS_FILTERS)
 #include "JSWebKitCSSFilterValue.cpp"
 #endif

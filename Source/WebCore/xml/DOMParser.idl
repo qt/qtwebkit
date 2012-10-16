@@ -17,9 +17,11 @@
  * Boston, MA 02110-1301, USA.
  */
 
-[
-    Constructor
-] interface DOMParser {
-    Document parseFromString(in [Optional=DefaultIsUndefined] DOMString str, 
-                             in [Optional=DefaultIsUndefined] DOMString contentType);
-};
+module xpath {
+    interface [
+        Constructor
+    ] DOMParser {
+        Document parseFromString(in [Optional=DefaultIsUndefined] DOMString str, 
+                                 in [Optional=DefaultIsUndefined] DOMString contentType);
+    };
+}

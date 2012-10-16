@@ -17,6 +17,9 @@
  * Boston, MA 02110-1301, USA.
  */
 
-interface CDATASection : Text {
-};
+module core {
 
+    interface CDATASection : Text {
+    };
+
+}

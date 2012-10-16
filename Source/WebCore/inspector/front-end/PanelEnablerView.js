@@ -94,7 +94,7 @@ WebInspector.PanelEnablerView.prototype = {
 
     get alwaysEnabled() {
         return this.enabledAlways.checked;
-    },
-
-    __proto__: WebInspector.View.prototype
+    }
 }
+
+WebInspector.PanelEnablerView.prototype.__proto__ = WebInspector.View.prototype;

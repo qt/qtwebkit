@@ -28,10 +28,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=SQL_DATABASE,
-    OmitConstructor,
-    JSNoStaticTables
-] interface SQLTransactionSync {
-    [Custom] SQLResultSet executeSql(in DOMString sqlStatement, in ObjectArray arguments);
-};
+module storage {
+
+    interface [
+        Conditional=SQL_DATABASE,
+        OmitConstructor,
+        JSNoStaticTables
+    ] SQLTransactionSync {
+        [Custom] SQLResultSet executeSql(in DOMString sqlStatement, in ObjectArray arguments);
+    };
+}

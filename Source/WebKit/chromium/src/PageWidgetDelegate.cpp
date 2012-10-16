@@ -59,7 +59,8 @@ void PageWidgetDelegate::animate(Page* page, double monotonicFrameBeginTime)
     FrameView* view = mainFrameView(page);
     if (!view)
         return;
-    view->serviceScriptedAnimations(monotonicFrameBeginTime);
+    double timeShift = currentTime() - monotonicallyIncreasingTime();
+    view->serviceScriptedAnimations(convertSecondsToDOMTimeStamp(monotonicFrameBeginTime + timeShift));
 #endif
 }
 
@@ -89,7 +90,6 @@ void PageWidgetDelegate::paint(Page* page, PageOverlayList* overlays, WebCanvas*
     GraphicsContext& gc = builder.context();
     gc.platformContext()->setDrawingToImageBuffer(background == Opaque ? false : true);
     gc.applyDeviceScaleFactor(page->deviceScaleFactor());
-    gc.platformContext()->setDeviceScaleFactor(page->deviceScaleFactor());
     IntRect dirtyRect(rect);
     gc.save();
     FrameView* view = mainFrameView(page);

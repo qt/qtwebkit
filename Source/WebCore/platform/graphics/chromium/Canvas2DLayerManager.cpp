@@ -25,10 +25,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include "Canvas2DLayerManager.h"
 
-#include <public/Platform.h>
 #include <wtf/StdLibExtras.h>
-
-using WebKit::WebThread;
 
 namespace {
 enum {
@@ -43,7 +40,6 @@ Canvas2DLayerManager::Canvas2DLayerManager()
     : m_bytesAllocated(0)
     , m_maxBytesAllocated(DefaultMaxBytesAllocated)
     , m_targetBytesAllocated(DefaultTargetBytesAllocated)
-    , m_taskObserverActive(false)
 {
 }
 
@@ -51,7 +47,6 @@ Canvas2DLayerManager::~Canvas2DLayerManager()
 {
     ASSERT(!m_bytesAllocated);
     ASSERT(!m_layerList.head());
-    ASSERT(!m_taskObserverActive);
 }
 
 void Canvas2DLayerManager::init(size_t maxBytesAllocated, size_t targetBytesAllocated)
@@ -67,20 +62,6 @@ Canvas2DLayerManager& Canvas2DLayerManager::get()
     return manager;
 }
 
-void Canvas2DLayerManager::willProcessTask()
-{
-}
-
-void Canvas2DLayerManager::didProcessTask()
-{
-    // Called after the script action for the current frame has been processed.
-    ASSERT(m_taskObserverActive);
-    WebKit::Platform::current()->currentThread()->removeTaskObserver(this);
-    m_taskObserverActive = false;
-    for (Canvas2DLayerBridge* layer = m_layerList.head(); layer; layer = layer->next())
-        layer->limitPendingFrames();
-}
-
 void Canvas2DLayerManager::layerDidDraw(Canvas2DLayerBridge* layer)
 {
     if (isInList(layer)) {
@@ -89,13 +70,7 @@ void Canvas2DLayerManager::layerDidDraw(Canvas2DLayerBridge* layer)
             m_layerList.push(layer); // Set as MRU
         }
     } else
-        addLayerToList(layer);
-
-    if (!m_taskObserverActive) {
-        m_taskObserverActive = true;
-        // Schedule a call to didProcessTask() after completion of the current script task.
-        WebKit::Platform::current()->currentThread()->addTaskObserver(this);
-    }
+        addLayerToList(layer); 
 }
 
 void Canvas2DLayerManager::addLayerToList(Canvas2DLayerBridge* layer)

@@ -55,8 +55,6 @@ SVGAnimationElement::SVGAnimationElement(const QualifiedName& tagName, Document*
     , m_fromPropertyValueType(RegularPropertyValue)
     , m_toPropertyValueType(RegularPropertyValue)
     , m_animationValid(false)
-    , m_attributeType(AttributeTypeAuto)
-    , m_hasInvalidCSSAttributeType(false)
 {
     registerAnimatedPropertiesForSVGAnimationElement();
 }
@@ -147,7 +145,6 @@ bool SVGAnimationElement::isSupportedAttribute(const QualifiedName& attrName)
         supportedAttributes.add(SVGNames::keyTimesAttr);
         supportedAttributes.add(SVGNames::keyPointsAttr);
         supportedAttributes.add(SVGNames::keySplinesAttr);
-        supportedAttributes.add(SVGNames::attributeTypeAttr);
     }
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
 }
@@ -185,11 +182,6 @@ void SVGAnimationElement::parseAttribute(const Attribute& attribute)
 
     if (attribute.name() == SVGNames::keySplinesAttr) {
         parseKeySplines(attribute.value(), m_keySplines);
-        return;
-    }
-
-    if (attribute.name() == SVGNames::attributeTypeAttr) {
-        setAttributeType(attribute.value());
         return;
     }
 
@@ -289,17 +281,16 @@ CalcMode SVGAnimationElement::calcMode() const
     return hasTagName(SVGNames::animateMotionTag) ? CalcModePaced : CalcModeLinear;
 }
 
-void SVGAnimationElement::setAttributeType(const AtomicString& attributeType)
-{
+SVGAnimationElement::AttributeType SVGAnimationElement::attributeType() const
+{    
     DEFINE_STATIC_LOCAL(const AtomicString, css, ("CSS"));
     DEFINE_STATIC_LOCAL(const AtomicString, xml, ("XML"));
-    if (attributeType == css)
-        m_attributeType = AttributeTypeCSS;
-    else if (attributeType == xml)
-        m_attributeType = AttributeTypeXML;
-    else
-        m_attributeType = AttributeTypeAuto;
-    checkInvalidCSSAttributeType(targetElement(DoNotResolveNewTarget));
+    const AtomicString& value = fastGetAttribute(SVGNames::attributeTypeAttr);
+    if (value == css)
+        return AttributeTypeCSS;
+    if (value == xml)
+        return AttributeTypeXML;
+    return AttributeTypeAuto;
 }
 
 String SVGAnimationElement::toValue() const
@@ -655,25 +646,6 @@ void SVGAnimationElement::determinePropertyValueTypes(const String& from, const 
         m_fromPropertyValueType = InheritValue;
     if (inheritsFromProperty(targetElement, attributeName, to))
         m_toPropertyValueType = InheritValue;
-}
-
-void SVGAnimationElement::targetElementWillChange(SVGElement* currentTarget, SVGElement* newTarget)
-{
-    SVGSMILElement::targetElementWillChange(currentTarget, newTarget);
-
-    checkInvalidCSSAttributeType(newTarget);
-}
-
-void SVGAnimationElement::setAttributeName(const QualifiedName& attributeName)
-{
-    SVGSMILElement::setAttributeName(attributeName);
-
-    checkInvalidCSSAttributeType(targetElement(DoNotResolveNewTarget));
-}
-
-void SVGAnimationElement::checkInvalidCSSAttributeType(SVGElement* target)
-{
-    m_hasInvalidCSSAttributeType = target && hasValidAttributeName() && attributeType() == AttributeTypeCSS && !isTargetAttributeCSSProperty(target, attributeName());
 }
 
 }

@@ -203,8 +203,6 @@ void CSSStyleSheet::setDisabled(bool disabled)
 void CSSStyleSheet::setMediaQueries(PassRefPtr<MediaQuerySet> mediaQueries)
 {
     m_mediaQueries = mediaQueries;
-    if (m_mediaCSSOMWrapper && m_mediaQueries)
-        m_mediaCSSOMWrapper->reattach(m_mediaQueries.get());
 }
 
 unsigned CSSStyleSheet::length() const

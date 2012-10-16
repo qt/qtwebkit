@@ -132,16 +132,12 @@ RenderObject* RenderObject::createObject(Node* node, RenderStyle* style)
     const ContentData* contentData = style->contentData();
     if (contentData && !contentData->next() && contentData->isImage() && doc != node) {
         RenderImage* image = new (arena) RenderImage(node);
-        // RenderImageResourceStyleImage requires a style being present on the image but we don't want to
-        // trigger a style change now as the node is not fully attached. Moving this code to style change
-        // doesn't make sense as it should be run once at renderer creation.
-        image->m_style = style;
+        image->setStyle(style);
         if (const StyleImage* styleImage = static_cast<const ImageContentData*>(contentData)->image()) {
             image->setImageResource(RenderImageResourceStyleImage::create(const_cast<StyleImage*>(styleImage)));
             image->setIsGeneratedContent();
         } else
             image->setImageResource(RenderImageResource::create());
-        image->m_style = 0;
         return image;
     }
 
@@ -312,7 +308,7 @@ void RenderObject::addChild(RenderObject* newChild, RenderObject* beforeChild)
     // To avoid the problem alltogether, detect early if we're inside a hidden SVG subtree
     // and stop creating layers at all for these cases - they're not used anyways.
     if (newChild->hasLayer() && !layerCreationAllowedForSubtree())
-        toRenderLayerModelObject(newChild)->layer()->removeOnlyThisLayer();
+        toRenderBoxModelObject(newChild)->layer()->removeOnlyThisLayer();
 }
 
 void RenderObject::removeChild(RenderObject* oldChild)
@@ -434,7 +430,7 @@ static void addLayers(RenderObject* obj, RenderLayer* parentLayer, RenderObject*
             beforeChild = newObject->parent()->findNextLayer(parentLayer, newObject);
             newObject = 0;
         }
-        parentLayer->addChild(toRenderLayerModelObject(obj)->layer(), beforeChild);
+        parentLayer->addChild(toRenderBoxModelObject(obj)->layer(), beforeChild);
         return;
     }
 
@@ -458,7 +454,7 @@ void RenderObject::removeLayers(RenderLayer* parentLayer)
         return;
 
     if (hasLayer()) {
-        parentLayer->removeChild(toRenderLayerModelObject(this)->layer());
+        parentLayer->removeChild(toRenderBoxModelObject(this)->layer());
         return;
     }
 
@@ -472,7 +468,7 @@ void RenderObject::moveLayers(RenderLayer* oldParent, RenderLayer* newParent)
         return;
 
     if (hasLayer()) {
-        RenderLayer* layer = toRenderLayerModelObject(this)->layer();
+        RenderLayer* layer = toRenderBoxModelObject(this)->layer();
         ASSERT(oldParent == layer->parent());
         if (oldParent)
             oldParent->removeChild(layer);
@@ -492,7 +488,7 @@ RenderLayer* RenderObject::findNextLayer(RenderLayer* parentLayer, RenderObject*
         return 0;
 
     // Step 1: If our layer is a child of the desired parent, then return our layer.
-    RenderLayer* ourLayer = hasLayer() ? toRenderLayerModelObject(this)->layer() : 0;
+    RenderLayer* ourLayer = hasLayer() ? toRenderBoxModelObject(this)->layer() : 0;
     if (ourLayer && ourLayer->parent() == parentLayer)
         return ourLayer;
 
@@ -524,7 +520,7 @@ RenderLayer* RenderObject::enclosingLayer() const
 {
     const RenderObject* curr = this;
     while (curr) {
-        RenderLayer* layer = curr->hasLayer() ? toRenderLayerModelObject(curr)->layer() : 0;
+        RenderLayer* layer = curr->hasLayer() ? toRenderBoxModelObject(curr)->layer() : 0;
         if (layer)
             return layer;
         curr = curr->parent();
@@ -720,13 +716,13 @@ void RenderObject::invalidateContainerPreferredLogicalWidths()
 void RenderObject::setLayerNeedsFullRepaint()
 {
     ASSERT(hasLayer());
-    toRenderLayerModelObject(this)->layer()->setRepaintStatus(NeedsFullRepaint);
+    toRenderBoxModelObject(this)->layer()->setRepaintStatus(NeedsFullRepaint);
 }
 
 void RenderObject::setLayerNeedsFullRepaintForPositionedMovementLayout()
 {
     ASSERT(hasLayer());
-    toRenderLayerModelObject(this)->layer()->setRepaintStatus(NeedsFullRepaintForPositionedMovementLayout);
+    toRenderBoxModelObject(this)->layer()->setRepaintStatus(NeedsFullRepaintForPositionedMovementLayout);
 }
 
 RenderBlock* RenderObject::containingBlock() const
@@ -1202,7 +1198,7 @@ void RenderObject::absoluteFocusRingQuads(Vector<FloatQuad>& quads)
     for (size_t i = 0; i < count; ++i) {
         IntRect rect = rects[i];
         rect.move(-absolutePoint.x(), -absolutePoint.y());
-        quads.append(localToAbsoluteQuad(FloatQuad(rect), SnapOffsetForTransforms));
+        quads.append(localToAbsoluteQuad(FloatQuad(rect)));
     }
 }
 
@@ -1245,13 +1241,13 @@ void RenderObject::paint(PaintInfo&, const LayoutPoint&)
 {
 }
 
-RenderLayerModelObject* RenderObject::containerForRepaint() const
+RenderBoxModelObject* RenderObject::containerForRepaint() const
 {
     RenderView* v = view();
     if (!v)
         return 0;
     
-    RenderLayerModelObject* repaintContainer = 0;
+    RenderBoxModelObject* repaintContainer = 0;
 
 #if USE(ACCELERATED_COMPOSITING)
     if (v->usesCompositing()) {
@@ -1281,7 +1277,7 @@ RenderLayerModelObject* RenderObject::containerForRepaint() const
     return repaintContainer;
 }
 
-void RenderObject::repaintUsingContainer(RenderLayerModelObject* repaintContainer, const IntRect& r, bool immediate) const
+void RenderObject::repaintUsingContainer(RenderBoxModelObject* repaintContainer, const IntRect& r, bool immediate) const
 {
     if (!repaintContainer) {
         view()->repaintViewRectangle(r, immediate);
@@ -1334,7 +1330,7 @@ void RenderObject::repaint(bool immediate) const
     if (view->printing())
         return; // Don't repaint if we're printing.
 
-    RenderLayerModelObject* repaintContainer = containerForRepaint();
+    RenderBoxModelObject* repaintContainer = containerForRepaint();
     repaintUsingContainer(repaintContainer ? repaintContainer : view, pixelSnappedIntRect(clippedOverflowRectForRepaint(repaintContainer)), immediate);
 }
 
@@ -1354,7 +1350,7 @@ void RenderObject::repaintRectangle(const LayoutRect& r, bool immediate) const
     // repaint containers. https://bugs.webkit.org/show_bug.cgi?id=23308
     dirtyRect.move(view->layoutDelta());
 
-    RenderLayerModelObject* repaintContainer = containerForRepaint();
+    RenderBoxModelObject* repaintContainer = containerForRepaint();
     computeRectForRepaint(repaintContainer, dirtyRect);
     repaintUsingContainer(repaintContainer ? repaintContainer : view, pixelSnappedIntRect(dirtyRect), immediate);
 }
@@ -1364,7 +1360,7 @@ IntRect RenderObject::pixelSnappedAbsoluteClippedOverflowRect() const
     return pixelSnappedIntRect(absoluteClippedOverflowRect());
 }
 
-bool RenderObject::repaintAfterLayoutIfNeeded(RenderLayerModelObject* repaintContainer, const LayoutRect& oldBounds, const LayoutRect& oldOutlineBox, const LayoutRect* newBoundsPtr, const LayoutRect* newOutlineBoxRectPtr)
+bool RenderObject::repaintAfterLayoutIfNeeded(RenderBoxModelObject* repaintContainer, const LayoutRect& oldBounds, const LayoutRect& oldOutlineBox, const LayoutRect* newBoundsPtr, const LayoutRect* newOutlineBoxRectPtr)
 {
     RenderView* v = view();
     if (v->printing())
@@ -1427,24 +1423,22 @@ bool RenderObject::repaintAfterLayoutIfNeeded(RenderLayerModelObject* repaintCon
     if (newOutlineBox == oldOutlineBox)
         return false;
 
-    // We didn't move, but we did change size. Invalidate the delta, which will consist of possibly
+    // We didn't move, but we did change size.  Invalidate the delta, which will consist of possibly
     // two rectangles (but typically only one).
     RenderStyle* outlineStyle = outlineStyleForRepaint();
-    LayoutUnit outlineWidth = outlineStyle->outlineSize();
-    LayoutBoxExtent insetShadowExtent = style()->getBoxShadowInsetExtent();
+    LayoutUnit ow = outlineStyle->outlineSize();
     LayoutUnit width = absoluteValue(newOutlineBox.width() - oldOutlineBox.width());
     if (width) {
         LayoutUnit shadowLeft;
         LayoutUnit shadowRight;
         style()->getBoxShadowHorizontalExtent(shadowLeft, shadowRight);
+
         int borderRight = isBox() ? toRenderBox(this)->borderRight() : 0;
         LayoutUnit boxWidth = isBox() ? toRenderBox(this)->width() : ZERO_LAYOUT_UNIT;
-        LayoutUnit minInsetRightShadowExtent = min<LayoutUnit>(-insetShadowExtent.right(), min<LayoutUnit>(newBounds.width(), oldBounds.width()));
-        LayoutUnit borderWidth = max<LayoutUnit>(borderRight, max<LayoutUnit>(valueForLength(style()->borderTopRightRadius().width(), boxWidth, v), valueForLength(style()->borderBottomRightRadius().width(), boxWidth, v)));
-        LayoutUnit decorationsWidth = max<LayoutUnit>(-outlineStyle->outlineOffset(), borderWidth + minInsetRightShadowExtent) + max<LayoutUnit>(outlineWidth, shadowRight);
-        LayoutRect rightRect(newOutlineBox.x() + min(newOutlineBox.width(), oldOutlineBox.width()) - decorationsWidth,
+        LayoutUnit borderWidth = max<LayoutUnit>(-outlineStyle->outlineOffset(), max<LayoutUnit>(borderRight, max<LayoutUnit>(valueForLength(style()->borderTopRightRadius().width(), boxWidth, v), valueForLength(style()->borderBottomRightRadius().width(), boxWidth, v)))) + max<LayoutUnit>(ow, shadowRight);
+        LayoutRect rightRect(newOutlineBox.x() + min(newOutlineBox.width(), oldOutlineBox.width()) - borderWidth,
             newOutlineBox.y(),
-            width + decorationsWidth,
+            width + borderWidth,
             max(newOutlineBox.height(), oldOutlineBox.height()));
         LayoutUnit right = min<LayoutUnit>(newBounds.maxX(), oldBounds.maxX());
         if (rightRect.x() < right) {
@@ -1457,15 +1451,14 @@ bool RenderObject::repaintAfterLayoutIfNeeded(RenderLayerModelObject* repaintCon
         LayoutUnit shadowTop;
         LayoutUnit shadowBottom;
         style()->getBoxShadowVerticalExtent(shadowTop, shadowBottom);
+
         int borderBottom = isBox() ? toRenderBox(this)->borderBottom() : 0;
         LayoutUnit boxHeight = isBox() ? toRenderBox(this)->height() : ZERO_LAYOUT_UNIT;
-        LayoutUnit minInsetBottomShadowExtent = min<LayoutUnit>(-insetShadowExtent.bottom(), min<LayoutUnit>(newBounds.height(), oldBounds.height()));
-        LayoutUnit borderHeight = max<LayoutUnit>(borderBottom, max<LayoutUnit>(valueForLength(style()->borderBottomLeftRadius().height(), boxHeight, v), valueForLength(style()->borderBottomRightRadius().height(), boxHeight, v)));
-        LayoutUnit decorationsHeight = max<LayoutUnit>(-outlineStyle->outlineOffset(), borderHeight + minInsetBottomShadowExtent) + max<LayoutUnit>(outlineWidth, shadowBottom);
+        LayoutUnit borderHeight = max<LayoutUnit>(-outlineStyle->outlineOffset(), max<LayoutUnit>(borderBottom, max<LayoutUnit>(valueForLength(style()->borderBottomLeftRadius().height(), boxHeight, v), valueForLength(style()->borderBottomRightRadius().height(), boxHeight, v)))) + max<LayoutUnit>(ow, shadowBottom);
         LayoutRect bottomRect(newOutlineBox.x(),
-            min(newOutlineBox.maxY(), oldOutlineBox.maxY()) - decorationsHeight,
+            min(newOutlineBox.maxY(), oldOutlineBox.maxY()) - borderHeight,
             max(newOutlineBox.width(), oldOutlineBox.width()),
-            height + decorationsHeight);
+            height + borderHeight);
         LayoutUnit bottom = min(newBounds.maxY(), oldBounds.maxY());
         if (bottomRect.y() < bottom) {
             bottomRect.setHeight(min(bottomRect.height(), bottom - bottomRect.y()));
@@ -1488,20 +1481,20 @@ bool RenderObject::checkForRepaintDuringLayout() const
     return !document()->view()->needsFullRepaint() && !hasLayer() && everHadLayout();
 }
 
-LayoutRect RenderObject::rectWithOutlineForRepaint(RenderLayerModelObject* repaintContainer, LayoutUnit outlineWidth) const
+LayoutRect RenderObject::rectWithOutlineForRepaint(RenderBoxModelObject* repaintContainer, LayoutUnit outlineWidth) const
 {
     LayoutRect r(clippedOverflowRectForRepaint(repaintContainer));
     r.inflate(outlineWidth);
     return r;
 }
 
-LayoutRect RenderObject::clippedOverflowRectForRepaint(RenderLayerModelObject*) const
+LayoutRect RenderObject::clippedOverflowRectForRepaint(RenderBoxModelObject*) const
 {
     ASSERT_NOT_REACHED();
     return LayoutRect();
 }
 
-void RenderObject::computeRectForRepaint(RenderLayerModelObject* repaintContainer, LayoutRect& rect, bool fixed) const
+void RenderObject::computeRectForRepaint(RenderBoxModelObject* repaintContainer, LayoutRect& rect, bool fixed) const
 {
     if (repaintContainer == this)
         return;
@@ -1524,7 +1517,7 @@ void RenderObject::computeRectForRepaint(RenderLayerModelObject* repaintContaine
     }
 }
 
-void RenderObject::computeFloatRectForRepaint(RenderLayerModelObject*, FloatRect&, bool) const
+void RenderObject::computeFloatRectForRepaint(RenderBoxModelObject*, FloatRect&, bool) const
 {
     ASSERT_NOT_REACHED();
 }
@@ -1685,7 +1678,7 @@ StyleDifference RenderObject::adjustStyleDifference(StyleDifference diff, unsign
         // Text nodes share style with their parents but transforms don't apply to them,
         // hence the !isText() check.
         // FIXME: when transforms are taken into account for overflow, we will need to do a layout.
-        if (!isText() && (!hasLayer() || !toRenderLayerModelObject(this)->layer()->isComposited())) {
+        if (!isText() && (!hasLayer() || !toRenderBoxModelObject(this)->layer()->isComposited())) {
             // We need to set at least SimplifiedLayout, but if PositionedMovementOnly is already set
             // then we actually need SimplifiedLayoutAndPositionedMovement.
             if (!hasLayer())
@@ -1701,7 +1694,7 @@ StyleDifference RenderObject::adjustStyleDifference(StyleDifference diff, unsign
     // If opacity changed, and we are not composited, need to repaint (also
     // ignoring text nodes)
     if (contextSensitiveProperties & ContextSensitivePropertyOpacity) {
-        if (!isText() && (!hasLayer() || !toRenderLayerModelObject(this)->layer()->isComposited()))
+        if (!isText() && (!hasLayer() || !toRenderBoxModelObject(this)->layer()->isComposited()))
             diff = StyleDifferenceRepaintLayer;
         else if (diff < StyleDifferenceRecompositeLayer)
             diff = StyleDifferenceRecompositeLayer;
@@ -1709,7 +1702,7 @@ StyleDifference RenderObject::adjustStyleDifference(StyleDifference diff, unsign
     
 #if ENABLE(CSS_FILTERS)
     if ((contextSensitiveProperties & ContextSensitivePropertyFilter) && hasLayer()) {
-        RenderLayer* layer = toRenderLayerModelObject(this)->layer();
+        RenderLayer* layer = toRenderBoxModelObject(this)->layer();
         if (!layer->isComposited() || layer->paintsWithFilters())
             diff = StyleDifferenceRepaintLayer;
         else if (diff < StyleDifferenceRecompositeLayer)
@@ -1717,11 +1710,11 @@ StyleDifference RenderObject::adjustStyleDifference(StyleDifference diff, unsign
     }
 #endif
     
-    // The answer to requiresLayer() for plugins, iframes, and canvas can change without the actual
-    // style changing, since it depends on whether we decide to composite these elements. When the
-    // layer status of one of these elements changes, we need to force a layout.
-    if (diff == StyleDifferenceEqual && style() && isLayerModelObject()) {
-        if (hasLayer() != toRenderLayerModelObject(this)->requiresLayer())
+    // The answer to requiresLayer() for plugins and iframes can change outside of the style system,
+    // since it depends on whether we decide to composite these elements. When the layer status of
+    // one of these elements changes, we need to force a layout.
+    if (diff == StyleDifferenceEqual && style() && isBoxModelObject()) {
+        if (hasLayer() != toRenderBoxModelObject(this)->requiresLayer())
             diff = StyleDifferenceLayout;
     }
 #else
@@ -1739,9 +1732,9 @@ void RenderObject::setStyle(PassRefPtr<RenderStyle> style)
 {
     if (m_style == style) {
 #if USE(ACCELERATED_COMPOSITING)
-        // We need to run through adjustStyleDifference() for iframes, plugins, and canvas so
+        // We need to run through adjustStyleDifference() for iframes and plugins, so
         // style sharing is disabled for them. That should ensure that we never hit this code path.
-        ASSERT(!isRenderIFrame() && !isEmbeddedObject() && !isCanvas());
+        ASSERT(!isRenderIFrame() && !isEmbeddedObject());
 #endif
         return;
     }
@@ -1819,7 +1812,7 @@ void RenderObject::styleWillChange(StyleDifference diff, const RenderStyle* newS
                 || m_style->hasAutoZIndex() != newStyle->hasAutoZIndex();
 #if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
             if (visibilityChanged)
-                document()->setAnnotatedRegionsDirty(true);
+                document()->setDashboardRegionsDirty(true);
 #endif
             if (visibilityChanged && AXObjectCache::accessibilityEnabled())
                 document()->axObjectCache()->childrenChanged(this);
@@ -2006,25 +1999,30 @@ LayoutRect RenderObject::viewRect() const
     return view()->viewRect();
 }
 
-FloatPoint RenderObject::localToAbsolute(const FloatPoint& localPoint, MapCoordinatesFlags mode) const
+FloatPoint RenderObject::localToAbsolute(const FloatPoint& localPoint, bool fixed, bool useTransforms) const
 {
     TransformState transformState(TransformState::ApplyTransformDirection, localPoint);
-    mapLocalToContainer(0, transformState, mode | ApplyContainerFlip);
+    MapLocalToContainerFlags mode = ApplyContainerFlip;
+    if (fixed)
+        mode |= IsFixed;
+    if (useTransforms)
+        mode |= UseTransforms;
+    mapLocalToContainer(0, transformState, mode);
     transformState.flatten();
     
     return transformState.lastPlanarPoint();
 }
 
-FloatPoint RenderObject::absoluteToLocal(const FloatPoint& containerPoint, MapCoordinatesFlags mode) const
+FloatPoint RenderObject::absoluteToLocal(const FloatPoint& containerPoint, bool fixed, bool useTransforms) const
 {
     TransformState transformState(TransformState::UnapplyInverseTransformDirection, containerPoint);
-    mapAbsoluteToLocalPoint(mode, transformState);
+    mapAbsoluteToLocalPoint(fixed, useTransforms, transformState);
     transformState.flatten();
     
     return transformState.lastPlanarPoint();
 }
 
-void RenderObject::mapLocalToContainer(RenderLayerModelObject* repaintContainer, TransformState& transformState, MapCoordinatesFlags mode, bool* wasFixed) const
+void RenderObject::mapLocalToContainer(RenderBoxModelObject* repaintContainer, TransformState& transformState, MapLocalToContainerFlags mode, bool* wasFixed) const
 {
     if (repaintContainer == this)
         return;
@@ -2052,7 +2050,7 @@ void RenderObject::mapLocalToContainer(RenderLayerModelObject* repaintContainer,
     o->mapLocalToContainer(repaintContainer, transformState, mode, wasFixed);
 }
 
-const RenderObject* RenderObject::pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap) const
+const RenderObject* RenderObject::pushMappingToContainer(const RenderBoxModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap) const
 {
     ASSERT_UNUSED(ancestorToStopAt, ancestorToStopAt != this);
 
@@ -2070,11 +2068,11 @@ const RenderObject* RenderObject::pushMappingToContainer(const RenderLayerModelO
     return container;
 }
 
-void RenderObject::mapAbsoluteToLocalPoint(MapCoordinatesFlags mode, TransformState& transformState) const
+void RenderObject::mapAbsoluteToLocalPoint(bool fixed, bool useTransforms, TransformState& transformState) const
 {
     RenderObject* o = parent();
     if (o) {
-        o->mapAbsoluteToLocalPoint(mode, transformState);
+        o->mapAbsoluteToLocalPoint(fixed, useTransforms, transformState);
         if (o->hasOverflowClip())
             transformState.move(toRenderBox(o)->scrolledContentOffset());
     }
@@ -2085,7 +2083,7 @@ bool RenderObject::shouldUseTransformFromContainer(const RenderObject* container
 #if ENABLE(3D_RENDERING)
     // hasTransform() indicates whether the object has transform, transform-style or perspective. We just care about transform,
     // so check the layer's transform directly.
-    return (hasLayer() && toRenderLayerModelObject(this)->layer()->transform()) || (containerObject && containerObject->style()->hasPerspective());
+    return (hasLayer() && toRenderBoxModelObject(this)->layer()->transform()) || (containerObject && containerObject->style()->hasPerspective());
 #else
     UNUSED_PARAM(containerObject);
     return hasTransform();
@@ -2097,14 +2095,14 @@ void RenderObject::getTransformFromContainer(const RenderObject* containerObject
     transform.makeIdentity();
     transform.translate(offsetInContainer.width(), offsetInContainer.height());
     RenderLayer* layer;
-    if (hasLayer() && (layer = toRenderLayerModelObject(this)->layer()) && layer->transform())
+    if (hasLayer() && (layer = toRenderBoxModelObject(this)->layer()) && layer->transform())
         transform.multiply(layer->currentTransform());
     
 #if ENABLE(3D_RENDERING)
     if (containerObject && containerObject->hasLayer() && containerObject->style()->hasPerspective()) {
         // Perpsective on the container affects us, so we have to factor it in here.
         ASSERT(containerObject->hasLayer());
-        FloatPoint perspectiveOrigin = toRenderLayerModelObject(containerObject)->layer()->perspectiveOrigin();
+        FloatPoint perspectiveOrigin = toRenderBoxModelObject(containerObject)->layer()->perspectiveOrigin();
 
         TransformationMatrix perspectiveMatrix;
         perspectiveMatrix.applyPerspective(containerObject->style()->perspective());
@@ -2118,21 +2116,31 @@ void RenderObject::getTransformFromContainer(const RenderObject* containerObject
 #endif
 }
 
-FloatQuad RenderObject::localToContainerQuad(const FloatQuad& localQuad, RenderLayerModelObject* repaintContainer, MapCoordinatesFlags mode, bool* wasFixed) const
+FloatQuad RenderObject::localToContainerQuad(const FloatQuad& localQuad, RenderBoxModelObject* repaintContainer, bool snapOffsetForTransforms, bool fixed, bool* wasFixed) const
 {
     // Track the point at the center of the quad's bounding box. As mapLocalToContainer() calls offsetFromContainer(),
     // it will use that point as the reference point to decide which column's transform to apply in multiple-column blocks.
     TransformState transformState(TransformState::ApplyTransformDirection, localQuad.boundingBox().center(), localQuad);
-    mapLocalToContainer(repaintContainer, transformState, mode | ApplyContainerFlip | UseTransforms, wasFixed);
+    MapLocalToContainerFlags mode = ApplyContainerFlip | UseTransforms;
+    if (fixed)
+        mode |= IsFixed;
+    if (snapOffsetForTransforms)
+        mode |= SnapOffsetForTransforms;
+    mapLocalToContainer(repaintContainer, transformState, mode, wasFixed);
     transformState.flatten();
     
     return transformState.lastPlanarQuad();
 }
 
-FloatPoint RenderObject::localToContainerPoint(const FloatPoint& localPoint, RenderLayerModelObject* repaintContainer, MapCoordinatesFlags mode, bool* wasFixed) const
+FloatPoint RenderObject::localToContainerPoint(const FloatPoint& localPoint, RenderBoxModelObject* repaintContainer, bool snapOffsetForTransforms, bool fixed, bool* wasFixed) const
 {
     TransformState transformState(TransformState::ApplyTransformDirection, localPoint);
-    mapLocalToContainer(repaintContainer, transformState, mode | ApplyContainerFlip | UseTransforms, wasFixed);
+    MapLocalToContainerFlags mode = ApplyContainerFlip | UseTransforms;
+    if (fixed)
+        mode |= IsFixed;
+    if (snapOffsetForTransforms)
+        mode |= SnapOffsetForTransforms;
+    mapLocalToContainer(repaintContainer, transformState, mode, wasFixed);
     transformState.flatten();
 
     return transformState.lastPlanarPoint();
@@ -2227,7 +2235,7 @@ bool RenderObject::hasOutlineAnnotation() const
     return node() && node()->isLink() && document()->printing();
 }
 
-RenderObject* RenderObject::container(const RenderLayerModelObject* repaintContainer, bool* repaintContainerSkipped) const
+RenderObject* RenderObject::container(const RenderBoxModelObject* repaintContainer, bool* repaintContainerSkipped) const
 {
     if (repaintContainerSkipped)
         *repaintContainerSkipped = false;
@@ -2360,7 +2368,7 @@ void RenderObject::willBeDestroyed()
     // be moved into RenderBoxModelObject::destroy.
     if (hasLayer()) {
         setHasLayer(false);
-        toRenderLayerModelObject(this)->destroyLayer();
+        toRenderBoxModelObject(this)->destroyLayer();
     }
 
     setAncestorLineBoxDirty(false);
@@ -2514,7 +2522,7 @@ void RenderObject::updateDragState(bool dragOn)
 
 bool RenderObject::isComposited() const
 {
-    return hasLayer() && toRenderLayerModelObject(this)->layer()->isComposited();
+    return hasLayer() && toRenderBoxModelObject(this)->layer()->isComposited();
 }
 
 bool RenderObject::hitTest(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestFilter hitTestFilter)
@@ -2587,37 +2595,6 @@ void RenderObject::layout()
     setNeedsLayout(false);
 }
 
-enum StyleCacheState {
-    Cached,
-    Uncached
-};
-
-static PassRefPtr<RenderStyle> firstLineStyleForCachedUncachedType(StyleCacheState type, const RenderObject* renderer, RenderStyle* style)
-{
-    const RenderObject* rendererForFirstLineStyle = renderer;
-    if (renderer->isBeforeOrAfterContent())
-        rendererForFirstLineStyle = renderer->parent();
-
-    if (rendererForFirstLineStyle->isBlockFlow()) {
-        if (RenderBlock* firstLineBlock = rendererForFirstLineStyle->firstLineBlock()) {
-            if (type == Cached)
-                return firstLineBlock->getCachedPseudoStyle(FIRST_LINE, style);
-            return firstLineBlock->getUncachedPseudoStyle(FIRST_LINE, style, firstLineBlock == renderer ? style : 0);
-        }
-    } else if (!rendererForFirstLineStyle->isAnonymous() && rendererForFirstLineStyle->isRenderInline()) {
-        RenderStyle* parentStyle = rendererForFirstLineStyle->parent()->firstLineStyle();
-        if (parentStyle != rendererForFirstLineStyle->parent()->style()) {
-            if (type == Cached) {
-                // A first-line style is in effect. Cache a first-line style for ourselves.
-                rendererForFirstLineStyle->style()->setHasPseudoStyle(FIRST_LINE_INHERITED);
-                return rendererForFirstLineStyle->getCachedPseudoStyle(FIRST_LINE_INHERITED, parentStyle);
-            }
-            return rendererForFirstLineStyle->getUncachedPseudoStyle(FIRST_LINE_INHERITED, parentStyle, style);
-        }
-    }
-    return 0;
-}
-
 PassRefPtr<RenderStyle> RenderObject::uncachedFirstLineStyle(RenderStyle* style) const
 {
     if (!document()->styleSheetCollection()->usesFirstLineRules())
@@ -2625,17 +2602,39 @@ PassRefPtr<RenderStyle> RenderObject::uncachedFirstLineStyle(RenderStyle* style)
 
     ASSERT(!isText());
 
-    return firstLineStyleForCachedUncachedType(Uncached, this, style);
+    RefPtr<RenderStyle> result;
+
+    if (isBlockFlow()) {
+        if (RenderBlock* firstLineBlock = this->firstLineBlock())
+            result = firstLineBlock->getUncachedPseudoStyle(FIRST_LINE, style, firstLineBlock == this ? style : 0);
+    } else if (!isAnonymous() && isRenderInline()) {
+        RenderStyle* parentStyle = parent()->firstLineStyle();
+        if (parentStyle != parent()->style())
+            result = getUncachedPseudoStyle(FIRST_LINE_INHERITED, parentStyle, style);
+    }
+
+    return result.release();
 }
 
-RenderStyle* RenderObject::cachedFirstLineStyle() const
+RenderStyle* RenderObject::firstLineStyleSlowCase() const
 {
     ASSERT(document()->styleSheetCollection()->usesFirstLineRules());
 
-    if (RefPtr<RenderStyle> style = firstLineStyleForCachedUncachedType(Cached, isText() ? parent() : this, m_style.get()))
-        return style.get();
+    RenderStyle* style = m_style.get();
+    const RenderObject* renderer = isText() ? parent() : this;
+    if (renderer->isBlockFlow()) {
+        if (RenderBlock* firstLineBlock = renderer->firstLineBlock())
+            style = firstLineBlock->getCachedPseudoStyle(FIRST_LINE, style);
+    } else if (!renderer->isAnonymous() && renderer->isRenderInline()) {
+        RenderStyle* parentStyle = renderer->parent()->firstLineStyle();
+        if (parentStyle != renderer->parent()->style()) {
+            // A first-line style is in effect. Cache a first-line style for ourselves.
+            renderer->style()->setHasPseudoStyle(FIRST_LINE_INHERITED);
+            style = renderer->getCachedPseudoStyle(FIRST_LINE_INHERITED, parentStyle);
+        }
+    }
 
-    return m_style.get();
+    return style;
 }
 
 RenderStyle* RenderObject::getCachedPseudoStyle(PseudoId pseudo, RenderStyle* parentStyle) const
@@ -2736,16 +2735,14 @@ void RenderObject::getTextDecorationColors(int decorations, Color& underline, Co
 }
 
 #if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
-void RenderObject::addAnnotatedRegions(Vector<AnnotatedRegionValue>& regions)
+void RenderObject::addDashboardRegions(Vector<DashboardRegionValue>& regions)
 {
     // Convert the style regions to absolute coordinates.
     if (style()->visibility() != VISIBLE || !isBox())
         return;
     
     RenderBox* box = toRenderBox(this);
-    FloatPoint absPos = localToAbsolute();
 
-#if ENABLE(DASHBOARD_SUPPORT)
     const Vector<StyleDashboardRegion>& styleRegions = style()->dashboardRegions();
     unsigned i, count = styleRegions.size();
     for (i = 0; i < count; i++) {
@@ -2754,7 +2751,7 @@ void RenderObject::addAnnotatedRegions(Vector<AnnotatedRegionValue>& regions)
         LayoutUnit w = box->width();
         LayoutUnit h = box->height();
 
-        AnnotatedRegionValue region;
+        DashboardRegionValue region;
         region.label = styleRegion.label;
         region.bounds = LayoutRect(styleRegion.offset.left().value(),
                                    styleRegion.offset.top().value(),
@@ -2769,31 +2766,24 @@ void RenderObject::addAnnotatedRegions(Vector<AnnotatedRegionValue>& regions)
             region.clip.setWidth(0);
         }
 
+        FloatPoint absPos = localToAbsolute();
         region.bounds.setX(absPos.x() + styleRegion.offset.left().value());
         region.bounds.setY(absPos.y() + styleRegion.offset.top().value());
 
         regions.append(region);
     }
-#else // ENABLE(WIDGET_REGION)
-    if (style()->getDraggableRegionMode() == DraggableRegionNone)
-        return;
-    AnnotatedRegionValue region;
-    region.draggable = style()->getDraggableRegionMode() == DraggableRegionDrag;
-    region.bounds = LayoutRect(absPos.x(), absPos.y(), box->width(), box->height());
-    regions.append(region);
-#endif
 }
 
-void RenderObject::collectAnnotatedRegions(Vector<AnnotatedRegionValue>& regions)
+void RenderObject::collectDashboardRegions(Vector<DashboardRegionValue>& regions)
 {
     // RenderTexts don't have their own style, they just use their parent's style,
     // so we don't want to include them.
     if (isText())
         return;
 
-    addAnnotatedRegions(regions);
+    addDashboardRegions(regions);
     for (RenderObject* curr = firstChild(); curr; curr = curr->nextSibling())
-        curr->collectAnnotatedRegions(regions);
+        curr->collectDashboardRegions(regions);
 }
 #endif
 
@@ -2809,7 +2799,16 @@ bool RenderObject::willRenderImage(CachedImage*)
 
     // If we're not in a window (i.e., we're dormant from being put in the b/f cache or in a background tab)
     // then we don't want to render either.
-    return !document()->inPageCache() && !document()->view()->isOffscreen();
+    if (document()->inPageCache() || document()->view()->isOffscreen())
+        return false;
+
+    // If the document is being destroyed or has not been attached, then this
+    // RenderObject will not be rendered.
+    if (!view())
+        return false;
+
+    // If a renderer is outside the viewport, we won't render.
+    return viewRect().intersects(absoluteClippedOverflowRect());
 }
 
 int RenderObject::maximalOutlineSize(PaintPhase p) const

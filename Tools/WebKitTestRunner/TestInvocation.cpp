@@ -371,39 +371,7 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
         WKDoubleRef accuracyWK = static_cast<WKDoubleRef>(WKDictionaryGetItemForKey(messageBodyDictionary, accuracyKeyWK.get()));
         double accuracy = WKDoubleGetValue(accuracyWK);
 
-        WKRetainPtr<WKStringRef> providesAltitudeKeyWK(AdoptWK, WKStringCreateWithUTF8CString("providesAltitude"));
-        WKBooleanRef providesAltitudeWK = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(messageBodyDictionary, providesAltitudeKeyWK.get()));
-        bool providesAltitude = WKBooleanGetValue(providesAltitudeWK);
-
-        WKRetainPtr<WKStringRef> altitudeKeyWK(AdoptWK, WKStringCreateWithUTF8CString("altitude"));
-        WKDoubleRef altitudeWK = static_cast<WKDoubleRef>(WKDictionaryGetItemForKey(messageBodyDictionary, altitudeKeyWK.get()));
-        double altitude = WKDoubleGetValue(altitudeWK);
-
-        WKRetainPtr<WKStringRef> providesAltitudeAccuracyKeyWK(AdoptWK, WKStringCreateWithUTF8CString("providesAltitudeAccuracy"));
-        WKBooleanRef providesAltitudeAccuracyWK = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(messageBodyDictionary, providesAltitudeAccuracyKeyWK.get()));
-        bool providesAltitudeAccuracy = WKBooleanGetValue(providesAltitudeAccuracyWK);
-
-        WKRetainPtr<WKStringRef> altitudeAccuracyKeyWK(AdoptWK, WKStringCreateWithUTF8CString("altitudeAccuracy"));
-        WKDoubleRef altitudeAccuracyWK = static_cast<WKDoubleRef>(WKDictionaryGetItemForKey(messageBodyDictionary, altitudeAccuracyKeyWK.get()));
-        double altitudeAccuracy = WKDoubleGetValue(altitudeAccuracyWK);
-
-        WKRetainPtr<WKStringRef> providesHeadingKeyWK(AdoptWK, WKStringCreateWithUTF8CString("providesHeading"));
-        WKBooleanRef providesHeadingWK = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(messageBodyDictionary, providesHeadingKeyWK.get()));
-        bool providesHeading = WKBooleanGetValue(providesHeadingWK);
-
-        WKRetainPtr<WKStringRef> headingKeyWK(AdoptWK, WKStringCreateWithUTF8CString("heading"));
-        WKDoubleRef headingWK = static_cast<WKDoubleRef>(WKDictionaryGetItemForKey(messageBodyDictionary, headingKeyWK.get()));
-        double heading = WKDoubleGetValue(headingWK);
-
-        WKRetainPtr<WKStringRef> providesSpeedKeyWK(AdoptWK, WKStringCreateWithUTF8CString("providesSpeed"));
-        WKBooleanRef providesSpeedWK = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(messageBodyDictionary, providesSpeedKeyWK.get()));
-        bool providesSpeed = WKBooleanGetValue(providesSpeedWK);
-
-        WKRetainPtr<WKStringRef> speedKeyWK(AdoptWK, WKStringCreateWithUTF8CString("speed"));
-        WKDoubleRef speedWK = static_cast<WKDoubleRef>(WKDictionaryGetItemForKey(messageBodyDictionary, speedKeyWK.get()));
-        double speed = WKDoubleGetValue(speedWK);
-
-        TestController::shared().setMockGeolocationPosition(latitude, longitude, accuracy, providesAltitude, altitude, providesAltitudeAccuracy, altitudeAccuracy, providesHeading, heading, providesSpeed, speed);
+        TestController::shared().setMockGeolocationPosition(latitude, longitude, accuracy);
         return;
     }
 
@@ -411,22 +379,6 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
         ASSERT(WKGetTypeID(messageBody) == WKStringGetTypeID());
         WKStringRef errorMessage = static_cast<WKStringRef>(messageBody);
         TestController::shared().setMockGeolocationPositionUnavailableError(errorMessage);
-        return;
-    }
-
-    if (WKStringIsEqualToUTF8CString(messageName, "SetCustomPolicyDelegate")) {
-        ASSERT(WKGetTypeID(messageBody) == WKDictionaryGetTypeID());
-        WKDictionaryRef messageBodyDictionary = static_cast<WKDictionaryRef>(messageBody);
-
-        WKRetainPtr<WKStringRef> enabledKeyWK(AdoptWK, WKStringCreateWithUTF8CString("enabled"));
-        WKBooleanRef enabledWK = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(messageBodyDictionary, enabledKeyWK.get()));
-        bool enabled = WKBooleanGetValue(enabledWK);
-
-        WKRetainPtr<WKStringRef> permissiveKeyWK(AdoptWK, WKStringCreateWithUTF8CString("permissive"));
-        WKBooleanRef permissiveWK = static_cast<WKBooleanRef>(WKDictionaryGetItemForKey(messageBodyDictionary, permissiveKeyWK.get()));
-        bool permissive = WKBooleanGetValue(permissiveWK);
-
-        TestController::shared().setCustomPolicyDelegate(enabled, permissive);
         return;
     }
 

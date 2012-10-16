@@ -18,34 +18,37 @@
  * Boston, MA 02110-1301, USA.
  */
 
-interface HTMLFrameElement : HTMLElement {
+module html {
 
-    [Reflect] attribute DOMString frameBorder;
-    [Reflect] attribute DOMString longDesc;
-    [Reflect] attribute DOMString marginHeight;
-    [Reflect] attribute DOMString marginWidth;
-    [Reflect] attribute DOMString name;
-    [Reflect] attribute boolean noResize;
-    [Reflect] attribute DOMString scrolling;
-    [Reflect, URL] attribute DOMString src;
+    interface HTMLFrameElement : HTMLElement {
 
-    // Introduced in DOM Level 2:
-    [CheckSecurityForNode] readonly attribute Document contentDocument;
+        attribute [Reflect] DOMString frameBorder;
+        attribute [Reflect] DOMString longDesc;
+        attribute [Reflect] DOMString marginHeight;
+        attribute [Reflect] DOMString marginWidth;
+        attribute [Reflect] DOMString name;
+        attribute [Reflect] boolean noResize;
+        attribute [Reflect] DOMString scrolling;
+        attribute [Reflect, URL] DOMString src;
 
-    // Extensions
-    readonly attribute DOMWindow contentWindow;
+        // Introduced in DOM Level 2:
+        readonly attribute [CheckSecurityForNode] Document contentDocument;
+
+        // Extensions
+        readonly attribute DOMWindow contentWindow;
 
 #if defined(ENABLE_SVG) && ENABLE_SVG
 #if !defined(LANGUAGE_OBJECTIVE_C) || !LANGUAGE_OBJECTIVE_C || defined(ENABLE_SVG_DOM_OBJC_BINDINGS) && ENABLE_SVG_DOM_OBJC_BINDINGS
-    [CheckSecurityForNode] SVGDocument getSVGDocument()
-        raises(DOMException);
+        [CheckSecurityForNode] SVGDocument getSVGDocument()
+            raises(DOMException);
 #endif
 #endif
 
-    [TreatNullAs=NullString, CustomSetter] attribute DOMString location;
+        attribute [TreatNullAs=NullString, CustomSetter] DOMString location;
 
-    readonly attribute long width;
-    readonly attribute long height;
+        readonly attribute long width;
+        readonly attribute long height;
 
-};
+    };
 
+}

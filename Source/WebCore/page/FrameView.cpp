@@ -97,7 +97,6 @@ using namespace HTMLNames;
 
 double FrameView::sCurrentPaintTimeStamp = 0.0;
 
-
 // REPAINT_THROTTLING now chooses default values for throttling parameters.
 // Should be removed when applications start using runtime configuration.
 #if ENABLE(REPAINT_THROTTLING)
@@ -335,7 +334,7 @@ void FrameView::init()
     // Propagate the marginwidth/height and scrolling modes to the view.
     Element* ownerElement = m_frame ? m_frame->ownerElement() : 0;
     if (ownerElement && (ownerElement->hasTagName(frameTag) || ownerElement->hasTagName(iframeTag))) {
-        HTMLFrameElementBase* frameElt = static_cast<HTMLFrameElementBase*>(ownerElement);
+        HTMLFrameElement* frameElt = static_cast<HTMLFrameElement*>(ownerElement);
         if (frameElt->scrollingMode() == ScrollbarAlwaysOff)
             setCanHaveScrollbars(false);
         LayoutUnit marginWidth = frameElt->marginWidth();
@@ -782,19 +781,6 @@ TiledBacking* FrameView::tiledBacking()
     return backing->graphicsLayer()->tiledBacking();
 }
 
-uint64_t FrameView::scrollLayerID() const
-{
-    RenderView* root = rootRenderer(this);
-    if (!root)
-        return 0;
-
-    RenderLayerBacking* backing = root->layer()->backing();
-    if (!backing)
-        return 0;
-
-    return backing->scrollLayerID();
-}
-
 #if ENABLE(RUBBER_BANDING)
 GraphicsLayer* FrameView::layerForOverhangAreas() const
 {
@@ -805,7 +791,7 @@ GraphicsLayer* FrameView::layerForOverhangAreas() const
 }
 #endif
 
-bool FrameView::flushCompositingStateForThisFrame(Frame* rootFrameForFlush)
+bool FrameView::syncCompositingStateForThisFrame(Frame* rootFrameForSync)
 {
     RenderView* root = rootRenderer(this);
     if (!root)
@@ -822,7 +808,7 @@ bool FrameView::flushCompositingStateForThisFrame(Frame* rootFrameForFlush)
     // visible flash to occur. Instead, stop the deferred repaint timer and repaint immediately.
     flushDeferredRepaints();
 
-    root->compositor()->flushPendingLayerChanges(rootFrameForFlush == m_frame);
+    root->compositor()->flushPendingLayerChanges(rootFrameForSync == m_frame);
 
     return true;
 }
@@ -901,16 +887,16 @@ bool FrameView::isEnclosedInCompositingLayer() const
     return false;
 }
     
-bool FrameView::flushCompositingStateIncludingSubframes()
+bool FrameView::syncCompositingStateIncludingSubframes()
 {
 #if USE(ACCELERATED_COMPOSITING)
-    bool allFramesFlushed = flushCompositingStateForThisFrame(m_frame.get());
+    bool allFramesSynced = syncCompositingStateForThisFrame(m_frame.get());
     
     for (Frame* child = m_frame->tree()->firstChild(); child; child = child->tree()->traverseNext(m_frame.get())) {
-        bool flushed = child->view()->flushCompositingStateForThisFrame(m_frame.get());
-        allFramesFlushed &= flushed;
+        bool synced = child->view()->syncCompositingStateForThisFrame(m_frame.get());
+        allFramesSynced &= synced;
     }
-    return allFramesFlushed;
+    return allFramesSynced;
 #else // USE(ACCELERATED_COMPOSITING)
     return true;
 #endif
@@ -1045,7 +1031,6 @@ void FrameView::layout(bool allowSubtree)
     ASSERT(m_frame->view() == this);
 
     Document* document = m_frame->document();
-    ASSERT(!document->inPageCache());
     bool subtree;
     RenderObject* root;
 
@@ -1228,7 +1213,7 @@ void FrameView::layout(bool allowSubtree)
         root->document()->axObjectCache()->postNotification(root, AXObjectCache::AXLayoutComplete, true);
 #endif
 #if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
-    updateAnnotatedRegions();
+    updateDashboardRegions();
 #endif
 
     ASSERT(!root->needsLayout());
@@ -2198,21 +2183,19 @@ void FrameView::scheduleRelayoutOfSubtree(RenderObject* relayoutRoot)
                 m_layoutRoot->markContainingBlocksForLayout(false, relayoutRoot);
                 m_layoutRoot = relayoutRoot;
                 ASSERT(!m_layoutRoot->container() || !m_layoutRoot->container()->needsLayout());
-                InspectorInstrumentation::didInvalidateLayout(m_frame.get());
             } else {
                 // Just do a full relayout
                 if (m_layoutRoot)
                     m_layoutRoot->markContainingBlocksForLayout(false);
                 m_layoutRoot = 0;
                 relayoutRoot->markContainingBlocksForLayout(false);
-                InspectorInstrumentation::didInvalidateLayout(m_frame.get());
             }
         }
     } else if (m_layoutSchedulingEnabled) {
+        InspectorInstrumentation::didInvalidateLayout(m_frame.get());
         int delay = m_frame->document()->minimumLayoutDelay();
         m_layoutRoot = relayoutRoot;
         ASSERT(!m_layoutRoot->container() || !m_layoutRoot->container()->needsLayout());
-        InspectorInstrumentation::didInvalidateLayout(m_frame.get());
         m_delayedLayout = delay != 0;
         m_layoutTimer.startOneShot(delay * 0.001);
     }
@@ -2264,7 +2247,7 @@ void FrameView::unscheduleRelayout()
 }
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
-void FrameView::serviceScriptedAnimations(double monotonicAnimationStartTime)
+void FrameView::serviceScriptedAnimations(DOMTimeStamp time)
 {
     for (Frame* frame = m_frame.get(); frame; frame = frame->tree()->traverseNext()) {
         frame->view()->serviceScrollAnimations();
@@ -2276,7 +2259,7 @@ void FrameView::serviceScriptedAnimations(double monotonicAnimationStartTime)
         documents.append(frame->document());
 
     for (size_t i = 0; i < documents.size(); ++i)
-        documents[i]->serviceScriptedAnimations(monotonicAnimationStartTime);
+        documents[i]->serviceScriptedAnimations(time);
 }
 #endif
 
@@ -2501,7 +2484,7 @@ void FrameView::performPostLayoutTasks()
 
 #if USE(ACCELERATED_COMPOSITING)
     if (TiledBacking* tiledBacking = this->tiledBacking())
-        tiledBacking->setTileCoverage(canHaveScrollbars() ? TiledBacking::CoverageForScrolling : TiledBacking::CoverageForVisibleArea);
+        tiledBacking->setCanHaveScrollbars(canHaveScrollbars());
 #endif
 
     scrollToAnchor();
@@ -2913,20 +2896,20 @@ bool FrameView::scrollAnimatorEnabled() const
 }
 
 #if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
-void FrameView::updateAnnotatedRegions()
+void FrameView::updateDashboardRegions()
 {
     Document* document = m_frame->document();
-    if (!document->hasAnnotatedRegions())
+    if (!document->hasDashboardRegions())
         return;
-    Vector<AnnotatedRegionValue> newRegions;
-    document->renderBox()->collectAnnotatedRegions(newRegions);
-    if (newRegions == document->annotatedRegions())
+    Vector<DashboardRegionValue> newRegions;
+    document->renderBox()->collectDashboardRegions(newRegions);
+    if (newRegions == document->dashboardRegions())
         return;
-    document->setAnnotatedRegions(newRegions);
+    document->setDashboardRegions(newRegions);
     Page* page = m_frame->page();
     if (!page)
         return;
-    page->chrome()->client()->annotatedRegionsChanged();
+    page->chrome()->client()->dashboardRegionsChanged();
 }
 #endif
 
@@ -3065,9 +3048,10 @@ bool FrameView::hasCustomScrollbars() const
 
 FrameView* FrameView::parentFrameView() const
 {
-    if (Frame* parentFrame = m_frame->tree()->parent())
-        return parentFrame->view();
-
+    if (Widget* parentView = parent()) {
+        if (parentView->isFrameView())
+            return static_cast<FrameView*>(parentView);
+    }
     return 0;
 }
 
@@ -3208,7 +3192,7 @@ void FrameView::paintContents(GraphicsContext* p, const IntRect& rect)
 
 #if USE(ACCELERATED_COMPOSITING)
     if (!p->paintingDisabled() && !document->printing())
-        flushCompositingStateForThisFrame(m_frame.get());
+        syncCompositingStateForThisFrame(m_frame.get());
 #endif
 
     PaintBehavior oldPaintBehavior = m_paintBehavior;
@@ -3249,10 +3233,10 @@ void FrameView::paintContents(GraphicsContext* p, const IntRect& rect)
     m_paintBehavior = oldPaintBehavior;
     m_lastPaintTime = currentTime();
 
-    // Regions may have changed as a result of the visibility/z-index of element changing.
 #if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
-    if (document->annotatedRegionsDirty())
-        updateAnnotatedRegions();
+    // Regions may have changed as a result of the visibility/z-index of element changing.
+    if (document->dashboardRegionsDirty())
+        updateDashboardRegions();
 #endif
 
     if (isTopLevelPainter)
@@ -3475,7 +3459,7 @@ void FrameView::adjustPageHeightDeprecated(float *newBottom, float oldTop, float
 
 IntRect FrameView::convertFromRenderer(const RenderObject* renderer, const IntRect& rendererRect) const
 {
-    IntRect rect = renderer->localToAbsoluteQuad(FloatRect(rendererRect), SnapOffsetForTransforms).enclosingBoundingBox();
+    IntRect rect = renderer->localToAbsoluteQuad(FloatRect(rendererRect)).enclosingBoundingBox();
 
     // Convert from page ("absolute") to FrameView coordinates.
     if (!delegatesScrolling())
@@ -3494,13 +3478,13 @@ IntRect FrameView::convertToRenderer(const RenderObject* renderer, const IntRect
 
     // FIXME: we don't have a way to map an absolute rect down to a local quad, so just
     // move the rect for now.
-    rect.setLocation(roundedIntPoint(renderer->absoluteToLocal(rect.location(), UseTransforms | SnapOffsetForTransforms)));
+    rect.setLocation(roundedIntPoint(renderer->absoluteToLocal(rect.location(), false, true /* use transforms */)));
     return rect;
 }
 
 IntPoint FrameView::convertFromRenderer(const RenderObject* renderer, const IntPoint& rendererPoint) const
 {
-    IntPoint point = roundedIntPoint(renderer->localToAbsolute(rendererPoint, UseTransforms | SnapOffsetForTransforms));
+    IntPoint point = roundedIntPoint(renderer->localToAbsolute(rendererPoint, false, true /* use transforms */));
 
     // Convert from page ("absolute") to FrameView coordinates.
     if (!delegatesScrolling())
@@ -3516,7 +3500,7 @@ IntPoint FrameView::convertToRenderer(const RenderObject* renderer, const IntPoi
     if (!delegatesScrolling())
         point += IntSize(scrollX(), scrollY());
 
-    return roundedIntPoint(renderer->absoluteToLocal(point, UseTransforms | SnapOffsetForTransforms));
+    return roundedIntPoint(renderer->absoluteToLocal(point, false, true /* use transforms */));
 }
 
 IntRect FrameView::convertToContainingView(const IntRect& localRect) const

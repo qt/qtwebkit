@@ -65,10 +65,10 @@ WebInspector.TopDownProfileDataGridNode.prototype = {
 
         if (child)
             this._merge(child, true);
-    },
-
-    __proto__: WebInspector.ProfileDataGridNode.prototype
+    }
 }
+
+WebInspector.TopDownProfileDataGridNode.prototype.__proto__ = WebInspector.ProfileDataGridNode.prototype;
 
 /**
  * @constructor
@@ -127,7 +127,7 @@ WebInspector.TopDownProfileDataGridTree.prototype = {
 
     _merge: WebInspector.TopDownProfileDataGridNode.prototype._merge,
 
-    _sharedPopulate: WebInspector.TopDownProfileDataGridNode.prototype._sharedPopulate,
-
-    __proto__: WebInspector.ProfileDataGridTree.prototype
+    _sharedPopulate: WebInspector.TopDownProfileDataGridNode.prototype._sharedPopulate
 }
+
+WebInspector.TopDownProfileDataGridTree.prototype.__proto__ = WebInspector.ProfileDataGridTree.prototype;

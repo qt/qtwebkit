@@ -41,7 +41,6 @@ namespace WebKit {
 
 WebGeolocationManager::WebGeolocationManager(WebProcess* process)
     : m_process(process)
-    , m_didAddMessageReceiver(false)
 {
 }
 
@@ -56,11 +55,6 @@ void WebGeolocationManager::didReceiveMessage(CoreIPC::Connection* connection, C
 
 void WebGeolocationManager::registerWebPage(WebPage* page)
 {
-    if (!m_didAddMessageReceiver) {
-        m_process->connection()->addMessageReceiver(CoreIPC::MessageClassWebGeolocationManager, this);
-        m_didAddMessageReceiver = true;
-    }
-
     bool wasEmpty = m_pageSet.isEmpty();
 
     m_pageSet.add(page);
@@ -80,7 +74,7 @@ void WebGeolocationManager::unregisterWebPage(WebPage* page)
 void WebGeolocationManager::didChangePosition(const WebGeolocationPosition::Data& data)
 {
 #if ENABLE(GEOLOCATION)
-    RefPtr<GeolocationPosition> position = GeolocationPosition::create(data.timestamp, data.latitude, data.longitude, data.accuracy, data.canProvideAltitude, data.altitude, data.canProvideAltitudeAccuracy, data.altitudeAccuracy, data.canProvideHeading, data.heading, data.canProvideSpeed, data.speed);
+    RefPtr<GeolocationPosition> position = GeolocationPosition::create(data.timestamp, data.latitude, data.longitude, data.accuracy);
 
     Vector<RefPtr<WebPage> > webPageCopy;
     copyToVector(m_pageSet, webPageCopy);

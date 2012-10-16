@@ -470,7 +470,7 @@ Node* InspectorDOMAgent::nodeForId(int id)
 
     HashMap<int, Node*>::iterator it = m_idToNode.find(id);
     if (it != m_idToNode.end())
-        return it->value;
+        return it->second;
     return 0;
 }
 
@@ -916,9 +916,9 @@ void InspectorDOMAgent::performSearch(ErrorString*, const String& whitespaceTrim
     SearchResults::iterator resultsIt = m_searchResults.add(*searchId, Vector<RefPtr<Node> >()).iterator;
 
     for (ListHashSet<Node*>::iterator it = resultCollector.begin(); it != resultCollector.end(); ++it)
-        resultsIt->value.append(*it);
+        resultsIt->second.append(*it);
 
-    *resultCount = resultsIt->value.size();
+    *resultCount = resultsIt->second.size();
 }
 
 void InspectorDOMAgent::getSearchResults(ErrorString* errorString, const String& searchId, int fromIndex, int toIndex, RefPtr<TypeBuilder::Array<int> >& nodeIds)
@@ -929,7 +929,7 @@ void InspectorDOMAgent::getSearchResults(ErrorString* errorString, const String&
         return;
     }
 
-    int size = it->value.size();
+    int size = it->second.size();
     if (fromIndex < 0 || toIndex > size || fromIndex >= toIndex) {
         *errorString = "Invalid search result range";
         return;
@@ -937,7 +937,7 @@ void InspectorDOMAgent::getSearchResults(ErrorString* errorString, const String&
 
     nodeIds = TypeBuilder::Array<int>::create();
     for (int i = fromIndex; i < toIndex; ++i)
-        nodeIds->addItem(pushNodePathToFrontend((it->value)[i].get()));
+        nodeIds->addItem(pushNodePathToFrontend((it->second)[i].get()));
 }
 
 void InspectorDOMAgent::discardSearchResults(ErrorString*, const String& searchId)
@@ -957,22 +957,9 @@ bool InspectorDOMAgent::handleMousePress()
     return false;
 }
 
-bool InspectorDOMAgent::handleTouchEvent(Node* node)
-{
-    if (!m_searchingForNode)
-        return false;
-    if (node && m_inspectModeHighlightConfig) {
-        m_overlay->highlightNode(node, *m_inspectModeHighlightConfig);
-        inspect(node);
-        return true;
-    }
-    return false;
-}
-
-void InspectorDOMAgent::inspect(Node* inspectedNode)
+void InspectorDOMAgent::inspect(Node* node)
 {
     ErrorString error;
-    RefPtr<Node> node = inspectedNode;
     setSearchingForNode(&error, false, 0);
 
     if (node->nodeType() != Node::ELEMENT_NODE && node->nodeType() != Node::DOCUMENT_NODE)

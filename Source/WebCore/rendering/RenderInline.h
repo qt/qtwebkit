@@ -131,12 +131,12 @@ private:
     virtual LayoutUnit offsetWidth() const { return linesBoundingBox().width(); }
     virtual LayoutUnit offsetHeight() const { return linesBoundingBox().height(); }
 
-    virtual LayoutRect clippedOverflowRectForRepaint(RenderLayerModelObject* repaintContainer) const OVERRIDE;
-    virtual LayoutRect rectWithOutlineForRepaint(RenderLayerModelObject* repaintContainer, LayoutUnit outlineWidth) const OVERRIDE;
-    virtual void computeRectForRepaint(RenderLayerModelObject* repaintContainer, LayoutRect&, bool fixed) const OVERRIDE;
+    virtual LayoutRect clippedOverflowRectForRepaint(RenderBoxModelObject* repaintContainer) const;
+    virtual LayoutRect rectWithOutlineForRepaint(RenderBoxModelObject* repaintContainer, LayoutUnit outlineWidth) const;
+    virtual void computeRectForRepaint(RenderBoxModelObject* repaintContainer, LayoutRect&, bool fixed) const;
 
-    virtual void mapLocalToContainer(RenderLayerModelObject* repaintContainer, TransformState&, MapCoordinatesFlags = ApplyContainerFlip | SnapOffsetForTransforms, bool* wasFixed = 0) const OVERRIDE;
-    virtual const RenderObject* pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap&) const OVERRIDE;
+    virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, TransformState&, MapLocalToContainerFlags mode = ApplyContainerFlip | SnapOffsetForTransforms, bool* wasFixed = 0) const OVERRIDE;
+    virtual const RenderObject* pushMappingToContainer(const RenderBoxModelObject* ancestorToStopAt, RenderGeometryMap&) const;
 
     virtual VisiblePosition positionForPoint(const LayoutPoint&);
 
@@ -162,10 +162,10 @@ private:
     virtual void imageChanged(WrappedImagePtr, const IntRect* = 0);
 
 #if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
-    virtual void addAnnotatedRegions(Vector<AnnotatedRegionValue>&);
+    virtual void addDashboardRegions(Vector<DashboardRegionValue>&);
 #endif
     
-    virtual void updateFromStyle() OVERRIDE;
+    virtual void updateBoxModelInfoFromStyle();
     
     RenderInline* clone() const;
 

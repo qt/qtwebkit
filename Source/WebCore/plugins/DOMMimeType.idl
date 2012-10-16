@@ -18,12 +18,15 @@
     Boston, MA 02110-1301, USA.
 */
 
-[
-    InterfaceName=MimeType
-] interface DOMMimeType {
-    readonly attribute DOMString type;
-    readonly attribute DOMString suffixes;
-    readonly attribute DOMString description;
-    readonly attribute DOMPlugin enabledPlugin;
-};
+module window {
 
+    interface [
+        InterfaceName=MimeType
+    ] DOMMimeType {
+        readonly attribute DOMString type;
+        readonly attribute DOMString suffixes;
+        readonly attribute DOMString description;
+        readonly attribute DOMPlugin enabledPlugin;
+    };
+
+}

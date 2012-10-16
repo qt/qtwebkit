@@ -26,11 +26,14 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=SQL_DATABASE,
-    OmitConstructor,
-    JSNoStaticTables
-] interface SQLResultSetRowList {
-    readonly attribute unsigned long length;
-    [Custom] DOMObject item(in unsigned long index);
-};
+module storage {
+
+    interface [
+        Conditional=SQL_DATABASE,
+        OmitConstructor,
+        JSNoStaticTables
+    ] SQLResultSetRowList {
+        readonly attribute unsigned long length;
+        [Custom] DOMObject item(in unsigned long index);
+    };
+}

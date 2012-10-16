@@ -178,8 +178,7 @@ WebInspector.DialogDelegate.prototype = {
 
     onEnter: function() { },
 
-    willHide: function() { },
+    willHide: function() { }
+};
 
-    __proto__: WebInspector.Object.prototype
-}
-
+WebInspector.DialogDelegate.prototype.__proto__ = WebInspector.Object.prototype;

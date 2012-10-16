@@ -154,13 +154,11 @@ struct WKBundlePageLoaderClient {
     // Version 3
     WKBundlePageDidReceiveIntentForFrameCallback                            didReceiveIntentForFrame;
     WKBundlePageRegisterIntentServiceForFrameCallback                       registerIntentServiceForFrame;
-
-    // Version 4
     WKBundlePageDidLayoutCallback                                           didLayout;
 };
 typedef struct WKBundlePageLoaderClient WKBundlePageLoaderClient;
 
-enum { kWKBundlePageLoaderClientCurrentVersion = 4 };
+enum { kWKBundlePageLoaderClientCurrentVersion = 3 };
 
 enum {
     WKBundlePagePolicyActionPassThrough,

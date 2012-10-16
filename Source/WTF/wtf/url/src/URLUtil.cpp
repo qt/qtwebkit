@@ -50,8 +50,9 @@ const char kMailtoScheme[] = "mailto";
 
 namespace {
 
+// Backend for LowerCaseEqualsASCII.
 template<typename Iter>
-static bool lowerCaseEqualsASCII(Iter aBegin, Iter aEnd, const char* b)
+inline bool doLowerCaseEqualsASCII(Iter aBegin, Iter aEnd, const char* b)
 {
     for (Iter it = aBegin; it != aEnd; ++it, ++b) {
         if (!*b || toASCIILower(*it) != *b)
@@ -79,7 +80,7 @@ inline bool doCompareSchemeComponent(const CharacterType* spec, const URLCompone
 {
     if (!component.isNonEmpty())
         return !compareTo[0]; // When component is empty, match empty scheme.
-    return lowerCaseEqualsASCII(&spec[component.begin()], &spec[component.end()], compareTo);
+    return LowerCaseEqualsASCII(&spec[component.begin()], &spec[component.end()], compareTo);
 }
 
 // Returns true if the given scheme identified by |scheme| within |spec| is one
@@ -91,7 +92,7 @@ bool doIsStandard(const CharacterType* spec, const URLComponent& scheme)
         return false; // Empty or invalid schemes are non-standard.
 
     for (size_t i = 0; i < kNumStandardURLSchemes; ++i) {
-        if (lowerCaseEqualsASCII(&spec[scheme.begin()], &spec[scheme.end()], kStandardURLSchemes[i]))
+        if (LowerCaseEqualsASCII(&spec[scheme.begin()], &spec[scheme.end()], kStandardURLSchemes[i]))
             return true;
     }
     return false;
@@ -318,7 +319,7 @@ bool doReplaceComponents(const char* spec,
 
 } // namespace
 
-bool isStandard(const LChar* spec, const URLComponent& scheme)
+bool isStandard(const char* spec, const URLComponent& scheme)
 {
     return doIsStandard(spec, scheme);
 }
@@ -394,6 +395,26 @@ bool ReplaceComponents(const char* spec,
 {
     return doReplaceComponents(spec, specLength, parsed, replacements,
                                charsetConverter, output, *outputParsed);
+}
+
+// Front-ends for LowerCaseEqualsASCII.
+bool LowerCaseEqualsASCII(const char* aBegin, const char* aEnd, const char* b)
+{
+    return doLowerCaseEqualsASCII(aBegin, aEnd, b);
+}
+
+bool LowerCaseEqualsASCII(const char* aBegin, const char* aEnd, const char* bBegin, const char* bEnd)
+{
+    while (aBegin != aEnd && bBegin != bEnd && toASCIILower(*aBegin) == *bBegin) {
+        aBegin++;
+        bBegin++;
+    }
+    return aBegin == aEnd && bBegin == bEnd;
+}
+
+bool LowerCaseEqualsASCII(const UChar* aBegin, const UChar* aEnd, const char* b)
+{
+    return doLowerCaseEqualsASCII(aBegin, aEnd, b);
 }
 
 void DecodeURLEscapeSequences(const char* input, int length, URLBuffer<UChar>& output)

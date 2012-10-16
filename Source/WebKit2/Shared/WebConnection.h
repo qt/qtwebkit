@@ -28,42 +28,26 @@
 
 #include "APIObject.h"
 #include "WebConnectionClient.h"
-#include <wtf/RefPtr.h>
-
-namespace CoreIPC {
-    class ArgumentDecoder;
-    class ArgumentEncoder;
-    class Connection;
-    class DataReference;
-    class MessageID;
-}
+#include <wtf/Forward.h>
 
 namespace WebKit {
 
 class WebConnection : public APIObject {
 public:
     static const Type APIType = TypeConnection;
+
     virtual ~WebConnection();
 
-    CoreIPC::Connection* connection() { return m_connection.get(); }
-
+    // Initialize the connection client.
     void initializeConnectionClient(const WKConnectionClient*);
-    void postMessage(const String&, APIObject*);
 
-    void invalidate();
+    virtual void postMessage(const String&, APIObject*) = 0;
 
 protected:
-    explicit WebConnection(PassRefPtr<CoreIPC::Connection>);
-
     virtual Type type() const { return APIType; }
-    virtual void encodeMessageBody(CoreIPC::ArgumentEncoder*, APIObject*) = 0;
-    virtual bool decodeMessageBody(CoreIPC::ArgumentDecoder*, RefPtr<APIObject>&) = 0;
 
-    // Implemented in generated WebConnectionMessageReceiver.cpp
-    void didReceiveWebConnectionMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-    void handleMessage(const CoreIPC::DataReference& messageData);
+    void forwardDidReceiveMessageToClient(const String&, APIObject*);
 
-    RefPtr<CoreIPC::Connection> m_connection;
     WebConnectionClient m_client;
 };
 

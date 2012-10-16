@@ -94,7 +94,6 @@ public:
             , noExtensions(false)
             , shareResources(true)
             , preferDiscreteGPU(false)
-            , noAutomaticFlushes(false)
         {
         }
 
@@ -107,7 +106,6 @@ public:
         bool noExtensions;
         bool shareResources;
         bool preferDiscreteGPU;
-        bool noAutomaticFlushes;
     };
 
     class WebGraphicsContextLostCallback {

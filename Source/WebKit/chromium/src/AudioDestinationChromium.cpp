@@ -29,9 +29,14 @@
 #include "config.h"
 
 #if ENABLE(WEB_AUDIO)
+
 #include "AudioDestinationChromium.h"
+
 #include "AudioFIFO.h"
 #include "AudioPullFIFO.h"
+#include "WebKit.h"
+#include "platform/WebKitPlatformSupport.h"
+
 #include <public/Platform.h>
 
 using namespace WebKit;

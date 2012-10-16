@@ -34,6 +34,7 @@ public:
     static IconDatabaseClientBlackBerry* getInstance();
     bool initIconDatabase(const BlackBerry::WebKit::WebSettings*);
 
+    virtual bool performImport();
     virtual void didRemoveAllIcons();
     virtual void didImportIconURLForPageURL(const String&);
     virtual void didImportIconDataForPageURL(const String&);

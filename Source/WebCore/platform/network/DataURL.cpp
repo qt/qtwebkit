@@ -40,7 +40,7 @@ namespace WebCore {
 
 void handleDataURL(ResourceHandle* handle)
 {
-    ASSERT(handle->firstRequest().url().protocolIsData());
+    ASSERT(handle->firstRequest().url().protocolIs("data"));
     String url = handle->firstRequest().url().string();
 
     int index = url.find(',');

@@ -306,19 +306,19 @@ static NPError NPN_PostURL(NPP npp, const char* url, const char* target, uint32_
     return NPERR_NO_ERROR;
 }
 
-static NPError NPN_RequestRead(NPStream*, NPByteRange*)
+static NPError NPN_RequestRead(NPStream* stream, NPByteRange* rangeList)
 {
     notImplemented();
     return NPERR_GENERIC_ERROR;
 }
 
-static NPError NPN_NewStream(NPP, NPMIMEType, const char*, NPStream**)
+static NPError NPN_NewStream(NPP instance, NPMIMEType type, const char* target, NPStream** stream)
 {
     notImplemented();
     return NPERR_GENERIC_ERROR;
 }
     
-static int32_t NPN_Write(NPP, NPStream*, int32_t, void*)
+static int32_t NPN_Write(NPP instance, NPStream* stream, int32_t len, void* buffer)
 {
     notImplemented();    
     return -1;
@@ -358,12 +358,12 @@ static void NPN_MemFree(void* ptr)
     npnMemFree(ptr);
 }
 
-static uint32_t NPN_MemFlush(uint32_t)
+static uint32_t NPN_MemFlush(uint32_t size)
 {
     return 0;
 }
 
-static void NPN_ReloadPlugins(NPBool)
+static void NPN_ReloadPlugins(NPBool reloadPages)
 {
     notImplemented();
 }
@@ -374,7 +374,7 @@ static JRIEnv* NPN_GetJavaEnv(void)
     return 0;
 }
 
-static jref NPN_GetJavaPeer(NPP)
+static jref NPN_GetJavaPeer(NPP instance)
 {
     notImplemented();
     return 0;
@@ -612,14 +612,14 @@ static void NPN_InvalidateRect(NPP npp, NPRect* invalidRect)
     plugin->invalidate(invalidRect);
 }
 
-static void NPN_InvalidateRegion(NPP npp, NPRegion)
+static void NPN_InvalidateRegion(NPP npp, NPRegion invalidRegion)
 {
     // FIXME: We could at least figure out the bounding rectangle of the invalid region.
     RefPtr<NetscapePlugin> plugin = NetscapePlugin::fromNPP(npp);
     plugin->invalidate(0);
 }
 
-static void NPN_ForceRedraw(NPP)
+static void NPN_ForceRedraw(NPP instance)
 {
     notImplemented();
 }

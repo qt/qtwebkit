@@ -31,36 +31,24 @@
 #ifndef WeekInputType_h
 #define WeekInputType_h
 
-#include "BaseMultipleFieldsDateAndTimeInputType.h"
+#include "BaseDateAndTimeInputType.h"
 
 #if ENABLE(INPUT_TYPE_WEEK)
 
 namespace WebCore {
 
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
-typedef BaseMultipleFieldsDateAndTimeInputType BaseWeekInputType;
-#else
-typedef BaseDateAndTimeInputType BaseWeekInputType;
-#endif
-
-class WeekInputType : public BaseWeekInputType {
+class WeekInputType : public BaseDateAndTimeInputType {
 public:
     static PassOwnPtr<InputType> create(HTMLInputElement*);
 
 private:
-    WeekInputType(HTMLInputElement* element) : BaseWeekInputType(element) { }
+    WeekInputType(HTMLInputElement* element) : BaseDateAndTimeInputType(element) { }
     virtual const AtomicString& formControlType() const OVERRIDE;
     virtual DateComponents::Type dateType() const OVERRIDE;
     virtual StepRange createStepRange(AnyStepHandling) const OVERRIDE;
     virtual bool parseToDateComponentsInternal(const UChar*, unsigned length, DateComponents*) const OVERRIDE;
     virtual bool setMillisecondToDateComponents(double, DateComponents*) const OVERRIDE;
     virtual bool isWeekField() const OVERRIDE;
-
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
-    // BaseMultipleFieldsDateAndTimeInputType functions
-    virtual String formatDateTimeFieldsState(const DateTimeFieldsState&) const OVERRIDE FINAL;
-    virtual void setupLayoutParameters(DateTimeEditElement::LayoutParameters&, const DateComponents&) const OVERRIDE FINAL;
-#endif
 };
 
 } // namespace WebCore

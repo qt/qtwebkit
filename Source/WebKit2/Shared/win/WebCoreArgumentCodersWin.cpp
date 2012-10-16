@@ -49,7 +49,7 @@ namespace CoreIPC {
 
 // FIXME: These coders should really go in a WebCoreArgumentCodersCFNetwork file.
 
-void ArgumentCoder<ResourceRequest>::encodePlatformData(ArgumentEncoder* encoder, const ResourceRequest& resourceRequest)
+void ArgumentCoder<ResourceRequest>::encode(ArgumentEncoder* encoder, const ResourceRequest& resourceRequest)
 {
 #if USE(CFNETWORK)
     bool requestIsPresent = resourceRequest.cfURLRequest();
@@ -63,7 +63,7 @@ void ArgumentCoder<ResourceRequest>::encodePlatformData(ArgumentEncoder* encoder
 #endif
 }
 
-bool ArgumentCoder<ResourceRequest>::decodePlatformData(ArgumentDecoder* decoder, ResourceRequest& resourceRequest)
+bool ArgumentCoder<ResourceRequest>::decode(ArgumentDecoder* decoder, ResourceRequest& resourceRequest)
 {
 #if USE(CFNETWORK)
     bool requestIsPresent;
@@ -95,7 +95,7 @@ bool ArgumentCoder<ResourceRequest>::decodePlatformData(ArgumentDecoder* decoder
 }
 
 
-void ArgumentCoder<ResourceResponse>::encodePlatformData(ArgumentEncoder* encoder, const ResourceResponse& resourceResponse)
+void ArgumentCoder<ResourceResponse>::encode(ArgumentEncoder* encoder, const ResourceResponse& resourceResponse)
 {
 #if USE(CFNETWORK)
     bool responseIsPresent = resourceResponse.cfURLResponse();
@@ -109,7 +109,7 @@ void ArgumentCoder<ResourceResponse>::encodePlatformData(ArgumentEncoder* encode
 #endif
 }
 
-bool ArgumentCoder<ResourceResponse>::decodePlatformData(ArgumentDecoder* decoder, ResourceResponse& resourceResponse)
+bool ArgumentCoder<ResourceResponse>::decode(ArgumentDecoder* decoder, ResourceResponse& resourceResponse)
 {
 #if USE(CFNETWORK)
     bool responseIsPresent;
@@ -137,25 +137,50 @@ bool ArgumentCoder<ResourceResponse>::decodePlatformData(ArgumentDecoder* decode
 }
 
 
-void ArgumentCoder<ResourceError>::encodePlatformData(ArgumentEncoder* encoder, const ResourceError& resourceError)
+void ArgumentCoder<ResourceError>::encode(ArgumentEncoder* encoder, const ResourceError& resourceError)
 {
+    encoder->encode(resourceError.domain());
+    encoder->encode(resourceError.errorCode());
+    encoder->encode(resourceError.failingURL()); 
+    encoder->encode(resourceError.localizedDescription());
+
 #if USE(CFNETWORK)
     encoder->encode(PlatformCertificateInfo(resourceError.certificate()));
 #endif
 }
 
-bool ArgumentCoder<ResourceError>::decodePlatformData(ArgumentDecoder* decoder, ResourceError& resourceError)
+bool ArgumentCoder<ResourceError>::decode(ArgumentDecoder* decoder, ResourceError& resourceError)
 {
+    String domain;
+    if (!decoder->decode(domain))
+        return false;
+
+    int errorCode;
+    if (!decoder->decode(errorCode))
+        return false;
+
+    String failingURL;
+    if (!decoder->decode(failingURL))
+        return false;
+
+    String localizedDescription;
+    if (!decoder->decode(localizedDescription))
+        return false;
+
 #if USE(CFNETWORK)
     PlatformCertificateInfo certificate;
     if (!decoder->decode(certificate))
         return false;
     
     const Vector<PCCERT_CONTEXT> certificateChain = certificate.certificateChain();
-    if (!certificateChain.isEmpty())
-        resourceError.setCertificate(copyCertificateToData(certificateChain.first()).get());
+    if (!certificateChain.isEmpty()) {
+        ASSERT(certificateChain.size() == 1);
+        resourceError = ResourceError(domain, errorCode, failingURL, localizedDescription, copyCertificateToData(certificateChain.first()).get());
+        return true;
+    }
 #endif
 
+    resourceError = ResourceError(domain, errorCode, failingURL, localizedDescription);
     return true;
 }
 

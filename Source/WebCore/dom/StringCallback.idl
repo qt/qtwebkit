@@ -28,8 +28,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Callback
-] interface StringCallback {
-    boolean handleEvent(in DOMString data);
-};
+module core {
+    interface [
+        Callback
+    ] StringCallback {
+        boolean handleEvent(in DOMString data);
+    };
+}

@@ -29,10 +29,16 @@
 #include "APIObject.h"
 #include "GenericCallback.h"
 #include "ImmutableArray.h"
-#include "MessageReceiver.h"
+
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
+
+namespace CoreIPC {
+    class ArgumentDecoder;
+    class Connection;
+    class MessageID;
+}
 
 namespace WebKit {
 
@@ -43,7 +49,7 @@ class WebSecurityOrigin;
 
 typedef GenericCallback<WKArrayRef> ArrayCallback;
 
-class WebKeyValueStorageManagerProxy : public APIObject, private CoreIPC::MessageReceiver {
+class WebKeyValueStorageManagerProxy : public APIObject {
 public:
     static const Type APIType = TypeKeyValueStorageManager;
 
@@ -57,6 +63,8 @@ public:
     void deleteEntriesForOrigin(WebSecurityOrigin*);
     void deleteAllEntries();
 
+    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+
     bool shouldTerminate(WebProcessProxy*) const;
 
 private:
@@ -65,9 +73,7 @@ private:
     virtual Type type() const { return APIType; }
 
     void didGetKeyValueStorageOrigins(const Vector<SecurityOriginData>&, uint64_t callbackID);
-
-    // CoreIPC::MessageReceiver
-    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*) OVERRIDE;
+    
     void didReceiveWebKeyValueStorageManagerProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
 
     WebContext* m_webContext;

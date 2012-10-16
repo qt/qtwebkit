@@ -24,42 +24,53 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=INDEXED_DATABASE,
-    ActiveDOMObject,
-    EventTarget
-] interface IDBDatabase {
-    readonly attribute DOMString name;
-    readonly attribute IDBAny version;
-    readonly attribute DOMStringList objectStoreNames;
+module storage {
 
-    attribute EventListener onabort;
-    attribute EventListener onerror;
-    attribute EventListener onversionchange;
+    interface [
+        Conditional=INDEXED_DATABASE,
+        ActiveDOMObject,
+        EventTarget
+    ] IDBDatabase {
+        readonly attribute DOMString name;
+        readonly attribute IDBAny version;
+        readonly attribute DOMStringList objectStoreNames;
 
-    IDBObjectStore createObjectStore(in DOMString name, in [Optional] Dictionary options)
-        raises (IDBDatabaseException);
-    void deleteObjectStore(in DOMString name)
-        raises (IDBDatabaseException);
-    [CallWith=ScriptExecutionContext] IDBVersionChangeRequest setVersion(in DOMString version)
-        raises (IDBDatabaseException);
-    [CallWith=ScriptExecutionContext] IDBTransaction transaction(in DOMStringList storeNames, in [Optional=DefaultIsNullString] DOMString mode)
-        raises (IDBDatabaseException);
-    [CallWith=ScriptExecutionContext] IDBTransaction transaction(in DOMString[] storeNames, in [Optional=DefaultIsNullString] DOMString mode)
-        raises (IDBDatabaseException);
-    [CallWith=ScriptExecutionContext] IDBTransaction transaction(in DOMString storeName, in [Optional=DefaultIsNullString] DOMString mode)
-        raises (IDBDatabaseException);
+        attribute EventListener onabort;
+        attribute EventListener onerror;
+        attribute EventListener onversionchange;
 
-    void close();
+        IDBObjectStore createObjectStore(in DOMString name, in [Optional] Dictionary options)
+            raises (IDBDatabaseException);
+        void deleteObjectStore(in DOMString name)
+            raises (IDBDatabaseException);
+        [CallWith=ScriptExecutionContext] IDBVersionChangeRequest setVersion(in DOMString version)
+            raises (IDBDatabaseException);
+        [CallWith=ScriptExecutionContext] IDBTransaction transaction(in DOMStringList storeNames, in [Optional=DefaultIsNullString] DOMString mode)
+            raises (IDBDatabaseException);
+        [CallWith=ScriptExecutionContext] IDBTransaction transaction(in DOMString[] storeNames, in [Optional=DefaultIsNullString] DOMString mode)
+            raises (IDBDatabaseException);
+        [CallWith=ScriptExecutionContext] IDBTransaction transaction(in DOMString storeName, in [Optional=DefaultIsNullString] DOMString mode)
+            raises (IDBDatabaseException);
 
-    // EventTarget interface
-    void addEventListener(in DOMString type,
-                          in EventListener listener,
-                          in [Optional] boolean useCapture);
-    void removeEventListener(in DOMString type,
-                             in EventListener listener,
-                             in [Optional] boolean useCapture);
-    boolean dispatchEvent(in Event evt)
-        raises(EventException);
-};
+        // FIXME: remove these when https://bugs.webkit.org/show_bug.cgi?id=85326 is fixed.
+        [CallWith=ScriptExecutionContext] IDBTransaction transaction(in DOMStringList storeNames, in unsigned short mode)
+            raises (IDBDatabaseException);
+        [CallWith=ScriptExecutionContext] IDBTransaction transaction(in DOMString[] storeNames, in unsigned short mode)
+            raises (IDBDatabaseException);
+        [CallWith=ScriptExecutionContext] IDBTransaction transaction(in DOMString storeName, in unsigned short mode)
+            raises (IDBDatabaseException);
 
+        void close();
+
+        // EventTarget interface
+        void addEventListener(in DOMString type,
+                              in EventListener listener,
+                              in [Optional] boolean useCapture);
+        void removeEventListener(in DOMString type,
+                                 in EventListener listener,
+                                 in [Optional] boolean useCapture);
+        boolean dispatchEvent(in Event evt)
+            raises(EventException);
+    };
+
+}

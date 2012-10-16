@@ -154,7 +154,7 @@ public:
     LayoutRect computedCSSContentBoxRect() const { return LayoutRect(borderLeft() + computedCSSPaddingLeft(), borderTop() + computedCSSPaddingTop(), clientWidth() - computedCSSPaddingLeft() - computedCSSPaddingRight(), clientHeight() - computedCSSPaddingTop() - computedCSSPaddingBottom()); }
 
     // Bounds of the outline box in absolute coords. Respects transforms
-    virtual LayoutRect outlineBoundsForRepaint(RenderLayerModelObject* /*repaintContainer*/, LayoutPoint* cachedOffsetToRepaintContainer) const OVERRIDE;
+    virtual LayoutRect outlineBoundsForRepaint(RenderBoxModelObject* /*repaintContainer*/, LayoutPoint* cachedOffsetToRepaintContainer) const;
     virtual void addFocusRingRects(Vector<IntRect>&, const LayoutPoint&);
 
     // Use this with caution! No type checking is done!
@@ -289,10 +289,6 @@ public:
     virtual LayoutUnit minPreferredLogicalWidth() const;
     virtual LayoutUnit maxPreferredLogicalWidth() const;
 
-    // FIXME: We should rename these back to overrideLogicalHeight/Width and have them store
-    // the border-box height/width like the regular height/width accessors on RenderBox.
-    // Right now, these are different than contentHeight/contentWidth because they still
-    // include the scrollbar height/width.
     LayoutUnit overrideLogicalContentWidth() const;
     LayoutUnit overrideLogicalContentHeight() const;
     bool hasOverrideHeight() const;
@@ -358,8 +354,8 @@ public:
     void setInlineBoxWrapper(InlineBox* boxWrapper) { m_inlineBoxWrapper = boxWrapper; }
     void deleteLineBoxWrapper();
 
-    virtual LayoutRect clippedOverflowRectForRepaint(RenderLayerModelObject* repaintContainer) const OVERRIDE;
-    virtual void computeRectForRepaint(RenderLayerModelObject* repaintContainer, LayoutRect&, bool fixed = false) const OVERRIDE;
+    virtual LayoutRect clippedOverflowRectForRepaint(RenderBoxModelObject* repaintContainer) const;
+    virtual void computeRectForRepaint(RenderBoxModelObject* repaintContainer, LayoutRect&, bool fixed = false) const;
 
     virtual void repaintDuringLayoutIfMoved(const LayoutRect&);
 
@@ -554,7 +550,7 @@ protected:
 
     virtual void styleWillChange(StyleDifference, const RenderStyle* newStyle);
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
-    virtual void updateFromStyle() OVERRIDE;
+    virtual void updateBoxModelInfoFromStyle();
 
     virtual bool backgroundIsObscured() const { return false; }
     void paintBackground(const PaintInfo&, const LayoutRect&, BackgroundBleedAvoidance = BackgroundBleedNone);
@@ -574,9 +570,9 @@ protected:
     
     virtual bool shouldComputeSizeAsReplaced() const { return isReplaced() && !isInlineBlockOrInlineTable(); }
 
-    virtual void mapLocalToContainer(RenderLayerModelObject* repaintContainer, TransformState&, MapCoordinatesFlags = ApplyContainerFlip | SnapOffsetForTransforms, bool* wasFixed = 0) const OVERRIDE;
-    virtual const RenderObject* pushMappingToContainer(const RenderLayerModelObject*, RenderGeometryMap&) const OVERRIDE;
-    virtual void mapAbsoluteToLocalPoint(MapCoordinatesFlags, TransformState&) const;
+    virtual void mapLocalToContainer(RenderBoxModelObject* repaintContainer, TransformState&, MapLocalToContainerFlags mode = ApplyContainerFlip | SnapOffsetForTransforms, bool* wasFixed = 0) const OVERRIDE;
+    virtual const RenderObject* pushMappingToContainer(const RenderBoxModelObject*, RenderGeometryMap&) const;
+    virtual void mapAbsoluteToLocalPoint(bool fixed, bool useTransforms, TransformState&) const;
 
     void paintRootBoxFillLayers(const PaintInfo&);
 

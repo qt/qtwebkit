@@ -33,11 +33,13 @@
 #include "GraphicsContext.h"
 #include "MathMLNames.h"
 #include "PaintInfo.h"
+#include "RenderText.h"
 
 namespace WebCore {
     
 using namespace MathMLNames;
 
+static const float gHorizontalPad = 0.2f;
 static const float gLineThin = 0.33f;
 static const float gLineMedium = 1.f;
 static const float gLineThick = 3.f;
@@ -53,6 +55,9 @@ void RenderMathMLFraction::fixChildStyle(RenderObject* child)
 {
     ASSERT(child->isAnonymous() && child->style()->refCount() == 1);
     child->style()->setFlexDirection(FlowColumn);
+    Length pad(static_cast<int>(style()->fontSize() * gHorizontalPad), Fixed);
+    child->style()->setPaddingLeft(pad);
+    child->style()->setPaddingRight(pad);
 }
 
 // FIXME: It's cleaner to only call updateFromElement when an attribute has changed. Move parts
@@ -134,11 +139,25 @@ void RenderMathMLFraction::paint(PaintInfo& info, const LayoutPoint& paintOffset
     if (info.context->paintingDisabled() || info.phase != PaintPhaseForeground)
         return;
     
-    RenderBox* denominatorWrapper = lastChildBox();
-    if (!denominatorWrapper || !m_lineThickness)
+    if (!firstChild() ||!m_lineThickness)
         return;
 
-    IntPoint adjustedPaintOffset = roundedIntPoint(paintOffset + location() + denominatorWrapper->location() + LayoutPoint(0, m_lineThickness / 2));
+    int verticalOffset = 0;
+    // The children are always RenderMathMLBlock instances
+    if (firstChild()->isRenderMathMLBlock()) {
+        int adjustForThickness = m_lineThickness > 1 ? int(m_lineThickness / 2) : 1;
+        if (int(m_lineThickness) % 2 == 1)
+            adjustForThickness++;
+        // FIXME: This is numeratorWrapper, not numerator.
+        RenderMathMLBlock* numerator = toRenderMathMLBlock(firstChild());
+        if (numerator->isRenderMathMLRow())
+            verticalOffset = numerator->pixelSnappedOffsetHeight() + adjustForThickness;
+        else 
+            verticalOffset = numerator->pixelSnappedOffsetHeight();        
+    }
+    
+    IntPoint adjustedPaintOffset = roundedIntPoint(paintOffset + location());
+    adjustedPaintOffset.setY(adjustedPaintOffset.y() + verticalOffset);
     
     GraphicsContextStateSaver stateSaver(*info.context);
     
@@ -146,13 +165,21 @@ void RenderMathMLFraction::paint(PaintInfo& info, const LayoutPoint& paintOffset
     info.context->setStrokeStyle(SolidStroke);
     info.context->setStrokeColor(style()->visitedDependentColor(CSSPropertyColor), ColorSpaceSRGB);
     
-    info.context->drawLine(adjustedPaintOffset, IntPoint(adjustedPaintOffset.x() + denominatorWrapper->pixelSnappedOffsetWidth(), adjustedPaintOffset.y()));
+    info.context->drawLine(adjustedPaintOffset, IntPoint(adjustedPaintOffset.x() + pixelSnappedOffsetWidth(), adjustedPaintOffset.y()));
 }
 
 LayoutUnit RenderMathMLFraction::firstLineBoxBaseline() const
 {
-    if (RenderBox* denominatorWrapper = lastChildBox())
-        return denominatorWrapper->logicalTop() + static_cast<int>(lroundf((m_lineThickness + style()->fontMetrics().xHeight()) / 2));
+    if (firstChild() && firstChild()->isRenderMathMLBlock()) {
+        RenderMathMLBlock* numeratorWrapper = toRenderMathMLBlock(firstChild());
+        RenderStyle* refStyle = style();
+        if (previousSibling())
+            refStyle = previousSibling()->style();
+        else if (nextSibling())
+            refStyle = nextSibling()->style();
+        int shift = int(ceil((refStyle->fontMetrics().xHeight() + 1) / 2));
+        return numeratorWrapper->pixelSnappedOffsetHeight() + shift;
+    }
     return RenderMathMLBlock::firstLineBoxBaseline();
 }
 

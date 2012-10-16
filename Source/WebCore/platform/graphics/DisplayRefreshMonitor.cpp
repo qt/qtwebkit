@@ -53,7 +53,7 @@ void DisplayRefreshMonitorClient::fireDisplayRefreshIfNeeded(double timestamp)
 }
 
 DisplayRefreshMonitor::DisplayRefreshMonitor(PlatformDisplayID displayID)
-    : m_monotonicAnimationStartTime(0)
+    : m_timestamp(0)
     , m_active(true)
     , m_scheduled(false)
     , m_previousFrameDone(true)
@@ -91,7 +91,7 @@ bool DisplayRefreshMonitor::removeClient(DisplayRefreshMonitorClient* client)
 
 void DisplayRefreshMonitor::displayDidRefresh()
 {
-    double monotonicAnimationStartTime;
+    double timestamp;
     {
         MutexLocker lock(m_mutex);
          if (!m_scheduled)
@@ -100,7 +100,7 @@ void DisplayRefreshMonitor::displayDidRefresh()
             m_unscheduledFireCount = 0;
 
         m_scheduled = false;
-        monotonicAnimationStartTime = m_monotonicAnimationStartTime;
+        timestamp = m_timestamp;
     }
 
     // The call back can cause all our clients to be unregistered, so we need to protect
@@ -110,7 +110,7 @@ void DisplayRefreshMonitor::displayDidRefresh()
     Vector<DisplayRefreshMonitorClient*> clients;
     copyToVector(m_clients, clients);
     for (size_t i = 0; i < clients.size(); ++i)
-        clients[i]->fireDisplayRefreshIfNeeded(monotonicAnimationStartTime);
+        clients[i]->fireDisplayRefreshIfNeeded(timestamp);
 
     {
         MutexLocker lock(m_mutex);
@@ -136,8 +136,8 @@ DisplayRefreshMonitor* DisplayRefreshMonitorManager::ensureMonitorForClient(Disp
         m_monitors.add(client->m_displayID, monitor.release());
         return result;
     }
-    it->value->addClient(client);
-    return it->value.get();
+
+    return it->second.get();
 }
 
 void DisplayRefreshMonitorManager::registerClient(DisplayRefreshMonitorClient* client)
@@ -157,7 +157,7 @@ void DisplayRefreshMonitorManager::unregisterClient(DisplayRefreshMonitorClient*
     if (it == m_monitors.end())
         return;
     
-    DisplayRefreshMonitor* monitor = it->value.get();
+    DisplayRefreshMonitor* monitor = it->second.get();
     if (monitor->removeClient(client)) {
         if (!monitor->hasClients())
             m_monitors.remove(it);

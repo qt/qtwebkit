@@ -35,6 +35,7 @@
 #include "Blob.h"
 #include "Document.h"
 #include "ExceptionCode.h"
+#include "FeatureObserver.h"
 #include "File.h"
 #include "HistogramSupport.h"
 #include "LineEnding.h"
@@ -50,20 +51,32 @@
 
 namespace WebCore {
 
-// FIXME: Move this file to BlobBuilder.cpp
-
 enum BlobConstructorArrayBufferOrView {
     BlobConstructorArrayBuffer,
     BlobConstructorArrayBufferView,
     BlobConstructorArrayBufferOrViewMax,
 };
 
-BlobBuilder::BlobBuilder()
+// static
+PassRefPtr<WebKitBlobBuilder> WebKitBlobBuilder::create(ScriptExecutionContext* context)
+{
+    String message("BlobBuilder is deprecated. Use \"Blob\" constructor instead.");
+    context->addConsoleMessage(JSMessageSource, LogMessageType, WarningMessageLevel, message);
+
+    if (context->isDocument()) {
+        Document* document = static_cast<Document*>(context);
+        FeatureObserver::observe(document->domWindow(), FeatureObserver::LegacyBlobBuilder);
+    }
+
+    return adoptRef(new WebKitBlobBuilder());
+}
+
+WebKitBlobBuilder::WebKitBlobBuilder()
     : m_size(0)
 {
 }
 
-Vector<char>& BlobBuilder::getBuffer()
+Vector<char>& WebKitBlobBuilder::getBuffer()
 {
     // If the last item is not a data item, create one. Otherwise, we simply append the new string to the last data item.
     if (m_items.isEmpty() || m_items[m_items.size() - 1].type != BlobDataItem::Data)
@@ -72,24 +85,34 @@ Vector<char>& BlobBuilder::getBuffer()
     return *m_items[m_items.size() - 1].data->mutableData();
 }
 
-void BlobBuilder::append(const String& text, const String& endingType)
+void WebKitBlobBuilder::append(const String& text, const String& endingType, ExceptionCode& ec)
 {
+    bool isEndingTypeTransparent = endingType == "transparent";
+    bool isEndingTypeNative = endingType == "native";
+    if (!endingType.isEmpty() && !isEndingTypeTransparent && !isEndingTypeNative) {
+        ec = SYNTAX_ERR;
+        return;
+    }
+
     CString utf8Text = UTF8Encoding().encode(text.characters(), text.length(), EntitiesForUnencodables);
 
     Vector<char>& buffer = getBuffer();
     size_t oldSize = buffer.size();
 
-    if (endingType == "native")
+    if (isEndingTypeNative)
         normalizeLineEndingsToNative(utf8Text, buffer);
-    else {
-        ASSERT(endingType == "transparent");
+    else
         buffer.append(utf8Text.data(), utf8Text.length());
-    }
     m_size += buffer.size() - oldSize;
 }
 
+void WebKitBlobBuilder::append(const String& text, ExceptionCode& ec)
+{
+    append(text, String(), ec);
+}
+
 #if ENABLE(BLOB)
-void BlobBuilder::append(ScriptExecutionContext* context, ArrayBuffer* arrayBuffer)
+void WebKitBlobBuilder::append(ScriptExecutionContext* context, ArrayBuffer* arrayBuffer)
 {
     String consoleMessage("ArrayBuffer values are deprecated in Blob Constructor. Use ArrayBufferView instead.");
     context->addConsoleMessage(JSMessageSource, LogMessageType, WarningMessageLevel, consoleMessage);
@@ -102,7 +125,7 @@ void BlobBuilder::append(ScriptExecutionContext* context, ArrayBuffer* arrayBuff
     appendBytesData(arrayBuffer->data(), arrayBuffer->byteLength());
 }
 
-void BlobBuilder::append(ArrayBufferView* arrayBufferView)
+void WebKitBlobBuilder::append(ArrayBufferView* arrayBufferView)
 {
     HistogramSupport::histogramEnumeration("WebCore.Blob.constructor.ArrayBufferOrView", BlobConstructorArrayBufferView, BlobConstructorArrayBufferOrViewMax);
 
@@ -113,7 +136,7 @@ void BlobBuilder::append(ArrayBufferView* arrayBufferView)
 }
 #endif
 
-void BlobBuilder::append(Blob* blob)
+void WebKitBlobBuilder::append(Blob* blob)
 {
     if (!blob)
         return;
@@ -139,7 +162,7 @@ void BlobBuilder::append(Blob* blob)
     }
 }
 
-void BlobBuilder::appendBytesData(const void* data, size_t length)
+void WebKitBlobBuilder::appendBytesData(const void* data, size_t length)
 {
     Vector<char>& buffer = getBuffer();
     size_t oldSize = buffer.size();
@@ -147,8 +170,10 @@ void BlobBuilder::appendBytesData(const void* data, size_t length)
     m_size += buffer.size() - oldSize;
 }
 
-PassRefPtr<Blob> BlobBuilder::getBlob(const String& contentType)
+PassRefPtr<Blob> WebKitBlobBuilder::getBlob(const String& contentType, BlobConstructionReason constructionReason)
 {
+    HistogramSupport::histogramEnumeration("WebCore.BlobBuilder.getBlob", constructionReason, BlobConstructionReasonMax);
+
     OwnPtr<BlobData> blobData = BlobData::create();
     blobData->setContentType(contentType);
     blobData->swapItems(m_items);

@@ -54,7 +54,6 @@ using namespace WebCore;
 #endif
 #if ENABLE(LEGACY_NOTIFICATIONS)
     RefPtr<VoidCallback> _voidCallback;
-    bool _isLegacyRequest;
 #endif
 }
 #if ENABLE(NOTIFICATIONS)
@@ -91,7 +90,7 @@ bool WebNotificationClient::show(Notification* notification)
     m_notificationMap.set(notification, webNotification);
 
     NotificationContextMap::iterator it = m_notificationContextMap.add(notification->scriptExecutionContext(), Vector<RetainPtr<WebNotification> >()).iterator;
-    it->value.append(webNotification);
+    it->second.append(webNotification);
 
     [[m_webView _notificationProvider] showNotification:webNotification.get() fromWebView:m_webView];
     return true;
@@ -121,7 +120,7 @@ void WebNotificationClient::clearNotifications(ScriptExecutionContext* context)
     if (it == m_notificationContextMap.end())
         return;
     
-    Vector<RetainPtr<WebNotification> >& webNotifications = it->value;
+    Vector<RetainPtr<WebNotification> >& webNotifications = it->second;
     NSMutableArray *nsIDs = [NSMutableArray array];
     size_t count = webNotifications.size();
     for (size_t i = 0; i < count; ++i) {
@@ -147,10 +146,10 @@ void WebNotificationClient::notificationObjectDestroyed(Notification* notificati
 
     NotificationContextMap::iterator it = m_notificationContextMap.find(notification->scriptExecutionContext());
     ASSERT(it != m_notificationContextMap.end());
-    size_t index = it->value.find(webNotification);
+    size_t index = it->second.find(webNotification);
     ASSERT(index != notFound);
-    it->value.remove(index);
-    if (it->value.isEmpty())
+    it->second.remove(index);
+    if (it->second.isEmpty())
         m_notificationContextMap.remove(it);
 
     [[m_webView _notificationProvider] notificationDestroyed:webNotification.get()];
@@ -253,7 +252,7 @@ uint64_t WebNotificationClient::notificationIDForTesting(WebCore::Notification* 
     if (!(self = [super init]))
         return nil;
 
-    _isLegacyRequest = true;
+    ASSERT(callback);
     _voidCallback = callback;
     return self;
 }
@@ -262,9 +261,8 @@ uint64_t WebNotificationClient::notificationIDForTesting(WebCore::Notification* 
 - (void)allow
 {
 #if ENABLE(LEGACY_NOTIFICATIONS)
-    if (_isLegacyRequest) {
-        if (_voidCallback)
-            _voidCallback->handleEvent();
+    if (_voidCallback) {
+        _voidCallback->handleEvent();
         return;
     }
 #endif
@@ -276,9 +274,8 @@ uint64_t WebNotificationClient::notificationIDForTesting(WebCore::Notification* 
 - (void)deny
 {
 #if ENABLE(LEGACY_NOTIFICATIONS)
-    if (_isLegacyRequest) {
-        if (_voidCallback)
-            _voidCallback->handleEvent();
+    if (_voidCallback) {
+        _voidCallback->handleEvent();
         return;
     }
 #endif

@@ -40,7 +40,6 @@
 #include "RTCPeerConnectionHandlerClient.h"
 #include "RTCSessionDescriptionDescriptor.h"
 #include "RTCSessionDescriptionRequest.h"
-#include "RTCStatsRequest.h"
 #include "RTCVoidRequest.h"
 #include <public/Platform.h>
 #include <public/WebMediaConstraints.h>
@@ -49,16 +48,10 @@
 #include <public/WebRTCICECandidate.h>
 #include <public/WebRTCSessionDescription.h>
 #include <public/WebRTCSessionDescriptionRequest.h>
-#include <public/WebRTCStatsRequest.h>
 #include <public/WebRTCVoidRequest.h>
 #include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
-
-WebKit::WebRTCPeerConnectionHandler* RTCPeerConnectionHandlerChromium::toWebRTCPeerConnectionHandler(RTCPeerConnectionHandler* handler)
-{
-    return static_cast<RTCPeerConnectionHandlerChromium*>(handler)->m_webHandler.get();
-}
 
 PassOwnPtr<RTCPeerConnectionHandler> RTCPeerConnectionHandler::create(RTCPeerConnectionHandlerClient* client)
 {
@@ -69,7 +62,6 @@ RTCPeerConnectionHandlerChromium::RTCPeerConnectionHandlerChromium(RTCPeerConnec
     : m_client(client)
 {
     ASSERT(m_client);
-    m_webHandler = adoptPtr(WebKit::Platform::current()->createRTCPeerConnectionHandler(this));
 }
 
 RTCPeerConnectionHandlerChromium::~RTCPeerConnectionHandlerChromium()
@@ -78,10 +70,8 @@ RTCPeerConnectionHandlerChromium::~RTCPeerConnectionHandlerChromium()
 
 bool RTCPeerConnectionHandlerChromium::initialize(PassRefPtr<RTCConfiguration> configuration, PassRefPtr<MediaConstraints> constraints)
 {
-    if (!m_webHandler)
-        return false;
-
-    return m_webHandler->initialize(configuration, constraints);
+    m_webHandler = adoptPtr(WebKit::Platform::current()->createRTCPeerConnectionHandler(this));
+    return m_webHandler ? m_webHandler->initialize(configuration, constraints) : false;
 }
 
 void RTCPeerConnectionHandlerChromium::createOffer(PassRefPtr<RTCSessionDescriptionRequest> request, PassRefPtr<MediaConstraints> constraints)
@@ -164,14 +154,6 @@ void RTCPeerConnectionHandlerChromium::removeStream(PassRefPtr<MediaStreamDescri
         return;
 
     m_webHandler->removeStream(mediaStream);
-}
-
-void RTCPeerConnectionHandlerChromium::getStats(PassRefPtr<RTCStatsRequest> request)
-{
-    if (!m_webHandler)
-        return;
-
-    m_webHandler->getStats(request);
 }
 
 void RTCPeerConnectionHandlerChromium::stop()

@@ -28,17 +28,20 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=SHARED_WORKERS,
-    ExtendsDOMGlobalObject,
-    IsWorkerContext,
-    JSGenerateToNativeObject,
-    JSNoStaticTables,
-    OmitConstructor
-] interface SharedWorkerContext : WorkerContext {
+module threads {
 
-    readonly attribute DOMString name;
-             attribute EventListener onconnect;
+    interface [
+        Conditional=SHARED_WORKERS,
+        ExtendsDOMGlobalObject,
+        IsWorkerContext,
+        JSGenerateToNativeObject,
+        JSNoStaticTables,
+        OmitConstructor
+    ] SharedWorkerContext : WorkerContext {
 
-};
+        readonly attribute DOMString name;
+                 attribute EventListener onconnect;
 
+    };
+
+}

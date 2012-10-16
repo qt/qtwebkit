@@ -49,26 +49,18 @@ class CachedShader;
 class CachedTextTrack;
 class CachedXSLStyleSheet;
 class Document;
-class DocumentLoader;
 class Frame;
 class ImageLoader;
 class KURL;
 
-// The CachedResourceLoader provides a per-context interface to the MemoryCache
-// and enforces a bunch of security checks and rules for resource revalidation.
-// Its lifetime is roughly per-DocumentLoader, in that it is generally created
-// in the DocumentLoader constructor and loses its ability to generate network
-// requests when the DocumentLoader is destroyed. Documents also hold a 
-// RefPtr<CachedResourceLoader> for their lifetime (and will create one if they
-// are initialized without a Frame), so a Document can keep a CachedResourceLoader
-// alive past detach if scripts still reference the Document.
-class CachedResourceLoader : public RefCounted<CachedResourceLoader> {
+// The CachedResourceLoader manages the loading of scripts/images/stylesheets for a single document.
+class CachedResourceLoader {
     WTF_MAKE_NONCOPYABLE(CachedResourceLoader); WTF_MAKE_FAST_ALLOCATED;
 friend class ImageLoader;
 friend class ResourceCacheValidationSuppressor;
 
 public:
-    static PassRefPtr<CachedResourceLoader> create(DocumentLoader* documentLoader) { return adoptRef(new CachedResourceLoader(documentLoader)); }
+    CachedResourceLoader(Document*);
     ~CachedResourceLoader();
 
     CachedResourceHandle<CachedImage> requestImage(ResourceRequest&);
@@ -112,10 +104,8 @@ public:
     
     CachePolicy cachePolicy() const;
     
-    Frame* frame() const; // Can be null
-    Document* document() const { return m_document; } // Can be null
-    void setDocument(Document* document) { m_document = document; }
-    void clearDocumentLoader() { m_documentLoader = 0; }
+    Frame* frame() const; // Can be NULL
+    Document* document() const { return m_document; }
 
     void removeCachedResource(CachedResource*) const;
     void loadDone();
@@ -136,8 +126,6 @@ public:
     void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
-    explicit CachedResourceLoader(DocumentLoader*);
-
     enum DeferOption { NoDefer, DeferredByClient };
     CachedResourceHandle<CachedResource> requestResource(CachedResource::Type, ResourceRequest&, const String& charset, const ResourceLoaderOptions&, ResourceLoadPriority = ResourceLoadPriorityUnresolved, bool isPreload = false, DeferOption = NoDefer);
     CachedResourceHandle<CachedResource> revalidateResource(CachedResource*);
@@ -159,7 +147,6 @@ private:
     HashSet<String> m_validatedURLs;
     mutable DocumentResourceMap m_documentResources;
     Document* m_document;
-    DocumentLoader* m_documentLoader;
     
     int m_requestCount;
     

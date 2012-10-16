@@ -143,10 +143,10 @@ WebInspector.ContextSubMenuItem.prototype = {
         for (var i = 0; i < this._items.length; ++i)
             result.subItems.push(this._items[i]._buildDescriptor());
         return result;
-    },
-
-    __proto__: WebInspector.ContextMenuItem.prototype
+    }
 }
+
+WebInspector.ContextSubMenuItem.prototype.__proto__ = WebInspector.ContextMenuItem.prototype;
 
 /**
  * @constructor
@@ -206,10 +206,10 @@ WebInspector.ContextMenu.prototype = {
             provider.appendApplicableItems(this, target);
             this.appendSeparator();
         }
-    },
-
-    __proto__: WebInspector.ContextSubMenuItem.prototype
+    }
 }
+
+WebInspector.ContextMenu.prototype.__proto__ = WebInspector.ContextSubMenuItem.prototype;
 
 /**
  * @interface

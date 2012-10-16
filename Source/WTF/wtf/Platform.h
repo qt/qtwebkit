@@ -540,6 +540,9 @@
 #define WTF_USE_SCROLLBAR_PAINTER 1
 #define HAVE_XPC 1
 #endif
+#if !defined(ENABLE_JAVA_BRIDGE)
+#define ENABLE_JAVA_BRIDGE 1
+#endif
 #if !defined(ENABLE_DASHBOARD_SUPPORT)
 #define ENABLE_DASHBOARD_SUPPORT 1
 #endif
@@ -588,6 +591,7 @@
 #define ENABLE_GEOLOCATION 1
 #define ENABLE_ICONDATABASE 0
 #define ENABLE_INSPECTOR 1
+#define ENABLE_JAVA_BRIDGE 0
 #define ENABLE_NETSCAPE_PLUGIN_API 0
 #define ENABLE_ORIENTATION_EVENTS 1
 #define ENABLE_REPAINT_THROTTLING 1
@@ -872,7 +876,6 @@
 /* JIT is not implemented for Windows 64-bit */
 #if !defined(ENABLE_JIT) && OS(WINDOWS) && CPU(X86_64)
 #define ENABLE_JIT 0
-#define ENABLE_YARR_JIT 0
 #endif
 
 #if !defined(ENABLE_JIT) && CPU(SH4) && PLATFORM(QT)
@@ -899,20 +902,12 @@
 #define ENABLE_DISASSEMBLER 1
 #endif
 
-/* On the GTK+ port we take an extra precaution for LLINT support:
- * We disable it on x86 builds if the build target doesn't support SSE2
- * instructions (LLINT requires SSE2 on this platform). */
-#if !defined(ENABLE_LLINT) && PLATFORM(GTK) && CPU(X86) && COMPILER(GCC) \
-    && !defined(__SSE2__)
-#define ENABLE_LLINT 0
-#endif
-
 /* On some of the platforms where we have a JIT, we want to also have the 
    low-level interpreter. */
 #if !defined(ENABLE_LLINT) \
     && ENABLE(JIT) \
     && (OS(DARWIN) || OS(LINUX)) \
-    && (PLATFORM(MAC) || PLATFORM(IOS) || PLATFORM(GTK) || (PLATFORM(QT) && OS(LINUX))) \
+    && (PLATFORM(MAC) || PLATFORM(IOS) || PLATFORM(GTK)) \
     && (CPU(X86) || CPU(X86_64) || CPU(ARM_THUMB2))
 #define ENABLE_LLINT 1
 #endif
@@ -1109,7 +1104,7 @@
    since most ports try to support sub-project independence, adding new headers
    to WTF causes many ports to break, and so this way we can address the build
    breakages one port at a time. */
-#if !defined(WTF_USE_EXPORT_MACROS) && (PLATFORM(MAC) || PLATFORM(QT) || PLATFORM(WX))
+#if !defined(WTF_USE_EXPORT_MACROS) && (PLATFORM(MAC) || PLATFORM(QT) || PLATFORM(WX) || PLATFORM(BLACKBERRY))
 #define WTF_USE_EXPORT_MACROS 1
 #endif
 

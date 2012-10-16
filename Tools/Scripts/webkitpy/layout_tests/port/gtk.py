@@ -41,9 +41,6 @@ class GtkPort(Port, PulseAudioSanitizer):
     def expectations_files(self):
         return [self._filesystem.join(self._webkit_baseline_path(d), 'TestExpectations') for d in self._skipped_file_search_paths()]
 
-    def warn_if_bug_missing_in_test_expectations(self):
-        return True
-
     def _port_flag_for_scripts(self):
         return "--gtk"
 
@@ -91,6 +88,18 @@ class GtkPort(Port, PulseAudioSanitizer):
 
     def _path_to_image_diff(self):
         return self._build_path('Programs', 'ImageDiff')
+
+    def _path_to_apache(self):
+        if self._is_redhat_based():
+            return '/usr/sbin/httpd'
+        else:
+            return '/usr/sbin/apache2'
+
+    def _path_to_wdiff(self):
+        if self._is_redhat_based():
+            return '/usr/bin/dwdiff'
+        else:
+            return '/usr/bin/wdiff'
 
     def _path_to_webcore_library(self):
         gtk_library_names = [

@@ -23,24 +23,27 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=SVG
-] interface SVGStringList {
-    readonly attribute unsigned long numberOfItems;
+module svg {
 
-    void clear()
-        raises(DOMException);
-    [StrictTypeChecking] DOMString initialize(in DOMString item)
-        raises(DOMException, SVGException);
-    [StrictTypeChecking] DOMString getItem(in unsigned long index)
-        raises(DOMException);
-    [StrictTypeChecking] DOMString insertItemBefore(in DOMString item, in unsigned long index)
-        raises(DOMException, SVGException);
-    [StrictTypeChecking] DOMString replaceItem(in DOMString item, in unsigned long index)
-        raises(DOMException, SVGException);
-    [StrictTypeChecking] DOMString removeItem(in unsigned long index)
-        raises(DOMException);
-    [StrictTypeChecking] DOMString appendItem(in DOMString item)
-        raises(DOMException, SVGException);
-};
+    interface [
+        Conditional=SVG
+    ] SVGStringList {
+        readonly attribute unsigned long numberOfItems;
 
+        void clear()
+            raises(DOMException);
+        [StrictTypeChecking] DOMString initialize(in DOMString item)
+            raises(DOMException, SVGException);
+        [StrictTypeChecking] DOMString getItem(in unsigned long index)
+            raises(DOMException);
+        [StrictTypeChecking] DOMString insertItemBefore(in DOMString item, in unsigned long index)
+            raises(DOMException, SVGException);
+        [StrictTypeChecking] DOMString replaceItem(in DOMString item, in unsigned long index)
+            raises(DOMException, SVGException);
+        [StrictTypeChecking] DOMString removeItem(in unsigned long index)
+            raises(DOMException);
+        [StrictTypeChecking] DOMString appendItem(in DOMString item)
+            raises(DOMException, SVGException);
+    };
+
+}

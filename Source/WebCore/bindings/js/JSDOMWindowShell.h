@@ -30,24 +30,24 @@
 #define JSDOMWindowShell_h
 
 #include "JSDOMWindow.h"
-#include <runtime/JSProxy.h>
+#include <runtime/JSGlobalThis.h>
 
 namespace WebCore {
 
     class DOMWindow;
     class Frame;
 
-    class JSDOMWindowShell : public JSC::JSProxy {
-        typedef JSC::JSProxy Base;
+    class JSDOMWindowShell : public JSC::JSGlobalThis {
+        typedef JSC::JSGlobalThis Base;
     public:
         JSDOMWindowShell(PassRefPtr<DOMWindow>, JSC::Structure*, DOMWrapperWorld*);
         static void destroy(JSCell*);
 
-        JSDOMWindow* window() const { return JSC::jsCast<JSDOMWindow*>(target()); }
+        JSDOMWindow* window() const { return JSC::jsCast<JSDOMWindow*>(unwrappedObject()); }
         void setWindow(JSC::JSGlobalData& globalData, JSDOMWindow* window)
         {
             ASSERT_ARG(window, window);
-            setTarget(globalData, window);
+            setUnwrappedObject(globalData, window);
             structure()->setGlobalObject(*JSDOMWindow::commonJSGlobalData(), window);
         }
         void setWindow(PassRefPtr<DOMWindow>);
@@ -66,7 +66,7 @@ namespace WebCore {
 
         static JSC::Structure* createStructure(JSC::JSGlobalData& globalData, JSC::JSValue prototype) 
         {
-            return JSC::Structure::create(globalData, 0, prototype, JSC::TypeInfo(JSC::ProxyType, StructureFlags), &s_info);
+            return JSC::Structure::create(globalData, 0, prototype, JSC::TypeInfo(JSC::GlobalThisType, StructureFlags), &s_info); 
         }
 
         DOMWrapperWorld* world() { return m_world.get(); }
@@ -74,6 +74,22 @@ namespace WebCore {
     protected:
         JSDOMWindowShell(JSC::Structure*, DOMWrapperWorld*);
         void finishCreation(JSC::JSGlobalData&, PassRefPtr<DOMWindow>);
+
+    private:
+        static const unsigned StructureFlags = JSC::OverridesGetOwnPropertySlot | JSC::OverridesGetPropertyNames | Base::StructureFlags;
+
+        static String className(const JSC::JSObject*);
+        static bool getOwnPropertySlot(JSC::JSCell*, JSC::ExecState*, JSC::PropertyName, JSC::PropertySlot&);
+        static bool getOwnPropertySlotByIndex(JSC::JSCell*, JSC::ExecState*, unsigned, JSC::PropertySlot&);
+        static bool getOwnPropertyDescriptor(JSC::JSObject*, JSC::ExecState*, JSC::PropertyName, JSC::PropertyDescriptor&);
+        static void put(JSC::JSCell*, JSC::ExecState*, JSC::PropertyName, JSC::JSValue, JSC::PutPropertySlot&);
+        static void putByIndex(JSC::JSCell*, JSC::ExecState*, unsigned, JSC::JSValue, bool shouldThrow);
+        static void putDirectVirtual(JSC::JSObject*, JSC::ExecState*, JSC::PropertyName, JSC::JSValue, unsigned attributes);
+        static bool deleteProperty(JSC::JSCell*, JSC::ExecState*, JSC::PropertyName);
+        static bool deletePropertyByIndex(JSC::JSCell*, JSC::ExecState*, unsigned);
+        static void getOwnPropertyNames(JSC::JSObject*, JSC::ExecState*, JSC::PropertyNameArray&, JSC::EnumerationMode);
+        static void getPropertyNames(JSC::JSObject*, JSC::ExecState*, JSC::PropertyNameArray&, JSC::EnumerationMode);
+        static bool defineOwnProperty(JSC::JSObject*, JSC::ExecState*, JSC::PropertyName, JSC::PropertyDescriptor&, bool shouldThrow);
 
         RefPtr<DOMWrapperWorld> m_world;
     };

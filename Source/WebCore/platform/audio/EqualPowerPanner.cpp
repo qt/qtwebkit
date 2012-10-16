@@ -51,12 +51,11 @@ EqualPowerPanner::EqualPowerPanner(float sampleRate)
 
 void EqualPowerPanner::pan(double azimuth, double /*elevation*/, const AudioBus* inputBus, AudioBus* outputBus, size_t framesToProcess)
 {
-    bool isInputSafe = inputBus && (inputBus->numberOfChannels() == 1 || inputBus->numberOfChannels() == 2) && framesToProcess <= inputBus->length();
+    unsigned numberOfInputChannels = inputBus->numberOfChannels();
+    bool isInputSafe = inputBus && (numberOfInputChannels == 1 || numberOfInputChannels == 2) && framesToProcess <= inputBus->length();
     ASSERT(isInputSafe);
     if (!isInputSafe)
         return;
-
-    unsigned numberOfInputChannels = inputBus->numberOfChannels();
 
     bool isOutputSafe = outputBus && outputBus->numberOfChannels() == 2 && framesToProcess <= outputBus->length();
     ASSERT(isOutputSafe);

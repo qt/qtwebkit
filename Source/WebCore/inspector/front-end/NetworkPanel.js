@@ -1261,11 +1261,10 @@ WebInspector.NetworkLogView.prototype = {
     {
         node.element.addStyleClass("highlighted-row");
         this._highlightedNode = node;
-    },
+    }
+};
 
-    __proto__: WebInspector.View.prototype
-}
-
+WebInspector.NetworkLogView.prototype.__proto__ = WebInspector.View.prototype;
 
 WebInspector.NetworkLogView.EventTypes = {
     ViewCleared: "ViewCleared",
@@ -1521,10 +1520,10 @@ WebInspector.NetworkPanel.prototype = {
             this.revealAndHighlightRequest(/** @type {WebInspector.NetworkRequest} */ target);
         }
         contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Reveal in network panel" : "Reveal in Network Panel"), reveal.bind(this));
-    },
-
-    __proto__: WebInspector.Panel.prototype
+    }
 }
+
+WebInspector.NetworkPanel.prototype.__proto__ = WebInspector.Panel.prototype;
 
 /**
  * @constructor
@@ -1726,10 +1725,10 @@ WebInspector.NetworkTimeCalculator.prototype = {
     _upperBound: function(request)
     {
         return 0;
-    },
-
-    __proto__: WebInspector.NetworkBaseCalculator.prototype
+    }
 }
+
+WebInspector.NetworkTimeCalculator.prototype.__proto__ = WebInspector.NetworkBaseCalculator.prototype;
 
 /**
  * @constructor
@@ -1754,10 +1753,10 @@ WebInspector.NetworkTransferTimeCalculator.prototype = {
     _upperBound: function(request)
     {
         return request.endTime;
-    },
-
-    __proto__: WebInspector.NetworkTimeCalculator.prototype
+    }
 }
+
+WebInspector.NetworkTransferTimeCalculator.prototype.__proto__ = WebInspector.NetworkTimeCalculator.prototype;
 
 /**
  * @constructor
@@ -1777,10 +1776,10 @@ WebInspector.NetworkTransferDurationCalculator.prototype = {
     _upperBound: function(request)
     {
         return request.duration;
-    },
-
-    __proto__: WebInspector.NetworkTimeCalculator.prototype
+    }
 }
+
+WebInspector.NetworkTransferDurationCalculator.prototype.__proto__ = WebInspector.NetworkTimeCalculator.prototype;
 
 /**
  * @constructor
@@ -1943,8 +1942,8 @@ WebInspector.NetworkDataGridNode.prototype = {
     _fileName: function()
     {
         var fileName = this._request.displayName;
-        if (this._request.queryString())
-            fileName += "?" + this._request.queryString();
+        if (this._request.queryString)
+            fileName += "?" + this._request.queryString;
         return fileName;
     },
 
@@ -2165,16 +2164,13 @@ WebInspector.NetworkDataGridNode.prototype = {
             this._labelRightElement.style.setProperty("left", this._percentages.middle + "%");
             this._labelRightElement.style.setProperty("right", (100 - this._percentages.end) + "%");
         }
-    },
-
-    __proto__: WebInspector.DataGridNode.prototype
+    }
 }
-
 
 WebInspector.NetworkDataGridNode.NameComparator = function(a, b)
 {
-    var aFileName = a._request.displayName + (a._request.queryString() ? a._request.queryString() : "");
-    var bFileName = b._request.displayName + (b._request.queryString() ? b._request.queryString() : "");
+    var aFileName = a._request.displayName + (a._request.queryString ? a._request.queryString : "");
+    var bFileName = b._request.displayName + (b._request.queryString ? b._request.queryString : "");
     if (aFileName > bFileName)
         return 1;
     if (bFileName > aFileName)
@@ -2220,3 +2216,5 @@ WebInspector.NetworkDataGridNode.RequestPropertyComparator = function(propertyNa
         return revert ? 1 : -1;
     return 0;
 }
+
+WebInspector.NetworkDataGridNode.prototype.__proto__ = WebInspector.DataGridNode.prototype;

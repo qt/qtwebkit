@@ -33,6 +33,14 @@
 
 #if ENABLE(ICONDATABASE)
 
+bool WebIconDatabaseClient::performImport()
+{
+    NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    bool result = importToWebCoreFormat();
+    [pool drain];
+    return result;
+}
+
 void WebIconDatabaseClient::didRemoveAllIcons()
 {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];

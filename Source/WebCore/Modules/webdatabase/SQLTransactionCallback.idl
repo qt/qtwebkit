@@ -26,9 +26,11 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=SQL_DATABASE,
-    Callback
-] interface SQLTransactionCallback {
-    boolean handleEvent(in SQLTransaction transaction);
-};
+module storage {
+    interface [
+        Conditional=SQL_DATABASE,
+        Callback
+    ] SQLTransactionCallback {
+        boolean handleEvent(in SQLTransaction transaction);
+    };
+}

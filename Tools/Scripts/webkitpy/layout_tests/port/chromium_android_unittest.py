@@ -30,7 +30,6 @@ import optparse
 import StringIO
 import time
 import unittest
-import sys
 
 from webkitpy.common.system import executive_mock
 from webkitpy.common.system.executive_mock import MockExecutive2
@@ -245,8 +244,7 @@ class ChromiumAndroidDriverTest(unittest.TestCase):
     def test_command_from_driver_input(self):
         driver_input = driver.DriverInput('foo/bar/test.html', 10, 'checksum', True)
         expected_command = "/data/local/tmp/third_party/WebKit/LayoutTests/foo/bar/test.html'--pixel-test'checksum\n"
-        if (sys.platform != "cygwin"):
-            self.assertEquals(self.driver._command_from_driver_input(driver_input), expected_command)
+        self.assertEquals(self.driver._command_from_driver_input(driver_input), expected_command)
 
         driver_input = driver.DriverInput('http/tests/foo/bar/test.html', 10, 'checksum', True)
         expected_command = "http://127.0.0.1:8000/foo/bar/test.html'--pixel-test'checksum\n"

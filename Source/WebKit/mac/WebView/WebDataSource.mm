@@ -52,7 +52,6 @@
 #import <WebCore/KURL.h>
 #import <WebCore/LegacyWebArchive.h>
 #import <WebCore/MIMETypeRegistry.h>
-#import <WebCore/ResourceBuffer.h>
 #import <WebCore/ResourceRequest.h>
 #import <WebCore/RunLoop.h>
 #import <WebCore/SharedBuffer.h>
@@ -400,7 +399,7 @@ static inline void addTypesFromClass(NSMutableDictionary *allTypes, Class objCCl
 
 - (NSData *)data
 {
-    RefPtr<ResourceBuffer> mainResourceData = toPrivate(_private)->loader->mainResourceData();
+    RefPtr<SharedBuffer> mainResourceData = toPrivate(_private)->loader->mainResourceData();
     if (!mainResourceData)
         return nil;
     return [mainResourceData->createNSData() autorelease];

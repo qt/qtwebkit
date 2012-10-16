@@ -53,8 +53,8 @@ void ShareableBitmap::releaseSharedMemoryData(void* typelessBitmap)
 
 PassRefPtr<Image> ShareableBitmap::createImage()
 {
-    QPixmap* pixmap = new QPixmap(QPixmap::fromImage(createQImage()));
-    return BitmapImage::create(pixmap);
+    QImage* image = new QImage(createQImage());
+    return BitmapImage::create(image);
 }
 
 PassOwnPtr<GraphicsContext> ShareableBitmap::createGraphicsContext()
@@ -82,13 +82,8 @@ void ShareableBitmap::paint(GraphicsContext& context, float scaleFactor, const I
         return;
     }
 
-    QImage image = createQImage();
-    QPainter* painter = context.platformContext();
-
-    painter->save();
-    painter->scale(scaleFactor, scaleFactor);
-    painter->drawImage(dstPoint, image, QRect(srcRect));
-    painter->restore();
+    // See <https://bugs.webkit.org/show_bug.cgi?id=64663>.
+    notImplemented();
 }
 
 }

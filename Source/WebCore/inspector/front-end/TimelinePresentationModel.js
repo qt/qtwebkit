@@ -439,10 +439,10 @@ WebInspector.TimelinePresentationModel.prototype = {
                 return false;
         }
         return true;
-    },
-
-    __proto__: WebInspector.Object.prototype
+    }
 }
+
+WebInspector.TimelinePresentationModel.prototype.__proto__ = WebInspector.Object.prototype;
 
 /**
  * @constructor
@@ -1166,7 +1166,7 @@ WebInspector.TimelineCategory.prototype = {
     {
         this._hidden = hidden;
         this.dispatchEventToListeners(WebInspector.TimelineCategory.Events.VisibilityChanged, this);
-    },
-
-    __proto__: WebInspector.Object.prototype
+    }
 }
+
+WebInspector.TimelineCategory.prototype.__proto__ = WebInspector.Object.prototype;

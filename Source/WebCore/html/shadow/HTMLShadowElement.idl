@@ -28,9 +28,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=SHADOW_DOM,
-    V8EnabledAtRuntime=shadowDOM
-] interface HTMLShadowElement : HTMLElement {
-    attribute boolean resetStyleInheritance;
-};
+module html {
+
+    interface [
+        Conditional=SHADOW_DOM,
+        V8EnabledAtRuntime=shadowDOM
+    ] HTMLShadowElement : HTMLElement {
+    };
+
+}

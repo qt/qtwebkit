@@ -201,7 +201,7 @@ void RenderBox::styleWillChange(StyleDifference diff, const RenderStyle* newStyl
 
 void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
 {
-    // Horizontal writing mode definition is updated in RenderBoxModelObject::updateFromStyle,
+    // Horizontal writing mode definition is updated in RenderBoxModelObject::updateBoxModelInfoFromStyle,
     // (as part of the RenderBoxModelObject::styleDidChange call below). So, we can safely cache the horizontal
     // writing mode value before style change here.
     bool oldHorizontalWritingMode = isHorizontalWritingMode();
@@ -269,9 +269,9 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
     }
 }
 
-void RenderBox::updateFromStyle()
+void RenderBox::updateBoxModelInfoFromStyle()
 {
-    RenderBoxModelObject::updateFromStyle();
+    RenderBoxModelObject::updateBoxModelInfoFromStyle();
 
     RenderStyle* styleToUse = style();
     bool isRootObject = isRoot();
@@ -403,7 +403,7 @@ void RenderBox::absoluteRects(Vector<IntRect>& rects, const LayoutPoint& accumul
 
 void RenderBox::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed) const
 {
-    quads.append(localToAbsoluteQuad(FloatRect(0, 0, width(), height()), 0 /* mode */, wasFixed));
+    quads.append(localToAbsoluteQuad(FloatRect(0, 0, width(), height()), false, wasFixed));
 }
 
 void RenderBox::updateLayerTransform()
@@ -436,7 +436,7 @@ IntRect RenderBox::absoluteContentBox() const
 {
     // This is wrong with transforms and flipped writing modes.
     IntRect rect = pixelSnappedIntRect(contentBoxRect());
-    FloatPoint absPos = localToAbsolute();
+    FloatPoint absPos = localToAbsolute(FloatPoint());
     rect.move(absPos.x(), absPos.y());
     return rect;
 }
@@ -447,7 +447,7 @@ FloatQuad RenderBox::absoluteContentQuad() const
     return localToAbsoluteQuad(FloatRect(rect));
 }
 
-LayoutRect RenderBox::outlineBoundsForRepaint(RenderLayerModelObject* repaintContainer, LayoutPoint* cachedOffsetToRepaintContainer) const
+LayoutRect RenderBox::outlineBoundsForRepaint(RenderBoxModelObject* repaintContainer, LayoutPoint* cachedOffsetToRepaintContainer) const
 {
     LayoutRect box = borderBoundingBox();
     adjustRectForOutlineAndShadow(box);
@@ -708,14 +708,14 @@ void RenderBox::clearOverrideSize()
 
 LayoutUnit RenderBox::overrideLogicalContentWidth() const
 {
-    ASSERT(hasOverrideWidth());
-    return gOverrideWidthMap->get(this);
+    // FIXME: This should probably be returning contentLogicalWidth instead of contentWidth.
+    return hasOverrideWidth() ? gOverrideWidthMap->get(this) : contentWidth();
 }
 
 LayoutUnit RenderBox::overrideLogicalContentHeight() const
 {
-    ASSERT(hasOverrideHeight());
-    return gOverrideHeightMap->get(this);
+    // FIXME: This should probably be returning contentLogicalHeight instead of contentHeight.
+    return hasOverrideHeight() ? gOverrideHeightMap->get(this) : contentHeight();
 }
 
 LayoutUnit RenderBox::adjustBorderBoxLogicalWidthForBoxSizing(LayoutUnit width) const
@@ -1258,7 +1258,7 @@ LayoutUnit RenderBox::perpendicularContainingBlockLogicalHeight() const
     return cb->adjustContentBoxLogicalHeightForBoxSizing(logicalHeightLength.value());
 }
 
-void RenderBox::mapLocalToContainer(RenderLayerModelObject* repaintContainer, TransformState& transformState, MapCoordinatesFlags mode, bool* wasFixed) const
+void RenderBox::mapLocalToContainer(RenderBoxModelObject* repaintContainer, TransformState& transformState, MapLocalToContainerFlags mode, bool* wasFixed) const
 {
     if (repaintContainer == this)
         return;
@@ -1323,7 +1323,7 @@ void RenderBox::mapLocalToContainer(RenderLayerModelObject* repaintContainer, Tr
     o->mapLocalToContainer(repaintContainer, transformState, mode, wasFixed);
 }
 
-const RenderObject* RenderBox::pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap) const
+const RenderObject* RenderBox::pushMappingToContainer(const RenderBoxModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap) const
 {
     ASSERT(ancestorToStopAt != this);
 
@@ -1363,18 +1363,18 @@ const RenderObject* RenderBox::pushMappingToContainer(const RenderLayerModelObje
     return ancestorSkipped ? ancestorToStopAt : container;
 }
 
-void RenderBox::mapAbsoluteToLocalPoint(MapCoordinatesFlags mode, TransformState& transformState) const
+void RenderBox::mapAbsoluteToLocalPoint(bool fixed, bool useTransforms, TransformState& transformState) const
 {
     bool isFixedPos = style()->position() == FixedPosition;
     bool hasTransform = hasLayer() && layer()->transform();
-    if (hasTransform && !isFixedPos) {
+    if (hasTransform) {
         // If this box has a transform, it acts as a fixed position container for fixed descendants,
         // and may itself also be fixed position. So propagate 'fixed' up only if this box is fixed position.
-        mode &= ~IsFixed;
-    } else if (isFixedPos)
-        mode |= IsFixed;
+        fixed &= isFixedPos;
+    } else
+        fixed |= isFixedPos;
 
-    RenderBoxModelObject::mapAbsoluteToLocalPoint(mode, transformState);
+    RenderBoxModelObject::mapAbsoluteToLocalPoint(fixed, useTransforms, transformState);
 }
 
 LayoutSize RenderBox::offsetFromContainer(RenderObject* o, const LayoutPoint& point, bool* offsetDependsOnPoint) const
@@ -1473,7 +1473,7 @@ void RenderBox::deleteLineBoxWrapper()
     }
 }
 
-LayoutRect RenderBox::clippedOverflowRectForRepaint(RenderLayerModelObject* repaintContainer) const
+LayoutRect RenderBox::clippedOverflowRectForRepaint(RenderBoxModelObject* repaintContainer) const
 {
     if (style()->visibility() != VISIBLE && !enclosingLayer()->hasVisibleContent())
         return LayoutRect();
@@ -1500,7 +1500,7 @@ LayoutRect RenderBox::clippedOverflowRectForRepaint(RenderLayerModelObject* repa
     return r;
 }
 
-void RenderBox::computeRectForRepaint(RenderLayerModelObject* repaintContainer, LayoutRect& rect, bool fixed) const
+void RenderBox::computeRectForRepaint(RenderBoxModelObject* repaintContainer, LayoutRect& rect, bool fixed) const
 {
     // The rect we compute at each step is shifted by our x/y offset in the parent container's coordinate space.
     // Only when we cross a writing mode boundary will we have to possibly flipForWritingMode (to convert into a more appropriate
@@ -2341,11 +2341,8 @@ LayoutUnit RenderBox::availableLogicalHeightUsing(const Length& h) const
     // We need to stop here, since we don't want to increase the height of the table
     // artificially.  We're going to rely on this cell getting expanded to some new
     // height, and then when we lay out again we'll use the calculation below.
-    if (isTableCell() && (h.isAuto() || h.isPercent())) {
-        if (hasOverrideHeight())
-            return overrideLogicalContentHeight();
-        return logicalHeight() - borderAndPaddingLogicalHeight();
-    }
+    if (isTableCell() && (h.isAuto() || h.isPercent()))
+        return overrideLogicalContentHeight();
 
     if (h.isPercent() && isOutOfFlowPositioned()) {
         // FIXME: This is wrong if the containingBlock has a perpendicular writing mode.
@@ -3318,7 +3315,7 @@ void RenderBox::computePositionedLogicalWidthReplaced(LogicalExtentComputedValue
 
     LayoutUnit logicalLeftPos = logicalLeftValue + marginLogicalLeftAlias;
     computeLogicalLeftPositionedOffset(logicalLeftPos, this, computedValues.m_extent, containerBlock, containerLogicalWidth);
-    computedValues.m_position = logicalLeftPos;
+    computedValues.m_position = logicalLeftPos.round();
 }
 
 void RenderBox::computePositionedLogicalHeightReplaced(LogicalExtentComputedValues& computedValues) const
@@ -3447,7 +3444,7 @@ void RenderBox::computePositionedLogicalHeightReplaced(LogicalExtentComputedValu
     // Use computed values to calculate the vertical position.
     LayoutUnit logicalTopPos = logicalTopValue + marginBeforeAlias;
     computeLogicalTopPositionedOffset(logicalTopPos, this, computedValues.m_extent, containerBlock, containerLogicalHeight);
-    computedValues.m_position = logicalTopPos;
+    computedValues.m_position = logicalTopPos.round();
 }
 
 LayoutRect RenderBox::localCaretRect(InlineBox* box, int caretOffset, LayoutUnit* extraWidthToEndOfLine)
@@ -3823,7 +3820,7 @@ RenderLayer* RenderBox::enclosingFloatPaintingLayer() const
 {
     const RenderObject* curr = this;
     while (curr) {
-        RenderLayer* layer = curr->hasLayer() && curr->isBox() ? toRenderBox(curr)->layer() : 0;
+        RenderLayer* layer = curr->hasLayer() && curr->isBox() ? toRenderBoxModelObject(curr)->layer() : 0;
         if (layer && layer->isSelfPaintingLayer())
             return layer;
         curr = curr->parent();

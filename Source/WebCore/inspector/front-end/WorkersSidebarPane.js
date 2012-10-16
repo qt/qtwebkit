@@ -118,7 +118,7 @@ WebInspector.WorkersSidebarPane.prototype = {
     _autoattachToWorkersClicked: function(event)
     {
         WorkerAgent.setAutoconnectToWorkers(event.target.checked);
-    },
-
-    __proto__: WebInspector.SidebarPane.prototype
+    }
 }
+
+WebInspector.WorkersSidebarPane.prototype.__proto__ = WebInspector.SidebarPane.prototype;

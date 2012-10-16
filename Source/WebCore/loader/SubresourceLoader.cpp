@@ -36,7 +36,6 @@
 #include "FrameLoader.h"
 #include "Logging.h"
 #include "MemoryCache.h"
-#include "ResourceBuffer.h"
 #include "SecurityOrigin.h"
 #include "SecurityPolicy.h"
 #include "WebCoreMemoryInstrumentation.h"
@@ -63,6 +62,7 @@ SubresourceLoader::RequestCountTracker::~RequestCountTracker()
 SubresourceLoader::SubresourceLoader(Frame* frame, CachedResource* resource, const ResourceLoaderOptions& options)
     : ResourceLoader(frame, options)
     , m_resource(resource)
+    , m_document(frame->document())
     , m_loadingMultipartContent(false)
     , m_state(Uninitialized)
     , m_requestCountTracker(adoptPtr(new RequestCountTracker(frame->document()->cachedResourceLoader(), resource)))
@@ -75,6 +75,7 @@ SubresourceLoader::SubresourceLoader(Frame* frame, CachedResource* resource, con
 SubresourceLoader::~SubresourceLoader()
 {
     ASSERT(m_state != Initialized);
+    ASSERT(!m_document);
     ASSERT(reachedTerminalState());
 #ifndef NDEBUG
     subresourceLoaderCounter.decrement();
@@ -139,7 +140,7 @@ void SubresourceLoader::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) co
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Loader);
     ResourceLoader::reportMemoryUsage(memoryObjectInfo);
     info.addMember(m_resource);
-    info.addMember(m_documentLoader);
+    info.addMember(m_document);
     info.addMember(m_requestCountTracker);
 }
 
@@ -166,8 +167,8 @@ void SubresourceLoader::willSendRequest(ResourceRequest& newRequest, const Resou
     
     ResourceLoader::willSendRequest(newRequest, redirectResponse);
     if (!previousURL.isNull() && !newRequest.isNull() && previousURL != newRequest.url()) {
-        if (m_documentLoader->cachedResourceLoader()->canRequest(m_resource->type(), newRequest.url())) {
-            if (m_resource->type() != CachedResource::ImageResource || !m_documentLoader->cachedResourceLoader()->shouldDeferImageLoad(newRequest.url())) {
+        if (m_document->cachedResourceLoader()->canRequest(m_resource->type(), newRequest.url())) {
+            if (m_resource->type() != CachedResource::ImageResource || !m_document->cachedResourceLoader()->shouldDeferImageLoad(newRequest.url())) {
                 m_resource->willSendRequest(newRequest, redirectResponse);
                 return;
             }
@@ -221,7 +222,7 @@ void SubresourceLoader::didReceiveResponse(const ResourceResponse& response)
         }
     }
 
-    RefPtr<ResourceBuffer> buffer = resourceData();
+    RefPtr<SharedBuffer> buffer = resourceData();
     if (m_loadingMultipartContent && buffer && buffer->size()) {
         sendDataToResource(buffer->data(), buffer->size());
         clearResourceData();
@@ -270,8 +271,8 @@ void SubresourceLoader::sendDataToResource(const char* data, int length)
     //     ResourceLoader::resourceData() will be null. However, unlike the multipart case, we don't want to tell the CachedResource 
     //     that all data has been received yet. 
     if (m_loadingMultipartContent || !resourceData()) { 
-        RefPtr<ResourceBuffer> copiedData = ResourceBuffer::create(data, length); 
-        m_resource->data(copiedData.release(), m_loadingMultipartContent);
+        RefPtr<SharedBuffer> copiedData = SharedBuffer::create(data, length); 
+        m_resource->data(copiedData.release(), m_loadingMultipartContent); 
     } else 
         m_resource->data(resourceData(), false);
 }
@@ -337,12 +338,13 @@ void SubresourceLoader::releaseResources()
     ASSERT(!reachedTerminalState());
     if (m_state != Uninitialized) {
         m_requestCountTracker.clear();
-        m_documentLoader->cachedResourceLoader()->loadDone();
+        m_document->cachedResourceLoader()->loadDone();
         if (reachedTerminalState())
             return;
         m_resource->stopLoading();
         m_documentLoader->removeSubresourceLoader(this);
     }
+    m_document = 0;
     ResourceLoader::releaseResources();
 }
 

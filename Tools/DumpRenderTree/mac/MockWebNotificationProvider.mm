@@ -107,7 +107,7 @@
         uint64_t id = [notificationID unsignedLongLongValue];
         NotificationIDMap::iterator it = _notifications.find(id);
         ASSERT(it != _notifications.end());
-        [it->value.get() dispatchCloseEvent];
+        [it->second.get() dispatchCloseEvent];
         _notifications.remove(it);
         _notificationViewMap.remove(id);
     }
@@ -129,7 +129,7 @@
     return WebNotificationPermissionDenied;
 }
 
-- (void)setWebNotificationOrigin:(NSString *)origin permission:(BOOL)allowed
+- (void)setWebNotificationOrigin:(NSString*)origin permission:(BOOL)allowed
 {
     [_permissions.get() setObject:[NSNumber numberWithBool:allowed] forKey:origin];
 }

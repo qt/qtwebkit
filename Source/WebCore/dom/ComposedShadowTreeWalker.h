@@ -164,17 +164,16 @@ inline ComposedShadowTreeWalker::ComposedShadowTreeWalker(const Node* node, Poli
 #endif
 }
 
-class AncestorChainWalker {
+// A special walker class which is only used for traversing a parent node, including
+// insertion points and shadow roots.
+class ComposedShadowTreeParentWalker {
 public:
-    explicit AncestorChainWalker(const Node*);
-    void parent();
+    explicit ComposedShadowTreeParentWalker(const Node*);
+    void parentIncludingInsertionPointAndShadowRoot();
     Node* get() const { return const_cast<Node*>(m_node); }
-    bool crossingInsertionPoint() { return m_isCrossingInsertionPoint; }
-
 private:
+    Node* traverseParentIncludingInsertionPointAndShadowRoot(const Node*) const;
     const Node* m_node;
-    const Node* m_distributedNode;
-    bool m_isCrossingInsertionPoint;
 };
 
 } // namespace

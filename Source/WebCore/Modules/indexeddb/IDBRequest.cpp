@@ -174,7 +174,7 @@ void IDBRequest::abort()
     m_error.clear();
     m_errorMessage = String();
     m_result.clear();
-    onError(IDBDatabaseError::create(IDBDatabaseException::IDB_ABORT_ERR));
+    onError(IDBDatabaseError::create(IDBDatabaseException::IDB_ABORT_ERR, "The transaction was aborted, so the request cannot be fulfilled."));
     m_requestAborted = true;
 }
 

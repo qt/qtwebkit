@@ -17,6 +17,9 @@
  * Boston, MA 02110-1301, USA.
  */
 
-interface HTMLQuoteElement : HTMLElement {
-    [Reflect, URL] attribute DOMString cite;
-};
+module html {
+
+    interface HTMLQuoteElement : HTMLElement {
+        attribute [Reflect, URL] DOMString cite;
+    };
+}

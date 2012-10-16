@@ -183,7 +183,7 @@ protected:
         AttributeTypeXML,
         AttributeTypeAuto
     };
-    AttributeType attributeType() const { return m_attributeType; }
+    AttributeType attributeType() const;
 
     String toValue() const;
     String byValue() const;
@@ -198,15 +198,8 @@ protected:
     AnimatedPropertyValueType m_fromPropertyValueType;
     AnimatedPropertyValueType m_toPropertyValueType;
 
-    virtual void targetElementWillChange(SVGElement* currentTarget, SVGElement* oldTarget) OVERRIDE;
-    bool hasInvalidCSSAttributeType() const { return m_hasInvalidCSSAttributeType; }
-
 private:
     virtual void animationAttributeChanged() OVERRIDE;
-    virtual void setAttributeName(const QualifiedName&) OVERRIDE;
-    void setAttributeType(const AtomicString&);
-
-    void checkInvalidCSSAttributeType(SVGElement*);
 
     virtual bool calculateToAtEndOfDurationValue(const String& toAtEndOfDurationString) = 0;
     virtual bool calculateFromAndToValues(const String& fromString, const String& toString) = 0;
@@ -237,14 +230,12 @@ private:
 
     bool m_animationValid;
 
-    AttributeType m_attributeType;
     Vector<String> m_values;
     Vector<float> m_keyTimes;
     Vector<float> m_keyPoints;
     Vector<UnitBezier> m_keySplines;
     String m_lastValuesAnimationFrom;
     String m_lastValuesAnimationTo;
-    bool m_hasInvalidCSSAttributeType;
 };
 
 } // namespace WebCore

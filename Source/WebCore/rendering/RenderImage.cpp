@@ -173,7 +173,7 @@ void RenderImage::imageChanged(WrappedImagePtr newImage, const IntRect* rect)
 
     // Set image dimensions, taking into account the size of the alt text.
     if (m_imageResource->errorOccurred()) {
-        if (!m_altText.isEmpty() && document()->hasPendingStyleRecalc()) {
+        if (!m_altText.isEmpty() && document()->isPendingStyleRecalc()) {
             ASSERT(node());
             if (node()) {
                 m_needsToSetSizeForAltText = true;
@@ -219,19 +219,22 @@ void RenderImage::imageDimensionsChanged(bool imageSizeChanged, const IntRect* r
 
     bool shouldRepaint = true;
     if (intrinsicSizeChanged) {
+        // lets see if we need to relayout at all..
+        LayoutUnit oldwidth = width();
+        LayoutUnit oldheight = height();
         if (!preferredLogicalWidthsDirty())
             setPreferredLogicalWidthsDirty(true);
-        LogicalExtentComputedValues computedValues;
-        computeLogicalWidthInRegion(computedValues);
-        LayoutUnit newWidth = computedValues.m_extent;
-        computeLogicalHeight(height(), 0, computedValues);
-        LayoutUnit newHeight = computedValues.m_extent;
+        updateLogicalWidth();
+        updateLogicalHeight();
 
-        if (imageSizeChanged || width() != newWidth || height() != newHeight) {
+        if (imageSizeChanged || width() != oldwidth || height() != oldheight) {
             shouldRepaint = false;
             if (!selfNeedsLayout())
                 setNeedsLayout(true);
         }
+
+        setWidth(oldwidth);
+        setHeight(oldheight);
     }
 
     if (shouldRepaint) {

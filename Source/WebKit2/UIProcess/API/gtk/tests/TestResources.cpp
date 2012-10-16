@@ -80,11 +80,6 @@ public:
     {
         test->assertObjectIsDeletedWhenTestFinishes(G_OBJECT(resource));
         test->assertObjectIsDeletedWhenTestFinishes(G_OBJECT(request));
-
-        // Ignore favicons.
-        if (g_str_has_suffix(webkit_uri_request_get_uri(request), "favicon.ico"))
-            return;
-
         test->resourceLoadStarted(resource, request);
         g_signal_connect(resource, "sent-request", G_CALLBACK(resourceSentRequestCallback), test);
         g_signal_connect(resource, "notify::response", G_CALLBACK(resourceReceivedResponseCallback), test);
@@ -512,31 +507,21 @@ static void testWebResourceGetData(ResourcesTest* test, gconstpointer)
 
 static void testWebViewResourcesHistoryCache(SingleResourceLoadTest* test, gconstpointer)
 {
-    CString javascriptURI = kServer->getURIForPath("/javascript.html");
-    test->loadURI(javascriptURI.data());
+    test->loadURI(kServer->getURIForPath("/").data());
     test->waitUntilResourceLoadFinished();
-    WebKitWebResource* resource = webkit_web_view_get_main_resource(test->m_webView);
-    g_assert(resource);
-    g_assert_cmpstr(webkit_web_resource_get_uri(resource), ==, javascriptURI.data());
+    g_assert(webkit_web_view_get_main_resource(test->m_webView));
 
-    CString simpleStyleCSSURI = kServer->getURIForPath("/simple-style-css.html");
-    test->loadURI(simpleStyleCSSURI.data());
+    test->loadURI(kServer->getURIForPath("/javascript.html").data());
     test->waitUntilResourceLoadFinished();
-    resource = webkit_web_view_get_main_resource(test->m_webView);
-    g_assert(resource);
-    g_assert_cmpstr(webkit_web_resource_get_uri(resource), ==, simpleStyleCSSURI.data());
+    g_assert(webkit_web_view_get_main_resource(test->m_webView));
 
     test->goBack();
     test->waitUntilResourceLoadFinished();
-    resource = webkit_web_view_get_main_resource(test->m_webView);
-    g_assert(resource);
-    g_assert_cmpstr(webkit_web_resource_get_uri(resource), ==, javascriptURI.data());
+    g_assert(webkit_web_view_get_main_resource(test->m_webView));
 
     test->goForward();
     test->waitUntilResourceLoadFinished();
-    resource = webkit_web_view_get_main_resource(test->m_webView);
-    g_assert(resource);
-    g_assert_cmpstr(webkit_web_resource_get_uri(resource), ==, simpleStyleCSSURI.data());
+    g_assert(webkit_web_view_get_main_resource(test->m_webView));
 }
 
 static void addCacheHTTPHeadersToResponse(SoupMessage* message)
@@ -582,9 +567,6 @@ static void serverCallback(SoupServer* server, SoupMessage* message, const char*
     } else if (g_str_equal(path, "/invalid-css.html")) {
         static const char* invalidCSSHtml = "<html><head><link rel='stylesheet' href='/invalid.css' type='text/css'></head><body></html>";
         soup_message_body_append(message->response_body, SOUP_MEMORY_STATIC, invalidCSSHtml, strlen(invalidCSSHtml));
-    } else if (g_str_equal(path, "/simple-style-css.html")) {
-        static const char* simpleStyleCSSHtml = "<html><head><link rel='stylesheet' href='/simple-style.css' type='text/css'></head><body></html>";
-        soup_message_body_append(message->response_body, SOUP_MEMORY_STATIC, simpleStyleCSSHtml, strlen(simpleStyleCSSHtml));
     } else if (g_str_equal(path, "/style.css")) {
         soup_message_body_append(message->response_body, SOUP_MEMORY_STATIC, kStyleCSS, strlen(kStyleCSS));
         addCacheHTTPHeadersToResponse(message);
@@ -612,8 +594,6 @@ static void serverCallback(SoupServer* server, SoupMessage* message, const char*
         soup_message_headers_append(message->response_headers, "Location", "/simple-style.css");
     } else if (g_str_equal(path, "/invalid.css"))
         soup_message_set_status(message, SOUP_STATUS_CANT_CONNECT);
-    else
-        soup_message_set_status(message, SOUP_STATUS_NOT_FOUND);
     soup_message_body_complete(message->response_body);
 }
 

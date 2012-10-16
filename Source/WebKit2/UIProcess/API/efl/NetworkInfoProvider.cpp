@@ -28,7 +28,6 @@
 
 #if ENABLE(NETWORK_INFO)
 
-#include "WKContext.h"
 #include "WKNetworkInfoManager.h"
 #include <NotImplemented.h>
 
@@ -57,18 +56,15 @@ static bool isMeteredCallback(WKNetworkInfoManagerRef, const void* clientInfo)
     return toNetworkInfoProvider(clientInfo)->metered();
 }
 
-PassRefPtr<NetworkInfoProvider> NetworkInfoProvider::create(WKContextRef wkContext)
+PassRefPtr<NetworkInfoProvider> NetworkInfoProvider::create(WKNetworkInfoManagerRef wkManager)
 {
-    return adoptRef(new NetworkInfoProvider(wkContext));
+    return adoptRef(new NetworkInfoProvider(wkManager));
 }
 
-NetworkInfoProvider::NetworkInfoProvider(WKContextRef wkContext)
-    : m_wkContext(wkContext)
+NetworkInfoProvider::NetworkInfoProvider(WKNetworkInfoManagerRef wkManager)
+    : m_wkNetworkInfoManager(wkManager)
 {
-    ASSERT(wkContext);
-
-    WKNetworkInfoManagerRef wkNetworkInfoManager = WKContextGetNetworkInfoManager(m_wkContext.get());
-    ASSERT(wkNetworkInfoManager);
+    ASSERT(wkManager);
 
     WKNetworkInfoProvider wkNetworkInfoProvider = {
         kWKNetworkInfoProviderCurrentVersion,
@@ -78,15 +74,11 @@ NetworkInfoProvider::NetworkInfoProvider(WKContextRef wkContext)
         getBandwidthCallback,
         isMeteredCallback
     };
-    WKNetworkInfoManagerSetProvider(wkNetworkInfoManager, &wkNetworkInfoProvider);
+    WKNetworkInfoManagerSetProvider(m_wkNetworkInfoManager.get(), &wkNetworkInfoProvider);
 }
 
 NetworkInfoProvider::~NetworkInfoProvider()
 {
-    WKNetworkInfoManagerRef wkNetworkInfoManager = WKContextGetNetworkInfoManager(m_wkContext.get());
-    ASSERT(wkNetworkInfoManager);
-
-    WKNetworkInfoManagerSetProvider(wkNetworkInfoManager, 0);
 }
 
 double NetworkInfoProvider::bandwidth() const

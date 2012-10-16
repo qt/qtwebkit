@@ -574,10 +574,10 @@ WebInspector.DefaultTextEditor.prototype = {
         if (!this.readOnly())
             WebInspector.markBeingEdited(this.element, false);
         this._freeCachedElements();
-    },
-
-    __proto__: WebInspector.View.prototype
+    }
 }
+
+WebInspector.DefaultTextEditor.prototype.__proto__ = WebInspector.View.prototype;
 
 /**
  * @constructor
@@ -1061,10 +1061,10 @@ WebInspector.TextEditorGutterPanel.prototype = {
             if (!decorations.length)
                 delete this._decorations[lineNumber];
         }
-    },
-
-    __proto__: WebInspector.TextEditorChunkedPanel.prototype
+    }
 }
+
+WebInspector.TextEditorGutterPanel.prototype.__proto__ = WebInspector.TextEditorChunkedPanel.prototype;
 
 /**
  * @constructor
@@ -1563,9 +1563,10 @@ WebInspector.TextEditorMainPanel.prototype = {
 
             if (lineNumber === range.startLine)
                 newRange.startColumn = Math.max(0, newRange.startColumn - lineIndentLength);
-            if (lineNumber === range.endLine)
-                newRange.endColumn = Math.max(0, newRange.endColumn - lineIndentLength);
         }
+
+        if (lineIndentLength)
+            newRange.endColumn = Math.max(0, newRange.endColumn - lineIndentLength);
 
         this._lastEditedRange = newRange;
 
@@ -2029,7 +2030,7 @@ WebInspector.TextEditorMainPanel.prototype = {
             var rangeBoundary = lineRow.rangeBoundaryForOffset(column);
         else {
             var offset = column;
-            for (var i = chunk.startLine; i < line && i < this._textModel.linesCount; ++i)
+            for (var i = chunk.startLine; i < line; ++i)
                 offset += this._textModel.lineLength(i) + 1; // \n
             lineRow = chunk.element;
             if (lineRow.firstChild)
@@ -2508,10 +2509,10 @@ WebInspector.TextEditorMainPanel.prototype = {
         textContents = textContent.split("\n");
         for (var i = 0; i < textContents.length; ++i)
             lines.push(textContents[i]);
-    },
-
-    __proto__: WebInspector.TextEditorChunkedPanel.prototype
+    }
 }
+
+WebInspector.TextEditorMainPanel.prototype.__proto__ = WebInspector.TextEditorChunkedPanel.prototype;
 
 /**
  * @constructor

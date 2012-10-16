@@ -42,17 +42,10 @@ inline size_t IndexingHeader::preCapacity(Structure* structure)
 
 inline size_t IndexingHeader::indexingPayloadSizeInBytes(Structure* structure)
 {
-    switch (structure->indexingType()) {
-    case ALL_CONTIGUOUS_INDEXING_TYPES:
-        return vectorLength() * sizeof(EncodedJSValue);
-        
-    case ALL_ARRAY_STORAGE_INDEXING_TYPES:
-        return ArrayStorage::sizeFor(arrayStorage()->vectorLength());
-        
-    default:
-        ASSERT(!hasIndexedProperties(structure->indexingType()));
+    if (LIKELY(!hasArrayStorage(structure->indexingType())))
         return 0;
-    }
+    
+    return ArrayStorage::sizeFor(arrayStorage()->vectorLength());
 }
 
 } // namespace JSC

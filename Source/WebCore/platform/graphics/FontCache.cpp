@@ -34,6 +34,7 @@
 #include "FontFallbackList.h"
 #include "FontPlatformData.h"
 #include "FontSelector.h"
+#include "GlyphPageTreeNode.h"
 #include "OpenTypeVerticalData.h"
 #include "WebKitFontFamilyNames.h"
 #include <wtf/HashMap.h>
@@ -210,7 +211,7 @@ FontPlatformData* FontCache::getCachedFontPlatformData(const FontDescription& fo
         gFontPlatformDataCache->set(key, result);
         foundResult = result;
     } else {
-        result = it->value;
+        result = it->second;
         foundResult = true;
     }
 
@@ -228,7 +229,7 @@ FontPlatformData* FontCache::getCachedFontPlatformData(const FontDescription& fo
 }
 
 #if ENABLE(OPENTYPE_VERTICAL)
-typedef HashMap<FontCache::FontFileKey, OwnPtr<OpenTypeVerticalData>, WTF::IntHash<FontCache::FontFileKey>, WTF::UnsignedWithZeroKeyHashTraits<FontCache::FontFileKey> > FontVerticalDataCache;
+typedef HashMap<FontCache::FontFileKey, OwnPtr<OpenTypeVerticalData> > FontVerticalDataCache;
 
 FontVerticalDataCache& fontVerticalDataCacheInstance()
 {
@@ -241,7 +242,7 @@ OpenTypeVerticalData* FontCache::getVerticalData(const FontFileKey& key, const F
     FontVerticalDataCache& fontVerticalDataCache = fontVerticalDataCacheInstance();
     FontVerticalDataCache::iterator result = fontVerticalDataCache.find(key);
     if (result != fontVerticalDataCache.end())
-        return result.get()->value.get();
+        return result.get()->second.get();
 
     OpenTypeVerticalData* verticalData = new OpenTypeVerticalData(platformData);
     if (!verticalData->isOpenType()) {
@@ -285,7 +286,7 @@ struct FontDataCacheKeyTraits : WTF::GenericHashTraits<FontPlatformData> {
     }
 };
 
-typedef HashMap<FontPlatformData, pair<RefPtr<SimpleFontData>, unsigned>, FontDataCacheKeyHash, FontDataCacheKeyTraits> FontDataCache;
+typedef HashMap<FontPlatformData, pair<SimpleFontData*, unsigned>, FontDataCacheKeyHash, FontDataCacheKeyTraits> FontDataCache;
 
 static FontDataCache* gFontDataCache = 0;
 
@@ -296,9 +297,9 @@ const int cTargetInactiveFontData = 200;
 const int cMaxInactiveFontData = 50; // Pretty Low Threshold
 const int cTargetInactiveFontData = 30;
 #endif
-static ListHashSet<RefPtr<SimpleFontData> >* gInactiveFontData = 0;
+static ListHashSet<const SimpleFontData*>* gInactiveFontData = 0;
 
-PassRefPtr<SimpleFontData> FontCache::getCachedFontData(const FontDescription& fontDescription, const AtomicString& family, bool checkingAlternateName, ShouldRetain shouldRetain)
+SimpleFontData* FontCache::getCachedFontData(const FontDescription& fontDescription, const AtomicString& family, bool checkingAlternateName, ShouldRetain shouldRetain)
 {
     FontPlatformData* platformData = getCachedFontPlatformData(fontDescription, family, checkingAlternateName);
     if (!platformData)
@@ -307,7 +308,7 @@ PassRefPtr<SimpleFontData> FontCache::getCachedFontData(const FontDescription& f
     return getCachedFontData(platformData, shouldRetain);
 }
 
-PassRefPtr<SimpleFontData> FontCache::getCachedFontData(const FontPlatformData* platformData, ShouldRetain shouldRetain)
+SimpleFontData* FontCache::getCachedFontData(const FontPlatformData* platformData, ShouldRetain shouldRetain)
 {
     if (!platformData)
         return 0;
@@ -319,37 +320,37 @@ PassRefPtr<SimpleFontData> FontCache::getCachedFontData(const FontPlatformData* 
 
     if (!gFontDataCache) {
         gFontDataCache = new FontDataCache;
-        gInactiveFontData = new ListHashSet<RefPtr<SimpleFontData> >;
+        gInactiveFontData = new ListHashSet<const SimpleFontData*>;
     }
 
     FontDataCache::iterator result = gFontDataCache->find(*platformData);
     if (result == gFontDataCache->end()) {
-        pair<RefPtr<SimpleFontData>, unsigned> newValue(SimpleFontData::create(*platformData), shouldRetain == Retain ? 1 : 0);
+        pair<SimpleFontData*, unsigned> newValue(new SimpleFontData(*platformData), shouldRetain == Retain ? 1 : 0);
         gFontDataCache->set(*platformData, newValue);
         if (shouldRetain == DoNotRetain)
             gInactiveFontData->add(newValue.first);
-        return newValue.first.release();
+        return newValue.first;
     }
 
-    if (!result.get()->value.second) {
-        ASSERT(gInactiveFontData->contains(result.get()->value.first));
-        gInactiveFontData->remove(result.get()->value.first);
+    if (!result.get()->second.second) {
+        ASSERT(gInactiveFontData->contains(result.get()->second.first));
+        gInactiveFontData->remove(result.get()->second.first);
     }
 
     if (shouldRetain == Retain)
-        result.get()->value.second++;
-    else if (!result.get()->value.second) {
+        result.get()->second.second++;
+    else if (!result.get()->second.second) {
         // If shouldRetain is DoNotRetain and count is 0, we want to remove the fontData from 
         // gInactiveFontData (above) and re-add here to update LRU position.
-        gInactiveFontData->add(result.get()->value.first);
+        gInactiveFontData->add(result.get()->second.first);
     }
 
-    return result.get()->value.first;
+    return result.get()->second.first;
 }
 
 SimpleFontData* FontCache::getNonRetainedLastResortFallbackFont(const FontDescription& fontDescription)
 {
-    return getLastResortFallbackFont(fontDescription, DoNotRetain).leakRef();
+    return getLastResortFallbackFont(fontDescription, DoNotRetain);
 }
 
 void FontCache::releaseFontData(const SimpleFontData* fontData)
@@ -360,9 +361,9 @@ void FontCache::releaseFontData(const SimpleFontData* fontData)
     FontDataCache::iterator it = gFontDataCache->find(fontData->platformData());
     ASSERT(it != gFontDataCache->end());
 
-    ASSERT(it->value.second);
-    if (!--it->value.second)
-        gInactiveFontData->add(it->value.first);
+    ASSERT(it->second.second);
+    if (!--it->second.second)
+        gInactiveFontData->add(fontData);
 }
 
 void FontCache::purgeInactiveFontDataIfNeeded()
@@ -382,11 +383,11 @@ void FontCache::purgeInactiveFontData(int count)
 
     isPurging = true;
 
-    Vector<RefPtr<SimpleFontData>, 20> fontDataToDelete;
-    ListHashSet<RefPtr<SimpleFontData> >::iterator end = gInactiveFontData->end();
-    ListHashSet<RefPtr<SimpleFontData> >::iterator it = gInactiveFontData->begin();
+    Vector<const SimpleFontData*, 20> fontDataToDelete;
+    ListHashSet<const SimpleFontData*>::iterator end = gInactiveFontData->end();
+    ListHashSet<const SimpleFontData*>::iterator it = gInactiveFontData->begin();
     for (int i = 0; i < count && it != end; ++it, ++i) {
-        RefPtr<SimpleFontData>& fontData = *it.get();
+        const SimpleFontData* fontData = *it.get();
         gFontDataCache->remove(fontData->platformData());
         // We should not delete SimpleFontData here because deletion can modify gInactiveFontData. See http://trac.webkit.org/changeset/44011
         fontDataToDelete.append(fontData);
@@ -400,15 +401,17 @@ void FontCache::purgeInactiveFontData(int count)
             gInactiveFontData->remove(gInactiveFontData->begin());
     }
 
-    fontDataToDelete.clear();
+    size_t fontDataToDeleteCount = fontDataToDelete.size();
+    for (size_t i = 0; i < fontDataToDeleteCount; ++i)
+        delete fontDataToDelete[i];
 
     if (gFontPlatformDataCache) {
         Vector<FontPlatformDataCacheKey> keysToRemove;
         keysToRemove.reserveInitialCapacity(gFontPlatformDataCache->size());
         FontPlatformDataCache::iterator platformDataEnd = gFontPlatformDataCache->end();
         for (FontPlatformDataCache::iterator platformData = gFontPlatformDataCache->begin(); platformData != platformDataEnd; ++platformData) {
-            if (platformData->value && !gFontDataCache->contains(*platformData->value))
-                keysToRemove.append(platformData->key);
+            if (platformData->second && !gFontDataCache->contains(*platformData->second))
+                keysToRemove.append(platformData->first);
         }
         
         size_t keysToRemoveCount = keysToRemove.size();
@@ -422,20 +425,20 @@ void FontCache::purgeInactiveFontData(int count)
         // Mark & sweep unused verticalData
         FontVerticalDataCache::iterator verticalDataEnd = fontVerticalDataCache.end();
         for (FontVerticalDataCache::iterator verticalData = fontVerticalDataCache.begin(); verticalData != verticalDataEnd; ++verticalData) {
-            if (verticalData->value)
-                verticalData->value->m_inFontCache = false;
+            if (verticalData->second)
+                verticalData->second->m_inFontCache = false;
         }
         FontDataCache::iterator fontDataEnd = gFontDataCache->end();
         for (FontDataCache::iterator fontData = gFontDataCache->begin(); fontData != fontDataEnd; ++fontData) {
-            OpenTypeVerticalData* verticalData = const_cast<OpenTypeVerticalData*>(fontData->value.first->verticalData());
+            OpenTypeVerticalData* verticalData = const_cast<OpenTypeVerticalData*>(fontData->second.first->verticalData());
             if (verticalData)
                 verticalData->m_inFontCache = true;
         }
         Vector<FontFileKey> keysToRemove;
         keysToRemove.reserveInitialCapacity(fontVerticalDataCache.size());
         for (FontVerticalDataCache::iterator verticalData = fontVerticalDataCache.begin(); verticalData != verticalDataEnd; ++verticalData) {
-            if (!verticalData->value || !verticalData->value->m_inFontCache)
-                keysToRemove.append(verticalData->key);
+            if (!verticalData->second || !verticalData->second->m_inFontCache)
+                keysToRemove.append(verticalData->first);
         }
         for (size_t i = 0, count = keysToRemove.size(); i < count; ++i)
             fontVerticalDataCache.take(keysToRemove[i]);
@@ -459,9 +462,9 @@ size_t FontCache::inactiveFontDataCount()
     return 0;
 }
 
-PassRefPtr<FontData> FontCache::getFontData(const Font& font, int& familyIndex, FontSelector* fontSelector)
+const FontData* FontCache::getFontData(const Font& font, int& familyIndex, FontSelector* fontSelector)
 {
-    RefPtr<FontData> result;
+    FontData* result = 0;
 
     int startIndex = familyIndex;
     const FontFamily* startFamily = &font.fontDescription().family();
@@ -495,14 +498,14 @@ PassRefPtr<FontData> FontCache::getFontData(const Font& font, int& familyIndex, 
 
         if (fontSelector) {
             // Try the user's preferred standard font.
-            if (RefPtr<FontData> data = fontSelector->getFontData(font.fontDescription(), standardFamily))
-                return data.release();
+            if (FontData* data = fontSelector->getFontData(font.fontDescription(), standardFamily))
+                return data;
         }
 
         // Still no result.  Hand back our last resort fallback font.
         result = getLastResortFallbackFont(font.fontDescription());
     }
-    return result.release();
+    return result;
 }
 
 static HashSet<FontSelector*>* gClients;

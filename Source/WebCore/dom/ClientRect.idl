@@ -24,12 +24,15 @@
  *
  */
 
-interface ClientRect {
-    readonly attribute float top;
-    readonly attribute float right;
-    readonly attribute float bottom;
-    readonly attribute float left;
-    readonly attribute float width;
-    readonly attribute float height;
-};
+module view {
 
+    interface ClientRect {
+        readonly attribute float top;
+        readonly attribute float right;
+        readonly attribute float bottom;
+        readonly attribute float left;
+        readonly attribute float width;
+        readonly attribute float height;
+    };
+
+}

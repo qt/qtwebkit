@@ -149,7 +149,7 @@ WebInspector.DOMStorageItemsView.prototype = {
             this.domStorage.removeItem(node.data[0]);
 
         this.update();
-    },
-
-    __proto__: WebInspector.View.prototype
+    }
 }
+
+WebInspector.DOMStorageItemsView.prototype.__proto__ = WebInspector.View.prototype;

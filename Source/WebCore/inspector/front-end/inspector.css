@@ -66,8 +66,8 @@ body.inactive #toolbar {
     border-bottom: 1px solid rgb(64%, 64%, 64%);
 }
 
-body.undocked.platform-mac-leopard #toolbar,
-body.undocked.platform-mac-snowleopard #toolbar {
+body.detached.platform-mac-leopard #toolbar,
+body.detached.platform-mac-snowleopard #toolbar {
     background: transparent;
 }
 
@@ -194,8 +194,8 @@ body.compact #toolbar-dropdown-arrow {
     background-image: inherit;
 }
 
-body.undocked.platform-mac-leopard #toolbar-dropdown,
-body.undocked.platform-mac-snowleopard #toolbar-dropdown {
+body.detached.platform-mac-leopard #toolbar-dropdown,
+body.detached.platform-mac-snowleopard #toolbar-dropdown {
     background-image: -webkit-gradient(linear, left top, left bottom, from(rgb(191, 191, 191)), to(rgb(151, 151, 151)));
 }
 
@@ -1020,11 +1020,6 @@ body.platform-linux .monospace, body.platform-linux .source-code {
     color: rgb(15%, 15%, 15%);
 }
 
-ol.watch-expressions > li.hovered,
-.console-message:hover { 
-    background-color: #F0F0F0;
-}
-
 .console-message-url {
     float: right;
     margin-left: 4px;
@@ -1371,6 +1366,7 @@ iframe.panel.extension {
     float: right;
     font-size: 10px;
     margin-left: 5px;
+    max-width: 55%;
     color: rgba(0, 0, 0, 0.7);
     text-overflow: ellipsis;
     overflow: hidden;
@@ -1578,17 +1574,10 @@ li.editing .swatch, li.editing .enabled-button,  li.editing-sub-part .delete-but
 
 .properties-tree.watch-expressions {
     padding-bottom: 8px;
-    padding-left: 4px !important;
 }
 
-.properties-tree.watch-expressions > li {
+.properties-tree.watch-expressions li {
     padding-top: 2px;
-    padding-left: 4px;
-}
-
-.properties-tree.watch-expressions > li:not(.parent) {
-    margin-left: 1px;
-    padding-left: 15px;
 }
 
 .watch-expressions > li.editing-sub-part .text-prompt {
@@ -1619,7 +1608,8 @@ li.editing .swatch, li.editing .enabled-button,  li.editing-sub-part .delete-but
     background-repeat: no-repeat;
     border: 0 none transparent;
     position: absolute;
-    right: 8px;
+    margin-left: -25px;
+    margin-top: 2px;
     display: none;
 }
 

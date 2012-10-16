@@ -33,6 +33,7 @@ using namespace JSC;
 
 namespace WebCore {
 
+ASSERT_CLASS_FITS_IN_CELL(JSTestActiveDOMObject);
 /* Hash table */
 
 static const HashTableValue JSTestActiveDOMObjectTableValues[] =

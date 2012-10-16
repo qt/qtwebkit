@@ -18,16 +18,19 @@
  * Boston, MA 02110-1301, USA.
  */
 
-[
-    CustomIsReachable,
-    IndexedGetter,
-    NamedGetter,
-    V8DependentLifetime
-] interface NodeList {
+module core {
 
-    Node item(in [IsIndex,Optional=DefaultIsUndefined] unsigned long index);
+    interface [
+        CustomIsReachable,
+        IndexedGetter,
+        NamedGetter,
+        V8DependentLifetime
+    ] NodeList {
 
-    readonly attribute unsigned long length;
+        Node item(in [IsIndex,Optional=DefaultIsUndefined] unsigned long index);
 
-};
+        readonly attribute unsigned long length;
 
+    };
+
+}

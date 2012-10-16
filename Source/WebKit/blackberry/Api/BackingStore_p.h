@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2010, 2011, 2012 Research In Motion Limited. All rights reserved.
+ * Copyright (C) 2009, 2010, 2011 Research In Motion Limited. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -38,11 +38,6 @@ class TransformationMatrix;
 }
 
 namespace BlackBerry {
-
-namespace Platform {
-class ViewportAccessor;
-}
-
 namespace WebKit {
 
 class BackingStoreTile;
@@ -56,7 +51,6 @@ public:
     BackingStoreGeometry()
         : m_numberOfTilesWide(0)
         , m_numberOfTilesHigh(0)
-        , m_scale(0.0)
     {
     }
 
@@ -73,13 +67,9 @@ public:
     const TileMap& tileMap() const { return m_tileMap; }
     void setTileMap(const TileMap& tileMap) { m_tileMap = tileMap; }
 
-    double scale() const { return m_scale; }
-    void setScale(double scale) { m_scale = scale; }
-
   private:
     int m_numberOfTilesWide;
     int m_numberOfTilesHigh;
-    double m_scale;
     Platform::IntPoint m_backingStoreOffset;
     TileMap m_tileMap;
 };
@@ -126,10 +116,10 @@ public:
 
     bool isSuspended() const { return m_suspendBackingStoreUpdates; }
 
-    // Suspends all screen updates so that 'blitVisibleContents' is disabled.
+    // Suspends all screen updates so that 'blitContents' is disabled.
     void suspendScreenAndBackingStoreUpdates();
 
-    // Resumes all screen updates so that 'blitVisibleContents' is enabled.
+    // Resumes all screen updates so that 'blitContents' is enabled.
     void resumeScreenAndBackingStoreUpdates(BackingStore::ResumeUpdateOperation);
 
     // The functions repaint(), slowScroll(), scroll(), scrollingStartedHelper() are
@@ -164,7 +154,7 @@ public:
     bool canMoveDown(const Platform::IntRect&) const;
 
     Platform::IntRect backingStoreRectForScroll(int deltaX, int deltaY, const Platform::IntRect&) const;
-    void setBackingStoreRect(const Platform::IntRect&, double scale);
+    void setBackingStoreRect(const Platform::IntRect&);
 
     typedef WTF::Vector<TileIndex> TileIndexList;
     TileIndexList indexesForBackingStoreRect(const Platform::IntRect&) const;
@@ -203,16 +193,16 @@ public:
     // Assumes the rect to be in window/viewport coordinates.
     void copyPreviousContentsToBackSurfaceOfWindow();
     void copyPreviousContentsToBackSurfaceOfTile(const Platform::IntRect&, BackingStoreTile*);
-    void paintDefaultBackground(const Platform::IntRect& dstRect, BlackBerry::Platform::ViewportAccessor*, bool flush);
+    void paintDefaultBackground(const Platform::IntRect& contents, const WebCore::TransformationMatrix&, bool flush);
+    void blitContents(const Platform::IntRect& dstRect, const Platform::IntRect& contents, bool force = false);
     void blitOnIdle();
 
     typedef std::pair<TileIndex, Platform::IntRect> TileRect;
     Platform::IntRect blitTileRect(TileBuffer*, const TileRect&, const Platform::IntPoint&, const WebCore::TransformationMatrix&, BackingStoreGeometry*);
 
 #if USE(ACCELERATED_COMPOSITING)
-    // Use instead of blitVisibleContents() if you need more control over
-    // OpenGL state. Note that contents is expressed in untransformed
-    // content coordinates.
+    // Use instead of blitContents if you need more control over OpenGL state.
+    // Note that contents is expressed in untransformed content coordinates.
     // Preconditions: You have to call prepareFrame and setViewport on the LayerRenderer before
     //                calling this.
     void compositeContents(WebCore::LayerRenderer*, const WebCore::TransformationMatrix&, const WebCore::FloatRect& contents, bool contentsOpaque);
@@ -226,8 +216,8 @@ public:
     void setDirectRenderingAnimationMessageScheduled() { m_isDirectRenderingAnimationMessageScheduled = true; }
 #endif
 
-    void blitHorizontalScrollbar();
-    void blitVerticalScrollbar();
+    void blitHorizontalScrollbar(const Platform::IntPoint&);
+    void blitVerticalScrollbar(const Platform::IntPoint&);
 
     // Returns whether the tile index is currently visible or not.
     bool isTileVisible(const TileIndex&) const;

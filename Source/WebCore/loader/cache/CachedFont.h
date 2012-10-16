@@ -39,6 +39,9 @@ class CachedResourceLoader;
 class FontPlatformData;
 class SVGDocument;
 class SVGFontElement;
+class SharedBuffer;
+struct FontCustomPlatformData;
+
 struct FontCustomPlatformData;
 
 class CachedFont : public CachedResource {
@@ -49,7 +52,7 @@ public:
     virtual void load(CachedResourceLoader*, const ResourceLoaderOptions&);
 
     virtual void didAddClient(CachedResourceClient*);
-    virtual void data(PassRefPtr<ResourceBuffer> data, bool allDataReceived);
+    virtual void data(PassRefPtr<SharedBuffer> data, bool allDataReceived);
 
     virtual void allClientsRemoved();
     void beginLoadIfNeeded(CachedResourceLoader* dl);

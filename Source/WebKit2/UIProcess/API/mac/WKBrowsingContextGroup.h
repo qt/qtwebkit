@@ -36,11 +36,6 @@ WK_EXPORT
 
 - (id)initWithIdentifier:(NSString *)identifier;
 
-/* User Content */
-
-- (void)addUserStyleSheet:(NSString *)source baseURL:(NSURL *)baseURL whitelist:(NSArray *)whitelist blacklist:(NSArray *)blacklist mainFrameOnly:(BOOL)mainFrameOnly;
-- (void)removeAllUserStyleSheets;
-
 
 /* Settings */
 

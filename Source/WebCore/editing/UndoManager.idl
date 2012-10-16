@@ -28,25 +28,28 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=UNDO_MANAGER,
-    V8GenerateIsReachable=ImplOwnerNodeRoot
-] interface UndoManager {
-    [Custom] void transact(in Dictionary transaction, in boolean merge);
+module core {
 
-    void undo()
-        raises(DOMException);
-    void redo()
-        raises(DOMException);
+    interface [
+        Conditional=UNDO_MANAGER,
+        V8GenerateIsReachable=ImplOwnerNodeRoot
+    ] UndoManager {
+        [Custom] void transact(in Dictionary transaction, in boolean merge);
 
-    [Custom] sequence<DOMTransaction> item(in unsigned long index);
+        void undo()
+            raises(DOMException);
+        void redo()
+            raises(DOMException);
 
-    readonly attribute unsigned long length;
-    readonly attribute unsigned long position;
+        [Custom] sequence<DOMTransaction> item(in unsigned long index);
 
-    void clearUndo()
-        raises(DOMException);
-    void clearRedo()
-        raises(DOMException);
-};
+        readonly attribute unsigned long length;
+        readonly attribute unsigned long position;
 
+        void clearUndo()
+            raises(DOMException);
+        void clearRedo()
+            raises(DOMException);
+    };
+
+}

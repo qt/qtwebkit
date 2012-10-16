@@ -30,7 +30,6 @@
 #include <wtf/Assertions.h>
 #include <wtf/FastMalloc.h>
 #include <wtf/HashSet.h>
-#include <wtf/text/ASCIIFastPath.h>
 #include <wtf/text/StringHash.h>
 
 using WTF::ThreadSpecific;
@@ -81,7 +80,11 @@ struct IdentifierLCharFromUCharTranslator {
     {
         LChar* d;
         StringImpl* r = StringImpl::createUninitialized(buf.length, d).leakRef();
-        WTF::copyLCharsFromUCharSource(d, buf.s, buf.length);
+        for (unsigned i = 0; i != buf.length; i++) {
+            UChar c = buf.s[i];
+            ASSERT(c <= 0xff);
+            d[i] = c;
+        }
         r->setHash(hash);
         location = r; 
     }
@@ -99,7 +102,7 @@ PassRefPtr<StringImpl> Identifier::add(JSGlobalData* globalData, const char* c)
 
     const LiteralIdentifierTable::iterator& iter = literalIdentifierTable.find(c);
     if (iter != literalIdentifierTable.end())
-        return iter->value;
+        return iter->second;
 
     HashSet<StringImpl*>::AddResult addResult = identifierTable.add<const LChar*, IdentifierASCIIStringTranslator>(reinterpret_cast<const LChar*>(c));
 

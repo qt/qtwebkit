@@ -43,12 +43,11 @@ class Dictionary;
 
 class MediaConstraintsImpl : public MediaConstraints {
 public:
-    static PassRefPtr<MediaConstraintsImpl> create();
     static PassRefPtr<MediaConstraintsImpl> create(const Dictionary&, ExceptionCode&);
     virtual ~MediaConstraintsImpl();
 
-    virtual void getMandatoryConstraints(Vector<MediaConstraint>&) const OVERRIDE;
-    virtual void getOptionalConstraints(Vector<MediaConstraint>&) const OVERRIDE;
+    virtual void getMandatoryConstraintNames(Vector<String>& names) const OVERRIDE;
+    virtual void getOptionalConstraintNames(Vector<String>& names) const OVERRIDE;
 
     virtual bool getMandatoryConstraintValue(const String& name, String& value) const OVERRIDE;
     virtual bool getOptionalConstraintValue(const String& name, String& value) const OVERRIDE;
@@ -58,7 +57,8 @@ private:
     bool initialize(const Dictionary&);
 
     HashMap<String, String> m_mandatoryConstraints;
-    Vector<MediaConstraint> m_optionalConstraints;
+    Vector<String> m_optionalConstraintNames;
+    Vector<String> m_optionalConstraintValues;
 };
 
 } // namespace WebCore

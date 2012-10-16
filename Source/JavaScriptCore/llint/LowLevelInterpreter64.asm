@@ -796,23 +796,23 @@ _llint_op_is_string:
     dispatch(3)
 
 
-macro loadPropertyAtVariableOffsetKnownNotInline(propertyOffsetAsPointer, objectAndStorage, value)
-    assert(macro (ok) bigteq propertyOffsetAsPointer, firstOutOfLineOffset, ok end)
+macro loadPropertyAtVariableOffsetKnownNotFinal(propertyOffsetAsPointer, objectAndStorage, value)
+    assert(macro (ok) bigteq propertyOffsetAsPointer, InlineStorageCapacity, ok end)
     negp propertyOffsetAsPointer
     loadp JSObject::m_butterfly[objectAndStorage], objectAndStorage
-    loadp (firstOutOfLineOffset - 2) * 8[objectAndStorage, propertyOffsetAsPointer, 8], value
+    loadp (InlineStorageCapacity - 1) * 8 - sizeof IndexingHeader[objectAndStorage, propertyOffsetAsPointer, 8], value
 end
 
 macro loadPropertyAtVariableOffset(propertyOffsetAsInt, objectAndStorage, value)
-    bilt propertyOffsetAsInt, firstOutOfLineOffset, .isInline
+    bilt propertyOffsetAsInt, InlineStorageCapacity, .isInline
     loadp JSObject::m_butterfly[objectAndStorage], objectAndStorage
     negi propertyOffsetAsInt
     sxi2p propertyOffsetAsInt, propertyOffsetAsInt
     jmp .ready
 .isInline:
-    addp sizeof JSObject - (firstOutOfLineOffset - 2) * 8, objectAndStorage
+    addp JSFinalObject::m_inlineStorage - (InlineStorageCapacity - 1) * 8 + sizeof IndexingHeader, objectAndStorage
 .ready:
-    loadp (firstOutOfLineOffset - 2) * 8[objectAndStorage, propertyOffsetAsInt, 8], value
+    loadp (InlineStorageCapacity - 1) * 8 - sizeof IndexingHeader[objectAndStorage, propertyOffsetAsInt, 8], value
 end
 
 macro resolveGlobal(size, slow)
@@ -826,7 +826,7 @@ macro resolveGlobal(size, slow)
     loadp JSCell::m_structure[t0], t1
     bpneq t1, 24[PB, PC, 8], slow
     loadis 32[PB, PC, 8], t1
-    loadPropertyAtVariableOffsetKnownNotInline(t1, t0, t2)
+    loadPropertyAtVariableOffset(t1, t0, t2)
     loadis 8[PB, PC, 8], t0
     storep t2, [cfr, t0, 8]
     loadp (size - 1) * 8[PB, PC, 8], t0
@@ -1018,7 +1018,7 @@ _llint_op_get_array_length:
     loadp JSCell::m_structure[t3], t2
     arrayProfile(t2, t1, t0)
     btiz t2, IsArray, .opGetArrayLengthSlow
-    btiz t2, IndexingShapeMask, .opGetArrayLengthSlow
+    btiz t2, HasArrayStorage, .opGetArrayLengthSlow
     loadis 8[PB, PC, 8], t1
     loadp 64[PB, PC, 8], t2
     loadp JSObject::m_butterfly[t3], t0
@@ -1147,27 +1147,14 @@ _llint_op_get_by_val:
     loadp 32[PB, PC, 8], t3
     arrayProfile(t2, t3, t1)
     loadis 24[PB, PC, 8], t3
+    btiz t2, HasArrayStorage, .opGetByValSlow
     loadConstantOrVariableInt32(t3, t1, .opGetByValSlow)
     sxi2p t1, t1
     loadp JSObject::m_butterfly[t0], t3
-    andi IndexingShapeMask, t2
-    bineq t2, ContiguousShape, .opGetByValNotContiguous
-
-    biaeq t1, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t3], .opGetByValSlow
-    loadis 8[PB, PC, 8], t0
-    loadp [t3, t1, 8], t2
-    btpz t2, .opGetByValSlow
-    jmp .opGetByValDone
-
-.opGetByValNotContiguous:
-    subi ArrayStorageShape, t2
-    bia t2, SlowPutArrayStorageShape - ArrayStorageShape, .opGetByValSlow
     biaeq t1, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t3], .opGetByValSlow
     loadis 8[PB, PC, 8], t0
     loadp ArrayStorage::m_vector[t3, t1, 8], t2
     btpz t2, .opGetByValSlow
-
-.opGetByValDone:
     storep t2, [cfr, t0, 8]
     loadp 40[PB, PC, 8], t0
     valueProfile(t2, t0)
@@ -1221,10 +1208,7 @@ _llint_op_get_by_pname:
     loadi PayloadOffset[cfr, t3, 8], t3
     subi 1, t3
     biaeq t3, JSPropertyNameIterator::m_numCacheableSlots[t1], .opGetByPnameSlow
-    bilt t3, JSPropertyNameIterator::m_cachedStructureInlineCapacity[t1], .opGetByPnameInlineProperty
-    addi firstOutOfLineOffset, t3
-    subi JSPropertyNameIterator::m_cachedStructureInlineCapacity[t1], t3
-.opGetByPnameInlineProperty:
+    addi JSPropertyNameIterator::m_offsetBase[t1], t3
     loadPropertyAtVariableOffset(t3, t0, t0)
     loadis 8[PB, PC, 8], t1
     storep t0, [cfr, t1, 8]
@@ -1242,52 +1226,29 @@ _llint_op_put_by_val:
     loadp JSCell::m_structure[t1], t2
     loadp 32[PB, PC, 8], t3
     arrayProfile(t2, t3, t0)
+    btiz t2, HasArrayStorage, .opPutByValSlow
     loadis 16[PB, PC, 8], t0
-    loadConstantOrVariableInt32(t0, t3, .opPutByValSlow)
-    sxi2p t3, t3
+    loadConstantOrVariableInt32(t0, t2, .opPutByValSlow)
+    sxi2p t2, t2
     loadp JSObject::m_butterfly[t1], t0
-    andi IndexingShapeMask, t2
-    bineq t2, ContiguousShape, .opPutByValNotContiguous
-    
-    biaeq t3, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t0], .opPutByValContiguousOutOfBounds
-.opPutByValContiguousStoreResult:
-    loadis 24[PB, PC, 8], t2
-    loadConstantOrVariable(t2, t1)
+    biaeq t2, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t0], .opPutByValSlow
+    btpz ArrayStorage::m_vector[t0, t2, 8], .opPutByValEmpty
+.opPutByValStoreResult:
+    loadis 24[PB, PC, 8], t3
+    loadConstantOrVariable(t3, t1)
     writeBarrier(t1)
-    storep t1, [t0, t3, 8]
+    storep t1, ArrayStorage::m_vector[t0, t2, 8]
     dispatch(5)
 
-.opPutByValContiguousOutOfBounds:
-    biaeq t3, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t0], .opPutByValSlow
+.opPutByValEmpty:
     if VALUE_PROFILER
-        loadp 32[PB, PC, 8], t2
-        storeb 1, ArrayProfile::m_mayStoreToHole[t2]
-    end
-    addi 1, t3, t2
-    storei t2, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t0]
-    jmp .opPutByValContiguousStoreResult
-
-.opPutByValNotContiguous:
-    bineq t2, ArrayStorageShape, .opPutByValSlow
-    biaeq t3, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t0], .opPutByValSlow
-    btpz ArrayStorage::m_vector[t0, t3, 8], .opPutByValArrayStorageEmpty
-.opPutByValArrayStorageStoreResult:
-    loadis 24[PB, PC, 8], t2
-    loadConstantOrVariable(t2, t1)
-    writeBarrier(t1)
-    storep t1, ArrayStorage::m_vector[t0, t3, 8]
-    dispatch(5)
-
-.opPutByValArrayStorageEmpty:
-    if VALUE_PROFILER
-        loadp 32[PB, PC, 8], t1
-        storeb 1, ArrayProfile::m_mayStoreToHole[t1]
+        storeb 1, ArrayProfile::m_mayStoreToHole[t3]
     end
     addi 1, ArrayStorage::m_numValuesInVector[t0]
-    bib t3, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t0], .opPutByValArrayStorageStoreResult
-    addi 1, t3, t1
+    bib t2, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t0], .opPutByValStoreResult
+    addi 1, t2, t1
     storei t1, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t0]
-    jmp .opPutByValArrayStorageStoreResult
+    jmp .opPutByValStoreResult
 
 .opPutByValSlow:
     callSlowPath(_llint_slow_path_put_by_val)
@@ -1367,10 +1328,7 @@ _llint_op_jneq_null:
 _llint_op_jneq_ptr:
     traceExecution()
     loadis 8[PB, PC, 8], t0
-    loadi 16[PB, PC, 8], t1
-    loadp CodeBlock[cfr], t2
-    loadp CodeBlock::m_globalObject[t2], t2
-    loadp JSGlobalObject::m_specialPointers[t2, t1, 8], t1
+    loadp 16[PB, PC, 8], t1
     bpneq t1, [cfr, t0, 8], .opJneqPtrTarget
     dispatch(4)
 

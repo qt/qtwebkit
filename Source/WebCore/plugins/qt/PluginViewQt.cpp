@@ -56,11 +56,11 @@
 #include "MouseEvent.h"
 #include "NotImplemented.h"
 #include "Page.h"
-#include "PlatformKeyboardEvent.h"
 #include "PlatformMouseEvent.h"
+#include "PlatformKeyboardEvent.h"
 #include "PluginDebug.h"
-#include "PluginMainThreadScheduler.h"
 #include "PluginPackage.h"
+#include "PluginMainThreadScheduler.h"
 #include "QWebPageClient.h"
 #include "RenderObject.h"
 #include "Settings.h"
@@ -81,8 +81,8 @@
 
 #include "QtX11ImageConversion.h"
 #include <QGuiApplication>
-#include <QWindow>
 #include <qpa/qplatformnativeinterface.h>
+#include <QWindow>
 
 using JSC::ExecState;
 #if USE(JSC)

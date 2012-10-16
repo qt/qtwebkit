@@ -23,24 +23,20 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-var global = {
-    argumentsReceived: false,
-    params: null
-};
+window.argumentsReceived = false;
 
 /**
  * @param {Event} event
  */
 function handleMessage(event) {
     initialize(JSON.parse(event.data));
-    global.argumentsReceived = true;
+    window.argumentsReceived = true;
 }
 
 /**
  * @param {!Object} args
  */
-function initialize(args) { 
-    global.params = args;
+function initialize(args) {
     var main = $("main");
     main.innerHTML = "";
     var errorString = validateArguments(args);
@@ -57,7 +53,7 @@ var DefaultColorPalette = ["#000000", "#404040", "#808080", "#c0c0c0",
     "#4a86e8", "#0000ff", "#9900ff", "#ff00ff"];
 
 function handleArgumentsTimeout() {
-    if (global.argumentsReceived)
+    if (window.argumentsReceived)
         return;
     var args = {
         values : DefaultColorPalette,

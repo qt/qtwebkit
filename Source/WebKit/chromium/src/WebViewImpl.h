@@ -392,7 +392,7 @@ public:
     void mouseContextMenu(const WebMouseEvent&);
     void mouseDoubleClick(const WebMouseEvent&);
 
-    bool detectContentOnTouch(const WebPoint&);
+    bool detectContentOnTouch(const WebPoint&, WebInputEvent::Type);
     void startPageScaleAnimation(const WebCore::IntPoint& targetPosition, bool useAnchor, float newScale, double durationInSeconds);
 
     void numberOfWheelEventHandlersChanged(unsigned);
@@ -561,13 +561,11 @@ public:
     void fullFramePluginZoomLevelChanged(double zoomLevel);
 
 #if ENABLE(GESTURE_EVENTS)
-    void computeScaleAndScrollForHitRect(const WebRect& hitRect, AutoZoomType, float& scale, WebPoint& scroll, bool& isAnchor);
+    void computeScaleAndScrollForHitRect(const WebRect& hitRect, AutoZoomType, float& scale, WebPoint& scroll);
     WebCore::Node* bestTouchLinkNode(WebCore::IntPoint touchEventLocation);
     void enableTouchHighlight(WebCore::IntPoint touchEventLocation);
 #endif
     void animateZoomAroundPoint(const WebCore::IntPoint&, AutoZoomType);
-
-    void shouldUseAnimateDoubleTapTimeZeroForTesting(bool);
 
     void loseCompositorContext(int numTimes);
 
@@ -741,12 +739,6 @@ private:
     // Saved page scale state.
     float m_savedPageScaleFactor; // 0 means that no page scale factor is saved.
     WebCore::IntSize m_savedScrollOffset;
-
-    // Whether the current scale was achieved by zooming in with double tap.
-    bool m_doubleTapZoomInEffect;
-
-    // Used for testing purposes.
-    bool m_shouldUseDoubleTapTimeZero;
 
     bool m_contextMenuAllowed;
 

@@ -516,6 +516,8 @@ void RenderTableSection::layoutRows()
 
     ASSERT(!needsLayout());
 
+    int rHeight;
+    unsigned rindx;
     unsigned totalRows = m_grid.size();
 
     // Set the width of our section now.  The rows will also be this width.
@@ -547,9 +549,9 @@ void RenderTableSection::layoutRows()
             if (!cell || cs.inColSpan)
                 continue;
 
-            int rowIndex = cell->rowIndex();
-            int rHeight = m_rowPos[rowIndex + cell->rowSpan()] - m_rowPos[rowIndex] - vspacing;
-
+            rindx = cell->rowIndex();
+            rHeight = m_rowPos[rindx + cell->rowSpan()] - m_rowPos[rindx] - vspacing;
+            
             // Force percent height children to lay themselves out again.
             // This will cause these children to grow to fill the cell.
             // FIXME: There is still more work to do here to fully match WinIE (should
@@ -614,11 +616,45 @@ void RenderTableSection::layoutRows()
                 }
             }
 
-            cell->computeIntrinsicPadding(rHeight);
+            int oldIntrinsicPaddingBefore = cell->intrinsicPaddingBefore();
+            int oldIntrinsicPaddingAfter = cell->intrinsicPaddingAfter();
+            int logicalHeightWithoutIntrinsicPadding = cell->pixelSnappedLogicalHeight() - oldIntrinsicPaddingBefore - oldIntrinsicPaddingAfter;
+
+            int intrinsicPaddingBefore = 0;
+            switch (cell->style()->verticalAlign()) {
+                case SUB:
+                case SUPER:
+                case TEXT_TOP:
+                case TEXT_BOTTOM:
+                case LENGTH:
+                case BASELINE: {
+                    LayoutUnit baseline = cell->cellBaselinePosition();
+                    if (baseline > cell->borderBefore() + cell->paddingBefore())
+                        intrinsicPaddingBefore = getBaseline(cell->rowIndex()) - (baseline - oldIntrinsicPaddingBefore);
+                    break;
+                }
+                case TOP:
+                    break;
+                case MIDDLE:
+                    intrinsicPaddingBefore = (rHeight - logicalHeightWithoutIntrinsicPadding) / 2;
+                    break;
+                case BOTTOM:
+                    intrinsicPaddingBefore = rHeight - logicalHeightWithoutIntrinsicPadding;
+                    break;
+                default:
+                    break;
+            }
+            
+            int intrinsicPaddingAfter = rHeight - logicalHeightWithoutIntrinsicPadding - intrinsicPaddingBefore;
+            cell->setIntrinsicPaddingBefore(intrinsicPaddingBefore);
+            cell->setIntrinsicPaddingAfter(intrinsicPaddingAfter);
 
             LayoutRect oldCellRect = cell->frameRect();
 
             setLogicalPositionForCell(cell, c);
+
+            if (intrinsicPaddingBefore != oldIntrinsicPaddingBefore || intrinsicPaddingAfter != oldIntrinsicPaddingAfter)
+                cell->setNeedsLayout(true, MarkOnlyThis);
 
             if (!cell->needsLayout() && view()->layoutState()->pageLogicalHeight() && view()->layoutState()->pageLogicalOffset(cell, cell->logicalTop()) != cell->pageLogicalOffset())
                 cell->setChildNeedsLayout(true, MarkOnlyThis);
@@ -1428,7 +1464,7 @@ CollapsedBorderValue& RenderTableSection::cachedCollapsedBorder(const RenderTabl
     ASSERT(table()->collapseBorders());
     HashMap<pair<const RenderTableCell*, int>, CollapsedBorderValue>::iterator it = m_cellsCollapsedBorders.find(make_pair(cell, side));
     ASSERT(it != m_cellsCollapsedBorders.end());
-    return it->value;
+    return it->second;
 }
 
 RenderTableSection* RenderTableSection::createAnonymousWithParentRenderer(const RenderObject* parent)

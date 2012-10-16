@@ -45,7 +45,6 @@ SOURCES += \
     assembler/ARMAssembler.cpp \
     assembler/ARMv7Assembler.cpp \
     assembler/LinkBuffer.cpp \
-    assembler/MacroAssembler.cpp \
     assembler/MacroAssemblerARM.cpp \
     assembler/MacroAssemblerSH4.cpp \
     bytecode/ArrayProfile.cpp \
@@ -65,7 +64,6 @@ SOURCES += \
     bytecode/PutByIdStatus.cpp \
     bytecode/ResolveGlobalStatus.cpp \
     bytecode/SamplingTool.cpp \
-    bytecode/SpecialPointer.cpp \
     bytecode/SpeculatedType.cpp \
     bytecode/StructureStubClearingWatchpoint.cpp \
     bytecode/StructureStubInfo.cpp \
@@ -73,7 +71,6 @@ SOURCES += \
     bytecompiler/BytecodeGenerator.cpp \
     bytecompiler/NodesCodegen.cpp \
     heap/CopiedSpace.cpp \
-    heap/CopyVisitor.cpp \
     heap/ConservativeRoots.cpp \
     heap/DFGCodeBlocks.cpp \
     heap/WeakSet.cpp \
@@ -83,9 +80,7 @@ SOURCES += \
     heap/HandleStack.cpp \
     heap/BlockAllocator.cpp \
     heap/GCThreadSharedData.cpp \
-    heap/GCThread.cpp \
     heap/Heap.cpp \
-    heap/HeapStatistics.cpp \
     heap/HeapTimer.cpp \
     heap/IncrementalSweeper.cpp \
     heap/JITStubRoutineSet.cpp \
@@ -141,7 +136,7 @@ SOURCES += \
     interpreter/AbstractPC.cpp \
     interpreter/CallFrame.cpp \
     interpreter/Interpreter.cpp \
-    interpreter/JSStack.cpp \
+    interpreter/RegisterFile.cpp \
     jit/ExecutableAllocatorFixedVMPool.cpp \
     jit/ExecutableAllocator.cpp \
     jit/HostCallReturnValue.cpp \
@@ -160,13 +155,6 @@ SOURCES += \
     jit/JITStubs.cpp \
     jit/JumpReplacementWatchpoint.cpp \
     jit/ThunkGenerators.cpp \
-    llint/LLIntCLoop.cpp \
-    llint/LLIntData.cpp \
-    llint/LLIntEntrypoints.cpp \
-    llint/LLIntExceptions.cpp \
-    llint/LLIntSlowPaths.cpp \
-    llint/LLIntThunks.cpp \
-    llint/LowLevelInterpreter.cpp \
     parser/Lexer.cpp \
     parser/Nodes.cpp \
     parser/ParserArena.cpp \
@@ -203,7 +191,6 @@ SOURCES += \
     runtime/GetterSetter.cpp \
     runtime/Options.cpp \
     runtime/Identifier.cpp \
-    runtime/IndexingType.cpp \
     runtime/InitializeThreading.cpp \
     runtime/InternalFunction.cpp \
     runtime/JSActivation.cpp \
@@ -216,7 +203,7 @@ SOURCES += \
     runtime/JSGlobalData.cpp \
     runtime/JSGlobalObject.cpp \
     runtime/JSGlobalObjectFunctions.cpp \
-    runtime/JSProxy.cpp \
+    runtime/JSGlobalThis.cpp \
     runtime/JSLock.cpp \
     runtime/JSNotAnObject.cpp \
     runtime/JSObject.cpp \

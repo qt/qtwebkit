@@ -56,8 +56,8 @@ bool SVGAnimateElement::hasValidAttributeType()
     SVGElement* targetElement = this->targetElement();
     if (!targetElement)
         return false;
-
-    return m_animatedPropertyType != AnimatedUnknown && !hasInvalidCSSAttributeType();
+    
+    return m_animatedPropertyType != AnimatedUnknown;
 }
 
 AnimatedPropertyType SVGAnimateElement::determineAnimatedPropertyType(SVGElement* targetElement) const
@@ -398,7 +398,7 @@ float SVGAnimateElement::calculateDistance(const String& fromString, const Strin
 
 void SVGAnimateElement::targetElementWillChange(SVGElement* currentTarget, SVGElement* newTarget)
 {
-    SVGAnimationElement::targetElementWillChange(currentTarget, newTarget);
+    SVGSMILElement::targetElementWillChange(currentTarget, newTarget);
 
     ASSERT(!m_animatedType);
     m_fromType.clear();

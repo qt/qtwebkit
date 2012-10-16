@@ -30,6 +30,8 @@
 
 namespace JSC { namespace DFG {
 
+const double AssemblyHelpers::twoToThe32 = (double)0x100000000ull;
+
 ExecutableBase* AssemblyHelpers::executableFor(const CodeOrigin& codeOrigin)
 {
     if (!codeOrigin.inlineCallFrame)
@@ -47,9 +49,9 @@ Vector<BytecodeAndMachineOffset>& AssemblyHelpers::decodedCodeMapFor(CodeBlock* 
     HashMap<CodeBlock*, Vector<BytecodeAndMachineOffset> >::AddResult result = m_decodedCodeMaps.add(codeBlock, Vector<BytecodeAndMachineOffset>());
     
     if (result.isNewEntry)
-        codeBlock->jitCodeMap()->decode(result.iterator->value);
+        codeBlock->jitCodeMap()->decode(result.iterator->second);
     
-    return result.iterator->value;
+    return result.iterator->second;
 }
 
 #if ENABLE(SAMPLING_FLAGS)

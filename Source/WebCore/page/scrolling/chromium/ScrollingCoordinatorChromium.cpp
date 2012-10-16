@@ -25,7 +25,7 @@
 
 #include "config.h"
 
-#include "ScrollingCoordinatorChromium.h"
+#include "ScrollingCoordinator.h"
 
 #include "Frame.h"
 #include "FrameView.h"
@@ -95,32 +95,33 @@ private:
     OwnPtr<WebScrollbarLayer> m_verticalScrollbarLayer;
 };
 
-ScrollingCoordinatorChromium::ScrollingCoordinatorChromium(Page* page)
-    : ScrollingCoordinator(page)
-    , m_private(new ScrollingCoordinatorPrivate)
+PassRefPtr<ScrollingCoordinator> ScrollingCoordinator::create(Page* page)
 {
+    RefPtr<ScrollingCoordinator> coordinator(adoptRef(new ScrollingCoordinator(page)));
+    coordinator->m_private = new ScrollingCoordinatorPrivate;
+    return coordinator.release();
 }
 
-ScrollingCoordinatorChromium::~ScrollingCoordinatorChromium()
+ScrollingCoordinator::~ScrollingCoordinator()
 {
+    ASSERT(!m_page);
     delete m_private;
 }
 
-void ScrollingCoordinatorChromium::frameViewLayoutUpdated(FrameView*)
+static GraphicsLayer* scrollLayerForFrameView(FrameView* frameView)
 {
-    ASSERT(m_page);
+#if USE(ACCELERATED_COMPOSITING)
+    Frame* frame = frameView->frame();
+    if (!frame)
+        return 0;
 
-    // Compute the region of the page that we can't do fast scrolling for. This currently includes
-    // all scrollable areas, such as subframes, overflow divs and list boxes. We need to do this even if the
-    // frame view whose layout was updated is not the main frame.
-    Region nonFastScrollableRegion = computeNonFastScrollableRegion(m_page->mainFrame(), IntPoint());
-    setNonFastScrollableRegion(nonFastScrollableRegion);
-}
-
-void ScrollingCoordinatorChromium::frameViewRootLayerDidChange(FrameView* frameView)
-{
-    ScrollingCoordinator::frameViewRootLayerDidChange(frameView);
-    setScrollLayer(scrollLayerForFrameView(frameView));
+    RenderView* renderView = frame->contentRenderer();
+    if (!renderView)
+        return 0;
+    return renderView->compositor()->scrollLayer();
+#else
+    return 0;
+#endif
 }
 
 static WebLayer* scrollableLayerForGraphicsLayer(GraphicsLayer* layer)
@@ -128,7 +129,7 @@ static WebLayer* scrollableLayerForGraphicsLayer(GraphicsLayer* layer)
     return layer->platformLayer();
 }
 
-PassOwnPtr<WebScrollbarLayer> ScrollingCoordinatorChromium::createScrollbarLayer(Scrollbar* scrollbar, WebLayer* scrollLayer, GraphicsLayer* scrollbarGraphicsLayer, FrameView* frameView)
+static PassOwnPtr<WebScrollbarLayer> createScrollbarLayer(Scrollbar* scrollbar, WebLayer* scrollLayer, GraphicsLayer* scrollbarGraphicsLayer, FrameView* frameView)
 {
     ASSERT(scrollbar);
     ASSERT(scrollbarGraphicsLayer);
@@ -173,7 +174,7 @@ PassOwnPtr<WebScrollbarLayer> ScrollingCoordinatorChromium::createScrollbarLayer
     return scrollbarLayer.release();
 }
 
-void ScrollingCoordinatorChromium::frameViewHorizontalScrollbarLayerDidChange(FrameView* frameView, GraphicsLayer* horizontalScrollbarLayer)
+void ScrollingCoordinator::frameViewHorizontalScrollbarLayerDidChange(FrameView* frameView, GraphicsLayer* horizontalScrollbarLayer)
 {
     if (!horizontalScrollbarLayer || !coordinatesScrollingForFrameView(frameView))
         return;
@@ -182,7 +183,7 @@ void ScrollingCoordinatorChromium::frameViewHorizontalScrollbarLayerDidChange(Fr
     m_private->setHorizontalScrollbarLayer(createScrollbarLayer(frameView->horizontalScrollbar(), m_private->scrollLayer(), horizontalScrollbarLayer, frameView));
 }
 
-void ScrollingCoordinatorChromium::frameViewVerticalScrollbarLayerDidChange(FrameView* frameView, GraphicsLayer* verticalScrollbarLayer)
+void ScrollingCoordinator::frameViewVerticalScrollbarLayerDidChange(FrameView* frameView, GraphicsLayer* verticalScrollbarLayer)
 {
     if (!verticalScrollbarLayer || !coordinatesScrollingForFrameView(frameView))
         return;
@@ -191,12 +192,12 @@ void ScrollingCoordinatorChromium::frameViewVerticalScrollbarLayerDidChange(Fram
     m_private->setVerticalScrollbarLayer(createScrollbarLayer(frameView->verticalScrollbar(), m_private->scrollLayer(), verticalScrollbarLayer, frameView));
 }
 
-void ScrollingCoordinatorChromium::setScrollLayer(GraphicsLayer* scrollLayer)
+void ScrollingCoordinator::setScrollLayer(GraphicsLayer* scrollLayer)
 {
     m_private->setScrollLayer(scrollLayer ? scrollableLayerForGraphicsLayer(scrollLayer) : 0);
 }
 
-void ScrollingCoordinatorChromium::setNonFastScrollableRegion(const Region& region)
+void ScrollingCoordinator::setNonFastScrollableRegion(const Region& region)
 {
     // We won't necessarily get a setScrollLayer() call before this one, so grab the root ourselves.
     setScrollLayer(scrollLayerForFrameView(m_page->mainFrame()->view()));
@@ -209,7 +210,12 @@ void ScrollingCoordinatorChromium::setNonFastScrollableRegion(const Region& regi
     }
 }
 
-void ScrollingCoordinatorChromium::setWheelEventHandlerCount(unsigned wheelEventHandlerCount)
+void ScrollingCoordinator::setScrollParameters(const ScrollParameters&)
+{
+    // FIXME: Implement!
+}
+
+void ScrollingCoordinator::setWheelEventHandlerCount(unsigned wheelEventHandlerCount)
 {
     // We won't necessarily get a setScrollLayer() call before this one, so grab the root ourselves.
     setScrollLayer(scrollLayerForFrameView(m_page->mainFrame()->view()));
@@ -217,7 +223,7 @@ void ScrollingCoordinatorChromium::setWheelEventHandlerCount(unsigned wheelEvent
         m_private->scrollLayer()->setHaveWheelEventHandlers(wheelEventHandlerCount > 0);
 }
 
-void ScrollingCoordinatorChromium::setShouldUpdateScrollLayerPositionOnMainThread(MainThreadScrollingReasons reasons)
+void ScrollingCoordinator::setShouldUpdateScrollLayerPositionOnMainThread(MainThreadScrollingReasons reasons)
 {
     // We won't necessarily get a setScrollLayer() call before this one, so grab the root ourselves.
     setScrollLayer(scrollLayerForFrameView(m_page->mainFrame()->view()));
@@ -225,19 +231,24 @@ void ScrollingCoordinatorChromium::setShouldUpdateScrollLayerPositionOnMainThrea
         m_private->scrollLayer()->setShouldScrollOnMainThread(reasons);
 }
 
-void ScrollingCoordinatorChromium::setLayerIsContainerForFixedPositionLayers(GraphicsLayer* layer, bool enable)
+bool ScrollingCoordinator::supportsFixedPositionLayers() const
+{
+    return true;
+}
+
+void ScrollingCoordinator::setLayerIsContainerForFixedPositionLayers(GraphicsLayer* layer, bool enable)
 {
     if (WebLayer* scrollableLayer = scrollableLayerForGraphicsLayer(layer))
         scrollableLayer->setIsContainerForFixedPositionLayers(enable);
 }
 
-void ScrollingCoordinatorChromium::setLayerIsFixedToContainerLayer(GraphicsLayer* layer, bool enable)
+void ScrollingCoordinator::setLayerIsFixedToContainerLayer(GraphicsLayer* layer, bool enable)
 {
     if (WebLayer* scrollableLayer = scrollableLayerForGraphicsLayer(layer))
         scrollableLayer->setFixedToContainerLayer(enable);
 }
 
-void ScrollingCoordinatorChromium::scrollableAreaScrollLayerDidChange(ScrollableArea* scrollableArea, GraphicsLayer* scrollLayer)
+void ScrollingCoordinator::scrollableAreaScrollLayerDidChange(ScrollableArea* scrollableArea, GraphicsLayer* scrollLayer)
 {
     if (!scrollLayer)
         return;
@@ -249,12 +260,6 @@ void ScrollingCoordinatorChromium::scrollableAreaScrollLayerDidChange(Scrollable
         webLayer->setScrollPosition(scrollableArea->scrollPosition());
         webLayer->setMaxScrollPosition(IntSize(scrollableArea->scrollSize(HorizontalScrollbar), scrollableArea->scrollSize(VerticalScrollbar)));
     }
-}
-
-void ScrollingCoordinatorChromium::recomputeWheelEventHandlerCountForFrameView(FrameView* frameView)
-{
-    UNUSED_PARAM(frameView);
-    setWheelEventHandlerCount(computeCurrentWheelEventHandlerCount());
 }
 
 }

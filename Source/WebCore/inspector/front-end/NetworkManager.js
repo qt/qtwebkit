@@ -113,10 +113,10 @@ WebInspector.NetworkManager.prototype = {
     _userAgentSettingChanged: function()
     {
         NetworkAgent.setUserAgentOverride(WebInspector.settings.userAgent.get());
-    },
-
-    __proto__: WebInspector.Object.prototype
+    }
 }
+
+WebInspector.NetworkManager.prototype.__proto__ = WebInspector.Object.prototype;
 
 /**
  * @constructor

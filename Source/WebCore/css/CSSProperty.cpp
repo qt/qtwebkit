@@ -702,7 +702,7 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitDashboardRegion:
 #endif
 #if ENABLE(WIDGET_REGION)
-    case CSSPropertyWebkitAppRegion:
+    case CSSPropertyWebkitWidgetRegion:
 #endif
         return false;
     case CSSPropertyInvalid:

@@ -50,7 +50,7 @@ WebInspector.ElementsPanelDescriptor.prototype = {
         if (remoteObject.subtype !== "node")
             return;
         this.panel().appendApplicableItems(contextMenu, target);
-    },
-
-    __proto__: WebInspector.PanelDescriptor.prototype
+    }
 }
+
+WebInspector.ElementsPanelDescriptor.prototype.__proto__ = WebInspector.PanelDescriptor.prototype;

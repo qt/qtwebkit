@@ -33,13 +33,11 @@
 #include "LocalCurrentGraphicsContext.h"
 #include "NSScrollerImpDetails.h"
 #include "PlatformContextSkia.h"
+#include "PlatformSupport.h"
 #include "ScrollAnimatorMac.h"
 #include "ScrollView.h"
 #include "skia/ext/skia_utils_mac.h"
 #include <Carbon/Carbon.h>
-#include <public/Platform.h>
-#include <public/WebRect.h>
-#include <public/mac/WebThemeEngine.h>
 
 namespace WebCore {
 
@@ -60,16 +58,16 @@ ScrollbarThemeChromiumMac::~ScrollbarThemeChromiumMac()
 {
 }
 
-static WebKit::WebThemeEngine::State scrollbarStateToThemeState(ScrollbarThemeClient* scrollbar)
+static PlatformSupport::ThemePaintState scrollbarStateToThemeState(ScrollbarThemeClient* scrollbar)
 {
     if (!scrollbar->enabled())
-        return WebKit::WebThemeEngine::StateDisabled;
+        return PlatformSupport::StateDisabled;
     if (!scrollbar->isScrollableAreaActive())
-        return WebKit::WebThemeEngine::StateInactive;
+        return PlatformSupport::StateInactive;
     if (scrollbar->pressedPart() == ThumbPart)
-        return WebKit::WebThemeEngine::StatePressed;
+        return PlatformSupport::StatePressed;
 
-    return WebKit::WebThemeEngine::StateActive;
+    return PlatformSupport::StateActive;
 }
 
 static void scrollbarPainterPaintTrack(ScrollbarPainter scrollbarPainter, bool enabled, double value, CGFloat proportion, CGRect frameRect)
@@ -90,7 +88,7 @@ static void scrollbarPainterPaintTrack(ScrollbarPainter scrollbarPainter, bool e
 }
 
 // Override ScrollbarThemeMac::paint() to add support for the following:
-//     - drawing using WebThemeEngine functions
+//     - drawing using PlatformSupport functions
 //     - drawing tickmarks
 //     - Skia specific changes
 bool ScrollbarThemeChromiumMac::paint(ScrollbarThemeClient* scrollbar, GraphicsContext* context, const IntRect& damageRect)
@@ -237,20 +235,19 @@ bool ScrollbarThemeChromiumMac::paint(ScrollbarThemeClient* scrollbar, GraphicsC
     paintGivenTickmarks(drawingContext, scrollbar, tickmarkTrackRect, tickmarks);
 
     if (hasThumb(scrollbar)) {
-        WebKit::WebThemeEngine::ScrollbarInfo scrollbarInfo;
-        scrollbarInfo.orientation = scrollbar->orientation() == HorizontalScrollbar ? WebKit::WebThemeEngine::ScrollbarOrientationHorizontal : WebKit::WebThemeEngine::ScrollbarOrientationVertical;
-        scrollbarInfo.parent = scrollbar->isScrollViewScrollbar() ? WebKit::WebThemeEngine::ScrollbarParentScrollView : WebKit::WebThemeEngine::ScrollbarParentRenderLayer;
+        PlatformSupport::ThemePaintScrollbarInfo scrollbarInfo;
+        scrollbarInfo.orientation = scrollbar->orientation() == HorizontalScrollbar ? PlatformSupport::ScrollbarOrientationHorizontal : PlatformSupport::ScrollbarOrientationVertical;
+        scrollbarInfo.parent = scrollbar->isScrollViewScrollbar() ? PlatformSupport::ScrollbarParentScrollView : PlatformSupport::ScrollbarParentRenderLayer;
         scrollbarInfo.maxValue = scrollbar->maximum();
         scrollbarInfo.currentValue = scrollbar->currentPos();
         scrollbarInfo.visibleSize = scrollbar->visibleSize();
         scrollbarInfo.totalSize = scrollbar->totalSize();
 
-        WebKit::WebCanvas* webCanvas = drawingContext->platformContext()->canvas();
-        WebKit::Platform::current()->themeEngine()->paintScrollbarThumb(
-            webCanvas,
+        PlatformSupport::paintScrollbarThumb(
+            drawingContext,
             scrollbarStateToThemeState(scrollbar),
-            scrollbar->controlSize() == RegularScrollbar ? WebKit::WebThemeEngine::SizeRegular : WebKit::WebThemeEngine::SizeSmall,
-            WebKit::WebRect(scrollbar->frameRect()),
+            scrollbar->controlSize() == RegularScrollbar ? PlatformSupport::SizeRegular : PlatformSupport::SizeSmall,
+            scrollbar->frameRect(),
             scrollbarInfo);
     }
 

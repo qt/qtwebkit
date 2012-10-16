@@ -395,7 +395,6 @@ public:
         STENCIL_INDEX8 = 0x8D48,
         DEPTH_STENCIL = 0x84F9,
         UNSIGNED_INT_24_8 = 0x84FA,
-        DEPTH24_STENCIL8 = 0x88F0,
         RENDERBUFFER_WIDTH = 0x8D42,
         RENDERBUFFER_HEIGHT = 0x8D43,
         RENDERBUFFER_INTERNAL_FORMAT = 0x8D44,
@@ -965,65 +964,21 @@ public:
 #endif
 
 #if PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(BLACKBERRY)
-    struct SymbolInfo {
-        SymbolInfo()
-            : type(0)
-            , size(0)
-        {
-        }
-
-        SymbolInfo(GC3Denum type, int size, const String& mappedName)
-            : type(type)
-            , size(size)
-            , mappedName(mappedName)
-        {
-        }
-
-        bool operator==(SymbolInfo& other) const
-        {
-            return type == other.type && size == other.size && mappedName == other.mappedName;
-        }
-
-        GC3Denum type;
-        int size;
-        String mappedName;
-    };
-
-    typedef HashMap<String, SymbolInfo> ShaderSymbolMap;
-
     struct ShaderSourceEntry {
-        GC3Denum type;
         String source;
-        String translatedSource;
         String log;
         bool isValid;
-        ShaderSymbolMap attributeMap;
-        ShaderSymbolMap uniformMap;
         ShaderSourceEntry()
-            : type(VERTEX_SHADER)
-            , isValid(false)
+            : isValid(0)
         {
-        }
-        
-        ShaderSymbolMap& symbolMap(ANGLEShaderSymbolType symbolType)
-        {
-            ASSERT(symbolType == SHADER_SYMBOL_TYPE_ATTRIBUTE || symbolType == SHADER_SYMBOL_TYPE_UNIFORM);
-            if (symbolType == SHADER_SYMBOL_TYPE_ATTRIBUTE)
-                return attributeMap;
-            return uniformMap;
         }
     };
-
-    typedef HashMap<Platform3DObject, ShaderSourceEntry> ShaderSourceMap;
-    ShaderSourceMap m_shaderSourceMap;
-
-    String mappedSymbolName(Platform3DObject program, ANGLEShaderSymbolType, const String& name);
-    String originalSymbolName(Platform3DObject program, ANGLEShaderSymbolType, const String& name);
+    HashMap<Platform3DObject, ShaderSourceEntry> m_shaderSourceMap;
 
     ANGLEWebKitBridge m_compiler;
 #endif
 
-#if PLATFORM(BLACKBERRY) || (PLATFORM(QT) && defined(QT_OPENGL_ES_2)) || (PLATFORM(GTK) && USE(OPENGL_ES_2))
+#if PLATFORM(BLACKBERRY) || (PLATFORM(QT) && defined(QT_OPENGL_ES_2))
     friend class Extensions3DOpenGLES;
     OwnPtr<Extensions3DOpenGLES> m_extensions;
 #elif !PLATFORM(CHROMIUM)
@@ -1072,6 +1027,7 @@ public:
     friend class GraphicsContext3DPrivate;
     OwnPtr<GraphicsContext3DPrivate> m_private;
 #endif
+    bool systemAllowsMultisamplingOnATICards() const;
 };
 
 } // namespace WebCore

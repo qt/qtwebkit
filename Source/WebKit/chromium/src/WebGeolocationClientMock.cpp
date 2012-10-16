@@ -41,7 +41,7 @@
 #include "WebGeolocationError.h"
 #include "WebGeolocationPermissionRequest.h"
 #include "WebGeolocationPosition.h"
-#include <public/WebString.h>
+#include "platform/WebString.h"
 
 using namespace WebCore;
 

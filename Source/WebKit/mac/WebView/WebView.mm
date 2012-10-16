@@ -682,7 +682,7 @@ static NSString *leakMailQuirksUserScriptContents()
 {
     static NSString *mailQuirksScriptContents = leakMailQuirksUserScriptContents();
     core(self)->group().addUserScriptToWorld(core([WebScriptWorld world]),
-        mailQuirksScriptContents, KURL(), Vector<String>(), Vector<String>(), InjectAtDocumentEnd, InjectInAllFrames);
+        mailQuirksScriptContents, KURL(), nullptr, nullptr, InjectAtDocumentEnd, InjectInAllFrames);
 }
 
 static bool needsOutlookQuirksScript()
@@ -703,7 +703,7 @@ static NSString *leakOutlookQuirksUserScriptContents()
 {
     static NSString *outlookQuirksScriptContents = leakOutlookQuirksUserScriptContents();
     core(self)->group().addUserScriptToWorld(core([WebScriptWorld world]),
-        outlookQuirksScriptContents, KURL(), Vector<String>(), Vector<String>(), InjectAtDocumentEnd, InjectInAllFrames);
+        outlookQuirksScriptContents, KURL(), nullptr, nullptr, InjectAtDocumentEnd, InjectInAllFrames);
 }
 
 static bool shouldRespectPriorityInCSSAttributeSetters()
@@ -1580,8 +1580,6 @@ static bool needsSelfRetainWhileLoadingQuirk()
         break;
     }
 
-    settings->setPlugInSnapshottingEnabled([preferences plugInSnapshottingEnabled]);
-
     // We have enabled this setting in WebKit2 for the sake of some ScrollingCoordinator work.
     // To avoid possible rendering differences, we should enable it for WebKit1 too.
     settings->setFixedPositionCreatesStackingContext(true);
@@ -2122,12 +2120,12 @@ static inline IMP getMethod(id o, SEL s)
     if (!mainFrame)
         return nil;
 
-    const Vector<AnnotatedRegionValue>& regions = mainFrame->document()->annotatedRegions();
+    const Vector<DashboardRegionValue>& regions = mainFrame->document()->dashboardRegions();
     size_t size = regions.size();
 
     NSMutableDictionary *webRegions = [NSMutableDictionary dictionaryWithCapacity:size];
     for (size_t i = 0; i < size; i++) {
-        const AnnotatedRegionValue& region = regions[i];
+        const DashboardRegionValue& region = regions[i];
 
         if (region.type == StyleDashboardRegion::None)
             continue;
@@ -2627,20 +2625,19 @@ static inline IMP getMethod(id o, SEL s)
         _private->page->focusController()->setActive([[self window] _hasKeyAppearance]);
 }
 
-static Vector<String> toStringVector(NSArray* patterns)
+static PassOwnPtr<Vector<String> > toStringVector(NSArray* patterns)
 {
-    Vector<String> patternsVector;
-
+    // Convert the patterns into Vectors.
     NSUInteger count = [patterns count];
-    if (!count)
-        return patternsVector;
-
+    if (count == 0)
+        return nullptr;
+    OwnPtr<Vector<String> > patternsVector = adoptPtr(new Vector<String>);
     for (NSUInteger i = 0; i < count; ++i) {
         id entry = [patterns objectAtIndex:i];
         if ([entry isKindOfClass:[NSString class]])
-            patternsVector.append(String((NSString *)entry));
+            patternsVector->append(String((NSString*)entry));
     }
-    return patternsVector;
+    return patternsVector.release();
 }
 
 + (void)_addUserScriptToGroup:(NSString *)groupName world:(WebScriptWorld *)world source:(NSString *)source url:(NSURL *)url
@@ -3056,15 +3053,6 @@ static Vector<String> toStringVector(NSArray* patterns)
     ResourceRequest::setHTTPPipeliningEnabled(enabled);
 }
 
-- (void)_setVisibilityState:(int)visibilityState isInitialState:(BOOL)isInitialState
-{
-#if ENABLE(PAGE_VISIBILITY_API) || ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
-    if (_private->page) {
-        _private->page->setVisibilityState(static_cast<PageVisibilityState>(visibilityState), isInitialState);
-    }
-#endif
-}
-
 @end
 
 @implementation _WebSafeForwarder
@@ -3125,8 +3113,6 @@ static Vector<String> toStringVector(NSArray* patterns)
 
     continuousSpellCheckingEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:WebContinuousSpellCheckingEnabled];
     grammarCheckingEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:WebGrammarCheckingEnabled];
-
-    Font::setDefaultTypesettingFeatures([[NSUserDefaults standardUserDefaults] boolForKey:@"WebKitKerningAndLigaturesEnabledByDefault"] ? Kerning | Ligatures : 0);
 
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
     automaticQuoteSubstitutionEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:WebAutomaticQuoteSubstitutionEnabled];
@@ -6311,11 +6297,11 @@ static inline uint64_t roundUpToPowerOf2(uint64_t num)
     _private->needsOneShotDrawingSynchronization = needsSynchronization;
 }
 
-- (BOOL)_flushCompositingChanges
+- (BOOL)_syncCompositingChanges
 {
     Frame* frame = [self _mainCoreFrame];
     if (frame && frame->view())
-        return frame->view()->flushCompositingStateIncludingSubframes();
+        return frame->view()->syncCompositingStateIncludingSubframes();
 
     return YES;
 }
@@ -6343,14 +6329,14 @@ static inline uint64_t roundUpToPowerOf2(uint64_t num)
     
     To fix this, the GraphicsLayerCA code in WebCore does not change the CA
     layer tree during style changes and layout; it stores up all changes and
-    commits them via flushCompositingState(). There are then two situations in
-    which we can call flushCompositingState():
+    commits them via syncCompositingState(). There are then two situations in
+    which we can call syncCompositingState():
     
-    1. When painting. FrameView::paintContents() makes a call to flushCompositingState().
+    1. When painting. FrameView::paintContents() makes a call to syncCompositingState().
     
     2. When style changes/layout have made changes to the layer tree which do not
        result in painting. In this case we need a run loop observer to do a
-       flushCompositingState() at an appropriate time. The observer will keep firing
+       syncCompositingState() at an appropriate time. The observer will keep firing
        until the time is right (essentially when there are no more pending layouts).
     
 */
@@ -6372,7 +6358,7 @@ bool LayerFlushController::flushLayers()
     if (viewsNeedDisplay)
         return false;
 
-    if ([m_webView _flushCompositingChanges]) {
+    if ([m_webView _syncCompositingChanges]) {
         // AppKit may have disabled screen updates, thinking an upcoming window flush will re-enable them.
         // In case setNeedsDisplayInRect() has prevented the window from needing to be flushed, re-enable screen
         // updates here.
@@ -6389,7 +6375,7 @@ bool LayerFlushController::flushLayers()
     return false;
 }
 
-- (void)_scheduleCompositingLayerFlush
+- (void)_scheduleCompositingLayerSync
 {
     if (!_private->layerFlushController)
         _private->layerFlushController = LayerFlushController::create(self);
@@ -6445,7 +6431,7 @@ bool LayerFlushController::flushLayers()
     if (![[WebPreferences standardPreferences] fullScreenEnabled])
         return NO;
 
-    return !withKeyboard;
+    return YES;
 }
 
 - (void)_enterFullScreenForElement:(WebCore::Element*)element

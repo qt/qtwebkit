@@ -23,8 +23,11 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=INDEXED_DATABASE
-] interface IDBCursorWithValue : IDBCursor {
-    [V8CustomGetter] readonly attribute IDBAny value;
-};
+module storage {
+
+    interface [
+        Conditional=INDEXED_DATABASE
+    ] IDBCursorWithValue : IDBCursor {
+        readonly attribute [V8CustomGetter] IDBAny value;
+    };
+}

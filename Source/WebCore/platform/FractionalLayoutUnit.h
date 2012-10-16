@@ -38,6 +38,10 @@
 #include <wtf/MathExtras.h>
 #include <wtf/SaturatedArithmetic.h>
 
+#if PLATFORM(QT)
+#include <QDataStream>
+#endif
+
 namespace WebCore {
 
 #ifdef NDEBUG
@@ -55,7 +59,7 @@ while (0)
 #endif
 
 #if ENABLE(SUBPIXEL_LAYOUT)
-static const int kFixedPointDenominator = 64;
+static const int kFixedPointDenominator = 60;
 #else
 static const int kFixedPointDenominator = 1;
 #endif
@@ -76,7 +80,7 @@ public:
     FractionalLayoutUnit(float value)
     {
 #if ENABLE(SATURATED_LAYOUT_ARITHMETIC)
-        m_value = clampTo<float>(value * kFixedPointDenominator, static_cast<float>(INT_MIN), static_cast<float>(INT_MAX));
+        m_value = clampTo<float>(value * kFixedPointDenominator, INT_MIN, INT_MAX);
 #else
         REPORT_OVERFLOW(isInBounds(value));
         m_value = value * kFixedPointDenominator;
@@ -85,7 +89,7 @@ public:
     FractionalLayoutUnit(double value)
     {
 #if ENABLE(SATURATED_LAYOUT_ARITHMETIC)
-        m_value = clampTo<double>(value * kFixedPointDenominator, static_cast<double>(INT_MIN), static_cast<double>(INT_MAX));
+        m_value = clampTo<double>(value * kFixedPointDenominator, INT_MIN, INT_MAX);
 #else
         REPORT_OVERFLOW(isInBounds(value));
         m_value = value * kFixedPointDenominator;
@@ -203,11 +207,7 @@ public:
     }
     int round() const
     {
-#if ENABLE(SUBPIXEL_LAYOUT) && ENABLE(SATURATED_LAYOUT_ARITHMETIC)
-        if (m_value > 0)
-            return saturatedAddition(rawValue(), kFixedPointDenominator / 2) / kFixedPointDenominator;
-        return saturatedSubtraction(rawValue(), kFixedPointDenominator / 2) / kFixedPointDenominator;
-#elif ENABLE(SUBPIXEL_LAYOUT)
+#if ENABLE(SUBPIXEL_LAYOUT)
         if (m_value > 0)
             return (m_value + (kFixedPointDenominator / 2)) / kFixedPointDenominator;
         return (m_value - (kFixedPointDenominator / 2)) / kFixedPointDenominator;
@@ -290,9 +290,9 @@ private:
     inline void setValue(int value)
     {
 #if ENABLE(SATURATED_LAYOUT_ARITHMETIC)
-        if (value > intMaxForLayoutUnit)
+        if (value >= intMaxForLayoutUnit)
             m_value = std::numeric_limits<int>::max();
-        else if (value < intMinForLayoutUnit)
+        else if (value <= intMinForLayoutUnit)
             m_value = std::numeric_limits<int>::min();
         else
             m_value = value * kFixedPointDenominator;
@@ -819,6 +819,26 @@ inline int snapSizeToPixel(FractionalLayoutUnit size, FractionalLayoutUnit locat
     FractionalLayoutUnit fraction = location.fraction();
     return (fraction + size).round() - fraction.round();
 }
+
+#if PLATFORM(QT)
+inline QDataStream& operator<<(QDataStream& stream, const FractionalLayoutUnit& value)
+{
+    if (kFixedPointDenominator == 1)
+        stream << value.rawValue();
+    else
+        stream << QString::fromLatin1("%1").arg(value.toFloat(), 0, 'f', 2);
+
+    return stream;
+}
+
+inline QDataStream& operator>>(QDataStream& stream, FractionalLayoutUnit& value)
+{
+    float v;
+    stream >> v;
+    value = v;
+    return stream;
+}
+#endif
 
 } // namespace WebCore
 

@@ -21,14 +21,12 @@
 #include "config.h"
 #include "Heap.h"
 
-#include "CodeBlock.h"
-#include "ConservativeRoots.h"
 #include "CopiedSpace.h"
 #include "CopiedSpaceInlineMethods.h"
-#include "CopyVisitorInlineMethods.h"
+#include "CodeBlock.h"
+#include "ConservativeRoots.h"
 #include "GCActivityCallback.h"
 #include "HeapRootVisitor.h"
-#include "HeapStatistics.h"
 #include "IncrementalSweeper.h"
 #include "Interpreter.h"
 #include "JSGlobalData.h"
@@ -237,6 +235,74 @@ inline PassOwnPtr<TypeCountSet> RecordType::returnValue()
     return m_typeCountSet.release();
 }
 
+class StorageStatistics : public MarkedBlock::VoidFunctor {
+public:
+    StorageStatistics();
+
+    void operator()(JSCell*);
+
+    size_t objectWithOutOfLineStorageCount();
+    size_t objectCount();
+
+    size_t storageSize();
+    size_t storageCapacity();
+
+private:
+    size_t m_objectWithOutOfLineStorageCount;
+    size_t m_objectCount;
+    size_t m_storageSize;
+    size_t m_storageCapacity;
+};
+
+inline StorageStatistics::StorageStatistics()
+    : m_objectWithOutOfLineStorageCount(0)
+    , m_objectCount(0)
+    , m_storageSize(0)
+    , m_storageCapacity(0)
+{
+}
+
+inline void StorageStatistics::operator()(JSCell* cell)
+{
+    if (!cell->isObject())
+        return;
+
+    JSObject* object = jsCast<JSObject*>(cell);
+    if (hasIndexedProperties(object->structure()->indexingType()))
+        return;
+
+    if (object->structure()->isUncacheableDictionary())
+        return;
+
+    ++m_objectCount;
+    if (!object->hasInlineStorage())
+        ++m_objectWithOutOfLineStorageCount;
+    m_storageSize += object->structure()->totalStorageSize() * sizeof(WriteBarrierBase<Unknown>);
+    m_storageCapacity += object->structure()->totalStorageCapacity() * sizeof(WriteBarrierBase<Unknown>); 
+}
+
+inline size_t StorageStatistics::objectWithOutOfLineStorageCount()
+{
+    return m_objectWithOutOfLineStorageCount;
+}
+
+inline size_t StorageStatistics::objectCount()
+{
+    return m_objectCount;
+}
+
+
+inline size_t StorageStatistics::storageSize()
+{
+    return m_storageSize;
+}
+
+
+inline size_t StorageStatistics::storageCapacity()
+{
+    return m_storageCapacity;
+}
+
 } // anonymous namespace
 
 Heap::Heap(JSGlobalData* globalData, HeapType heapType)
@@ -253,7 +319,6 @@ Heap::Heap(JSGlobalData* globalData, HeapType heapType)
     , m_machineThreads(this)
     , m_sharedData(globalData)
     , m_slotVisitor(m_sharedData)
-    , m_copyVisitor(m_sharedData)
     , m_handleSet(globalData)
     , m_isSafeToCollect(false)
     , m_globalData(globalData)
@@ -357,7 +422,7 @@ void Heap::markProtectedObjects(HeapRootVisitor& heapRootVisitor)
 {
     ProtectCountSet::iterator end = m_protectedValues.end();
     for (ProtectCountSet::iterator it = m_protectedValues.begin(); it != end; ++it)
-        heapRootVisitor.visit(&it->key);
+        heapRootVisitor.visit(&it->first);
 }
 
 void Heap::pushTempSortVector(Vector<ValueStringPair>* tempVector)
@@ -397,19 +462,19 @@ void Heap::finalizeUnconditionalFinalizers()
     m_slotVisitor.finalizeUnconditionalFinalizers();
 }
 
-inline JSStack& Heap::stack()
+inline RegisterFile& Heap::registerFile()
 {
-    return m_globalData->interpreter->stack();
+    return m_globalData->interpreter->registerFile();
 }
 
 void Heap::getConservativeRegisterRoots(HashSet<JSCell*>& roots)
 {
     ASSERT(isValidThreadState(m_globalData));
-    ConservativeRoots stackRoots(&m_objectSpace.blocks(), &m_storageSpace);
-    stack().gatherConservativeRoots(stackRoots);
-    size_t stackRootCount = stackRoots.size();
-    JSCell** registerRoots = stackRoots.roots();
-    for (size_t i = 0; i < stackRootCount; i++) {
+    ConservativeRoots registerFileRoots(&m_objectSpace.blocks(), &m_storageSpace);
+    registerFile().gatherConservativeRoots(registerFileRoots);
+    size_t registerFileRootCount = registerFileRoots.size();
+    JSCell** registerRoots = registerFileRoots.roots();
+    for (size_t i = 0; i < registerFileRootCount; i++) {
         setMarked(registerRoots[i]);
         roots.add(registerRoots[i]);
     }
@@ -438,12 +503,12 @@ void Heap::markRoots(bool fullGC)
         m_machineThreads.gatherConservativeRoots(machineThreadRoots, &dummy);
     }
 
-    ConservativeRoots stackRoots(&m_objectSpace.blocks(), &m_storageSpace);
+    ConservativeRoots registerFileRoots(&m_objectSpace.blocks(), &m_storageSpace);
     m_dfgCodeBlocks.clearMarks();
     {
-        GCPHASE(GatherStackRoots);
-        stack().gatherConservativeRoots(
-            stackRoots, m_jitStubRoutines, m_dfgCodeBlocks);
+        GCPHASE(GatherRegisterFileRoots);
+        registerFile().gatherConservativeRoots(
+            registerFileRoots, m_jitStubRoutines, m_dfgCodeBlocks);
     }
 
 #if ENABLE(DFG_JIT)
@@ -466,7 +531,7 @@ void Heap::markRoots(bool fullGC)
         m_objectSpace.clearMarks();
     }
 
-    m_sharedData.didStartMarking();
+    m_storageSpace.startedCopying();
     SlotVisitor& visitor = m_slotVisitor;
     visitor.setup();
     HeapRootVisitor heapRootVisitor(visitor);
@@ -498,9 +563,9 @@ void Heap::markRoots(bool fullGC)
             visitor.donateAndDrain();
         }
         {
-            GCPHASE(VisitStackRoots);
-            MARK_LOG_ROOT(visitor, "Stack");
-            visitor.append(stackRoots);
+            GCPHASE(VisitRegisterFileRoots);
+            MARK_LOG_ROOT(visitor, "Register File");
+            visitor.append(registerFileRoots);
             visitor.donateAndDrain();
         }
 #if ENABLE(DFG_JIT)
@@ -591,7 +656,7 @@ void Heap::markRoots(bool fullGC)
 
     GCCOUNTER(VisitedValueCount, visitor.visitCount());
 
-    m_sharedData.didFinishMarking();
+    visitor.doneCopying();
 #if ENABLE(OBJECT_MARK_LOGGING)
     size_t visitCount = visitor.visitCount();
 #if ENABLE(PARALLEL_GC)
@@ -605,23 +670,7 @@ void Heap::markRoots(bool fullGC)
     m_sharedData.resetChildren();
 #endif
     m_sharedData.reset();
-}
-
-void Heap::copyBackingStores()
-{
-    m_storageSpace.startedCopying();
-    if (m_storageSpace.shouldDoCopyPhase()) {
-        m_sharedData.didStartCopying();
-        CopyVisitor& visitor = m_copyVisitor;
-        visitor.startCopying();
-        visitor.copyFromShared();
-        visitor.doneCopying();
-        // We need to wait for everybody to finish and return their CopiedBlocks 
-        // before signaling that the phase is complete.
-        m_storageSpace.doneCopying();
-        m_sharedData.didFinishCopying();
-    } else 
-        m_storageSpace.doneCopying();
+    m_storageSpace.doneCopying();
 }
 
 size_t Heap::objectCount()
@@ -752,14 +801,6 @@ void Heap::collect(SweepToggle sweepToggle)
     JAVASCRIPTCORE_GC_MARKED();
 
     {
-        m_blockSnapshot.resize(m_objectSpace.blocks().set().size());
-        MarkedBlockSnapshotFunctor functor(m_blockSnapshot);
-        m_objectSpace.forEachBlock(functor);
-    }
-
-    copyBackingStores();
-
-    {
         GCPHASE(FinalizeUnconditionalFinalizers);
         finalizeUnconditionalFinalizers();
     }
@@ -781,7 +822,7 @@ void Heap::collect(SweepToggle sweepToggle)
         m_objectSpace.shrink();
     }
 
-    m_sweeper->startSweeping(m_blockSnapshot);
+    m_sweeper->startSweeping(m_objectSpace.blocks().set());
     m_bytesAbandoned = 0;
 
     {
@@ -790,9 +831,6 @@ void Heap::collect(SweepToggle sweepToggle)
     }
     
     size_t currentHeapSize = size();
-    if (Options::gcMaxHeapSize() && currentHeapSize > Options::gcMaxHeapSize())
-        HeapStatistics::exitWithFailure();
-
     if (fullGC) {
         m_sizeAfterLastCollect = currentHeapSize;
 
@@ -806,8 +844,6 @@ void Heap::collect(SweepToggle sweepToggle)
     double lastGCEndTime = WTF::currentTime();
     m_lastGCLength = lastGCEndTime - lastGCStartTime;
 
-    if (Options::recordGCPauseTimes())
-        HeapStatistics::recordGCPauseTime(lastGCStartTime, lastGCEndTime);
     if (m_operationInProgress != Collection)
         CRASH();
     m_operationInProgress = NoOperation;
@@ -819,8 +855,31 @@ void Heap::collect(SweepToggle sweepToggle)
     if (Options::objectsAreImmortal())
         markDeadObjects();
 
-    if (Options::showObjectStatistics())
-        HeapStatistics::showObjectStatistics(this);
+    if (Options::showHeapStatistics())
+        showStatistics();
+}
+
+void Heap::showStatistics()
+{
+    dataLog("\n=== Heap Statistics: ===\n");
+    dataLog("size: %ldkB\n", static_cast<long>(m_sizeAfterLastCollect / KB));
+    dataLog("capacity: %ldkB\n", static_cast<long>(capacity() / KB));
+    dataLog("pause time: %lfms\n\n", m_lastGCLength);
+
+    StorageStatistics storageStatistics;
+    m_objectSpace.forEachLiveCell(storageStatistics);
+    dataLog("wasted .property storage: %ldkB (%ld%%)\n",
+        static_cast<long>(
+            (storageStatistics.storageCapacity() - storageStatistics.storageSize()) / KB),
+        static_cast<long>(
+            (storageStatistics.storageCapacity() - storageStatistics.storageSize()) * 100
+                / storageStatistics.storageCapacity()));
+    dataLog("objects with out-of-line .property storage: %ld (%ld%%)\n",
+        static_cast<long>(
+            storageStatistics.objectWithOutOfLineStorageCount()),
+        static_cast<long>(
+            storageStatistics.objectWithOutOfLineStorageCount() * 100
+                / storageStatistics.objectCount()));
 }
 
 void Heap::markDeadObjects()
@@ -881,6 +940,11 @@ void Heap::FinalizerOwner::finalize(Handle<Unknown> handle, void* context)
 void Heap::addCompiledCode(ExecutableBase* executable)
 {
     m_compiledCode.append(executable);
+}
+
+bool Heap::isSafeToSweepStructures()
+{
+    return !m_sweeper || m_sweeper->structuresCanBeSwept();
 }
 
 void Heap::didStartVMShutdown()

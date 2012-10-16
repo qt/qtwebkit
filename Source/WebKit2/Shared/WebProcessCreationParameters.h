@@ -69,6 +69,9 @@ struct WebProcessCreationParameters {
     Vector<String> urlSchemesRegisteredAsDisplayIsolated;
     Vector<String> urlSchemesRegisteredAsCORSEnabled;
 
+    // MIME types for which the UI process will handle showing the data.
+    Vector<String> mimeTypesWithCustomRepresentation;
+
     CacheModel cacheModel;
     bool shouldTrackVisitedLinks;
 
@@ -76,6 +79,10 @@ struct WebProcessCreationParameters {
     bool shouldUseFontSmoothing;
 
     bool iconDatabaseEnabled;
+
+#if ENABLE(PLUGIN_PROCESS)
+    bool disablePluginProcessMessageTimeout;
+#endif
 
     double terminationTimeout;
 
@@ -109,8 +116,6 @@ struct WebProcessCreationParameters {
     SandboxExtension::Handle uiProcessBundleResourcePathExtensionHandle;
 
     bool shouldForceScreenFontSubstitution;
-    bool shouldEnableKerningAndLigaturesByDefault;
-
 #elif PLATFORM(WIN)
     String cfURLCachePath;
     uint64_t cfURLCacheDiskCapacity;

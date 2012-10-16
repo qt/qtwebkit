@@ -155,7 +155,7 @@ void PluginView::setParent(ScrollView* parent)
         init();
 }
 
-void PluginView::setNPWindowRect(const IntRect&)
+void PluginView::setNPWindowRect(const IntRect& rect)
 {
     notImplemented();
 }
@@ -319,7 +319,7 @@ void PluginView::invalidateRect(NPRect* rect)
     invalidateRect(IntRect(rect->left, rect->top, rect->right - rect->left, rect->bottom - rect->top));
 }
 
-void PluginView::invalidateRegion(NPRegion)
+void PluginView::invalidateRegion(NPRegion region)
 {
     notImplemented();
 }

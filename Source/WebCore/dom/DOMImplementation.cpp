@@ -372,8 +372,7 @@ PassRefPtr<HTMLDocument> DOMImplementation::createHTMLDocument(const String& tit
     RefPtr<HTMLDocument> d = HTMLDocument::create(0, KURL());
     d->open();
     d->write("<!doctype html><html><body></body></html>");
-    if (!title.isNull())
-        d->setTitle(title);
+    d->setTitle(title);
     d->setSecurityOrigin(m_document->securityOrigin());
     d->setContextFeatures(m_document->contextFeatures());
     return d.release();

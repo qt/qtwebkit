@@ -30,6 +30,7 @@
 #if USE(WTFURL)
 
 #include <wtf/DataLog.h>
+#include <wtf/MemoryInstrumentation.h>
 #include <wtf/RawURLBuffer.h>
 #include <wtf/URLComponent.h>
 #include <wtf/URLUtil.h>
@@ -137,15 +138,6 @@ String ParsedURL::scheme() const
     return segment(m_segments.scheme);
 }
 
-bool ParsedURL::hasStandardScheme() const
-{
-    ASSERT(m_segments.scheme.isValid());
-    const String& urlStringSpec = m_spec.m_string;
-    if (urlStringSpec.is8Bit())
-        return URLUtilities::isStandard(urlStringSpec.characters8(), m_segments.scheme);
-    return URLUtilities::isStandard(urlStringSpec.characters16(), m_segments.scheme);
-}
-
 String ParsedURL::username() const
 {
     return segment(m_segments.username);
@@ -161,33 +153,9 @@ String ParsedURL::host() const
     return segment(m_segments.host);
 }
 
-bool ParsedURL::hasPort() const
-{
-    return m_segments.port.isNonEmpty();
-}
-
 String ParsedURL::port() const
 {
     return segment(m_segments.port);
-}
-
-void ParsedURL::removePort()
-{
-    if (!hasPort())
-        return;
-
-    // 1) Remove the port from the spec, including the delimiter.
-    String newSpec;
-    int beginning = m_segments.port.begin() - 1;
-    unsigned length = m_segments.port.length() + 1;
-
-    String newSpecString = m_spec.string();
-    newSpecString.remove(beginning, length);
-    m_spec = URLString(newSpecString);
-
-    // 2) Update the components positions.
-    m_segments.port.reset();
-    m_segments.moveFromComponentBy(URLSegments::Path, -length);
 }
 
 String ParsedURL::path() const
@@ -243,6 +211,12 @@ String ParsedURL::segment(const URLComponent& component) const
     // FIXME: GoogleURL create empty segments. This happen for the fragment for the test fast/url/segments.html
     // ASSERT_WITH_MESSAGE(!segment.isEmpty(), "A valid URL component should not be empty.");
     return segment;
+}
+
+void ParsedURL::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this);
+    info.addMember(m_spec);
 }
 
 #ifndef NDEBUG

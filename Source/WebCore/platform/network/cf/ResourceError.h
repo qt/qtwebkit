@@ -65,7 +65,6 @@ public:
 #if PLATFORM(WIN)
     ResourceError(const String& domain, int errorCode, const String& failingURL, const String& localizedDescription, CFDataRef certificate);
     PCCERT_CONTEXT certificate() const;
-    void setCertificate(CFDataRef);
 #endif
     ResourceError(CFStreamError error);
     CFStreamError cfStreamError() const;

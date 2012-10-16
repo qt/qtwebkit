@@ -27,9 +27,71 @@
 
 namespace WebCore {
 
+// We do not want to call glXMakeContextCurrent using different Display pointers,
+// because it might lead to crashes in some drivers (fglrx). We use a shared display
+// pointer here.
+static Display* gSharedDisplay = 0;
+Display* GLContextGLX::sharedDisplay()
+{
+    if (!gSharedDisplay)
+        gSharedDisplay = XOpenDisplay(0);
+    return gSharedDisplay;
+}
+
+// Because of driver bugs, exiting the program when there are active pbuffers
+// can crash the X server (this has been observed with the official Nvidia drivers).
+// We need to ensure that we clean everything up on exit. There are several reasons
+// that GraphicsContext3Ds will still be alive at exit, including user error (memory
+// leaks) and the page cache. In any case, we don't want the X server to crash.
+typedef Vector<GLContext*> ActiveContextList;
+static ActiveContextList& activeContextList()
+{
+    DEFINE_STATIC_LOCAL(ActiveContextList, activeContexts, ());
+    return activeContexts;
+}
+
+void GLContextGLX::addActiveContext(GLContextGLX* context)
+{
+    static bool addedAtExitHandler = false;
+    if (!addedAtExitHandler) {
+        atexit(&GLContextGLX::cleanupActiveContextsAtExit);
+        addedAtExitHandler = true;
+    }
+    activeContextList().append(context);
+}
+
+static bool gCleaningUpAtExit = false;
+
+void GLContextGLX::removeActiveContext(GLContext* context)
+{
+    // If we are cleaning up the context list at exit, don't bother removing the context
+    // from the list, since we don't want to modify the list while it's being iterated.
+    if (gCleaningUpAtExit)
+        return;
+
+    ActiveContextList& contextList = activeContextList();
+    size_t i = contextList.find(context);
+    if (i != notFound)
+        contextList.remove(i);
+}
+
+void GLContextGLX::cleanupActiveContextsAtExit()
+{
+    gCleaningUpAtExit = true;
+
+    ActiveContextList& contextList = activeContextList();
+    for (size_t i = 0; i < contextList.size(); ++i)
+        delete contextList[i];
+
+    if (!gSharedDisplay)
+        return;
+    XCloseDisplay(gSharedDisplay);
+    gSharedDisplay = 0;
+}
+
 PassOwnPtr<GLContextGLX> GLContextGLX::createWindowContext(XID window, GLContext* sharingContext)
 {
-    Display* display = sharedX11Display();
+    Display* display = sharedDisplay();
     XWindowAttributes attributes;
     if (!XGetWindowAttributes(display, window, &attributes))
         return nullptr;
@@ -68,7 +130,7 @@ PassOwnPtr<GLContextGLX> GLContextGLX::createPbufferContext(GLXContext sharingCo
     };
 
     int returnedElements;
-    Display* display = sharedX11Display();
+    Display* display = sharedDisplay();
     GLXFBConfig* configs = glXChooseFBConfig(display, 0, fbConfigAttributes, &returnedElements);
     if (!returnedElements) {
         XFree(configs);
@@ -108,7 +170,7 @@ PassOwnPtr<GLContextGLX> GLContextGLX::createPixmapContext(GLXContext sharingCon
         0
     };
 
-    Display* display = sharedX11Display();
+    Display* display = sharedDisplay();
     XVisualInfo* visualInfo = glXChooseVisual(display, DefaultScreen(display), visualAttributes);
     if (!visualInfo)
         return nullptr;
@@ -138,7 +200,7 @@ PassOwnPtr<GLContextGLX> GLContextGLX::createPixmapContext(GLXContext sharingCon
 
 PassOwnPtr<GLContextGLX> GLContextGLX::createContext(XID window, GLContext* sharingContext)
 {
-    if (!sharedX11Display())
+    if (!sharedDisplay())
         return nullptr;
 
     static bool initialized = false;
@@ -169,6 +231,7 @@ GLContextGLX::GLContextGLX(GLXContext context)
     , m_pixmap(0)
     , m_glxPixmap(0)
 {
+    addActiveContext(this);
 }
 
 GLContextGLX::GLContextGLX(GLXContext context, Pixmap pixmap, GLXPixmap glxPixmap)
@@ -178,6 +241,7 @@ GLContextGLX::GLContextGLX(GLXContext context, Pixmap pixmap, GLXPixmap glxPixma
     , m_pixmap(pixmap)
     , m_glxPixmap(glxPixmap)
 {
+    addActiveContext(this);
 }
 
 GLContextGLX::~GLContextGLX()
@@ -186,22 +250,23 @@ GLContextGLX::~GLContextGLX()
         // This may be necessary to prevent crashes with NVidia's closed source drivers. Originally
         // from Mozilla's 3D canvas implementation at: http://bitbucket.org/ilmari/canvas3d/
         glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0);
-        glXMakeCurrent(sharedX11Display(), None, None);
-        glXDestroyContext(sharedX11Display(), m_context);
+        glXMakeCurrent(sharedDisplay(), None, None);
+        glXDestroyContext(sharedDisplay(), m_context);
     }
 
     if (m_pbuffer) {
-        glXDestroyPbuffer(sharedX11Display(), m_pbuffer);
+        glXDestroyPbuffer(sharedDisplay(), m_pbuffer);
         m_pbuffer = 0;
     }
     if (m_glxPixmap) {
-        glXDestroyGLXPixmap(sharedX11Display(), m_glxPixmap);
+        glXDestroyGLXPixmap(sharedDisplay(), m_glxPixmap);
         m_glxPixmap = 0;
     }
     if (m_pixmap) {
-        XFreePixmap(sharedX11Display(), m_pixmap);
+        XFreePixmap(sharedDisplay(), m_pixmap);
         m_pixmap = 0;
     }
+    removeActiveContext(this);
 }
 
 bool GLContextGLX::canRenderToDefaultFramebuffer()
@@ -217,7 +282,7 @@ IntSize GLContextGLX::defaultFrameBufferSize()
     int x, y;
     Window rootWindow;
     unsigned int width, height, borderWidth, depth;
-    if (!XGetGeometry(sharedX11Display(), m_window, &rootWindow, &x, &y, &width, &height, &borderWidth, &depth))
+    if (!XGetGeometry(sharedDisplay(), m_window, &rootWindow, &x, &y, &width, &height, &borderWidth, &depth))
         return IntSize();
 
     return IntSize(width, height);
@@ -232,23 +297,18 @@ bool GLContextGLX::makeContextCurrent()
         return true;
 
     if (m_window)
-        return glXMakeCurrent(sharedX11Display(), m_window, m_context);
+        return glXMakeCurrent(sharedDisplay(), m_window, m_context);
 
     if (m_pbuffer)
-        return glXMakeCurrent(sharedX11Display(), m_pbuffer, m_context);
+        return glXMakeCurrent(sharedDisplay(), m_pbuffer, m_context);
 
-    return ::glXMakeCurrent(sharedX11Display(), m_glxPixmap, m_context);
+    return ::glXMakeCurrent(sharedDisplay(), m_glxPixmap, m_context);
 }
 
 void GLContextGLX::swapBuffers()
 {
     if (m_window)
-        glXSwapBuffers(sharedX11Display(), m_window);
-}
-
-void GLContextGLX::waitNative()
-{
-    glXWaitX();
+        glXSwapBuffers(sharedDisplay(), m_window);
 }
 
 #if USE(3D_GRAPHICS)

@@ -35,7 +35,6 @@
 #include "ScriptExecutionContext.h"
 #include "SuspendableTimer.h"
 #include "WebCoreMemoryInstrumentation.h"
-#include <wtf/MemoryInstrumentationHashSet.h>
 
 namespace WebCore {
     
@@ -113,8 +112,8 @@ void DocumentEventQueue::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) c
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
     info.addMember(m_pendingEventTimer);
-    info.addMember(m_queuedEvents);
-    info.addMember(m_nodesWithQueuedScrollEvents);
+    info.addInstrumentedHashSet(m_queuedEvents);
+    info.addInstrumentedHashSet(m_nodesWithQueuedScrollEvents);
 }
 
 bool DocumentEventQueue::cancelEvent(Event* event)
@@ -148,7 +147,7 @@ void DocumentEventQueue::pendingEventTimerFired()
     RefPtr<DocumentEventQueue> protector(this);
 
     while (!m_queuedEvents.isEmpty()) {
-        ListHashSet<RefPtr<Event>, 16>::iterator iter = m_queuedEvents.begin();
+        ListHashSet<RefPtr<Event> >::iterator iter = m_queuedEvents.begin();
         RefPtr<Event> event = *iter;
         m_queuedEvents.remove(iter);
         if (!event)

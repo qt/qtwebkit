@@ -53,7 +53,6 @@ class ChromiumPort(Port):
     ALL_SYSTEMS = (
         ('snowleopard', 'x86'),
         ('lion', 'x86'),
-        ('mountainlion', 'x86'),
         ('xp', 'x86'),
         ('win7', 'x86'),
         ('lucid', 'x86'),
@@ -63,13 +62,13 @@ class ChromiumPort(Port):
         ('icecreamsandwich', 'x86'))
 
     ALL_BASELINE_VARIANTS = [
-        'chromium-mac-mountainlion', 'chromium-mac-lion', 'chromium-mac-snowleopard',
+        'chromium-mac-lion', 'chromium-mac-snowleopard', 'chromium-mac-leopard',
         'chromium-win-win7', 'chromium-win-xp',
         'chromium-linux-x86_64', 'chromium-linux-x86',
     ]
 
     CONFIGURATION_SPECIFIER_MACROS = {
-        'mac': ['snowleopard', 'lion', 'mountainlion'],
+        'mac': ['snowleopard', 'lion'],
         'win': ['xp', 'win7'],
         'linux': ['lucid'],
         'android': ['icecreamsandwich'],
@@ -111,13 +110,6 @@ class ChromiumPort(Port):
 
     def is_chromium(self):
         return True
-
-    def default_max_locked_shards(self):
-        """Return the number of "locked" shards to run in parallel (like the http tests)."""
-        max_locked_shards = int(self.default_child_processes()) / 4
-        if not max_locked_shards:
-            return 1
-        return max_locked_shards
 
     def default_pixel_tests(self):
         return True
@@ -340,16 +332,13 @@ class ChromiumPort(Port):
         'win_layout_rel',
     ])
 
-    def warn_if_bug_missing_in_test_expectations(self):
-        return True
-
     def expectations_files(self):
         paths = [self.path_to_test_expectations_file()]
         skia_expectations_path = self.path_from_chromium_base('skia', 'skia_test_expectations.txt')
-        # FIXME: we should probably warn if this file is missing in some situations.
-        # See the discussion in webkit.org/b/97699.
         if self._filesystem.exists(skia_expectations_path):
             paths.append(skia_expectations_path)
+        else:
+            _log.warning("Using the chromium port without having the downstream skia_test_expectations.txt file checked out. Expectations related things might be wonky.")
 
         builder_name = self.get_option('builder_name', 'DUMMY_BUILDER_NAME')
         if builder_name == 'DUMMY_BUILDER_NAME' or '(deps)' in builder_name or builder_name in self.try_builder_names:
@@ -387,9 +376,6 @@ class ChromiumPort(Port):
             VirtualTestSuite('platform/chromium/virtual/gpu/fast/hidpi',
                              'fast/hidpi',
                              ['--force-compositing-mode']),
-            VirtualTestSuite('platform/chromium/virtual/softwarecompositing',
-                             'compositing',
-                             ['--enable-software-compositing']),
         ]
 
     #

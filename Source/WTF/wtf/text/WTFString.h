@@ -40,6 +40,7 @@ typedef const struct __CFString * CFStringRef;
 QT_BEGIN_NAMESPACE
 class QString;
 QT_END_NAMESPACE
+#include <QDataStream>
 #endif
 
 #if PLATFORM(WX)
@@ -301,7 +302,6 @@ public:
     WTF_EXPORT_STRING_API void append(LChar);
     void append(char c) { append(static_cast<LChar>(c)); };
     WTF_EXPORT_STRING_API void append(UChar);
-    WTF_EXPORT_STRING_API void append(const LChar*, unsigned length);
     WTF_EXPORT_STRING_API void append(const UChar*, unsigned length);
     WTF_EXPORT_STRING_API void insert(const String&, unsigned pos);
     void insert(const UChar*, unsigned length, unsigned pos);
@@ -414,7 +414,6 @@ public:
 #endif
 
     WTF_EXPORT_STRING_API static String make8BitFrom16BitSource(const UChar*, size_t);
-    WTF_EXPORT_STRING_API static String make16BitFrom8BitSource(const LChar*, size_t);
 
     // String::fromUTF8 will return a null string if
     // the input data contains invalid UTF-8 sequences.
@@ -457,12 +456,16 @@ public:
         return (*m_impl)[index];
     }
 
-private:
-    template <typename CharacterType>
-    void removeInternal(const CharacterType*, unsigned, int);
+    WTF_EXPORT_STRING_API void reportMemoryUsage(MemoryObjectInfo*) const;
 
+private:
     RefPtr<StringImpl> m_impl;
 };
+
+#if PLATFORM(QT)
+QDataStream& operator<<(QDataStream& stream, const String& str);
+QDataStream& operator>>(QDataStream& stream, String& str);
+#endif
 
 inline bool operator==(const String& a, const String& b) { return equal(a.impl(), b.impl()); }
 inline bool operator==(const String& a, const LChar* b) { return equal(a.impl(), b); }

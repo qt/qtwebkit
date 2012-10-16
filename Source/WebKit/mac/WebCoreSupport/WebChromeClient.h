@@ -117,7 +117,7 @@ public:
     virtual void populateVisitedLinks() OVERRIDE;
 
 #if ENABLE(DASHBOARD_SUPPORT)
-    virtual void annotatedRegionsChanged() OVERRIDE;
+    virtual void dashboardRegionsChanged() OVERRIDE;
 #endif
 
     virtual void runOpenPanel(WebCore::Frame*, PassRefPtr<WebCore::FileChooser>) OVERRIDE;
@@ -147,7 +147,7 @@ public:
 #if USE(ACCELERATED_COMPOSITING)
     virtual void attachRootGraphicsLayer(WebCore::Frame*, WebCore::GraphicsLayer*) OVERRIDE;
     virtual void setNeedsOneShotDrawingSynchronization() OVERRIDE;
-    virtual void scheduleCompositingLayerFlush() OVERRIDE;
+    virtual void scheduleCompositingLayerSync() OVERRIDE;
 
     virtual CompositingTriggerFlags allowedCompositingTriggers() const
     {

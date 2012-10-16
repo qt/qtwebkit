@@ -28,18 +28,16 @@
 
 #include "PlatformMemoryInstrumentation.h"
 #include "ResourceRequest.h"
-#include <wtf/MemoryInstrumentationHashMap.h>
 #include <wtf/MemoryInstrumentationVector.h>
 
 using namespace std;
 
 namespace WebCore {
 
-#if !USE(SOUP) && (!PLATFORM(MAC) || USE(CFNETWORK))
+#if !PLATFORM(MAC) || USE(CFNETWORK)
 double ResourceRequestBase::s_defaultTimeoutInterval = INT_MAX;
 #else
 // Will use NSURLRequest default timeout unless set to a non-zero value with setDefaultTimeoutInterval().
-// For libsoup the timeout enabled with integer milliseconds. We set 0 as the default value to avoid integer overflow.
 double ResourceRequestBase::s_defaultTimeoutInterval = 0;
 #endif
 
@@ -377,7 +375,7 @@ void ResourceRequestBase::addHTTPHeaderField(const AtomicString& name, const Str
     updateResourceRequest();
     HTTPHeaderMap::AddResult result = m_httpHeaderFields.add(name, value);
     if (!result.isNewEntry)
-        result.iterator->value = result.iterator->value + ',' + value;
+        result.iterator->second = result.iterator->second + ',' + value;
 
     if (url().protocolIsInHTTPFamily())
         m_platformRequestUpdated = false;
@@ -387,7 +385,7 @@ void ResourceRequestBase::addHTTPHeaderFields(const HTTPHeaderMap& headerFields)
 {
     HTTPHeaderMap::const_iterator end = headerFields.end();
     for (HTTPHeaderMap::const_iterator it = headerFields.begin(); it != end; ++it)
-        addHTTPHeaderField(it->key, it->value);
+        addHTTPHeaderField(it->first, it->second);
 }
 
 bool equalIgnoringHeaderFields(const ResourceRequestBase& a, const ResourceRequestBase& b)
@@ -453,7 +451,8 @@ void ResourceRequestBase::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) 
     info.addMember(m_url);
     info.addMember(m_firstPartyForCookies);
     info.addMember(m_httpMethod);
-    info.addMember(m_httpHeaderFields);
+    info.addHashMap(m_httpHeaderFields);
+    info.addInstrumentedMapEntries(m_httpHeaderFields);
     info.addMember(m_responseContentDispositionEncodingFallbackArray);
     info.addMember(m_httpBody);
 }

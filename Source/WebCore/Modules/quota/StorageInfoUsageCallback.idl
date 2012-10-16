@@ -28,9 +28,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=QUOTA,
-    Callback
-] interface StorageInfoUsageCallback {
-    boolean handleEvent(in unsigned long long currentUsageInBytes, in unsigned long long currentQuotaInBytes);
-};
+module storage {
+    interface [
+        Conditional=QUOTA,
+        Callback
+    ] StorageInfoUsageCallback {
+        boolean handleEvent(in unsigned long long currentUsageInBytes, in unsigned long long currentQuotaInBytes);
+    };
+}
+

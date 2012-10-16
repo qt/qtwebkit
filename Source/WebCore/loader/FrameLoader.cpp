@@ -102,7 +102,6 @@
 #include "WindowFeatures.h"
 #include "XMLDocumentParser.h"
 #include <wtf/CurrentTime.h>
-#include <wtf/MemoryInstrumentationHashSet.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
@@ -1145,7 +1144,6 @@ void FrameLoader::prepareForLoadStart()
 
 void FrameLoader::setupForReplace()
 {
-    m_client->revertToProvisionalState(m_documentLoader.get());
     setState(FrameStateProvisional);
     m_provisionalDocumentLoader = m_documentLoader;
     m_documentLoader = 0;
@@ -1716,7 +1714,7 @@ void FrameLoader::commitProvisionalLoad()
 
     transitionToCommitted(cachedPage);
 
-    if (pdl && m_documentLoader) {
+    if (pdl) {
         // Check if the destination page is allowed to access the previous page's timing information.
         RefPtr<SecurityOrigin> securityOrigin = SecurityOrigin::create(pdl->request().url());
         m_documentLoader->timing()->setHasSameOriginAsPreviousDocument(securityOrigin->canRequest(m_previousUrl));
@@ -2333,7 +2331,7 @@ void FrameLoader::closeAndRemoveChild(Frame* child)
 
     child->setView(0);
     if (child->ownerElement() && child->page())
-        child->page()->decrementSubframeCount();
+        child->page()->decrementFrameCount();
     child->willDetachPage();
     child->detachFromPage();
 
@@ -2952,7 +2950,7 @@ void FrameLoader::loadProvisionalItemFromCachedPage()
     // Should have timing data from previous time(s) the page was shown.
     ASSERT(provisionalLoader->timing()->navigationStart());
     provisionalLoader->resetTiming();
-    provisionalLoader->timing()->markNavigationStart();
+    provisionalLoader->timing()->markNavigationStart(frame());
 
     provisionalLoader->setCommitted(true);
     commitProvisionalLoad();
@@ -3281,7 +3279,7 @@ void FrameLoader::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addMember(m_provisionalDocumentLoader);
     info.addMember(m_policyDocumentLoader);
     info.addMember(m_outgoingReferrer);
-    info.addMember(m_openedFrames);
+    info.addInstrumentedHashSet(m_openedFrames);
 }
 
 bool FrameLoaderClient::hasHTMLView() const

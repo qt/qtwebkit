@@ -38,7 +38,7 @@ using namespace WebKit;
 
 namespace CoreIPC {
 
-void ArgumentCoder<ResourceRequest>::encodePlatformData(ArgumentEncoder* encoder, const ResourceRequest& resourceRequest)
+void ArgumentCoder<ResourceRequest>::encode(ArgumentEncoder* encoder, const ResourceRequest& resourceRequest)
 {
     bool requestIsPresent = resourceRequest.nsURLRequest();
     encoder->encode(requestIsPresent);
@@ -50,7 +50,7 @@ void ArgumentCoder<ResourceRequest>::encodePlatformData(ArgumentEncoder* encoder
     CoreIPC::encode(encoder, dictionary.get());
 }
 
-bool ArgumentCoder<ResourceRequest>::decodePlatformData(ArgumentDecoder* decoder, ResourceRequest& resourceRequest)
+bool ArgumentCoder<ResourceRequest>::decode(ArgumentDecoder* decoder, ResourceRequest& resourceRequest)
 {
     bool requestIsPresent;
     if (!decoder->decode(requestIsPresent))
@@ -73,7 +73,7 @@ bool ArgumentCoder<ResourceRequest>::decodePlatformData(ArgumentDecoder* decoder
     return true;
 }
 
-void ArgumentCoder<ResourceResponse>::encodePlatformData(ArgumentEncoder* encoder, const ResourceResponse& resourceResponse)
+void ArgumentCoder<ResourceResponse>::encode(ArgumentEncoder* encoder, const ResourceResponse& resourceResponse)
 {
     bool responseIsPresent = resourceResponse.nsURLResponse();
     encoder->encode(responseIsPresent);
@@ -85,7 +85,7 @@ void ArgumentCoder<ResourceResponse>::encodePlatformData(ArgumentEncoder* encode
     CoreIPC::encode(encoder, dictionary.get());
 }
 
-bool ArgumentCoder<ResourceResponse>::decodePlatformData(ArgumentDecoder* decoder, ResourceResponse& resourceResponse)
+bool ArgumentCoder<ResourceResponse>::decode(ArgumentDecoder* decoder, ResourceResponse& resourceResponse)
 {
     bool responseIsPresent;
     if (!decoder->decode(responseIsPresent))
@@ -113,7 +113,7 @@ static NSString* nsString(const String& string)
     return string.impl() ? [NSString stringWithCharacters:reinterpret_cast<const UniChar*>(string.characters()) length:string.length()] : @"";
 }
 
-void ArgumentCoder<ResourceError>::encodePlatformData(ArgumentEncoder* encoder, const ResourceError& resourceError)
+void ArgumentCoder<ResourceError>::encode(ArgumentEncoder* encoder, const ResourceError& resourceError)
 {
     bool errorIsNull = resourceError.isNull();
     encoder->encode(errorIsNull);
@@ -147,7 +147,7 @@ void ArgumentCoder<ResourceError>::encodePlatformData(ArgumentEncoder* encoder, 
     encoder->encode(PlatformCertificateInfo((CFArrayRef)peerCertificateChain));
 }
 
-bool ArgumentCoder<ResourceError>::decodePlatformData(ArgumentDecoder* decoder, ResourceError& resourceError)
+bool ArgumentCoder<ResourceError>::decode(ArgumentDecoder* decoder, ResourceError& resourceError)
 {
     bool errorIsNull;
     if (!decoder->decode(errorIsNull))
@@ -183,7 +183,7 @@ bool ArgumentCoder<ResourceError>::decodePlatformData(ArgumentDecoder* decoder, 
     HashMap<String, String>::const_iterator it = stringUserInfoMap.begin();
     HashMap<String, String>::const_iterator end = stringUserInfoMap.end();
     for (; it != end; ++it)
-        [userInfo setObject:nsString(it->value) forKey:nsString(it->key)];
+        [userInfo setObject:nsString(it->second) forKey:nsString(it->first)];
 
     if (certificate.certificateChain())
         [userInfo setObject:(NSArray *)certificate.certificateChain() forKey:@"NSErrorPeerCertificateChainKey"];

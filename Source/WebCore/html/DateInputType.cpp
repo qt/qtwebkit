@@ -31,17 +31,16 @@
 #include "config.h"
 #include "DateInputType.h"
 
-#if ENABLE(INPUT_TYPE_DATE)
+#include "CalendarPickerElement.h"
 #include "DateComponents.h"
-#include "DateTimeFieldsState.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "InputTypeNames.h"
 #include "KeyboardEvent.h"
-#include "LocalizedStrings.h"
-#include "Localizer.h"
-#include "PickerIndicatorElement.h"
+#include "LocalizedDate.h"
 #include <wtf/PassOwnPtr.h>
+
+#if ENABLE(INPUT_TYPE_DATE)
 
 namespace WebCore {
 
@@ -52,8 +51,8 @@ static const int dateDefaultStepBase = 0;
 static const int dateStepScaleFactor = 86400000;
 
 inline DateInputType::DateInputType(HTMLInputElement* element)
-    : BaseDateInputType(element)
-#if ENABLE(INPUT_TYPE_DATE_LEGACY_UI)
+    : BaseDateAndTimeInputType(element)
+#if ENABLE(CALENDAR_PICKER)
     , m_pickerElement(0)
 #endif
 {
@@ -103,11 +102,11 @@ bool DateInputType::isDateField() const
     return true;
 }
 
-#if ENABLE(INPUT_TYPE_DATE_LEGACY_UI)
+#if ENABLE(CALENDAR_PICKER)
 void DateInputType::createShadowSubtree()
 {
     BaseDateAndTimeInputType::createShadowSubtree();
-    RefPtr<PickerIndicatorElement> pickerElement = PickerIndicatorElement::create(element()->document());
+    RefPtr<CalendarPickerElement> pickerElement = CalendarPickerElement::create(element()->document());
     m_pickerElement = pickerElement.get();
     containerElement()->insertBefore(m_pickerElement, innerBlockElement()->nextSibling(), ASSERT_NO_EXCEPTION);
 }
@@ -165,30 +164,9 @@ bool DateInputType::usesFixedPlaceholder() const
 
 String DateInputType::fixedPlaceholder()
 {
-    return element()->localizer().dateFormatText();
+    return localizedDateFormatText();
 }
-#endif // ENABLE(INPUT_TYPE_DATE_LEGACY_UI)
-
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI) && !ENABLE(INPUT_TYPE_DATE_LEGACY_UI)
-String DateInputType::formatDateTimeFieldsState(const DateTimeFieldsState& dateTimeFieldsState) const
-{
-    if (!dateTimeFieldsState.hasDayOfMonth() || !dateTimeFieldsState.hasMonth() || !dateTimeFieldsState.hasYear())
-        return emptyString();
-
-    return String::format("%04u-%02u-%02u", dateTimeFieldsState.year(), dateTimeFieldsState.month(), dateTimeFieldsState.dayOfMonth());
-}
-
-void DateInputType::setupLayoutParameters(DateTimeEditElement::LayoutParameters& layoutParameters, const DateComponents& date) const
-{
-    layoutParameters.dateTimeFormat = layoutParameters.localizer.dateFormat();
-    layoutParameters.fallbackDateTimeFormat = ASCIILiteral("yyyy-MM-dd");
-    layoutParameters.minimumYear = fullYear(element()->fastGetAttribute(minAttr));
-    layoutParameters.maximumYear = fullYear(element()->fastGetAttribute(maxAttr));
-    layoutParameters.placeholderForDay = placeholderForDayOfMonthField();
-    layoutParameters.placeholderForMonth = placeholderForMonthField();
-    layoutParameters.placeholderForYear = placeholderForYearField();
-}
-#endif
+#endif // ENABLE(CALENDAR_PICKER)
 
 } // namespace WebCore
 #endif

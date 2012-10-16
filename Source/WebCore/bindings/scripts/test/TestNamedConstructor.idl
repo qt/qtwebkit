@@ -28,9 +28,11 @@
 
 // This IDL file is for testing the bindings code generator and for tracking
 // changes in its ouput.
-[
-    ActiveDOMObject,
-    NamedConstructor=Audio(in DOMString str1, in [Optional=DefaultIsUndefined] DOMString str2, in [Optional=DefaultIsNullString] DOMString str3),
-    ConstructorRaisesException
-] interface TestNamedConstructor {
-};
+module test {
+    interface [
+        ActiveDOMObject,
+        NamedConstructor=Audio(in DOMString str1, in [Optional=DefaultIsUndefined] DOMString str2, in [Optional=DefaultIsNullString] DOMString str3),
+        ConstructorRaisesException
+    ] TestNamedConstructor {
+    };
+}

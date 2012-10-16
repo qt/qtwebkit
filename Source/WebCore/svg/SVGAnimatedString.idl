@@ -23,11 +23,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=SVG
-] interface SVGAnimatedString {
-    attribute DOMString baseVal
-        setter raises(DOMException);
-    readonly attribute DOMString animVal;
-};
+module svg {
 
+    interface [
+        Conditional=SVG
+    ] SVGAnimatedString {
+        attribute DOMString baseVal
+            setter raises(DOMException);
+        readonly attribute DOMString animVal;
+    };
+
+}

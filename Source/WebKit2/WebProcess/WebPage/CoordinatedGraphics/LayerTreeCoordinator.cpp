@@ -83,7 +83,7 @@ LayerTreeCoordinator::LayerTreeCoordinator(WebPage* webPage)
     , m_forceRepaintAsyncCallbackID(0)
 {
     // Create a root layer.
-    m_rootLayer = GraphicsLayer::create(this, this);
+    m_rootLayer = GraphicsLayer::create(this);
     CoordinatedGraphicsLayer* webRootLayer = toCoordinatedGraphicsLayer(m_rootLayer.get());
     webRootLayer->setRootLayer(true);
 #ifndef NDEBUG
@@ -93,7 +93,7 @@ LayerTreeCoordinator::LayerTreeCoordinator(WebPage* webPage)
     m_rootLayer->setSize(m_webPage->size());
     m_layerTreeContext.webLayerID = toCoordinatedGraphicsLayer(webRootLayer)->id();
 
-    m_nonCompositedContentLayer = GraphicsLayer::create(this, this);
+    m_nonCompositedContentLayer = GraphicsLayer::create(this);
     toCoordinatedGraphicsLayer(m_rootLayer.get())->setCoordinatedGraphicsLayerClient(this);
 #ifndef NDEBUG
     m_nonCompositedContentLayer->setName("LayerTreeCoordinator non-composited content");
@@ -258,12 +258,12 @@ bool LayerTreeCoordinator::flushPendingLayerChanges()
         m_webPage->send(Messages::LayerTreeCoordinatorProxy::DeleteCompositingLayer(m_detachedLayers[i]));
     m_detachedLayers.clear();
 
-    bool didSync = m_webPage->corePage()->mainFrame()->view()->flushCompositingStateIncludingSubframes();
-    m_nonCompositedContentLayer->flushCompositingStateForThisLayerOnly();
+    bool didSync = m_webPage->corePage()->mainFrame()->view()->syncCompositingStateIncludingSubframes();
+    m_nonCompositedContentLayer->syncCompositingStateForThisLayerOnly();
     if (m_pageOverlayLayer)
-        m_pageOverlayLayer->flushCompositingStateForThisLayerOnly();
+        m_pageOverlayLayer->syncCompositingStateForThisLayerOnly();
 
-    m_rootLayer->flushCompositingStateForThisLayerOnly();
+    m_rootLayer->syncCompositingStateForThisLayerOnly();
 
     if (m_shouldSyncRootLayer) {
         m_webPage->send(Messages::LayerTreeCoordinatorProxy::SetRootCompositingLayer(toCoordinatedGraphicsLayer(m_rootLayer.get())->id()));
@@ -272,10 +272,7 @@ bool LayerTreeCoordinator::flushPendingLayerChanges()
 
     if (m_shouldSyncFrame) {
         didSync = true;
-
-        IntSize contentsSize = roundedIntSize(m_nonCompositedContentLayer->size());
-        IntRect coveredRect = toCoordinatedGraphicsLayer(m_nonCompositedContentLayer.get())->coverRect();
-        m_webPage->send(Messages::LayerTreeCoordinatorProxy::DidRenderFrame(contentsSize, coveredRect));
+        m_webPage->send(Messages::LayerTreeCoordinatorProxy::DidRenderFrame());
         m_waitingForUIProcess = true;
         m_shouldSyncFrame = false;
     }
@@ -305,13 +302,11 @@ void LayerTreeCoordinator::syncLayerChildren(WebLayerID id, const Vector<WebLaye
     m_webPage->send(Messages::LayerTreeCoordinatorProxy::SetCompositingLayerChildren(id, children));
 }
 
-#if USE(GRAPHICS_SURFACE)
-void LayerTreeCoordinator::syncCanvas(WebLayerID id, const IntSize& canvasSize, const GraphicsSurfaceToken& token, uint32_t frontBuffer)
+void LayerTreeCoordinator::syncCanvas(WebLayerID id, const IntSize& canvasSize, uint64_t graphicsSurfaceToken, uint32_t frontBuffer)
 {
     m_shouldSyncFrame = true;
-    m_webPage->send(Messages::LayerTreeCoordinatorProxy::SyncCanvas(id, canvasSize, token, frontBuffer));
+    m_webPage->send(Messages::LayerTreeCoordinatorProxy::SyncCanvas(id, canvasSize, graphicsSurfaceToken, frontBuffer));
 }
-#endif
 
 #if ENABLE(CSS_FILTERS)
 void LayerTreeCoordinator::syncLayerFilters(WebLayerID id, const FilterOperations& filters)
@@ -427,7 +422,7 @@ void LayerTreeCoordinator::createPageOverlayLayer()
 {
     ASSERT(!m_pageOverlayLayer);
 
-    m_pageOverlayLayer = GraphicsLayer::create(this, this);
+    m_pageOverlayLayer = GraphicsLayer::create(this);
 #ifndef NDEBUG
     m_pageOverlayLayer->setName("LayerTreeCoordinator page overlay content");
 #endif
@@ -453,26 +448,18 @@ int64_t LayerTreeCoordinator::adoptImageBackingStore(Image* image)
     int64_t key = 0;
 
 #if PLATFORM(QT)
-    QPixmap* nativeImage = image->nativeImageForCurrentFrame();
+    QImage* nativeImage = image->nativeImageForCurrentFrame();
 
     if (!nativeImage)
         return InvalidWebLayerID;
 
     key = nativeImage->cacheKey();
-#elif USE(CAIRO)
-    NativeImageCairo* nativeImage = image->nativeImageForCurrentFrame();
-    if (!nativeImage)
-        return InvalidWebLayerID;
-    // This can be safely done since we own the reference.
-    // A corresponding cairo_surface_destroy() is ensured in releaseImageBackingStore().
-    cairo_surface_t* cairoSurface = cairo_surface_reference(nativeImage->surface());
-    key = reinterpret_cast<int64_t>(cairoSurface);
 #endif
 
     HashMap<int64_t, int>::iterator it = m_directlyCompositedImageRefCounts.find(key);
 
     if (it != m_directlyCompositedImageRefCounts.end()) {
-        ++(it->value);
+        ++(it->second);
         return key;
     }
 
@@ -497,17 +484,12 @@ void LayerTreeCoordinator::releaseImageBackingStore(int64_t key)
     if (it == m_directlyCompositedImageRefCounts.end())
         return;
 
-    it->value--;
+    it->second--;
 
-    if (it->value)
+    if (it->second)
         return;
 
     m_directlyCompositedImageRefCounts.remove(it);
-#if USE(CAIRO)
-    // Complement the referencing in adoptImageBackingStore().
-    cairo_surface_t* cairoSurface = reinterpret_cast<cairo_surface_t*>(key);
-    cairo_surface_destroy(cairoSurface);
-#endif
     m_webPage->send(Messages::LayerTreeCoordinatorProxy::DestroyDirectlyCompositedImage(key));
 }
 
@@ -516,7 +498,7 @@ void LayerTreeCoordinator::notifyAnimationStarted(const WebCore::GraphicsLayer*,
 {
 }
 
-void LayerTreeCoordinator::notifyFlushRequired(const WebCore::GraphicsLayer*)
+void LayerTreeCoordinator::notifySyncRequired(const WebCore::GraphicsLayer*)
 {
 }
 
@@ -543,11 +525,6 @@ bool LayerTreeCoordinator::showDebugBorders(const WebCore::GraphicsLayer*) const
 bool LayerTreeCoordinator::showRepaintCounter(const WebCore::GraphicsLayer*) const
 {
     return m_webPage->corePage()->settings()->showRepaintCounter();
-}
-
-PassOwnPtr<GraphicsLayer> LayerTreeCoordinator::createGraphicsLayer(GraphicsLayerClient* client)
-{
-    return adoptPtr(new CoordinatedGraphicsLayer(client));
 }
 
 bool LayerTreeHost::supportsAcceleratedCompositing()
@@ -617,11 +594,6 @@ void LayerTreeCoordinator::setVisibleContentsRect(const IntRect& rect, float sca
         m_webPage->setFixedVisibleContentRect(rect);
     if (contentsRectDidChange)
         m_shouldSendScrollPositionUpdate = true;
-}
-
-GraphicsLayerFactory* LayerTreeCoordinator::graphicsLayerFactory()
-{
-    return this;
 }
 
 void LayerTreeCoordinator::scheduleAnimation()

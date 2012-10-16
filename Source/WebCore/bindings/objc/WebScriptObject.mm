@@ -140,6 +140,19 @@ static void addExceptionToConsole(ExecState* exec)
     return WebCore::createJSWrapper(toJS(jsObject), originRootObject, rootObject);
 }
 
+static void _didExecute(WebScriptObject *obj)
+{
+    RootObject* root = [obj _rootObject];
+    if (!root)
+        return;
+
+    ExecState* exec = root->globalObject()->globalExec();
+    ASSERT(exec->globalData().apiLock().currentThreadIsHoldingLock());
+    KJSDidExecuteFunctionPtr func = Instance::didExecuteFunction();
+    if (func)
+        func(exec, root->globalObject());
+}
+
 - (void)_setImp:(JSObject*)imp originRootObject:(PassRefPtr<RootObject>)originRootObject rootObject:(PassRefPtr<RootObject>)rootObject
 {
     // This function should only be called once, as a (possibly lazy) initializer.
@@ -327,6 +340,8 @@ static void getListFromNSArray(ExecState *exec, NSArray *array, RootObject* root
     // Convert and return the result of the function call.
     id resultObj = [WebScriptObject _convertValueToObjcValue:result originRootObject:[self _originRootObject] rootObject:[self _rootObject]];
 
+    _didExecute(self);
+        
     return resultObj;
 }
 
@@ -345,6 +360,8 @@ static void getListFromNSArray(ExecState *exec, NSArray *array, RootObject* root
     [self _rootObject]->globalObject()->globalData().timeoutChecker.stop();
 
     id resultObj = [WebScriptObject _convertValueToObjcValue:returnValue originRootObject:[self _originRootObject] rootObject:[self _rootObject]];
+    
+    _didExecute(self);
     
     return resultObj;
 }
@@ -366,6 +383,8 @@ static void getListFromNSArray(ExecState *exec, NSArray *array, RootObject* root
         addExceptionToConsole(exec);
         exec->clearException();
     }
+
+    _didExecute(self);
 }
 
 - (id)valueForKey:(NSString *)key
@@ -397,6 +416,9 @@ static void getListFromNSArray(ExecState *exec, NSArray *array, RootObject* root
     if ([resultObj isKindOfClass:[WebUndefined class]])
         resultObj = [super valueForKey:key];    // defaults to throwing an exception
 
+    JSLockHolder lock(exec);
+    _didExecute(self);
+    
     return resultObj;
 }
 
@@ -415,6 +437,8 @@ static void getListFromNSArray(ExecState *exec, NSArray *array, RootObject* root
         addExceptionToConsole(exec);
         exec->clearException();
     }
+
+    _didExecute(self);
 }
 
 - (BOOL)hasWebScriptKey:(NSString *)key
@@ -433,6 +457,8 @@ static void getListFromNSArray(ExecState *exec, NSArray *array, RootObject* root
         exec->clearException();
     }
 
+    _didExecute(self);
+
     return result;
 }
 
@@ -449,6 +475,8 @@ static void getListFromNSArray(ExecState *exec, NSArray *array, RootObject* root
     id result = convertValueToObjcValue(exec, [self _imp], ObjcObjectType).objectValue;
 
     NSString *description = [result description];
+
+    _didExecute(self);
 
     return description;
 }
@@ -472,6 +500,8 @@ static void getListFromNSArray(ExecState *exec, NSArray *array, RootObject* root
 
     id resultObj = [WebScriptObject _convertValueToObjcValue:result originRootObject:[self _originRootObject] rootObject:[self _rootObject]];
 
+    _didExecute(self);
+
     return resultObj;
 }
 
@@ -490,6 +520,8 @@ static void getListFromNSArray(ExecState *exec, NSArray *array, RootObject* root
         addExceptionToConsole(exec);
         exec->clearException();
     }
+
+    _didExecute(self);
 }
 
 - (void)setException:(NSString *)description

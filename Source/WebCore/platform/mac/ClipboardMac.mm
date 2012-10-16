@@ -65,8 +65,6 @@ ClipboardMac::ClipboardMac(ClipboardType clipboardType, const String& pasteboard
 
 ClipboardMac::~ClipboardMac()
 {
-    if (m_dragImage)
-        m_dragImage->removeClient(this);
 }
 
 bool ClipboardMac::hasData()
@@ -122,7 +120,7 @@ static String utiTypeFromCocoaType(const String& type)
     return String();
 }
 
-static void addHTMLClipboardTypesForCocoaType(ListHashSet<String>& resultTypes, const String& cocoaType, const String& pasteboardName)
+static void addHTMLClipboardTypesForCocoaType(HashSet<String>& resultTypes, const String& cocoaType, const String& pasteboardName)
 {
     // UTI may not do these right, so make sure we get the right, predictable result
     if (cocoaType == String(NSStringPboardType)) {
@@ -284,10 +282,10 @@ bool ClipboardMac::setData(const String &type, const String &data)
     return false;
 }
 
-ListHashSet<String> ClipboardMac::types() const
+HashSet<String> ClipboardMac::types() const
 {
     if (policy() != ClipboardReadable && policy() != ClipboardTypesReadable)
-        return ListHashSet<String>();
+        return HashSet<String>();
 
     Vector<String> types;
     platformStrategies()->pasteboardStrategy()->getTypes(types, m_pasteboardName);
@@ -295,9 +293,9 @@ ListHashSet<String> ClipboardMac::types() const
     // Enforce changeCount ourselves for security.  We check after reading instead of before to be
     // sure it doesn't change between our testing the change count and accessing the data.
     if (m_changeCount != platformStrategies()->pasteboardStrategy()->changeCount(m_pasteboardName))
-        return ListHashSet<String>();
+        return HashSet<String>();
 
-    ListHashSet<String> result;
+    HashSet<String> result;
     // FIXME: This loop could be split into two stages. One which adds all the HTML5 specified types
     // and a second which adds all the extra types from the cocoa clipboard (which is Mac-only behavior).
     for (size_t i = 0; i < types.size(); i++) {

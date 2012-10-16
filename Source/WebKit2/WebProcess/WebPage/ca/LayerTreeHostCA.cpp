@@ -51,7 +51,7 @@ LayerTreeHostCA::LayerTreeHostCA(WebPage* webPage)
 void LayerTreeHostCA::initialize()
 {
     // Create a root layer.
-    m_rootLayer = GraphicsLayer::create(graphicsLayerFactory(), this);
+    m_rootLayer = GraphicsLayer::create(this);
 #ifndef NDEBUG
     m_rootLayer->setName("LayerTreeHost root layer");
 #endif
@@ -59,7 +59,7 @@ void LayerTreeHostCA::initialize()
     m_rootLayer->setSize(m_webPage->size());
     static_cast<GraphicsLayerCA*>(m_rootLayer.get())->platformCALayer()->setGeometryFlipped(true);
 
-    m_nonCompositedContentLayer = GraphicsLayer::create(graphicsLayerFactory(), this);
+    m_nonCompositedContentLayer = GraphicsLayer::create(this);
     static_cast<GraphicsLayerCA*>(m_nonCompositedContentLayer.get())->setAllowTiledLayer(false);
 #ifndef NDEBUG
     m_nonCompositedContentLayer->setName("LayerTreeHost non-composited content");
@@ -186,7 +186,7 @@ void LayerTreeHostCA::notifyAnimationStarted(const WebCore::GraphicsLayer*, doub
 {
 }
 
-void LayerTreeHostCA::notifyFlushRequired(const WebCore::GraphicsLayer*)
+void LayerTreeHostCA::notifySyncRequired(const WebCore::GraphicsLayer*)
 {
 }
 
@@ -245,19 +245,19 @@ void LayerTreeHostCA::didPerformScheduledLayerFlush()
 
 bool LayerTreeHostCA::flushPendingLayerChanges()
 {
-    m_rootLayer->flushCompositingStateForThisLayerOnly();
-    m_nonCompositedContentLayer->flushCompositingStateForThisLayerOnly();
+    m_rootLayer->syncCompositingStateForThisLayerOnly();
+    m_nonCompositedContentLayer->syncCompositingStateForThisLayerOnly();
     if (m_pageOverlayLayer)
-        m_pageOverlayLayer->flushCompositingStateForThisLayerOnly();
+        m_pageOverlayLayer->syncCompositingStateForThisLayerOnly();
 
-    return m_webPage->corePage()->mainFrame()->view()->flushCompositingStateIncludingSubframes();
+    return m_webPage->corePage()->mainFrame()->view()->syncCompositingStateIncludingSubframes();
 }
 
 void LayerTreeHostCA::createPageOverlayLayer()
 {
     ASSERT(!m_pageOverlayLayer);
 
-    m_pageOverlayLayer = GraphicsLayer::create(graphicsLayerFactory(), this);
+    m_pageOverlayLayer = GraphicsLayer::create(this);
 #ifndef NDEBUG
     m_pageOverlayLayer->setName("LayerTreeHost page overlay content");
 #endif

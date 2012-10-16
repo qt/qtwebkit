@@ -68,10 +68,10 @@ WebInspector.SidebarSectionTreeElement.prototype = {
     {
         if (this.listItemElement)
             this.listItemElement.scrollIntoViewIfNeeded(false);
-    },
-
-    __proto__: TreeElement.prototype
+    }
 }
+
+WebInspector.SidebarSectionTreeElement.prototype.__proto__ = TreeElement.prototype;
 
 /**
  * @constructor
@@ -222,7 +222,7 @@ WebInspector.SidebarTreeElement.prototype = {
     {
         if (this._listItemNode)
             this._listItemNode.scrollIntoViewIfNeeded(false);
-    },
-
-    __proto__: TreeElement.prototype
+    }
 }
+
+WebInspector.SidebarTreeElement.prototype.__proto__ = TreeElement.prototype;

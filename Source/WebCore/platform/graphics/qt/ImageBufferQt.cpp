@@ -32,6 +32,7 @@
 #include "GraphicsContext.h"
 #include "ImageData.h"
 #include "MIMETypeRegistry.h"
+#include "NativeImageQt.h"
 #include "StillImageQt.h"
 #include "TransparencyLayer.h"
 #include <wtf/text/CString.h>
@@ -42,23 +43,22 @@
 #include <QImage>
 #include <QImageWriter>
 #include <QPainter>
-#include <QPixmap>
 #include <math.h>
 
 namespace WebCore {
 
 ImageBufferData::ImageBufferData(const IntSize& size)
-    : m_pixmap(size)
+    : m_nativeImage(size, NativeImageQt::defaultFormatForAlphaEnabledImages())
 {
-    if (m_pixmap.isNull())
+    if (m_nativeImage.isNull())
         return;
 
-    m_pixmap.fill(QColor(Qt::transparent));
+    m_nativeImage.fill(QColor(Qt::transparent));
 
     QPainter* painter = new QPainter;
     m_painter = adoptPtr(painter);
 
-    if (!painter->begin(&m_pixmap))
+    if (!painter->begin(&m_nativeImage))
         return;
 
     // Since ImageBuffer is used mainly for Canvas, explicitly initialize
@@ -76,22 +76,7 @@ ImageBufferData::ImageBufferData(const IntSize& size)
     painter->setBrush(brush);
     painter->setCompositionMode(QPainter::CompositionMode_SourceOver);
     
-    m_image = StillImage::createForRendering(&m_pixmap);
-}
-
-QImage ImageBufferData::toQImage() const
-{
-    QPaintEngine* paintEngine = m_pixmap.paintEngine();
-    if (!paintEngine || paintEngine->type() != QPaintEngine::Raster)
-        return m_pixmap.toImage();
-
-    // QRasterPixmapData::toImage() will deep-copy the backing QImage if there's an active QPainter on it.
-    // For performance reasons, we don't want that here, so we temporarily redirect the paint engine.
-    QPaintDevice* currentPaintDevice = paintEngine->paintDevice();
-    paintEngine->setPaintDevice(0);
-    QImage image = m_pixmap.toImage();
-    paintEngine->setPaintDevice(currentPaintDevice);
-    return image;
+    m_image = StillImage::createForRendering(&m_nativeImage);
 }
 
 ImageBuffer::ImageBuffer(const IntSize& size, float /* resolutionScale */, ColorSpace, RenderingMode, DeferralMode, bool& success)
@@ -120,9 +105,9 @@ GraphicsContext* ImageBuffer::context() const
 PassRefPtr<Image> ImageBuffer::copyImage(BackingStoreCopy copyBehavior) const
 {
     if (copyBehavior == CopyBackingStore)
-        return StillImage::create(m_data.m_pixmap);
+        return StillImage::create(m_data.m_nativeImage);
 
-    return StillImage::createForRendering(&m_data.m_pixmap);
+    return StillImage::createForRendering(&m_data.m_nativeImage);
 }
 
 void ImageBuffer::draw(GraphicsContext* destContext, ColorSpace styleColorSpace, const FloatRect& destRect, const FloatRect& srcRect,
@@ -149,12 +134,12 @@ void ImageBuffer::drawPattern(GraphicsContext* destContext, const FloatRect& src
 
 void ImageBuffer::clip(GraphicsContext* context, const FloatRect& floatRect) const
 {
-    QPixmap* nativeImage = m_data.m_image->nativeImageForCurrentFrame();
+    QImage* nativeImage = m_data.m_image->nativeImageForCurrentFrame();
     if (!nativeImage)
         return;
 
     IntRect rect = enclosingIntRect(floatRect);
-    QPixmap alphaMask = *nativeImage;
+    QImage alphaMask = *nativeImage;
 
     context->pushTransparencyLayerInternal(rect, 1.0, alphaMask);
 }
@@ -165,7 +150,7 @@ void ImageBuffer::platformTransformColorSpace(const Vector<int>& lookUpTable)
     if (isPainting)
         m_data.m_painter->end();
 
-    QImage image = m_data.toQImage().convertToFormat(QImage::Format_ARGB32);
+    QImage image = m_data.m_nativeImage.convertToFormat(QImage::Format_ARGB32);
     ASSERT(!image.isNull());
 
     uchar* bits = image.bits();
@@ -182,20 +167,10 @@ void ImageBuffer::platformTransformColorSpace(const Vector<int>& lookUpTable)
         }
     }
 
-    m_data.m_pixmap = QPixmap::fromImage(image);
+    m_data.m_nativeImage = image;
 
     if (isPainting)
-        m_data.m_painter->begin(&m_data.m_pixmap);
-}
-
-static inline quint32 convertABGRToARGB(quint32 pixel)
-{
-    return ((pixel << 16) & 0xff0000) | ((pixel >> 16) & 0xff) | (pixel & 0xff00ff00);
-}
-
-static inline quint32 convertARGBToABGR(quint32 pixel)
-{
-    return convertABGRToARGB(pixel);
+        m_data.m_painter->begin(&m_data.m_nativeImage);
 }
 
 template <Multiply multiplied>
@@ -234,7 +209,7 @@ PassRefPtr<Uint8ClampedArray> getImageData(const IntRect& rect, const ImageBuffe
     int numRows = endy - originy;
 
     // NOTE: For unmultiplied data, we undo the premultiplication below.
-    QImage image = imageData.toQImage().convertToFormat(QImage::Format_ARGB32_Premultiplied);
+    QImage image = imageData.m_nativeImage.convertToFormat(NativeImageQt::defaultFormatForAlphaEnabledImages());
 
     ASSERT(!image.isNull());
 
@@ -242,18 +217,40 @@ PassRefPtr<Uint8ClampedArray> getImageData(const IntRect& rect, const ImageBuffe
     const uchar* bits = image.constBits();
 
     quint32* destRows = reinterpret_cast_ptr<quint32*>(&data[desty * rect.width() * 4 + destx * 4]);
-    for (int y = 0; y < numRows; ++y) {
-        const quint32* scanLine = reinterpret_cast_ptr<const quint32*>(bits + (y + originy) * bytesPerLine);
-        for (int x = 0; x < numColumns; x++) {
-            QRgb pixel = scanLine[x + originx];
-            Color pixelColor;
-            if (multiplied == Unmultiplied)
-                pixelColor = colorFromPremultipliedARGB(Color(qRed(pixel), qGreen(pixel), qBlue(pixel), qAlpha(pixel)).rgb());
-            else
-                pixelColor = Color(qRed(pixel), qGreen(pixel), qBlue(pixel), qAlpha(pixel));
-            destRows[x] = convertARGBToABGR(pixelColor.rgb());
+
+    if (multiplied == Unmultiplied) {
+        for (int y = 0; y < numRows; ++y) {
+            const quint32* scanLine = reinterpret_cast_ptr<const quint32*>(bits + (y + originy) * bytesPerLine);
+            for (int x = 0; x < numColumns; x++) {
+                QRgb pixel = scanLine[x + originx];
+                int alpha = qAlpha(pixel);
+                // Un-premultiply and convert RGB to BGR.
+                if (alpha == 255)
+                    destRows[x] = (0xFF000000
+                                | (qBlue(pixel) << 16)
+                                | (qGreen(pixel) << 8)
+                                | (qRed(pixel)));
+                else if (alpha > 0)
+                    destRows[x] = ((alpha << 24)
+                                | (((255 * qBlue(pixel)) / alpha)) << 16)
+                                | (((255 * qGreen(pixel)) / alpha) << 8)
+                                | ((255 * qRed(pixel)) / alpha);
+                else
+                    destRows[x] = 0;
+            }
+            destRows += rect.width();
         }
-        destRows += rect.width();
+    } else {
+        for (int y = 0; y < numRows; ++y) {
+            const quint32* scanLine = reinterpret_cast_ptr<const quint32*>(bits + (y + originy) * bytesPerLine);
+            for (int x = 0; x < numColumns; x++) {
+                QRgb pixel = scanLine[x + originx];
+                // Convert RGB to BGR.
+                destRows[x] = ((pixel << 16) & 0xff0000) | ((pixel >> 16) & 0xff) | (pixel & 0xff00ff00);
+
+            }
+            destRows += rect.width();
+        }
     }
 
     return result.release();
@@ -267,6 +264,22 @@ PassRefPtr<Uint8ClampedArray> ImageBuffer::getUnmultipliedImageData(const IntRec
 PassRefPtr<Uint8ClampedArray> ImageBuffer::getPremultipliedImageData(const IntRect& rect, CoordinateSystem) const
 {
     return getImageData<Premultiplied>(rect, m_data, m_size);
+}
+
+static inline unsigned int premultiplyABGRtoARGB(unsigned int x)
+{
+    unsigned int a = x >> 24;
+    if (a == 255)
+        return (x << 16) | ((x >> 16) & 0xff) | (x & 0xff00ff00);
+    unsigned int t = (x & 0xff00ff) * a;
+    t = (t + ((t >> 8) & 0xff00ff) + 0x800080) >> 8;
+    t = ((t << 16) | (t >> 16)) & 0xff00ff;
+
+    x = ((x >> 8) & 0xff) * a;
+    x = (x + ((x >> 8) & 0xff) + 0x80);
+    x &= 0xff00;
+    x |= t | (a << 24);
+    return x;
 }
 
 void ImageBuffer::putByteArray(Multiply multiplied, Uint8ClampedArray* source, const IntSize& sourceSize, const IntRect& sourceRect, const IntPoint& destPoint, CoordinateSystem)
@@ -306,21 +319,31 @@ void ImageBuffer::putByteArray(Multiply multiplied, Uint8ClampedArray* source, c
 
     const quint32* srcScanLine = reinterpret_cast_ptr<const quint32*>(source->data() + originy * srcBytesPerRow + originx * 4);
 
-    for (int y = 0; y < numRows; ++y) {
-        quint32* destScanLine = reinterpret_cast_ptr<quint32*>(bits + y * bytesPerLine);
-        for (int x = 0; x < numColumns; x++) {
-            quint32 pixel = convertABGRToARGB(srcScanLine[x]);
-            if (multiplied == Unmultiplied)
-                destScanLine[x] = premultipliedARGBFromColor(Color(pixel));
-            else
-                destScanLine[x] = pixel;
+    if (multiplied == Unmultiplied) {
+        for (int y = 0; y < numRows; ++y) {
+            quint32* destScanLine = reinterpret_cast_ptr<quint32*>(bits + y * bytesPerLine);
+            for (int x = 0; x < numColumns; x++) {
+                // Premultiply and convert BGR to RGB.
+                quint32 pixel = srcScanLine[x];
+                destScanLine[x] = premultiplyABGRtoARGB(pixel);
+            }
+            srcScanLine += sourceSize.width();
         }
-        srcScanLine += sourceSize.width();
+    } else {
+        for (int y = 0; y < numRows; ++y) {
+            quint32* destScanLine = reinterpret_cast_ptr<quint32*>(bits + y * bytesPerLine);
+            for (int x = 0; x < numColumns; x++) {
+                // Convert BGR to RGB.
+                quint32 pixel = srcScanLine[x];
+                destScanLine[x] = ((pixel << 16) & 0xff0000) | ((pixel >> 16) & 0xff) | (pixel & 0xff00ff00);
+            }
+            srcScanLine += sourceSize.width();
+        }
     }
 
     bool isPainting = m_data.m_painter->isActive();
     if (!isPainting)
-        m_data.m_painter->begin(&m_data.m_pixmap);
+        m_data.m_painter->begin(&m_data.m_nativeImage);
     else {
         m_data.m_painter->save();
 
@@ -339,7 +362,7 @@ void ImageBuffer::putByteArray(Multiply multiplied, Uint8ClampedArray* source, c
         m_data.m_painter->restore();
 }
 
-static bool encodeImage(const QPixmap& pixmap, const String& format, const double* quality, QByteArray& data)
+static bool encodeImage(const QImage& image, const String& format, const double* quality, QByteArray& data)
 {
     int compressionQuality = 100;
     if (quality && *quality >= 0.0 && *quality <= 1.0)
@@ -347,7 +370,7 @@ static bool encodeImage(const QPixmap& pixmap, const String& format, const doubl
 
     QBuffer buffer(&data);
     buffer.open(QBuffer::WriteOnly);
-    bool success = pixmap.save(&buffer, format.utf8().data(), compressionQuality);
+    bool success = image.save(&buffer, format.utf8().data(), compressionQuality);
     buffer.close();
 
     return success;
@@ -359,10 +382,10 @@ String ImageBuffer::toDataURL(const String& mimeType, const double* quality, Coo
 
     // QImageWriter does not support mimetypes. It does support Qt image formats (png,
     // gif, jpeg..., xpm) so skip the image/ to get the Qt image format used to encode
-    // the m_pixmap image.
+    // the m_nativeImage image.
 
     QByteArray data;
-    if (!encodeImage(m_data.m_pixmap, mimeType.substring(sizeof "image"), quality, data))
+    if (!encodeImage(m_data.m_nativeImage, mimeType.substring(sizeof "image"), quality, data))
         return "data:,";
 
     return "data:" + mimeType + ";base64," + data.toBase64().data();

@@ -37,7 +37,7 @@ typedef struct _Ewk_Vibration_Client Ewk_Vibration_Client;
 
 class VibrationProvider : public RefCounted<VibrationProvider> {
 public:
-    static PassRefPtr<VibrationProvider> create(WKContextRef);
+    static PassRefPtr<VibrationProvider> create(WKVibrationRef);
     virtual ~VibrationProvider();
 
     void vibrate(uint64_t vibrationTime);
@@ -45,9 +45,9 @@ public:
     void setVibrationClientCallbacks(Ewk_Vibration_Client_Vibrate_Cb, Ewk_Vibration_Client_Vibration_Cancel_Cb, void*);
 
 private:
-    explicit VibrationProvider(WKContextRef);
+    explicit VibrationProvider(WKVibrationRef);
 
-    WKRetainPtr<WKContextRef> m_wkContext;
+    WKRetainPtr<WKVibrationRef> m_wkVibrationRef;
     OwnPtr<Ewk_Vibration_Client> m_vibrationClient;
 };
 

@@ -90,6 +90,7 @@ class Event;
 class EventListener;
 class FloatRect;
 class FloatQuad;
+class FontData;
 class FormController;
 class Frame;
 class FrameView;
@@ -157,7 +158,7 @@ class TransformSource;
 #endif
 
 #if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
-struct AnnotatedRegionValue;
+struct DashboardRegionValue;
 #endif
 
 #if ENABLE(TOUCH_EVENTS)
@@ -358,6 +359,7 @@ public:
     bool cssStickyPositionEnabled() const;
     bool cssRegionsEnabled() const;
 #if ENABLE(CSS_REGIONS)
+    PassRefPtr<WebKitNamedFlow> webkitGetFlowByName(const String&);
     PassRefPtr<DOMNamedFlowCollection> webkitGetNamedFlows();
 #endif
 
@@ -539,6 +541,8 @@ public:
     PassRefPtr<RenderStyle> styleForElementIgnoringPendingStylesheets(Element*);
     PassRefPtr<RenderStyle> styleForPage(int pageIndex);
 
+    void registerCustomFont(PassOwnPtr<FontData>);
+
     // Returns true if page box (margin boxes and page borders) is visible.
     bool isPageBoxVisible(int pageIndex);
 
@@ -709,8 +713,7 @@ public:
     void scheduleForcedStyleRecalc();
     void scheduleStyleRecalc();
     void unscheduleStyleRecalc();
-    bool hasPendingStyleRecalc() const;
-    bool hasPendingForcedStyleRecalc() const;
+    bool isPendingStyleRecalc() const;
     void styleRecalcTimerFired(Timer<Document>*);
 
     void registerNodeListCache(DynamicNodeListCacheBase*);
@@ -993,12 +996,12 @@ public:
     bool frameElementsShouldIgnoreScrolling() const { return m_frameElementsShouldIgnoreScrolling; }
 
 #if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
-    void setAnnotatedRegionsDirty(bool f) { m_annotatedRegionsDirty = f; }
-    bool annotatedRegionsDirty() const { return m_annotatedRegionsDirty; }
-    bool hasAnnotatedRegions () const { return m_hasAnnotatedRegions; }
-    void setHasAnnotatedRegions(bool f) { m_hasAnnotatedRegions = f; }
-    const Vector<AnnotatedRegionValue>& annotatedRegions() const;
-    void setAnnotatedRegions(const Vector<AnnotatedRegionValue>&);
+    void setDashboardRegionsDirty(bool f) { m_dashboardRegionsDirty = f; }
+    bool dashboardRegionsDirty() const { return m_dashboardRegionsDirty; }
+    bool hasDashboardRegions () const { return m_hasDashboardRegions; }
+    void setHasDashboardRegions(bool f) { m_hasDashboardRegions = f; }
+    const Vector<DashboardRegionValue>& dashboardRegions() const;
+    void setDashboardRegions(const Vector<DashboardRegionValue>&);
 #endif
 
     virtual void removeAllEventListeners();
@@ -1091,9 +1094,9 @@ public:
     const DocumentTiming* timing() const { return &m_documentTiming; }
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
-    int requestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback>);
-    void cancelAnimationFrame(int id);
-    void serviceScriptedAnimations(double monotonicAnimationStartTime);
+    int webkitRequestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback>);
+    void webkitCancelAnimationFrame(int id);
+    void serviceScriptedAnimations(DOMTimeStamp);
 #endif
 
     virtual EventTarget* errorEventTarget();
@@ -1156,8 +1159,7 @@ public:
 
     bool inStyleRecalc() { return m_inStyleRecalc; }
 
-    // Return a Localizer for the default locale if the argument is null or empty.
-    Localizer& getCachedLocalizer(const AtomicString& locale = nullAtom);
+    Localizer& getLocalizer(const AtomicString& locale);
 
 protected:
     Document(Frame*, const KURL&, bool isXHTML, bool isHTML);
@@ -1197,8 +1199,6 @@ private:
 
     virtual double minimumTimerInterval() const;
 
-    virtual double timerAlignmentInterval() const;
-
     void updateTitle(const StringWithDirection&);
     void updateFocusAppearanceTimerFired(Timer<Document>*);
     void updateBaseURL();
@@ -1208,6 +1208,8 @@ private:
     void createStyleResolver();
 
     void seamlessParentUpdatedStylesheets();
+
+    void deleteCustomFonts();
 
     PassRefPtr<NodeList> handleZeroPadding(const HitTestRequest&, HitTestResult&) const;
 
@@ -1253,10 +1255,12 @@ private:
     // do eventually load.
     PendingSheetLayout m_pendingSheetLayout;
 
+    Vector<OwnPtr<FontData> > m_customFonts;
+
     Frame* m_frame;
     RefPtr<DOMWindow> m_domWindow;
 
-    RefPtr<CachedResourceLoader> m_cachedResourceLoader;
+    OwnPtr<CachedResourceLoader> m_cachedResourceLoader;
     RefPtr<DocumentParser> m_parser;
     RefPtr<ContextFeatures> m_contextFeatures;
 
@@ -1405,9 +1409,9 @@ private:
 #endif
 
 #if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
-    Vector<AnnotatedRegionValue> m_annotatedRegions;
-    bool m_hasAnnotatedRegions;
-    bool m_annotatedRegionsDirty;
+    Vector<DashboardRegionValue> m_dashboardRegions;
+    bool m_hasDashboardRegions;
+    bool m_dashboardRegionsDirty;
 #endif
 
     HashMap<String, RefPtr<HTMLCanvasElement> > m_cssCanvasElements;

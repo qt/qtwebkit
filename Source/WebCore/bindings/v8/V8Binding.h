@@ -182,28 +182,27 @@ namespace WebCore {
 
     template<>
     struct NativeValueTraits<String> {
-        static inline String nativeValue(const v8::Handle<v8::Value>& value)
+        static inline String arrayNativeValue(const v8::Local<v8::Array>& array, size_t i)
         {
-            return toWebCoreString(value);
+            return toWebCoreString(array->Get(i));
         }
     };
 
     template<>
     struct NativeValueTraits<float> {
-        static inline float nativeValue(const v8::Handle<v8::Value>& value)
+        static inline float arrayNativeValue(const v8::Local<v8::Array>& array, size_t i)
         {
-            return static_cast<float>(value->NumberValue());
+            return static_cast<float>(array->Get(v8Integer(i))->NumberValue());
         }
     };
 
     template<>
     struct NativeValueTraits<double> {
-        static inline double nativeValue(const v8::Handle<v8::Value>& value)
+        static inline double arrayNativeValue(const v8::Local<v8::Array>& array, size_t i)
         {
-            return static_cast<double>(value->NumberValue());
+            return static_cast<double>(array->Get(v8Integer(i))->NumberValue());
         }
     };
-
 
     template <class T>
     Vector<T> toNativeArray(v8::Handle<v8::Value> value)
@@ -216,23 +215,11 @@ namespace WebCore {
         v8::Local<v8::Value> v8Value(v8::Local<v8::Value>::New(value));
         v8::Local<v8::Array> array = v8::Local<v8::Array>::Cast(v8Value);
         size_t length = array->Length();
-        for (size_t i = 0; i < length; ++i)
-            result.append(TraitsType::nativeValue(array->Get(i)));
+        for (size_t i = 0; i < length; ++i) {
+            result.append(TraitsType::arrayNativeValue(array, i));
+        }
         return result;
     }
-
-    template <class T>
-    Vector<T> toNativeArguments(const v8::Arguments& args, int startIndex)
-    {
-        ASSERT(startIndex <= args.Length());
-        Vector<T> result;
-        typedef NativeValueTraits<T> TraitsType;
-        int length = args.Length();
-        for (int i = startIndex; i < length; ++i)
-            result.append(TraitsType::nativeValue(args[i]));
-        return result;
-    }
-
 
     // Validates that the passed object is a sequence type per WebIDL spec
     // http://www.w3.org/TR/2012/WD-WebIDL-20120207/#es-sequence

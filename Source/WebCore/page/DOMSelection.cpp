@@ -53,7 +53,10 @@ static Node* selectionShadowAncestor(Frame* frame)
     if (!node->isInShadowTree())
         return 0;
 
-    return frame->document()->ancestorInThisScope(node);
+    Node* shadowAncestor = node->shadowAncestorNode();
+    while (shadowAncestor->isInShadowTree())
+        shadowAncestor = shadowAncestor->shadowAncestorNode();
+    return shadowAncestor;
 }
 
 DOMSelection::DOMSelection(const TreeScope* treeScope)

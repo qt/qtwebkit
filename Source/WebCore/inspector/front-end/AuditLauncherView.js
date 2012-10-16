@@ -249,7 +249,7 @@ WebInspector.AuditLauncherView.prototype = {
     {
         this._launchButton.textContent = this._auditRunning ? WebInspector.UIString("Stop") : WebInspector.UIString("Run");
         this._launchButton.disabled = !this._currentCategoriesCount;
-    },
-
-    __proto__: WebInspector.View.prototype
+    }
 }
+
+WebInspector.AuditLauncherView.prototype.__proto__ = WebInspector.View.prototype;

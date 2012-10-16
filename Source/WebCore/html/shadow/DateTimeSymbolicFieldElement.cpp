@@ -24,7 +24,7 @@
  */
 
 #include "config.h"
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
 #include "DateTimeSymbolicFieldElement.h"
 
 #include "FontCache.h"

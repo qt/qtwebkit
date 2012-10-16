@@ -17,10 +17,13 @@
  * Boston, MA 02110-1301, USA.
  */
 
-interface Rect {
-    readonly attribute CSSPrimitiveValue  top;
-    readonly attribute CSSPrimitiveValue  right;
-    readonly attribute CSSPrimitiveValue  bottom;
-    readonly attribute CSSPrimitiveValue  left;
-};
+module css {
 
+    interface Rect {
+        readonly attribute CSSPrimitiveValue  top;
+        readonly attribute CSSPrimitiveValue  right;
+        readonly attribute CSSPrimitiveValue  bottom;
+        readonly attribute CSSPrimitiveValue  left;
+    };
+
+}

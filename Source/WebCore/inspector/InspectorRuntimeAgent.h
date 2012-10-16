@@ -57,10 +57,7 @@ class InspectorRuntimeAgent : public InspectorBaseAgent<InspectorRuntimeAgent>, 
 public:
     virtual ~InspectorRuntimeAgent();
 
-    bool enabled() { return m_enabled; }
     // Part of the protocol.
-    virtual void enable(ErrorString*) { m_enabled = true; }
-    virtual void disable(ErrorString*) { m_enabled = false; }
     virtual void evaluate(ErrorString*,
                   const String& expression,
                   const String* objectGroup,
@@ -79,7 +76,7 @@ public:
                         RefPtr<TypeBuilder::Runtime::RemoteObject>& result,
                         TypeBuilder::OptOutput<bool>* wasThrown);
     virtual void releaseObject(ErrorString*, const String& objectId);
-    virtual void getProperties(ErrorString*, const String& objectId, const bool* ownProperties, RefPtr<TypeBuilder::Array<TypeBuilder::Runtime::PropertyDescriptor> >& result, RefPtr<TypeBuilder::Array<TypeBuilder::Runtime::InternalPropertyDescriptor> >& internalProperties);
+    virtual void getProperties(ErrorString*, const String& objectId, const bool* ownProperties, RefPtr<TypeBuilder::Array<TypeBuilder::Runtime::PropertyDescriptor> >& result);
     virtual void releaseObjectGroup(ErrorString*, const String& objectGroup);
     virtual void run(ErrorString*);
 
@@ -98,7 +95,6 @@ protected:
     virtual void unmuteConsole() = 0;
 
     InjectedScriptManager* injectedScriptManager() { return m_injectedScriptManager; }
-    bool m_enabled;
 
 private:
     InjectedScriptManager* m_injectedScriptManager;

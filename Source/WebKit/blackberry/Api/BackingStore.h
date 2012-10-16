@@ -60,6 +60,7 @@ public:
     void setScrollingOrZooming(bool);
 
     void blitVisibleContents();
+    void blitContents(const BlackBerry::Platform::IntRect& dstRect, const BlackBerry::Platform::IntRect& contents);
     void repaint(int x, int y, int width, int height, bool contentChanged, bool immediate);
 
     // In the defers blit mode, any blit requests will just return early, and

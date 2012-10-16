@@ -30,6 +30,17 @@ bool MarkedAllocator::isPagedOut(double deadline)
 inline void* MarkedAllocator::tryAllocateHelper(size_t bytes)
 {
     if (!m_freeList.head) {
+        if (m_onlyContainsStructures && !m_heap->isSafeToSweepStructures()) {
+            if (m_currentBlock) {
+                m_currentBlock->didConsumeFreeList();
+                m_currentBlock = 0;
+            }
+            // We sweep another random block here so that we can make progress
+            // toward being able to sweep Structures.
+            m_heap->sweeper()->sweepNextBlock();
+            return 0;
+        }
+
         for (MarkedBlock*& block = m_blocksToSweep; block; block = block->next()) {
             MarkedBlock::FreeList freeList = block->sweep(MarkedBlock::SweepToFreeList);
             if (!freeList.head) {
@@ -111,9 +122,15 @@ MarkedBlock* MarkedAllocator::allocateBlock(size_t bytes)
 
     size_t cellSize = m_cellSize ? m_cellSize : WTF::roundUpToMultipleOf<MarkedBlock::atomSize>(bytes);
 
-    if (blockSize == MarkedBlock::blockSize)
-        return MarkedBlock::create(m_heap->blockAllocator().allocate<MarkedBlock>(), this, cellSize, m_destructorType);
-    return MarkedBlock::create(m_heap->blockAllocator().allocateCustomSize(blockSize, MarkedBlock::blockSize), this, cellSize, m_destructorType);
+    if (blockSize == MarkedBlock::blockSize) {
+        PageAllocationAligned allocation = m_heap->blockAllocator().allocate();
+        return MarkedBlock::create(allocation, m_heap, cellSize, m_cellsNeedDestruction, m_onlyContainsStructures);
+    }
+
+    PageAllocationAligned allocation = PageAllocationAligned::allocate(blockSize, MarkedBlock::blockSize, OSAllocator::JSGCHeapPages);
+    if (!static_cast<bool>(allocation))
+        CRASH();
+    return MarkedBlock::create(allocation, m_heap, cellSize, m_cellsNeedDestruction, m_onlyContainsStructures);
 }
 
 void MarkedAllocator::addBlock(MarkedBlock* block)

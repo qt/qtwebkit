@@ -22,10 +22,13 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=MEDIA_STREAM
-] interface NavigatorUserMediaError {
-    const unsigned short PERMISSION_DENIED = 1;
-    readonly attribute unsigned short code;
-};
+module window {
+    interface [
+        Conditional=MEDIA_STREAM
+    ] NavigatorUserMediaError {
+        const unsigned short PERMISSION_DENIED = 1;
+        readonly attribute unsigned short code;
+    };
+
+}
 

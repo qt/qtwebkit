@@ -124,7 +124,7 @@ class CheckWebKitStyle(object):
         args = sys.argv[1:]
 
         host = Host()
-        host.initialize_scm()
+        host._initialize_scm()
 
         stderr = self._engage_awesome_stderr_hacks()
 

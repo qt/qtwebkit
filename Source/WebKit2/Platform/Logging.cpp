@@ -37,7 +37,6 @@ WTFLogChannel LogTextInput    = { 0x00000004, "WebKit2LogLevel", WTFLogChannelOf
 WTFLogChannel LogView         = { 0x00000008, "WebKit2LogLevel", WTFLogChannelOff };
 WTFLogChannel LogIconDatabase = { 0x00000010, "WebKit2LogLevel", WTFLogChannelOff };
 WTFLogChannel LogKeyHandling  = { 0x00000020, "WebKit2LogLevel", WTFLogChannelOff };
-WTFLogChannel LogPlugins      = { 0x00000040, "WebKit2LogLevel", WTFLogChannelOff };
 
 #if !PLATFORM(MAC) && !PLATFORM(GTK) && !PLATFORM(QT) && !PLATFORM(EFL)
 void initializeLogChannel(WTFLogChannel* channel)
@@ -70,9 +69,6 @@ WTFLogChannel* getChannelFromName(const String& channelName)
     if (equalIgnoringCase(channelName, String("KeyHandling")))
         return &LogKeyHandling;
 
-    if (equalIgnoringCase(channelName, String("Plugins")))
-        return &LogPlugins;
-
     return 0;
 }
 #endif
@@ -87,7 +83,6 @@ void initializeLogChannelsIfNecessary()
     initializeLogChannel(&LogContextMenu);
     initializeLogChannel(&LogIconDatabase);
     initializeLogChannel(&LogKeyHandling);
-    initializeLogChannel(&LogPlugins);
     initializeLogChannel(&LogSessionState);
     initializeLogChannel(&LogTextInput);
     initializeLogChannel(&LogView);

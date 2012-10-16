@@ -17,7 +17,10 @@
  * Boston, MA 02110-1301, USA.
  */
 
-interface HTMLDListElement : HTMLElement {
-    [Reflect] attribute boolean compact;
-};
+module html {
 
+    interface HTMLDListElement : HTMLElement {
+        attribute [Reflect] boolean compact;
+    };
+
+}

@@ -23,8 +23,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Callback
-] interface VoidCallback {
-    boolean handleEvent();
-};
+module html {
+    interface [
+        Callback
+    ] VoidCallback {
+        boolean handleEvent();
+    };
+}

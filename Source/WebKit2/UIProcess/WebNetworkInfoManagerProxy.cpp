@@ -43,7 +43,6 @@ WebNetworkInfoManagerProxy::WebNetworkInfoManagerProxy(WebContext* context)
     : m_isUpdating(false)
     , m_context(context)
 {
-    m_context->addMessageReceiver(CoreIPC::MessageClassWebNetworkInfoManagerProxy, this);
 }
 
 WebNetworkInfoManagerProxy::~WebNetworkInfoManagerProxy()
@@ -73,7 +72,7 @@ void WebNetworkInfoManagerProxy::didReceiveMessage(CoreIPC::Connection* connecti
     didReceiveWebNetworkInfoManagerProxyMessage(connection, messageID, arguments);
 }
 
-void WebNetworkInfoManagerProxy::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments, OwnPtr<CoreIPC::ArgumentEncoder>& reply)
+void WebNetworkInfoManagerProxy::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments, WTF::OwnPtr<CoreIPC::ArgumentEncoder>& reply)
 {
     didReceiveSyncWebNetworkInfoManagerProxyMessage(connection, messageID, arguments, reply);
 }

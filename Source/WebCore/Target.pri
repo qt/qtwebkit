@@ -313,8 +313,6 @@ SOURCES += \
     css/MediaQueryMatcher.cpp \
     css/PropertySetCSSStyleDeclaration.cpp \
     css/RGBColor.cpp \
-    css/RuleFeature.cpp \
-    css/RuleSet.cpp \
     css/SelectorChecker.cpp \
     css/ShadowValue.cpp \
     css/StyleBuilder.cpp \
@@ -324,7 +322,6 @@ SOURCES += \
     css/StyleResolver.cpp \
     css/StyleRule.cpp \
     css/StyleRuleImport.cpp \
-    css/StyleScopeResolver.cpp \
     css/StyleSheet.cpp \
     css/StyleSheetContents.cpp \
     css/StyleSheetList.cpp \
@@ -558,7 +555,6 @@ SOURCES += \
     html/BaseCheckableInputType.cpp \
     html/BaseClickableWithKeyInputType.cpp \
     html/BaseDateAndTimeInputType.cpp \
-    html/BaseMultipleFieldsDateAndTimeInputType.cpp \
     html/BaseTextInputType.cpp \
     html/ButtonInputType.cpp \
     html/CheckboxInputType.cpp \
@@ -718,11 +714,6 @@ SOURCES += \
     html/parser/XSSAuditor.cpp \
     html/shadow/ContentDistributor.cpp \
     html/shadow/ContentSelectorQuery.cpp \
-    html/shadow/DateTimeEditElement.cpp \
-    html/shadow/DateTimeFieldElement.cpp \
-    html/shadow/DateTimeFieldElements.cpp \
-    html/shadow/DateTimeNumericFieldElement.cpp \
-    html/shadow/DateTimeSymbolicFieldElement.cpp \
     html/shadow/DetailsMarkerControl.cpp \
     html/shadow/HTMLContentElement.cpp \
     html/shadow/HTMLShadowElement.cpp \
@@ -843,7 +834,6 @@ SOURCES += \
     loader/Prerenderer.cpp \
     loader/PrerendererClient.cpp \
     loader/NavigationScheduler.cpp \
-    loader/ResourceBuffer.cpp \
     loader/ResourceLoader.cpp \
     loader/ResourceLoadNotifier.cpp \
     loader/ResourceLoadScheduler.cpp \
@@ -906,6 +896,7 @@ SOURCES += \
     page/Screen.cpp \
     page/scrolling/ScrollingConstraints.cpp \
     page/scrolling/ScrollingCoordinator.cpp \
+    page/scrolling/ScrollingCoordinatorNone.cpp \
     page/SecurityOrigin.cpp \
     page/SecurityPolicy.cpp \
     page/Settings.cpp \
@@ -929,6 +920,8 @@ SOURCES += \
     platform/text/Hyphenation.cpp \
     platform/text/LocaleNone.cpp \
     platform/text/LocaleToScriptMappingDefault.cpp \
+    platform/text/LocalizedDateNone.cpp \
+    platform/text/LocalizedNumberNone.cpp \
     platform/text/Localizer.cpp \
     platform/text/QuotedPrintable.cpp \
     platform/CalculationValue.cpp \
@@ -1108,10 +1101,8 @@ SOURCES += \
     rendering/CounterNode.cpp \
     rendering/EllipsisBox.cpp \
     rendering/ExclusionInterval.cpp \
-    rendering/ExclusionPolygon.cpp \
     rendering/ExclusionRectangle.cpp \
     rendering/ExclusionShape.cpp \
-    rendering/ExclusionShapeInsideInfo.cpp \
     rendering/FilterEffectRenderer.cpp \
     rendering/FixedTableLayout.cpp \
     rendering/FlowThreadController.cpp \
@@ -1155,7 +1146,6 @@ SOURCES += \
     rendering/RenderLayerBacking.cpp \
     rendering/RenderLayerCompositor.cpp \
     rendering/RenderLayerFilterInfo.cpp \
-    rendering/RenderLayerModelObject.cpp \
     rendering/RenderLineBoxList.cpp \
     rendering/RenderListBox.cpp \
     rendering/RenderListItem.cpp \
@@ -1185,7 +1175,6 @@ SOURCES += \
     rendering/RenderScrollbarTheme.cpp \
     rendering/RenderSearchField.cpp \
     rendering/RenderSlider.cpp \
-    rendering/RenderSnapshottedPlugIn.cpp \
     rendering/RenderTable.cpp \
     rendering/RenderTableCaption.cpp \
     rendering/RenderTableCell.cpp \
@@ -1205,6 +1194,7 @@ SOURCES += \
     rendering/RenderWordBreak.cpp \
     rendering/RootInlineBox.cpp \
     rendering/ScrollBehavior.cpp \
+    rendering/WrapShapeInfo.cpp \
     rendering/style/BasicShapes.cpp \
     rendering/style/ContentData.cpp \
     rendering/style/CounterDirectives.cpp \
@@ -1485,7 +1475,6 @@ HEADERS += \
     css/RGBColor.h \
     css/SelectorChecker.h \
     css/ShadowValue.h \
-    css/SiblingTraversalStrategies.h \
     css/StyleMedia.h \
     css/StyleBuilder.h \
     css/StylePropertySet.h \
@@ -1964,7 +1953,6 @@ HEADERS += \
     loader/Prerenderer.h \
     loader/PrerendererClient.h \
     loader/ProgressTracker.h \
-    loader/ResourceBuffer.h \
     loader/ResourceLoader.h \
     loader/SubresourceLoader.h \
     loader/SubstituteData.h \
@@ -2062,7 +2050,6 @@ HEADERS += \
     platform/graphics/Color.h \
     platform/graphics/CrossfadeGeneratedImage.h \
     platform/graphics/filters/CustomFilterArrayParameter.h \
-    platform/graphics/filters/CustomFilterConstants.h \
     platform/graphics/filters/CustomFilterGlobalContext.h \
     platform/graphics/filters/CustomFilterMesh.h \
     platform/graphics/filters/CustomFilterMeshGenerator.h \
@@ -2149,7 +2136,6 @@ HEADERS += \
     platform/graphics/ShadowBlur.h \
     platform/graphics/SimpleFontData.h \
     platform/graphics/surfaces/GraphicsSurface.h \
-    platform/graphics/surfaces/GraphicsSurfaceToken.h \
     platform/graphics/SurrogatePairAwareTextIterator.h \
     platform/graphics/texmap/GraphicsLayerTextureMapper.h \
     platform/graphics/texmap/TextureMapper.h \
@@ -2243,11 +2229,8 @@ HEADERS += \
     platform/qt/ClipboardQt.h \
     platform/qt/CookieJarQt.h \
     platform/qt/QWebPageClient.h \
-    platform/qt/QStyleFacade.h \
-    platform/qt/RenderThemeQStyle.h \
     platform/qt/RenderThemeQt.h \
     platform/qt/RenderThemeQtMobile.h \
-    platform/qt/ScrollbarThemeQStyle.h \
     platform/qt/UserAgentQt.h \
     platform/ScrollableArea.h \
     platform/ScrollAnimator.h \
@@ -2308,10 +2291,8 @@ HEADERS += \
     rendering/CounterNode.h \
     rendering/EllipsisBox.h \
     rendering/ExclusionInterval.h \
-    rendering/ExclusionPolygon.h \
     rendering/ExclusionRectangle.h \
     rendering/ExclusionShape.h \
-    rendering/ExclusionShapeInsideInfo.h \
     rendering/FilterEffectRenderer.h \
     rendering/FixedTableLayout.h \
     rendering/HitTestingTransformState.h \
@@ -2366,7 +2347,6 @@ HEADERS += \
     rendering/RenderLayer.h \
     rendering/RenderLayerBacking.h \
     rendering/RenderLayerCompositor.h \
-    rendering/RenderLayerModelObject.h \
     rendering/RenderLineBoxList.h \
     rendering/RenderListBox.h \
     rendering/RenderListItem.h \
@@ -2392,7 +2372,6 @@ HEADERS += \
     rendering/RenderScrollbarTheme.h \
     rendering/RenderSearchField.h \
     rendering/RenderSlider.h \
-    rendering/RenderSnapshottedPlugIn.h \
     rendering/RenderTableCaption.h \
     rendering/RenderTableCell.h \
     rendering/RenderTableCol.h \
@@ -2412,6 +2391,7 @@ HEADERS += \
     rendering/RenderWordBreak.h \
     rendering/RootInlineBox.h \
     rendering/ScrollBehavior.h \
+    rendering/WrapShapeInfo.h \
     rendering/style/BasicShapes.h \
     rendering/style/ContentData.h \
     rendering/style/CounterDirectives.h \
@@ -2821,11 +2801,8 @@ SOURCES += \
     platform/qt/PasteboardQt.cpp \
     platform/qt/PlatformKeyboardEventQt.cpp \
     platform/qt/PlatformScreenQt.cpp \
-    platform/qt/QStyleFacade.cpp \
-    platform/qt/RenderThemeQStyle.cpp \
     platform/qt/RenderThemeQt.cpp \
     platform/qt/RenderThemeQtMobile.cpp \
-    platform/qt/ScrollbarThemeQStyle.cpp \
     platform/qt/ScrollbarThemeQt.cpp \
     platform/qt/ScrollViewQt.cpp \
     platform/qt/SharedTimerQt.cpp \
@@ -3824,7 +3801,6 @@ enable?(WEB_SOCKETS) {
         Modules/websockets/WebSocketDeflateFramer.h \
         Modules/websockets/WebSocketDeflater.h \
         Modules/websockets/WebSocketExtensionDispatcher.h \
-        Modules/websockets/WebSocketExtensionParser.h \
         Modules/websockets/WebSocketExtensionProcessor.h \
         Modules/websockets/WebSocketFrame.h \
         Modules/websockets/WebSocketHandshake.h \
@@ -3839,7 +3815,6 @@ enable?(WEB_SOCKETS) {
         Modules/websockets/WebSocketDeflateFramer.cpp \
         Modules/websockets/WebSocketDeflater.cpp \
         Modules/websockets/WebSocketExtensionDispatcher.cpp \
-        Modules/websockets/WebSocketExtensionParser.cpp \
         Modules/websockets/WebSocketFrame.cpp \
         Modules/websockets/WebSocketHandshake.cpp \
         Modules/websockets/WebSocketHandshakeRequest.cpp \

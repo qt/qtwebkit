@@ -18,16 +18,19 @@
     Boston, MA 02110-1301, USA.
 */
 
-[
-    NamedGetter,
-    IndexedGetter,
-    InterfaceName=Plugin
-] interface DOMPlugin {
-    readonly attribute DOMString name;
-    readonly attribute DOMString filename;
-    readonly attribute DOMString description;
-    readonly attribute unsigned long length;
-    DOMMimeType item(in [Optional=DefaultIsUndefined] unsigned long index);
-    DOMMimeType namedItem(in [Optional=DefaultIsUndefined] DOMString name);
-};
+module window {
 
+    interface [
+        NamedGetter,
+        IndexedGetter,
+        InterfaceName=Plugin
+    ] DOMPlugin {
+        readonly attribute DOMString name;
+        readonly attribute DOMString filename;
+        readonly attribute DOMString description;
+        readonly attribute unsigned long length;
+        DOMMimeType item(in [Optional=DefaultIsUndefined] unsigned long index);
+        DOMMimeType namedItem(in [Optional=DefaultIsUndefined] DOMString name);
+    };
+
+}

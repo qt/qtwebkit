@@ -24,11 +24,14 @@
  *
  */
 
+module events {
+
 #if !defined(LANGUAGE_CPP) || !LANGUAGE_CPP
-[
-    ConstructorTemplate=Event
-] interface PopStateEvent : Event {
-    [InitializedByEventConstructor, CachedAttribute, CustomGetter] readonly attribute DOMObject state;
-};
+    interface [
+        ConstructorTemplate=Event
+    ] PopStateEvent : Event {
+        readonly attribute [InitializedByEventConstructor, CachedAttribute, CustomGetter] DOMObject state;
+    };
 #endif
 
+}

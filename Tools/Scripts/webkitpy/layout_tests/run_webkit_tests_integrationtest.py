@@ -301,12 +301,6 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
         for batch in batch_tests_run:
             self.assertTrue(len(batch) <= 2, '%s had too many tests' % ', '.join(batch))
 
-    def test_max_locked_shards(self):
-        if not self.should_test_processes:
-            return
-        _, _, regular_output, _ = logging_run(['--debug-rwt-logging', '--child-processes', '2'], shared_port=False)
-        self.assertTrue(any(['(1 locked)' in line for line in regular_output.buflist]))
-
     def test_child_processes_2(self):
         if self.should_test_processes:
             _, _, regular_output, _ = logging_run(
@@ -316,7 +310,7 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
     def test_child_processes_min(self):
         if self.should_test_processes:
             _, _, regular_output, _ = logging_run(
-                ['--debug-rwt-logging', '--child-processes', '2', '-i', 'passes/passes', 'passes'],
+                ['--debug-rwt-logging', '--child-processes', '2', 'passes'],
                 tests_included=True, shared_port=False)
             self.assertTrue(any(['Running 1 ' in line for line in regular_output.buflist]))
 
@@ -423,10 +417,6 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
         # Now check that we only run the skipped test.
         self.assertEquals(get_tests_run(['--skipped=only', 'passes'], tests_included=True, flatten_batches=True),
                           ['passes/skipped/skip.html'])
-
-        # Now check that we don't run anything.
-        self.assertEquals(get_tests_run(['--skipped=always', 'passes/skipped/skip.html'], tests_included=True, flatten_batches=True),
-                          [])
 
     def test_iterations(self):
         tests_to_run = ['passes/image.html', 'passes/text.html']
@@ -785,7 +775,7 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
         # These next tests test that we run the tests in ascending alphabetical
         # order per directory. HTTP tests are sharded separately from other tests,
         # so we have to test both.
-        tests_run = get_tests_run(['-i', 'passes/passes', 'passes'], tests_included=True, flatten_batches=True)
+        tests_run = get_tests_run(['passes'], tests_included=True, flatten_batches=True)
         self.assertEquals(tests_run, sorted(tests_run))
 
         tests_run = get_tests_run(['http/tests/passes'], tests_included=True, flatten_batches=True)
@@ -932,11 +922,6 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
         # child process (e.g., on win32) and we need to make sure that works and we still
         # see the verbose log output. However, we can't use logging_run() because using
         # outputcapture to capture stdout and stderr latter results in a nonpicklable host.
-
-        # Test is flaky on Windows: https://bugs.webkit.org/show_bug.cgi?id=98559
-        if not self.should_test_processes:
-            return
-
         options, parsed_args = parse_args(['--verbose', '--fully-parallel', '--child-processes', '2', 'passes/text.html', 'passes/image.html'], tests_included=True, print_nothing=False)
         host = MockHost()
         port_obj = host.port_factory.get(port_name=options.platform, options=options)

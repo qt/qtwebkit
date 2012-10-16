@@ -85,10 +85,10 @@ WebInspector.FileContentView.prototype = {
 
         if (this._file.isTextFile)
             this._file.requestMetadata(this._metadataReceived.bind(this));
-    },
-
-    __proto__: WebInspector.View.prototype
+    }
 }
+
+WebInspector.FileContentView.prototype.__proto__ = WebInspector.View.prototype;
 
 /**
  * @constructor
@@ -104,7 +104,7 @@ WebInspector.FileContentView.FileContentProvider = function(file, metadata)
 
 WebInspector.FileContentView.FileContentProvider.prototype = {
     /**
-     * @return {string}
+     * @return {?string}
      */
     contentURL: function()
     {

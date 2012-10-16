@@ -110,10 +110,10 @@ WebInspector.WatchExpressionsSidebarPane.prototype = {
     {
         event.consume();
         this.refreshExpressions();
-    },
-
-    __proto__: WebInspector.SidebarPane.prototype
+    }
 }
+
+WebInspector.WatchExpressionsSidebarPane.prototype.__proto__ = WebInspector.SidebarPane.prototype;
 
 /**
  * @constructor
@@ -206,7 +206,7 @@ WebInspector.WatchExpressionsSection.prototype = {
             if (!expression)
                 continue;
 
-            WebInspector.runtimeModel.evaluate(expression, this._watchObjectGroupId, false, true, false, appendResult.bind(this, expression, i));
+            WebInspector.consoleView.evalInInspectedWindow(expression, this._watchObjectGroupId, false, true, false, appendResult.bind(this, expression, i));
         }
 
         if (!propertyCount) {
@@ -320,10 +320,10 @@ WebInspector.WatchExpressionsSection.prototype = {
         }
 
         this._lastMouseMovePageY = pageY;
-    },
-
-    __proto__: WebInspector.ObjectPropertiesSection.prototype
+    }
 }
+
+WebInspector.WatchExpressionsSection.prototype.__proto__ = WebInspector.ObjectPropertiesSection.prototype;
 
 WebInspector.WatchExpressionsSection.CompareProperties = function(propertyA, propertyB)
 {
@@ -411,7 +411,7 @@ WebInspector.WatchExpressionTreeElement.prototype = {
 
         this.property.name = expression;
         this.treeOutline.section.updateExpression(this, expression);
-    },
-
-    __proto__: WebInspector.ObjectPropertyTreeElement.prototype
+    }
 }
+
+WebInspector.WatchExpressionTreeElement.prototype.__proto__ = WebInspector.ObjectPropertyTreeElement.prototype;

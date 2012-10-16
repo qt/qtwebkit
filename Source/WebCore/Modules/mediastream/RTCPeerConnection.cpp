@@ -35,11 +35,8 @@
 #include "RTCPeerConnection.h"
 
 #include "ArrayValue.h"
-#include "Document.h"
 #include "Event.h"
 #include "ExceptionCode.h"
-#include "Frame.h"
-#include "FrameLoaderClient.h"
 #include "MediaConstraintsImpl.h"
 #include "MediaStreamEvent.h"
 #include "RTCConfiguration.h"
@@ -51,8 +48,6 @@
 #include "RTCSessionDescriptionCallback.h"
 #include "RTCSessionDescriptionDescriptor.h"
 #include "RTCSessionDescriptionRequestImpl.h"
-#include "RTCStatsCallback.h"
-#include "RTCStatsRequestImpl.h"
 #include "RTCVoidRequestImpl.h"
 #include "ScriptExecutionContext.h"
 #include "VoidCallback.h"
@@ -133,26 +128,9 @@ RTCPeerConnection::RTCPeerConnection(ScriptExecutionContext* context, PassRefPtr
     , m_localStreams(MediaStreamList::create())
     , m_remoteStreams(MediaStreamList::create())
 {
-    ASSERT(m_scriptExecutionContext->isDocument());
-    Document* document = static_cast<Document*>(m_scriptExecutionContext);
-
-    if (!document->frame()) {
-        ec = NOT_SUPPORTED_ERR;
-        return;
-    }
-
     m_peerHandler = RTCPeerConnectionHandler::create(this);
-    if (!m_peerHandler) {
+    if (!m_peerHandler || !m_peerHandler->initialize(configuration, constraints))
         ec = NOT_SUPPORTED_ERR;
-        return;
-    }
-
-    document->frame()->loader()->client()->dispatchWillStartUsingPeerConnectionHandler(m_peerHandler.get());
-
-    if (!m_peerHandler->initialize(configuration, constraints)) {
-        ec = NOT_SUPPORTED_ERR;
-        return;
-    }
 }
 
 RTCPeerConnection::~RTCPeerConnection()
@@ -399,13 +377,6 @@ MediaStreamList* RTCPeerConnection::localStreams() const
 MediaStreamList* RTCPeerConnection::remoteStreams() const
 {
     return m_remoteStreams.get();
-}
-
-void RTCPeerConnection::getStats(PassRefPtr<RTCStatsCallback> successCallback, PassRefPtr<MediaStreamTrack> selector)
-{
-    RefPtr<RTCStatsRequestImpl> statsRequest = RTCStatsRequestImpl::create(scriptExecutionContext(), successCallback);
-    // FIXME: Add passing selector as part of the statsRequest.
-    m_peerHandler->getStats(statsRequest.release());
 }
 
 void RTCPeerConnection::close(ExceptionCode& ec)

@@ -22,32 +22,35 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=MEDIA_STREAM,
-    EventTarget,
-    Constructor(in MediaStreamTrackList audioTracks, in MediaStreamTrackList videoTracks),
-    CallWith=ScriptExecutionContext,
-    ConstructorRaisesException
-   ] interface MediaStream {
-    readonly attribute DOMString label;
-    readonly attribute MediaStreamTrackList audioTracks;
-    readonly attribute MediaStreamTrackList videoTracks;
+module core {
 
-    // FIXME: implement the record method when MediaStreamRecorder is available.
+    interface [
+        Conditional=MEDIA_STREAM,
+        EventTarget,
+        Constructor(in MediaStreamTrackList audioTracks, in MediaStreamTrackList videoTracks),
+        CallWith=ScriptExecutionContext,
+        ConstructorRaisesException
+   ] MediaStream {
+        readonly attribute DOMString label;
+        readonly attribute MediaStreamTrackList audioTracks;
+        readonly attribute MediaStreamTrackList videoTracks;
 
-    const unsigned short LIVE = 1;
-    const unsigned short ENDED = 2;
-    readonly attribute unsigned short readyState;
-             attribute EventListener onended;
+        // FIXME: implement the record method when MediaStreamRecorder is available.
 
-    // EventTarget interface
-    void addEventListener(in DOMString type,
-                          in EventListener listener,
-                          in [Optional] boolean useCapture);
-    void removeEventListener(in DOMString type,
-                             in EventListener listener,
-                             in [Optional] boolean useCapture);
-    boolean dispatchEvent(in Event event)
-        raises(EventException);
-};
+        const unsigned short LIVE = 1;
+        const unsigned short ENDED = 2;
+        readonly attribute unsigned short readyState;
+                 attribute EventListener onended;
 
+        // EventTarget interface
+        void addEventListener(in DOMString type,
+                              in EventListener listener,
+                              in [Optional] boolean useCapture);
+        void removeEventListener(in DOMString type,
+                                 in EventListener listener,
+                                 in [Optional] boolean useCapture);
+        boolean dispatchEvent(in Event event)
+            raises(EventException);
+    };
+
+}

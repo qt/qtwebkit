@@ -21,7 +21,6 @@
 #define GraphicsSurface_h
 
 #include "GraphicsContext.h"
-#include "GraphicsSurfaceToken.h"
 #include "IntRect.h"
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
@@ -33,8 +32,7 @@
 #if OS(DARWIN)
 typedef struct __IOSurface* IOSurfaceRef;
 typedef IOSurfaceRef PlatformGraphicsSurface;
-#endif
-#if OS(LINUX)
+#else
 typedef uint32_t PlatformGraphicsSurface;
 #endif
 
@@ -71,13 +69,13 @@ public:
     IntSize size() const { return m_size; }
 
     static PassRefPtr<GraphicsSurface> create(const IntSize&, Flags);
-    static PassRefPtr<GraphicsSurface> create(const IntSize&, Flags, const GraphicsSurfaceToken&);
+    static PassRefPtr<GraphicsSurface> create(const IntSize&, Flags, uint64_t token);
     void copyToGLTexture(uint32_t target, uint32_t texture, const IntRect& targetRect, const IntPoint& sourceOffset);
     void copyFromFramebuffer(uint32_t fbo, const IntRect& sourceRect);
     void paintToTextureMapper(TextureMapper*, const FloatRect& targetRect, const TransformationMatrix&, float opacity, BitmapTexture* mask);
     uint32_t frontBuffer();
     uint32_t swapBuffers();
-    GraphicsSurfaceToken exportToken();
+    uint64_t exportToken();
     uint32_t getTextureID();
     PassOwnPtr<GraphicsContext> beginPaint(const IntRect&, LockOptions);
     PassRefPtr<Image> createReadOnlyImage(const IntRect&);
@@ -85,8 +83,8 @@ public:
 
 protected:
     static PassRefPtr<GraphicsSurface> platformCreate(const IntSize&, Flags);
-    static PassRefPtr<GraphicsSurface> platformImport(const IntSize&, Flags, const GraphicsSurfaceToken&);
-    GraphicsSurfaceToken platformExport();
+    static PassRefPtr<GraphicsSurface> platformImport(const IntSize&, Flags, uint64_t);
+    uint64_t platformExport();
     void platformDestroy();
 
     uint32_t platformGetTextureID();

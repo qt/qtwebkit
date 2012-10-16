@@ -82,7 +82,7 @@ struct UUIDHolder : public RefCounted<UUIDHolder> {
 static void setUpTerminationNotificationHandler(pid_t pid)
 {
 #if HAVE(DISPATCH_H)
-    dispatch_source_t processDiedSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_PROC, pid, DISPATCH_PROC_EXIT, dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0));
+    dispatch_source_t processDiedSource = dispatch_source_create(DISPATCH_SOURCE_TYPE_PROC, pid, DISPATCH_PROC_EXIT, dispatch_get_current_queue());
     dispatch_source_set_event_handler(processDiedSource, ^{
         int status;
         waitpid(dispatch_source_get_handle(processDiedSource), &status, 0);
@@ -366,22 +366,7 @@ static void createProcess(const ProcessLauncher::LaunchOptions& launchOptions, b
     CString localization = String(cfLocalization.get()).utf8();
 
     NSBundle *webKit2Bundle = [NSBundle bundleWithIdentifier:@"com.apple.WebKit2"];
-
-    NSString *processPath;
-    switch(launchOptions.processType) {
-    case ProcessLauncher::WebProcess:
-        processPath = [webKit2Bundle pathForAuxiliaryExecutable:@"WebProcess.app"];
-        break;
-    case ProcessLauncher::PluginProcess:
-        processPath = [webKit2Bundle pathForAuxiliaryExecutable:@"PluginProcess.app"];
-        break;
-#if ENABLE(NETWORK_PROCESS)
-    case ProcessLauncher::NetworkProcess:
-        processPath = [webKit2Bundle pathForAuxiliaryExecutable:@"NetworkProcess.app"];
-        break;
-#endif
-    }
-
+    NSString *processPath = [webKit2Bundle pathForAuxiliaryExecutable:(launchOptions.processType == ProcessLauncher::PluginProcess ? @"PluginProcess.app" : @"WebProcess.app")];
     NSString *frameworkExecutablePath = [webKit2Bundle executablePath];
     NSString *processAppExecutablePath = [[NSBundle bundleWithPath:processPath] executablePath];
 

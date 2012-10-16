@@ -50,8 +50,6 @@ struct WebIDBMetadata {
     // setVersion, WebString version can be removed.
     WebString version;
     long long intVersion;
-    long long id;
-    long long maxObjectStoreId;
     WebVector<ObjectStore> objectStores;
     WebIDBMetadata()
         : intVersion(NoIntVersion) { }
@@ -60,8 +58,6 @@ struct WebIDBMetadata {
         WebString name;
         WebIDBKeyPath keyPath;
         bool autoIncrement;
-        long long id;
-        long long maxIndexId;
         WebVector<Index> indexes;
         ObjectStore()
             : keyPath(WebIDBKeyPath::createNull())
@@ -73,7 +69,6 @@ struct WebIDBMetadata {
         WebIDBKeyPath keyPath;
         bool unique;
         bool multiEntry;
-        long long id;
         Index()
             : keyPath(WebIDBKeyPath::createNull())
             , unique(false)

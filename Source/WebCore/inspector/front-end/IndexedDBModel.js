@@ -392,7 +392,7 @@ WebInspector.IndexedDBModel.prototype = {
             if (!this._frames[frameId])
                 return;
 
-            var databaseModel = new WebInspector.IndexedDBModel.Database(databaseId, databaseWithObjectStores.version, databaseWithObjectStores.intVersion);
+            var databaseModel = new WebInspector.IndexedDBModel.Database(databaseId, databaseWithObjectStores.version);
             this._databases.put(databaseId, databaseModel); 
             for (var i = 0; i < databaseWithObjectStores.objectStores.length; ++i) {
                 var objectStore = databaseWithObjectStores.objectStores[i];
@@ -483,10 +483,10 @@ WebInspector.IndexedDBModel.prototype = {
 
         var keyRange = WebInspector.IndexedDBModel.keyRangeFromIDBKeyRange(idbKeyRange);
         IndexedDBAgent.requestData(frameId, databaseName, objectStoreName, indexName, skipCount, pageSize, keyRange ? keyRange : undefined, innerCallback.bind(this));
-    },
-
-    __proto__: WebInspector.Object.prototype
+    }
 }
+
+WebInspector.IndexedDBModel.prototype.__proto__ = WebInspector.Object.prototype;
 
 /**
  * @constructor
@@ -538,11 +538,10 @@ WebInspector.IndexedDBModel.DatabaseId.prototype = {
  * @param {WebInspector.IndexedDBModel.DatabaseId} databaseId
  * @param {string} version
  */
-WebInspector.IndexedDBModel.Database = function(databaseId, version, intVersion)
+WebInspector.IndexedDBModel.Database = function(databaseId, version)
 {
     this.databaseId = databaseId;
     this.version = version;
-    this.intVersion = intVersion;
     this.objectStores = {};
 }
 

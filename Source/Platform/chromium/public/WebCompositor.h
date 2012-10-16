@@ -55,7 +55,6 @@ public:
     WEBKIT_EXPORT static void setPerTilePaintingEnabled(bool);
     WEBKIT_EXPORT static void setPartialSwapEnabled(bool);
     WEBKIT_EXPORT static void setAcceleratedAnimationEnabled(bool);
-    WEBKIT_EXPORT static void setPageScalePinchZoomEnabled(bool);
 
 protected:
     virtual ~WebCompositor() { }

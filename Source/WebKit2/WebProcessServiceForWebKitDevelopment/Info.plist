@@ -2,8 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleGetInfoString</key>
-	<string>${BUNDLE_VERSION}, Copyright 2003-2012 Apple Inc.</string>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>English</string>
 	<key>CFBundleExecutable</key>
@@ -17,11 +15,11 @@
 	<key>CFBundlePackageType</key>
 	<string>XPC!</string>
 	<key>CFBundleShortVersionString</key>
-	<string>${SHORT_VERSION_STRING}</string>
+	<string>1.0</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
 	<key>CFBundleVersion</key>
-	<string>${BUNDLE_VERSION}</string>
+	<string>1</string>
 	<key>LSFileQuarantineEnabled</key>
 	<true/>
 	<key>NSPrincipalClass</key>
@@ -34,7 +32,7 @@
 		<string>Application</string>
 		<key>RunLoopType</key>
 		<string>_NSApplicationMain</string>
-		<key>_MultipleInstances</key>
+		<key>_MultipleInstance</key>
 		<true/>
 	</dict>
 </dict>

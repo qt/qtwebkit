@@ -118,7 +118,6 @@ public:
     static void setPageCacheSupportsPlugins(WebKitWebView*, bool enabled);
     static void setCSSGridLayoutEnabled(WebKitWebView*, bool enabled);
     static void setCSSRegionsEnabled(WebKitWebView*, bool enabled);
-    static void setCSSCustomFilterEnabled(WebKitWebView*, bool enabled);
     static void setShadowDOMEnabled(bool);
     static void setStyleScopedEnabled(bool);
 

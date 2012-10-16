@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009, 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2011 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -42,7 +42,7 @@ enum PreferPlugInsForImagesOption {
 };
 
 // Base class for HTMLObjectElement and HTMLEmbedElement
-class HTMLPlugInImageElement : public HTMLPlugInElement, public ImageLoaderClientBase<HTMLPlugInImageElement> {
+class HTMLPlugInImageElement : public HTMLPlugInElement {
 public:
     virtual ~HTMLPlugInImageElement();
 
@@ -90,8 +90,6 @@ private:
     void updateWidgetIfNecessary();
     virtual bool useFallbackContent() const { return false; }
     
-    virtual void updateSnapshot(PassRefPtr<Image>) OVERRIDE;
-
     bool m_needsWidgetUpdate;
     bool m_shouldPreferPlugInsForImages;
     bool m_needsDocumentActivationCallbacks;

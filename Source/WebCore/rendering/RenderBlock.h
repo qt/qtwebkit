@@ -35,7 +35,7 @@
 #include <wtf/ListHashSet.h>
 
 #if ENABLE(CSS_EXCLUSIONS)
-#include "ExclusionShapeInsideInfo.h"
+#include "WrapShapeInfo.h"
 #endif
 
 namespace WebCore {
@@ -53,17 +53,15 @@ struct PaintInfo;
 class LineInfo;
 class RenderRubyRun;
 class TextLayout;
-class WordMeasurement;
 
 template <class Iterator, class Run> class BidiResolver;
 template <class Run> class BidiRunList;
 template <class Iterator> struct MidpointState;
 typedef BidiResolver<InlineIterator, BidiRun> InlineBidiResolver;
 typedef MidpointState<InlineIterator> LineMidpointState;
-typedef WTF::ListHashSet<RenderBox*, 16> TrackedRendererListHashSet;
+typedef WTF::ListHashSet<RenderBox*> TrackedRendererListHashSet;
 typedef WTF::HashMap<const RenderBlock*, TrackedRendererListHashSet*> TrackedDescendantsMap;
 typedef WTF::HashMap<const RenderBox*, HashSet<RenderBlock*>*> TrackedContainerMap;
-typedef Vector<WordMeasurement, 64> WordMeasurements;
 
 enum CaretType { CursorCaret, DragCaret };
 
@@ -218,7 +216,7 @@ public:
 
     bool containsNonZeroBidiLevel() const;
 
-    GapRects selectionGapRectsForRepaint(RenderLayerModelObject* repaintContainer);
+    GapRects selectionGapRectsForRepaint(RenderBoxModelObject* repaintContainer);
     LayoutRect logicalLeftSelectionGap(RenderBlock* rootBlock, const LayoutPoint& rootBlockPhysicalPosition, const LayoutSize& offsetFromRootBlock,
                                        RenderObject* selObj, LayoutUnit logicalLeft, LayoutUnit logicalTop, LayoutUnit logicalHeight, const PaintInfo*);
     LayoutRect logicalRightSelectionGap(RenderBlock* rootBlock, const LayoutPoint& rootBlockPhysicalPosition, const LayoutSize& offsetFromRootBlock,
@@ -404,9 +402,9 @@ public:
 #endif
 
 #if ENABLE(CSS_EXCLUSIONS)
-    ExclusionShapeInsideInfo* exclusionShapeInsideInfo() const
+    WrapShapeInfo* wrapShapeInfo() const
     {
-        return style()->shapeInside() && ExclusionShapeInsideInfo::isExclusionShapeInsideInfoEnabledForRenderBlock(this) ? ExclusionShapeInsideInfo::exclusionShapeInsideInfoForRenderBlock(this) : 0;
+        return style()->wrapShapeInside() && WrapShapeInfo::isWrapShapeInfoEnabledForRenderBlock(this) ? WrapShapeInfo::wrapShapeInfoForRenderBlock(this) : 0;
     }
 #endif
 
@@ -462,8 +460,6 @@ protected:
     static void startDelayUpdateScrollInfo();
     static void finishDelayUpdateScrollInfo();
 
-    void updateScrollInfoAfterLayout();
-
     virtual void styleWillChange(StyleDifference, const RenderStyle* newStyle);
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
 
@@ -503,7 +499,7 @@ protected:
 private:
 #if ENABLE(CSS_EXCLUSIONS)
     void computeExclusionShapeSize();
-    void updateExclusionShapeInsideInfoAfterStyleChange(const BasicShape*, const BasicShape* oldWrapShape);
+    void updateWrapShapeInfoAfterStyleChange(const BasicShape*, const BasicShape* oldWrapShape);
 #endif
     virtual RenderObjectChildList* virtualChildren() { return children(); }
     virtual const RenderObjectChildList* virtualChildren() const { return children(); }
@@ -731,7 +727,7 @@ private:
             reset();
         }
 
-        InlineIterator nextLineBreak(InlineBidiResolver&, LineInfo&, RenderTextInfo&, FloatingObject* lastFloatFromPreviousLine, unsigned consecutiveHyphenatedLines, WordMeasurements&);
+        InlineIterator nextLineBreak(InlineBidiResolver&, LineInfo&, RenderTextInfo&, FloatingObject* lastFloatFromPreviousLine, unsigned consecutiveHyphenatedLines);
 
         bool lineWasHyphenated() { return m_hyphenated; }
         const Vector<RenderBox*>& positionedObjects() { return m_positionedObjects; }
@@ -759,7 +755,7 @@ private:
 
     void setMarginsForRubyRun(BidiRun*, RenderRubyRun*, RenderObject*, const LineInfo&);
 
-    void computeInlineDirectionPositionsForLine(RootInlineBox*, const LineInfo&, BidiRun* firstRun, BidiRun* trailingSpaceRun, bool reachedEnd, GlyphOverflowAndFallbackFontsMap&, VerticalPositionCache&, WordMeasurements&);
+    void computeInlineDirectionPositionsForLine(RootInlineBox*, const LineInfo&, BidiRun* firstRun, BidiRun* trailingSpaceRun, bool reachedEnd, GlyphOverflowAndFallbackFontsMap&, VerticalPositionCache&);
     void computeBlockDirectionPositionsForLine(RootInlineBox*, BidiRun*, GlyphOverflowAndFallbackFontsMap&, VerticalPositionCache&);
     void deleteEllipsisLineBoxes();
     void checkLinesForTextOverflow();
@@ -813,14 +809,14 @@ private:
     // children.
     virtual RenderBlock* firstLineBlock() const;
 
-    virtual LayoutRect rectWithOutlineForRepaint(RenderLayerModelObject* repaintContainer, LayoutUnit outlineWidth) const OVERRIDE;
+    virtual LayoutRect rectWithOutlineForRepaint(RenderBoxModelObject* repaintContainer, LayoutUnit outlineWidth) const;
     virtual RenderStyle* outlineStyleForRepaint() const;
     
     virtual RenderObject* hoverAncestor() const;
     virtual void updateDragState(bool dragOn);
     virtual void childBecameNonInline(RenderObject* child);
 
-    virtual LayoutRect selectionRectForRepaint(RenderLayerModelObject* repaintContainer, bool /*clipToVisibleContent*/) OVERRIDE
+    virtual LayoutRect selectionRectForRepaint(RenderBoxModelObject* repaintContainer, bool /*clipToVisibleContent*/)
     {
         return selectionGapRectsForRepaint(repaintContainer);
     }
@@ -861,6 +857,8 @@ private:
     void makeChildrenAnonymousColumnBlocks(RenderObject* beforeChild, RenderBlock* newBlockBox, RenderObject* newChild);
 
     bool expandsToEncloseOverhangingFloats() const;
+
+    void updateScrollInfoAfterLayout();
 
     void splitBlocks(RenderBlock* fromBlock, RenderBlock* toBlock, RenderBlock* middleBlock,
                      RenderObject* beforeChild, RenderBoxModelObject* oldCont);
@@ -965,7 +963,7 @@ private:
     // End helper functions and structs used by layoutBlockChildren.
 
     // Helper function for layoutInlineChildren()
-    RootInlineBox* createLineBoxesFromBidiRuns(BidiRunList<BidiRun>&, const InlineIterator& end, LineInfo&, VerticalPositionCache&, BidiRun* trailingSpaceRun, WordMeasurements&);
+    RootInlineBox* createLineBoxesFromBidiRuns(BidiRunList<BidiRun>&, const InlineIterator& end, LineInfo&, VerticalPositionCache&, BidiRun* trailingSpaceRun);
     void layoutRunsAndFloats(LineLayoutState&, bool hasInlineChild);
     void layoutRunsAndFloatsInRange(LineLayoutState&, InlineBidiResolver&, const InlineIterator& cleanLineStart, const BidiStatus& cleanLineBidiStatus, unsigned consecutiveHyphenatedLines);
     void linkToEndLineIfNeeded(LineLayoutState&);

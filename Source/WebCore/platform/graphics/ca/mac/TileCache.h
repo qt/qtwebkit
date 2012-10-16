@@ -65,9 +65,6 @@ public:
     bool acceleratesDrawing() const { return m_acceleratesDrawing; }
     void setAcceleratesDrawing(bool);
 
-    void setTilesOpaque(bool);
-    bool tilesAreOpaque() const { return m_tilesAreOpaque; }
-
     CALayer *tileContainerLayer() const { return m_tileContainerLayer.get(); }
 
     void setTileDebugBorderWidth(float);
@@ -84,11 +81,8 @@ private:
     // TiledBacking member functions.
     virtual void visibleRectChanged(const IntRect&) OVERRIDE;
     virtual void setIsInWindow(bool) OVERRIDE;
-    virtual void setTileCoverage(TileCoverage) OVERRIDE;
-    virtual TileCoverage tileCoverage() const OVERRIDE { return m_tileCoverage; }
+    virtual void setCanHaveScrollbars(bool) OVERRIDE;
     virtual void forceRepaint() OVERRIDE;
-    virtual void setScrollingPerformanceLoggingEnabled(bool flag) OVERRIDE { m_scrollingPerformanceLoggingEnabled = flag; }
-    virtual bool scrollingPerformanceLoggingEnabled() const OVERRIDE { return m_scrollingPerformanceLoggingEnabled; }
     
     IntRect bounds() const;
 
@@ -121,11 +115,9 @@ private:
     CGFloat m_scale;
     CGFloat m_deviceScaleFactor;
 
-    TileCoverage m_tileCoverage;
     bool m_isInWindow;
-    bool m_scrollingPerformanceLoggingEnabled;
+    bool m_canHaveScrollbars;
     bool m_acceleratesDrawing;
-    bool m_tilesAreOpaque;
 
     RetainPtr<CGColorRef> m_tileDebugBorderColor;
     float m_tileDebugBorderWidth;

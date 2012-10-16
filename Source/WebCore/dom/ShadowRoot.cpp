@@ -55,7 +55,6 @@ ShadowRoot::ShadowRoot(Document* document)
     , m_applyAuthorStyles(false)
     , m_resetStyleInheritance(false)
     , m_insertionPointAssignedTo(0)
-    , m_numberOfShadowElementChildren(0)
 {
     ASSERT(document);
     

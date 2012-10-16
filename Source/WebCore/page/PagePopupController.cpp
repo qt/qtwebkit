@@ -32,7 +32,7 @@
 #include "PagePopupController.h"
 
 #if ENABLE(PAGE_POPUP)
-#include "Localizer.h"
+#include "LocalizedNumber.h"
 #include "PagePopupClient.h"
 
 namespace WebCore {
@@ -55,7 +55,7 @@ void PagePopupController::setValueAndClosePopup(int numValue, const String& stri
 
 String PagePopupController::localizeNumberString(const String& numberString)
 {
-    return m_popupClient->localizer().convertToLocalizedNumber(numberString);
+    return convertToLocalizedNumber(numberString);
 }
 
 }

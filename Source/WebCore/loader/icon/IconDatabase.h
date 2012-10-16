@@ -192,6 +192,10 @@ private:
 
 // *** Sync Thread Only ***
 public:
+    // Should be used only on the sync thread and only by the Safari 2 Icons import procedure
+    virtual void importIconURLForPageURL(const String& iconURL, const String& pageURL);
+    virtual void importIconDataForIconURL(PassRefPtr<SharedBuffer> data, const String& iconURL);
+    
     virtual bool shouldStopThreadActivity() const;
 
 private:    
@@ -213,6 +217,10 @@ private:
     void* cleanupSyncThread();
     void performRetainIconForPageURL(const String&, int retainCount);
     void performReleaseIconForPageURL(const String&, int releaseCount);
+
+    // Record (on disk) whether or not Safari 2-style icons were imported (once per dataabse)
+    bool imported();
+    void setImported(bool);
     
     bool wasExcludedFromBackup();
     void setWasExcludedFromBackup();
@@ -240,6 +248,10 @@ private:
     IconDatabaseClient* m_client;
     
     SQLiteDatabase m_syncDB;
+    
+    // Track whether the "Safari 2" import is complete and/or set in the database
+    bool m_imported;
+    bool m_isImportedSet;
     
     OwnPtr<SQLiteStatement> m_setIconIDForPageURLStatement;
     OwnPtr<SQLiteStatement> m_removePageURLStatement;

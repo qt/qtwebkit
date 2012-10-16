@@ -23,9 +23,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=INPUT_SPEECH,
-] interface SpeechInputEvent : Event {
-    readonly attribute SpeechInputResultList results;
-};
+module core {
 
+    interface [
+        Conditional=INPUT_SPEECH,
+    ] SpeechInputEvent : Event {
+        readonly attribute SpeechInputResultList results;
+    };
+
+}

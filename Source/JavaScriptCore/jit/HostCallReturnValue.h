@@ -30,7 +30,10 @@
 #include "MacroAssemblerCodeRef.h"
 #include <wtf/Platform.h>
 
-#if ENABLE(JIT)
+// Unfortunately this only works on GCC-like compilers. And it's currently only used
+// by LLInt and DFG, which also are restricted to GCC-like compilers. We should
+// probably fix that at some point.
+#if COMPILER(GCC) && ENABLE(JIT)
 
 #if CALLING_CONVENTION_IS_STDCALL
 #define HOST_CALL_RETURN_VALUE_OPTION CDECL
@@ -42,8 +45,6 @@ namespace JSC {
 
 extern "C" EncodedJSValue HOST_CALL_RETURN_VALUE_OPTION getHostCallReturnValue() REFERENCED_FROM_ASM WTF_INTERNAL;
 
-#if COMPILER(GCC)
-
 // This is a public declaration only to convince CLANG not to elide it.
 extern "C" EncodedJSValue HOST_CALL_RETURN_VALUE_OPTION getHostCallReturnValueWithExecState(ExecState*) REFERENCED_FROM_ASM WTF_INTERNAL;
 
@@ -52,14 +53,15 @@ inline void initializeHostCallReturnValue()
     getHostCallReturnValueWithExecState(0);
 }
 
+}
+
 #else // COMPILER(GCC)
 
+namespace JSC {
 inline void initializeHostCallReturnValue() { }
+}
 
 #endif // COMPILER(GCC)
 
-} // namespace JSC
-
-#endif // ENABLE(JIT)
-
 #endif // HostCallReturnValue_h
+

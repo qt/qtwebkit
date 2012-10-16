@@ -208,7 +208,7 @@ void DumpRenderTreeSupportGtk::addUserStyleSheet(WebKitWebFrame* frame, const ch
 
     WebKitWebView* webView = getViewFromFrame(frame);
     Page* page = core(webView);
-    page->group().addUserStyleSheetToWorld(mainThreadNormalWorld(), sourceCode, KURL(), Vector<String>(), Vector<String>(), allFrames ? InjectInAllFrames : InjectInTopFrameOnly); 
+    page->group().addUserStyleSheetToWorld(mainThreadNormalWorld(), sourceCode, KURL(), nullptr, nullptr, allFrames ? InjectInAllFrames : InjectInTopFrameOnly); 
 }
 
 /**
@@ -673,8 +673,6 @@ int DumpRenderTreeSupportGtk::numberOfPendingGeolocationPermissionRequests(WebKi
 #if ENABLE(GEOLOCATION)
     GeolocationClientMock* mock = static_cast<GeolocationClientMock*>(GeolocationController::from(core(webView))->client());
     return mock->numberOfPendingPermissionRequests();
-#else
-    return 0;
 #endif
 }
 
@@ -691,13 +689,6 @@ void DumpRenderTreeSupportGtk::setCSSGridLayoutEnabled(WebKitWebView* webView, b
 void DumpRenderTreeSupportGtk::setCSSRegionsEnabled(WebKitWebView* webView, bool enabled)
 {
     core(webView)->settings()->setCSSRegionsEnabled(enabled);
-}
-
-void DumpRenderTreeSupportGtk::setCSSCustomFilterEnabled(WebKitWebView* webView, bool enabled)
-{
-#if ENABLE(CSS_SHADERS)
-    core(webView)->settings()->setCSSCustomFilterEnabled(enabled);
-#endif
 }
 
 void DumpRenderTreeSupportGtk::setShadowDOMEnabled(bool enabled)

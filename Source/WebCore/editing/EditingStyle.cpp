@@ -981,11 +981,6 @@ static inline bool elementMatchesAndPropertyIsNotInInlineStyleDecl(const HTMLEle
 
 void EditingStyle::mergeInlineAndImplicitStyleOfElement(StyledElement* element, CSSPropertyOverrideMode mode, PropertiesToInclude propertiesToInclude)
 {
-    RefPtr<EditingStyle> styleFromRules = EditingStyle::create();
-    styleFromRules->mergeStyleFromRulesForSerialization(element);
-    styleFromRules->removeNonEditingProperties();
-    mergeStyle(styleFromRules->m_mutableStyle.get(), mode);
-
     mergeInlineStyleOfElement(element, mode, propertiesToInclude);
 
     const Vector<OwnPtr<HTMLElementEquivalent> >& elementEquivalents = htmlElementEquivalents();
@@ -1024,7 +1019,7 @@ PassRefPtr<EditingStyle> EditingStyle::wrappingStyleForSerialization(Node* conte
 
     // When not annotating for interchange, we only preserve inline style declarations.
     for (Node* node = context; node && !node->isDocumentNode(); node = node->parentNode()) {
-        if (node->isStyledElement() && !isMailBlockquote(node)) {
+        if (node->isStyledElement()) {
             wrappingStyle->mergeInlineAndImplicitStyleOfElement(static_cast<StyledElement*>(node), EditingStyle::DoNotOverrideValues,
                 EditingStyle::EditingPropertiesInEffect);
         }

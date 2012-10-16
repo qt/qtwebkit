@@ -46,7 +46,7 @@ WebInspector.DatabaseQueryView = function(database)
 
     this.prompt = new WebInspector.TextPromptWithHistory(this.completions.bind(this), " ");
     this.prompt.attach(this._promptElement);
-
+    
     this.element.addEventListener("click", this._messagesClicked.bind(this), true);
 }
 
@@ -61,13 +61,7 @@ WebInspector.DatabaseQueryView.prototype = {
             this.prompt.moveCaretToEndOfPrompt();
     },
     
-    /**
-     * @param {Element} proxyElement
-     * @param {Range} wordRange
-     * @param {boolean} force
-     * @param {function(Array.<string>, number=)} completionsReadyCallback
-     */
-    completions: function(proxyElement, wordRange, force, completionsReadyCallback)
+    completions: function(textPrompt, wordRange, force, completionsReadyCallback)
     {
         var prefix = wordRange.toString().toLowerCase();
         if (!prefix.length && !force)
@@ -199,7 +193,7 @@ WebInspector.DatabaseQueryView.prototype = {
         resultElement.className = "database-query-result";
         element.appendChild(resultElement);
         return resultElement;
-    },
-
-    __proto__: WebInspector.View.prototype
+    }
 }
+
+WebInspector.DatabaseQueryView.prototype.__proto__ = WebInspector.View.prototype;

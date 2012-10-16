@@ -57,9 +57,6 @@
 #include "ProgressTracker.h"
 #include "ResourceHandleInternal.h"
 #include "ResourceLoader.h"
-#if ENABLE(MEDIA_STREAM)
-#include "RTCPeerConnectionHandlerChromium.h"
-#endif
 #include "Settings.h"
 #include "SocketStreamHandleInternal.h"
 #include "WebDOMEvent.h"
@@ -78,17 +75,18 @@
 #include "WebPluginLoadObserver.h"
 #include "WebPluginParams.h"
 #include "WebSecurityOrigin.h"
+#include "platform/WebSocketStreamHandle.h"
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
 #include "WindowFeatures.h"
 #include "WrappedResourceRequest.h"
 #include "WrappedResourceResponse.h"
+#include "platform/WebURL.h"
+#include "platform/WebURLError.h"
+#include "platform/WebVector.h"
 #include <public/Platform.h>
 #include <public/WebMimeRegistry.h>
-#include <public/WebSocketStreamHandle.h>
-#include <public/WebURL.h>
-#include <public/WebURLError.h>
-#include <public/WebVector.h>
+
 #include <wtf/StringExtras.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
@@ -128,7 +126,7 @@ void FrameLoaderClientImpl::frameLoaderDestroyed()
     // serves to keep us alive until the FrameLoader is done with us.  The
     // FrameLoader calls this method when it's going away.  Therefore, we balance
     // out that extra reference, which may cause 'this' to be deleted.
-    ASSERT(!m_webFrame->frame());
+    m_webFrame->closing();
     m_webFrame->deref();
 }
 
@@ -1640,13 +1638,5 @@ void FrameLoaderClientImpl::dispatchWillOpenSocketStream(SocketStreamHandle* han
 {
     m_webFrame->client()->willOpenSocketStream(SocketStreamHandleInternal::toWebSocketStreamHandle(handle));
 }
-
-#if ENABLE(MEDIA_STREAM)
-void FrameLoaderClientImpl::dispatchWillStartUsingPeerConnectionHandler(RTCPeerConnectionHandler* handler)
-{
-    m_webFrame->client()->willStartUsingPeerConnectionHandler(webFrame(), RTCPeerConnectionHandlerChromium::toWebRTCPeerConnectionHandler(handler));
-}
-#endif
-
 
 } // namespace WebKit

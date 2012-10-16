@@ -38,9 +38,6 @@ using namespace WebKit;
 
 WKURLRef WKURLCreateWithCFURL(CFURLRef cfURL)
 {
-    if (!cfURL)
-        return 0;
-
     String urlString(CFURLGetString(cfURL));
     return toCopiedURLAPI(urlString);
 }

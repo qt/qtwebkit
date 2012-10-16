@@ -65,7 +65,6 @@
 #include "WebUserMediaClientMock.h"
 #include "WebView.h"
 #include "WebViewHostOutputSurface.h"
-#include "WebViewHostSoftwareOutputDevice.h"
 #include "WebWindowFeatures.h"
 #include "platform/WebSerializedScriptValue.h"
 #include "skia/ext/platform_canvas.h"
@@ -289,14 +288,11 @@ WebStorageNamespace* WebViewHost::createSessionStorageNamespace(unsigned quota)
     return webkit_support::CreateSessionStorageNamespace(quota);
 }
 
-WebCompositorOutputSurface* WebViewHost::createOutputSurface()
+WebKit::WebCompositorOutputSurface* WebViewHost::createOutputSurface()
 {
     if (!webView())
         return 0;
-
-    if (m_shell->softwareCompositingEnabled())
-        return WebViewHostOutputSurface::createSoftware(adoptPtr(new WebViewHostSoftwareOutputDevice)).leakPtr();
-    return WebViewHostOutputSurface::create3d(adoptPtr(webkit_support::CreateGraphicsContext3D(WebGraphicsContext3D::Attributes(), webView()))).leakPtr();
+    return new WebKit::WebViewHostOutputSurface(adoptPtr(webkit_support::CreateGraphicsContext3D(WebKit::WebGraphicsContext3D::Attributes(), webView())));
 }
 
 void WebViewHost::didAddMessageToConsole(const WebConsoleMessage& message, const WebString& sourceName, unsigned sourceLine)
@@ -1100,7 +1096,7 @@ void WebViewHost::unableToImplementPolicyWithError(WebFrame* frame, const WebURL
 {
     printf("Policy delegate: unable to implement policy with error domain '%s', "
            "error code %d, in frame '%s'\n",
-            error.domain.utf8().data(), error.reason, frame->uniqueName().utf8().data());
+           error.domain.utf8().data(), error.reason, frame->name().utf8().data());
 }
 
 void WebViewHost::willPerformClientRedirect(WebFrame* frame, const WebURL& from, const WebURL& to,
@@ -1403,7 +1399,7 @@ void WebViewHost::deleteFileSystem(WebKit::WebFrame* frame, WebKit::WebFileSyste
     webkit_support::DeleteFileSystem(frame, type, callbacks);
 }
 
-bool WebViewHost::willCheckAndDispatchMessageEvent(WebFrame* sourceFrame, WebFrame* targetFrame, WebSecurityOrigin target, WebDOMMessageEvent event)
+bool WebViewHost::willCheckAndDispatchMessageEvent(WebFrame* source, WebSecurityOrigin target, WebDOMMessageEvent event)
 {
     if (m_shell->testRunner()->shouldInterceptPostMessage()) {
         fputs("intercepted postMessage\n", stdout);
@@ -1749,7 +1745,7 @@ void WebViewHost::updateSessionHistory(WebFrame* frame)
 
 void WebViewHost::printFrameDescription(WebFrame* webframe)
 {
-    string name8 = webframe->uniqueName().utf8();
+    string name8 = webframe->name().utf8();
     if (webframe == webView()->mainFrame()) {
         if (!name8.length()) {
             fputs("main frame", stdout);
@@ -1774,7 +1770,7 @@ void WebViewHost::printFrameUserGestureStatus(WebFrame* webframe, const char* ms
 void WebViewHost::printResourceDescription(unsigned identifier)
 {
     ResourceMap::iterator it = m_resourceIdentifierMap.find(identifier);
-    printf("%s", it != m_resourceIdentifierMap.end() ? it->value.c_str() : "<unknown>");
+    printf("%s", it != m_resourceIdentifierMap.end() ? it->second.c_str() : "<unknown>");
 }
 
 void WebViewHost::setPendingExtraData(PassOwnPtr<TestShellExtraData> extraData)

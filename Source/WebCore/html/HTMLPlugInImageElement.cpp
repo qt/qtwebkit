@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2011 Apple Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -31,9 +31,7 @@
 #include "Page.h"
 #include "RenderEmbeddedObject.h"
 #include "RenderImage.h"
-#include "RenderSnapshottedPlugIn.h"
 #include "SecurityOrigin.h"
-#include "Settings.h"
 #include "StyleResolver.h"
 
 namespace WebCore {
@@ -49,9 +47,6 @@ HTMLPlugInImageElement::HTMLPlugInImageElement(const QualifiedName& tagName, Doc
     , m_needsDocumentActivationCallbacks(false)
 {
     setHasCustomCallbacks();
-
-    if (document->page() && document->page()->settings()->plugInSnapshottingEnabled())
-        setDisplayState(WaitingForSnapshot);
 }
 
 HTMLPlugInImageElement::~HTMLPlugInImageElement()
@@ -88,7 +83,7 @@ bool HTMLPlugInImageElement::allowedToLoadFrameURL(const String& url)
 {
     ASSERT(document());
     ASSERT(document()->frame());
-    if (document()->frame()->page()->subframeCount() >= Page::maxNumberOfFrames)
+    if (document()->frame()->page()->frameCount() >= Page::maxNumberOfFrames)
         return false;
 
     KURL completeURL = document()->completeURL(url);
@@ -146,9 +141,6 @@ RenderObject* HTMLPlugInImageElement::createRenderer(RenderArena* arena, RenderS
         image->setImageResource(RenderImageResource::create());
         return image;
     }
-
-    if (document()->page() && document()->page()->settings()->plugInSnapshottingEnabled())
-        return new (arena) RenderSnapshottedPlugIn(this);
     return new (arena) RenderEmbeddedObject(this);
 }
 
@@ -259,15 +251,6 @@ PassRefPtr<RenderStyle> HTMLPlugInImageElement::customStyleForRenderer()
 void HTMLPlugInImageElement::updateWidgetCallback(Node* n, unsigned)
 {
     static_cast<HTMLPlugInImageElement*>(n)->updateWidgetIfNecessary();
-}
-
-void HTMLPlugInImageElement::updateSnapshot(PassRefPtr<Image> image)
-{
-    if (displayState() > WaitingForSnapshot || !renderer()->isSnapshottedPlugIn())
-        return;
-
-    toRenderSnapshottedPlugIn(renderer())->updateSnapshot(image);
-    setDisplayState(DisplayingSnapshot);
 }
 
 } // namespace WebCore

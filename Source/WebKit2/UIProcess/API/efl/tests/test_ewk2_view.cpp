@@ -44,42 +44,42 @@ static void onLoadFinishedForRedirection(void* userData, Evas_Object*, void*)
     (*countLoadFinished)--;
 }
 
-TEST_F(EWK2UnitTestBase, ewk_view_url_get)
+TEST_F(EWK2UnitTestBase, ewk_view_uri_get)
 {
-    ASSERT_TRUE(loadUrlSync(environment->defaultTestPageUrl()));
-    EXPECT_STREQ(environment->defaultTestPageUrl(), ewk_view_url_get(webView()));
+    loadUrlSync(environment->defaultTestPageUrl());
+    EXPECT_STREQ(ewk_view_uri_get(webView()), environment->defaultTestPageUrl());
 
     int countLoadFinished = 2;
     evas_object_smart_callback_add(webView(), "load,finished", onLoadFinishedForRedirection, &countLoadFinished);
-    ewk_view_url_set(webView(), environment->urlForResource("redirect_url_to_default.html").data());
+    ewk_view_uri_set(webView(), environment->urlForResource("redirect_uri_to_default.html").data());
     while (countLoadFinished)
         ecore_main_loop_iterate();
     evas_object_smart_callback_del(webView(), "load,finished", onLoadFinishedForRedirection);
-    EXPECT_STREQ(environment->defaultTestPageUrl(), ewk_view_url_get(webView()));
+    EXPECT_STREQ(ewk_view_uri_get(webView()), environment->defaultTestPageUrl());
 }
 
 TEST_F(EWK2UnitTestBase, ewk_view_device_pixel_ratio)
 {
-    ASSERT_TRUE(loadUrlSync(environment->defaultTestPageUrl()));
+    loadUrlSync(environment->defaultTestPageUrl());
 
     // Default pixel ratio is 1.0
-    ASSERT_FLOAT_EQ(1, ewk_view_device_pixel_ratio_get(webView()));
+    ASSERT_FLOAT_EQ(ewk_view_device_pixel_ratio_get(webView()), 1);
 
     ASSERT_TRUE(ewk_view_device_pixel_ratio_set(webView(), 1.2));
-    ASSERT_FLOAT_EQ(1.2, ewk_view_device_pixel_ratio_get(webView()));
+    ASSERT_FLOAT_EQ(ewk_view_device_pixel_ratio_get(webView()), 1.2);
 
     ASSERT_TRUE(ewk_view_device_pixel_ratio_set(webView(), 1));
-    ASSERT_FLOAT_EQ(1, ewk_view_device_pixel_ratio_get(webView()));
+    ASSERT_FLOAT_EQ(ewk_view_device_pixel_ratio_get(webView()), 1);
 }
 
 TEST_F(EWK2UnitTestBase, ewk_view_html_string_load)
 {
     ewk_view_html_string_load(webView(), "<html><head><title>Foo</title></head><body>Bar</body></html>", 0, 0);
     ASSERT_TRUE(waitUntilTitleChangedTo("Foo"));
-    ASSERT_STREQ("Foo", ewk_view_title_get(webView()));
+    ASSERT_STREQ(ewk_view_title_get(webView()), "Foo");
     ewk_view_html_string_load(webView(), "<html><head><title>Bar</title></head><body>Foo</body></html>", 0, 0);
     ASSERT_TRUE(waitUntilTitleChangedTo("Bar"));
-    ASSERT_STREQ("Bar", ewk_view_title_get(webView()));
+    ASSERT_STREQ(ewk_view_title_get(webView()), "Bar");
 }
 
 static void serverCallbackNavigation(SoupServer* server, SoupMessage* message, const char* path, GHashTable*, SoupClientContext*, gpointer)
@@ -106,28 +106,28 @@ TEST_F(EWK2UnitTestBase, ewk_view_navigation)
     httpServer->run(serverCallbackNavigation);
 
     // Visit Page1
-    ASSERT_TRUE(loadUrlSync(httpServer->getURLForPath("/Page1").data()));
-    ASSERT_STREQ("Page1", ewk_view_title_get(webView()));
+    loadUrlSync(httpServer->getURIForPath("/Page1").data());
+    ASSERT_STREQ(ewk_view_title_get(webView()), "Page1");
     ASSERT_FALSE(ewk_view_back_possible(webView()));
     ASSERT_FALSE(ewk_view_forward_possible(webView()));
 
     // Visit Page2
-    ASSERT_TRUE(loadUrlSync(httpServer->getURLForPath("/Page2").data()));
-    ASSERT_STREQ("Page2", ewk_view_title_get(webView()));
+    loadUrlSync(httpServer->getURIForPath("/Page2").data());
+    ASSERT_STREQ(ewk_view_title_get(webView()), "Page2");
     ASSERT_TRUE(ewk_view_back_possible(webView()));
     ASSERT_FALSE(ewk_view_forward_possible(webView()));
 
     // Go back to Page1
     ewk_view_back(webView());
     ASSERT_TRUE(waitUntilTitleChangedTo("Page1"));
-    ASSERT_STREQ("Page1", ewk_view_title_get(webView()));
+    ASSERT_STREQ(ewk_view_title_get(webView()), "Page1");
     ASSERT_FALSE(ewk_view_back_possible(webView()));
     ASSERT_TRUE(ewk_view_forward_possible(webView()));
 
     // Go forward to Page2
     ewk_view_forward(webView());
     ASSERT_TRUE(waitUntilTitleChangedTo("Page2"));
-    ASSERT_STREQ("Page2", ewk_view_title_get(webView()));
+    ASSERT_STREQ(ewk_view_title_get(webView()), "Page2");
     ASSERT_TRUE(ewk_view_back_possible(webView()));
     ASSERT_FALSE(ewk_view_forward_possible(webView()));
 }
@@ -136,7 +136,7 @@ TEST_F(EWK2UnitTestBase, ewk_view_setting_encoding_custom)
 {
     ASSERT_FALSE(ewk_view_setting_encoding_custom_get(webView()));
     ASSERT_TRUE(ewk_view_setting_encoding_custom_set(webView(), "UTF-8"));
-    ASSERT_STREQ("UTF-8", ewk_view_setting_encoding_custom_get(webView()));
+    ASSERT_STREQ(ewk_view_setting_encoding_custom_get(webView()), "UTF-8");
     // Set the default charset.
     ASSERT_TRUE(ewk_view_setting_encoding_custom_set(webView(), 0));
     ASSERT_FALSE(ewk_view_setting_encoding_custom_get(webView()));
@@ -151,19 +151,19 @@ static void onFormAboutToBeSubmitted(void* userData, Evas_Object*, void* eventIn
 
     Eina_List* fieldNames = ewk_form_submission_request_field_names_get(request);
     ASSERT_TRUE(fieldNames);
-    ASSERT_EQ(3, eina_list_count(fieldNames));
+    ASSERT_EQ(eina_list_count(fieldNames), 3);
     void* data;
     EINA_LIST_FREE(fieldNames, data)
         eina_stringshare_del(static_cast<char*>(data));
 
     const char* value1 = ewk_form_submission_request_field_value_get(request, "text1");
-    ASSERT_STREQ("value1", value1);
+    ASSERT_STREQ(value1, "value1");
     eina_stringshare_del(value1);
     const char* value2 = ewk_form_submission_request_field_value_get(request, "text2");
-    ASSERT_STREQ("value2", value2);
+    ASSERT_STREQ(value2, "value2");
     eina_stringshare_del(value2);
     const char* password = ewk_form_submission_request_field_value_get(request, "password");
-    ASSERT_STREQ("secret", password);
+    ASSERT_STREQ(password, "secret");
     eina_stringshare_del(password);
 
     *handled = true;
@@ -195,9 +195,9 @@ TEST_F(EWK2UnitTestBase, ewk_view_form_submission_request)
 
 static inline void checkBasicPopupMenuItem(Ewk_Popup_Menu_Item* item, const char* title, bool enabled)
 {
-    EXPECT_EQ(EWK_POPUP_MENU_ITEM, ewk_popup_menu_item_type_get(item));
-    EXPECT_STREQ(title, ewk_popup_menu_item_text_get(item));
-    EXPECT_EQ(enabled, ewk_popup_menu_item_enabled_get(item));
+    EXPECT_EQ(ewk_popup_menu_item_type_get(item), EWK_POPUP_MENU_ITEM);
+    EXPECT_STREQ(ewk_popup_menu_item_text_get(item), title);
+    EXPECT_EQ(ewk_popup_menu_item_enabled_get(item), enabled);
 }
 
 static Eina_Bool selectItemAfterDelayed(void* data)
@@ -208,25 +208,25 @@ static Eina_Bool selectItemAfterDelayed(void* data)
 
 static Eina_Bool showPopupMenu(Ewk_View_Smart_Data* smartData, Eina_Rectangle, Ewk_Text_Direction, double, Eina_List* list, int selectedIndex)
 {
-    EXPECT_EQ(2, selectedIndex);
+    EXPECT_EQ(selectedIndex, 2);
 
     Ewk_Popup_Menu_Item* item = static_cast<Ewk_Popup_Menu_Item*>(eina_list_nth(list, 0));
     checkBasicPopupMenuItem(item, "first", true);
-    EXPECT_EQ(EWK_TEXT_DIRECTION_LEFT_TO_RIGHT, ewk_popup_menu_item_text_direction_get(item));
-    EXPECT_STREQ("", ewk_popup_menu_item_tooltip_get(item));
-    EXPECT_STREQ("", ewk_popup_menu_item_accessibility_text_get(item));
+    EXPECT_EQ(ewk_popup_menu_item_text_direction_get(item), EWK_TEXT_DIRECTION_LEFT_TO_RIGHT);
+    EXPECT_STREQ(ewk_popup_menu_item_tooltip_get(item), "");
+    EXPECT_STREQ(ewk_popup_menu_item_accessibility_text_get(item), "");
     EXPECT_FALSE(ewk_popup_menu_item_is_label_get(item));
     EXPECT_FALSE(ewk_popup_menu_item_selected_get(item));
 
     item = static_cast<Ewk_Popup_Menu_Item*>(eina_list_nth(list, 1));
     checkBasicPopupMenuItem(item, "second", false);
-    EXPECT_FALSE(ewk_popup_menu_item_enabled_get(item));
+    EXPECT_EQ(ewk_popup_menu_item_enabled_get(item), false);
 
     item = static_cast<Ewk_Popup_Menu_Item*>(eina_list_nth(list, 2));
     checkBasicPopupMenuItem(item, "third", true);
-    EXPECT_EQ(EWK_TEXT_DIRECTION_RIGHT_TO_LEFT, ewk_popup_menu_item_text_direction_get(item));
-    EXPECT_STREQ("tooltip", ewk_popup_menu_item_tooltip_get(item));
-    EXPECT_STREQ("aria", ewk_popup_menu_item_accessibility_text_get(item));
+    EXPECT_EQ(ewk_popup_menu_item_text_direction_get(item), EWK_TEXT_DIRECTION_RIGHT_TO_LEFT);
+    EXPECT_STREQ(ewk_popup_menu_item_tooltip_get(item), "tooltip");
+    EXPECT_STREQ(ewk_popup_menu_item_accessibility_text_get(item), "aria");
     EXPECT_TRUE(ewk_popup_menu_item_selected_get(item));
 
     item = static_cast<Ewk_Popup_Menu_Item*>(eina_list_nth(list, 3));
@@ -237,8 +237,8 @@ static Eina_Bool showPopupMenu(Ewk_View_Smart_Data* smartData, Eina_Rectangle, E
     checkBasicPopupMenuItem(item, "    forth", true);
 
     item = static_cast<Ewk_Popup_Menu_Item*>(eina_list_nth(list, 5));
-    EXPECT_EQ(EWK_POPUP_MENU_UNKNOWN, ewk_popup_menu_item_type_get(item));
-    EXPECT_STREQ(0, ewk_popup_menu_item_text_get(item));
+    EXPECT_EQ(ewk_popup_menu_item_type_get(item), EWK_POPUP_MENU_UNKNOWN);
+    EXPECT_STREQ(ewk_popup_menu_item_text_get(item), 0);
 
     ecore_timer_add(0, selectItemAfterDelayed, smartData->self);
     return true;
@@ -310,6 +310,18 @@ static Eina_Bool fullScreenCallback(Ewk_View_Smart_Data* smartData)
     return false;
 }
 
+static void checkFullScreenProperty(Evas_Object* webView, bool expectedState)
+{
+    if (environment->useX11Window()) {
+        Ewk_View_Smart_Data* smartData = static_cast<Ewk_View_Smart_Data*>(evas_object_smart_data_get(webView));
+        Ecore_Evas* ecoreEvas = ecore_evas_ecore_evas_get(smartData->base.evas);
+        bool windowState = false;
+        while (((windowState = ecore_evas_fullscreen_get(ecoreEvas)) != expectedState))
+            ecore_main_loop_iterate();
+        ASSERT_TRUE(expectedState == windowState);
+    }
+}
+
 TEST_F(EWK2UnitTestBase, ewk_view_full_screen_enter)
 {
     const char fullscreenHTML[] =
@@ -327,6 +339,7 @@ TEST_F(EWK2UnitTestBase, ewk_view_full_screen_enter)
     mouseClick(50, 50);
     ASSERT_TRUE(waitUntilTitleChangedTo("fullscreen entered"));
     ASSERT_TRUE(fullScreenCallbackCalled);
+    checkFullScreenProperty(webView(), true);
 }
 
 TEST_F(EWK2UnitTestBase, ewk_view_full_screen_exit)
@@ -347,17 +360,18 @@ TEST_F(EWK2UnitTestBase, ewk_view_full_screen_exit)
     mouseClick(50, 50);
     ASSERT_TRUE(waitUntilTitleChangedTo("fullscreen exited"));
     ASSERT_TRUE(fullScreenCallbackCalled);
+    checkFullScreenProperty(webView(), false);
 }
 
 TEST_F(EWK2UnitTestBase, ewk_view_same_page_navigation)
 {
-    // Tests that same page navigation updates the page URL.
+    // Tests that same page navigation updates the page URI.
     String testUrl = environment->urlForResource("same_page_navigation.html").data();
-    ASSERT_TRUE(loadUrlSync(testUrl.utf8().data()));
-    ASSERT_STREQ(testUrl.utf8().data(), ewk_view_url_get(webView()));
+    loadUrlSync(testUrl.utf8().data());
+    ASSERT_STREQ(testUrl.utf8().data(), ewk_view_uri_get(webView()));
     mouseClick(50, 50);
     testUrl = testUrl + '#';
-    ASSERT_TRUE(waitUntilURLChangedTo(testUrl.utf8().data()));
+    ASSERT_TRUE(waitUntilURIChangedTo(testUrl.utf8().data()));
 }
 
 TEST_F(EWK2UnitTestBase, ewk_view_title_changed)
@@ -367,21 +381,21 @@ TEST_F(EWK2UnitTestBase, ewk_view_title_changed)
         "<body onload=\"document.title='Title after changed';\"></body>";
     ewk_view_html_string_load(webView(), titleChangedHTML, 0, 0);
     EXPECT_TRUE(waitUntilTitleChangedTo("Title after changed"));
-    EXPECT_STREQ("Title after changed", ewk_view_title_get(webView()));
+    EXPECT_STREQ(ewk_view_title_get(webView()), "Title after changed");
 
     titleChangedHTML =
         "<!doctype html><head><title>Title before changed</title></head>"
         "<body onload=\"document.title='';\"></body>";
     ewk_view_html_string_load(webView(), titleChangedHTML, 0, 0);
     EXPECT_TRUE(waitUntilTitleChangedTo(""));
-    EXPECT_STREQ("", ewk_view_title_get(webView()));
+    EXPECT_STREQ(ewk_view_title_get(webView()), "");
 
     titleChangedHTML =
         "<!doctype html><head><title>Title before changed</title></head>"
         "<body onload=\"document.title=null;\"></body>";
     ewk_view_html_string_load(webView(), titleChangedHTML, 0, 0);
     EXPECT_TRUE(waitUntilTitleChangedTo(""));
-    EXPECT_STREQ("", ewk_view_title_get(webView()));
+    EXPECT_STREQ(ewk_view_title_get(webView()), "");
 }
 
 static struct {
@@ -417,35 +431,35 @@ TEST_F(EWK2UnitTestBase, ewk_view_run_javascript_alert)
     alertCallbackData.called = false;
     ewk_view_html_string_load(webView(), alertHTML, 0, 0);
     EXPECT_TRUE(waitUntilLoadFinished());
-    EXPECT_TRUE(alertCallbackData.called);
+    EXPECT_EQ(alertCallbackData.called, true);
 
     alertHTML = "<!doctype html><body onload=\"alert('');\"></body>";
     alertCallbackData.expectedMessage = "";
     alertCallbackData.called = false;
     ewk_view_html_string_load(webView(), alertHTML, 0, 0);
     EXPECT_TRUE(waitUntilLoadFinished());
-    EXPECT_TRUE(alertCallbackData.called);
+    EXPECT_EQ(alertCallbackData.called, true);
 
     alertHTML = "<!doctype html><body onload=\"alert(null);\"></body>";
     alertCallbackData.expectedMessage = "null";
     alertCallbackData.called = false;
     ewk_view_html_string_load(webView(), alertHTML, 0, 0);
     EXPECT_TRUE(waitUntilLoadFinished());
-    EXPECT_TRUE(alertCallbackData.called);
+    EXPECT_EQ(alertCallbackData.called, true);
 
     alertHTML = "<!doctype html><body onload=\"alert();\"></body>";
     alertCallbackData.expectedMessage = "undefined";
     alertCallbackData.called = false;
     ewk_view_html_string_load(webView(), alertHTML, 0, 0);
     EXPECT_TRUE(waitUntilLoadFinished());
-    EXPECT_TRUE(alertCallbackData.called);
+    EXPECT_EQ(alertCallbackData.called, true);
 
     ewkViewClass()->run_javascript_alert = 0;
 
     alertCallbackData.called = false;
     ewk_view_html_string_load(webView(), alertHTML, 0, 0);
     EXPECT_TRUE(waitUntilLoadFinished());
-    EXPECT_FALSE(alertCallbackData.called);
+    EXPECT_EQ(alertCallbackData.called, false);
 }
 
 static Eina_Bool checkConfirm(Ewk_View_Smart_Data*, const char* message)
@@ -465,16 +479,16 @@ TEST_F(EWK2UnitTestBase, ewk_view_run_javascript_confirm)
     confirmCallbackData.called = false;
     ewk_view_html_string_load(webView(), confirmHTML, 0, 0);
     EXPECT_TRUE(waitUntilTitleChangedTo("true"));
-    EXPECT_STREQ("true", ewk_view_title_get(webView()));
-    EXPECT_TRUE(confirmCallbackData.called);
+    EXPECT_STREQ(ewk_view_title_get(webView()), "true");
+    EXPECT_EQ(confirmCallbackData.called, true);
 
     confirmCallbackData.expectedMessage = "Confirm message";
     confirmCallbackData.result = false;
     confirmCallbackData.called = false;
     ewk_view_html_string_load(webView(), confirmHTML, 0, 0);
     EXPECT_TRUE(waitUntilTitleChangedTo("false"));
-    EXPECT_STREQ("false", ewk_view_title_get(webView()));
-    EXPECT_TRUE(confirmCallbackData.called);
+    EXPECT_STREQ(ewk_view_title_get(webView()), "false");
+    EXPECT_EQ(confirmCallbackData.called, true);
 
     confirmHTML = "<!doctype html><body onload=\"document.title = confirm('');\"></body>";
     confirmCallbackData.expectedMessage = "";
@@ -482,8 +496,8 @@ TEST_F(EWK2UnitTestBase, ewk_view_run_javascript_confirm)
     confirmCallbackData.called = false;
     ewk_view_html_string_load(webView(), confirmHTML, 0, 0);
     EXPECT_TRUE(waitUntilTitleChangedTo("true"));
-    EXPECT_STREQ("true", ewk_view_title_get(webView()));
-    EXPECT_TRUE(confirmCallbackData.called);
+    EXPECT_STREQ(ewk_view_title_get(webView()), "true");
+    EXPECT_EQ(confirmCallbackData.called, true);
 
     confirmHTML = "<!doctype html><body onload=\"document.title = confirm(null);\"></body>";
     confirmCallbackData.expectedMessage = "null";
@@ -491,8 +505,8 @@ TEST_F(EWK2UnitTestBase, ewk_view_run_javascript_confirm)
     confirmCallbackData.called = false;
     ewk_view_html_string_load(webView(), confirmHTML, 0, 0);
     EXPECT_TRUE(waitUntilTitleChangedTo("true"));
-    EXPECT_STREQ("true", ewk_view_title_get(webView()));
-    EXPECT_TRUE(confirmCallbackData.called);
+    EXPECT_STREQ(ewk_view_title_get(webView()), "true");
+    EXPECT_EQ(confirmCallbackData.called, true);
 
     confirmHTML = "<!doctype html><body onload=\"document.title = confirm();\"></body>";
     confirmCallbackData.expectedMessage = "undefined";
@@ -500,16 +514,16 @@ TEST_F(EWK2UnitTestBase, ewk_view_run_javascript_confirm)
     confirmCallbackData.called = false;
     ewk_view_html_string_load(webView(), confirmHTML, 0, 0);
     EXPECT_TRUE(waitUntilTitleChangedTo("true"));
-    EXPECT_STREQ("true", ewk_view_title_get(webView()));
-    EXPECT_TRUE(confirmCallbackData.called);
+    EXPECT_STREQ(ewk_view_title_get(webView()), "true");
+    EXPECT_EQ(confirmCallbackData.called, true);
 
     ewkViewClass()->run_javascript_confirm = 0;
 
     confirmCallbackData.called = false;
     ewk_view_html_string_load(webView(), confirmHTML, 0, 0);
     EXPECT_TRUE(waitUntilTitleChangedTo("false"));
-    EXPECT_STREQ("false", ewk_view_title_get(webView()));
-    EXPECT_FALSE(confirmCallbackData.called);
+    EXPECT_STREQ(ewk_view_title_get(webView()), "false");
+    EXPECT_EQ(confirmCallbackData.called, false);
 }
 
 static const char* checkPrompt(Ewk_View_Smart_Data*, const char* message, const char* defaultValue)
@@ -538,8 +552,8 @@ TEST_F(EWK2UnitTestBase, ewk_view_run_javascript_prompt)
     promptCallbackData.called = false;
     ewk_view_html_string_load(webView(), promptHTML, 0, 0);
     EXPECT_TRUE(waitUntilTitleChangedTo(promptResult));
-    EXPECT_STREQ(promptResult, ewk_view_title_get(webView()));
-    EXPECT_TRUE(promptCallbackData.called);
+    EXPECT_STREQ(ewk_view_title_get(webView()), promptResult);
+    EXPECT_EQ(promptCallbackData.called, true);
 
     promptHTML = "<!doctype html><body onload=\"document.title = prompt('Prompt message', '');\"></body>";
     promptCallbackData.expectedMessage = promptMessage;
@@ -548,8 +562,8 @@ TEST_F(EWK2UnitTestBase, ewk_view_run_javascript_prompt)
     promptCallbackData.called = false;
     ewk_view_html_string_load(webView(), promptHTML, 0, 0);
     EXPECT_TRUE(waitUntilTitleChangedTo(promptResult));
-    EXPECT_STREQ(promptResult, ewk_view_title_get(webView()));
-    EXPECT_TRUE(promptCallbackData.called);
+    EXPECT_STREQ(ewk_view_title_get(webView()), promptResult);
+    EXPECT_EQ(promptCallbackData.called, true);
 
     promptHTML = "<!doctype html><body onload=\"document.title = prompt('Prompt message');\"></body>";
     promptCallbackData.expectedMessage = promptMessage;
@@ -558,8 +572,8 @@ TEST_F(EWK2UnitTestBase, ewk_view_run_javascript_prompt)
     promptCallbackData.called = false;
     ewk_view_html_string_load(webView(), promptHTML, 0, 0);
     EXPECT_TRUE(waitUntilTitleChangedTo(promptResult));
-    EXPECT_STREQ(promptResult, ewk_view_title_get(webView()));
-    EXPECT_TRUE(promptCallbackData.called);
+    EXPECT_STREQ(ewk_view_title_get(webView()), promptResult);
+    EXPECT_EQ(promptCallbackData.called, true);
 
     promptHTML = "<!doctype html><body onload=\"document.title = prompt('');\"></body>";
     promptCallbackData.expectedMessage = "";
@@ -568,8 +582,8 @@ TEST_F(EWK2UnitTestBase, ewk_view_run_javascript_prompt)
     promptCallbackData.called = false;
     ewk_view_html_string_load(webView(), promptHTML, 0, 0);
     EXPECT_TRUE(waitUntilTitleChangedTo(promptResult));
-    EXPECT_STREQ(promptResult, ewk_view_title_get(webView()));
-    EXPECT_TRUE(promptCallbackData.called);
+    EXPECT_STREQ(ewk_view_title_get(webView()), promptResult);
+    EXPECT_EQ(promptCallbackData.called, true);
 
     promptHTML = "<!doctype html><body onload=\"document.title = prompt();\"></body>";
     promptCallbackData.expectedMessage = "undefined";
@@ -578,8 +592,8 @@ TEST_F(EWK2UnitTestBase, ewk_view_run_javascript_prompt)
     promptCallbackData.called = false;
     ewk_view_html_string_load(webView(), promptHTML, 0, 0);
     EXPECT_TRUE(waitUntilTitleChangedTo(promptResult));
-    EXPECT_STREQ(promptResult, ewk_view_title_get(webView()));
-    EXPECT_TRUE(promptCallbackData.called);
+    EXPECT_STREQ(ewk_view_title_get(webView()), promptResult);
+    EXPECT_EQ(promptCallbackData.called, true);
 
     promptHTML = "<html><head><title>Default title</title></head>"
                  "<body onload=\"var promptResult = prompt('Prompt message');"
@@ -591,8 +605,8 @@ TEST_F(EWK2UnitTestBase, ewk_view_run_javascript_prompt)
     promptCallbackData.called = false;
     ewk_view_html_string_load(webView(), promptHTML, 0, 0);
     EXPECT_TRUE(waitUntilTitleChangedTo(""));
-    EXPECT_STREQ("", ewk_view_title_get(webView()));
-    EXPECT_TRUE(promptCallbackData.called);
+    EXPECT_STREQ(ewk_view_title_get(webView()), "");
+    EXPECT_EQ(promptCallbackData.called, true);
 
     promptCallbackData.expectedMessage = promptMessage;
     promptCallbackData.expectedDefaultValue = "";
@@ -600,16 +614,16 @@ TEST_F(EWK2UnitTestBase, ewk_view_run_javascript_prompt)
     promptCallbackData.called = false;
     ewk_view_html_string_load(webView(), promptHTML, 0, 0);
     EXPECT_TRUE(waitUntilTitleChangedTo("null"));
-    EXPECT_STREQ("null", ewk_view_title_get(webView()));
-    EXPECT_TRUE(promptCallbackData.called);
+    EXPECT_STREQ(ewk_view_title_get(webView()), "null");
+    EXPECT_EQ(promptCallbackData.called, true);
 
     ewkViewClass()->run_javascript_prompt = 0;
 
     promptCallbackData.called = false;
     ewk_view_html_string_load(webView(), promptHTML, 0, 0);
     EXPECT_TRUE(waitUntilTitleChangedTo("null"));
-    EXPECT_STREQ("null", ewk_view_title_get(webView()));
-    EXPECT_FALSE(promptCallbackData.called);
+    EXPECT_STREQ(ewk_view_title_get(webView()), "null");
+    EXPECT_EQ(promptCallbackData.called, false);
 }
 
 #if ENABLE(INPUT_TYPE_COLOR)
@@ -651,18 +665,18 @@ static Eina_Bool showColorPicker(Ewk_View_Smart_Data* smartData, int r, int g, i
 
     if (isFirstRun) {
         // 2. Check initial value from html file.
-        EXPECT_EQ(initialRed, r);
-        EXPECT_EQ(initialGreen, g);
-        EXPECT_EQ(initialBlue, b);
-        EXPECT_EQ(initialAlpha, a);
+        EXPECT_EQ(r, initialRed);
+        EXPECT_EQ(g, initialGreen);
+        EXPECT_EQ(b, initialBlue);
+        EXPECT_EQ(a, initialAlpha);
 
         isFirstRun = false;
     } else {
         // 7. Input values should be same as changed color.
-        EXPECT_EQ(changedRed, r);
-        EXPECT_EQ(changedGreen, g);
-        EXPECT_EQ(changedBlue, b);
-        EXPECT_EQ(changedAlpha, a);
+        EXPECT_EQ(r, changedRed);
+        EXPECT_EQ(g, changedGreen);
+        EXPECT_EQ(b, changedBlue);
+        EXPECT_EQ(a, changedAlpha);
 
         evas_object_smart_callback_call(smartData->self, "input,type,color,request", 0);
         return true;
@@ -730,7 +744,7 @@ TEST_F(EWK2UnitTestBase, ewk_view_color_picker_color_set)
     while (!handled)
         ecore_main_loop_iterate();
 
-    // 8. Click button to remove input element durlng color picker is shown.
+    // 8. Click button to remove input element during color picker is shown.
     api->input_picker_color_dismiss = hideColorPickerByRemovingElement;
     mouseClick(80, 20);
 
@@ -772,169 +786,4 @@ TEST_F(EWK2UnitTestBase, ewk_view_feed_touch_event)
     points = eina_list_remove(points, &point1);
 
     eina_list_free(points);
-}
-
-static void onTextFound(void* userData, Evas_Object*, void* eventInfo)
-{
-    int* result = static_cast<int*>(userData);
-    unsigned* matchCount = static_cast<unsigned*>(eventInfo);
-
-    *result = *matchCount;
-}
-
-TEST_F(EWK2UnitTestBase, ewk_view_text_find)
-{
-    const char textFindHTML[] =
-        "<!DOCTYPE html>"
-        "<body>"
-        "apple apple apple banana banana coconut"
-        "</body>";
-    ewk_view_html_string_load(webView(), textFindHTML, 0, 0);
-    waitUntilLoadFinished();
-
-    int matchCount = -1;
-    evas_object_smart_callback_add(webView(), "text,found", onTextFound, &matchCount);
-
-    ewk_view_text_find(webView(), "apple", EWK_FIND_OPTIONS_SHOW_OVERLAY, 100);
-    while (matchCount < 0)
-        ecore_main_loop_iterate();
-    EXPECT_EQ(3, matchCount);
-
-    matchCount = -1;
-    ewk_view_text_find(webView(), "mango", EWK_FIND_OPTIONS_SHOW_OVERLAY, 100);
-    while (matchCount < 0)
-        ecore_main_loop_iterate();
-    EXPECT_EQ(0, matchCount);
-
-    evas_object_smart_callback_del(webView(), "text,found", onTextFound);
-}
-
-TEST_F(EWK2UnitTestBase, ewk_view_text_matches_count)
-{
-    const char textFindHTML[] =
-        "<!DOCTYPE html>"
-        "<body>"
-        "apple Apple apple apple banana bananaApple banana coconut"
-        "</body>";
-    ewk_view_html_string_load(webView(), textFindHTML, 0, 0);
-    waitUntilLoadFinished();
-
-    int matchCount = -1;
-    evas_object_smart_callback_add(webView(), "text,found", onTextFound, &matchCount);
-
-    ewk_view_text_matches_count(webView(), "apple", EWK_FIND_OPTIONS_NONE, 100);
-    while (matchCount < 0)
-        ecore_main_loop_iterate();
-    EXPECT_EQ(3, matchCount);
-
-    matchCount = -1;
-    ewk_view_text_matches_count(webView(), "apple", EWK_FIND_OPTIONS_CASE_INSENSITIVE, 100);
-    while (matchCount < 0)
-        ecore_main_loop_iterate();
-    EXPECT_EQ(5, matchCount);
-
-    matchCount = -1;
-    ewk_view_text_matches_count(webView(), "Apple", EWK_FIND_OPTIONS_AT_WORD_STARTS, 100);
-    while (matchCount < 0)
-        ecore_main_loop_iterate();
-    EXPECT_EQ(1, matchCount);
-
-    matchCount = -1;
-    ewk_view_text_matches_count(webView(), "Apple", EWK_FIND_OPTIONS_TREAT_MEDIAL_CAPITAL_AS_WORD_START, 100);
-    while (matchCount < 0)
-        ecore_main_loop_iterate();
-    EXPECT_EQ(2, matchCount);
-
-    matchCount = -1;
-    ewk_view_text_matches_count(webView(), "mango", EWK_FIND_OPTIONS_NONE, 100);
-    while (matchCount < 0)
-        ecore_main_loop_iterate();
-    EXPECT_EQ(0, matchCount);
-
-    // If we have more matches than allowed, -1 is returned as a matched count.
-    matchCount = -2;
-    ewk_view_text_matches_count(webView(), "apple", EWK_FIND_OPTIONS_NONE, 2);
-    while (matchCount < -1)
-        ecore_main_loop_iterate();
-    EXPECT_EQ(-1, matchCount);
-
-    evas_object_smart_callback_del(webView(), "text,found", onTextFound);
-}
-
-TEST_F(EWK2UnitTestBase, ewk_view_touch_events_enabled)
-{
-    ASSERT_FALSE(ewk_view_touch_events_enabled_get(webView()));
-
-    ASSERT_TRUE(ewk_view_touch_events_enabled_set(webView(), true));
-    ASSERT_TRUE(ewk_view_touch_events_enabled_get(webView()));
-
-    ASSERT_TRUE(ewk_view_touch_events_enabled_set(webView(), 2));
-    ASSERT_TRUE(ewk_view_touch_events_enabled_get(webView()));
-
-    const char* touchHTML =
-        "<!doctype html><body><div style=\"width:100px; height:100px;\" "
-        "ontouchstart=\"document.title='touchstarted' + event.touches.length;\" "
-        "ontouchmove=\"document.title='touchmoved' + event.touches.length;\" "
-        "ontouchend=\"document.title='touchended' + event.touches.length;\">"
-        "</div></body>";
-
-    ewk_view_html_string_load(webView(), touchHTML, "file:///", 0);
-    ASSERT_TRUE(waitUntilLoadFinished());
-
-    mouseDown(10, 10);
-    ASSERT_TRUE(waitUntilTitleChangedTo("touchstarted1"));
-
-    multiDown(1, 30, 30);
-    ASSERT_TRUE(waitUntilTitleChangedTo("touchstarted2"));
-
-    multiMove(1, 40, 40);
-    ASSERT_TRUE(waitUntilTitleChangedTo("touchmoved2"));
-
-    multiUp(1, 40, 40);
-    ASSERT_TRUE(waitUntilTitleChangedTo("touchended1"));
-
-    mouseMove(20, 20);
-    ASSERT_TRUE(waitUntilTitleChangedTo("touchmoved1"));
-
-    mouseUp(20, 20);
-    ASSERT_TRUE(waitUntilTitleChangedTo("touchended0"));
-
-    ASSERT_TRUE(ewk_view_touch_events_enabled_set(webView(), false));
-    ASSERT_FALSE(ewk_view_touch_events_enabled_get(webView()));
-}
-
-Eina_Bool windowMoveResizeTimedOut(void* data)
-{
-    *static_cast<bool*>(data) = true;
-}
-
-TEST_F(EWK2UnitTestBase, window_move_resize)
-{
-    int x, y, width, height;
-    Ecore_Evas* ee = ecore_evas_ecore_evas_get(evas_object_evas_get(webView()));
-    ecore_evas_geometry_get(ee, 0, 0, &width, &height);
-
-    EXPECT_EQ(800, width);
-    EXPECT_EQ(600, height);
-
-    ewk_view_url_set(webView(), environment->urlForResource("window_move_resize.html").data());
-    ASSERT_TRUE(waitUntilTitleChangedTo("Moved and resized"));
-
-    // Check that the window has been moved and resized.
-    ecore_evas_request_geometry_get(ee, &x, &y, &width, &height);
-    EXPECT_EQ(150, x);
-    EXPECT_EQ(200, y);
-    EXPECT_EQ(200, width);
-    EXPECT_EQ(100, height);
-}
-
-TEST_F(EWK2UnitTestBase, ewk_view_inspector)
-{
-#if ENABLE(INSPECTOR)
-    ASSERT_TRUE(ewk_view_inspector_show(webView()));
-    ASSERT_TRUE(ewk_view_inspector_close(webView()));
-#else
-    ASSERT_FALSE(ewk_view_inspector_show(webView()));
-    ASSERT_FALSE(ewk_view_inspector_close(webView()));
-#endif
 }

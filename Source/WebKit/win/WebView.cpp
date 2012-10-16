@@ -6227,14 +6227,15 @@ void WebView::exitFullscreen()
 #endif
 }
 
-static Vector<String> toStringVector(unsigned patternsCount, BSTR* patterns)
+static PassOwnPtr<Vector<String> > toStringVector(unsigned patternsCount, BSTR* patterns)
 {
-    Vector<String> patternsVector;
-    if (!patternsCount)
-        return patternsVector;
+    // Convert the patterns into a Vector.
+    if (patternsCount == 0)
+        return nullptr;
+    OwnPtr<Vector<String> > patternsVector = adoptPtr(new Vector<String>);
     for (unsigned i = 0; i < patternsCount; ++i)
-        patternsVector.append(toString(patterns[i]));
-    return patternsVector;
+        patternsVector->append(toString(patterns[i]));
+    return patternsVector.release();
 }
 
 HRESULT WebView::addUserScriptToGroup(BSTR groupName, IWebScriptWorld* iWorld, BSTR source, BSTR url, 
@@ -6487,7 +6488,7 @@ void WebView::setAcceleratedCompositing(bool accelerated)
             // FIXME: We could perhaps get better performance by never allowing this layer to
             // become tiled (or choosing a higher-than-normal tiling threshold).
             // <http://webkit.org/b/52603>
-            m_backingLayer = GraphicsLayer::create(0, this);
+            m_backingLayer = GraphicsLayer::create(this);
             m_backingLayer->setDrawsContent(true);
             m_backingLayer->setContentsOpaque(true);
             RECT clientRect;
@@ -6630,7 +6631,7 @@ void WebView::notifyAnimationStarted(const GraphicsLayer*, double)
     ASSERT_NOT_REACHED();
 }
 
-void WebView::notifyFlushRequired(const GraphicsLayer*)
+void WebView::notifySyncRequired(const GraphicsLayer*)
 {
     flushPendingGraphicsLayerChangesSoon();
 }
@@ -6672,9 +6673,9 @@ void WebView::flushPendingGraphicsLayerChanges()
 
     // Updating layout might have taken us out of compositing mode.
     if (m_backingLayer)
-        m_backingLayer->flushCompositingStateForThisLayerOnly();
+        m_backingLayer->syncCompositingStateForThisLayerOnly();
 
-    view->flushCompositingStateIncludingSubframes();
+    view->syncCompositingStateIncludingSubframes();
 }
 
 #endif

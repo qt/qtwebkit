@@ -88,12 +88,12 @@ void RenderSVGForeignObject::paint(PaintInfo& paintInfo, const LayoutPoint&)
     }
 }
 
-LayoutRect RenderSVGForeignObject::clippedOverflowRectForRepaint(RenderLayerModelObject* repaintContainer) const
+LayoutRect RenderSVGForeignObject::clippedOverflowRectForRepaint(RenderBoxModelObject* repaintContainer) const
 {
     return SVGRenderSupport::clippedOverflowRectForRepaint(this, repaintContainer);
 }
 
-void RenderSVGForeignObject::computeFloatRectForRepaint(RenderLayerModelObject* repaintContainer, FloatRect& repaintRect, bool fixed) const
+void RenderSVGForeignObject::computeFloatRectForRepaint(RenderBoxModelObject* repaintContainer, FloatRect& repaintRect, bool fixed) const
 {
     SVGRenderSupport::computeFloatRectForRepaint(this, repaintContainer, repaintRect, fixed);
 }
@@ -112,13 +112,11 @@ void RenderSVGForeignObject::updateLogicalWidth()
     setWidth(static_cast<int>(roundf(m_viewport.width())));
 }
 
-void RenderSVGForeignObject::computeLogicalHeight(LayoutUnit, LayoutUnit logicalTop, LogicalExtentComputedValues& computedValues) const
+void RenderSVGForeignObject::updateLogicalHeight()
 {
     // FIXME: Investigate in size rounding issues
     // FIXME: Remove unnecessary rounding when layout is off ints: webkit.org/b/63656
-    // FIXME: Is this correct for vertical writing mode?
-    computedValues.m_extent = static_cast<int>(roundf(m_viewport.height()));
-    computedValues.m_position = logicalTop;
+    setHeight(static_cast<int>(roundf(m_viewport.height())));
 }
 
 void RenderSVGForeignObject::layout()
@@ -192,12 +190,12 @@ bool RenderSVGForeignObject::nodeAtPoint(const HitTestRequest&, HitTestResult&, 
     return false;
 }
 
-void RenderSVGForeignObject::mapLocalToContainer(RenderLayerModelObject* repaintContainer, TransformState& transformState, MapCoordinatesFlags mode, bool* wasFixed) const
+void RenderSVGForeignObject::mapLocalToContainer(RenderBoxModelObject* repaintContainer, TransformState& transformState, MapLocalToContainerFlags mode, bool* wasFixed) const
 {
     SVGRenderSupport::mapLocalToContainer(this, repaintContainer, transformState, mode & SnapOffsetForTransforms, wasFixed);
 }
 
-const RenderObject* RenderSVGForeignObject::pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap) const
+const RenderObject* RenderSVGForeignObject::pushMappingToContainer(const RenderBoxModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap) const
 {
     return SVGRenderSupport::pushMappingToContainer(this, ancestorToStopAt, geometryMap);
 }

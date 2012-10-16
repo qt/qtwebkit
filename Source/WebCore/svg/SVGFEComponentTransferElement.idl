@@ -23,10 +23,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=SVG&FILTERS
-] interface SVGFEComponentTransferElement : SVGElement,
-                                                            SVGFilterPrimitiveStandardAttributes {
-    readonly attribute SVGAnimatedString in1;
-};
+module svg {
 
+    interface [
+        Conditional=SVG&FILTERS
+    ] SVGFEComponentTransferElement : SVGElement,
+                                                                SVGFilterPrimitiveStandardAttributes {
+        readonly attribute SVGAnimatedString in1;
+    };
+
+}

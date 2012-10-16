@@ -35,7 +35,6 @@ WebInspector.WorkspaceController = function(workspace)
 {
     this._workspace = workspace;
     WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.MainFrameNavigated, this._mainFrameNavigated, this);
-    WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.FrameAdded, this._frameAdded, this);
 }
 
 WebInspector.WorkspaceController.prototype = {
@@ -45,13 +44,6 @@ WebInspector.WorkspaceController.prototype = {
         this._workspace.dispatchEventToListeners(WebInspector.Workspace.Events.ProjectWillReset, this._workspace.project());
         this._workspace.project().reset();
         this._workspace.dispatchEventToListeners(WebInspector.Workspace.Events.ProjectDidReset, this._workspace.project());
-    },
-
-    _frameAdded: function(event)
-    {
-        var frame = /** @type {WebInspector.ResourceTreeFrame} */ event.data;
-        if (frame.isMainFrame())
-            WebInspector.Revision.filterOutStaleRevisions();
     }
 }
 
@@ -85,11 +77,16 @@ WebInspector.Project.prototype = {
     },
 
     /**
+     * @param {WebInspector.UISourceCode} oldUISourceCode
      * @param {WebInspector.UISourceCode} uiSourceCode
      */
-    addTemporaryUISourceCode: function(uiSourceCode)
+    replaceUISourceCode: function(oldUISourceCode, uiSourceCode)
     {
-        this._workspace.dispatchEventToListeners(WebInspector.UISourceCodeProvider.Events.TemporaryUISourceCodeAdded, uiSourceCode);
+        this._uiSourceCodes.splice(this._uiSourceCodes.indexOf(oldUISourceCode), 1);
+        if (this._uiSourceCodes.indexOf(uiSourceCode) === -1)
+            this._uiSourceCodes.push(uiSourceCode);
+        var data = { oldUISourceCode: oldUISourceCode, uiSourceCode: uiSourceCode };
+        this._workspace.dispatchEventToListeners(WebInspector.UISourceCodeProvider.Events.UISourceCodeReplaced, data);
     },
 
     /**
@@ -99,14 +96,6 @@ WebInspector.Project.prototype = {
     {
         this._uiSourceCodes.splice(this._uiSourceCodes.indexOf(uiSourceCode), 1);
         this._workspace.dispatchEventToListeners(WebInspector.UISourceCodeProvider.Events.UISourceCodeRemoved, uiSourceCode);
-    },
-
-    /**
-     * @param {WebInspector.UISourceCode} uiSourceCode
-     */
-    removeTemporaryUISourceCode: function(uiSourceCode)
-    {
-        this._workspace.dispatchEventToListeners(WebInspector.UISourceCodeProvider.Events.TemporaryUISourceCodeRemoved, uiSourceCode);
     },
 
     /**
@@ -172,10 +161,10 @@ WebInspector.Workspace.prototype = {
     uiSourceCodes: function()
     {
         return this._project.uiSourceCodes();
-    },
-
-    __proto__: WebInspector.Object.prototype
+    }
 }
+
+WebInspector.Workspace.prototype.__proto__ = WebInspector.Object.prototype;
 
 /**
  * @type {?WebInspector.Workspace}

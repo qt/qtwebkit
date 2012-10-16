@@ -136,9 +136,9 @@ void AcceleratedCompositingContext::scheduleLayerFlush()
 bool AcceleratedCompositingContext::flushPendingLayerChanges()
 {
     if (m_rootGraphicsLayer)
-        m_rootGraphicsLayer->flushCompositingStateForThisLayerOnly();
+        m_rootGraphicsLayer->syncCompositingStateForThisLayerOnly();
 
-    return core(m_webView)->mainFrame()->view()->flushCompositingStateIncludingSubframes();
+    return core(m_webView)->mainFrame()->view()->syncCompositingStateIncludingSubframes();
 }
 
 void AcceleratedCompositingContext::flushAndRenderLayers()
@@ -155,7 +155,7 @@ void AcceleratedCompositingContext::notifyAnimationStarted(const WebCore::Graphi
 {
     ASSERT_NOT_REACHED();
 }
-void AcceleratedCompositingContext::notifyFlushRequired(const WebCore::GraphicsLayer*)
+void AcceleratedCompositingContext::notifySyncRequired(const WebCore::GraphicsLayer*)
 {
     ASSERT_NOT_REACHED();
 }

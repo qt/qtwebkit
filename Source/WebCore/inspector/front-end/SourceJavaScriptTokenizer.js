@@ -2438,7 +2438,7 @@ case 300:
         }
 
         }
-    },
-
-    __proto__: WebInspector.SourceTokenizer.prototype
+    }
 }
+
+WebInspector.SourceJavaScriptTokenizer.prototype.__proto__ = WebInspector.SourceTokenizer.prototype;

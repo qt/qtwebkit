@@ -23,7 +23,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=WEBGL
-] interface WebGLProgram {
-};
+module html {
+    interface [
+        Conditional=WEBGL
+    ] WebGLProgram {
+    };
+}

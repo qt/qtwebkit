@@ -74,8 +74,6 @@ ClipboardGtk::ClipboardGtk(ClipboardAccessPolicy policy, PassRefPtr<DataObjectGt
 
 ClipboardGtk::~ClipboardGtk()
 {
-    if (m_dragImage)
-        m_dragImage->removeClient(this);
 }
 
 static ClipboardDataType dataObjectTypeFromHTMLClipboardType(const String& rawType)
@@ -186,15 +184,15 @@ bool ClipboardGtk::setData(const String& typeString, const String& data)
     return success;
 }
 
-ListHashSet<String> ClipboardGtk::types() const
+HashSet<String> ClipboardGtk::types() const
 {
     if (policy() != ClipboardReadable && policy() != ClipboardTypesReadable)
-        return ListHashSet<String>();
+        return HashSet<String>();
 
     if (m_clipboard)
         PasteboardHelper::defaultPasteboardHelper()->getClipboardContents(m_clipboard);
 
-    ListHashSet<String> types;
+    HashSet<String> types;
     if (m_dataObject->hasText()) {
         types.add("text/plain");
         types.add("Text");

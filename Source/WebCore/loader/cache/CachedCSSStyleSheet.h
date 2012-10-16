@@ -32,6 +32,7 @@
 namespace WebCore {
 
     class CachedResourceClient;
+    class SharedBuffer;
     class StyleSheetContents;
     class TextResourceDecoder;
     struct CSSParserContext;
@@ -47,7 +48,7 @@ namespace WebCore {
         
         virtual void setEncoding(const String&);
         virtual String encoding() const;
-        virtual void data(PassRefPtr<ResourceBuffer> data, bool allDataReceived);
+        virtual void data(PassRefPtr<SharedBuffer> data, bool allDataReceived);
         virtual void destroyDecodedData() OVERRIDE;
 
         PassRefPtr<StyleSheetContents> restoreParsedStyleSheet(const CSSParserContext&);

@@ -757,6 +757,21 @@ void QWebPagePrivate::mouseTripleClickEvent(T *ev)
     ev->setAccepted(accepted);
 }
 
+void QWebPagePrivate::handleClipboard(QEvent* ev, Qt::MouseButton button)
+{
+#ifndef QT_NO_CLIPBOARD
+    if (QApplication::clipboard()->supportsSelection()) {
+        WebCore::Frame* focusFrame = page->focusController()->focusedOrMainFrame();
+        if (button == Qt::MidButton) {
+            if (focusFrame) {
+                focusFrame->editor()->command(AtomicString("PasteGlobalSelection")).execute();
+                ev->setAccepted(true);
+            }
+        }
+    }
+#endif
+}
+
 template<class T>
 void QWebPagePrivate::mouseReleaseEvent(T *ev)
 {
@@ -772,6 +787,8 @@ void QWebPagePrivate::mouseReleaseEvent(T *ev)
         accepted = frame->eventHandler()->handleMouseReleaseEvent(mev);
     ev->setAccepted(accepted);
 
+    if (!ev->isAccepted())
+        handleClipboard(ev, ev->button());
     handleSoftwareInputPanel(ev->button(), QPointF(ev->pos()).toPoint());
 }
 
@@ -2237,7 +2254,7 @@ static void extractContentTypeFromPluginVector(const Vector<PluginPackage*>& plu
         MIMEToDescriptionsMap::const_iterator map_it = plugins[i]->mimeToDescriptions().begin();
         MIMEToDescriptionsMap::const_iterator map_end = plugins[i]->mimeToDescriptions().end();
         for (; map_it != map_end; ++map_it)
-            *list << map_it->key;
+            *list << map_it->first;
     }
 }
 

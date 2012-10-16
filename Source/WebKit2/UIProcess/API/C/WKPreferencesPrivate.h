@@ -219,14 +219,6 @@ WK_EXPORT bool WKPreferencesGetScrollingPerformanceLoggingEnabled(WKPreferencesR
 WK_EXPORT void WKPreferencesSetScreenFontSubstitutionEnabled(WKPreferencesRef preferences, bool enabled);
 WK_EXPORT bool WKPreferencesGetScreenFontSubstitutionEnabled(WKPreferencesRef preferences);
 
-// Defaults to true
-WK_EXPORT void WKPreferencesSetCookieEnabled(WKPreferencesRef preferences, bool enabled);
-WK_EXPORT bool WKPreferencesGetCookieEnabled(WKPreferencesRef preferences);
-
-// Defaults to false
-WK_EXPORT void WKPreferencesSetPDFPluginEnabled(WKPreferencesRef preferences, bool enabled);
-WK_EXPORT bool WKPreferencesGetPDFPluginEnabled(WKPreferencesRef preferences);
-
 WK_EXPORT void WKPreferencesResetTestRunnerOverrides(WKPreferencesRef preferencesRef);
 
 #ifdef __cplusplus

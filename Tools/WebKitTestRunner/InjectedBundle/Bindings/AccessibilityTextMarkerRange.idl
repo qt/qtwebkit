@@ -23,7 +23,10 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-interface AccessibilityTextMarkerRange {
-    boolean isEqual(in AccessibilityTextMarkerRange otherMarkerRange);
-};
+module WTR {
 
+    interface AccessibilityTextMarkerRange {
+        boolean isEqual(in AccessibilityTextMarkerRange otherMarkerRange);
+    };
+
+}

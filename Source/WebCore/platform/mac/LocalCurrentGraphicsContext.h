@@ -39,7 +39,6 @@ public:
 private:
     GraphicsContext* m_savedGraphicsContext;
     NSGraphicsContext* m_savedNSGraphicsContext;
-    bool m_didSetGraphicsContext;
 #if USE(SKIA)
     gfx::SkiaBitLocker m_skiaBitLocker;
 #endif

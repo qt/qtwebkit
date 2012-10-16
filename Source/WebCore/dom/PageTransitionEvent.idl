@@ -23,9 +23,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    ConstructorTemplate=Event
-] interface PageTransitionEvent : Event {
-    [InitializedByEventConstructor] readonly attribute boolean persisted;
-};
+module events {
 
+    interface [
+        ConstructorTemplate=Event
+    ] PageTransitionEvent : Event {
+        readonly attribute [InitializedByEventConstructor] boolean persisted;
+    };
+
+}

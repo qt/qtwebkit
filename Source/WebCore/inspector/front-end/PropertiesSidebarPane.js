@@ -99,7 +99,7 @@ WebInspector.PropertiesSidebarPane.prototype = {
                 body.appendChild(section.element);
             }
         }
-    },
-
-    __proto__: WebInspector.SidebarPane.prototype
+    }
 }
+
+WebInspector.PropertiesSidebarPane.prototype.__proto__ = WebInspector.SidebarPane.prototype;

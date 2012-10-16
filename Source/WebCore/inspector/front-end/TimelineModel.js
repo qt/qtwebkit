@@ -247,10 +247,10 @@ WebInspector.TimelineModel.prototype = {
     recordOffsetInSeconds: function(rawRecord)
     {
         return WebInspector.TimelineModel.startTimeInSeconds(rawRecord) - this._minimumRecordTime;
-    },
-
-    __proto__: WebInspector.Object.prototype
+    }
 }
+
+WebInspector.TimelineModel.prototype.__proto__ = WebInspector.Object.prototype;
 
 /**
  * @constructor
@@ -330,14 +330,11 @@ WebInspector.TimelineModelLoadFromFileDelegate = function(model, progress)
 }
 
 WebInspector.TimelineModelLoadFromFileDelegate.prototype = {
-    onTransferStarted: function()
+    onTransferStarted: function(reader)
     {
         this._progress.setTitle(WebInspector.UIString("Loading\u2026"));
     },
 
-    /**
-     * @param {WebInspector.ChunkedReader} reader
-     */
     onChunkTransferred: function(reader)
     {
         if (this._progress.isCanceled()) {
@@ -354,14 +351,11 @@ WebInspector.TimelineModelLoadFromFileDelegate.prototype = {
         }
     },
 
-    onTransferFinished: function()
+    onTransferFinished: function(reader)
     {
         this._progress.done();
     },
 
-    /**
-     * @param {WebInspector.ChunkedReader} reader
-     */
     onError: function(reader, event)
     {
         this._progress.done();

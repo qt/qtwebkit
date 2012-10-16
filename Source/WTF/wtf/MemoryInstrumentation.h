@@ -83,17 +83,8 @@ private:
 
 template<typename T> void reportMemoryUsage(const T* const&, MemoryObjectInfo*);
 
-class MemoryInstrumentationClient {
-public:
-    virtual ~MemoryInstrumentationClient() { }
-    virtual void countObjectSize(MemoryObjectType, size_t) = 0;
-    virtual bool visited(const void*) = 0;
-    virtual void checkCountedObject(const void*) = 0;
-};
-
 class MemoryInstrumentation {
 public:
-    explicit MemoryInstrumentation(MemoryInstrumentationClient* client) : m_client(client) { }
     virtual ~MemoryInstrumentation() { }
 
     template <typename T> void addRootObject(const T& t)
@@ -101,6 +92,8 @@ public:
         addObject(t, 0);
         processDeferredInstrumentedPointers();
     }
+
+    template<typename Container> static size_t calculateContainerSize(const Container&, bool contentOnly = false);
 
 protected:
     class InstrumentedPointerBase {
@@ -110,11 +103,9 @@ protected:
     };
 
 private:
-    void countObjectSize(MemoryObjectType objectType, size_t size) { m_client->countObjectSize(objectType, size); }
-    bool visited(const void* pointer) { return m_client->visited(pointer); }
-    void checkCountedObject(const void* pointer) { return m_client->checkCountedObject(pointer); }
-
+    virtual void countObjectSize(MemoryObjectType, size_t) = 0;
     virtual void deferInstrumentedPointer(PassOwnPtr<InstrumentedPointerBase>) = 0;
+    virtual bool visited(const void*) = 0;
     virtual void processDeferredInstrumentedPointers() = 0;
 
     friend class MemoryClassInfo;
@@ -154,6 +145,11 @@ private:
     };
 
     template<typename T> void addObject(const T& t, MemoryObjectType ownerObjectType) { OwningTraits<T>::addObject(this, t, ownerObjectType); }
+    template<typename HashMapType> void addHashMap(const HashMapType&, MemoryObjectType, bool contentOnly = false);
+    template<typename HashSetType> void addHashSet(const HashSetType&, MemoryObjectType, bool contentOnly = false);
+    template<typename CollectionType> void addInstrumentedCollection(const CollectionType&, MemoryObjectType, bool contentOnly = false);
+    template<typename MapType> void addInstrumentedMapEntries(const MapType&, MemoryObjectType);
+    template<typename MapType> void addInstrumentedMapValues(const MapType&, MemoryObjectType);
     template<typename ListHashSetType> void addListHashSet(const ListHashSetType&, MemoryObjectType, bool contentOnly = false);
     void addRawBuffer(const void* const& buffer, MemoryObjectType ownerObjectType, size_t size)
     {
@@ -181,8 +177,6 @@ private:
     template<typename T> void addObjectImpl(const T* const&, MemoryObjectType, MemoryOwningType);
     template<typename T> void addObjectImpl(const OwnPtr<T>* const&, MemoryObjectType, MemoryOwningType);
     template<typename T> void addObjectImpl(const RefPtr<T>* const&, MemoryObjectType, MemoryOwningType);
-
-    MemoryInstrumentationClient* m_client;
 };
 
 class MemoryClassInfo {
@@ -197,9 +191,15 @@ public:
     }
 
     template<typename M> void addMember(const M& member) { m_memoryInstrumentation->addObject(member, m_objectType); }
+
+    template<typename HashMapType> void addHashMap(const HashMapType& map) { m_memoryInstrumentation->addHashMap(map, m_objectType, true); }
+    template<typename HashSetType> void addHashSet(const HashSetType& set) { m_memoryInstrumentation->addHashSet(set, m_objectType, true); }
+    template<typename HashSetType> void addHashCountedSet(const HashSetType& set) { m_memoryInstrumentation->addHashSet(set, m_objectType, true); }
+    template<typename HashSetType> void addInstrumentedHashSet(const HashSetType& set) { m_memoryInstrumentation->addInstrumentedCollection(set, m_objectType, true); }
+    template<typename MapType> void addInstrumentedMapEntries(const MapType& map) { m_memoryInstrumentation->addInstrumentedMapEntries(map, m_objectType); }
+    template<typename MapType> void addInstrumentedMapValues(const MapType& map) { m_memoryInstrumentation->addInstrumentedMapValues(map, m_objectType); }
     template<typename ListHashSetType> void addListHashSet(const ListHashSetType& set) { m_memoryInstrumentation->addListHashSet(set, m_objectType, true); }
     void addRawBuffer(const void* const& buffer, size_t size) { m_memoryInstrumentation->addRawBuffer(buffer, m_objectType, size); }
-    void addPrivateBuffer(size_t size) { m_memoryInstrumentation->countObjectSize(m_objectType, size); }
 
     void addWeakPointer(void*) { }
 
@@ -224,7 +224,6 @@ void MemoryInstrumentation::addObjectImpl(const T* const& object, MemoryObjectTy
     } else {
         if (!object || visited(object))
             return;
-        checkCountedObject(object);
         deferInstrumentedPointer(adoptPtr(new InstrumentedPointer<T>(object, ownerObjectType)));
     }
 }
@@ -232,21 +231,62 @@ void MemoryInstrumentation::addObjectImpl(const T* const& object, MemoryObjectTy
 template<typename T>
 void MemoryInstrumentation::addObjectImpl(const OwnPtr<T>* const& object, MemoryObjectType ownerObjectType, MemoryOwningType owningType)
 {
-    if (owningType == byPointer && !visited(object)) {
+    if (owningType == byPointer && !visited(object))
         countObjectSize(ownerObjectType, sizeof(*object));
-        checkCountedObject(object);
-    }
     addObjectImpl(object->get(), ownerObjectType, byPointer);
 }
 
 template<typename T>
 void MemoryInstrumentation::addObjectImpl(const RefPtr<T>* const& object, MemoryObjectType ownerObjectType, MemoryOwningType owningType)
 {
-    if (owningType == byPointer && !visited(object)) {
+    if (owningType == byPointer && !visited(object))
         countObjectSize(ownerObjectType, sizeof(*object));
-        checkCountedObject(object);
-    }
     addObjectImpl(object->get(), ownerObjectType, byPointer);
+}
+
+template<typename HashMapType>
+void MemoryInstrumentation::addHashMap(const HashMapType& hashMap, MemoryObjectType ownerObjectType, bool contentOnly)
+{
+    if (visited(&hashMap))
+        return;
+    countObjectSize(ownerObjectType, calculateContainerSize(hashMap, contentOnly));
+}
+
+template<typename HashSetType>
+void MemoryInstrumentation::addHashSet(const HashSetType& hashSet, MemoryObjectType ownerObjectType, bool contentOnly)
+{
+    if (visited(&hashSet))
+        return;
+    countObjectSize(ownerObjectType, calculateContainerSize(hashSet, contentOnly));
+}
+
+template<typename CollectionType>
+void MemoryInstrumentation::addInstrumentedCollection(const CollectionType& collection, MemoryObjectType ownerObjectType, bool contentOnly)
+{
+    if (visited(&collection))
+        return;
+    countObjectSize(ownerObjectType, calculateContainerSize(collection, contentOnly));
+    typename CollectionType::const_iterator end = collection.end();
+    for (typename CollectionType::const_iterator i = collection.begin(); i != end; ++i)
+        addObject(*i, ownerObjectType);
+}
+
+template<typename MapType>
+void MemoryInstrumentation::addInstrumentedMapEntries(const MapType& map, MemoryObjectType ownerObjectType)
+{
+    typename MapType::const_iterator end = map.end();
+    for (typename MapType::const_iterator i = map.begin(); i != end; ++i) {
+        addObject(i->first, ownerObjectType);
+        addObject(i->second, ownerObjectType);
+    }
+}
+
+template<typename MapType>
+void MemoryInstrumentation::addInstrumentedMapValues(const MapType& map, MemoryObjectType ownerObjectType)
+{
+    typename MapType::const_iterator end = map.end();
+    for (typename MapType::const_iterator i = map.begin(); i != end; ++i)
+        addObject(i->second, ownerObjectType);
 }
 
 template<typename ListHashSetType>
@@ -258,6 +298,12 @@ void MemoryInstrumentation::addListHashSet(const ListHashSetType& hashSet, Memor
     countObjectSize(ownerObjectType, size);
 }
 
+template<typename Container>
+size_t MemoryInstrumentation::calculateContainerSize(const Container& container, bool contentOnly)
+{
+    return (contentOnly ? 0 : sizeof(container)) + container.capacity() * sizeof(typename Container::ValueType);
+}
+
 template<typename T>
 void MemoryInstrumentation::InstrumentedPointer<T>::process(MemoryInstrumentation* memoryInstrumentation)
 {
@@ -266,36 +312,9 @@ void MemoryInstrumentation::InstrumentedPointer<T>::process(MemoryInstrumentatio
     memoryInstrumentation->countObjectSize(memoryObjectInfo.objectType(), memoryObjectInfo.objectSize());
 }
 
-// Link time guard for classes with external memory instrumentation.
+// Link time guard for vector memory instrumentation.
 template<typename T, size_t inlineCapacity> class Vector;
 template<typename T, size_t inlineCapacity> void reportMemoryUsage(const Vector<T, inlineCapacity>* const&, MemoryObjectInfo*);
-
-template<typename KeyArg, typename MappedArg, typename HashArg, typename KeyTraitsArg, typename MappedTraitsArg> class HashMap;
-template<typename KeyArg, typename MappedArg, typename HashArg, typename KeyTraitsArg, typename MappedTraitsArg> void reportMemoryUsage(const HashMap<KeyArg, MappedArg, HashArg, KeyTraitsArg, MappedTraitsArg>* const&, MemoryObjectInfo*);
-
-template<typename ValueArg, typename HashArg, typename TraitsArg> class HashCountedSet;
-template<typename ValueArg, typename HashArg, typename TraitsArg> void reportMemoryUsage(const HashCountedSet<ValueArg, HashArg, TraitsArg>* const&, MemoryObjectInfo*);
-
-class String;
-void reportMemoryUsage(const String* const&, MemoryObjectInfo*);
-
-class StringImpl;
-void reportMemoryUsage(const StringImpl* const&, MemoryObjectInfo*);
-
-class AtomicString;
-void reportMemoryUsage(const AtomicString* const&, MemoryObjectInfo*);
-
-class CString;
-void reportMemoryUsage(const CString* const&, MemoryObjectInfo*);
-
-class CStringBuffer;
-void reportMemoryUsage(const CStringBuffer* const&, MemoryObjectInfo*);
-
-class ParsedURL;
-void reportMemoryUsage(const ParsedURL* const&, MemoryObjectInfo*);
-
-class URLString;
-void reportMemoryUsage(const URLString* const&, MemoryObjectInfo*);
 
 } // namespace WTF
 

@@ -130,6 +130,6 @@ def parse_output_lines(fd, parse_line_callback):
                 parse_line_callback(output[:pos + 1])
                 output = output[pos + 1:]
 
-            if not chunk and output:
+            if len(chunk) < 1024 and output:
                 parse_line_callback(output)
                 output = ''

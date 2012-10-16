@@ -97,12 +97,12 @@ unsigned WKBundleFrameGetNumberOfActiveAnimations(WKBundleFrameRef frameRef)
 
 bool WKBundleFramePauseAnimationOnElementWithId(WKBundleFrameRef frameRef, WKStringRef animationName, WKStringRef elementID, double time)
 {
-    return toImpl(frameRef)->pauseAnimationOnElementWithId(toWTFString(animationName), toWTFString(elementID), time);
+    return toImpl(frameRef)->pauseAnimationOnElementWithId(toImpl(animationName)->string(), toImpl(elementID)->string(), time);
 }
 
 bool WKBundleFramePauseTransitionOnElementWithId(WKBundleFrameRef frameRef, WKStringRef propertyName, WKStringRef elementID, double time)
 {
-    return toImpl(frameRef)->pauseTransitionOnElementWithId(toWTFString(propertyName), toWTFString(elementID), time);
+    return toImpl(frameRef)->pauseTransitionOnElementWithId(toImpl(propertyName)->string(), toImpl(elementID)->string(), time);
 }
 
 void WKBundleFrameSuspendAnimations(WKBundleFrameRef frameRef)
@@ -194,7 +194,7 @@ WKStringRef WKBundleFrameCopyLayerTreeAsText(WKBundleFrameRef frameRef)
 
 bool WKBundleFrameAllowsFollowingLink(WKBundleFrameRef frameRef, WKURLRef urlRef)
 {
-    return toImpl(frameRef)->allowsFollowingLink(WebCore::KURL(WebCore::KURL(), toWTFString(urlRef)));
+    return toImpl(frameRef)->allowsFollowingLink(WebCore::KURL(WebCore::KURL(), toImpl(urlRef)->string()));
 }
 
 WKRect WKBundleFrameGetContentBounds(WKBundleFrameRef frameRef)
@@ -234,12 +234,12 @@ bool WKBundleFrameGetDocumentBackgroundColor(WKBundleFrameRef frameRef, double* 
 
 WKStringRef WKBundleFrameCopySuggestedFilenameForResourceWithURL(WKBundleFrameRef frameRef, WKURLRef urlRef)
 {
-    return toCopiedAPI(toImpl(frameRef)->suggestedFilenameForResourceWithURL(WebCore::KURL(WebCore::KURL(), toWTFString(urlRef))));
+    return toCopiedAPI(toImpl(frameRef)->suggestedFilenameForResourceWithURL(WebCore::KURL(WebCore::KURL(), toImpl(urlRef)->string())));
 }
 
 WKStringRef WKBundleFrameCopyMIMETypeForResourceWithURL(WKBundleFrameRef frameRef, WKURLRef urlRef)
 {
-    return toCopiedAPI(toImpl(frameRef)->mimeTypeForResourceWithURL(WebCore::KURL(WebCore::KURL(), toWTFString(urlRef))));
+    return toCopiedAPI(toImpl(frameRef)->mimeTypeForResourceWithURL(WebCore::KURL(WebCore::KURL(), toImpl(urlRef)->string())));
 }
 
 bool WKBundleFrameContainsAnyFormElements(WKBundleFrameRef frameRef)
@@ -249,7 +249,7 @@ bool WKBundleFrameContainsAnyFormElements(WKBundleFrameRef frameRef)
 
 void WKBundleFrameSetTextDirection(WKBundleFrameRef frameRef, WKStringRef directionRef)
 {
-    toImpl(frameRef)->setTextDirection(toWTFString(directionRef));
+    toImpl(frameRef)->setTextDirection(toImpl(directionRef)->string());
 }
 
 WKDataRef WKBundleFrameCopyWebArchive(WKBundleFrameRef frameRef)

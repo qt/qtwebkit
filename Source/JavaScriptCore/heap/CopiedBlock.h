@@ -26,12 +26,9 @@
 #ifndef CopiedBlock_h
 #define CopiedBlock_h
 
-#include "BlockAllocator.h"
 #include "HeapBlock.h"
 #include "JSValue.h"
 #include "JSValueInlineMethods.h"
-#include "Options.h"
-#include <wtf/Atomics.h>
 
 namespace JSC {
 
@@ -41,17 +38,8 @@ class CopiedBlock : public HeapBlock<CopiedBlock> {
     friend class CopiedSpace;
     friend class CopiedAllocator;
 public:
-    static CopiedBlock* create(DeadBlock*);
-    static CopiedBlock* createNoZeroFill(DeadBlock*);
-
-    bool isPinned();
-
-    unsigned liveBytes();
-    void reportLiveBytes(unsigned);
-    void didSurviveGC();
-    bool didEvacuateBytes(unsigned);
-    bool shouldEvacuate();
-    bool canBeRecycled();
+    static CopiedBlock* create(const PageAllocationAligned&);
+    static CopiedBlock* createNoZeroFill(const PageAllocationAligned&);
 
     // The payload is the region of the block that is usable for allocations.
     char* payload();
@@ -72,28 +60,24 @@ public:
     size_t size();
     size_t capacity();
 
-    static const size_t blockSize = 64 * KB;
-
 private:
-    CopiedBlock(Region*);
+    CopiedBlock(const PageAllocationAligned&);
     void zeroFillWilderness(); // Can be called at any time to zero-fill to the end of the block.
 
     size_t m_remaining;
     uintptr_t m_isPinned;
-    unsigned m_liveBytes;
 };
 
-inline CopiedBlock* CopiedBlock::createNoZeroFill(DeadBlock* block)
+inline CopiedBlock* CopiedBlock::createNoZeroFill(const PageAllocationAligned& allocation)
 {
-    Region* region = block->region();
-    return new(NotNull, block) CopiedBlock(region);
+    return new(NotNull, allocation.base()) CopiedBlock(allocation);
 }
 
-inline CopiedBlock* CopiedBlock::create(DeadBlock* block)
+inline CopiedBlock* CopiedBlock::create(const PageAllocationAligned& allocation)
 {
-    CopiedBlock* newBlock = createNoZeroFill(block);
-    newBlock->zeroFillWilderness();
-    return newBlock;
+    CopiedBlock* block = createNoZeroFill(allocation);
+    block->zeroFillWilderness();
+    return block;
 }
 
 inline void CopiedBlock::zeroFillWilderness()
@@ -108,62 +92,12 @@ inline void CopiedBlock::zeroFillWilderness()
 #endif
 }
 
-inline CopiedBlock::CopiedBlock(Region* region)
-    : HeapBlock<CopiedBlock>(region)
+inline CopiedBlock::CopiedBlock(const PageAllocationAligned& allocation)
+    : HeapBlock<CopiedBlock>(allocation)
     , m_remaining(payloadCapacity())
     , m_isPinned(false)
-    , m_liveBytes(0)
 {
     ASSERT(is8ByteAligned(reinterpret_cast<void*>(m_remaining)));
-}
-
-inline void CopiedBlock::reportLiveBytes(unsigned bytes)
-{
-    unsigned oldValue = 0;
-    unsigned newValue = 0;
-    do {
-        oldValue = m_liveBytes;
-        newValue = oldValue + bytes;
-    } while (!WTF::weakCompareAndSwap(&m_liveBytes, oldValue, newValue));
-}
-
-inline void CopiedBlock::didSurviveGC()
-{
-    m_liveBytes = 0;
-    m_isPinned = false;
-}
-
-inline bool CopiedBlock::didEvacuateBytes(unsigned bytes)
-{
-    ASSERT(m_liveBytes >= bytes);
-    unsigned oldValue = 0;
-    unsigned newValue = 0;
-    do {
-        oldValue = m_liveBytes;
-        newValue = oldValue - bytes;
-    } while (!WTF::weakCompareAndSwap(&m_liveBytes, oldValue, newValue));
-    ASSERT(m_liveBytes < oldValue);
-    return !newValue;
-}
-
-inline bool CopiedBlock::canBeRecycled()
-{
-    return !m_liveBytes;
-}
-
-inline bool CopiedBlock::shouldEvacuate()
-{
-    return static_cast<double>(m_liveBytes) / static_cast<double>(payloadCapacity()) <= Options::minCopiedBlockUtilization();
-}
-
-inline bool CopiedBlock::isPinned()
-{
-    return m_isPinned;
-}
-
-inline unsigned CopiedBlock::liveBytes()
-{
-    return m_liveBytes;
 }
 
 inline char* CopiedBlock::payload()
@@ -173,7 +107,7 @@ inline char* CopiedBlock::payload()
 
 inline char* CopiedBlock::payloadEnd()
 {
-    return reinterpret_cast<char*>(this) + region()->blockSize();
+    return reinterpret_cast<char*>(this) + allocation().size();
 }
 
 inline size_t CopiedBlock::payloadCapacity()
@@ -218,7 +152,7 @@ inline size_t CopiedBlock::size()
 
 inline size_t CopiedBlock::capacity()
 {
-    return region()->blockSize();
+    return allocation().size();
 }
 
 } // namespace JSC

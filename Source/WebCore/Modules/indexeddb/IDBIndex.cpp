@@ -37,6 +37,7 @@
 #include "IDBRequest.h"
 #include "IDBTracing.h"
 #include "IDBTransaction.h"
+#include "ScriptCallStack.h"
 
 namespace WebCore {
 
@@ -69,18 +70,42 @@ PassRefPtr<IDBRequest> IDBIndex::openCursor(ScriptExecutionContext* context, Pas
         ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
         return 0;
     }
-    IDBCursor::Direction direction = IDBCursor::stringToDirection(directionString, context, ec);
+    IDBCursor::Direction direction = IDBCursor::stringToDirection(directionString, ec);
     if (ec)
         return 0;
 
     RefPtr<IDBRequest> request = IDBRequest::create(context, IDBAny::create(this), m_transaction.get());
     request->setCursorDetails(IDBCursorBackendInterface::IndexCursor, direction);
     m_backend->openCursor(keyRange, direction, request, m_transaction->backend(), ec);
-    ASSERT(!ec);
+    if (ec) {
+        request->markEarlyDeath();
+        return 0;
+    }
     return request;
 }
 
+PassRefPtr<IDBRequest> IDBIndex::openCursor(ScriptExecutionContext* context, PassRefPtr<IDBKeyRange> keyRange, unsigned short direction, ExceptionCode& ec)
+{
+    IDB_TRACE("IDBIndex::openCursor");
+    // FIXME: Is this thread-safe?
+    DEFINE_STATIC_LOCAL(String, consoleMessage, (ASCIILiteral("Numeric direction values are deprecated in IDBIndex.openCursor. Use \"next\", \"nextunique\", \"prev\", or \"prevunique\".")));
+    context->addConsoleMessage(JSMessageSource, LogMessageType, WarningMessageLevel, consoleMessage);
+    const String& directionString = IDBCursor::directionToString(direction, ec);
+    if (ec)
+        return 0;
+    return openCursor(context, keyRange, directionString, ec);
+}
+
 PassRefPtr<IDBRequest> IDBIndex::openCursor(ScriptExecutionContext* context, PassRefPtr<IDBKey> key, const String& direction, ExceptionCode& ec)
+{
+    IDB_TRACE("IDBIndex::openCursor");
+    RefPtr<IDBKeyRange> keyRange = IDBKeyRange::only(key, ec);
+    if (ec)
+        return 0;
+    return openCursor(context, keyRange.release(), direction, ec);
+}
+
+PassRefPtr<IDBRequest> IDBIndex::openCursor(ScriptExecutionContext* context, PassRefPtr<IDBKey> key, unsigned short direction, ExceptionCode& ec)
 {
     IDB_TRACE("IDBIndex::openCursor");
     RefPtr<IDBKeyRange> keyRange = IDBKeyRange::only(key, ec);
@@ -102,7 +127,10 @@ PassRefPtr<IDBRequest> IDBIndex::count(ScriptExecutionContext* context, PassRefP
     }
     RefPtr<IDBRequest> request = IDBRequest::create(context, IDBAny::create(this), m_transaction.get());
     m_backend->count(keyRange, request, m_transaction->backend(), ec);
-    ASSERT(!ec);
+    if (ec) {
+        request->markEarlyDeath();
+        return 0;
+    }
     return request;
 }
 
@@ -126,18 +154,42 @@ PassRefPtr<IDBRequest> IDBIndex::openKeyCursor(ScriptExecutionContext* context, 
         ec = IDBDatabaseException::TRANSACTION_INACTIVE_ERR;
         return 0;
     }
-    IDBCursor::Direction direction = IDBCursor::stringToDirection(directionString, context, ec);
+    IDBCursor::Direction direction = IDBCursor::stringToDirection(directionString, ec);
     if (ec)
         return 0;
 
     RefPtr<IDBRequest> request = IDBRequest::create(context, IDBAny::create(this), m_transaction.get());
     request->setCursorDetails(IDBCursorBackendInterface::IndexKeyCursor, direction);
     m_backend->openKeyCursor(keyRange, direction, request, m_transaction->backend(), ec);
-    ASSERT(!ec);
+    if (ec) {
+        request->markEarlyDeath();
+        return 0;
+    }
     return request;
 }
 
+PassRefPtr<IDBRequest> IDBIndex::openKeyCursor(ScriptExecutionContext* context, PassRefPtr<IDBKeyRange> keyRange, unsigned short direction, ExceptionCode& ec)
+{
+    IDB_TRACE("IDBIndex::openKeyCursor");
+    // FIXME: Is this thread-safe?
+    DEFINE_STATIC_LOCAL(String, consoleMessage, (ASCIILiteral("Numeric direction values are deprecated in IDBIndex.openKeyCursor. Use \"next\", \"nextunique\", \"prev\", or \"prevunique\".")));
+    context->addConsoleMessage(JSMessageSource, LogMessageType, WarningMessageLevel, consoleMessage);
+    const String& directionString = IDBCursor::directionToString(direction, ec);
+    if (ec)
+        return 0;
+    return openKeyCursor(context, keyRange, directionString, ec);
+}
+
 PassRefPtr<IDBRequest> IDBIndex::openKeyCursor(ScriptExecutionContext* context, PassRefPtr<IDBKey> key, const String& direction, ExceptionCode& ec)
+{
+    IDB_TRACE("IDBIndex::openKeyCursor");
+    RefPtr<IDBKeyRange> keyRange = IDBKeyRange::only(key, ec);
+    if (ec)
+        return 0;
+    return openKeyCursor(context, keyRange.release(), direction, ec);
+}
+
+PassRefPtr<IDBRequest> IDBIndex::openKeyCursor(ScriptExecutionContext* context, PassRefPtr<IDBKey> key, unsigned short direction, ExceptionCode& ec)
 {
     IDB_TRACE("IDBIndex::openKeyCursor");
     RefPtr<IDBKeyRange> keyRange = IDBKeyRange::only(key, ec);
@@ -173,7 +225,10 @@ PassRefPtr<IDBRequest> IDBIndex::get(ScriptExecutionContext* context, PassRefPtr
 
     RefPtr<IDBRequest> request = IDBRequest::create(context, IDBAny::create(this), m_transaction.get());
     m_backend->get(keyRange, request, m_transaction->backend(), ec);
-    ASSERT(!ec);
+    if (ec) {
+        request->markEarlyDeath();
+        return 0;
+    }
     return request;
 }
 
@@ -205,7 +260,10 @@ PassRefPtr<IDBRequest> IDBIndex::getKey(ScriptExecutionContext* context, PassRef
 
     RefPtr<IDBRequest> request = IDBRequest::create(context, IDBAny::create(this), m_transaction.get());
     m_backend->getKey(keyRange, request, m_transaction->backend(), ec);
-    ASSERT(!ec);
+    if (ec) {
+        request->markEarlyDeath();
+        return 0;
+    }
     return request;
 }
 

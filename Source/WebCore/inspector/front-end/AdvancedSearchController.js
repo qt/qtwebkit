@@ -222,6 +222,8 @@ WebInspector.SearchView = function(controller)
 WebInspector.SearchView.maxQueriesCount = 20;
 
 WebInspector.SearchView.prototype = {
+    __proto__: WebInspector.View.prototype,
+
     /**
      * @return {Array.<Element>}
      */
@@ -385,11 +387,10 @@ WebInspector.SearchView.prototype = {
         
         this._save();
         this._controller.startSearch(this.searchConfig);
-    },
-
-    __proto__: WebInspector.View.prototype
+    }
 }
 
+//WebInspector.SearchView.prototype.__proto__ = WebInspector.View.prototype;
 
 /**
  * @constructor
@@ -666,10 +667,10 @@ WebInspector.FileBasedSearchResultsPane.prototype = {
         contentSpan.textContent = lineContent;
         WebInspector.highlightRangesWithStyleClass(contentSpan, matchRanges, "highlighted-match");
         return contentSpan;
-    },
-
-    __proto__: WebInspector.SearchResultsPane.prototype
+    }
 }
+
+WebInspector.FileBasedSearchResultsPane.prototype.__proto__ = WebInspector.SearchResultsPane.prototype;
 
 /**
  * @constructor

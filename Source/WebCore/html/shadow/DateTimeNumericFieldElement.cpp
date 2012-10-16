@@ -24,20 +24,32 @@
  */
 
 #include "config.h"
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
 #include "DateTimeNumericFieldElement.h"
 
-#include "FontCache.h"
 #include "KeyboardEvent.h"
-#include "Localizer.h"
-#include "RenderStyle.h"
-#include "StyleResolver.h"
-#include "TextRun.h"
+#include "LocalizedNumber.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
 
 static const DOMTimeStamp typeAheadTimeout = 1000;
+
+static size_t displaySizeOfNumber(int value)
+{
+    ASSERT(value >= 0);
+
+    if (!value)
+        return 1;
+
+    int numberOfDigits = 0;
+    while (value) {
+        value /= 10;
+        ++numberOfDigits;
+    }
+
+    return numberOfDigits;
+}
 
 DateTimeNumericFieldElement::Range::Range(int minimum, int maximum)
     : maximum(maximum)
@@ -51,65 +63,19 @@ int DateTimeNumericFieldElement::Range::clampValue(int value) const
     return std::min(std::max(value, minimum), maximum);
 }
 
-bool DateTimeNumericFieldElement::Range::isInRange(int value) const
-{
-    return value >= minimum && value <= maximum;
-}
-
-// ----------------------------
-
-DateTimeNumericFieldElement::DateTimeNumericFieldElement(Document* document, FieldOwner& fieldOwner, int minimum, int maximum, const String& placeholder)
+DateTimeNumericFieldElement::DateTimeNumericFieldElement(Document* document, FieldOwner& fieldOwner, int minimum, int maximum)
     : DateTimeFieldElement(document, fieldOwner)
     , m_lastDigitCharTime(0)
-    , m_placeholder(placeholder)
     , m_range(minimum, maximum)
     , m_value(0)
     , m_hasValue(false)
 {
-    setHasCustomCallbacks();
-}
-
-int DateTimeNumericFieldElement::clampValueForHardLimits(int value) const
-{
-    return clampValue(value);
-}
-
-PassRefPtr<RenderStyle> DateTimeNumericFieldElement::customStyleForRenderer()
-{
-    FontCachePurgePreventer fontCachePurgePreventer;
-    RefPtr<RenderStyle> originalStyle = document()->styleResolver()->styleForElement(this);
-    RefPtr<RenderStyle> style = RenderStyle::clone(originalStyle.get());
-    float maxiumWidth = style->font().width(m_placeholder);
-    maxiumWidth = std::max(maxiumWidth, style->font().width(formatValue(maximum())));
-    maxiumWidth = std::max(maxiumWidth, style->font().width(value()));
-    style->setWidth(Length(maxiumWidth, Fixed));
-    return style.release();
-}
-
-int DateTimeNumericFieldElement::defaultValueForStepDown() const
-{
-    return m_range.maximum;
-}
-
-int DateTimeNumericFieldElement::defaultValueForStepUp() const
-{
-    return m_range.minimum;
 }
 
 void DateTimeNumericFieldElement::didBlur()
 {
     m_lastDigitCharTime = 0;
     DateTimeFieldElement::didBlur();
-}
-
-String DateTimeNumericFieldElement::formatValue(int value) const
-{
-    Localizer& localizer = localizerForOwner();
-    if (m_range.maximum > 999)
-        return localizer.convertToLocalizedNumber(String::format("%04d", value));
-    if (m_range.maximum > 99)
-        return localizer.convertToLocalizedNumber(String::format("%03d", value));
-    return localizer.convertToLocalizedNumber(String::format("%02d", value));
 }
 
 void DateTimeNumericFieldElement::handleKeyboardEvent(KeyboardEvent* keyboardEvent)
@@ -127,7 +93,7 @@ void DateTimeNumericFieldElement::handleKeyboardEvent(KeyboardEvent* keyboardEve
     DOMTimeStamp delta = keyboardEvent->timeStamp() - m_lastDigitCharTime;
     m_lastDigitCharTime = 0;
 
-    String number = localizerForOwner().convertFromLocalizedNumber(String(&charCode, 1));
+    String number = convertFromLocalizedNumber(String(&charCode, 1));
     const int digit = number[0] - '0';
     if (digit < 0 || digit > 9)
         return;
@@ -143,11 +109,6 @@ void DateTimeNumericFieldElement::handleKeyboardEvent(KeyboardEvent* keyboardEve
 bool DateTimeNumericFieldElement::hasValue() const
 {
     return m_hasValue;
-}
-
-Localizer& DateTimeNumericFieldElement::localizerForOwner() const
-{
-    return document()->getCachedLocalizer(localeIdentifier());
 }
 
 int DateTimeNumericFieldElement::maximum() const
@@ -176,7 +137,7 @@ void DateTimeNumericFieldElement::setEmptyValue(const DateComponents& dateForRea
 
 void DateTimeNumericFieldElement::setValueAsInteger(int value, EventBehavior eventBehavior)
 {
-    m_value = clampValueForHardLimits(value);
+    m_value = clampValue(value);
     m_hasValue = true;
     updateVisibleValue(eventBehavior);
     m_lastDigitCharTime = 0;
@@ -187,7 +148,7 @@ void DateTimeNumericFieldElement::stepDown()
     if (m_hasValue)
         setValueAsInteger(m_value == m_range.minimum ? m_range.maximum : clampValue(m_value - 1), DispatchEvent);
     else
-        setValueAsInteger(defaultValueForStepDown(), DispatchEvent);
+        setValueAsInteger(m_range.maximum, DispatchEvent);
 }
 
 void DateTimeNumericFieldElement::stepUp()
@@ -195,12 +156,21 @@ void DateTimeNumericFieldElement::stepUp()
     if (m_hasValue)
         setValueAsInteger(m_value == m_range.maximum ? m_range.minimum : clampValue(m_value + 1), DispatchEvent);
     else
-        setValueAsInteger(defaultValueForStepUp(), DispatchEvent);
+        setValueAsInteger(m_range.minimum, DispatchEvent);
 }
 
 String DateTimeNumericFieldElement::value() const
 {
-    return m_hasValue ? formatValue(m_value) : emptyString();
+    if (!m_hasValue)
+        return emptyString();
+
+    if (m_range.maximum > 999)
+        return convertToLocalizedNumber(String::number(m_value));
+
+    if (m_range.maximum > 99)
+        return convertToLocalizedNumber(String::format("%03d", m_value));
+
+    return convertToLocalizedNumber(String::format("%02d", m_value));
 }
 
 int DateTimeNumericFieldElement::valueAsInteger() const
@@ -210,7 +180,13 @@ int DateTimeNumericFieldElement::valueAsInteger() const
 
 String DateTimeNumericFieldElement::visibleValue() const
 {
-    return m_hasValue ? value() : m_placeholder;
+    if (m_hasValue)
+        return value();
+
+    StringBuilder builder;
+    for (int numberOfDashs = std::max(displaySizeOfNumber(m_range.maximum), displaySizeOfNumber(m_range.minimum)); numberOfDashs; --numberOfDashs)
+        builder.append('-');
+    return builder.toString();
 }
 
 } // namespace WebCore

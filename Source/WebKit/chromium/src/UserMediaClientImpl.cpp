@@ -37,7 +37,7 @@
 #include "WebUserMediaRequest.h"
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
-#include <public/WebMediaStreamSource.h>
+#include "platform/WebMediaStreamSource.h"
 #include <wtf/RefPtr.h>
 
 using namespace WebCore;

@@ -32,9 +32,7 @@
 #include <wtf/HashMap.h>
 
 namespace WebCore {
-
-enum ResolveTarget { DoNotResolveNewTarget, ResolveNewTarget };
-
+    
 class ConditionEventListener;
 class SMILTimeContainer;
 
@@ -53,13 +51,12 @@ public:
     virtual void removedFrom(ContainerNode*) OVERRIDE;
     
     virtual bool hasValidAttributeType() = 0;
-    virtual bool hasValidAttributeName();
     virtual void animationAttributeChanged() = 0;
 
     SMILTimeContainer* timeContainer() const { return m_timeContainer.get(); }
 
-    SVGElement* targetElement(ResolveTarget = ResolveNewTarget);
-    void resetTargetElement(ResolveTarget = ResolveNewTarget);
+    SVGElement* targetElement();
+    void resetTargetElement();
     const QualifiedName& attributeName() const { return m_attributeName; }
 
     void beginByLinkActivation();
@@ -121,7 +118,6 @@ protected:
 
     // Sub-classes may need to take action when the target is changed.
     virtual void targetElementWillChange(SVGElement* currentTarget, SVGElement* newTarget);
-    virtual void setAttributeName(const QualifiedName&);
 
 private:
     virtual void startedActiveInterval() = 0;
@@ -142,6 +138,7 @@ private:
     void checkRestart(SMILTime elapsed);
     void beginListChanged(SMILTime eventTime);
     void endListChanged(SMILTime eventTime);
+    void reschedule();
 
     // This represents conditions on elements begin or end list that need to be resolved on runtime
     // for example <animate begin="otherElement.begin + 8s; button.click" ... />

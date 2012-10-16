@@ -34,7 +34,6 @@
 #include <QEventLoop>
 #include <QQmlProperty>
 #include <QtQuick/QQuickView>
-#include <WebKit2/WKImageQt.h>
 #include <qpa/qwindowsysteminterface.h>
 
 namespace WTR {
@@ -95,8 +94,7 @@ void PlatformWebView::resizeTo(unsigned width, unsigned height)
     // resized to what the layout test expects.
     if (!m_window->handle()) {
         QRect newGeometry(m_window->x(), m_window->y(), width, height);
-        QWindowSystemInterface::handleGeometryChange(m_window, newGeometry);
-        QWindowSystemInterface::flushWindowSystemEvents();
+        QWindowSystemInterface::handleSynchronousGeometryChange(m_window, newGeometry);
     }
 
     m_window->resize(width, height);

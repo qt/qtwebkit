@@ -33,7 +33,6 @@
 
 #include "LocalizedStrings.h"
 #include <limits>
-#include <unicode/uloc.h>
 #include <wtf/DateMath.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/text/StringBuilder.h>
@@ -57,7 +56,7 @@ LocaleICU::LocaleICU(const char* locale)
 #if ENABLE(CALENDAR_PICKER)
     , m_firstDayOfWeek(0)
 #endif
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
     , m_mediumTimeFormat(0)
     , m_shortTimeFormat(0)
     , m_didCreateTimeFormat(false)
@@ -69,7 +68,7 @@ LocaleICU::~LocaleICU()
 {
     unum_close(m_numberFormat);
     udat_close(m_shortDateFormat);
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
     udat_close(m_mediumTimeFormat);
     udat_close(m_shortTimeFormat);
 #endif
@@ -165,10 +164,8 @@ UDateFormat* LocaleICU::openDateFormat(UDateFormatStyle timeStyle, UDateFormatSt
     return udat_open(timeStyle, dateStyle, m_locale.data(), gmtTimezone, WTF_ARRAY_LENGTH(gmtTimezone), 0, -1, &status);
 }
 
-double LocaleICU::parseDateTime(const String& input, DateComponents::Type type)
+double LocaleICU::parseLocalizedDate(const String& input)
 {
-    if (type != DateComponents::Date)
-        return std::numeric_limits<double>::quiet_NaN();
     if (!initializeShortDateFormat())
         return numeric_limits<double>::quiet_NaN();
     if (input.length() > static_cast<unsigned>(numeric_limits<int32_t>::max()))
@@ -183,10 +180,8 @@ double LocaleICU::parseDateTime(const String& input, DateComponents::Type type)
     return date;
 }
 
-String LocaleICU::formatDateTime(const DateComponents& dateComponents, FormatType formatType)
+String LocaleICU::formatLocalizedDate(const DateComponents& dateComponents)
 {
-    if (dateComponents.type() != DateComponents::Date)
-        return Localizer::formatDateTime(dateComponents, formatType);
     if (!initializeShortDateFormat())
         return String();
     double input = dateComponents.millisecondsSinceEpoch();
@@ -202,7 +197,7 @@ String LocaleICU::formatDateTime(const DateComponents& dateComponents, FormatTyp
     return String::adopt(buffer);
 }
 
-#if ENABLE(CALENDAR_PICKER) || ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+#if ENABLE(CALENDAR_PICKER) || ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
 static String getDateFormatPattern(const UDateFormat* dateFormat)
 {
     if (!dateFormat)
@@ -286,7 +281,7 @@ void LocaleICU::initializeLocalizedDateFormatText()
     m_localizedDateFormatText = localizeFormat(getDateFormatPattern(m_shortDateFormat));
 }
 
-String LocaleICU::dateFormatText()
+String LocaleICU::localizedDateFormatText()
 {
     initializeLocalizedDateFormatText();
     return m_localizedDateFormatText;
@@ -378,15 +373,9 @@ unsigned LocaleICU::firstDayOfWeek()
     initializeCalendar();
     return m_firstDayOfWeek;
 }
-
-bool LocaleICU::isRTL()
-{
-    UErrorCode status = U_ZERO_ERROR;
-    return uloc_getCharacterOrientation(m_locale.data(), &status) == ULOC_LAYOUT_RTL;
-}
 #endif
 
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
 static PassOwnPtr<Vector<String> > createFallbackAMPMLabels()
 {
     OwnPtr<Vector<String> > labels = adoptPtr(new Vector<String>());
@@ -416,16 +405,6 @@ void LocaleICU::initializeDateTimeFormat()
     m_timeAMPMLabels = *timeAMPMLabels;
 
     m_didCreateTimeFormat = true;
-}
-
-String LocaleICU::dateFormat()
-{
-    if (!m_dateFormat.isEmpty())
-        return m_dateFormat;
-    if (!initializeShortDateFormat())
-        return ASCIILiteral("dd/MM/yyyy");
-    m_dateFormat = getDateFormatPattern(m_shortDateFormat);
-    return m_dateFormat;
 }
 
 String LocaleICU::timeFormat()

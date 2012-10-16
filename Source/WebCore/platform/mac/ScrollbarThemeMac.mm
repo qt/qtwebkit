@@ -86,8 +86,8 @@ static ScrollbarPainterMap* scrollbarMap()
         return;
     ScrollbarPainterMap::iterator end = scrollbarMap()->end();
     for (ScrollbarPainterMap::iterator it = scrollbarMap()->begin(); it != end; ++it) {
-        it->key->styleChanged();
-        it->key->invalidate();
+        it->first->styleChanged();
+        it->first->invalidate();
     }
 }
 
@@ -477,7 +477,6 @@ void ScrollbarThemeMac::updateEnabledState(ScrollbarThemeClient* scrollbar)
         [scrollbarMap()->get(scrollbar).get() setEnabled:scrollbar->enabled()];
 }
 
-#if !PLATFORM(CHROMIUM)
 static void scrollbarPainterPaint(ScrollbarPainter scrollbarPainter, bool enabled, double value, CGFloat proportion, CGRect frameRect)
 {
     [scrollbarPainter setEnabled:enabled];
@@ -495,6 +494,7 @@ static void scrollbarPainterPaint(ScrollbarPainter scrollbarPainter, bool enable
         [scrollbarPainter drawKnob];
 }
 
+#if !PLATFORM(CHROMIUM)
 bool ScrollbarThemeMac::paint(ScrollbarThemeClient* scrollbar, GraphicsContext* context, const IntRect& damageRect)
 {
     if (isScrollbarOverlayAPIAvailable()) {

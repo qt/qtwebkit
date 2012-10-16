@@ -26,9 +26,10 @@
 
 namespace EWK2UnitTest {
 
-EWK2UnitTestEnvironment::EWK2UnitTestEnvironment()
+EWK2UnitTestEnvironment::EWK2UnitTestEnvironment(bool useX11Window)
     : m_defaultWidth(800)
     , m_defaultHeight(600)
+    , m_useX11Window(useX11Window)
 {
 }
 

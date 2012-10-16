@@ -32,7 +32,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <wtf/ByteOrder.h>
+// For htons/ntohs
+#include <arpa/inet.h>
 
 // Buffer helper class
 //

@@ -71,15 +71,6 @@ GeolocationPosition* core(WebGeolocationPosition *position)
     return self;
 }
 
-- (id)initWithGeolocationPosition:(PassRefPtr<GeolocationPosition>)coreGeolocationPosition
-{
-    self = [super init];
-    if (!self)
-        return nil;
-    _internal = [[WebGeolocationPositionInternal alloc] initWithCoreGeolocationPosition:coreGeolocationPosition];
-    return self;
-}
-
 - (void)dealloc
 {
     [_internal release];

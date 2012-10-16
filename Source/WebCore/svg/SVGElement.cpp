@@ -68,7 +68,7 @@ SVGElement::~SVGElement()
         SVGElementRareData::SVGElementRareDataMap::iterator it = rareDataMap.find(this);
         ASSERT(it != rareDataMap.end());
 
-        SVGElementRareData* rareData = it->value;
+        SVGElementRareData* rareData = it->second;
         rareData->destroyAnimatedSMILStyleProperties();
         if (SVGCursorElement* cursorElement = rareData->cursorElement())
             cursorElement->removeClient(this);
@@ -569,8 +569,10 @@ void SVGElement::updateAnimatedSVGAttribute(const QualifiedName& name) const
 
 SVGAttributeToPropertyMap& SVGElement::localAttributeToPropertyMap()
 {
-    DEFINE_STATIC_LOCAL(SVGAttributeToPropertyMap, emptyMap, ());
-    return emptyMap;
+    ASSERT_NOT_REACHED();
+
+    DEFINE_STATIC_LOCAL(SVGAttributeToPropertyMap, dummyMap, ());
+    return dummyMap;
 }
 
 void SVGElement::synchronizeRequiredFeatures(void* contextElement)

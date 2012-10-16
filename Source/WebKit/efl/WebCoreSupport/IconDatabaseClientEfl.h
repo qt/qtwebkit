@@ -28,6 +28,7 @@ namespace WebCore {
 
 class IconDatabaseClientEfl : public IconDatabaseClient {
 public:
+    virtual bool performImport();
     virtual void didRemoveAllIcons();
     virtual void didImportIconURLForPageURL(const String&);
     virtual void didImportIconDataForPageURL(const String&);

@@ -156,9 +156,6 @@ public:
     void adjustMinimumTimerInterval(double oldMinimumTimerInterval);
     virtual double minimumTimerInterval() const;
 
-    void didChangeTimerAlignmentInterval();
-    virtual double timerAlignmentInterval() const;
-
     virtual EventQueue* eventQueue() const = 0;
 
 protected:

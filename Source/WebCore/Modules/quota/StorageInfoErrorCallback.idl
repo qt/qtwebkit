@@ -28,9 +28,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=QUOTA,
-    Callback
-] interface StorageInfoErrorCallback {
-    boolean handleEvent(in DOMCoreException error);
-};
+module storage {
+    interface [
+        Conditional=QUOTA,
+        Callback
+    ] StorageInfoErrorCallback {
+        boolean handleEvent(in DOMCoreException error);
+    };
+}

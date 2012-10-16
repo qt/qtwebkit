@@ -43,7 +43,7 @@ public:
     static CClass* classForIsA(NPClass*);
     virtual ~CClass();
 
-    virtual Method* methodNamed(PropertyName, Instance*) const;
+    virtual MethodList methodsNamed(PropertyName, Instance*) const;
     virtual Field* fieldNamed(PropertyName, Instance*) const;
 
 private:

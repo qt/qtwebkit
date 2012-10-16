@@ -39,7 +39,7 @@ protected:
 
 private:
     virtual void setStyle(PassRefPtr<RenderStyle>);
-    virtual void updateFromStyle() OVERRIDE;
+    virtual void updateBoxModelInfoFromStyle();
 
     virtual void absoluteRects(Vector<IntRect>&, const LayoutPoint& accumulatedOffset) const;
 

@@ -106,7 +106,6 @@ void ThreadTimers::sharedTimerFiredInternal()
     while (!m_timerHeap.isEmpty() && m_timerHeap.first()->m_nextFireTime <= fireTime) {
         TimerBase* timer = m_timerHeap.first();
         timer->m_nextFireTime = 0;
-        timer->m_unalignedNextFireTime = 0;
         timer->heapDeleteMin();
 
         double interval = timer->repeatInterval();

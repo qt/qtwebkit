@@ -40,20 +40,14 @@ protected:
     virtual void SetUp();
     virtual void TearDown();
 
-    static const double defaultTimeoutSeconds = 10.0;
+    void loadUrlSync(const char* url);
 
-    bool loadUrlSync(const char* url, double timeoutSeconds = defaultTimeoutSeconds);
+    static const double defaultTimeoutSeconds = 10.0;
     bool waitUntilLoadFinished(double timeoutSeconds = defaultTimeoutSeconds);
     bool waitUntilTitleChangedTo(const char* expectedTitle, double timeoutSeconds = defaultTimeoutSeconds);
-    bool waitUntilURLChangedTo(const char* expectedURL, double timeoutSeconds = defaultTimeoutSeconds);
+    bool waitUntilURIChangedTo(const char* expectedURI, double timeoutSeconds = defaultTimeoutSeconds);
 
     void mouseClick(int x, int y);
-    void mouseDown(int x, int y);
-    void mouseUp(int x, int y);
-    void mouseMove(int x, int y);
-    void multiDown(int id, int x, int y);
-    void multiUp(int id, int x, int y);
-    void multiMove(int id, int x, int y);
 
 private:
     Evas_Object* m_webView;

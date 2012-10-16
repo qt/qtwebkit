@@ -255,20 +255,10 @@ void RenderTable::updateLogicalWidth()
     // Ensure we aren't smaller than our min preferred width.
     setLogicalWidth(max<int>(logicalWidth(), minPreferredLogicalWidth()));
 
-    
-    // Ensure we aren't bigger than our max-width style.
-    Length styleMaxLogicalWidth = style()->logicalMaxWidth();
-    if (styleMaxLogicalWidth.isSpecified() && !styleMaxLogicalWidth.isNegative()) {
-        LayoutUnit computedMaxLogicalWidth = convertStyleLogicalWidthToComputedWidth(styleMaxLogicalWidth, availableLogicalWidth);
-        setLogicalWidth(min<int>(logicalWidth(), computedMaxLogicalWidth));
-    }
-
     // Ensure we aren't smaller than our min-width style.
     Length styleMinLogicalWidth = style()->logicalMinWidth();
-    if (styleMinLogicalWidth.isSpecified() && !styleMinLogicalWidth.isNegative()) {
-        LayoutUnit computedMinLogicalWidth = convertStyleLogicalWidthToComputedWidth(styleMinLogicalWidth, availableLogicalWidth);
-        setLogicalWidth(max<int>(logicalWidth(), computedMinLogicalWidth));
-    }
+    if (styleMinLogicalWidth.isSpecified() && styleMinLogicalWidth.isPositive())
+        setLogicalWidth(max<int>(logicalWidth(), convertStyleLogicalWidthToComputedWidth(styleMinLogicalWidth, availableLogicalWidth)));
 
     // Finally, with our true width determined, compute our margins for real.
     setMarginStart(0);
@@ -764,9 +754,10 @@ RenderTableCol* RenderTable::firstColumn() const
     return 0;
 }
 
-RenderTableCol* RenderTable::slowColElement(unsigned col, bool* startEdge, bool* endEdge) const
+RenderTableCol* RenderTable::colElement(unsigned col, bool* startEdge, bool* endEdge) const
 {
-    ASSERT(m_hasColElements);
+    if (!m_hasColElements)
+        return 0;
 
     unsigned columnCount = 0;
     for (RenderTableCol* columnRenderer = firstColumn(); columnRenderer; columnRenderer = columnRenderer->nextColumn()) {

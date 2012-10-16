@@ -42,9 +42,7 @@
 #include <cairo-ft.h>
 #include <cairo.h>
 #include <fontconfig/fcfreetype.h>
-#include <unicode/normlzr.h>
 #include <wtf/MathExtras.h>
-#include <wtf/unicode/Unicode.h>
 
 namespace WebCore {
 
@@ -89,16 +87,17 @@ void SimpleFontData::platformDestroy()
 {
 }
 
-PassRefPtr<SimpleFontData> SimpleFontData::createScaledFontData(const FontDescription& fontDescription, float scaleFactor) const
+PassOwnPtr<SimpleFontData> SimpleFontData::createScaledFontData(const FontDescription& fontDescription, float scaleFactor) const
 {
     ASSERT(m_platformData.scaledFont());
-    return SimpleFontData::create(FontPlatformData(cairo_scaled_font_get_font_face(m_platformData.scaledFont()),
+    return adoptPtr(new SimpleFontData(FontPlatformData(cairo_scaled_font_get_font_face(m_platformData.scaledFont()),
                                                         scaleFactor * fontDescription.computedSize(),
                                                         m_platformData.syntheticBold(),
-                                                        m_platformData.syntheticOblique()), isCustomFont(), false);
+                                                        m_platformData.syntheticOblique()),
+                                       isCustomFont(), false));
 }
 
-PassRefPtr<SimpleFontData> SimpleFontData::smallCapsFontData(const FontDescription& fontDescription) const
+SimpleFontData* SimpleFontData::smallCapsFontData(const FontDescription& fontDescription) const
 {
     if (!m_derivedFontData)
         m_derivedFontData = DerivedFontData::create(isCustomFont());
@@ -106,17 +105,17 @@ PassRefPtr<SimpleFontData> SimpleFontData::smallCapsFontData(const FontDescripti
     if (!m_derivedFontData->smallCaps)
         m_derivedFontData->smallCaps = createScaledFontData(fontDescription, .7);
 
-    return m_derivedFontData->smallCaps;
+    return m_derivedFontData->smallCaps.get();
 }
 
-PassRefPtr<SimpleFontData> SimpleFontData::emphasisMarkFontData(const FontDescription& fontDescription) const
+SimpleFontData* SimpleFontData::emphasisMarkFontData(const FontDescription& fontDescription) const
 {
     if (!m_derivedFontData)
         m_derivedFontData = DerivedFontData::create(isCustomFont());
     if (!m_derivedFontData->emphasisMark)
         m_derivedFontData->emphasisMark = createScaledFontData(fontDescription, .5);
 
-    return m_derivedFontData->emphasisMark;
+    return m_derivedFontData->emphasisMark.get();
 }
 
 bool SimpleFontData::containsCharacters(const UChar* characters, int length) const
@@ -172,34 +171,5 @@ float SimpleFontData::platformWidthForGlyph(Glyph glyph) const
 
     return w;    
 }
-
-#if USE(HARFBUZZ_NG)
-bool SimpleFontData::canRenderCombiningCharacterSequence(const UChar* characters, size_t length) const
-{
-    if (!m_combiningCharacterSequenceSupport)
-        m_combiningCharacterSequenceSupport = adoptPtr(new HashMap<String, bool>);
-
-    WTF::HashMap<String, bool>::AddResult addResult = m_combiningCharacterSequenceSupport->add(String(characters, length), false);
-    if (!addResult.isNewEntry)
-        return addResult.iterator->value;
-
-    UErrorCode error = U_ZERO_ERROR;
-    Vector<UChar, 4> normalizedCharacters(length);
-    int32_t normalizedLength = unorm_normalize(characters, length, UNORM_NFC, UNORM_UNICODE_3_2, &normalizedCharacters[0], length, &error);
-    // Can't render if we have an error or no composition occurred.
-    if (U_FAILURE(error) || (static_cast<size_t>(normalizedLength) == length))
-        return false;
-
-    FT_Face face = cairo_ft_scaled_font_lock_face(m_platformData.scaledFont());
-    if (!face)
-        return false;
-
-    if (FcFreeTypeCharIndex(face, normalizedCharacters[0]))
-        addResult.iterator->value = true;
-
-    cairo_ft_scaled_font_unlock_face(m_platformData.scaledFont());
-    return addResult.iterator->value;
-}
-#endif
 
 }

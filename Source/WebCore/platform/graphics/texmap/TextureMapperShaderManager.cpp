@@ -199,7 +199,7 @@ PassRefPtr<TextureMapperShaderProgram> TextureMapperShaderManager::getShaderProg
 
     TextureMapperShaderProgramMap::iterator it = m_textureMapperShaderProgramMap.find(shaderType);
     if (it != m_textureMapperShaderProgramMap.end())
-        return it->value;
+        return it->second;
 
     switch (shaderType) {
     case Simple:
@@ -759,7 +759,7 @@ PassRefPtr<StandardFilterProgram> TextureMapperShaderManager::getShaderForFilter
 
         m_filterMap.add(key, program);
     } else
-        program = iterator->value;
+        program = iterator->second;
 
     return program;
 }

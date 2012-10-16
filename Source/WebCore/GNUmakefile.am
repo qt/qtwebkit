@@ -27,6 +27,7 @@ webcore_cppflags += \
 	-I$(srcdir)/Source/WebCore/bindings/js \
 	-I$(srcdir)/Source/WebCore/bridge \
 	-I$(srcdir)/Source/WebCore/bridge/c \
+	-I$(srcdir)/Source/WebCore/bridge/jni/jsc \
 	-I$(srcdir)/Source/WebCore/bridge/jsc \
 	-I$(srcdir)/Source/WebCore/css \
 	-I$(srcdir)/Source/WebCore/dom \
@@ -112,7 +113,6 @@ webcoregtk_cppflags += \
 	-I$(srcdir)/Source/WebCore/platform/geoclue \
 	-I$(srcdir)/Source/WebCore/platform/graphics/cairo \
 	-I$(srcdir)/Source/WebCore/platform/graphics/glx \
-	-I$(srcdir)/Source/WebCore/platform/graphics/egl \
 	-I$(srcdir)/Source/WebCore/platform/graphics/gstreamer \
 	-I$(srcdir)/Source/WebCore/platform/graphics/gtk \
 	-I$(srcdir)/Source/WebCore/platform/gtk \
@@ -697,7 +697,6 @@ libWebCoreGtk_la_CPPFLAGS = \
 	$(SQLITE3_CFLAGS) \
 	$(UNICODE_CFLAGS) \
 	$(XCOMPOSITE_CFLAGS) \
-	$(XDAMAGE_CFLAGS) \
 	$(XRENDER_CFLAGS) \
 	$(XT_CFLAGS)
 

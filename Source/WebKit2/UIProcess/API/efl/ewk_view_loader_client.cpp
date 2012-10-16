@@ -28,13 +28,14 @@
 
 #include "WKFrame.h"
 #include "ewk_back_forward_list_private.h"
-#include "ewk_error_private.h"
 #include "ewk_intent.h"
 #include "ewk_intent_private.h"
 #include "ewk_intent_service.h"
 #include "ewk_intent_service_private.h"
 #include "ewk_view_loader_client_private.h"
 #include "ewk_view_private.h"
+#include "ewk_web_error.h"
+#include "ewk_web_error_private.h"
 #include <wtf/text/CString.h>
 
 using namespace WebKit;
@@ -89,10 +90,10 @@ static void didFailLoadWithErrorForFrame(WKPageRef, WKFrameRef frame, WKErrorRef
         return;
 
     Evas_Object* ewkView = static_cast<Evas_Object*>(const_cast<void*>(clientInfo));
-    Ewk_Error* ewkError = ewk_error_new(error);
+    Ewk_Web_Error* ewkError = ewk_web_error_new(error);
     ewk_view_load_error(ewkView, ewkError);
     ewk_view_load_finished(ewkView);
-    ewk_error_free(ewkError);
+    ewk_web_error_free(ewkError);
 }
 
 static void didStartProvisionalLoadForFrame(WKPageRef, WKFrameRef frame, WKTypeRef /*userData*/, const void* clientInfo)
@@ -119,9 +120,9 @@ static void didFailProvisionalLoadWithErrorForFrame(WKPageRef, WKFrameRef frame,
         return;
 
     Evas_Object* ewkView = static_cast<Evas_Object*>(const_cast<void*>(clientInfo));
-    Ewk_Error* ewkError = ewk_error_new(error);
+    Ewk_Web_Error* ewkError = ewk_web_error_new(error);
     ewk_view_load_provisional_failed(ewkView, ewkError);
-    ewk_error_free(ewkError);
+    ewk_web_error_free(ewkError);
 }
 
 static void didChangeBackForwardList(WKPageRef, WKBackForwardListItemRef addedItem, WKArrayRef removedItems, const void* clientInfo)
@@ -130,7 +131,6 @@ static void didChangeBackForwardList(WKPageRef, WKBackForwardListItemRef addedIt
     ASSERT(ewkView);
 
     ewk_back_forward_list_changed(ewk_view_back_forward_list_get(ewkView), addedItem, removedItems);
-    ewk_view_back_forward_list_changed(ewkView);
 }
 
 static void didSameDocumentNavigationForFrame(WKPageRef, WKFrameRef frame, WKSameDocumentNavigationType, WKTypeRef, const void* clientInfo)
@@ -139,7 +139,7 @@ static void didSameDocumentNavigationForFrame(WKPageRef, WKFrameRef frame, WKSam
         return;
 
     Evas_Object* ewkView = static_cast<Evas_Object*>(const_cast<void*>(clientInfo));
-    ewk_view_url_update(ewkView);
+    ewk_view_uri_update(ewkView);
 }
 
 void ewk_view_loader_client_attach(WKPageRef pageRef, Evas_Object* ewkView)

@@ -61,7 +61,7 @@ public:
     PassRefPtr<MemoryInfo> memory() const;
     PerformanceNavigation* navigation() const;
     PerformanceTiming* timing() const;
-    double now() const;
+    double webkitNow() const;
 
 #if ENABLE(PERFORMANCE_TIMELINE)
     PassRefPtr<PerformanceEntryList> webkitGetEntries() const;

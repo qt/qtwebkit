@@ -24,11 +24,14 @@
  *
  */
 
-[
-    IndexedGetter
-] interface ClientRectList {
-    readonly attribute unsigned long length;
-    ClientRect item(in [IsIndex,Optional=DefaultIsUndefined] unsigned long index);
-    // FIXME: Fix list behavior to allow custom exceptions to be thrown.
-};
+module view {
 
+    interface [
+        IndexedGetter
+    ] ClientRectList {
+        readonly attribute unsigned long length;
+        ClientRect item(in [IsIndex,Optional=DefaultIsUndefined] unsigned long index);
+        // FIXME: Fix list behavior to allow custom exceptions to be thrown.
+    };
+
+}

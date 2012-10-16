@@ -23,10 +23,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=SVG&FILTERS
-] interface SVGFEDistantLightElement : SVGElement {
-    readonly attribute SVGAnimatedNumber azimuth;
-    readonly attribute SVGAnimatedNumber elevation;
-};
+module svg {
 
+    interface [
+        Conditional=SVG&FILTERS
+    ] SVGFEDistantLightElement : SVGElement {
+        readonly attribute SVGAnimatedNumber azimuth;
+        readonly attribute SVGAnimatedNumber elevation;
+    };
+
+}

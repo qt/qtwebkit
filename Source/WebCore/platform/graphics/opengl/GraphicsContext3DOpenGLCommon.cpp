@@ -88,7 +88,13 @@ void GraphicsContext3D::validateDepthStencil(const char* packedDepthStencilExten
             m_attrs.stencil = false;
     }
     if (m_attrs.antialias) {
-        if (!extensions->maySupportMultisampling() || !extensions->supports("GL_ANGLE_framebuffer_multisample") || isGLES2Compliant())
+        bool isValidVendor = true;
+        // Currently in Mac we only turn on antialias if vendor is NVIDIA,
+        // or if ATI and on 10.7.2 and above.
+        const char* vendor = reinterpret_cast<const char*>(::glGetString(GL_VENDOR));
+        if (!vendor || (!std::strstr(vendor, "NVIDIA") && !(std::strstr(vendor, "ATI") && systemAllowsMultisamplingOnATICards())))
+            isValidVendor = false;
+        if (!isValidVendor || !extensions->supports("GL_ANGLE_framebuffer_multisample") || isGLES2Compliant())
             m_attrs.antialias = false;
         else
             extensions->ensureEnabled("GL_ANGLE_framebuffer_multisample");
@@ -465,8 +471,8 @@ void GraphicsContext3D::compileShader(Platform3DObject shader)
     ::glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
 
     if (length) {
-        ShaderSourceMap::iterator result = m_shaderSourceMap.find(shader);
-        GraphicsContext3D::ShaderSourceEntry& entry = result->value;
+        HashMap<Platform3DObject, GraphicsContext3D::ShaderSourceEntry>::iterator result = m_shaderSourceMap.find(shader);
+        GraphicsContext3D::ShaderSourceEntry& entry = result->second;
 
         GLsizei size = 0;
         OwnArrayPtr<GLchar> info = adoptArrayPtr(new GLchar[length]);
@@ -629,10 +635,7 @@ bool GraphicsContext3D::getActiveAttrib(Platform3DObject program, GC3Duint index
     ::glGetActiveAttrib(program, index, maxAttributeSize, &nameLength, &size, &type, name.get());
     if (!nameLength)
         return false;
-    
-    String originalName = originalSymbolName(program, SHADER_SYMBOL_TYPE_ATTRIBUTE, String(name.get(), nameLength));
-    
-    info.name = originalName;
+    info.name = String(name.get(), nameLength);
     info.type = type;
     info.size = size;
     return true;
@@ -656,12 +659,11 @@ bool GraphicsContext3D::getActiveUniform(Platform3DObject program, GC3Duint inde
     ::glGetActiveUniform(program, index, maxUniformSize, &nameLength, &size, &type, name.get());
     if (!nameLength)
         return false;
-    
-    String originalName = originalSymbolName(program, SHADER_SYMBOL_TYPE_UNIFORM, String(name.get(), nameLength));
-    
-    info.name = originalName;
+
+    info.name = String(name.get(), nameLength);
     info.type = type;
     info.size = size;
+
     return true;
 }
     
@@ -675,59 +677,13 @@ void GraphicsContext3D::getAttachedShaders(Platform3DObject program, GC3Dsizei m
     ::glGetAttachedShaders(program, maxCount, count, shaders);
 }
 
-String GraphicsContext3D::mappedSymbolName(Platform3DObject program, ANGLEShaderSymbolType symbolType, const String& name)
-{
-    GC3Dsizei count;
-    Platform3DObject shaders[2];
-    getAttachedShaders(program, 2, &count, shaders);
-
-    for (GC3Dsizei i = 0; i < count; ++i) {
-        ShaderSourceMap::iterator result = m_shaderSourceMap.find(shaders[i]);
-        if (result == m_shaderSourceMap.end())
-            continue;
-
-        const ShaderSymbolMap& symbolMap = result->value.symbolMap(symbolType);
-        ShaderSymbolMap::const_iterator symbolEntry = symbolMap.find(name);
-        if (symbolEntry != symbolMap.end())
-            return symbolEntry->value.mappedName;
-    }
-    return name;
-}
-    
-String GraphicsContext3D::originalSymbolName(Platform3DObject program, ANGLEShaderSymbolType symbolType, const String& name)
-{
-    GC3Dsizei count;
-    Platform3DObject shaders[2];
-    getAttachedShaders(program, 2, &count, shaders);
-    
-    for (GC3Dsizei i = 0; i < count; ++i) {
-        ShaderSourceMap::iterator result = m_shaderSourceMap.find(shaders[i]);
-        if (result == m_shaderSourceMap.end())
-            continue;
-        
-        const ShaderSymbolMap& symbolMap = result->value.symbolMap(symbolType);
-        ShaderSymbolMap::const_iterator symbolEntry;
-        for (symbolEntry = symbolMap.begin(); symbolEntry != symbolMap.end(); ++symbolEntry) {
-            if (symbolEntry->value.mappedName == name)
-                return symbolEntry->key;
-        }
-    }
-    return name;
-}
-
 int GraphicsContext3D::getAttribLocation(Platform3DObject program, const String& name)
 {
     if (!program)
         return -1;
 
     makeContextCurrent();
-
-    // The attribute name may have been translated during ANGLE compilation.
-    // Look through the corresponding ShaderSourceMap to make sure we
-    // reference the mapped name rather than the external name.
-    String mappedName = mappedSymbolName(program, SHADER_SYMBOL_TYPE_ATTRIBUTE, name);
-
-    return ::glGetAttribLocation(program, mappedName.utf8().data());
+    return ::glGetAttribLocation(program, name.utf8().data());
 }
 
 GraphicsContext3D::Attributes GraphicsContext3D::getContextAttributes()
@@ -1176,7 +1132,7 @@ void GraphicsContext3D::getShaderiv(Platform3DObject shader, GC3Denum pname, GC3
 
     makeContextCurrent();
 
-    ShaderSourceMap::iterator result = m_shaderSourceMap.find(shader);
+    HashMap<Platform3DObject, ShaderSourceEntry>::iterator result = m_shaderSourceMap.find(shader);
     
     switch (pname) {
     case DELETE_STATUS:
@@ -1188,7 +1144,7 @@ void GraphicsContext3D::getShaderiv(Platform3DObject shader, GC3Denum pname, GC3
             *value = static_cast<int>(false);
             return;
         }
-        *value = static_cast<int>(result->value.isValid);
+        *value = static_cast<int>(result->second.isValid);
         break;
     case INFO_LOG_LENGTH:
         if (result == m_shaderSourceMap.end()) {
@@ -1211,11 +1167,11 @@ String GraphicsContext3D::getShaderInfoLog(Platform3DObject shader)
 
     makeContextCurrent();
 
-    ShaderSourceMap::iterator result = m_shaderSourceMap.find(shader);
+    HashMap<Platform3DObject, ShaderSourceEntry>::iterator result = m_shaderSourceMap.find(shader);
     if (result == m_shaderSourceMap.end())
         return String(); 
 
-    ShaderSourceEntry entry = result->value;
+    ShaderSourceEntry entry = result->second;
     if (!entry.isValid)
         return entry.log;
 
@@ -1237,11 +1193,11 @@ String GraphicsContext3D::getShaderSource(Platform3DObject shader)
 
     makeContextCurrent();
 
-    ShaderSourceMap::iterator result = m_shaderSourceMap.find(shader);
+    HashMap<Platform3DObject, ShaderSourceEntry>::iterator result = m_shaderSourceMap.find(shader);
     if (result == m_shaderSourceMap.end())
         return String(); 
 
-    return result->value.source;
+    return result->second.source;
 }
 
 
@@ -1274,13 +1230,7 @@ GC3Dint GraphicsContext3D::getUniformLocation(Platform3DObject program, const St
     ASSERT(program);
 
     makeContextCurrent();
-
-    // The uniform name may have been translated during ANGLE compilation.
-    // Look through the corresponding ShaderSourceMap to make sure we
-    // reference the mapped name rather than the external name.
-    String mappedName = mappedSymbolName(program, SHADER_SYMBOL_TYPE_UNIFORM, name);
-
-    return ::glGetUniformLocation(program, mappedName.utf8().data());
+    return ::glGetUniformLocation(program, name.utf8().data());
 }
 
 void GraphicsContext3D::getVertexAttribfv(GC3Duint index, GC3Denum pname, GC3Dfloat* value)

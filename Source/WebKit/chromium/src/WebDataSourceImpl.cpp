@@ -32,9 +32,9 @@
 #include "WebDataSourceImpl.h"
 
 #include "ApplicationCacheHostInternal.h"
-#include <public/WebURL.h>
-#include <public/WebURLError.h>
-#include <public/WebVector.h>
+#include "platform/WebURL.h"
+#include "platform/WebURLError.h"
+#include "platform/WebVector.h"
 
 using namespace WebCore;
 

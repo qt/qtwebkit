@@ -41,7 +41,6 @@ class FloatPoint;
 class IntRect;
 class IntSize;
 class GraphicsLayer;
-class GraphicsLayerFactory;
 
 #if PLATFORM(WIN) && USE(AVFOUNDATION)
 struct GraphicsDeviceAdapter;
@@ -86,8 +85,6 @@ public:
 
     virtual void pauseRendering() { }
     virtual void resumeRendering() { }
-
-    virtual WebCore::GraphicsLayerFactory* graphicsLayerFactory() { return 0; }
 
 #if USE(COORDINATED_GRAPHICS)
     virtual void setVisibleContentsRect(const WebCore::IntRect&, float scale, const WebCore::FloatPoint&) { }

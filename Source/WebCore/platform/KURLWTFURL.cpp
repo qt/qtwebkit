@@ -175,7 +175,7 @@ bool KURL::hasPort() const
     if (!isValid())
         return false;
 
-    return m_urlImpl->m_parsedURL.hasPort();
+    return !m_urlImpl->m_parsedURL.port().isNull();
 }
 
 unsigned short KURL::port() const
@@ -313,11 +313,8 @@ void KURL::setHost(const String&)
 
 void KURL::removePort()
 {
-    if (!hasPort())
-        return;
-
     detach(m_urlImpl);
-    m_urlImpl->m_parsedURL.removePort();
+    // FIXME: Add WTFURL Implementation.
 }
 
 void KURL::setPort(unsigned short)
@@ -426,9 +423,8 @@ void KURL::invalidate()
 
 bool KURL::isHierarchical() const
 {
-    if (!isValid())
-        return false;
-    return m_urlImpl->m_parsedURL.hasStandardScheme();
+    // FIXME: Add WTFURL Implementation.
+    return false;
 }
 
 bool protocolIs(const String&, const char*)

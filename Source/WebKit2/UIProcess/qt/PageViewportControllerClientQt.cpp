@@ -322,6 +322,8 @@ void PageViewportControllerClientQt::setContentsScale(float localScale, bool tre
         setContentRectVisiblePositionAtScale(QPointF(), localScale);
     } else
         scaleContent(localScale);
+
+    updateViewportController();
 }
 
 void PageViewportControllerClientQt::setContentsRectToNearestValidBounds()
@@ -333,7 +335,6 @@ void PageViewportControllerClientQt::setContentsRectToNearestValidBounds()
 
 void PageViewportControllerClientQt::didResumeContent()
 {
-    // Make sure that tiles all around the viewport will be requested.
     updateViewportController();
 }
 
@@ -467,10 +468,8 @@ void PageViewportControllerClientQt::pinchGestureCancelled()
     m_scaleUpdateDeferrer.reset();
 }
 
-void PageViewportControllerClientQt::didChangeContentsSize(const IntSize& newSize)
+void PageViewportControllerClientQt::didChangeContentsSize()
 {
-    m_pageItem->setContentsSize(QSizeF(newSize));
-
     // Emit for testing purposes, so that it can be verified that
     // we didn't do scale adjustment.
     emit m_viewportItem->experimental()->test()->contentsScaleCommitted();
@@ -493,14 +492,18 @@ void PageViewportControllerClientQt::didChangeVisibleContents()
 
 void PageViewportControllerClientQt::didChangeViewportAttributes()
 {
+    // Make sure we apply the new initial scale when deferring ends.
+    ViewportUpdateDeferrer guard(m_controller);
+
     emit m_viewportItem->experimental()->test()->devicePixelRatioChanged();
     emit m_viewportItem->experimental()->test()->viewportChanged();
 }
 
-void PageViewportControllerClientQt::updateViewportController(const QPointF& trajectory)
+void PageViewportControllerClientQt::updateViewportController(const QPointF& trajectory, qreal scale)
 {
     FloatPoint viewportPos = m_viewportItem->mapToWebContent(QPointF());
-    m_controller->didChangeContentsVisibility(viewportPos, m_pageItem->contentsScale(), trajectory);
+    float viewportScale = (scale < 0) ? m_pageItem->contentsScale() : scale;
+    m_controller->didChangeContentsVisibility(viewportPos, viewportScale, trajectory);
 }
 
 void PageViewportControllerClientQt::scaleContent(qreal itemScale, const QPointF& centerInCSSCoordinates)

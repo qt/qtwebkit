@@ -1130,32 +1130,6 @@ bool GraphicsContext::supportsTransparencyLayers()
     return true;
 }
 
-static void applyShadowOffsetWorkaroundIfNeeded(const GraphicsContext& context, CGFloat& xOffset, CGFloat& yOffset)
-{
-#if !PLATFORM(IOS)
-    if (context.isAcceleratedContext())
-        return;
-
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
-    if (wkCGContextDrawsWithCorrectShadowOffsets(context.platformContext()))
-        return;
-#endif
-
-    // Work around <rdar://problem/5539388> by ensuring that the offsets will get truncated
-    // to the desired integer. Also see: <rdar://problem/10056277>
-    static const CGFloat extraShadowOffset = narrowPrecisionToCGFloat(1.0 / 128);
-    if (xOffset > 0)
-        xOffset += extraShadowOffset;
-    else if (xOffset < 0)
-        xOffset -= extraShadowOffset;
-
-    if (yOffset > 0)
-        yOffset += extraShadowOffset;
-    else if (yOffset < 0)
-        yOffset -= extraShadowOffset;
-#endif
-}
-
 void GraphicsContext::setPlatformShadow(const FloatSize& offset, float blur, const Color& color, ColorSpace colorSpace)
 {
     if (paintingDisabled())
@@ -1189,7 +1163,23 @@ void GraphicsContext::setPlatformShadow(const FloatSize& offset, float blur, con
     // Extreme "blur" values can make text drawing crash or take crazy long times, so clamp
     blurRadius = min(blurRadius, narrowPrecisionToCGFloat(1000.0));
 
-    applyShadowOffsetWorkaroundIfNeeded(*this, xOffset, yOffset);
+
+#if !PLATFORM(IOS) && __MAC_OS_X_VERSION_MIN_REQUIRED <= 1070
+    if (!isAcceleratedContext()) {
+        // Work around <rdar://problem/5539388> by ensuring that the offsets will get truncated
+        // to the desired integer. Also see: <rdar://problem/10056277>
+        static const CGFloat extraShadowOffset = narrowPrecisionToCGFloat(1.0 / 128);
+        if (xOffset > 0)
+            xOffset += extraShadowOffset;
+        else if (xOffset < 0)
+            xOffset -= extraShadowOffset;
+
+        if (yOffset > 0)
+            yOffset += extraShadowOffset;
+        else if (yOffset < 0)
+            yOffset -= extraShadowOffset;
+    }
+#endif
 
     // Check for an invalid color, as this means that the color was not set for the shadow
     // and we should therefore just use the default shadow color.

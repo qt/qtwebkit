@@ -418,10 +418,7 @@ void EventSenderProxy::sendTouchEvent(QEvent::Type type)
         QWindowSystemInterface::registerTouchDevice(device);
     }
 
-    Qt::TouchPointStates eventStates;
-    for (int i = 0; i < m_touchPoints.count(); i++)
-        eventStates |= m_touchPoints[i].state();
-    QTouchEvent event(type, device, m_touchModifiers, eventStates);
+    QTouchEvent event(type, device, m_touchModifiers);
     event.setTouchPoints(m_touchPoints);
     m_testController->mainWebView()->sendEvent(&event);
     QList<QTouchEvent::TouchPoint>::Iterator it = m_touchPoints.begin();

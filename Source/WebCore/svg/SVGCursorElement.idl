@@ -23,13 +23,16 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=SVG
-] interface SVGCursorElement : SVGElement,
-                                               SVGURIReference,
-                                               SVGTests,
-                                               SVGExternalResourcesRequired {
-    readonly attribute SVGAnimatedLength x;
-    readonly attribute SVGAnimatedLength y;
-};
+module svg {
 
+    interface [
+        Conditional=SVG
+    ] SVGCursorElement : SVGElement,
+                                                   SVGURIReference,
+                                                   SVGTests,
+                                                   SVGExternalResourcesRequired {
+        readonly attribute SVGAnimatedLength x;
+        readonly attribute SVGAnimatedLength y;
+    };
+
+}

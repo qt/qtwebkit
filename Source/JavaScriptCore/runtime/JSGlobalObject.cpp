@@ -100,6 +100,8 @@ const GlobalObjectMethodTable JSGlobalObject::s_globalObjectMethodTable = { &all
 @end
 */
 
+ASSERT_CLASS_FITS_IN_CELL(JSGlobalObject);
+
 // Default number of ticks before a timeout check should be done.
 static const int initialTickCountThreshold = 255;
 
@@ -226,11 +228,10 @@ void JSGlobalObject::reset(JSValue prototype)
     m_callbackFunctionStructure.set(exec->globalData(), this, JSCallbackFunction::createStructure(exec->globalData(), this, m_functionPrototype.get()));
     m_argumentsStructure.set(exec->globalData(), this, Arguments::createStructure(exec->globalData(), this, m_objectPrototype.get()));
     m_callbackConstructorStructure.set(exec->globalData(), this, JSCallbackConstructor::createStructure(exec->globalData(), this, m_objectPrototype.get()));
-    m_callbackObjectStructure.set(exec->globalData(), this, JSCallbackObject<JSDestructibleObject>::createStructure(exec->globalData(), this, m_objectPrototype.get()));
+    m_callbackObjectStructure.set(exec->globalData(), this, JSCallbackObject<JSNonFinalObject>::createStructure(exec->globalData(), this, m_objectPrototype.get()));
 
     m_arrayPrototype.set(exec->globalData(), this, ArrayPrototype::create(exec, this, ArrayPrototype::createStructure(exec->globalData(), this, m_objectPrototype.get())));
-    m_arrayStructure.set(exec->globalData(), this, JSArray::createStructure(exec->globalData(), this, m_arrayPrototype.get(), ArrayWithContiguous));
-    m_arrayStructureWithArrayStorage.set(exec->globalData(), this, JSArray::createStructure(exec->globalData(), this, m_arrayPrototype.get(), ArrayWithArrayStorage));
+    m_arrayStructure.set(exec->globalData(), this, JSArray::createStructure(exec->globalData(), this, m_arrayPrototype.get(), ArrayWithArrayStorage));
     m_arrayStructureForSlowPut.set(exec->globalData(), this, JSArray::createStructure(exec->globalData(), this, m_arrayPrototype.get(), ArrayWithSlowPutArrayStorage));
     m_regExpMatchesArrayStructure.set(exec->globalData(), this, RegExpMatchesArray::createStructure(exec->globalData(), this, m_arrayPrototype.get()));
 
@@ -317,9 +318,6 @@ void JSGlobalObject::reset(JSValue prototype)
         GlobalPropertyInfo(Identifier(exec, "undefined"), jsUndefined(), DontEnum | DontDelete | ReadOnly)
     };
     addStaticGlobals(staticGlobals, WTF_ARRAY_LENGTH(staticGlobals));
-    
-    m_specialPointers[Special::CallFunction] = m_callFunction.get();
-    m_specialPointers[Special::ApplyFunction] = m_applyFunction.get();
 
     if (m_experimentsEnabled) {
         NamePrototype* privateNamePrototype = NamePrototype::create(exec, NamePrototype::createStructure(exec->globalData(), this, m_objectPrototype.get()));
@@ -356,8 +354,7 @@ ObjectsWithBrokenIndexingFinder::ObjectsWithBrokenIndexingFinder(
 inline bool hasBrokenIndexing(JSObject* object)
 {
     // This will change if we have more indexing types.
-    IndexingType type = object->structure()->indexingType();
-    return hasContiguous(type) || hasFastArrayStorage(type);
+    return !!(object->structure()->indexingType() & HasArrayStorage);
 }
 
 void ObjectsWithBrokenIndexingFinder::operator()(JSCell* cell)
@@ -410,7 +407,6 @@ void JSGlobalObject::haveABadTime(JSGlobalData& globalData)
     // Make sure that all JSArray allocations that load the appropriate structure from
     // this object now load a structure that uses SlowPut.
     m_arrayStructure.set(globalData, this, m_arrayStructureForSlowPut.get());
-    m_arrayStructureWithArrayStorage.set(globalData, this, m_arrayStructureForSlowPut.get());
     
     // Make sure that all objects that have indexed storage switch to the slow kind of
     // indexed storage.
@@ -486,7 +482,6 @@ void JSGlobalObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
     visitor.append(&thisObject->m_nameScopeStructure);
     visitor.append(&thisObject->m_argumentsStructure);
     visitor.append(&thisObject->m_arrayStructure);
-    visitor.append(&thisObject->m_arrayStructureWithArrayStorage);
     visitor.append(&thisObject->m_arrayStructureForSlowPut);
     visitor.append(&thisObject->m_booleanObjectStructure);
     visitor.append(&thisObject->m_callbackConstructorStructure);
@@ -507,14 +502,9 @@ void JSGlobalObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
     visitor.append(&thisObject->m_internalFunctionStructure);
 }
 
-JSObject* JSGlobalObject::toThisObject(JSCell* cell, ExecState*)
-{
-    return jsCast<JSGlobalObject*>(cell)->globalThis();
-}
-
 ExecState* JSGlobalObject::globalExec()
 {
-    return CallFrame::create(m_globalCallFrame + JSStack::CallFrameHeaderSize);
+    return CallFrame::create(m_globalCallFrame + RegisterFile::CallFrameHeaderSize);
 }
 
 void JSGlobalObject::addStaticGlobals(GlobalPropertyInfo* globals, int count)

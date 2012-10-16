@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2010 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -66,8 +66,6 @@ using namespace JSC;
 using namespace WebCore;
 
 namespace WebKit {
-
-static const double pluginSnapshotTimerDelay = 3;
 
 class PluginView::URLRequest : public RefCounted<URLRequest> {
 public:
@@ -172,9 +170,9 @@ static String buildHTTPHeaders(const ResourceResponse& response, long long& expe
     
     HTTPHeaderMap::const_iterator end = response.httpHeaderFields().end();
     for (HTTPHeaderMap::const_iterator it = response.httpHeaderFields().begin(); it != end; ++it) {
-        stringBuilder.append(it->key.characters(), it->key.length());
+        stringBuilder.append(it->first.characters(), it->first.length());
         stringBuilder.append(separator.characters(), separator.length());
-        stringBuilder.append(it->value.characters(), it->value.length());
+        stringBuilder.append(it->second.characters(), it->second.length());
         stringBuilder.append('\n');
     }
     
@@ -270,8 +268,6 @@ PluginView::PluginView(PassRefPtr<HTMLPlugInElement> pluginElement, PassRefPtr<P
     , m_npRuntimeObjectMap(this)
 #endif
     , m_manualStreamState(StreamStateInitial)
-    , m_pluginSnapshotTimer(this, &PluginView::pluginSnapshotTimerFired, pluginSnapshotTimerDelay)
-    , m_pageScaleFactor(1)
 {
     m_webPage->addPluginView(this);
 }
@@ -286,18 +282,9 @@ PluginView::~PluginView()
     if (m_isWaitingUntilMediaCanStart)
         m_pluginElement->document()->removeMediaCanStartListener(this);
 
-    destroyPluginAndReset();
-
-    // Null out the plug-in element explicitly so we'll crash earlier if we try to use
-    // the plug-in view after it's been destroyed.
-    m_pluginElement = nullptr;
-}
-
-void PluginView::destroyPluginAndReset()
-{
     // Cancel all pending frame loads.
     for (FrameLoadMap::iterator it = m_pendingFrameLoads.begin(), end = m_pendingFrameLoads.end(); it != end; ++it)
-        it->key->setLoadListener(0);
+        it->first->setLoadListener(0);
 
     if (m_plugin) {
         m_isBeingDestroyed = true;
@@ -315,26 +302,10 @@ void PluginView::destroyPluginAndReset()
 #endif
 
     cancelAllStreams();
-}
 
-void PluginView::recreateAndInitialize(PassRefPtr<Plugin> plugin)
-{
-    if (m_plugin) {
-        if (m_pluginSnapshotTimer.isActive())
-            m_pluginSnapshotTimer.stop();
-        destroyPluginAndReset();
-    }
-
-    // Reset member variables to initial values.
-    m_plugin = plugin;
-    m_isInitialized = false;
-    m_isWaitingForSynchronousInitialization = false;
-    m_isWaitingUntilMediaCanStart = false;
-    m_isBeingDestroyed = false;
-    m_manualStreamState = StreamStateInitial;
-    m_transientPaintingSnapshot = nullptr;
-
-    initializePlugin();
+    // Null out the plug-in element explicitly so we'll crash earlier if we try to use
+    // the plug-in view after it's been destroyed.
+    m_pluginElement = nullptr;
 }
 
 Frame* PluginView::frame() const
@@ -426,18 +397,6 @@ RenderBoxModelObject* PluginView::renderer() const
 void PluginView::pageScaleFactorDidChange()
 {
     viewGeometryDidChange();
-}
-
-void PluginView::setPageScaleFactor(double scaleFactor, IntPoint)
-{
-    m_pageScaleFactor = scaleFactor;
-    m_webPage->send(Messages::WebPageProxy::PageScaleFactorDidChange(scaleFactor));
-    pageScaleFactorDidChange();
-}
-
-double PluginView::pageScaleFactor()
-{
-    return m_pageScaleFactor;
 }
 
 void PluginView::webPageDestroyed()
@@ -554,9 +513,7 @@ void PluginView::didInitializePlugin()
     redeliverManualStream();
 
 #if PLATFORM(MAC)
-    if (m_pluginElement->displayState() < HTMLPlugInElement::Playing)
-        m_pluginSnapshotTimer.restart();
-    else if (m_plugin->pluginLayer()) {
+    if (m_plugin->pluginLayer()) {
         if (frame()) {
             frame()->view()->enterCompositingMode();
             m_pluginElement->setNeedsStyleRecalc(SyntheticStyleChange);
@@ -686,7 +643,7 @@ void PluginView::setFrameRect(const WebCore::IntRect& rect)
 
 void PluginView::paint(GraphicsContext* context, const IntRect& /*dirtyRect*/)
 {
-    if (!m_plugin || !m_isInitialized || m_pluginElement->displayState() < HTMLPlugInElement::Playing)
+    if (!m_plugin || !m_isInitialized)
         return;
 
     if (context->paintingDisabled()) {
@@ -701,8 +658,8 @@ void PluginView::paint(GraphicsContext* context, const IntRect& /*dirtyRect*/)
     if (paintRect.isEmpty())
         return;
 
-    if (m_transientPaintingSnapshot) {
-        m_transientPaintingSnapshot->paint(*context, contentsScaleFactor(), frameRect().location(), m_transientPaintingSnapshot->bounds());
+    if (m_snapshot) {
+        m_snapshot->paint(*context, contentsScaleFactor(), frameRect().location(), m_snapshot->bounds());
         return;
     }
     
@@ -773,26 +730,16 @@ void PluginView::handleEvent(Event* event)
     if (didHandleEvent)
         event->setDefaultHandled();
 }
-    
-bool PluginView::handleEditingCommand(const String& commandName, const String& argument)
-{
-    return m_plugin->handleEditingCommand(commandName, argument);
-}
-    
-bool PluginView::isEditingCommandEnabled(const String& commandName)
-{
-    return m_plugin->isEditingCommandEnabled(commandName);
-}
 
 void PluginView::notifyWidget(WidgetNotification notification)
 {
     switch (notification) {
     case WillPaintFlattened:
         if (m_plugin && m_isInitialized)
-            m_transientPaintingSnapshot = m_plugin->snapshot();
+            m_snapshot = m_plugin->snapshot();
         break;
     case DidPaintFlattened:
-        m_transientPaintingSnapshot = nullptr;
+        m_snapshot = nullptr;
         break;
     }
 }
@@ -1074,9 +1021,6 @@ void PluginView::invalidateRect(const IntRect& dirtyRect)
         return;
 #endif
 
-    if (m_pluginElement->displayState() < HTMLPlugInElement::Playing)
-        return;
-
     RenderBoxModelObject* renderer = toRenderBoxModelObject(m_pluginElement->renderer());
     if (!renderer)
         return;
@@ -1232,8 +1176,6 @@ bool PluginView::isAcceleratedCompositingEnabled()
     if (!settings)
         return false;
 
-    if (m_pluginElement->displayState() < HTMLPlugInElement::Playing)
-        return false;
     return settings->acceleratedCompositingEnabled();
 }
 
@@ -1421,20 +1363,5 @@ void PluginView::windowedPluginGeometryDidChange(const WebCore::IntRect& frameRe
     m_webPage->send(Messages::WebPageProxy::WindowedPluginGeometryDidChange(frameRect, clipRect, windowID));
 }
 #endif
-
-void PluginView::pluginSnapshotTimerFired(DeferrableOneShotTimer<PluginView>* timer)
-{
-    ASSERT_UNUSED(timer, timer == &m_pluginSnapshotTimer);
-    ASSERT(m_plugin);
-
-    // Snapshot might be 0 if plugin size is 0x0.
-    RefPtr<ShareableBitmap> snapshot = m_plugin->snapshot();
-    RefPtr<Image> snapshotImage;
-    if (snapshot)
-        snapshotImage = snapshot->createImage();
-    m_pluginElement->updateSnapshot(snapshotImage.release());
-    destroyPluginAndReset();
-    m_plugin = 0;
-}
 
 } // namespace WebKit

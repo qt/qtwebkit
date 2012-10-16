@@ -36,19 +36,11 @@ WebInspector.OutputStreamDelegate = function()
 }
 
 WebInspector.OutputStreamDelegate.prototype = {
-    onTransferStarted: function() { },
+    onTransferStarted: function(source) { },
 
-    onTransferFinished: function() { },
+    onChunkTransferred: function(source) { },
 
-    /**
-     * @param {WebInspector.ChunkedReader} reader
-     */
-    onChunkTransferred: function(reader) { },
-
-    /**
-     * @param {WebInspector.ChunkedReader} reader
-     */
-    onError: function(reader, event) { },
+    onError: function(source, event) { }
 }
 
 /**
@@ -69,34 +61,7 @@ WebInspector.OutputStream.prototype = {
 }
 
 /**
- * @interface
- */
-WebInspector.ChunkedReader = function()
-{
-}
-
-WebInspector.ChunkedReader.prototype = {
-    /**
-     * @return {number}
-     */
-    fileSize: function() { },
-
-    /**
-     * @return {number}
-     */
-    loadedSize: function() { },
-
-    /**
-     * @return {string}
-     */
-    fileName: function() { },
-
-    cancel: function() { }
-}
-
-/**
  * @constructor
- * @implements {WebInspector.ChunkedReader}
  * @param {!File} file
  * @param {number} chunkSize
  * @param {!WebInspector.OutputStreamDelegate} delegate
@@ -122,7 +87,7 @@ WebInspector.ChunkedFileReader.prototype = {
         this._reader = new FileReader();
         this._reader.onload = this._onChunkLoaded.bind(this);
         this._reader.onerror = this._delegate.onError.bind(this._delegate, this);
-        this._delegate.onTransferStarted();
+        this._delegate.onTransferStarted(this);
         this._loadChunk();
     },
 
@@ -131,25 +96,16 @@ WebInspector.ChunkedFileReader.prototype = {
         this._isCanceled = true;
     },
 
-    /**
-     * @return {number}
-     */
     loadedSize: function()
     {
         return this._loadedSize;
     },
 
-    /**
-     * @return {number}
-     */
     fileSize: function()
     {
         return this._fileSize;
     },
 
-    /**
-     * @return {string}
-     */
     fileName: function()
     {
         return this._file.name;
@@ -178,7 +134,7 @@ WebInspector.ChunkedFileReader.prototype = {
             this._file = null;
             this._reader = null;
             this._output.close();
-            this._delegate.onTransferFinished();
+            this._delegate.onTransferFinished(this);
             return;
         }
 
@@ -196,7 +152,6 @@ WebInspector.ChunkedFileReader.prototype = {
 
 /**
  * @constructor
- * @implements {WebInspector.ChunkedReader}
  * @param {string} url
  * @param {!WebInspector.OutputStreamDelegate} delegate
  */
@@ -224,7 +179,7 @@ WebInspector.ChunkedXHRReader.prototype = {
         this._xhr.onerror = this._delegate.onError.bind(this._delegate, this);
         this._xhr.send(null);
 
-        this._delegate.onTransferStarted();
+        this._delegate.onTransferStarted(this);
     },
 
     cancel: function()
@@ -233,25 +188,16 @@ WebInspector.ChunkedXHRReader.prototype = {
         this._xhr.abort();
     },
 
-    /**
-     * @return {number}
-     */
     loadedSize: function()
     {
         return this._loadedSize;
     },
 
-    /**
-     * @return {number}
-     */
     fileSize: function()
     {
         return this._fileSize;
     },
 
-    /**
-     * @return {string}
-     */
     fileName: function()
     {
         return this._url;
@@ -290,7 +236,7 @@ WebInspector.ChunkedXHRReader.prototype = {
             return;
 
         this._output.close();
-        this._delegate.onTransferFinished();
+        this._delegate.onTransferFinished(this);
     }
 }
 

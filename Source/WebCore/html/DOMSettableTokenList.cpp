@@ -44,46 +44,55 @@ const AtomicString DOMSettableTokenList::item(unsigned index) const
     return m_tokens[index];
 }
 
-bool DOMSettableTokenList::containsInternal(const AtomicString& token) const
+bool DOMSettableTokenList::contains(const AtomicString& token, ExceptionCode& ec) const
 {
+    if (!validateToken(token, ec))
+        return false;
     return m_tokens.contains(token);
 }
 
-void DOMSettableTokenList::add(const Vector<String>& tokens, ExceptionCode& ec)
+void DOMSettableTokenList::add(const AtomicString& token, ExceptionCode& ec)
 {
-    DOMTokenList::add(tokens, ec);
-
-    for (size_t i = 0; i < tokens.size(); ++i) {
-        if (m_tokens.isNull())
-            m_tokens.set(tokens[i], false);
-        else
-            m_tokens.add(tokens[i]);
-    }
+    if (!validateToken(token, ec) || m_tokens.contains(token))
+        return;
+    addInternal(token);
 }
 
 void DOMSettableTokenList::addInternal(const AtomicString& token)
 {
-    DOMTokenList::addInternal(token);
+    m_value = addToken(m_value, token);
     if (m_tokens.isNull())
         m_tokens.set(token, false);
     else
         m_tokens.add(token);
 }
 
-void DOMSettableTokenList::remove(const Vector<String>& tokens, ExceptionCode& ec)
+void DOMSettableTokenList::remove(const AtomicString& token, ExceptionCode& ec)
 {
-    DOMTokenList::remove(tokens, ec);
-    for (size_t i = 0; i < tokens.size(); ++i)
-        m_tokens.remove(tokens[i]);
+    if (!validateToken(token, ec) || !m_tokens.contains(token))
+        return;
+    removeInternal(token);
 }
 
 void DOMSettableTokenList::removeInternal(const AtomicString& token)
 {
-    DOMTokenList::removeInternal(token);
+    m_value = removeToken(m_value, token);
     m_tokens.remove(token);
 }
 
-void DOMSettableTokenList::setValue(const AtomicString& value)
+bool DOMSettableTokenList::toggle(const AtomicString& token, ExceptionCode& ec)
+{
+    if (!validateToken(token, ec))
+        return false;
+    if (m_tokens.contains(token)) {
+        removeInternal(token);
+        return false;
+    }
+    addInternal(token);
+    return true;
+}
+
+void DOMSettableTokenList::setValue(const String& value)
 {
     m_value = value;
     m_tokens.set(value, false);

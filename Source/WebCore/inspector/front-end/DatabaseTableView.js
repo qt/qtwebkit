@@ -95,7 +95,7 @@ WebInspector.DatabaseTableView.prototype = {
     _refreshButtonClicked: function(event)
     {
         this.update();
-    },
-
-    __proto__: WebInspector.View.prototype
+    }
 }
+
+WebInspector.DatabaseTableView.prototype.__proto__ = WebInspector.View.prototype;

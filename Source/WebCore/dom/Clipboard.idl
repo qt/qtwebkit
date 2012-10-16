@@ -26,19 +26,22 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-interface Clipboard {
-             [TreatReturnedNullStringAs=Undefined] attribute DOMString dropEffect;
-             [TreatReturnedNullStringAs=Undefined] attribute DOMString effectAllowed;
-    [CustomGetter] readonly attribute Array types;
-    readonly attribute FileList files;
+module core {
 
-    [Custom] void clearData(in [Optional] DOMString type)
-        raises(DOMException);
-    DOMString getData(in DOMString type);
-    boolean setData(in DOMString type, in DOMString data);
-    [Custom] void setDragImage(in HTMLImageElement image, in long x, in long y)
-        raises(DOMException);
+    interface Clipboard {
+                 attribute [TreatReturnedNullStringAs=Undefined] DOMString dropEffect;
+                 attribute [TreatReturnedNullStringAs=Undefined] DOMString effectAllowed;
+        readonly attribute [CustomGetter] Array types;
+        readonly attribute FileList files;
 
-    [Conditional=DATA_TRANSFER_ITEMS, V8EnabledAtRuntime=DataTransferItems] readonly attribute DataTransferItemList items;
-};
+        [Custom] void clearData(in [Optional] DOMString type)
+            raises(DOMException);
+        DOMString getData(in DOMString type);
+        boolean setData(in DOMString type, in DOMString data);
+        [Custom] void setDragImage(in HTMLImageElement image, in long x, in long y)
+            raises(DOMException);
 
+        readonly attribute [Conditional=DATA_TRANSFER_ITEMS, V8EnabledAtRuntime=DataTransferItems] DataTransferItemList items;
+    };
+
+}

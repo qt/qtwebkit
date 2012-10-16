@@ -17,28 +17,31 @@
  * Boston, MA 02110-1301, USA.
  */
 
-// Introduced in DOM Level 2:
-interface MutationEvent : Event {
+module events {
 
-    // attrChangeType
-    const unsigned short MODIFICATION = 1;
-    const unsigned short ADDITION     = 2;
-    const unsigned short REMOVAL      = 3;
+    // Introduced in DOM Level 2:
+    interface MutationEvent : Event {
 
-    readonly attribute Node           relatedNode;
-    readonly attribute DOMString      prevValue;
-    readonly attribute DOMString      newValue;
-    readonly attribute DOMString      attrName;
-    readonly attribute unsigned short attrChange;
+        // attrChangeType
+        const unsigned short MODIFICATION = 1;
+        const unsigned short ADDITION     = 2;
+        const unsigned short REMOVAL      = 3;
 
-    [ObjCLegacyUnnamedParameters] void initMutationEvent(in [Optional=DefaultIsUndefined] DOMString type, 
-                                          in [Optional=DefaultIsUndefined] boolean canBubble, 
-                                          in [Optional=DefaultIsUndefined] boolean cancelable, 
-                                          in [Optional=DefaultIsUndefined] Node relatedNode, 
-                                          in [Optional=DefaultIsUndefined] DOMString prevValue, 
-                                          in [Optional=DefaultIsUndefined] DOMString newValue, 
-                                          in [Optional=DefaultIsUndefined] DOMString attrName, 
-                                          in [Optional=DefaultIsUndefined] unsigned short attrChange);
+        readonly attribute Node           relatedNode;
+        readonly attribute DOMString      prevValue;
+        readonly attribute DOMString      newValue;
+        readonly attribute DOMString      attrName;
+        readonly attribute unsigned short attrChange;
 
-};
+        [ObjCLegacyUnnamedParameters] void initMutationEvent(in [Optional=DefaultIsUndefined] DOMString type, 
+                                              in [Optional=DefaultIsUndefined] boolean canBubble, 
+                                              in [Optional=DefaultIsUndefined] boolean cancelable, 
+                                              in [Optional=DefaultIsUndefined] Node relatedNode, 
+                                              in [Optional=DefaultIsUndefined] DOMString prevValue, 
+                                              in [Optional=DefaultIsUndefined] DOMString newValue, 
+                                              in [Optional=DefaultIsUndefined] DOMString attrName, 
+                                              in [Optional=DefaultIsUndefined] unsigned short attrChange);
 
+    };
+
+}

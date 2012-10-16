@@ -47,9 +47,13 @@ struct IDBObjectStoreMetadata;
 
 class IDBObjectStoreBackendImpl : public IDBObjectStoreBackendInterface {
 public:
-    static PassRefPtr<IDBObjectStoreBackendImpl> create(const IDBDatabaseBackendImpl* database, int64_t id, const String& name, const IDBKeyPath& keyPath, bool autoIncrement, int64_t maxIndexId)
+    static PassRefPtr<IDBObjectStoreBackendImpl> create(const IDBDatabaseBackendImpl* database, int64_t id, const String& name, const IDBKeyPath& keyPath, bool autoIncrement)
     {
-        return adoptRef(new IDBObjectStoreBackendImpl(database, id, name, keyPath, autoIncrement, maxIndexId));
+        return adoptRef(new IDBObjectStoreBackendImpl(database, id, name, keyPath, autoIncrement));
+    }
+    static PassRefPtr<IDBObjectStoreBackendImpl> create(const IDBDatabaseBackendImpl* database, const String& name, const IDBKeyPath& keyPath, bool autoIncrement)
+    {
+        return adoptRef(new IDBObjectStoreBackendImpl(database, name, keyPath, autoIncrement));
     }
     virtual ~IDBObjectStoreBackendImpl();
 
@@ -69,7 +73,7 @@ public:
     virtual void deleteFunction(PassRefPtr<IDBKeyRange>, PassRefPtr<IDBCallbacks>, IDBTransactionBackendInterface*, ExceptionCode&);
     virtual void clear(PassRefPtr<IDBCallbacks>, IDBTransactionBackendInterface*, ExceptionCode&);
 
-    virtual PassRefPtr<IDBIndexBackendInterface> createIndex(int64_t, const String& name, const IDBKeyPath&, bool unique, bool multiEntry, IDBTransactionBackendInterface*, ExceptionCode&);
+    virtual PassRefPtr<IDBIndexBackendInterface> createIndex(const String& name, const IDBKeyPath&, bool unique, bool multiEntry, IDBTransactionBackendInterface*, ExceptionCode&);
     virtual void setIndexKeys(PassRefPtr<IDBKey> prpPrimaryKey, const Vector<String>&, const Vector<IndexKeys>& , IDBTransactionBackendInterface*);
     virtual void setIndexesReady(const Vector<String>&, IDBTransactionBackendInterface*);
     virtual PassRefPtr<IDBIndexBackendInterface> index(const String& name, ExceptionCode&);
@@ -92,7 +96,8 @@ public:
     int64_t databaseId() const { return m_database->id(); }
     
 private:
-    IDBObjectStoreBackendImpl(const IDBDatabaseBackendImpl*, int64_t id, const String& name, const IDBKeyPath&, bool autoIncrement, int64_t maxIndexId);
+    IDBObjectStoreBackendImpl(const IDBDatabaseBackendImpl*, int64_t databaseId, const String& name, const IDBKeyPath&, bool autoIncrement);
+    IDBObjectStoreBackendImpl(const IDBDatabaseBackendImpl*, const String& name, const IDBKeyPath&, bool autoIncrement);
 
     void loadIndexes();
     PassRefPtr<IDBKey> generateKey(PassRefPtr<IDBTransactionBackendImpl>);
@@ -117,7 +122,6 @@ private:
     String m_name;
     IDBKeyPath m_keyPath;
     bool m_autoIncrement;
-    int64_t m_maxIndexId;
 
     IndexMap m_indexes;
 };

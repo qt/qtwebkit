@@ -42,8 +42,6 @@
 #import <JavaScriptCore/JSRetainPtr.h>
 #import <JavaScriptCore/JSStringRef.h>
 #import <JavaScriptCore/JSStringRefCF.h>
-#import <WebCore/GeolocationPosition.h>
-#import <WebCore/PageVisibilityState.h>
 #import <WebKit/DOMDocument.h>
 #import <WebKit/DOMElement.h>
 #import <WebKit/WebApplicationCache.h>
@@ -108,10 +106,6 @@
     return 0;
 }
 
-@end
-
-@interface WebGeolocationPosition (Internal)
-- (id)initWithGeolocationPosition:(PassRefPtr<WebCore::GeolocationPosition>)coreGeolocationPosition;
 @end
 
 TestRunner::~TestRunner()
@@ -273,6 +267,12 @@ void TestRunner::keepWebHistory()
 JSValueRef TestRunner::computedStyleIncludingVisitedInfo(JSContextRef context, JSValueRef value)
 {   
     return [[mainFrame webView] _computedStyleIncludingVisitedInfo:context forElement:value];
+}
+
+JSRetainPtr<JSStringRef> TestRunner::layerTreeAsText() const
+{
+    JSRetainPtr<JSStringRef> string(Adopt, JSStringCreateWithCFString((CFStringRef)[mainFrame _layerTreeAsText]));
+    return string;
 }
 
 JSRetainPtr<JSStringRef> TestRunner::markerTextForListItem(JSContextRef context, JSValueRef nodeObject) const
@@ -472,16 +472,9 @@ void TestRunner::setMockDeviceOrientation(bool canProvideAlpha, double alpha, bo
     [orientation release];
 }
 
-void TestRunner::setMockGeolocationPosition(double latitude, double longitude, double accuracy, bool providesAltitude, double altitude, bool providesAltitudeAccuracy, double altitudeAccuracy, bool providesHeading, double heading, bool providesSpeed, double speed)
+void TestRunner::setMockGeolocationPosition(double latitude, double longitude, double accuracy)
 {
-    WebGeolocationPosition *position = nil;
-    if (!providesAltitude && !providesAltitudeAccuracy && !providesHeading && !providesSpeed) {
-        // Test the exposed API.
-        position = [[WebGeolocationPosition alloc] initWithTimestamp:currentTime() latitude:latitude longitude:longitude accuracy:accuracy];
-    } else {
-        RefPtr<WebCore::GeolocationPosition> coreGeolocationPosition = WebCore::GeolocationPosition::create(currentTime(), latitude, longitude, accuracy, providesAltitude, altitude, providesAltitudeAccuracy, altitudeAccuracy, providesHeading, heading, providesSpeed, speed);
-        position = [[WebGeolocationPosition alloc] initWithGeolocationPosition:(coreGeolocationPosition.release())];
-    }
+    WebGeolocationPosition *position = [[WebGeolocationPosition alloc] initWithTimestamp:currentTime() latitude:latitude longitude:longitude accuracy:accuracy];
     [[MockGeolocationProvider shared] setPosition:position];
     [position release];
 }
@@ -899,8 +892,8 @@ unsigned worldIDForWorld(WebScriptWorld *world)
 {
     WorldMap::const_iterator end = worldMap().end();
     for (WorldMap::const_iterator it = worldMap().begin(); it != end; ++it) {
-        if (it->value == world)
-            return it->key;
+        if (it->second == world)
+            return it->first;
     }
 
     return 0;
@@ -922,7 +915,7 @@ void TestRunner::evaluateScriptInIsolatedWorld(unsigned worldID, JSObjectRef glo
     if (!worldID)
         world = [WebScriptWorld world];
     else {
-        RetainPtr<WebScriptWorld>& worldSlot = worldMap().add(worldID, 0).iterator->value;
+        RetainPtr<WebScriptWorld>& worldSlot = worldMap().add(worldID, 0).iterator->second;
         if (!worldSlot)
             worldSlot.adoptNS([[WebScriptWorld alloc] init]);
         world = worldSlot.get();
@@ -1155,26 +1148,12 @@ void TestRunner::setBackingScaleFactor(double backingScaleFactor)
 
 void TestRunner::resetPageVisibility()
 {
-    WebView *webView = [mainFrame webView];
-    if ([webView respondsToSelector:@selector(_setVisibilityState:isInitialState:)]) {
-        [webView _setVisibilityState:WebCore::PageVisibilityStateVisible isInitialState:NO];
-    }
+    // FIXME: Implement.
 }
 
-void TestRunner::setPageVisibility(const char* newVisibility)
+void TestRunner::setPageVisibility(const char*)
 {
-    if (!newVisibility)
-        return;
-
-    WebView *webView = [mainFrame webView];
-    if (!strcmp(newVisibility, "visible"))
-        [webView _setVisibilityState:WebCore::PageVisibilityStateVisible isInitialState:NO];
-    else if (!strcmp(newVisibility, "hidden"))
-        [webView _setVisibilityState:WebCore::PageVisibilityStateHidden isInitialState:NO];
-    else if (!strcmp(newVisibility, "prerender"))
-        [webView _setVisibilityState:WebCore::PageVisibilityStatePrerender isInitialState:NO];
-    else if (!strcmp(newVisibility, "preview"))
-        [webView _setVisibilityState:WebCore::PageVisibilityStatePreview isInitialState:NO];
+    // FIXME: Implement.
 }
 
 void TestRunner::sendWebIntentResponse(JSStringRef)

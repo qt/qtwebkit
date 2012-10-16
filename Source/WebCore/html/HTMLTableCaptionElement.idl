@@ -18,9 +18,12 @@
  * Boston, MA 02110-1301, USA.
  */
 
-[
-    JSGenerateToNativeObject
-] interface HTMLTableCaptionElement : HTMLElement {
-    [Reflect] attribute DOMString align;
-};
+module html {
 
+    interface [
+        JSGenerateToNativeObject
+    ] HTMLTableCaptionElement : HTMLElement {
+        attribute [Reflect] DOMString align;
+    };
+
+}

@@ -74,10 +74,10 @@ WebInspector.CSSSelectorDataGridNode.prototype = {
         }
 
         return cell;
-    },
-
-    __proto__: WebInspector.DataGridNode.prototype
+    }
 }
+
+WebInspector.CSSSelectorDataGridNode.prototype.__proto__ = WebInspector.DataGridNode.prototype;
 
 /**
  * @constructor
@@ -259,10 +259,10 @@ WebInspector.CSSSelectorProfileView.prototype = {
         this.refreshShowAsPercents();
 
         event.consume(true);
-    },
-
-    __proto__: WebInspector.View.prototype
+    }
 }
+
+WebInspector.CSSSelectorProfileView.prototype.__proto__ = WebInspector.View.prototype;
 
 /**
  * @constructor
@@ -364,10 +364,10 @@ WebInspector.CSSSelectorProfileType.prototype = {
     {
         title = title || WebInspector.UIString("Recording\u2026");
         return new WebInspector.CSSProfileHeader(this, title);
-    },
-
-    __proto__: WebInspector.ProfileType.prototype
+    }
 }
+
+WebInspector.CSSSelectorProfileType.prototype.__proto__ = WebInspector.ProfileType.prototype;
 
 
 /**
@@ -401,7 +401,7 @@ WebInspector.CSSProfileHeader.prototype = {
     {
         var profile = /** @type {CSSAgent.SelectorProfile} */this._protocolData;
         return new WebInspector.CSSSelectorProfileView(profile);
-    },
-
-    __proto__: WebInspector.ProfileHeader.prototype
+    }
 }
+
+WebInspector.CSSProfileHeader.prototype.__proto__ = WebInspector.ProfileHeader.prototype;

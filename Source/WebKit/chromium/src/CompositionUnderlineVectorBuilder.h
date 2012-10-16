@@ -32,9 +32,9 @@
 #define CompositionUnderlineVectorBuilder_h
 
 #include "Editor.h"
-#include "WebCompositionUnderline.h"
-#include <public/WebVector.h>
 #include <wtf/Vector.h>
+#include "WebCompositionUnderline.h"
+#include "platform/WebVector.h"
 
 namespace WebKit {
 

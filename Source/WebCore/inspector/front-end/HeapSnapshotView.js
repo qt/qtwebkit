@@ -732,11 +732,10 @@ WebInspector.HeapSnapshotView.prototype = {
             filterOption.label = title;
             this.filterSelectElement.appendChild(filterOption);
         }
-    },
+    }
+};
 
-    __proto__: WebInspector.View.prototype
-}
-
+WebInspector.HeapSnapshotView.prototype.__proto__ = WebInspector.View.prototype;
 
 /**
  * @constructor
@@ -795,10 +794,10 @@ WebInspector.HeapSnapshotProfileType.prototype = {
     createProfile: function(profile)
     {
         return new WebInspector.HeapProfileHeader(this, profile.title, profile.uid, profile.maxJSObjectId || 0);
-    },
-
-    __proto__: WebInspector.ProfileType.prototype
+    }
 }
+
+WebInspector.HeapSnapshotProfileType.prototype.__proto__ = WebInspector.ProfileType.prototype;
 
 /**
  * @constructor
@@ -813,7 +812,7 @@ WebInspector.HeapProfileHeader = function(type, title, uid, maxJSObjectId)
     WebInspector.ProfileHeader.call(this, type, title, uid);
     this.maxJSObjectId = maxJSObjectId;
     /**
-     * @type {WebInspector.OutputStream}
+     * @type {WebInspector.FileOutputStream}
      */
     this._receiver = null;
     /**
@@ -858,8 +857,6 @@ WebInspector.HeapProfileHeader.prototype = {
         }
 
         this._numberOfChunks = 0;
-        this._savedChunks = 0;
-        this._savingToFile = false;
         if (!this._receiver) {
             this._setupWorker();
             this.sidebarElement.subtitle = WebInspector.UIString("Loading\u2026");
@@ -892,22 +889,15 @@ WebInspector.HeapProfileHeader.prototype = {
     },
 
     /**
-     * @param {number} value
-     * @param {number} maxValue
+     * @param {number} savedChunksCount
      */
-    _updateTransferProgress: function(value, maxValue)
+    _saveStatusUpdate: function(savedChunksCount)
     {
-        var percentValue = ((maxValue ? (value / maxValue) : 0) * 100).toFixed(2);
-        if (this._savingToFile)
-            this.sidebarElement.subtitle = WebInspector.UIString("Saving\u2026 %d\%", percentValue);
-        else
-            this.sidebarElement.subtitle = WebInspector.UIString("Loading\u2026 %d\%", percentValue);
-    },
-
-    _updateSnapshotStatus: function()
-    {
-        this.sidebarElement.subtitle = Number.bytesToString(this._snapshotProxy.totalSize);
-        this.sidebarElement.wait = false;
+        if (savedChunksCount === this._totalNumberOfChunks) {
+            this.sidebarElement.subtitle = Number.bytesToString(this._snapshotProxy.totalSize);
+            this.sidebarElement.wait = false;
+        } else
+            this.sidebarElement.subtitle = WebInspector.UIString("Saving\u2026 %d\%", (savedChunksCount * 100 / this._totalNumberOfChunks).toFixed(2));
     },
 
     /**
@@ -919,32 +909,31 @@ WebInspector.HeapProfileHeader.prototype = {
         this._receiver.write(chunk, callback.bind(this));
         function callback()
         {
-            this._updateTransferProgress(++this._savedChunks, this._totalNumberOfChunks);
-            if (this._totalNumberOfChunks === this._savedChunks) {
-                if (this._savingToFile)
-                    this._updateSnapshotStatus();
-                else
-                    this.sidebarElement.subtitle = WebInspector.UIString("Parsing\u2026");
-
-                this._receiver.close();
-            }
+            this._saveStatusUpdate(++this._savedChunks);
+            if (this._totalNumberOfChunks === this._savedChunks)
+                this._snapshotReceived(null);
         }
     },
 
     _snapshotReceived: function(snapshotProxy)
     {
+        this._receiver.close();
         this._receiver = null;
         if (snapshotProxy)
             this._snapshotProxy = snapshotProxy;
-        this._updateSnapshotStatus();
+        this.sidebarElement.subtitle = Number.bytesToString(this._snapshotProxy.totalSize);
+        this.sidebarElement.wait = false;
         var worker = /** @type {WebInspector.HeapSnapshotWorker} */ this._snapshotProxy.worker;
         this.isTemporary = false;
         worker.startCheckingForLongRunningCalls();
     },
 
-    finishHeapSnapshot: function()
+    finishHeapSnapshot: function(transferFinished)
     {
         this._totalNumberOfChunks = this._numberOfChunks;
+        this.sidebarElement.subtitle = WebInspector.UIString("Parsing\u2026");
+        if (!transferFinished && this._receiver)
+            this._receiver.close();
     },
 
     /**
@@ -965,10 +954,9 @@ WebInspector.HeapProfileHeader.prototype = {
         function onOpen()
         {
             this._savedChunks = 0;
-            this._updateTransferProgress(0, this._totalNumberOfChunks);
+            this._saveStatusUpdate(0);
             ProfilerAgent.getProfile(this.profileType().id, this.uid);
         }
-        this._savingToFile = true;
         this._fileName = this._fileName || "Heap-" + new Date().toISO8601Compact() + ".heapsnapshot";
         this._receiver = new WebInspector.FileOutputStream();
         this._receiver.open(this._fileName, onOpen.bind(this));
@@ -993,7 +981,6 @@ WebInspector.HeapProfileHeader.prototype = {
         this.sidebarElement.wait = true;
         this._setupWorker();
         this._numberOfChunks = 0;
-        this._savingToFile = false;
 
         var delegate = new WebInspector.HeapSnapshotLoadFromFileDelegate(this);
         var fileReader = this._createFileReader(file, delegate);
@@ -1003,10 +990,10 @@ WebInspector.HeapProfileHeader.prototype = {
     _createFileReader: function(file, delegate)
     {
         return new WebInspector.ChunkedFileReader(file, 10000000, delegate);
-    },
-
-    __proto__: WebInspector.ProfileHeader.prototype
+    }
 }
+
+WebInspector.HeapProfileHeader.prototype.__proto__ = WebInspector.ProfileHeader.prototype;
 
 /**
  * @constructor
@@ -1018,39 +1005,34 @@ WebInspector.HeapSnapshotLoadFromFileDelegate = function(snapshotHeader)
 }
 
 WebInspector.HeapSnapshotLoadFromFileDelegate.prototype = {
-    onTransferStarted: function()
+    onTransferStarted: function(source)
     {
     },
 
-    /**
-     * @param {WebInspector.ChunkedReader} reader
-     */
-    onChunkTransferred: function(reader)
+    onChunkTransferred: function(source)
     {
-        this._snapshotHeader._updateTransferProgress(reader.loadedSize(), reader.fileSize());
+        this._snapshotHeader.sidebarElement.subtitle = WebInspector.UIString(
+            "Loading\u2026 %d%", (source.loadedSize() * 100 / source.fileSize()).toFixed(2));
     },
 
-    onTransferFinished: function()
+    onTransferFinished: function(source)
     {
-        this._snapshotHeader.finishHeapSnapshot();
+        this._snapshotHeader.finishHeapSnapshot(true);
     },
 
-    /**
-     * @param {WebInspector.ChunkedReader} reader
-     */
-    onError: function (reader, e)
+    onError: function (source, e)
     {
         switch(e.target.error.code) {
         case e.target.error.NOT_FOUND_ERR:
-            this._snapshotHeader.sidebarElement.subtitle = WebInspector.UIString("'%s' not found.", reader.fileName());
+            this._snapshotHeader.sidebarElement.subtitle = WebInspector.UIString("'%s' not found.", source.fileName());
         break;
         case e.target.error.NOT_READABLE_ERR:
-            this._snapshotHeader.sidebarElement.subtitle = WebInspector.UIString("'%s' is not readable", reader.fileName());
+            this._snapshotHeader.sidebarElement.subtitle = WebInspector.UIString("'%s' is not readable", source.fileName());
         break;
         case e.target.error.ABORT_ERR:
             break;
         default:
-            this._snapshotHeader.sidebarElement.subtitle = WebInspector.UIString("'%s' error %d", reader.fileName(), e.target.error.code);
+            this._snapshotHeader.sidebarElement.subtitle = WebInspector.UIString("'%s' error %d", source.fileName(), e.target.error.code);
         }
     }
 }

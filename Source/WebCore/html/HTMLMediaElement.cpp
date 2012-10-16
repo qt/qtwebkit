@@ -756,7 +756,7 @@ void HTMLMediaElement::loadInternal()
     // Some of the code paths below this function dispatch the BeforeLoad event. This ASSERT helps
     // us catch those bugs more quickly without needing all the branches to align to actually
     // trigger the event.
-    ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
+    ASSERT(!eventDispatchForbidden());
 
     // If we can't start a load right away, start it later.
     Page* page = document()->page();
@@ -1834,14 +1834,8 @@ void HTMLMediaElement::mediaPlayerKeyMessage(MediaPlayer*, const String& keySyst
     m_asyncEventQueue->enqueueEvent(event.release());
 }
 
-bool HTMLMediaElement::mediaPlayerKeyNeeded(MediaPlayer*, const String& keySystem, const String& sessionId, const unsigned char* initData, unsigned initDataLength)
+void HTMLMediaElement::mediaPlayerKeyNeeded(MediaPlayer*, const String& keySystem, const String& sessionId, const unsigned char* initData, unsigned initDataLength)
 {
-    if (!hasEventListeners(eventNames().webkitneedkeyEvent)) {
-        m_error = MediaError::create(MediaError::MEDIA_ERR_ENCRYPTED);
-        scheduleEvent(eventNames().errorEvent);
-        return false;
-    }
-
     MediaKeyEventInit initializer;
     initializer.keySystem = keySystem;
     initializer.sessionId = sessionId;
@@ -1852,7 +1846,6 @@ bool HTMLMediaElement::mediaPlayerKeyNeeded(MediaPlayer*, const String& keySyste
     RefPtr<Event> event = MediaKeyEvent::create(eventNames().webkitneedkeyEvent, initializer);
     event->setTarget(this);
     m_asyncEventQueue->enqueueEvent(event.release());
-    return true;
 }
 #endif
 

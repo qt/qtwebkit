@@ -107,7 +107,6 @@
 #import <WebCore/Range.h>
 #import <WebCore/RenderWidget.h>
 #import <WebCore/RenderView.h>
-#import <WebCore/ResourceBuffer.h>
 #import <WebCore/RunLoop.h>
 #import <WebCore/RuntimeApplicationChecks.h>
 #import <WebCore/SharedBuffer.h>
@@ -2379,7 +2378,7 @@ static String commandNameForSelector(SEL selector)
     static const SelectorNameMap* exceptionMap = createSelectorExceptionMap();
     SelectorNameMap::const_iterator it = exceptionMap->find(selector);
     if (it != exceptionMap->end())
-        return it->value;
+        return it->second;
 
     // Remove the trailing colon.
     // No need to capitalize the command name since Editor command names are
@@ -3688,7 +3687,7 @@ static bool matchesExtensionOrEquivalent(NSString *filename, NSString *extension
     
     if (WebCore::CachedImage* tiffResource = [self promisedDragTIFFDataSource]) {
         
-        ResourceBuffer *buffer = static_cast<CachedResource*>(tiffResource)->resourceBuffer();
+        SharedBuffer *buffer = static_cast<CachedResource*>(tiffResource)->data();
         if (!buffer)
             goto noPromisedData;
         

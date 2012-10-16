@@ -50,12 +50,12 @@ ALWAYS_INLINE JSValue JIT::getConstantOperand(unsigned src)
     return m_codeBlock->getConstant(src);
 }
 
-ALWAYS_INLINE void JIT::emitPutToCallFrameHeader(RegisterID from, JSStack::CallFrameHeaderEntry entry)
+ALWAYS_INLINE void JIT::emitPutToCallFrameHeader(RegisterID from, RegisterFile::CallFrameHeaderEntry entry)
 {
     storePtr(from, payloadFor(entry, callFrameRegister));
 }
 
-ALWAYS_INLINE void JIT::emitPutCellToCallFrameHeader(RegisterID from, JSStack::CallFrameHeaderEntry entry)
+ALWAYS_INLINE void JIT::emitPutCellToCallFrameHeader(RegisterID from, RegisterFile::CallFrameHeaderEntry entry)
 {
 #if USE(JSVALUE32_64)
     store32(TrustedImm32(JSValue::CellTag), tagFor(entry, callFrameRegister));
@@ -63,18 +63,18 @@ ALWAYS_INLINE void JIT::emitPutCellToCallFrameHeader(RegisterID from, JSStack::C
     storePtr(from, payloadFor(entry, callFrameRegister));
 }
 
-ALWAYS_INLINE void JIT::emitPutIntToCallFrameHeader(RegisterID from, JSStack::CallFrameHeaderEntry entry)
+ALWAYS_INLINE void JIT::emitPutIntToCallFrameHeader(RegisterID from, RegisterFile::CallFrameHeaderEntry entry)
 {
     store32(TrustedImm32(Int32Tag), intTagFor(entry, callFrameRegister));
     store32(from, intPayloadFor(entry, callFrameRegister));
 }
 
-ALWAYS_INLINE void JIT::emitPutImmediateToCallFrameHeader(void* value, JSStack::CallFrameHeaderEntry entry)
+ALWAYS_INLINE void JIT::emitPutImmediateToCallFrameHeader(void* value, RegisterFile::CallFrameHeaderEntry entry)
 {
     storePtr(TrustedImmPtr(value), Address(callFrameRegister, entry * sizeof(Register)));
 }
 
-ALWAYS_INLINE void JIT::emitGetFromCallFrameHeaderPtr(JSStack::CallFrameHeaderEntry entry, RegisterID to, RegisterID from)
+ALWAYS_INLINE void JIT::emitGetFromCallFrameHeaderPtr(RegisterFile::CallFrameHeaderEntry entry, RegisterID to, RegisterID from)
 {
     loadPtr(Address(from, entry * sizeof(Register)), to);
 #if USE(JSVALUE64)
@@ -101,7 +101,7 @@ ALWAYS_INLINE void JIT::emitLoadCharacterString(RegisterID src, RegisterID dst, 
     cont8Bit.link(this);
 }
 
-ALWAYS_INLINE void JIT::emitGetFromCallFrameHeader32(JSStack::CallFrameHeaderEntry entry, RegisterID to, RegisterID from)
+ALWAYS_INLINE void JIT::emitGetFromCallFrameHeader32(RegisterFile::CallFrameHeaderEntry entry, RegisterID to, RegisterID from)
 {
     load32(Address(from, entry * sizeof(Register)), to);
 #if USE(JSVALUE64)
@@ -265,9 +265,9 @@ ALWAYS_INLINE void JIT::updateTopCallFrame()
     ASSERT(static_cast<int>(m_bytecodeOffset) >= 0);
     if (m_bytecodeOffset) {
 #if USE(JSVALUE32_64)
-        storePtr(TrustedImmPtr(m_codeBlock->instructions().begin() + m_bytecodeOffset + 1), intTagFor(JSStack::ArgumentCount));
+        storePtr(TrustedImmPtr(m_codeBlock->instructions().begin() + m_bytecodeOffset + 1), intTagFor(RegisterFile::ArgumentCount));
 #else
-        store32(TrustedImm32(m_bytecodeOffset + 1), intTagFor(JSStack::ArgumentCount));
+        store32(TrustedImm32(m_bytecodeOffset + 1), intTagFor(RegisterFile::ArgumentCount));
 #endif
     }
     storePtr(callFrameRegister, &m_globalData->topCallFrame);
@@ -405,16 +405,13 @@ ALWAYS_INLINE bool JIT::isOperandConstantImmediateChar(unsigned src)
     return m_codeBlock->isConstantRegisterIndex(src) && getConstantOperand(src).isString() && asString(getConstantOperand(src).asCell())->length() == 1;
 }
 
-template <typename ClassType, MarkedBlock::DestructorType destructorType, typename StructureType> inline void JIT::emitAllocateBasicJSObject(StructureType structure, RegisterID result, RegisterID storagePtr)
+template <typename ClassType, bool destructor, typename StructureType> inline void JIT::emitAllocateBasicJSObject(StructureType structure, RegisterID result, RegisterID storagePtr)
 {
-    size_t size = ClassType::allocationSize(INLINE_STORAGE_CAPACITY);
     MarkedAllocator* allocator = 0;
-    if (destructorType == MarkedBlock::Normal)
-        allocator = &m_globalData->heap.allocatorForObjectWithNormalDestructor(size);
-    else if (destructorType == MarkedBlock::ImmortalStructure)
-        allocator = &m_globalData->heap.allocatorForObjectWithImmortalStructureDestructor(size);
+    if (destructor)
+        allocator = &m_globalData->heap.allocatorForObjectWithDestructor(sizeof(ClassType));
     else
-        allocator = &m_globalData->heap.allocatorForObjectWithoutDestructor(size);
+        allocator = &m_globalData->heap.allocatorForObjectWithoutDestructor(sizeof(ClassType));
     loadPtr(&allocator->m_freeList.head, result);
     addSlowCase(branchTestPtr(Zero, result));
 
@@ -431,7 +428,7 @@ template <typename ClassType, MarkedBlock::DestructorType destructorType, typena
 
 template <typename T> inline void JIT::emitAllocateJSFinalObject(T structure, RegisterID result, RegisterID scratch)
 {
-    emitAllocateBasicJSObject<JSFinalObject, MarkedBlock::None, T>(structure, result, scratch);
+    emitAllocateBasicJSObject<JSFinalObject, false, T>(structure, result, scratch);
 }
 
 inline void JIT::emitAllocateBasicStorage(size_t size, ptrdiff_t offsetFromBase, RegisterID result)
@@ -448,24 +445,23 @@ inline void JIT::emitAllocateBasicStorage(size_t size, ptrdiff_t offsetFromBase,
 
 inline void JIT::emitAllocateJSArray(unsigned valuesRegister, unsigned length, RegisterID cellResult, RegisterID storageResult, RegisterID storagePtr, RegisterID scratch)
 {
-    unsigned initialLength = std::max(length, BASE_VECTOR_LEN);
-    size_t initialStorage = Butterfly::totalSize(0, 0, true, initialLength * sizeof(EncodedJSValue));
-
-    loadPtr(m_codeBlock->globalObject()->addressOfArrayStructure(), scratch);
-    load8(Address(scratch, Structure::indexingTypeOffset()), storagePtr);
-    and32(TrustedImm32(IndexingShapeMask), storagePtr);
-    addSlowCase(branch32(NotEqual, storagePtr, TrustedImm32(ContiguousShape)));
+    unsigned initialLength = std::max(length, 4U);
+    size_t initialStorage = Butterfly::totalSize(0, 0, true, ArrayStorage::sizeFor(initialLength));
 
     // We allocate the backing store first to ensure that garbage collection 
     // doesn't happen during JSArray initialization.
     emitAllocateBasicStorage(initialStorage, sizeof(IndexingHeader), storageResult);
 
     // Allocate the cell for the array.
-    emitAllocateBasicJSObject<JSArray, MarkedBlock::None>(scratch, cellResult, storagePtr);
+    loadPtr(m_codeBlock->globalObject()->addressOfArrayStructure(), scratch);
+    emitAllocateBasicJSObject<JSArray, false>(scratch, cellResult, storagePtr);
 
-    // Store all the necessary info in the indexing header.
-    store32(Imm32(length), Address(storageResult, Butterfly::offsetOfPublicLength()));
-    store32(Imm32(initialLength), Address(storageResult, Butterfly::offsetOfVectorLength()));
+    // Store all the necessary info in the ArrayStorage.
+    store32(Imm32(length), Address(storageResult, ArrayStorage::lengthOffset()));
+    store32(Imm32(length), Address(storageResult, ArrayStorage::numValuesInVectorOffset()));
+    store32(Imm32(initialLength), Address(storageResult, ArrayStorage::vectorLengthOffset()));
+    store32(TrustedImm32(0), Address(storageResult, ArrayStorage::indexBiasOffset()));
+    storePtr(TrustedImmPtr(0), Address(storageResult, ArrayStorage::sparseMapOffset()));
 
     // Store the newly allocated ArrayStorage.
     storePtr(storageResult, Address(cellResult, JSObject::butterflyOffset()));
@@ -474,12 +470,12 @@ inline void JIT::emitAllocateJSArray(unsigned valuesRegister, unsigned length, R
     for (unsigned i = 0; i < length; i++) {
 #if USE(JSVALUE64)
         loadPtr(Address(callFrameRegister, (valuesRegister + i) * sizeof(Register)), storagePtr);
-        storePtr(storagePtr, Address(storageResult, sizeof(WriteBarrier<Unknown>) * i));
+        storePtr(storagePtr, Address(storageResult, ArrayStorage::vectorOffset() + sizeof(WriteBarrier<Unknown>) * i));
 #else
         load32(Address(callFrameRegister, (valuesRegister + i) * sizeof(Register)), storagePtr);
-        store32(storagePtr, Address(storageResult, sizeof(WriteBarrier<Unknown>) * i));
+        store32(storagePtr, Address(storageResult, ArrayStorage::vectorOffset() + sizeof(WriteBarrier<Unknown>) * i));
         load32(Address(callFrameRegister, (valuesRegister + i) * sizeof(Register) + sizeof(uint32_t)), storagePtr);
-        store32(storagePtr, Address(storageResult, sizeof(WriteBarrier<Unknown>) * i + sizeof(uint32_t)));
+        store32(storagePtr, Address(storageResult, ArrayStorage::vectorOffset() + sizeof(WriteBarrier<Unknown>) * i + sizeof(uint32_t)));
 #endif
     }
 }
@@ -563,29 +559,10 @@ inline void JIT::emitArrayProfilingSiteForBytecodeIndex(RegisterID structureAndI
 
 inline void JIT::emitArrayProfileStoreToHoleSpecialCase(ArrayProfile* arrayProfile)
 {
-#if ENABLE(VALUE_PROFILER)    
+    if (!canBeOptimized())
+        return;
+    
     store8(TrustedImm32(1), arrayProfile->addressOfMayStoreToHole());
-#else
-    UNUSED_PARAM(arrayProfile);
-#endif
-}
-
-static inline bool arrayProfileSaw(ArrayProfile* profile, IndexingType capability)
-{
-#if ENABLE(VALUE_PROFILER)
-    return !!(profile->observedArrayModes() & (asArrayModes(NonArray | capability) | asArrayModes(ArrayClass | capability)));
-#else
-    UNUSED_PARAM(profile);
-    UNUSED_PARAM(capability);
-    return false;
-#endif
-}
-
-inline JITArrayMode JIT::chooseArrayMode(ArrayProfile* profile)
-{
-    if (arrayProfileSaw(profile, ArrayStorageShape))
-        return JITArrayStorage;
-    return JITContiguous;
 }
 
 #if USE(JSVALUE32_64)
@@ -778,7 +755,7 @@ inline void JIT::unmap(RegisterID registerID)
 inline void JIT::unmap()
 {
     m_mappedBytecodeOffset = (unsigned)-1;
-    m_mappedVirtualRegisterIndex = JSStack::ReturnPC;
+    m_mappedVirtualRegisterIndex = RegisterFile::ReturnPC;
     m_mappedTag = (RegisterID)-1;
     m_mappedPayload = (RegisterID)-1;
 }

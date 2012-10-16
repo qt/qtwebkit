@@ -47,6 +47,7 @@
 #include "HTMLMediaElement.h"
 #include "HTMLNames.h"
 #include "HTMLPlugInImageElement.h"
+
 #include "HistoryItem.h"
 #include "HitTestResult.h"
 #include "KURL.h"
@@ -56,6 +57,7 @@
 #include "Settings.h"
 #include "TextBreakIterator.h"
 #include "Widget.h"
+
 #include "WebContextMenuData.h"
 #include "WebDataSourceImpl.h"
 #include "WebFormElement.h"
@@ -63,15 +65,15 @@
 #include "WebMenuItemInfo.h"
 #include "WebPlugin.h"
 #include "WebPluginContainerImpl.h"
+#include "platform/WebPoint.h"
 #include "WebSearchableFormData.h"
 #include "WebSpellCheckClient.h"
+#include "platform/WebString.h"
+#include "platform/WebURL.h"
+#include "platform/WebURLResponse.h"
+#include "platform/WebVector.h"
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
-#include <public/WebPoint.h>
-#include <public/WebString.h>
-#include <public/WebURL.h>
-#include <public/WebURLResponse.h>
-#include <public/WebVector.h>
 #include <wtf/text/WTFString.h>
 
 using namespace WebCore;

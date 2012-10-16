@@ -516,7 +516,6 @@ static void resetDefaultsToConsistentValues()
 
     DumpRenderTreeSupportGtk::setCSSGridLayoutEnabled(webView, false);
     DumpRenderTreeSupportGtk::setCSSRegionsEnabled(webView, true);
-    DumpRenderTreeSupportGtk::setCSSCustomFilterEnabled(webView, false);
     DumpRenderTreeSupportGtk::setShadowDOMEnabled(true);
     DumpRenderTreeSupportGtk::setStyleScopedEnabled(true);
 }

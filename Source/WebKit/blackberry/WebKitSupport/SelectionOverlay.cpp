@@ -94,9 +94,9 @@ void SelectionOverlay::hide()
     m_page->m_webPage->removeOverlay(m_overlay.get());
 }
 
-void SelectionOverlay::notifyFlushRequired(const GraphicsLayer* layer)
+void SelectionOverlay::notifySyncRequired(const GraphicsLayer* layer)
 {
-    m_page->notifyFlushRequired(layer);
+    m_page->notifySyncRequired(layer);
 }
 
 void SelectionOverlay::paintContents(const GraphicsLayer*, GraphicsContext& c, GraphicsLayerPaintingPhase, const IntRect& inClip)

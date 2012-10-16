@@ -17,13 +17,16 @@
  * Boston, MA 02110-1301, USA.
  */
 
-[
-    Conditional=WEB_INTENTS,
-    Supplemental=Navigator
-] interface NavigatorIntents {
-    void webkitStartActivity(in Intent intent,
-                             in [Callback, Optional] IntentResultCallback successCallback,
-                             in [Callback, Optional] IntentResultCallback failureCallback)
-        raises(DOMException);
-};
+module window {
 
+    interface [
+        Conditional=WEB_INTENTS,
+        Supplemental=Navigator
+    ] NavigatorIntents {
+        void webkitStartActivity(in Intent intent,
+                                 in [Callback, Optional] IntentResultCallback successCallback,
+                                 in [Callback, Optional] IntentResultCallback failureCallback)
+            raises(DOMException);
+    };
+
+}

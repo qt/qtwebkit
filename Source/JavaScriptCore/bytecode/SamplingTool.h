@@ -37,7 +37,6 @@
 #include <wtf/Atomics.h>
 #include <wtf/HashMap.h>
 #include <wtf/MainThread.h>
-#include <wtf/Spectrum.h>
 #include <wtf/Threading.h>
 
 namespace JSC {

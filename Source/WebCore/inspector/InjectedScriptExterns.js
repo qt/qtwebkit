@@ -38,7 +38,6 @@ console.log = function(vararg) { }
  */
 function InjectedScriptHost() { }
 InjectedScriptHost.prototype.storageId = function(object) { }
-InjectedScriptHost.prototype.getInternalProperties = function(object) { }
 /**
  * @param {Function} func
  */

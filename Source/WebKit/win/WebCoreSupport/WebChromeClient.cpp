@@ -746,7 +746,7 @@ void WebChromeClient::attachRootGraphicsLayer(Frame* frame, GraphicsLayer* graph
     m_webView->setRootChildLayer(graphicsLayer);
 }
 
-void WebChromeClient::scheduleCompositingLayerFlush()
+void WebChromeClient::scheduleCompositingLayerSync()
 {
     m_webView->flushPendingGraphicsLayerChangesSoon();
 }

@@ -23,22 +23,25 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=SVG&FILTERS,
-    DoNotCheckConstants
-] interface SVGFEMorphologyElement : SVGElement,
-                           SVGFilterPrimitiveStandardAttributes {
-    // Morphology Operators
-    const unsigned short SVG_MORPHOLOGY_OPERATOR_UNKNOWN  = 0;
-    const unsigned short SVG_MORPHOLOGY_OPERATOR_ERODE    = 1;
-    const unsigned short SVG_MORPHOLOGY_OPERATOR_DILATE   = 2;
+module svg {
 
-    readonly attribute SVGAnimatedString      in1;
-    readonly attribute SVGAnimatedEnumeration operator;
-    readonly attribute SVGAnimatedNumber      radiusX;
-    readonly attribute SVGAnimatedNumber      radiusY;
+    interface [
+        Conditional=SVG&FILTERS,
+        DoNotCheckConstants
+    ] SVGFEMorphologyElement : SVGElement,
+                               SVGFilterPrimitiveStandardAttributes {
+        // Morphology Operators
+        const unsigned short SVG_MORPHOLOGY_OPERATOR_UNKNOWN  = 0;
+        const unsigned short SVG_MORPHOLOGY_OPERATOR_ERODE    = 1;
+        const unsigned short SVG_MORPHOLOGY_OPERATOR_DILATE   = 2;
 
-    void setRadius(in [Optional=DefaultIsUndefined] float radiusX, 
-                   in [Optional=DefaultIsUndefined] float radiusY);
-};
+        readonly attribute SVGAnimatedString      in1;
+        readonly attribute SVGAnimatedEnumeration operator;
+        readonly attribute SVGAnimatedNumber      radiusX;
+        readonly attribute SVGAnimatedNumber      radiusY;
 
+        void setRadius(in [Optional=DefaultIsUndefined] float radiusX, 
+                       in [Optional=DefaultIsUndefined] float radiusY);
+    };
+
+}

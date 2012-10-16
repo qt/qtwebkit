@@ -31,7 +31,6 @@
 #include <wtf/RefCounted.h>
 #include <wtf/RetainPtr.h>
 #include <wtf/Vector.h>
-#include <wtf/text/WTFString.h>
 #include <wtf/unicode/Unicode.h>
 
 typedef unsigned short CGGlyph;
@@ -54,7 +53,7 @@ public:
     ComplexTextController(const Font*, const TextRun&, bool mayUseNaturalWritingDirection = false, HashSet<const SimpleFontData*>* fallbackFonts = 0, bool forTextEmphasis = false);
 
     // Advance and emit glyphs up to the specified character.
-    void advance(unsigned to, GlyphBuffer* = 0, GlyphIterationStyle = IncludePartialGlyphs, HashSet<const SimpleFontData*>* fallbackFonts = 0);
+    void advance(unsigned to, GlyphBuffer* = 0, GlyphIterationStyle = IncludePartialGlyphs);
 
     // Compute the character offset for a given x coordinate.
     int offsetForPosition(float x, bool includePartialGlyphs);
@@ -144,7 +143,6 @@ private:
     bool m_mayUseNaturalWritingDirection;
     bool m_forTextEmphasis;
 
-    Vector<String> m_stringsFor8BitRuns;
     Vector<UChar, 256> m_smallCapsBuffer;
 
     // Retain lines rather than their runs for better performance.

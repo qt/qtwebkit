@@ -25,7 +25,7 @@
 #if USE(GRAPHICS_SURFACE)
 namespace WebCore {
 
-PassRefPtr<GraphicsSurface> GraphicsSurface::create(const IntSize& size, Flags flags, const GraphicsSurfaceToken& token)
+PassRefPtr<GraphicsSurface> GraphicsSurface::create(const IntSize& size, Flags flags, uint64_t token)
 {
     return platformImport(size, flags, token);
 }
@@ -35,7 +35,7 @@ PassRefPtr<GraphicsSurface> GraphicsSurface::create(const IntSize& size, Graphic
     return platformCreate(size, flags);
 }
 
-GraphicsSurfaceToken GraphicsSurface::exportToken()
+uint64_t GraphicsSurface::exportToken()
 {
     return platformExport();
 }

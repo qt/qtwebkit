@@ -31,46 +31,46 @@
 namespace JSC {
 
 BlockAllocator::BlockAllocator()
-    : m_numberOfEmptyRegions(0)
-    , m_numberOfPartialRegions(0)
+    : m_numberOfFreeBlocks(0)
     , m_isCurrentlyAllocating(false)
     , m_blockFreeingThreadShouldQuit(false)
     , m_blockFreeingThread(createThread(blockFreeingThreadStartFunc, this, "JavaScriptCore::BlockFree"))
 {
     ASSERT(m_blockFreeingThread);
-    m_regionLock.Init();
+    m_freeBlockLock.Init();
 }
 
 BlockAllocator::~BlockAllocator()
 {
-    releaseFreeRegions();
+    releaseFreeBlocks();
     {
-        MutexLocker locker(m_emptyRegionConditionLock);
+        MutexLocker locker(m_freeBlockConditionLock);
+
         m_blockFreeingThreadShouldQuit = true;
-        m_emptyRegionCondition.broadcast();
+        m_freeBlockCondition.broadcast();
     }
     waitForThreadCompletion(m_blockFreeingThread);
 }
 
-void BlockAllocator::releaseFreeRegions()
+void BlockAllocator::releaseFreeBlocks()
 {
     while (true) {
-        Region* region;
+        DeadBlock* block;
         {
-            SpinLockHolder locker(&m_regionLock);
-            if (!m_numberOfEmptyRegions)
-                region = 0;
+            SpinLockHolder locker(&m_freeBlockLock);
+            if (!m_numberOfFreeBlocks)
+                block = 0;
             else {
-                region = m_emptyRegions.removeHead();
-                ASSERT(region);
-                m_numberOfEmptyRegions--;
+                block = m_freeBlocks.removeHead();
+                ASSERT(block);
+                m_numberOfFreeBlocks--;
             }
         }
         
-        if (!region)
+        if (!block)
             break;
 
-        delete region;
+        DeadBlock::destroy(block).deallocate();
     }
 }
 
@@ -79,7 +79,7 @@ void BlockAllocator::waitForRelativeTimeWhileHoldingLock(double relative)
     if (m_blockFreeingThreadShouldQuit)
         return;
 
-    m_emptyRegionCondition.timedWait(m_emptyRegionConditionLock, currentTime() + relative);
+    m_freeBlockCondition.timedWait(m_freeBlockConditionLock, currentTime() + relative);
 }
 
 void BlockAllocator::waitForRelativeTime(double relative)
@@ -88,7 +88,7 @@ void BlockAllocator::waitForRelativeTime(double relative)
     // frequently. It would only be a bug if this function failed to return
     // when it was asked to do so.
     
-    MutexLocker locker(m_emptyRegionConditionLock);
+    MutexLocker locker(m_freeBlockConditionLock);
     waitForRelativeTimeWhileHoldingLock(relative);
 }
 
@@ -114,40 +114,30 @@ void BlockAllocator::blockFreeingThreadMain()
         // Now process the list of free blocks. Keep freeing until half of the
         // blocks that are currently on the list are gone. Assume that a size_t
         // field can be accessed atomically.
-        size_t currentNumberOfEmptyRegions = m_numberOfEmptyRegions;
-        if (!currentNumberOfEmptyRegions)
+        size_t currentNumberOfFreeBlocks = m_numberOfFreeBlocks;
+        if (!currentNumberOfFreeBlocks)
             continue;
         
-        size_t desiredNumberOfEmptyRegions = currentNumberOfEmptyRegions / 2;
+        size_t desiredNumberOfFreeBlocks = currentNumberOfFreeBlocks / 2;
         
         while (!m_blockFreeingThreadShouldQuit) {
-            Region* region;
+            DeadBlock* block;
             {
-                SpinLockHolder locker(&m_regionLock);
-                if (m_numberOfEmptyRegions <= desiredNumberOfEmptyRegions)
-                    region = 0;
+                SpinLockHolder locker(&m_freeBlockLock);
+                if (m_numberOfFreeBlocks <= desiredNumberOfFreeBlocks)
+                    block = 0;
                 else {
-                    region = m_emptyRegions.removeHead();
-                    ASSERT(region);
-                    m_numberOfEmptyRegions--;
+                    block = m_freeBlocks.removeHead();
+                    ASSERT(block);
+                    m_numberOfFreeBlocks--;
                 }
             }
             
-            if (!region)
+            if (!block)
                 break;
             
-            delete region;
+            DeadBlock::destroy(block).deallocate();
         }
-
-        // Sleep until there is actually work to do rather than waking up every second to check.
-        MutexLocker locker(m_emptyRegionConditionLock);
-        m_regionLock.Lock();
-        while (!m_numberOfEmptyRegions && !m_blockFreeingThreadShouldQuit) {
-            m_regionLock.Unlock();
-            m_emptyRegionCondition.wait(m_emptyRegionConditionLock);
-            m_regionLock.Lock();
-        }
-        m_regionLock.Unlock();
     }
 }
 

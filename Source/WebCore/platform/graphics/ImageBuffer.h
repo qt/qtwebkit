@@ -121,8 +121,6 @@ namespace WebCore {
 
         bool copyToPlatformTexture(GraphicsContext3D&, Platform3DObject, GC3Denum, bool, bool);
 
-        void reportMemoryUsage(MemoryObjectInfo*) const;
-
     private:
 #if USE(CG)
         NativeImagePtr copyNativeImage(BackingStoreCopy = CopyBackingStore) const;

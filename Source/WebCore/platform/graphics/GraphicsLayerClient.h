@@ -58,13 +58,14 @@ public:
     virtual ~GraphicsLayerClient() {}
 
     virtual bool shouldUseTileCache(const GraphicsLayer*) const { return false; }
+    virtual bool usingTileCache(const GraphicsLayer*) const { return false; }
     
     // Callback for when hardware-accelerated animation started.
     virtual void notifyAnimationStarted(const GraphicsLayer*, double time) = 0;
 
-    // Notification that a layer property changed that requires a subsequent call to flushCompositingState()
+    // Notification that a layer property changed that requires a subsequent call to syncCompositingState()
     // to appear on the screen.
-    virtual void notifyFlushRequired(const GraphicsLayer*) = 0;
+    virtual void notifySyncRequired(const GraphicsLayer*) = 0;
     
     virtual void paintContents(const GraphicsLayer*, GraphicsContext&, GraphicsLayerPaintingPhase, const IntRect& inClip) = 0;
     virtual void didCommitChangesForLayer(const GraphicsLayer*) const { }

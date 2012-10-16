@@ -133,10 +133,10 @@ WebInspector.EventListenersSidebarPane.prototype = {
         var selectedOption = this.settingsSelectElement[this.settingsSelectElement.selectedIndex];
         WebInspector.settings.eventListenersFilter.set(selectedOption.value);
         this.update(this._selectedNode);
-    },
-
-    __proto__: WebInspector.SidebarPane.prototype
+    }
 }
+
+WebInspector.EventListenersSidebarPane.prototype.__proto__ = WebInspector.SidebarPane.prototype;
 
 /**
  * @constructor
@@ -164,10 +164,10 @@ WebInspector.EventListenersSection.prototype = {
     {
         var eventListenerBar = new WebInspector.EventListenerBar(eventListener, this._nodeId, this._linkifier);
         this._eventBars.appendChild(eventListenerBar.element);
-    },
-
-    __proto__: WebInspector.PropertiesSection.prototype
+    }
 }
+
+WebInspector.EventListenersSection.prototype.__proto__ = WebInspector.PropertiesSection.prototype;
 
 /**
  * @constructor
@@ -256,7 +256,7 @@ WebInspector.EventListenerBar.prototype = {
             else
                 this.subtitleElement.textContent = WebInspector.UIString("(anonymous function)");
         }
-    },
-
-    __proto__: WebInspector.ObjectPropertiesSection.prototype
+    }
 }
+
+WebInspector.EventListenerBar.prototype.__proto__ = WebInspector.ObjectPropertiesSection.prototype;

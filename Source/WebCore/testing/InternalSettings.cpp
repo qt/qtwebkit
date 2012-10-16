@@ -79,9 +79,6 @@ InternalSettings::Backup::Backup(Page* page, Settings* settings)
     , m_originalShadowDOMEnabled(RuntimeEnabledFeatures::shadowDOMEnabled())
     , m_originalAuthorShadowDOMForAnyElementEnabled(RuntimeEnabledFeatures::authorShadowDOMForAnyElementEnabled())
 #endif
-#if ENABLE(STYLE_SCOPED)
-    , m_originalStyleScoped(RuntimeEnabledFeatures::styleScopedEnabled())
-#endif
     , m_originalEditingBehavior(settings->editingBehaviorType())
     , m_originalUnifiedSpellCheckerEnabled(settings->unifiedTextCheckerEnabled())
     , m_originalFixedPositionCreatesStackingContext(settings->fixedPositionCreatesStackingContext())
@@ -116,9 +113,6 @@ void InternalSettings::Backup::restoreTo(Page* page, Settings* settings)
 #if ENABLE(SHADOW_DOM)
     RuntimeEnabledFeatures::setShadowDOMEnabled(m_originalShadowDOMEnabled);
     RuntimeEnabledFeatures::setAuthorShadowDOMForAnyElementEnabled(m_originalAuthorShadowDOMForAnyElementEnabled);
-#endif
-#if ENABLE(STYLE_SCOPED)
-    RuntimeEnabledFeatures::setStyleScopedEnabled(m_originalStyleScoped);
 #endif
     settings->setEditingBehaviorType(m_originalEditingBehavior);
     settings->setUnifiedTextCheckerEnabled(m_originalUnifiedSpellCheckerEnabled);
@@ -305,15 +299,6 @@ void InternalSettings::setAuthorShadowDOMForAnyElementEnabled(bool isEnabled)
     RuntimeEnabledFeatures::setAuthorShadowDOMForAnyElementEnabled(isEnabled);
 #else
     UNUSED_PARAM(isEnabled);
-#endif
-}
-
-void InternalSettings::setStyleScopedEnabled(bool enabled)
-{
-#if ENABLE(STYLE_SCOPED)
-    RuntimeEnabledFeatures::setStyleScopedEnabled(enabled);
-#else
-    UNUSED_PARAM(enabled);
 #endif
 }
 

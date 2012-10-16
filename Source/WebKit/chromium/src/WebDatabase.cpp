@@ -36,7 +36,7 @@
 #include "QuotaTracker.h"
 #include "SecurityOrigin.h"
 #include "WebDatabaseObserver.h"
-#include <public/WebString.h>
+#include "platform/WebString.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 

@@ -195,11 +195,11 @@ void LayerWebKitThread::setDrawable(bool isDrawable)
 
 void LayerWebKitThread::setNeedsCommit()
 {
-    // Call notifyFlushRequired(), which in this implementation plumbs through to
+    // Call notifySyncRequired(), which in this implementation plumbs through to
     // call scheduleRootLayerCommit() on the WebView, which will cause us to commit
     // changes done on the WebKit thread for display on the Compositing thread.
     if (m_owner)
-        m_owner->notifyFlushRequired();
+        m_owner->notifySyncRequired();
 }
 
 void LayerWebKitThread::notifyAnimationStarted(double time)

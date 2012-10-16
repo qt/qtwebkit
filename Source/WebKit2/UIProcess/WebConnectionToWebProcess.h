@@ -33,28 +33,32 @@ namespace WebKit {
 
 class WebProcessProxy;
 
-class WebConnectionToWebProcess : public WebConnection, public CoreIPC::Connection::Client {
+class WebConnectionToWebProcess : public WebConnection, CoreIPC::Connection::Client {
 public:
     static PassRefPtr<WebConnectionToWebProcess> create(WebProcessProxy*, CoreIPC::Connection::Identifier, WebCore::RunLoop*);
 
-    WebProcessProxy* webProcessProxy() const { return m_process; }
+    CoreIPC::Connection* connection() { return m_connection.get(); }
+
+    void invalidate();
+
 private:
     WebConnectionToWebProcess(WebProcessProxy*, CoreIPC::Connection::Identifier, WebCore::RunLoop*);
 
     // WebConnection
-    virtual void encodeMessageBody(CoreIPC::ArgumentEncoder*, APIObject*) OVERRIDE;
-    virtual bool decodeMessageBody(CoreIPC::ArgumentDecoder*, RefPtr<APIObject>&) OVERRIDE;
+    virtual void postMessage(const String&, APIObject*);
 
     // CoreIPC::Connection::Client
     virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
     virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
     virtual void didClose(CoreIPC::Connection*);
     virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::MessageID);
+    virtual void syncMessageSendTimedOut(CoreIPC::Connection*);
 #if PLATFORM(WIN)
     virtual Vector<HWND> windowsToReceiveSentMessagesWhileWaitingForSyncReply();
 #endif
 
     WebProcessProxy* m_process;
+    RefPtr<CoreIPC::Connection> m_connection;
 };
 
 } // namespace WebKit

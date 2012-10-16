@@ -194,18 +194,6 @@ bool ImageSource::isSizeAvailable()
     return result;
 }
 
-static ImageOrientation orientationFromProperties(CFDictionaryRef imageProperties)
-{
-    ASSERT(imageProperties);
-    CFNumberRef orientationProperty = (CFNumberRef)CFDictionaryGetValue(imageProperties, kCGImagePropertyOrientation);
-    if (!orientationProperty)
-        return DefaultImageOrientation;
-
-    int exifValue;
-    CFNumberGetValue(orientationProperty, kCFNumberIntType, &exifValue);
-    return ImageOrientation::fromEXIFValue(exifValue);
-}
-
 IntSize ImageSource::frameSizeAtIndex(size_t index, RespectImageOrientationEnum shouldRespectOrientation) const
 {
     RetainPtr<CFDictionaryRef> properties(AdoptCF, CGImageSourceCopyPropertiesAtIndex(m_decoder, index, imageSourceOptions(SkipMetadata)));
@@ -221,7 +209,7 @@ IntSize ImageSource::frameSizeAtIndex(size_t index, RespectImageOrientationEnum 
     if (num)
         CFNumberGetValue(num, kCFNumberIntType, &h);
 
-    if ((shouldRespectOrientation == RespectImageOrientation) && orientationFromProperties(properties.get()).usesWidthAsHeight())
+    if ((shouldRespectOrientation == RespectImageOrientation) && orientationAtIndex(index).usesWidthAsHeight())
         return IntSize(h, w);
 
     return IntSize(w, h);
@@ -233,7 +221,13 @@ ImageOrientation ImageSource::orientationAtIndex(size_t index) const
     if (!properties)
         return DefaultImageOrientation;
 
-    return orientationFromProperties(properties.get());
+    CFNumberRef orientationProperty = (CFNumberRef)CFDictionaryGetValue(properties.get(), kCGImagePropertyOrientation);
+    if (!orientationProperty)
+        return DefaultImageOrientation;
+
+    int exifValue;
+    CFNumberGetValue(orientationProperty, kCFNumberIntType, &exifValue);
+    return ImageOrientation::fromEXIFValue(exifValue);
 }
 
 IntSize ImageSource::size(RespectImageOrientationEnum shouldRespectOrientation) const

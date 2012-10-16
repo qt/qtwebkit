@@ -37,9 +37,10 @@
 #include "Logging.h"
 #include "NotImplemented.h"
 #include "SocketStreamHandleClient.h"
-#include <public/Platform.h>
-#include <public/WebData.h>
-#include <public/WebSocketStreamHandle.h>
+#include "platform/WebData.h"
+#include "WebKit.h"
+#include "platform/WebKitPlatformSupport.h"
+#include "platform/WebSocketStreamHandle.h"
 #include <wtf/PassOwnPtr.h>
 
 using namespace WebKit;
@@ -72,13 +73,7 @@ void SocketStreamHandleInternal::connect(const KURL& url)
 int SocketStreamHandleInternal::send(const char* data, int len)
 {
     LOG(Network, "send len=%d", len);
-    // FIXME: |m_socket| should not be null here, but it seems that there is the
-    // case. We should figure out such a path and fix it rather than checking
-    // null here.
-    if (!m_socket) {
-        LOG(Network, "m_socket is null when sending. It should not be.");
-        return 0;
-    }
+    ASSERT(m_socket);
     if (m_pendingAmountSent + len >= m_maxPendingSendAllowed)
         len = m_maxPendingSendAllowed - m_pendingAmountSent - 1;
 

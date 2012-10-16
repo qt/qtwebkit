@@ -251,10 +251,10 @@ class RenderLayer : public ScrollableArea {
 public:
     friend class RenderReplica;
 
-    RenderLayer(RenderLayerModelObject*);
+    RenderLayer(RenderBoxModelObject*);
     ~RenderLayer();
 
-    RenderLayerModelObject* renderer() const { return m_renderer; }
+    RenderBoxModelObject* renderer() const { return m_renderer; }
     RenderBox* renderBox() const { return m_renderer && m_renderer->isBox() ? toRenderBox(m_renderer) : 0; }
     RenderLayer* parent() const { return m_parent; }
     RenderLayer* previousSibling() const { return m_previous; }
@@ -275,7 +275,7 @@ public:
     // if layer compositing is being used,
     void setBackingNeedsRepaint();
     void setBackingNeedsRepaintInRect(const LayoutRect&); // r is in the coordinate space of the layer's render object
-    void repaintIncludingNonCompositingDescendants(RenderLayerModelObject* repaintContainer);
+    void repaintIncludingNonCompositingDescendants(RenderBoxModelObject* repaintContainer);
 #endif
 
     void styleChanged(StyleDifference, const RenderStyle* oldStyle);
@@ -882,7 +882,7 @@ private:
 
     friend class RenderLayerBacking;
     friend class RenderLayerCompositor;
-    friend class RenderLayerModelObject;
+    friend class RenderBoxModelObject;
 
     // Only safe to call from RenderBoxModelObject::destroyLayer(RenderArena*)
     void destroy(RenderArena*);
@@ -956,7 +956,7 @@ protected:
     BlendMode m_blendMode;
 #endif
 
-    RenderLayerModelObject* m_renderer;
+    RenderBoxModelObject* m_renderer;
 
     RenderLayer* m_parent;
     RenderLayer* m_previous;

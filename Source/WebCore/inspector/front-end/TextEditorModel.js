@@ -528,7 +528,7 @@ WebInspector.TextEditorModel.prototype = {
     resetUndoStack: function()
     {
         this._undoStack = [];
-    },
-
-    __proto__: WebInspector.Object.prototype
+    }
 }
+
+WebInspector.TextEditorModel.prototype.__proto__ = WebInspector.Object.prototype;

@@ -35,10 +35,10 @@ using namespace WebCore;
 namespace JSC {
 namespace Bindings {
 
-const ClassInfo RuntimeObject::s_info = { "RuntimeObject", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(RuntimeObject) };
+const ClassInfo RuntimeObject::s_info = { "RuntimeObject", &JSNonFinalObject::s_info, 0, 0, CREATE_METHOD_TABLE(RuntimeObject) };
 
 RuntimeObject::RuntimeObject(ExecState*, JSGlobalObject* globalObject, Structure* structure, PassRefPtr<Instance> instance)
-    : JSDestructibleObject(globalObject->globalData(), structure)
+    : JSNonFinalObject(globalObject->globalData(), structure)
     , m_instance(instance)
 {
 }
@@ -140,7 +140,8 @@ bool RuntimeObject::getOwnPropertySlot(JSCell* cell, ExecState *exec, PropertyNa
         } else {
             // Now check if a method with specified name exists, if so return a function object for
             // that method.
-            if (aClass->methodNamed(propertyName, instance.get())) {
+            MethodList methodList = aClass->methodsNamed(propertyName, instance.get());
+            if (methodList.size() > 0) {
                 slot.setCustom(thisObject, thisObject->methodGetter);
                 
                 instance->end();
@@ -186,7 +187,8 @@ bool RuntimeObject::getOwnPropertyDescriptor(JSObject* object, ExecState *exec, 
         } else {
             // Now check if a method with specified name exists, if so return a function object for
             // that method.
-            if (aClass->methodNamed(propertyName, instance.get())) {
+            MethodList methodList = aClass->methodsNamed(propertyName, instance.get());
+            if (methodList.size() > 0) {
                 PropertySlot slot;
                 slot.setCustom(thisObject, methodGetter);
                 instance->end();

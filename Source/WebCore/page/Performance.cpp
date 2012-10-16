@@ -165,9 +165,9 @@ EventTargetData* Performance::ensureEventTargetData()
     return &m_eventTargetData;
 }
 
-double Performance::now() const
+double Performance::webkitNow() const
 {
-    return 1000.0 * m_frame->document()->loader()->timing()->monotonicTimeToZeroBasedDocumentTime(monotonicallyIncreasingTime());
+    return 1000.0 * m_frame->document()->loader()->timing()->convertMonotonicTimeToZeroBasedDocumentTime(monotonicallyIncreasingTime());
 }
 
 } // namespace WebCore

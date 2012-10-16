@@ -31,7 +31,6 @@
 #include "FloatRect.h"
 #include "HTMLElement.h"
 #include "IntSize.h"
-#include <wtf/Forward.h>
 
 #if PLATFORM(CHROMIUM) || PLATFORM(QT)
 #define DefaultInterpolationQuality InterpolationMedium
@@ -137,8 +136,6 @@ public:
     bool shouldAccelerate(const IntSize&) const;
 
     float deviceScaleFactor() const { return m_deviceScaleFactor; }
-
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
 private:
     HTMLCanvasElement(const QualifiedName&, Document*);

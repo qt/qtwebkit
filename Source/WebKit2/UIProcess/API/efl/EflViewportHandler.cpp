@@ -53,11 +53,6 @@ DrawingAreaProxy* EflViewportHandler::drawingArea() const
     return ewk_view_page_get(m_viewWidget)->drawingArea();
 }
 
-void EflViewportHandler::setRendererActive(bool active)
-{
-    drawingArea()->layerTreeCoordinatorProxy()->layerTreeRenderer()->setActive(active);
-}
-
 void EflViewportHandler::display(const IntRect& rect)
 {
     WebCore::TransformationMatrix matrix;

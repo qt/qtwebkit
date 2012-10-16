@@ -27,7 +27,6 @@
 #define RenderLayerCompositor_h
 
 #include "ChromeClient.h"
-#include "Frame.h"
 #include "RenderLayer.h"
 #include "RenderLayerBacking.h"
 
@@ -196,7 +195,7 @@ public:
 
     void scrollingLayerDidChange(RenderLayer*);
 
-    String layerTreeAsText(LayerTreeFlags);
+    String layerTreeAsText(bool showDebugInfo = false);
 
     // These are named to avoid conflicts with the functions in GraphicsLayerClient
     // These return the actual internal variables.
@@ -226,7 +225,7 @@ private:
 
     // GraphicsLayerClient Implementation
     virtual void notifyAnimationStarted(const GraphicsLayer*, double) { }
-    virtual void notifyFlushRequired(const GraphicsLayer*) { scheduleLayerFlush(); }
+    virtual void notifySyncRequired(const GraphicsLayer*) { scheduleLayerFlush(); }
     virtual void paintContents(const GraphicsLayer*, GraphicsContext&, GraphicsLayerPaintingPhase, const IntRect&);
 
     virtual bool showDebugBorders(const GraphicsLayer*) const;
@@ -284,7 +283,6 @@ private:
 
     bool isFlushingLayers() const { return m_flushingLayers; }
 
-    GraphicsLayerFactory* graphicsLayerFactory() const;
     ScrollingCoordinator* scrollingCoordinator() const;
 
     // Whether a running transition or animation enforces the need for a compositing layer.

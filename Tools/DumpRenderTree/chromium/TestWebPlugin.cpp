@@ -33,7 +33,6 @@
 #include "platform/WebKitPlatformSupport.h"
 #include "WebPluginContainer.h"
 #include "WebPluginParams.h"
-#include "WebTouchPoint.h"
 #include <wtf/Assertions.h>
 #include <wtf/text/CString.h>
 
@@ -77,61 +76,16 @@ static void premultiplyAlpha(const unsigned colorIn[3], float alpha, float color
     colorOut[3] = alpha;
 }
 
-static const char* pointState(WebKit::WebTouchPoint::State state)
-{
-    switch (state) {
-    case WebKit::WebTouchPoint::StateReleased:
-        return "Released";
-    case WebKit::WebTouchPoint::StatePressed:
-        return "Pressed";
-    case WebKit::WebTouchPoint::StateMoved:
-        return "Moved";
-    case WebKit::WebTouchPoint::StateCancelled:
-        return "Cancelled";
-    default:
-        return "Unknown";
-    }
-
-    ASSERT_NOT_REACHED();
-    return 0;
-}
-
-static void printTouchList(const WebKit::WebTouchPoint* points, int length)
-{
-    for (int i = 0; i < length; ++i)
-        printf("* %d, %d: %s\n", points[i].position.x, points[i].position.y, pointState(points[i].state));
-}
-
-static void printEventDetails(const WebKit::WebInputEvent& event)
-{
-    if (WebKit::WebInputEvent::isTouchEventType(event.type)) {
-        const WebKit::WebTouchEvent& touch = static_cast<const WebKit::WebTouchEvent&>(event);
-        printTouchList(touch.touches, touch.touchesLength);
-        printTouchList(touch.changedTouches, touch.changedTouchesLength);
-        printTouchList(touch.targetTouches, touch.targetTouchesLength);
-    } else if (WebKit::WebInputEvent::isMouseEventType(event.type) || event.type == WebKit::WebInputEvent::MouseWheel) {
-        const WebKit::WebMouseEvent& mouse = static_cast<const WebKit::WebMouseEvent&>(event);
-        printf("* %d, %d\n", mouse.x, mouse.y);
-    } else if (WebKit::WebInputEvent::isGestureEventType(event.type)) {
-        const WebKit::WebGestureEvent& gesture = static_cast<const WebKit::WebGestureEvent&>(event);
-        printf("* %d, %d\n", gesture.x, gesture.y);
-    }
-}
-
 TestWebPlugin::TestWebPlugin(WebKit::WebFrame* frame,
                              const WebKit::WebPluginParams& params)
     : m_frame(frame)
     , m_container(0)
     , m_context(0)
-    , m_acceptsTouchEvent(false)
-    , m_printEventDetails(false)
 {
     static const WebString kAttributePrimitive = WebString::fromUTF8("primitive");
     static const WebString kAttributeBackgroundColor = WebString::fromUTF8("background-color");
     static const WebString kAttributePrimitiveColor = WebString::fromUTF8("primitive-color");
     static const WebString kAttributeOpacity = WebString::fromUTF8("opacity");
-    static const WebString kAttributeAcceptsTouch = WebString::fromUTF8("accepts-touch");
-    static const WebString kAttributePrintEventDetails = WebString::fromUTF8("print-event-details");
 
     ASSERT(params.attributeNames.size() == params.attributeValues.size());
     size_t size = params.attributeNames.size();
@@ -147,10 +101,6 @@ TestWebPlugin::TestWebPlugin(WebKit::WebFrame* frame,
             parseColor(attributeValue, m_scene.primitiveColor);
         else if (attributeName == kAttributeOpacity)
             m_scene.opacity = parseOpacity(attributeValue);
-        else if (attributeName == kAttributeAcceptsTouch)
-            m_acceptsTouchEvent = parseBoolean(attributeValue);
-        else if (attributeName == kAttributePrintEventDetails)
-            m_printEventDetails = parseBoolean(attributeValue);
     }
 }
 
@@ -179,7 +129,6 @@ bool TestWebPlugin::initialize(WebPluginContainer* container)
 
     m_container = container;
     m_container->setBackingTextureId(m_colorTexture);
-    m_container->setIsAcceptingTouchEvents(m_acceptsTouchEvent);
     return true;
 }
 
@@ -257,12 +206,6 @@ void TestWebPlugin::parseColor(const WebString& string, unsigned color[3])
 float TestWebPlugin::parseOpacity(const WebString& string)
 {
     return static_cast<float>(atof(string.utf8().data()));
-}
-
-bool TestWebPlugin::parseBoolean(const WebString& string)
-{
-    static const WebString kPrimitiveTrue = WebString::fromUTF8("true");
-    return string == kPrimitiveTrue;
 }
 
 bool TestWebPlugin::initScene()
@@ -464,31 +407,6 @@ bool TestWebPlugin::handleInputEvent(const WebKit::WebInputEvent& event, WebKit:
     }
 
     printf("Plugin received event: %s\n", eventName ? eventName : "unknown");
-    if (m_printEventDetails)
-        printEventDetails(event);
-    return false;
-}
-
-bool TestWebPlugin::handleDragStatusUpdate(WebKit::WebDragStatus dragStatus, const WebKit::WebDragData&, WebKit::WebDragOperationsMask, const WebKit::WebPoint& position, const WebKit::WebPoint& screenPosition)
-{
-    const char* dragStatusName = 0;
-    switch (dragStatus) {
-    case WebKit::WebDragStatusEnter:
-        dragStatusName = "DragEnter";
-        break;
-    case WebKit::WebDragStatusOver:
-        dragStatusName = "DragOver";
-        break;
-    case WebKit::WebDragStatusLeave:
-        dragStatusName = "DragLeave";
-        break;
-    case WebKit::WebDragStatusDrop:
-        dragStatusName = "DragDrop";
-        break;
-    case WebKit::WebDragStatusUnknown:
-        ASSERT_NOT_REACHED();
-    }
-    printf("Plugin received event: %s\n", dragStatusName);
     return false;
 }
 

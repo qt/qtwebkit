@@ -40,8 +40,6 @@
 #define ENABLE_PLUGIN_PROCESS 1
 #endif
 
-#define ENABLE_NETWORK_PROCESS 1
-
 #define ENABLE_MEMORY_SAMPLER 1
 
 #include <CoreFoundation/CoreFoundation.h>

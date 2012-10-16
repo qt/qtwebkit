@@ -1,4 +1,4 @@
-/*
+    /*
  Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
 
  This library is free software; you can redistribute it and/or
@@ -26,7 +26,6 @@
 #include "GraphicsLayer.h"
 #include "GraphicsLayerAnimation.h"
 #include "GraphicsLayerTransform.h"
-#include "GraphicsSurface.h"
 #include "Image.h"
 #include "IntSize.h"
 #include "ShareableBitmap.h"
@@ -62,8 +61,8 @@ public:
 #if ENABLE(CSS_FILTERS)
     virtual void syncLayerFilters(WebLayerID, const WebCore::FilterOperations&) = 0;
 #endif
-#if USE(GRAPHICS_SURFACE)
-    virtual void syncCanvas(WebLayerID, const WebCore::IntSize& canvasSize, const WebCore::GraphicsSurfaceToken&, uint32_t frontBuffer) = 0;
+#if PLATFORM(QT)
+    virtual void syncCanvas(WebLayerID, const WebCore::IntSize& canvasSize, uint64_t graphicsSurfaceToken, uint32_t frontBuffer) = 0;
 #endif
 
     virtual void setLayerAnimatedOpacity(WebLayerID, float) = 0;
@@ -116,8 +115,8 @@ public:
     void setContentsNeedsDisplay();
     void setContentsScale(float);
     void setVisibleContentRectTrajectoryVector(const FloatPoint&);
-    virtual void flushCompositingState(const FloatRect&);
-    virtual void flushCompositingStateForThisLayerOnly();
+    virtual void syncCompositingState(const FloatRect&);
+    virtual void syncCompositingStateForThisLayerOnly();
 #if ENABLE(CSS_FILTERS)
     bool setFilters(const FilterOperations&);
 #endif
@@ -134,7 +133,6 @@ public:
 
     GraphicsLayer* maskTarget() const { return m_maskTarget; }
     void setMaskTarget(GraphicsLayer* layer) { m_maskTarget = layer; }
-    IntRect coverRect() const { return m_mainBackingStore ? m_mainBackingStore->mapToContents(m_mainBackingStore->coverRect()) : IntRect(); }
 
     static void initFactory();
 

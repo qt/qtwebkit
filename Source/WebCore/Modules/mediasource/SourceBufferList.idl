@@ -28,24 +28,27 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
  
-[
-    Conditional=MEDIA_SOURCE,
-    V8EnabledAtRuntime=mediaSource,
-    IndexedGetter,
-    EventTarget,
-    CallWith=ScriptExecutionContext
-] interface SourceBufferList {
-    readonly attribute unsigned long length;
-    SourceBuffer item(in unsigned long index);
+module html {
 
-    // EventTarget interface
-    void addEventListener(in DOMString type,
-                          in EventListener listener,
-                          in [Optional] boolean useCapture);
-    void removeEventListener(in DOMString type,
-                             in EventListener listener,
-                             in [Optional] boolean useCapture);
-    boolean dispatchEvent(in Event event)
-        raises(EventException);
-};
+    interface [
+        Conditional=MEDIA_SOURCE,
+        V8EnabledAtRuntime=mediaSource,
+        IndexedGetter,
+        EventTarget,
+        CallWith=ScriptExecutionContext
+    ] SourceBufferList {
+        readonly attribute unsigned long length;
+        SourceBuffer item(in unsigned long index);
 
+        // EventTarget interface
+        void addEventListener(in DOMString type,
+                              in EventListener listener,
+                              in [Optional] boolean useCapture);
+        void removeEventListener(in DOMString type,
+                                 in EventListener listener,
+                                 in [Optional] boolean useCapture);
+        boolean dispatchEvent(in Event event)
+            raises(EventException);
+    };
+
+}

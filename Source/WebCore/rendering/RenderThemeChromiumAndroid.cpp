@@ -30,15 +30,13 @@
 #include "Color.h"
 #include "LayoutTestSupport.h"
 #include "PaintInfo.h"
+#include "PlatformSupport.h"
 #include "RenderMediaControlsChromium.h"
 #include "RenderObject.h"
 #include "RenderProgress.h"
 #include "RenderSlider.h"
 #include "ScrollbarTheme.h"
 #include "UserAgentStyleSheets.h"
-
-#include <public/Platform.h>
-#include <public/android/WebThemeEngine.h>
 
 namespace WebCore {
 
@@ -83,7 +81,7 @@ void RenderThemeChromiumAndroid::adjustInnerSpinButtonStyle(StyleResolver*, Rend
     if (isRunningLayoutTest()) {
         // Match Chromium Linux spin button style in layout tests.
         // FIXME: Consider removing the conditional if a future Android theme matches this.
-        IntSize size = WebKit::Platform::current()->themeEngine()->getSize(WebKit::WebThemeEngine::PartInnerSpinButton);
+        IntSize size = PlatformSupport::getThemePartSize(PlatformSupport::PartInnerSpinButton);
 
         style->setWidth(Length(size.width(), Fixed));
         style->setMinWidth(Length(size.width(), Fixed));
@@ -106,7 +104,7 @@ int RenderThemeChromiumAndroid::menuListArrowPadding() const
 {
     // We cannot use the scrollbar thickness here, as it's width is 0 on Android.
     // Instead, use the width of the scrollbar down arrow.
-    IntSize scrollbarSize = WebKit::Platform::current()->themeEngine()->getSize(WebKit::WebThemeEngine::PartScrollbarDownArrow);
+    IntSize scrollbarSize = PlatformSupport::getThemePartSize(PlatformSupport::PartScrollbarDownArrow);
     return scrollbarSize.width();
 }
 

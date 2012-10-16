@@ -28,17 +28,7 @@
 
 namespace WebCore {
 
-enum FontWidthVariant {
-    RegularWidth,
-    HalfWidth,
-    ThirdWidth,
-    QuarterWidth,
-    LastFontWidthVariant = QuarterWidth
-};
-
-const unsigned FontWidthVariantWidth = 2;
-
-COMPILE_ASSERT(LastFontWidthVariant >> FontWidthVariantWidth == 0, FontWidthVariantWidth_is_correct);
+enum FontWidthVariant { RegularWidth, HalfWidth, ThirdWidth, QuarterWidth };
 
 } // namespace WebCore
 

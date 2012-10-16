@@ -203,12 +203,6 @@ private:
     virtual bool handleContextMenuEvent(const WebMouseEvent&);
     virtual bool handleKeyboardEvent(const WebKeyboardEvent&);
     virtual void setFocus(bool);
-
-    virtual bool handleEditingCommand(const String& commandName, const String& argument) OVERRIDE;
-    virtual bool isEditingCommandEnabled(const String&) OVERRIDE;
-    
-    virtual bool handlesPageScaleFactor() OVERRIDE;
-
     virtual NPObject* pluginScriptableNPObject();
 
 #if PLATFORM(MAC)

@@ -32,7 +32,6 @@
 #include "ResourceResponse.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/MathExtras.h>
-#include <wtf/MemoryInstrumentationHashMap.h>
 #include <wtf/StdLibExtras.h>
 
 using namespace std;
@@ -577,7 +576,8 @@ void ResourceResponseBase::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo)
     info.addMember(m_textEncodingName);
     info.addMember(m_suggestedFilename);
     info.addMember(m_httpStatusText);
-    info.addMember(m_httpHeaderFields);
+    info.addHashMap(m_httpHeaderFields);
+    info.addInstrumentedMapEntries(m_httpHeaderFields);
     info.addMember(m_resourceLoadTiming);
     info.addMember(m_resourceLoadInfo);
 }

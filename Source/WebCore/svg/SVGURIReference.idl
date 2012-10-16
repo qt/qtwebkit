@@ -24,12 +24,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=SVG,
-    ObjCProtocol,
-    SuppressToJSObject,
-    OmitConstructor
-] interface SVGURIReference {
-    readonly attribute SVGAnimatedString href;
-};
+module svg {
 
+    interface [
+        Conditional=SVG,
+        ObjCProtocol,
+        SuppressToJSObject,
+        OmitConstructor
+    ] SVGURIReference {
+        readonly attribute SVGAnimatedString href;
+    };
+
+}

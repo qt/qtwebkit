@@ -23,11 +23,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=WEBGL,
-] interface WebGLActiveInfo {
-    readonly attribute long size;
-    readonly attribute unsigned long type;
-    readonly attribute DOMString name;
-};
+module html {
 
+    interface [
+        Conditional=WEBGL,
+    ] WebGLActiveInfo {
+        readonly attribute long size;
+        readonly attribute unsigned long type;
+        readonly attribute DOMString name;
+    };
+
+}

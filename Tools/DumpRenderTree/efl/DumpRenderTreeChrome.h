@@ -48,8 +48,8 @@ public:
     Evas_Object* createNewWindow();
     void removeWindow(Evas_Object*);
 
-    Evas_Object* createInspectorView();
-    void removeInspectorView();
+    Evas_Object* createWebInspectorView();
+    void removeWebInspectorView();
     void waitInspectorLoadFinished();
 
     const Vector<Evas_Object*>& extraViews() const;

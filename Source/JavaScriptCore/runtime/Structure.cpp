@@ -149,7 +149,7 @@ void Structure::dumpStatistics()
 #endif
 }
 
-Structure::Structure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue prototype, const TypeInfo& typeInfo, const ClassInfo* classInfo, IndexingType indexingType, PropertyOffset inlineCapacity)
+Structure::Structure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue prototype, const TypeInfo& typeInfo, const ClassInfo* classInfo, IndexingType indexingType)
     : JSCell(globalData, globalData.structureStructure.get())
     , m_typeInfo(typeInfo)
     , m_indexingType(indexingType)
@@ -158,7 +158,6 @@ Structure::Structure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSV
     , m_classInfo(classInfo)
     , m_transitionWatchpointSet(InitializedWatching)
     , m_outOfLineCapacity(0)
-    , m_inlineCapacity(inlineCapacity)
     , m_offset(invalidOffset)
     , m_dictionaryKind(NoneDictionaryKind)
     , m_isPinnedPropertyTable(false)
@@ -183,7 +182,6 @@ Structure::Structure(JSGlobalData& globalData)
     , m_classInfo(&s_info)
     , m_transitionWatchpointSet(InitializedWatching)
     , m_outOfLineCapacity(0)
-    , m_inlineCapacity(0)
     , m_offset(invalidOffset)
     , m_dictionaryKind(NoneDictionaryKind)
     , m_isPinnedPropertyTable(false)
@@ -206,7 +204,6 @@ Structure::Structure(JSGlobalData& globalData, const Structure* previous)
     , m_classInfo(previous->m_classInfo)
     , m_transitionWatchpointSet(InitializedWatching)
     , m_outOfLineCapacity(previous->m_outOfLineCapacity)
-    , m_inlineCapacity(previous->m_inlineCapacity)
     , m_offset(invalidOffset)
     , m_dictionaryKind(previous->m_dictionaryKind)
     , m_isPinnedPropertyTable(false)
@@ -326,15 +323,11 @@ bool Structure::anyObjectInChainMayInterceptIndexedAccesses() const
     }
 }
 
-bool Structure::needsSlowPutIndexing() const
+NonPropertyTransition Structure::suggestedIndexingTransition() const
 {
-    return anyObjectInChainMayInterceptIndexedAccesses()
-        || globalObject()->isHavingABadTime();
-}
-
-NonPropertyTransition Structure::suggestedArrayStorageTransition() const
-{
-    if (needsSlowPutIndexing())
+    ASSERT(!hasIndexedProperties(indexingType()));
+    
+    if (anyObjectInChainMayInterceptIndexedAccesses() || globalObject()->isHavingABadTime())
         return AllocateSlowPutArrayStorage;
     
     return AllocateArrayStorage;
@@ -553,7 +546,6 @@ Structure* Structure::nonPropertyTransition(JSGlobalData& globalData, Structure*
     transition->m_previous.set(globalData, transition, structure);
     transition->m_attributesInPrevious = attributes;
     transition->m_indexingType = indexingType;
-    transition->m_offset = structure->m_offset;
     
     if (structure->m_propertyTable) {
         if (structure->m_isPinnedPropertyTable)
@@ -616,21 +608,20 @@ Structure* Structure::flattenDictionaryStructure(JSGlobalData& globalData, JSObj
         ASSERT(m_propertyTable);
 
         size_t propertyCount = m_propertyTable->size();
-
-        // Holds our values compacted by insertion order.
         Vector<JSValue> values(propertyCount);
-
-        // Copies out our values from their hashed locations, compacting property table offsets as we go.
+        
         unsigned i = 0;
+        PropertyOffset firstOffset = firstPropertyOffsetFor(m_typeInfo.type());
         PropertyTable::iterator end = m_propertyTable->end();
         for (PropertyTable::iterator iter = m_propertyTable->begin(); iter != end; ++iter, ++i) {
             values[i] = object->getDirectOffset(iter->offset);
-            iter->offset = propertyOffsetFor(i, m_inlineCapacity);
+            // Update property table to have the new property offsets
+            iter->offset = i + firstOffset;
         }
         
-        // Copies in our values to their compacted locations.
+        // Copy the original property values into their final locations
         for (unsigned i = 0; i < propertyCount; i++)
-            object->putDirectOffset(globalData, propertyOffsetFor(i, m_inlineCapacity), values[i]);
+            object->putDirectOffset(globalData, firstOffset + i, values[i]);
 
         m_propertyTable->clearDeletedOffsets();
     }
@@ -768,7 +759,7 @@ PropertyOffset Structure::putSpecificValue(JSGlobalData& globalData, PropertyNam
     if (!m_propertyTable)
         createPropertyMap();
 
-    PropertyOffset newOffset = m_propertyTable->nextOffset(m_inlineCapacity);
+    PropertyOffset newOffset = m_propertyTable->nextOffset(m_typeInfo.type());
 
     m_propertyTable->add(PropertyMapEntry(globalData, this, rep, newOffset, attributes, specificValue));
 

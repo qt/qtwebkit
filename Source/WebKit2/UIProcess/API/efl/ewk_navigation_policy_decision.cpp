@@ -47,10 +47,10 @@ struct _Ewk_Navigation_Policy_Decision {
     Ewk_Navigation_Type navigationType;
     Event_Mouse_Button mouseButton;
     Event_Modifier_Keys modifiers;
-    RefPtr<Ewk_Url_Request> request;
+    Ewk_Url_Request* request;
     WKEinaSharedString frameName;
 
-    _Ewk_Navigation_Policy_Decision(WKFramePolicyListenerRef _listener, Ewk_Navigation_Type _navigationType, Event_Mouse_Button _mouseButton, Event_Modifier_Keys _modifiers, PassRefPtr<Ewk_Url_Request> _request, const char* _frameName)
+    _Ewk_Navigation_Policy_Decision(WKFramePolicyListenerRef _listener, Ewk_Navigation_Type _navigationType, Event_Mouse_Button _mouseButton, Event_Modifier_Keys _modifiers, Ewk_Url_Request* _request, const char* _frameName)
         : __ref(1)
         , listener(_listener)
         , actedUponByClient(false)
@@ -68,6 +68,8 @@ struct _Ewk_Navigation_Policy_Decision {
         // This is the default choice for all policy decisions in WebPageProxy.cpp.
         if (!actedUponByClient)
             WKFramePolicyListenerUse(listener.get());
+
+        ewk_url_request_unref(request);
     }
 };
 
@@ -122,7 +124,7 @@ Ewk_Url_Request* ewk_navigation_policy_request_get(const Ewk_Navigation_Policy_D
 {
     EINA_SAFETY_ON_NULL_RETURN_VAL(decision, 0);
 
-    return decision->request.get();
+    return decision->request;
 }
 
 void ewk_navigation_policy_decision_accept(Ewk_Navigation_Policy_Decision* decision)
@@ -175,6 +177,6 @@ Ewk_Navigation_Policy_Decision* ewk_navigation_policy_decision_new(WKFrameNaviga
                                               static_cast<Ewk_Navigation_Type>(navigationType),
                                               static_cast<Event_Mouse_Button>(mouseButton),
                                               static_cast<Event_Modifier_Keys>(modifiers),
-                                              adoptRef(ewk_url_request_new(request)),
+                                              ewk_url_request_new(request),
                                               frameName);
 }

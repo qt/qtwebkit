@@ -423,7 +423,7 @@ void WebPage::setUserScripts(const Vector<String>& scripts)
     PageGroup* pageGroup = PageGroup::pageGroup(this->pageGroup()->identifier());
     pageGroup->removeUserScriptsFromWorld(mainThreadNormalWorld());
     for (unsigned i = 0; i < scripts.size(); ++i)
-        pageGroup->addUserScriptToWorld(mainThreadNormalWorld(), scripts.at(i), KURL(), Vector<String>(), Vector<String>(), InjectAtDocumentEnd, InjectInTopFrameOnly);
+        pageGroup->addUserScriptToWorld(mainThreadNormalWorld(), scripts.at(i), KURL(), nullptr, nullptr, InjectAtDocumentEnd, InjectInTopFrameOnly);
 }
 
 void WebPage::selectedIndex(int32_t newIndex)
@@ -438,6 +438,23 @@ void WebPage::hidePopupMenu()
 
     m_activePopupMenu->client()->popupDidHide();
     m_activePopupMenu = 0;
+}
+
+bool WebPage::handleMouseReleaseEvent(const PlatformMouseEvent& platformMouseEvent)
+{
+#ifndef QT_NO_CLIPBOARD
+    if (platformMouseEvent.button() != WebCore::MiddleButton)
+        return false;
+
+    if (qApp->clipboard()->supportsSelection()) {
+        WebCore::Frame* focusFrame = m_page->focusController()->focusedOrMainFrame();
+        if (focusFrame) {
+            focusFrame->editor()->command(AtomicString("PasteGlobalSelection")).execute();
+            return true;
+        }
+    }
+#endif
+    return false;
 }
 
 } // namespace WebKit

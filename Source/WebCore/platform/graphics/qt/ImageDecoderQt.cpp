@@ -29,8 +29,8 @@
 #include "config.h"
 #include "ImageDecoderQt.h"
 
-#include <QtCore/QBuffer>
 #include <QtCore/QByteArray>
+#include <QtCore/QBuffer>
 #include <QtGui/QImageReader>
 
 namespace WebCore {
@@ -272,9 +272,7 @@ NativeImagePtr ImageFrame::asNewNativeImage() const
     else
         format = QImage::Format_RGB32;
 
-    QImage img(reinterpret_cast<uchar*>(m_bytes), m_size.width(), m_size.height(), sizeof(PixelData) * m_size.width(), format);
-
-    return new QPixmap(QPixmap::fromImage(img));
+    return new QImage(reinterpret_cast<uchar*>(m_bytes), m_size.width(), m_size.height(), sizeof(PixelData) * m_size.width(), format);
 }
 
 }

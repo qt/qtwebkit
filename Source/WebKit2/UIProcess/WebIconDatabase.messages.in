@@ -32,5 +32,4 @@ messages -> WebIconDatabase {
     SynchronousLoadDecisionForIconURL(WTF::String iconURL) -> (int loadDecision)
     
     GetLoadDecisionForIconURL(WTF::String iconURL, uint64_t callbackID)
-    DidReceiveIconForPageURL(WTF::String pageURL)
 }

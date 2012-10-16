@@ -36,7 +36,7 @@
 #include <GL/gl.h>
 #include <WebCore/Frame.h>
 #include <WebCore/FrameView.h>
-#include <WebCore/GLContext.h>
+#include <WebCore/GLContextGLX.h>
 #include <WebCore/Page.h>
 #include <WebCore/Settings.h>
 
@@ -84,12 +84,12 @@ GLContext* LayerTreeHostGtk::glContext()
 
 void LayerTreeHostGtk::initialize()
 {
-    m_rootLayer = GraphicsLayer::create(graphicsLayerFactory(), this);
+    m_rootLayer = GraphicsLayer::create(this);
     m_rootLayer->setDrawsContent(false);
     m_rootLayer->setSize(m_webPage->size());
 
     // The non-composited contents are a child of the root layer.
-    m_nonCompositedContentLayer = GraphicsLayer::create(graphicsLayerFactory(), this);
+    m_nonCompositedContentLayer = GraphicsLayer::create(this);
     m_nonCompositedContentLayer->setDrawsContent(true);
     m_nonCompositedContentLayer->setContentsOpaque(m_webPage->drawsBackground() && !m_webPage->drawsTransparentBackground());
     m_nonCompositedContentLayer->setSize(m_webPage->size());
@@ -241,7 +241,7 @@ void LayerTreeHostGtk::notifyAnimationStarted(const WebCore::GraphicsLayer*, dou
 {
 }
 
-void LayerTreeHostGtk::notifyFlushRequired(const WebCore::GraphicsLayer*)
+void LayerTreeHostGtk::notifySyncRequired(const WebCore::GraphicsLayer*)
 {
 }
 
@@ -287,12 +287,12 @@ void LayerTreeHostGtk::layerFlushTimerFired()
 
 bool LayerTreeHostGtk::flushPendingLayerChanges()
 {
-    m_rootLayer->flushCompositingStateForThisLayerOnly();
-    m_nonCompositedContentLayer->flushCompositingStateForThisLayerOnly();
+    m_rootLayer->syncCompositingStateForThisLayerOnly();
+    m_nonCompositedContentLayer->syncCompositingStateForThisLayerOnly();
     if (m_pageOverlayLayer)
-        m_pageOverlayLayer->flushCompositingStateForThisLayerOnly();
+        m_pageOverlayLayer->syncCompositingStateForThisLayerOnly();
 
-    return m_webPage->corePage()->mainFrame()->view()->flushCompositingStateIncludingSubframes();
+    return m_webPage->corePage()->mainFrame()->view()->syncCompositingStateIncludingSubframes();
 }
 
 void LayerTreeHostGtk::compositeLayersToContext(CompositePurpose purpose)
@@ -317,6 +317,7 @@ void LayerTreeHostGtk::compositeLayersToContext(CompositePurpose purpose)
     m_textureMapper->endPainting();
 
     context->swapBuffers();
+    m_webPage->invalidateWidget();
 }
 
 void LayerTreeHostGtk::flushAndRenderLayers()
@@ -350,7 +351,7 @@ void LayerTreeHostGtk::createPageOverlayLayer()
 {
     ASSERT(!m_pageOverlayLayer);
 
-    m_pageOverlayLayer = GraphicsLayer::create(graphicsLayerFactory(), this);
+    m_pageOverlayLayer = GraphicsLayer::create(this);
 #ifndef NDEBUG
     m_pageOverlayLayer->setName("LayerTreeHost page overlay content");
 #endif

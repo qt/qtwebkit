@@ -1000,8 +1000,6 @@ WebInspector.DataGrid.prototype = {
     ColumnResizePadding: 10,
 
     CenterResizerOverBorderAdjustment: 3,
-
-    __proto__: WebInspector.View.prototype
 }
 
 WebInspector.DataGrid.ResizeMethod = {
@@ -1009,6 +1007,8 @@ WebInspector.DataGrid.ResizeMethod = {
     First: "first",
     Last: "last"
 }
+
+WebInspector.DataGrid.prototype.__proto__ = WebInspector.View.prototype;
 
 /**
  * @constructor
@@ -1635,10 +1635,10 @@ WebInspector.DataGridNode.prototype = {
             this._savedPosition.parent.insertChild(this, this._savedPosition.index);
 
         delete this._savedPosition;
-    },
-
-    __proto__: WebInspector.Object.prototype
+    }
 }
+
+WebInspector.DataGridNode.prototype.__proto__ = WebInspector.Object.prototype;
 
 /**
  * @constructor
@@ -1655,7 +1655,7 @@ WebInspector.CreationDataGridNode.prototype = {
     {
         delete this.isCreationNode;
         delete this.makeNormal;
-    },
-
-    __proto__: WebInspector.DataGridNode.prototype
+    }
 }
+
+WebInspector.CreationDataGridNode.prototype.__proto__ = WebInspector.DataGridNode.prototype;

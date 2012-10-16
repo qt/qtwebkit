@@ -29,38 +29,41 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    ActiveDOMObject,
-    Constructor(in DOMString scriptUrl),
-    CallWith=ScriptExecutionContext,
-    ConstructorRaisesException,
-    EventTarget,
-    JSNoStaticTables
-] interface EventSource {
+module window {
 
-    readonly attribute DOMString URL; // Lowercased .url is the one in the spec, but leaving .URL for compatibility reasons.
-    readonly attribute DOMString url;
+    interface [
+        ActiveDOMObject,
+        Constructor(in DOMString scriptUrl),
+        CallWith=ScriptExecutionContext,
+        ConstructorRaisesException,
+        EventTarget,
+        JSNoStaticTables
+    ] EventSource {
 
-    // ready state
-    const unsigned short CONNECTING = 0;
-    const unsigned short OPEN = 1;
-    const unsigned short CLOSED = 2;
-    readonly attribute unsigned short readyState;
+        readonly attribute DOMString URL; // Lowercased .url is the one in the spec, but leaving .URL for compatibility reasons.
+        readonly attribute DOMString url;
 
-    // networking
-    attribute EventListener onopen;
-    attribute EventListener onmessage;
-    attribute EventListener onerror;
-    void close();
+        // ready state
+        const unsigned short CONNECTING = 0;
+        const unsigned short OPEN = 1;
+        const unsigned short CLOSED = 2;
+        readonly attribute unsigned short readyState;
 
-    // EventTarget interface
-    void addEventListener(in DOMString type,
-                          in EventListener listener,
-                          in [Optional] boolean useCapture);
-    void removeEventListener(in DOMString type,
-                             in EventListener listener,
-                             in [Optional] boolean useCapture);
-    boolean dispatchEvent(in Event evt)
-        raises(EventException);
+        // networking
+        attribute EventListener onopen;
+        attribute EventListener onmessage;
+        attribute EventListener onerror;
+        void close();
 
-};
+        // EventTarget interface
+        void addEventListener(in DOMString type,
+                              in EventListener listener,
+                              in [Optional] boolean useCapture);
+        void removeEventListener(in DOMString type,
+                                 in EventListener listener,
+                                 in [Optional] boolean useCapture);
+        boolean dispatchEvent(in Event evt)
+            raises(EventException);
+
+    };
+}

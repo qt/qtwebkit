@@ -1,1 +1,0 @@
-ADD_SUBDIRECTORY(${WEBKIT_DIR}/efl/DefaultTheme)

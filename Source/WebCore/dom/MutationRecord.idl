@@ -28,19 +28,21 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=MUTATION_OBSERVERS
-] interface MutationRecord {
-    readonly attribute DOMString type;
-    readonly attribute Node target;
+module core {
+    interface [
+        Conditional=MUTATION_OBSERVERS
+    ] MutationRecord {
+        readonly attribute DOMString type;
+        readonly attribute Node target;
 
-    readonly attribute NodeList addedNodes;
-    readonly attribute NodeList removedNodes;
-    readonly attribute Node previousSibling;
-    readonly attribute Node nextSibling;
+        readonly attribute NodeList addedNodes;
+        readonly attribute NodeList removedNodes;
+        readonly attribute Node previousSibling;
+        readonly attribute Node nextSibling;
 
-    [TreatReturnedNullStringAs=Null] readonly attribute DOMString attributeName;
-    [TreatReturnedNullStringAs=Null] readonly attribute DOMString attributeNamespace;
+        readonly attribute DOMString attributeName;
+        readonly attribute [TreatReturnedNullStringAs=Null] DOMString attributeNamespace;
 
-    [TreatReturnedNullStringAs=Null] readonly attribute DOMString oldValue;
-};
+        readonly attribute [TreatReturnedNullStringAs=Null] DOMString oldValue;
+    };
+}

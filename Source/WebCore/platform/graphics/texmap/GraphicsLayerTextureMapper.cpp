@@ -20,18 +20,9 @@
 #include "config.h"
 #include "GraphicsLayerTextureMapper.h"
 
-#include "GraphicsLayerFactory.h"
 #include "TextureMapperLayer.h"
 
 namespace WebCore {
-
-PassOwnPtr<GraphicsLayer> GraphicsLayer::create(GraphicsLayerFactory* factory, GraphicsLayerClient* client)
-{
-    if (!factory)
-        return adoptPtr(new GraphicsLayerTextureMapper(client));
-
-    return factory->createGraphicsLayer(client);
-}
 
 PassOwnPtr<GraphicsLayer> GraphicsLayer::create(GraphicsLayerClient* client)
 {
@@ -56,7 +47,7 @@ void GraphicsLayerTextureMapper::notifyChange(TextureMapperLayer::ChangeMask cha
     m_changeMask |= changeMask;
     if (!client())
         return;
-    client()->notifyFlushRequired(this);
+    client()->notifySyncRequired(this);
 }
 
 void GraphicsLayerTextureMapper::didSynchronize()
@@ -367,16 +358,16 @@ void GraphicsLayerTextureMapper::setContentsToMedia(TextureMapperPlatformLayer* 
 
 /* \reimp (GraphicsLayer.h)
 */
-void GraphicsLayerTextureMapper::flushCompositingStateForThisLayerOnly()
+void GraphicsLayerTextureMapper::syncCompositingStateForThisLayerOnly()
 {
-    m_layer->flushCompositingState(this);
+    m_layer->syncCompositingState(this);
 }
 
 /* \reimp (GraphicsLayer.h)
 */
-void GraphicsLayerTextureMapper::flushCompositingState(const FloatRect&)
+void GraphicsLayerTextureMapper::syncCompositingState(const FloatRect&)
 {
-    m_layer->flushCompositingState(this, TextureMapperLayer::TraverseDescendants);
+    m_layer->syncCompositingState(this, TextureMapperLayer::TraverseDescendants);
 }
 
 bool GraphicsLayerTextureMapper::addAnimation(const KeyframeValueList& valueList, const IntSize& boxSize, const Animation* anim, const String& keyframesName, double timeOffset)

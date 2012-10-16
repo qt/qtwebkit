@@ -23,14 +23,17 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=SCRIPTED_SPEECH,
-    CustomIsReachable,
-    IndexedGetter,
-    V8DependentLifetime
-] interface SpeechRecognitionResult {
-    readonly attribute unsigned long length;
-    SpeechRecognitionAlternative item(in [IsIndex] unsigned long index);
-    readonly attribute boolean final;
-    readonly attribute Document emma;
-};
+module core {
+    interface [
+        Conditional=SCRIPTED_SPEECH,
+        CustomIsReachable,
+        IndexedGetter,
+        V8DependentLifetime
+    ] SpeechRecognitionResult {
+        readonly attribute unsigned long length;
+        SpeechRecognitionAlternative item(in [IsIndex] unsigned long index);
+        readonly attribute boolean final;
+        readonly attribute Document emma;
+    };
+}
+

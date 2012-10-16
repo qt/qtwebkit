@@ -31,7 +31,6 @@
 #include "WKAPICast.h"
 #include "WKBatteryManager.h"
 #include "WKBatteryStatus.h"
-#include "WKContext.h"
 
 using namespace WebCore;
 using namespace WebKit;
@@ -54,25 +53,17 @@ static void stopUpdatingCallback(WKBatteryManagerRef, const void* clientInfo)
 BatteryProvider::~BatteryProvider()
 {
     m_provider.stopUpdating();
-
-    WKBatteryManagerRef wkBatteryManager = WKContextGetBatteryManager(m_wkContext.get());
-    ASSERT(wkBatteryManager);
-
-    WKBatteryManagerSetProvider(wkBatteryManager, 0);
 }
 
-PassRefPtr<BatteryProvider> BatteryProvider::create(WKContextRef wkContext)
+PassRefPtr<BatteryProvider> BatteryProvider::create(WKBatteryManagerRef wkBatteryManager)
 {
-    return adoptRef(new BatteryProvider(wkContext));
+    return adoptRef(new BatteryProvider(wkBatteryManager));
 }
 
-BatteryProvider::BatteryProvider(WKContextRef wkContext)
-    : m_wkContext(wkContext)
+BatteryProvider::BatteryProvider(WKBatteryManagerRef wkBatteryManager)
+    : m_wkBatteryManager(wkBatteryManager)
     , m_provider(this)
 {
-    ASSERT(m_wkContext);
-
-    WKBatteryManagerRef wkBatteryManager = WKContextGetBatteryManager(m_wkContext.get());
     ASSERT(wkBatteryManager);
 
     WKBatteryProvider wkBatteryProvider = {
@@ -81,7 +72,7 @@ BatteryProvider::BatteryProvider(WKContextRef wkContext)
         startUpdatingCallback,
         stopUpdatingCallback
     };
-    WKBatteryManagerSetProvider(wkBatteryManager, &wkBatteryProvider);
+    WKBatteryManagerSetProvider(m_wkBatteryManager.get(), &wkBatteryProvider);
 }
 
 void BatteryProvider::startUpdating()
@@ -96,11 +87,8 @@ void BatteryProvider::stopUpdating()
 
 void BatteryProvider::didChangeBatteryStatus(const AtomicString& eventType, PassRefPtr<BatteryStatus> status)
 {
-    WKBatteryManagerRef wkBatteryManager = WKContextGetBatteryManager(m_wkContext.get());
-    ASSERT(wkBatteryManager);
-
     WKRetainPtr<WKBatteryStatusRef> wkBatteryStatus(AdoptWK, WKBatteryStatusCreate(status->charging(), status->chargingTime(), status->dischargingTime(), status->level()));
-    WKBatteryManagerProviderDidChangeBatteryStatus(wkBatteryManager, toAPI(eventType.impl()), wkBatteryStatus.get());
+    WKBatteryManagerProviderDidChangeBatteryStatus(m_wkBatteryManager.get(), toAPI(eventType.impl()), wkBatteryStatus.get());
 }
 
 #endif // ENABLE(BATTERY_STATUS)

@@ -31,7 +31,7 @@
 #include "PlatformWheelEvent.h"
 #include "ScrollingCoordinator.h"
 #include "ScrollingTree.h"
-#include "ScrollingStateTree.h"
+#include "ScrollingTreeState.h"
 #include "Settings.h"
 #include "TileCache.h"
 #include "WebTileLayer.h"
@@ -62,26 +62,26 @@ ScrollingTreeNodeMac::~ScrollingTreeNodeMac()
         CFRunLoopTimerInvalidate(m_snapRubberbandTimer.get());
 }
 
-void ScrollingTreeNodeMac::update(ScrollingStateScrollingNode* state)
+void ScrollingTreeNodeMac::update(ScrollingTreeState* state)
 {
     ScrollingTreeNode::update(state);
 
-    if (state->scrollLayerDidChange())
+    if (state->changedProperties() & ScrollingTreeState::ScrollLayer)
         m_scrollLayer = state->platformScrollLayer();
 
-    if (state->changedProperties() & ScrollingStateScrollingNode::RequestedScrollPosition)
+    if (state->changedProperties() & ScrollingTreeState::RequestedScrollPosition)
         setScrollPosition(state->requestedScrollPosition());
 
-    if (state->scrollLayerDidChange() || state->changedProperties() & (ScrollingStateScrollingNode::ContentsSize | ScrollingStateScrollingNode::ViewportRect))
+    if (state->changedProperties() & (ScrollingTreeState::ScrollLayer | ScrollingTreeState::ContentsSize | ScrollingTreeState::ViewportRect))
         updateMainFramePinState(scrollPosition());
 
-    if ((state->changedProperties() & ScrollingStateScrollingNode::ShouldUpdateScrollLayerPositionOnMainThread)) {
+    if ((state->changedProperties() & ScrollingTreeState::ShouldUpdateScrollLayerPositionOnMainThread)) {
         unsigned mainThreadScrollingReasons = this->shouldUpdateScrollLayerPositionOnMainThread();
 
         if (mainThreadScrollingReasons) {
             // We're transitioning to the slow "update scroll layer position on the main thread" mode.
             // Initialize the probable main thread scroll position with the current scroll layer position.
-            if (state->changedProperties() & ScrollingStateScrollingNode::RequestedScrollPosition)
+            if (state->changedProperties() & ScrollingTreeState::RequestedScrollPosition)
                 m_probableMainThreadScrollPosition = state->requestedScrollPosition();
             else {
                 CGPoint scrollLayerPosition = m_scrollLayer.get().position;

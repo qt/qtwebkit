@@ -32,7 +32,6 @@
 #include <BlackBerryPlatformExecutableMessage.h>
 #include <BlackBerryPlatformMessage.h>
 #include <BlackBerryPlatformMessageClient.h>
-#include <BlackBerryPlatformViewportAccessor.h>
 #include <GenericTimerClient.h>
 #include <ThreadTimerClient.h>
 #include <wtf/CurrentTime.h>
@@ -224,11 +223,8 @@ void WebPageCompositorPrivate::animationFrameChanged()
 {
     BackingStore* backingStore = m_webPage->m_backingStore;
     if (!backingStore) {
-        Platform::ViewportAccessor* viewportAccessor = m_webPage->client()->userInterfaceViewportAccessor();
-        const Platform::IntRect dstRect = viewportAccessor->destinationSurfaceRect();
-        const Platform::FloatRect srcRect = viewportAccessor->documentViewportRect();
-
-        drawLayers(dstRect, srcRect);
+        drawLayers(m_webPage->client()->userInterfaceBlittedDestinationRect(),
+                   IntRect(m_webPage->client()->userInterfaceBlittedVisibleContentsRect()));
         return;
     }
 
@@ -242,9 +238,7 @@ void WebPageCompositorPrivate::animationFrameChanged()
         webKitThreadMessageClient()->dispatchMessage(createMethodCallMessage(&BackingStorePrivate::renderVisibleContents, backingStore->d));
         return;
     }
-
-    if (!m_webPage->needsOneShotDrawingSynchronization())
-        m_webPage->blitVisibleContents();
+    m_webPage->blitVisibleContents();
 }
 
 void WebPageCompositorPrivate::compositorDestroyed()

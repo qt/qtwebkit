@@ -18,34 +18,37 @@
  * Boston, MA 02110-1301, USA.
  */
 
-interface HTMLTableElement : HTMLElement {
-    attribute HTMLTableCaptionElement caption setter raises(DOMException);
-    attribute HTMLTableSectionElement tHead setter raises(DOMException);
-    attribute HTMLTableSectionElement tFoot setter raises(DOMException);
+module html {
 
-    readonly attribute HTMLCollection rows;
-    readonly attribute HTMLCollection tBodies;
-    [Reflect] attribute DOMString align;
-    [Reflect] attribute DOMString bgColor;
-    [Reflect] attribute DOMString border;
-    [Reflect] attribute DOMString cellPadding;
-    [Reflect] attribute DOMString cellSpacing;
+    interface HTMLTableElement : HTMLElement {
+        attribute HTMLTableCaptionElement caption setter raises(DOMException);
+        attribute HTMLTableSectionElement tHead setter raises(DOMException);
+        attribute HTMLTableSectionElement tFoot setter raises(DOMException);
 
-    [Reflect] attribute DOMString frame;
+        readonly attribute HTMLCollection rows;
+        readonly attribute HTMLCollection tBodies;
+        attribute [Reflect] DOMString align;
+        attribute [Reflect] DOMString bgColor;
+        attribute [Reflect] DOMString border;
+        attribute [Reflect] DOMString cellPadding;
+        attribute [Reflect] DOMString cellSpacing;
 
-    [Reflect] attribute DOMString rules;
-    [Reflect] attribute DOMString summary;
-    [Reflect] attribute DOMString width;
+        attribute [Reflect] DOMString frame;
 
-    HTMLElement createTHead();
-    void deleteTHead();
-    HTMLElement createTFoot();
-    void deleteTFoot();
-    HTMLElement createTBody();
-    HTMLElement createCaption();
-    void deleteCaption();
+        attribute [Reflect] DOMString rules;
+        attribute [Reflect] DOMString summary;
+        attribute [Reflect] DOMString width;
 
-    HTMLElement insertRow(in [Optional=DefaultIsUndefined] long index) raises(DOMException);
-    void deleteRow(in [Optional=DefaultIsUndefined] long index) raises(DOMException);
-};
+        HTMLElement createTHead();
+        void deleteTHead();
+        HTMLElement createTFoot();
+        void deleteTFoot();
+        HTMLElement createTBody();
+        HTMLElement createCaption();
+        void deleteCaption();
 
+        HTMLElement insertRow(in [Optional=DefaultIsUndefined] long index) raises(DOMException);
+        void deleteRow(in [Optional=DefaultIsUndefined] long index) raises(DOMException);
+    };
+
+}

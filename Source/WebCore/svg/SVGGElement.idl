@@ -23,13 +23,16 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=SVG
-] interface SVGGElement : SVGElement,
-                                          SVGTests,
-                                          SVGLangSpace,
-                                          SVGExternalResourcesRequired,
-                                          SVGStylable,
-                                          SVGTransformable {
-};
+module svg {
 
+    interface [
+        Conditional=SVG
+    ] SVGGElement : SVGElement,
+                                              SVGTests,
+                                              SVGLangSpace,
+                                              SVGExternalResourcesRequired,
+                                              SVGStylable,
+                                              SVGTransformable {
+    };
+
+}

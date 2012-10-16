@@ -37,14 +37,14 @@ namespace WebCore {
 
 class PlatformWheelEvent;
 class ScrollingTree;
-class ScrollingStateScrollingNode;
+class ScrollingTreeState;
 
 class ScrollingTreeNode {
 public:
     static PassOwnPtr<ScrollingTreeNode> create(ScrollingTree*);
     virtual ~ScrollingTreeNode();
 
-    virtual void update(ScrollingStateScrollingNode*);
+    virtual void update(ScrollingTreeState*);
     virtual void handleWheelEvent(const PlatformWheelEvent&) = 0;
     virtual void setScrollPosition(const IntPoint&) = 0;
 

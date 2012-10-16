@@ -45,14 +45,6 @@ public:
 
     using NodeRareData::needsFocusAppearanceUpdateSoonAfterAttach;
     using NodeRareData::setNeedsFocusAppearanceUpdateSoonAfterAttach;
-    using NodeRareData::styleAffectedByEmpty;
-    using NodeRareData::setStyleAffectedByEmpty;
-    using NodeRareData::isInCanvasSubtree;
-    using NodeRareData::setIsInCanvasSubtree;
-#if ENABLE(FULLSCREEN_API)
-    using NodeRareData::containsFullScreenElement;
-    using NodeRareData::setContainsFullScreenElement;
-#endif
 
     bool hasCachedHTMLCollections() const
     {
@@ -119,7 +111,14 @@ public:
     OwnPtr<ElementShadow> m_shadow;
     OwnPtr<NamedNodeMap> m_attributeMap;
 
+    bool m_styleAffectedByEmpty : 1;
+    bool m_isInCanvasSubtree : 1;
+
     IntSize m_savedLayerScrollOffset;
+
+#if ENABLE(FULLSCREEN_API)
+    bool m_containsFullScreenElement;
+#endif
 };
 
 inline IntSize defaultMinimumSizeForResizing()
@@ -128,7 +127,13 @@ inline IntSize defaultMinimumSizeForResizing()
 }
 
 inline ElementRareData::ElementRareData()
-    : m_minimumSizeForResizing(defaultMinimumSizeForResizing())
+    : NodeRareData()
+    , m_minimumSizeForResizing(defaultMinimumSizeForResizing())
+    , m_styleAffectedByEmpty(false)
+    , m_isInCanvasSubtree(false)
+#if ENABLE(FULLSCREEN_API)
+    , m_containsFullScreenElement(false)
+#endif
 {
 }
 

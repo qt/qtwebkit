@@ -51,8 +51,9 @@ namespace JSC {
 // purposes, you can do so in Options::initialize() after the default values
 // are set.
 //
-//     Alternatively, you can override the default values by specifying
-// environment variables of the form: JSC_<name of JSC option>.
+//     Alternatively, you can enable RUN_TIME_HEURISTICS which will allow you
+// to override the default values by specifying environment variables of the
+// form: JSC_<name of JSC option>.
 //
 // Note: Options::initialize() tries to ensure some sanity on the option values
 // which are set by doing some range checks, and value corrections. These
@@ -115,19 +116,14 @@ namespace JSC {
     v(unsigned, gcMarkStackSegmentSize, pageSize()) \
     v(unsigned, numberOfGCMarkers, computeNumberOfGCMarkers(7)) \
     v(unsigned, opaqueRootMergeThreshold, 1000) \
-    v(double, minHeapUtilization, 0.8) \
-    v(double, minCopiedBlockUtilization, 0.9) \
     \
     v(bool, forceWeakRandomSeed, false) \
     v(unsigned, forcedWeakRandomSeed, 0) \
     \
     v(bool, useZombieMode, false) \
     v(bool, objectsAreImmortal, false) \
-    v(bool, showObjectStatistics, false) \
-    \
-    v(unsigned, gcMaxHeapSize, 0) \
-    v(bool, recordGCPauseTimes, false) \
-    v(bool, logHeapStatisticsAtExit, false) 
+    v(bool, showHeapStatistics, false)
+
 
 class Options {
 public:
@@ -165,7 +161,7 @@ private:
         boolType,
         unsignedType,
         doubleType,
-        int32Type,
+        int32Type
     };
 
     // For storing for an option value:

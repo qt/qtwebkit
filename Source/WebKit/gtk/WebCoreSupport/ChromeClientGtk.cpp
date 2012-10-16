@@ -1014,7 +1014,7 @@ void ChromeClient::setNeedsOneShotDrawingSynchronization()
     m_webView->priv->acceleratedCompositingContext->scheduleLayerFlush();
 }
 
-void ChromeClient::scheduleCompositingLayerFlush()
+void ChromeClient::scheduleCompositingLayerSync()
 {
     m_webView->priv->acceleratedCompositingContext->scheduleLayerFlush();
 }

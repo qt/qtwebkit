@@ -31,7 +31,6 @@
 
 #include "ExecutableAllocator.h"
 #include "Heap.h"
-#include "HeapStatistics.h"
 #include "Options.h"
 #include "Identifier.h"
 #include "JSDateMath.h"
@@ -57,15 +56,13 @@ static void initializeThreadingOnce()
     WTF::initializeThreading();
     GlobalJSLock::initialize();
     Options::initialize();
-    if (Options::recordGCPauseTimes())
-        HeapStatistics::initialize();
 #if ENABLE(WRITE_BARRIER_PROFILING)
     WriteBarrierCounters::initialize();
 #endif
 #if ENABLE(ASSEMBLER)
     ExecutableAllocator::initializeAllocator();
 #endif
-    JSStack::initializeThreading();
+    RegisterFile::initializeThreading();
 #if ENABLE(LLINT)
     LLInt::initialize();
 #endif

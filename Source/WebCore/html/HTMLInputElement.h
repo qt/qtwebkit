@@ -208,7 +208,6 @@ public:
     String alt() const;
 
     void setSize(unsigned);
-    void setSize(unsigned, ExceptionCode&);
 
     KURL src() const;
 

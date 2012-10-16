@@ -44,28 +44,28 @@ public:
     }
     virtual ~DOMSettableTokenList();
 
-    virtual void ref() OVERRIDE { RefCounted<DOMSettableTokenList>::ref(); }
-    virtual void deref() OVERRIDE { RefCounted<DOMSettableTokenList>::deref(); }
+    virtual void ref() { RefCounted<DOMSettableTokenList>::ref(); }
+    virtual void deref() { RefCounted<DOMSettableTokenList>::deref(); }
 
-    virtual unsigned length() const OVERRIDE { return m_tokens.size(); }
-    virtual const AtomicString item(unsigned index) const OVERRIDE;
+    virtual unsigned length() const { return m_tokens.size(); }
+    virtual const AtomicString item(unsigned index) const;
+    virtual bool contains(const AtomicString&, ExceptionCode&) const;
+    virtual void add(const AtomicString&, ExceptionCode&);
+    virtual void remove(const AtomicString&, ExceptionCode&);
+    virtual bool toggle(const AtomicString&, ExceptionCode&);
+    virtual String toString() const { return value(); }
 
-    virtual void add(const Vector<String>&, ExceptionCode&) OVERRIDE;
-    virtual void remove(const Vector<String>&, ExceptionCode&) OVERRIDE;
-
-    virtual AtomicString value() const OVERRIDE { return m_value; }
-    virtual void setValue(const AtomicString&) OVERRIDE;
-
+    String value() const { return m_value; }
     const SpaceSplitString& tokens() const { return m_tokens; }
+    void setValue(const String&);
 
 private:
     DOMSettableTokenList();
 
-    virtual void addInternal(const AtomicString&) OVERRIDE;
-    virtual bool containsInternal(const AtomicString&) const OVERRIDE;
-    virtual void removeInternal(const AtomicString&) OVERRIDE;
+    void removeInternal(const AtomicString&);
+    void addInternal(const AtomicString&);
 
-    AtomicString m_value;
+    String m_value;
     SpaceSplitString m_tokens;
 };
 

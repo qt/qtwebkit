@@ -58,7 +58,6 @@
     <file>DOMStorage.js</file>
     <file>DOMStorageItemsView.js</file>
     <file>DOMSyntaxHighlighter.js</file>
-    <file>DockController.js</file>
     <file>Drawer.js</file>
     <file>ElementsPanel.js</file>
     <file>ElementsPanelDescriptor.js</file>
@@ -129,8 +128,7 @@
     <file>ProfileDataGridTree.js</file>
     <file>ProfileLauncherView.js</file>
     <file>ProfilesPanel.js</file>
-    <file>Progress.js</file>
-    <file>ProgressIndicator.js</file>
+    <file>ProgressBar.js</file>
     <file>PropertiesSection.js</file>
     <file>PropertiesSidebarPane.js</file>
     <file>RemoteObject.js</file>

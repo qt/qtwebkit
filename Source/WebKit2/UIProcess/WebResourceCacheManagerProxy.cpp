@@ -45,7 +45,6 @@ PassRefPtr<WebResourceCacheManagerProxy> WebResourceCacheManagerProxy::create(We
 WebResourceCacheManagerProxy::WebResourceCacheManagerProxy(WebContext* webContext)
     : m_webContext(webContext)
 {
-    m_webContext->addMessageReceiver(CoreIPC::MessageClassWebResourceCacheManagerProxy, this);
 }
 
 WebResourceCacheManagerProxy::~WebResourceCacheManagerProxy()
@@ -65,6 +64,7 @@ bool WebResourceCacheManagerProxy::shouldTerminate(WebProcessProxy*) const
 void WebResourceCacheManagerProxy::getCacheOrigins(PassRefPtr<ArrayCallback> prpCallback)
 {
     RefPtr<ArrayCallback> callback = prpCallback;
+    m_webContext->relaunchProcessIfNecessary();
     uint64_t callbackID = callback->callbackID();
     m_arrayCallbacks.set(callbackID, callback.release());
 
@@ -93,11 +93,6 @@ void WebResourceCacheManagerProxy::clearCacheForAllOrigins(ResourceCachesToClear
 {
     // FIXME (Multi-WebProcess): <rdar://problem/12239765> There is no need to relaunch all processes. One process to take care of persistent cache is enough.
     m_webContext->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebResourceCacheManager::ClearCacheForAllOrigins(cachesToClear));
-}
-
-void WebResourceCacheManagerProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
-{
-    didReceiveWebResourceCacheManagerProxyMessage(connection, messageID, arguments);
 }
 
 } // namespace WebKit

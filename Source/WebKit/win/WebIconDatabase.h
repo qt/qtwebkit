@@ -104,6 +104,7 @@ public:
         /* [retval][out] */ BOOL* result);
 
     // IconDatabaseClient
+    virtual bool performImport();
     virtual void didRemoveAllIcons();
     virtual void didImportIconURLForPageURL(const WTF::String&);
     virtual void didImportIconDataForPageURL(const WTF::String&);

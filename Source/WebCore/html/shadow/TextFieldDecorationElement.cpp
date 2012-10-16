@@ -57,7 +57,6 @@ TextFieldDecorator::~TextFieldDecorator()
 TextFieldDecorationElement::TextFieldDecorationElement(Document* document, TextFieldDecorator* decorator)
     : HTMLDivElement(HTMLNames::divTag, document)
     , m_textFieldDecorator(decorator)
-    , m_isInHoverState(false)
 {
     ASSERT(decorator);
     setHasCustomCallbacks();
@@ -138,8 +137,6 @@ void TextFieldDecorationElement::updateImage()
         image = m_textFieldDecorator->imageForDisabledState();
     else if (hostInput()->readOnly())
         image = m_textFieldDecorator->imageForReadonlyState();
-    else if (m_isInHoverState)
-        image = m_textFieldDecorator->imageForHoverState();
     else
         image = m_textFieldDecorator->imageForNormalState();
     ASSERT(image);
@@ -197,27 +194,8 @@ void TextFieldDecorationElement::defaultEventHandler(Event* event)
         event->setDefaultHandled();
     }
 
-    if (event->type() == eventNames().mouseoverEvent) {
-        m_isInHoverState = true;
-        updateImage();
-    }
-
-    if (event->type() == eventNames().mouseoutEvent) {
-        m_isInHoverState = false;
-        updateImage();
-    }
-
     if (!event->defaultHandled())
         HTMLDivElement::defaultEventHandler(event);
-}
-
-bool TextFieldDecorationElement::willRespondToMouseMoveEvents()
-{
-    const HTMLInputElement* input = hostInput();
-    if (!input->disabled() && !input->readOnly())
-        return true;
-
-    return HTMLDivElement::willRespondToMouseMoveEvents();
 }
 
 bool TextFieldDecorationElement::willRespondToMouseClickEvents()

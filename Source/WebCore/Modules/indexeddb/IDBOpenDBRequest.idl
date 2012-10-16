@@ -23,11 +23,14 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=INDEXED_DATABASE,
-    ActiveDOMObject,
-    EventTarget
-] interface IDBOpenDBRequest : IDBRequest {
-    attribute EventListener onblocked;
-    attribute EventListener onupgradeneeded;
-};
+module storage {
+
+    interface [
+        Conditional=INDEXED_DATABASE,
+        ActiveDOMObject,
+        EventTarget
+    ] IDBOpenDBRequest : IDBRequest {
+        attribute EventListener onblocked;
+        attribute EventListener onupgradeneeded;
+    };
+}

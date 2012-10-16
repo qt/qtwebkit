@@ -201,6 +201,10 @@ inline bool canInlineOpcode(OpcodeID opcodeID, CodeBlock* codeBlock, Instruction
     case op_resolve:
     case op_resolve_base:
         
+    // Constant buffers aren't copied correctly. This is easy to fix, but for
+    // now we just disable inlining for functions that use them.
+    case op_new_array_buffer:
+        
     // Inlining doesn't correctly remap regular expression operands.
     case op_new_regexp:
         

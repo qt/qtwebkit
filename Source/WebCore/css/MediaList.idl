@@ -23,21 +23,24 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-// Introduced in DOM Level 2:
-[
-    JSGenerateIsReachable,
-    IndexedGetter
-] interface MediaList {
+module stylesheets {
 
-             [TreatNullAs=NullString, TreatReturnedNullStringAs=Null] attribute DOMString mediaText
-                 setter raises(DOMException);
-    readonly attribute unsigned long length;
+    // Introduced in DOM Level 2:
+    interface [
+        JSGenerateIsReachable,
+        IndexedGetter
+    ] MediaList {
 
-    [TreatReturnedNullStringAs=Null] DOMString item(in [Optional=DefaultIsUndefined] unsigned long index);
-    void deleteMedium(in [Optional=DefaultIsUndefined] DOMString oldMedium)
-        raises(DOMException);
-    void appendMedium(in [Optional=DefaultIsUndefined] DOMString newMedium)
-        raises(DOMException);
+                 attribute [TreatNullAs=NullString, TreatReturnedNullStringAs=Null] DOMString mediaText
+                     setter raises(DOMException);
+        readonly attribute unsigned long length;
 
-};
+        [TreatReturnedNullStringAs=Null] DOMString item(in [Optional=DefaultIsUndefined] unsigned long index);
+        void deleteMedium(in [Optional=DefaultIsUndefined] DOMString oldMedium)
+            raises(DOMException);
+        void appendMedium(in [Optional=DefaultIsUndefined] DOMString newMedium)
+            raises(DOMException);
 
+    };
+
+}

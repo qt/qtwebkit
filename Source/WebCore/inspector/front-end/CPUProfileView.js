@@ -531,10 +531,10 @@ WebInspector.CPUProfileView.prototype = {
                     nodesToTraverse.push({ parent: children[i], children: children[i].children });
             }
         }
-    },
-
-    __proto__: WebInspector.View.prototype
+    }
 }
+
+WebInspector.CPUProfileView.prototype.__proto__ = WebInspector.View.prototype;
 
 /**
  * @constructor
@@ -622,10 +622,10 @@ WebInspector.CPUProfileType.prototype = {
     createProfile: function(profile)
     {
         return new WebInspector.CPUProfileHeader(this, profile.title, profile.uid);
-    },
-
-    __proto__: WebInspector.ProfileType.prototype
+    }
 }
+
+WebInspector.CPUProfileType.prototype.__proto__ = WebInspector.ProfileType.prototype;
 
 /**
  * @constructor
@@ -655,7 +655,7 @@ WebInspector.CPUProfileHeader.prototype = {
     createView: function(profilesPanel)
     {
         return new WebInspector.CPUProfileView(this);
-    },
-
-    __proto__: WebInspector.ProfileHeader.prototype
+    }
 }
+
+WebInspector.CPUProfileHeader.prototype.__proto__ = WebInspector.ProfileHeader.prototype;

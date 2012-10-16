@@ -23,10 +23,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=SVG
-] interface SVGAnimatedNumberList {
-    readonly attribute SVGNumberList baseVal;
-    readonly attribute SVGNumberList animVal;
-};
+module svg {
 
+    interface [
+        Conditional=SVG
+    ] SVGAnimatedNumberList {
+        readonly attribute SVGNumberList baseVal;
+        readonly attribute SVGNumberList animVal;
+    };
+
+}

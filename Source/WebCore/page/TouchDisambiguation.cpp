@@ -106,7 +106,7 @@ void findGoodTouchTargets(const IntRect& touchBox, Frame* mainFrame, float pageS
             if (node->isDocumentNode() || node->hasTagName(HTMLNames::htmlTag) || node->hasTagName(HTMLNames::bodyTag))
                 break;
             if (node->willRespondToMouseClickEvents()) {
-                TouchTargetData& targetData = touchTargets.add(node, TouchTargetData()).iterator->value;
+                TouchTargetData& targetData = touchTargets.add(node, TouchTargetData()).iterator->second;
                 targetData.windowBoundingBox = boundingBoxForEventNodes(node);
                 targetData.score = scoreTouchTarget(touchPoint, touchPointPadding, targetData.windowBoundingBox);
                 bestScore = max(bestScore, targetData.score);
@@ -118,9 +118,9 @@ void findGoodTouchTargets(const IntRect& touchBox, Frame* mainFrame, float pageS
     for (HashMap<Node*, TouchTargetData>::iterator it = touchTargets.begin(); it != touchTargets.end(); ++it) {
         // Currently the scoring function uses the overlap area with the fat point as the score.
         // We ignore the candidates that has less than 1/2 overlap (we consider not really ambiguous enough) than the best candidate to avoid excessive popups.
-        if (it->value.score < bestScore * 0.5)
+        if (it->second.score < bestScore * 0.5)
             continue;
-        goodTargets.append(it->value.windowBoundingBox);
+        goodTargets.append(it->second.windowBoundingBox);
     }
 }
 

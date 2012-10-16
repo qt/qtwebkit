@@ -68,13 +68,8 @@ WebInspector.RequestPreviewView.prototype = {
 
     _createPreviewView: function()
     {
-        if (this.request.content) {
-            if (this.request.hasErrorStatusCode() || (this.request.type === WebInspector.resourceTypes.XHR && this.request.mimeType === "text/html")) {
-                var dataURL = this.request.asDataURL();
-                if (dataURL !== null)
-                    return new WebInspector.RequestHTMLView(this.request, dataURL);
-            }
-        }
+        if (this.request.hasErrorStatusCode() && this.request.content)
+            return new WebInspector.RequestHTMLView(this.request);
 
         if (this.request.type === WebInspector.resourceTypes.XHR && this.request.content) {
             var parsedJSON = WebInspector.RequestJSONView.parseJSON(this.request.content);
@@ -95,7 +90,7 @@ WebInspector.RequestPreviewView.prototype = {
             return this._createEmptyView();
 
         return WebInspector.RequestView.nonSourceViewForRequest(this.request);
-    },
-
-    __proto__: WebInspector.RequestContentView.prototype
+    }
 }
+
+WebInspector.RequestPreviewView.prototype.__proto__ = WebInspector.RequestContentView.prototype;

@@ -88,11 +88,6 @@ using namespace HTMLNames;
 
 %{
 
-#if YYDEBUG > 0
-#define YYPRINT(File,Type,Value) print_token_value(File,Type,Value)
-static void print_token_value(FILE * yyoutput, int yytype, YYSTYPE const &yyvalue);
-#endif
-
 static inline int cssyyerror(void*, const char*)
 {
     return 1;
@@ -100,7 +95,7 @@ static inline int cssyyerror(void*, const char*)
 
 %}
 
-%expect 65
+%expect 63
 
 %nonassoc LOWEST_PREC
 
@@ -534,15 +529,9 @@ maybe_media_value:
     ;
 
 media_query_exp:
-    maybe_media_restrictor maybe_space '(' maybe_space media_feature maybe_space maybe_media_value ')' maybe_space {
-        // If restrictor is specified, media query expression is invalid.
-        // Create empty media query expression and continue parsing media query.
-        if ($1 != MediaQuery::None)
-            $$ = parser->createFloatingMediaQueryExp("", 0);
-        else {
-            $5.lower();
-            $$ = parser->createFloatingMediaQueryExp($5, $7);
-        }
+    '(' maybe_space media_feature maybe_space maybe_media_value ')' maybe_space {
+        $3.lower();
+        $$ = parser->createFloatingMediaQueryExp($3, $5);
     }
     ;
 
@@ -696,7 +685,7 @@ key_list:
     ;
 
 key:
-    maybe_unary_operator PERCENTAGE { $$.id = 0; $$.isInt = false; $$.fValue = $1 * $2; $$.unit = CSSPrimitiveValue::CSS_NUMBER; }
+    PERCENTAGE { $$.id = 0; $$.isInt = false; $$.fValue = $1; $$.unit = CSSPrimitiveValue::CSS_NUMBER; }
     | IDENT {
         $$.id = 0; $$.isInt = false; $$.unit = CSSPrimitiveValue::CSS_NUMBER;
         CSSParserString& str = $1;
@@ -1740,31 +1729,3 @@ invalid_block_list:
 ;
 
 %%
-
-#if YYDEBUG > 0
-static void print_token_value(FILE * yyoutput, int yytype, YYSTYPE const &yyvalue)
-{
-    switch (yytype) {
-    case IDENT:
-    case STRING:
-    case NTH:
-    case HEX:
-    case IDSEL:
-    case DIMEN:
-    case INVALIDDIMEN:
-    case URI:
-    case FUNCTION:
-    case ANYFUNCTION:
-    case NOTFUNCTION:
-    case CALCFUNCTION:
-    case MINFUNCTION:
-    case MAXFUNCTION:
-    case VAR_DEFINITION:
-    case UNICODERANGE:
-        YYFPRINTF(yyoutput, "%s", String(yyvalue.string).utf8().data());
-        break;
-    default:
-        break;
-    }
-}
-#endif

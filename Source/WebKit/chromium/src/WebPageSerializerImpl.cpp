@@ -91,10 +91,11 @@
 #include "KURL.h"
 #include "TextEncoding.h"
 #include "markup.h"
+
 #include "DOMUtilitiesPrivate.h"
 #include "WebFrameImpl.h"
-#include <public/WebURL.h>
-#include <public/WebVector.h>
+#include "platform/WebURL.h"
+#include "platform/WebVector.h"
 
 using namespace WebCore;
 

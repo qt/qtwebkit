@@ -25,21 +25,19 @@
 
 #include "config.h"
 #include "UserContentURLPattern.h"
-
 #include "KURL.h"
 #include <wtf/StdLibExtras.h>
 
 namespace WebCore {
 
-bool UserContentURLPattern::matchesPatterns(const KURL& url, const Vector<String>& whitelist, const Vector<String>& blacklist)
+bool UserContentURLPattern::matchesPatterns(const KURL& url, const Vector<String>* whitelist, const Vector<String>* blacklist)
 {
     // In order for a URL to be a match it has to be present in the whitelist and not present in the blacklist.
     // If there is no whitelist at all, then all URLs are assumed to be in the whitelist.
-    bool matchesWhitelist = whitelist.isEmpty();
+    bool matchesWhitelist = !whitelist || whitelist->isEmpty();
     if (!matchesWhitelist) {
-        size_t whitelistSize = whitelist.size();
-        for (size_t i = 0; i < whitelistSize; ++i) {
-            UserContentURLPattern contentPattern(whitelist[i]);
+        for (unsigned i = 0; i < whitelist->size(); ++i) {
+            UserContentURLPattern contentPattern(whitelist->at(i));
             if (contentPattern.matches(url)) {
                 matchesWhitelist = true;
                 break;
@@ -48,10 +46,9 @@ bool UserContentURLPattern::matchesPatterns(const KURL& url, const Vector<String
     }
 
     bool matchesBlacklist = false;
-    if (!blacklist.isEmpty()) {
-        size_t blacklistSize = blacklist.size();
-        for (size_t i = 0; i < blacklistSize; ++i) {
-            UserContentURLPattern contentPattern(blacklist[i]);
+    if (blacklist) {
+        for (unsigned i = 0; i < blacklist->size(); ++i) {
+            UserContentURLPattern contentPattern(blacklist->at(i));
             if (contentPattern.matches(url)) {
                 matchesBlacklist = true;
                 break;

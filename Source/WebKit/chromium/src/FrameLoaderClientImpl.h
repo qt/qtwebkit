@@ -182,7 +182,6 @@ public:
         const WebCore::IntSize&, WebCore::HTMLPlugInElement*, const WebCore::KURL&,
         const Vector<WTF::String>&, const Vector<WTF::String>&,
         const WTF::String&, bool loadManually);
-    virtual void recreatePlugin(WebCore::Widget*) { }
     virtual void redirectDataToPlugin(WebCore::Widget* pluginWidget);
     virtual PassRefPtr<WebCore::Widget> createJavaAppletWidget(
         const WebCore::IntSize&,
@@ -220,10 +219,6 @@ public:
 #endif
 
     virtual void dispatchWillOpenSocketStream(WebCore::SocketStreamHandle*) OVERRIDE;
-
-#if ENABLE(MEDIA_STREAM)
-    virtual void dispatchWillStartUsingPeerConnectionHandler(WebCore::RTCPeerConnectionHandler*) OVERRIDE;
-#endif
 
 private:
     void makeDocumentView();

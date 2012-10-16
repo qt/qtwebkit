@@ -23,11 +23,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=VIDEO_TRACK,
-    V8EnabledAtRuntime=webkitVideoTrack,
-    ConstructorTemplate=Event
-] interface TrackEvent : Event {
-    [InitializedByEventConstructor, CustomGetter] readonly attribute object track;
-};
+module html {
 
+    interface [
+        Conditional=VIDEO_TRACK,
+        V8EnabledAtRuntime=webkitVideoTrack,
+        ConstructorTemplate=Event
+    ] TrackEvent : Event {
+        readonly attribute [InitializedByEventConstructor, CustomGetter] object track;
+    };
+
+}

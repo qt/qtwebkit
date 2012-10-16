@@ -26,6 +26,7 @@
 #ifndef SlotVisitor_h
 #define SlotVisitor_h
 
+#include "CopiedSpace.h"
 #include "HandleTypes.h"
 #include "MarkStackInlineMethods.h"
 
@@ -79,8 +80,21 @@ public:
     void harvestWeakReferences();
     void finalizeUnconditionalFinalizers();
 
-    void copyLater(void*, size_t);
+    void startCopying();
     
+    // High-level API for copying, appropriate for cases where the object's heap references
+    // fall into a contiguous region of the storage chunk and if the object for which you're
+    // doing copying does not occur frequently.
+    void copyAndAppend(void**, size_t, JSValue*, unsigned);
+    
+    // Low-level API for copying, appropriate for cases where the object's heap references
+    // are discontiguous or if the object occurs frequently enough that you need to focus on
+    // performance. Use this with care as it is easy to shoot yourself in the foot.
+    bool checkIfShouldCopyAndPinOtherwise(void* oldPtr, size_t);
+    void* allocateNewSpace(size_t);
+    
+    void doneCopying(); 
+        
 #if ENABLE(SIMPLE_HEAP_PROFILING)
     VTableSpectrum m_visitedTypeCounts;
 #endif
@@ -111,6 +125,9 @@ private:
     void mergeOpaqueRootsIfNecessary();
     void mergeOpaqueRootsIfProfitable();
     
+    void* allocateNewSpaceOrPin(void*, size_t);
+    void* allocateNewSpaceSlow(size_t);
+
     void donateKnownParallel();
 
     MarkStackArray m_stack;
@@ -128,6 +145,8 @@ private:
 #if ENABLE(OBJECT_MARK_LOGGING)
     unsigned m_logChildCount;
 #endif
+
+    CopiedAllocator m_copiedAllocator;
 
 public:
 #if !ASSERT_DISABLED

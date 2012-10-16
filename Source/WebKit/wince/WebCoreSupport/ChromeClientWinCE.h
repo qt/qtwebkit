@@ -151,7 +151,7 @@ public:
     virtual void setNeedsOneShotDrawingSynchronization();
     // Sets a flag to specify that the view needs to be updated, so we need
     // to do an eager layout before the drawing.
-    virtual void scheduleCompositingLayerFlush();
+    virtual void scheduleCompositingLayerSync();
 #endif
 
     virtual void setLastSetCursorToCurrentCursor();

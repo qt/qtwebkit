@@ -28,14 +28,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=MICRODATA,
-    IndexedGetter,
-    JSGenerateToJSObject
-] interface PropertyNodeList : NodeList {
+module core {
 
-    sequence<MicroDataItemValue> getValues();
-    Node item(in unsigned long index);
+    interface [
+        Conditional=MICRODATA,
+        IndexedGetter,
+        JSGenerateToJSObject
+    ] PropertyNodeList : NodeList {
 
-    readonly attribute unsigned long length;
-};
+        sequence<MicroDataItemValue> getValues();
+        Node item(in unsigned long index);
+
+        readonly attribute unsigned long length;
+    };
+}

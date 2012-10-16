@@ -28,10 +28,12 @@
 
 // This IDL file is for testing the bindings code generator and for tracking
 // changes in its ouput.
-[
-    ConstructorTemplate=Event
-] interface TestEventConstructor {
-    // Attributes
-    readonly attribute DOMString attr1;
-    [InitializedByEventConstructor] readonly attribute DOMString attr2;
-};
+module test {
+    interface [
+        ConstructorTemplate=Event
+    ] TestEventConstructor {
+        // Attributes
+        readonly attribute DOMString attr1;
+        readonly attribute [InitializedByEventConstructor] DOMString attr2;
+    };
+}

@@ -43,6 +43,7 @@
 #import <WebCore/GraphicsContext.h>
 #import <WebCore/GraphicsLayerCA.h>
 #import <WebCore/Page.h>
+#import <WebCore/RenderLayerCompositor.h>
 #import <WebCore/RenderView.h>
 #import <WebCore/ScrollingCoordinator.h>
 #import <WebCore/ScrollingThread.h>
@@ -173,7 +174,7 @@ bool TiledCoreAnimationDrawingArea::layerTreeStateIsFrozen() const
     return m_layerTreeStateIsFrozen;
 }
 
-void TiledCoreAnimationDrawingArea::scheduleCompositingLayerFlush()
+void TiledCoreAnimationDrawingArea::scheduleCompositingLayerSync()
 {
     m_layerFlushScheduler.schedule();
 }
@@ -183,7 +184,7 @@ void TiledCoreAnimationDrawingArea::didInstallPageOverlay()
     m_webPage->corePage()->scrollingCoordinator()->setForceMainThreadScrollLayerPositionUpdates(true);
 
     createPageOverlayLayer();
-    scheduleCompositingLayerFlush();
+    scheduleCompositingLayerSync();
 }
 
 void TiledCoreAnimationDrawingArea::didUninstallPageOverlay()
@@ -192,14 +193,14 @@ void TiledCoreAnimationDrawingArea::didUninstallPageOverlay()
         page->scrollingCoordinator()->setForceMainThreadScrollLayerPositionUpdates(false);
 
     destroyPageOverlayLayer();
-    scheduleCompositingLayerFlush();
+    scheduleCompositingLayerSync();
 }
 
 void TiledCoreAnimationDrawingArea::setPageOverlayNeedsDisplay(const IntRect& rect)
 {
     ASSERT(m_pageOverlayLayer);
     m_pageOverlayLayer->setNeedsDisplayInRect(rect);
-    scheduleCompositingLayerFlush();
+    scheduleCompositingLayerSync();
 }
 
 void TiledCoreAnimationDrawingArea::updatePreferences(const WebPreferencesStore&)
@@ -262,7 +263,7 @@ void TiledCoreAnimationDrawingArea::notifyAnimationStarted(const GraphicsLayer*,
 {
 }
 
-void TiledCoreAnimationDrawingArea::notifyFlushRequired(const GraphicsLayer*)
+void TiledCoreAnimationDrawingArea::notifySyncRequired(const GraphicsLayer*)
 {
 }
 
@@ -304,10 +305,10 @@ bool TiledCoreAnimationDrawingArea::flushLayers()
 
     if (m_pageOverlayLayer) {
         m_pageOverlayLayer->setNeedsDisplay();
-        m_pageOverlayLayer->flushCompositingStateForThisLayerOnly();
+        m_pageOverlayLayer->syncCompositingStateForThisLayerOnly();
     }
 
-    bool returnValue = m_webPage->corePage()->mainFrame()->view()->flushCompositingStateIncludingSubframes();
+    bool returnValue = m_webPage->corePage()->mainFrame()->view()->syncCompositingStateIncludingSubframes();
 
     [pool drain];
     return returnValue;
@@ -441,7 +442,7 @@ void TiledCoreAnimationDrawingArea::createPageOverlayLayer()
 {
     ASSERT(!m_pageOverlayLayer);
 
-    m_pageOverlayLayer = GraphicsLayer::create(graphicsLayerFactory(), this);
+    m_pageOverlayLayer = GraphicsLayer::create(this);
 #ifndef NDEBUG
     m_pageOverlayLayer->setName("page overlay content");
 #endif

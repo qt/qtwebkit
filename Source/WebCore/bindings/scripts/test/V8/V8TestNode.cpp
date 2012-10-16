@@ -32,7 +32,7 @@
 
 namespace WebCore {
 
-WrapperTypeInfo V8TestNode::info = { V8TestNode::GetTemplate, V8TestNode::derefObject, 0, 0, V8TestNode::installPerContextPrototypeProperties, &V8Node::info, WrapperTypeObjectPrototype };
+WrapperTypeInfo V8TestNode::info = { V8TestNode::GetTemplate, V8TestNode::derefObject, 0, 0, &V8Node::info, WrapperTypeObjectPrototype };
 
 namespace TestNodeV8Internal {
 
@@ -80,7 +80,7 @@ v8::Persistent<v8::FunctionTemplate> V8TestNode::GetRawTemplate()
     V8PerIsolateData* data = V8PerIsolateData::current();
     V8PerIsolateData::TemplateMap::iterator result = data->rawTemplateMap().find(&info);
     if (result != data->rawTemplateMap().end())
-        return result->value;
+        return result->second;
 
     v8::HandleScope handleScope;
     v8::Persistent<v8::FunctionTemplate> templ = createRawTemplate();
@@ -93,7 +93,7 @@ v8::Persistent<v8::FunctionTemplate> V8TestNode::GetTemplate()
     V8PerIsolateData* data = V8PerIsolateData::current();
     V8PerIsolateData::TemplateMap::iterator result = data->templateMap().find(&info);
     if (result != data->templateMap().end())
-        return result->value;
+        return result->second;
 
     v8::HandleScope handleScope;
     v8::Persistent<v8::FunctionTemplate> templ =
@@ -132,8 +132,6 @@ v8::Handle<v8::Object> V8TestNode::wrapSlow(PassRefPtr<TestNode> impl, v8::Handl
 
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
-
-    installPerContextProperties(wrapper, impl.get());
     v8::Persistent<v8::Object> wrapperHandle = V8DOMWrapper::setJSWrapperForDOMNode(impl, wrapper, isolate);
     if (!hasDependentLifetime)
         wrapperHandle.MarkIndependent();

@@ -28,8 +28,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=DATALIST_ELEMENT,
-] interface HTMLDataListElement : HTMLElement {
-    readonly attribute HTMLCollection options;
-};
+module html {
+    interface [
+        Conditional=DATALIST_ELEMENT,
+    ] HTMLDataListElement : HTMLElement {
+        readonly attribute HTMLCollection options;
+    };
+}

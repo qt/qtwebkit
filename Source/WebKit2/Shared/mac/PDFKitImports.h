@@ -33,10 +33,6 @@ Class classFromPDFKit(NSString *className);
 Class pdfAnnotationLinkClass();
 Class pdfDocumentClass();
 
-#if ENABLE(PDFKIT_PLUGIN)
-Class pdfLayerControllerClass();
-#endif
-
 }
 
 #endif // PDFKitImports_h

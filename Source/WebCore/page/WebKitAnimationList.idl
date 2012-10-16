@@ -23,10 +23,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    IndexedGetter
-] interface WebKitAnimationList {
-    readonly attribute unsigned long length;
-    WebKitAnimation item(in unsigned long index);
-};
+module html {
 
+    interface [
+        IndexedGetter
+    ] WebKitAnimationList {
+        readonly attribute unsigned long length;
+        WebKitAnimation item(in unsigned long index);
+    };
+
+}

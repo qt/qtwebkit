@@ -38,6 +38,7 @@
 #include "Node.h"
 #include <runtime/ArrayPrototype.h>
 #include <runtime/Error.h>
+#include <wtf/HashSet.h>
 #include <wtf/text/StringHash.h>
 #include <wtf/text/WTFString.h>
 
@@ -51,13 +52,13 @@ JSValue JSClipboard::types(ExecState* exec) const
 {
     Clipboard* clipboard = impl();
 
-    ListHashSet<String> types = clipboard->types();
+    HashSet<String> types = clipboard->types();
     if (types.isEmpty())
         return jsNull();
 
     MarkedArgumentBuffer list;
-    ListHashSet<String>::const_iterator end = types.end();
-    for (ListHashSet<String>::const_iterator it = types.begin(); it != end; ++it)
+    HashSet<String>::const_iterator end = types.end();
+    for (HashSet<String>::const_iterator it = types.begin(); it != end; ++it)
         list.append(jsStringWithCache(exec, *it));
     return constructArray(exec, globalObject(), list);
 }

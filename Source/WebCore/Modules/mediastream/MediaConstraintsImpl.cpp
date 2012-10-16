@@ -51,11 +51,6 @@ PassRefPtr<MediaConstraintsImpl> MediaConstraintsImpl::create(const Dictionary& 
     return object.release();
 }
 
-PassRefPtr<MediaConstraintsImpl> MediaConstraintsImpl::create()
-{
-    return adoptRef(new MediaConstraintsImpl());
-}
-
 bool MediaConstraintsImpl::initialize(const Dictionary& constraints)
 {
     if (constraints.isUndefinedOrNull())
@@ -102,7 +97,8 @@ bool MediaConstraintsImpl::initialize(const Dictionary& constraints)
             ok = constraint.get(key, value);
             if (!ok)
                 return false;
-            m_optionalConstraints.append(MediaConstraint(key, value));
+            m_optionalConstraintNames.append(key);
+            m_optionalConstraintValues.append(value);
         }
     }
 
@@ -113,18 +109,18 @@ MediaConstraintsImpl::~MediaConstraintsImpl()
 {
 }
 
-void MediaConstraintsImpl::getMandatoryConstraints(Vector<MediaConstraint>& constraints) const
+void MediaConstraintsImpl::getMandatoryConstraintNames(Vector<String>& names) const
 {
-    constraints.clear();
+    names.clear();
     HashMap<String, String>::const_iterator i = m_mandatoryConstraints.begin();
     for (; i != m_mandatoryConstraints.end(); ++i)
-        constraints.append(MediaConstraint(i->key, i->value));
+        names.append(i->first);
 }
 
-void MediaConstraintsImpl::getOptionalConstraints(Vector<MediaConstraint>& constraints) const
+void MediaConstraintsImpl::getOptionalConstraintNames(Vector<String>& names) const
 {
-    constraints.clear();
-    constraints.append(m_optionalConstraints);
+    names.clear();
+    names = m_optionalConstraintNames;
 }
 
 bool MediaConstraintsImpl::getMandatoryConstraintValue(const String& name, String& value) const
@@ -133,21 +129,18 @@ bool MediaConstraintsImpl::getMandatoryConstraintValue(const String& name, Strin
     if (i == m_mandatoryConstraints.end())
         return false;
 
-    value = i->value;
+    value = i->second;
     return true;
 }
 
 bool MediaConstraintsImpl::getOptionalConstraintValue(const String& name, String& value) const
 {
-    Vector<MediaConstraint>::const_iterator i = m_optionalConstraints.begin();
-    for (; i != m_optionalConstraints.end(); ++i) {
-        if (i->m_name == name) {
-            value = i->m_value;
-            return true;
-        }
-    }
+    size_t index = m_optionalConstraintNames.find(name);
+    if (index == notFound)
+        return false;
 
-    return false;
+    value = m_optionalConstraintValues[index];
+    return true;
 }
 
 } // namespace WebCore

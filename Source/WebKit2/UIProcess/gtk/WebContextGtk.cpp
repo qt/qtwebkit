@@ -53,8 +53,8 @@ String WebContext::platformDefaultDatabaseDirectory() const
 
 String WebContext::platformDefaultIconDatabasePath() const
 {
-    GOwnPtr<gchar> databaseDirectory(g_build_filename(g_get_user_data_dir(), "webkitgtk", "icondatabase", NULL));
-    return WebCore::filenameToString(databaseDirectory.get());
+    // FIXME: Implement.
+    return WTF::String();
 }
 
 String WebContext::platformDefaultLocalStorageDirectory() const

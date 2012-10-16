@@ -94,8 +94,6 @@ WK_EXPORT void WKPageSetShouldSendEventsSynchronously(WKPageRef page, bool sync)
 
 WK_EXPORT void WKPageSetMediaVolume(WKPageRef page, float volume);
 
-WK_EXPORT WKArrayRef WKPageCopyRelatedPages(WKPageRef page);
-
 #ifdef __cplusplus
 }
 #endif

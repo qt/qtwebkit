@@ -37,7 +37,6 @@
 #include "IDBRequest.h"
 #include "IDBTracing.h"
 #include "IDBTransaction.h"
-#include "ScriptCallStack.h"
 #include "ScriptExecutionContext.h"
 
 namespace WebCore {
@@ -177,7 +176,8 @@ void IDBCursor::advance(unsigned long count, ExceptionCode& ec)
     m_request->setPendingCursor(this);
     m_gotValue = false;
     m_backend->advance(count, m_request, ec);
-    ASSERT(!ec);
+    if (ec)
+        m_request->markEarlyDeath();
 }
 
 void IDBCursor::continueFunction(PassRefPtr<IDBKey> key, ExceptionCode& ec)
@@ -218,7 +218,8 @@ void IDBCursor::continueFunction(PassRefPtr<IDBKey> key, ExceptionCode& ec)
     m_request->setPendingCursor(this);
     m_gotValue = false;
     m_backend->continueFunction(key, m_request, ec);
-    ASSERT(!ec);
+    if (ec)
+        m_request->markEarlyDeath();
 }
 
 PassRefPtr<IDBRequest> IDBCursor::deleteFunction(ScriptExecutionContext* context, ExceptionCode& ec)
@@ -233,13 +234,16 @@ PassRefPtr<IDBRequest> IDBCursor::deleteFunction(ScriptExecutionContext* context
         return 0;
     }
 
-    if (!m_gotValue || isKeyCursor()) {
+    if (!m_gotValue) {
         ec = IDBDatabaseException::IDB_INVALID_STATE_ERR;
         return 0;
     }
     RefPtr<IDBRequest> request = IDBRequest::create(context, IDBAny::create(this), m_transaction.get());
     m_backend->deleteFunction(request, ec);
-    ASSERT(!ec);
+    if (ec) {
+        request->markEarlyDeath();
+        return 0;
+    }
     return request.release();
 }
 
@@ -289,7 +293,7 @@ PassRefPtr<IDBObjectStore> IDBCursor::effectiveObjectStore()
     return index->objectStore();
 }
 
-IDBCursor::Direction IDBCursor::stringToDirection(const String& directionString, ScriptExecutionContext* context, ExceptionCode& ec)
+IDBCursor::Direction IDBCursor::stringToDirection(const String& directionString, ExceptionCode& ec)
 {
     if (directionString == IDBCursor::directionNext())
         return IDBCursor::NEXT;
@@ -299,14 +303,6 @@ IDBCursor::Direction IDBCursor::stringToDirection(const String& directionString,
         return IDBCursor::PREV;
     if (directionString == IDBCursor::directionPrevUnique())
         return IDBCursor::PREV_NO_DUPLICATE;
-
-    // FIXME: Remove legacy constants. http://webkit.org/b/85315
-    // FIXME: This is not thread-safe.
-    DEFINE_STATIC_LOCAL(String, consoleMessage, (ASCIILiteral("Numeric direction values are deprecated in openCursor and openKeyCursor. Use \"next\", \"nextunique\", \"prev\", or \"prevunique\".")));
-    if (directionString == "0" || directionString == "1" || directionString == "2" || directionString == "3") {
-        context->addConsoleMessage(JSMessageSource, LogMessageType, WarningMessageLevel, consoleMessage);
-        return static_cast<IDBCursor::Direction>(IDBCursor::NEXT + (directionString[0] - '0'));
-    }
 
     ec = NATIVE_TYPE_ERR;
     return IDBCursor::NEXT;

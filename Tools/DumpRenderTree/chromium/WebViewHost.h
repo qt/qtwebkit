@@ -52,7 +52,6 @@ class MockWebSpeechInputController;
 class MockWebSpeechRecognizer;
 class SkCanvas;
 class TestShell;
-class WebUserMediaClientMock;
 
 namespace WebKit {
 class WebFrame;
@@ -67,6 +66,7 @@ class WebSharedWorkerClient;
 class WebSpeechInputController;
 class WebSpeechInputListener;
 class WebURL;
+class WebUserMediaClientMock;
 struct WebRect;
 struct WebURLError;
 struct WebWindowFeatures;
@@ -268,9 +268,7 @@ class WebViewHost : public WebKit::WebViewClient, public WebKit::WebFrameClient,
     virtual void didDetectXSS(WebKit::WebFrame*, const WebKit::WebURL&, bool didBlockEntirePage);
     virtual void openFileSystem(WebKit::WebFrame*, WebKit::WebFileSystem::Type, long long size, bool create, WebKit::WebFileSystemCallbacks*);
     virtual void deleteFileSystem(WebKit::WebFrame*, WebKit::WebFileSystem::Type, WebKit::WebFileSystemCallbacks*);
-    virtual bool willCheckAndDispatchMessageEvent(
-        WebKit::WebFrame* sourceFrame, WebKit::WebFrame* targetFrame, 
-        WebKit::WebSecurityOrigin target, WebKit::WebDOMMessageEvent);
+    virtual bool willCheckAndDispatchMessageEvent(WebKit::WebFrame* source, WebKit::WebSecurityOrigin target, WebKit::WebDOMMessageEvent);
     virtual void registerIntentService(WebKit::WebFrame*, const WebKit::WebIntentServiceInfo&);
     virtual void dispatchIntent(WebKit::WebFrame*, const WebKit::WebIntentRequest&);
     virtual void deliveredIntentResult(WebKit::WebFrame*, int, const WebKit::WebSerializedScriptValue&);
@@ -345,7 +343,7 @@ private:
     void discardBackingStore();
 
 #if ENABLE(MEDIA_STREAM)
-    WebUserMediaClientMock* userMediaClientMock();
+    WebKit::WebUserMediaClientMock* userMediaClientMock();
     webkit_support::TestMediaStreamClient* testMediaStreamClient();
 #endif
 
@@ -432,7 +430,7 @@ private:
 #endif
 
 #if ENABLE(MEDIA_STREAM)
-    OwnPtr<WebUserMediaClientMock> m_userMediaClientMock;
+    OwnPtr<WebKit::WebUserMediaClientMock> m_userMediaClientMock;
     OwnPtr<webkit_support::TestMediaStreamClient> m_testMediaStreamClient;
 #endif
 

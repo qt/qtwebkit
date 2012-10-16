@@ -29,12 +29,14 @@ public:
     EWK2UnitTestServer();
     virtual ~EWK2UnitTestServer();
 
-    CString getURLForPath(const char* path) const;
+    SoupURI* baseURI() const { return m_baseURI; }
+
+    CString getURIForPath(const char* path) const;
     void run(SoupServerCallback);
 
 private:
     SoupServer* m_soupServer;
-    SoupURI* m_baseURL;
+    SoupURI* m_baseURI;
 };
 
 #endif // EWK2UnitTestServer_h

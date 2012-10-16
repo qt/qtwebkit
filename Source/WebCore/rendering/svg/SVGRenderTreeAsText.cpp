@@ -573,9 +573,9 @@ void writeSVGResourceContainer(TextStream& ts, const RenderObject& object, int i
         FloatPoint focalPoint = gradient->focalPoint(attributes);
         FloatPoint centerPoint = gradient->centerPoint(attributes);
         float radius = gradient->radius(attributes);
-        float focalRadius = gradient->focalRadius(attributes);
+        gradient->adjustFocalPointIfNeeded(radius, centerPoint, focalPoint);
 
-        ts << " [center=" << centerPoint << "] [focal=" << focalPoint << "] [radius=" << radius << "] [focalRadius=" << focalRadius << "]\n";
+        ts << " [center=" << centerPoint << "] [focal=" << focalPoint << "] [radius=" << radius << "]\n";
     } else
         ts << "\n";
     writeChildren(ts, object, indent);

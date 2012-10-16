@@ -70,7 +70,7 @@ WebInspector.StylesSourceMapping.prototype = {
         var uiSourceCode = /** @type {WebInspector.UISourceCode} */ event.data;
         if (!uiSourceCode.url || this._uiSourceCodeForURL[uiSourceCode.url])
             return;
-        if (uiSourceCode.contentType() !== WebInspector.resourceTypes.Stylesheet)
+        if (uiSourceCode.contentType() !== WebInspector.resourceTypes.StyleSheet)
             return;
             
         this._addUISourceCode(uiSourceCode);
@@ -83,8 +83,6 @@ WebInspector.StylesSourceMapping.prototype = {
     {
         this._uiSourceCodeForURL[uiSourceCode.url] = uiSourceCode;
         uiSourceCode.setSourceMapping(this);
-        var styleFile = new WebInspector.StyleFile(uiSourceCode);
-        uiSourceCode.setStyleFile(styleFile);
         WebInspector.cssModel.setSourceMapping(uiSourceCode.url, this);
     },
 
@@ -95,165 +93,3 @@ WebInspector.StylesSourceMapping.prototype = {
     }
 }
 
-/**
- * @constructor
- * @param {WebInspector.UISourceCode} uiSourceCode
- */
-WebInspector.StyleFile = function(uiSourceCode)
-{
-    this._uiSourceCode = uiSourceCode;
-}
-
-WebInspector.StyleFile.updateTimeout = 200;
-
-WebInspector.StyleFile.prototype = {
-    /**
-     * @param {function(?string)} callback
-     */
-    workingCopyCommitted: function(callback)
-    {
-        this._commitIncrementalEdit(true, callback);
-    },
-
-    workingCopyChanged: function()
-    {
-        this._callOrSetTimeout(this._commitIncrementalEdit.bind(this, false, function() {}));
-    },
-
-    /**
-     * @param {function(?string)} callback
-     */
-    _callOrSetTimeout: function(callback)
-    {
-        // FIXME: Extensions tests override updateTimeout because extensions don't have any control over applying changes to domain specific bindings.
-        if (WebInspector.StyleFile.updateTimeout >= 0)
-            this._incrementalUpdateTimer = setTimeout(callback, WebInspector.StyleFile.updateTimeout);
-        else
-            callback(null);
-    },
-
-    /**
-     * @param {boolean} majorChange
-     * @param {function(?string)} callback
-     */
-    _commitIncrementalEdit: function(majorChange, callback)
-    {
-        this._clearIncrementalUpdateTimer();
-        WebInspector.styleContentBinding.setStyleContent(this._uiSourceCode, this._uiSourceCode.workingCopy(), majorChange, callback);
-    },
-
-    _clearIncrementalUpdateTimer: function()
-    {
-        if (this._incrementalUpdateTimer)
-            clearTimeout(this._incrementalUpdateTimer);
-        delete this._incrementalUpdateTimer;
-    },
-}
-
-
-/**
- * @constructor
- * @param {WebInspector.CSSStyleModel} cssModel
- */
-WebInspector.StyleContentBinding = function(cssModel)
-{
-    this._cssModel = cssModel;
-    this._cssModel.addEventListener(WebInspector.CSSStyleModel.Events.StyleSheetChanged, this._styleSheetChanged, this);
-}
-
-WebInspector.StyleContentBinding.prototype = {
-    /**
-     * @param {WebInspector.UISourceCode} uiSourceCode
-     * @param {string} content
-     * @param {boolean} majorChange
-     * @param {function(?string)} userCallback
-     */
-    setStyleContent: function(uiSourceCode, content, majorChange, userCallback)
-    {
-        var resource = WebInspector.resourceForURL(uiSourceCode.url);
-        this._cssModel.resourceBinding().requestStyleSheetIdForResource(resource, callback.bind(this));
-
-        /**
-         * @param {?CSSAgent.StyleSheetId} styleSheetId
-         */
-        function callback(styleSheetId)
-        {
-            if (!styleSheetId) {
-                userCallback("No stylesheet found: " + resource.frameId + ":" + resource.url);
-                return;
-            }
-
-            this._innerSetContent(styleSheetId, content, majorChange, userCallback, null);
-        }
-    },
-
-    /**
-     * @param {CSSAgent.StyleSheetId} styleSheetId
-     * @param {string} content
-     * @param {boolean} majorChange
-     * @param {function(?string)} userCallback
-     */
-    _innerSetContent: function(styleSheetId, content, majorChange, userCallback)
-    {
-        this._isSettingContent = true;
-        function callback(error)
-        {
-            userCallback(error);
-            delete this._isSettingContent;
-        }
-        this._cssModel.setStyleSheetText(styleSheetId, content, majorChange, callback.bind(this));
-    },
-
-    /**
-     * @param {WebInspector.Event} event
-     */
-    _styleSheetChanged: function(event)
-    {
-        if (this._isSettingContent)
-            return;
-
-        if (!event.data.majorChange)
-            return;
-
-        /**
-         * @param {?string} error
-         * @param {string} content
-         */
-        function callback(error, content)
-        {
-            if (!error)
-                this._innerStyleSheetChanged(event.data.styleSheetId, content);
-        }
-        CSSAgent.getStyleSheetText(event.data.styleSheetId, callback.bind(this));
-    },
-
-    /**
-     * @param {CSSAgent.StyleSheetId} styleSheetId
-     * @param {string} content
-     */
-    _innerStyleSheetChanged: function(styleSheetId, content)
-    {
-        /**
-         * @param {?string} styleSheetURL
-         */
-        function callback(styleSheetURL)
-        {
-            if (typeof styleSheetURL !== "string")
-                return;
-
-            var uiSourceCode = WebInspector.workspace.uiSourceCodeForURL(styleSheetURL);
-            if (!uiSourceCode)
-                return;
-
-            if (uiSourceCode.contentType() === WebInspector.resourceTypes.Stylesheet)
-                uiSourceCode.addRevision(content);
-        }
-
-        this._cssModel.resourceBinding().requestResourceURLForStyleSheetId(styleSheetId, callback.bind(this));
-    },
-}
-
-/**
- * @type {?WebInspector.StyleContentBinding}
- */
-WebInspector.styleContentBinding = null;

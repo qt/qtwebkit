@@ -64,9 +64,7 @@ bool TextAutosizer::processSubtree(RenderObject* layoutRoot)
     windowInfo.windowSize = m_document->settings()->textAutosizingWindowSizeOverride();
     if (windowInfo.windowSize.isEmpty()) {
         bool includeScrollbars = !InspectorInstrumentation::shouldApplyScreenWidthOverride(mainFrame);
-        windowInfo.windowSize = mainFrame->view()->visibleContentRect(includeScrollbars).size();
-        if (!m_document->settings()->applyPageScaleFactorInCompositor())
-            windowInfo.windowSize.scale(1 / m_document->page()->deviceScaleFactor());
+        windowInfo.windowSize = mainFrame->view()->visibleContentRect(includeScrollbars).size(); // FIXME: Check that this is always in logical (density-independent) pixels (see wkbug.com/87440).
     }
 
     // Largest area of block that can be visible at once (assuming the main

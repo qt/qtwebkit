@@ -41,7 +41,6 @@ DelayDSPKernel::DelayDSPKernel(DelayProcessor* processor)
     : AudioDSPKernel(processor)
     , m_writeIndex(0)
     , m_firstTime(true)
-    , m_delayTimes(AudioNode::ProcessingSizeInFrames)
 {
     ASSERT(processor && processor->sampleRate() > 0);
     if (!(processor && processor->sampleRate() > 0))
@@ -51,7 +50,7 @@ DelayDSPKernel::DelayDSPKernel(DelayProcessor* processor)
     ASSERT(m_maxDelayTime >= 0);
     if (m_maxDelayTime < 0)
         return;
-
+    
     m_buffer.allocate(bufferLengthForDelay(m_maxDelayTime, processor->sampleRate()));
     m_buffer.zero();
 
@@ -67,12 +66,12 @@ DelayDSPKernel::DelayDSPKernel(double maxDelayTime, float sampleRate)
     ASSERT(maxDelayTime > 0.0);
     if (maxDelayTime <= 0.0)
         return;
-
+        
     size_t bufferLength = bufferLengthForDelay(maxDelayTime, sampleRate);
     ASSERT(bufferLength);
     if (!bufferLength)
         return;
-
+    
     m_buffer.allocate(bufferLength);
     m_buffer.zero();
 
@@ -94,43 +93,27 @@ void DelayDSPKernel::process(const float* source, float* destination, size_t fra
     ASSERT(bufferLength);
     if (!bufferLength)
         return;
-
+        
     ASSERT(source && destination);
     if (!source || !destination)
         return;
-
+        
     float sampleRate = this->sampleRate();
-    double delayTime = 0;
-    float* delayTimes = m_delayTimes.data();
-    double maxTime = maxDelayTime();
+    double delayTime = delayProcessor() ? delayProcessor()->delayTime()->finalValue() : m_desiredDelayFrames / sampleRate;
 
-    bool sampleAccurate = delayProcessor() && delayProcessor()->delayTime()->hasSampleAccurateValues();
+    // Make sure the delay time is in a valid range.
+    delayTime = min(maxDelayTime(), delayTime);
+    delayTime = max(0.0, delayTime);
 
-    if (sampleAccurate)
-        delayProcessor()->delayTime()->calculateSampleAccurateValues(delayTimes, framesToProcess);
-    else {
-        delayTime = delayProcessor() ? delayProcessor()->delayTime()->finalValue() : m_desiredDelayFrames / sampleRate;
-
-        // Make sure the delay time is in a valid range.
-        delayTime = min(maxTime, delayTime);
-        delayTime = max(0.0, delayTime);
-
-        if (m_firstTime) {
-            m_currentDelayTime = delayTime;
-            m_firstTime = false;
-        }
+    if (m_firstTime) {
+        m_currentDelayTime = delayTime;
+        m_firstTime = false;
     }
-
-    for (unsigned i = 0; i < framesToProcess; ++i) {
-        if (sampleAccurate) {
-            delayTime = delayTimes[i];
-            delayTime = std::min(maxTime, delayTime);
-            delayTime = std::max(0.0, delayTime);
-            m_currentDelayTime = delayTime;
-        } else {
-            // Approach desired delay time.
-            m_currentDelayTime += (delayTime - m_currentDelayTime) * m_smoothingRate;
-        }
+    
+    int n = framesToProcess;
+    while (n--) {
+        // Approach desired delay time.
+        m_currentDelayTime += (delayTime - m_currentDelayTime) * m_smoothingRate;
 
         double desiredDelayFrames = m_currentDelayTime * sampleRate;
 
@@ -145,15 +128,15 @@ void DelayDSPKernel::process(const float* source, float* destination, size_t fra
 
         double input = static_cast<float>(*source++);
         buffer[m_writeIndex] = static_cast<float>(input);
-        m_writeIndex = (m_writeIndex + 1) % bufferLength;
-
+        m_writeIndex = (m_writeIndex + 1) % bufferLength;        
+        
         double sample1 = buffer[readIndex1];
         double sample2 = buffer[readIndex2];
-
+        
         double output = (1.0 - interpolationFactor) * sample1 + interpolationFactor * sample2;
 
         *destination++ = static_cast<float>(output);
-    }
+    }        
 }
 
 void DelayDSPKernel::reset()

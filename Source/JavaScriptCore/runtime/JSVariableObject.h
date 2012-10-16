@@ -68,7 +68,7 @@ namespace JSC {
         {
         }
 
-        WriteBarrierBase<Unknown>* m_registers; // "r" in the stack.
+        WriteBarrierBase<Unknown>* m_registers; // "r" in the register file.
     };
 
 } // namespace JSC

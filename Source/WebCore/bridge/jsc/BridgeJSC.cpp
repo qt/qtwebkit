@@ -63,6 +63,18 @@ Instance::~Instance()
     ASSERT(!m_runtimeObject);
 }
 
+static KJSDidExecuteFunctionPtr s_didExecuteFunction;
+
+void Instance::setDidExecuteFunction(KJSDidExecuteFunctionPtr func)
+{
+    s_didExecuteFunction = func;
+}
+
+KJSDidExecuteFunctionPtr Instance::didExecuteFunction()
+{
+    return s_didExecuteFunction;
+}
+
 void Instance::begin()
 {
     virtualBegin();

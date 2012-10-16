@@ -30,7 +30,7 @@
 
 namespace JSC {
 
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(ErrorPrototype);
+ASSERT_CLASS_FITS_IN_CELL(ErrorPrototype);
 
 static EncodedJSValue JSC_HOST_CALL errorProtoFuncToString(ExecState*);
 
@@ -47,6 +47,8 @@ const ClassInfo ErrorPrototype::s_info = { "Error", &ErrorInstance::s_info, 0, E
   toString          errorProtoFuncToString         DontEnum|Function 0
 @end
 */
+
+ASSERT_CLASS_FITS_IN_CELL(ErrorPrototype);
 
 ErrorPrototype::ErrorPrototype(ExecState* exec, Structure* structure)
     : ErrorInstance(exec->globalData(), structure)

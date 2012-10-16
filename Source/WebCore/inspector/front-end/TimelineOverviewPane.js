@@ -347,10 +347,10 @@ WebInspector.TimelineOverviewPane.prototype = {
         if (!this.isShowing())
             return;
         this._refreshTimeout = setTimeout(this._update.bind(this), 300);
-    },
-
-    __proto__: WebInspector.View.prototype
+    }
 }
+
+WebInspector.TimelineOverviewPane.prototype.__proto__ = WebInspector.View.prototype;
 
 /**
  * @constructor
@@ -625,10 +625,10 @@ WebInspector.TimelineOverviewWindow.prototype = {
         left = Math.max(0, Math.min(max - delta, referencePoint + (left - referencePoint) * factor));
         right = Math.min(max, left + delta);
         this._setWindowPosition(left, right);
-    },
-
-    __proto__: WebInspector.Object.prototype
+    }
 }
+
+WebInspector.TimelineOverviewWindow.prototype.__proto__ = WebInspector.Object.prototype;
 
 /**
  * @constructor
@@ -1219,10 +1219,10 @@ WebInspector.TimelineFrameOverview.prototype = {
             startTime: firstBar >= this._barTimes.length ? Infinity : this._barTimes[firstBar].startTime,
             endTime: rightOffset + snapToRightTolerancePixels > windowSpan ? Infinity : this._barTimes[lastBar].endTime
         }
-    },
-
-    __proto__: WebInspector.View.prototype
+    }
 }
+
+WebInspector.TimelineFrameOverview.prototype.__proto__ = WebInspector.View.prototype;
 
 /**
  * @param {WebInspector.TimelineOverviewPane} pane

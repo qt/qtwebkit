@@ -110,7 +110,7 @@ TextureMapperLayerClientQt::~TextureMapperLayerClientQt()
 
 void TextureMapperLayerClientQt::syncRootLayer()
 {
-    m_rootGraphicsLayer->flushCompositingStateForThisLayerOnly();
+    m_rootGraphicsLayer->syncCompositingStateForThisLayerOnly();
 }
 
 TextureMapperLayer* TextureMapperLayerClientQt::rootLayer()
@@ -141,7 +141,7 @@ void PageClientQWidget::syncLayers(Timer<PageClientQWidget>*)
 {
     if (TextureMapperLayerClient)
         TextureMapperLayerClient->syncRootLayer();
-    QWebFramePrivate::core(page->mainFrame())->view()->flushCompositingStateIncludingSubframes();
+    QWebFramePrivate::core(page->mainFrame())->view()->syncCompositingStateIncludingSubframes();
     if (!TextureMapperLayerClient)
         return;
     if (TextureMapperLayerClient->rootLayer()->descendantsOrSelfHaveRunningAnimations() && !syncTimer.isActive())
@@ -271,7 +271,7 @@ void PageClientQGraphicsWidget::syncLayers()
     if (TextureMapperLayerClient)
         TextureMapperLayerClient->syncRootLayer();
 
-    QWebFramePrivate::core(page->mainFrame())->view()->flushCompositingStateIncludingSubframes();
+    QWebFramePrivate::core(page->mainFrame())->view()->syncCompositingStateIncludingSubframes();
 
     if (!TextureMapperLayerClient)
         return;

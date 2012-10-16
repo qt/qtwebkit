@@ -172,9 +172,6 @@ AtomicString FrameTree::uniqueChildName(const AtomicString& requestedName) const
 
 inline Frame* FrameTree::scopedChild(unsigned index, TreeScope* scope) const
 {
-    if (!scope)
-        return 0;
-
     unsigned scopedIndex = 0;
     for (Frame* result = firstChild(); result; result = result->tree()->nextSibling()) {
         if (result->inScope(scope)) {
@@ -189,9 +186,6 @@ inline Frame* FrameTree::scopedChild(unsigned index, TreeScope* scope) const
 
 inline Frame* FrameTree::scopedChild(const AtomicString& name, TreeScope* scope) const
 {
-    if (!scope)
-        return 0;
-
     for (Frame* child = firstChild(); child; child = child->tree()->nextSibling())
         if (child->tree()->uniqueName() == name && child->inScope(scope))
             return child;
@@ -200,9 +194,6 @@ inline Frame* FrameTree::scopedChild(const AtomicString& name, TreeScope* scope)
 
 inline unsigned FrameTree::scopedChildCount(TreeScope* scope) const
 {
-    if (!scope)
-        return 0;
-
     unsigned scopedCount = 0;
     for (Frame* result = firstChild(); result; result = result->tree()->nextSibling()) {
         if (result->inScope(scope))

@@ -31,7 +31,6 @@
 #include "config.h"
 #include "Font.h"
 
-#include "FontSmoothingMode.h"
 #include "GlyphBuffer.h"
 #include "GraphicsContext.h"
 #include "LayoutTestSupport.h"
@@ -72,16 +71,6 @@ static void setupPaint(SkPaint* paint, const SimpleFontData* fontData, const Fon
     paint->setAutohinted(false); // freetype specific
     paint->setLCDRenderText(shouldSmoothFonts);
     paint->setSubpixelText(true);
-
-#if OS(DARWIN)
-    // When using CoreGraphics, disable hinting when webkit-font-smoothing:antialiased is used.
-    // See crbug.com/152304
-    if (font->fontDescription().fontSmoothing() == Antialiased)
-        paint->setHinting(SkPaint::kNo_Hinting);
-#endif
-    
-    if (font->fontDescription().textRenderingMode() == GeometricPrecision)
-        paint->setHinting(SkPaint::kNo_Hinting);
 }
 
 // TODO: This needs to be split into helper functions to better scope the

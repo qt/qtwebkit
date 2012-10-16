@@ -33,7 +33,6 @@
 
 #include <hb.h>
 
-#include <wtf/HashMap.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
@@ -44,9 +43,6 @@ class FontPlatformData;
 
 class HarfBuzzNGFace : public RefCounted<HarfBuzzNGFace> {
 public:
-    static const hb_tag_t vertTag;
-    static const hb_tag_t vrt2Tag;
-
     static PassRefPtr<HarfBuzzNGFace> create(FontPlatformData* platformData, uint64_t uniqueID)
     {
         return adoptRef(new HarfBuzzNGFace(platformData, uniqueID));
@@ -54,8 +50,6 @@ public:
     ~HarfBuzzNGFace();
 
     hb_font_t* createFont();
-
-    void setScriptForVerticalGlyphSubstitution(hb_buffer_t*);
 
 private:
     HarfBuzzNGFace(FontPlatformData*, uint64_t);
@@ -65,9 +59,6 @@ private:
     FontPlatformData* m_platformData;
     uint64_t m_uniqueID;
     hb_face_t* m_face;
-    WTF::HashMap<uint32_t, uint16_t>* m_glyphCacheForFaceCacheEntry;
-
-    hb_script_t m_scriptForVerticalText;
 };
 
 }

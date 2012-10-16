@@ -40,7 +40,8 @@ PassOwnPtr<AsyncFileSystem> AsyncFileSystem::create()
     return adoptPtr(new AsyncFileSystemBlackBerry());
 }
 
-void AsyncFileSystem::openFileSystem(const String& basePath, const String& storageIdentifier, FileSystemType, bool, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
+// FIXME: Add FileSystemType parameter.
+void AsyncFileSystem::openFileSystem(const String& basePath, const String& storageIdentifier, bool, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
 {
     UNUSED_PARAM(basePath);
     UNUSED_PARAM(storageIdentifier);

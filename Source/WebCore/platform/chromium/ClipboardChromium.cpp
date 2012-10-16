@@ -45,6 +45,7 @@
 #include "Image.h"
 #include "MIMETypeRegistry.h"
 #include "NamedNodeMap.h"
+#include "PlatformSupport.h"
 #include "Range.h"
 #include "RenderImage.h"
 #include "StringCallback.h"
@@ -226,8 +227,6 @@ ClipboardChromium::ClipboardChromium(ClipboardType clipboardType,
 
 ClipboardChromium::~ClipboardChromium()
 {
-    if (m_dragImage)
-        m_dragImage->removeClient(this);
 }
 
 PassRefPtr<ClipboardChromium> ClipboardChromium::create(ClipboardType clipboardType,
@@ -275,10 +274,10 @@ bool ClipboardChromium::setData(const String& type, const String& data)
 }
 
 // extensions beyond IE's API
-ListHashSet<String> ClipboardChromium::types() const
+HashSet<String> ClipboardChromium::types() const
 {
     if (policy() != ClipboardReadable && policy() != ClipboardTypesReadable)
-        return ListHashSet<String>();
+        return HashSet<String>();
 
     return m_dataObject->types();
 }

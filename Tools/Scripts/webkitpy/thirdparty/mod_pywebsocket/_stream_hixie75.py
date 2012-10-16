@@ -32,8 +32,7 @@
 protocol version HyBi 00 and Hixie 75.
 
 Specification:
-- HyBi 00 http://tools.ietf.org/html/draft-ietf-hybi-thewebsocketprotocol-00
-- Hixie 75 http://tools.ietf.org/html/draft-hixie-thewebsocketprotocol-75
+http://tools.ietf.org/html/draft-ietf-hybi-thewebsocketprotocol-00
 """
 
 

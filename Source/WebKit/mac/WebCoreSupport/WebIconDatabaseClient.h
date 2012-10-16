@@ -31,6 +31,7 @@
 
 class WebIconDatabaseClient : public WebCore::IconDatabaseClient {
 public:
+    virtual bool performImport() OVERRIDE;
     virtual void didRemoveAllIcons() OVERRIDE;
     virtual void didImportIconURLForPageURL(const String&) OVERRIDE;
     virtual void didImportIconDataForPageURL(const String&) OVERRIDE;

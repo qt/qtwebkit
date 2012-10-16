@@ -212,17 +212,9 @@ WebInspector.TabbedEditorContainer.prototype = {
      */
     removeUISourceCode: function(uiSourceCode)
     {
-        var wasCurrent = this._currentFile === uiSourceCode;
-
         var tabId = this._tabIds.get(uiSourceCode);
         if (tabId)
             this._tabbedPane.closeTab(tabId);
-        
-        if (wasCurrent && uiSourceCode.isTemporary) {
-            var newUISourceCode = WebInspector.workspace.uiSourceCodeForURL(uiSourceCode.url);
-            if (newUISourceCode)
-                this._innerShowFile(newUISourceCode, false);
-        }
     },
 
     /**
@@ -327,14 +319,37 @@ WebInspector.TabbedEditorContainer.prototype = {
     },
 
     /**
+     * @param {WebInspector.UISourceCode} oldUISourceCode
+     * @param {WebInspector.UISourceCode} uiSourceCode
+     */
+    replaceFile: function(oldUISourceCode, uiSourceCode)
+    {
+        var tabId = this._tabIds.get(oldUISourceCode);
+        
+        if (!tabId)
+            return;
+        
+        delete this._files[this._tabIds.get(oldUISourceCode)]
+        this._tabIds.remove(oldUISourceCode);
+        this._tabIds.put(uiSourceCode, tabId);
+        this._files[tabId] = uiSourceCode;
+
+        this._tabbedPane.changeTabTitle(tabId, this._titleForFile(uiSourceCode));
+        this._tabbedPane.changeTabView(tabId, this._delegate.viewForFile(uiSourceCode));
+        this._tabbedPane.changeTabTooltip(tabId, this._tooltipForFile(uiSourceCode));
+
+        this._removeUISourceCodeListeners(oldUISourceCode);
+        this._addUISourceCodeListeners(uiSourceCode);
+    },
+
+    /**
      * @param {WebInspector.UISourceCode} uiSourceCode
      */
     _addUISourceCodeListeners: function(uiSourceCode)
     {
         uiSourceCode.addEventListener(WebInspector.UISourceCode.Events.TitleChanged, this._uiSourceCodeTitleChanged, this);
         uiSourceCode.addEventListener(WebInspector.UISourceCode.Events.WorkingCopyChanged, this._uiSourceCodeWorkingCopyChanged, this);
-        uiSourceCode.addEventListener(WebInspector.UISourceCode.Events.WorkingCopyCommitted, this._uiSourceCodeWorkingCopyCommitted, this);
-        uiSourceCode.addEventListener(WebInspector.UISourceCode.Events.FormattedChanged, this._uiSourceCodeFormattedChanged, this);
+        uiSourceCode.addEventListener(WebInspector.UISourceCode.Events.ContentChanged, this._uiSourceCodeContentChanged, this);
     },
 
     /**
@@ -344,8 +359,7 @@ WebInspector.TabbedEditorContainer.prototype = {
     {
         uiSourceCode.removeEventListener(WebInspector.UISourceCode.Events.TitleChanged, this._uiSourceCodeTitleChanged, this);
         uiSourceCode.removeEventListener(WebInspector.UISourceCode.Events.WorkingCopyChanged, this._uiSourceCodeWorkingCopyChanged, this);
-        uiSourceCode.removeEventListener(WebInspector.UISourceCode.Events.WorkingCopyCommitted, this._uiSourceCodeWorkingCopyCommitted, this);
-        uiSourceCode.removeEventListener(WebInspector.UISourceCode.Events.FormattedChanged, this._uiSourceCodeFormattedChanged, this);
+        uiSourceCode.removeEventListener(WebInspector.UISourceCode.Events.ContentChanged, this._uiSourceCodeContentChanged, this);
     },
 
     /**
@@ -372,13 +386,7 @@ WebInspector.TabbedEditorContainer.prototype = {
         this._updateFileTitle(uiSourceCode);
     },
 
-    _uiSourceCodeWorkingCopyCommitted: function(event)
-    {
-        var uiSourceCode = /** @type {WebInspector.UISourceCode} */ event.target;
-        this._updateFileTitle(uiSourceCode);
-    },
-
-    _uiSourceCodeFormattedChanged: function(event)
+    _uiSourceCodeContentChanged: function(event)
     {
         var uiSourceCode = /** @type {WebInspector.UISourceCode} */ event.target;
         this._updateFileTitle(uiSourceCode);
@@ -408,10 +416,10 @@ WebInspector.TabbedEditorContainer.prototype = {
     currentFile: function()
     {
         return this._currentFile;
-    },
-
-    __proto__: WebInspector.Object.prototype
+    }
 }
+
+WebInspector.TabbedEditorContainer.prototype.__proto__ = WebInspector.Object.prototype;
 
 /**
  * @constructor
@@ -447,10 +455,10 @@ WebInspector.TabbedEditorContainer.HistoryItem.prototype = {
         serializedHistoryItem.selectionRange = this.selectionRange;
         serializedHistoryItem.scrollLineNumber = this.scrollLineNumber;
         return serializedHistoryItem;
-    },
-
-    __proto__: WebInspector.Object.prototype
+    }
 }
+
+WebInspector.TabbedEditorContainer.HistoryItem.prototype.__proto__ = WebInspector.Object.prototype;
 
 /**
  * @constructor
@@ -577,7 +585,7 @@ WebInspector.TabbedEditorContainer.History.prototype = {
         for (var i = 0; i < this._items.length; ++i)
             serializedHistory.push(this._items[i].serializeToObject());
         return serializedHistory;
-    },
-
-    __proto__: WebInspector.Object.prototype
+    }
 }
+
+WebInspector.TabbedEditorContainer.History.prototype.__proto__ = WebInspector.Object.prototype;

@@ -26,9 +26,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    OmitConstructor
-] interface Crypto {
-    void getRandomValues(in ArrayBufferView array) raises(DOMException);
-};
+module window {
 
+    interface [
+        OmitConstructor
+    ] Crypto {
+        void getRandomValues(in ArrayBufferView array) raises(DOMException);
+    };
+
+}

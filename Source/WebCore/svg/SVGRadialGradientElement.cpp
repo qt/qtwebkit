@@ -46,7 +46,6 @@ DEFINE_ANIMATED_LENGTH(SVGRadialGradientElement, SVGNames::cyAttr, Cy, cy)
 DEFINE_ANIMATED_LENGTH(SVGRadialGradientElement, SVGNames::rAttr, R, r)
 DEFINE_ANIMATED_LENGTH(SVGRadialGradientElement, SVGNames::fxAttr, Fx, fx)
 DEFINE_ANIMATED_LENGTH(SVGRadialGradientElement, SVGNames::fyAttr, Fy, fy)
-DEFINE_ANIMATED_LENGTH(SVGRadialGradientElement, SVGNames::frAttr, Fr, fr)
 
 BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGRadialGradientElement)
     REGISTER_LOCAL_ANIMATED_PROPERTY(cx)
@@ -54,7 +53,6 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGRadialGradientElement)
     REGISTER_LOCAL_ANIMATED_PROPERTY(r)
     REGISTER_LOCAL_ANIMATED_PROPERTY(fx)
     REGISTER_LOCAL_ANIMATED_PROPERTY(fy)
-    REGISTER_LOCAL_ANIMATED_PROPERTY(fr)
     REGISTER_PARENT_ANIMATED_PROPERTIES(SVGGradientElement)
 END_REGISTER_ANIMATED_PROPERTIES
 
@@ -65,9 +63,8 @@ inline SVGRadialGradientElement::SVGRadialGradientElement(const QualifiedName& t
     , m_r(LengthModeOther, "50%")
     , m_fx(LengthModeWidth)
     , m_fy(LengthModeHeight)
-    , m_fr(LengthModeOther, "0%")
 {
-    // Spec: If the cx/cy/r/fr attribute is not specified, the effect is as if a value of "50%" were specified.
+    // Spec: If the cx/cy/r attribute is not specified, the effect is as if a value of "50%" were specified.
     ASSERT(hasTagName(SVGNames::radialGradientTag));
     registerAnimatedPropertiesForSVGRadialGradientElement();
 }
@@ -86,7 +83,6 @@ bool SVGRadialGradientElement::isSupportedAttribute(const QualifiedName& attrNam
         supportedAttributes.add(SVGNames::fxAttr);
         supportedAttributes.add(SVGNames::fyAttr);
         supportedAttributes.add(SVGNames::rAttr);
-        supportedAttributes.add(SVGNames::frAttr);
     }
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
 }
@@ -107,8 +103,6 @@ void SVGRadialGradientElement::parseAttribute(const Attribute& attribute)
         setFxBaseValue(SVGLength::construct(LengthModeWidth, attribute.value(), parseError));
     else if (attribute.name() == SVGNames::fyAttr)
         setFyBaseValue(SVGLength::construct(LengthModeHeight, attribute.value(), parseError));
-    else if (attribute.name() == SVGNames::frAttr)
-        setFrBaseValue(SVGLength::construct(LengthModeOther, attribute.value(), parseError, ForbidNegativeLengths));
     else
         ASSERT_NOT_REACHED();
 
@@ -181,9 +175,6 @@ bool SVGRadialGradientElement::collectGradientAttributes(RadialGradientAttribute
 
             if (!attributes.hasFy() && current->hasAttribute(SVGNames::fyAttr))
                 attributes.setFy(radial->fy());
-
-            if (!attributes.hasFr() && current->hasAttribute(SVGNames::frAttr))
-                attributes.setFr(radial->fr());
         }
 
         processedGradients.add(current);
@@ -210,6 +201,7 @@ bool SVGRadialGradientElement::collectGradientAttributes(RadialGradientAttribute
 
     if (!attributes.hasFy())
         attributes.setFy(attributes.cy());
+
     return true;
 }
 
@@ -219,8 +211,7 @@ bool SVGRadialGradientElement::selfHasRelativeLengths() const
         || cy().isRelative()
         || r().isRelative()
         || fx().isRelative()
-        || fy().isRelative()
-        || fr().isRelative();
+        || fy().isRelative();
 }
 
 }

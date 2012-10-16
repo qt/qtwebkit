@@ -182,10 +182,6 @@ class Port(object):
         """Return the number of DumpRenderTree instances to use for this port."""
         return self._executive.cpu_count()
 
-    def default_max_locked_shards(self):
-        """Return the number of "locked" shards to run in parallel (like the http tests)."""
-        return 1
-
     def worker_startup_delay_secs(self):
         # FIXME: If we start workers up too quickly, DumpRenderTree appears
         # to thrash on something and time out its first few tests. Until
@@ -874,7 +870,6 @@ class Port(object):
 
             # Most ports (?):
             'WEBKIT_TESTFONTS',
-            'WEBKITOUTPUTDIR',
         ]
         for variable in variables_to_copy:
             self._copy_value_from_environ_if_set(clean_env, variable)
@@ -1001,9 +996,6 @@ class Port(object):
         # This is different from checking test_expectations() is None, because
         # some ports have Skipped files which are returned as part of test_expectations().
         return self._filesystem.exists(self.path_to_test_expectations_file())
-
-    def warn_if_bug_missing_in_test_expectations(self):
-        return False
 
     def expectations_dict(self):
         """Returns an OrderedDict of name -> expectations strings.
@@ -1170,18 +1162,9 @@ class Port(object):
         return "apache2-httpd.conf"
 
     def _path_to_apache_config_file(self):
-        """Returns the full path to the apache configuration file.
-
-        If the WEBKIT_HTTP_SERVER_CONF_PATH environment variable is set, its
-        contents will be used instead.
+        """Returns the full path to the apache binary.
 
         This is needed only by ports that use the apache_http_server module."""
-        config_file_from_env = os.environ.get('WEBKIT_HTTP_SERVER_CONF_PATH')
-        if config_file_from_env:
-            if not self._filesystem.exists(config_file_from_env):
-                raise IOError('%s was not found on the system' % config_file_from_env)
-            return config_file_from_env
-
         config_file_name = self._apache_config_file_name_for_platform(sys.platform)
         return self._filesystem.join(self.layout_tests_dir(), 'http', 'conf', config_file_name)
 
@@ -1240,15 +1223,11 @@ class Port(object):
         This is needed only by ports that use the http_server.py module."""
         raise NotImplementedError('Port._path_to_lighttpd_php')
 
-    @memoized
     def _path_to_wdiff(self):
         """Returns the full path to the wdiff binary, or None if it is not available.
 
         This is likely used only by wdiff_text()"""
-        for path in ("/usr/bin/wdiff", "/usr/bin/dwdiff"):
-            if self._filesystem.exists(path):
-                return path
-        return None
+        return 'wdiff'
 
     def _webkit_baseline_path(self, platform):
         """Return the  full path to the top of the baseline tree for a
@@ -1296,7 +1275,7 @@ class Port(object):
             base_tests = self._real_tests([suite.base])
             suite.tests = {}
             for test in base_tests:
-                suite.tests[test.replace(suite.base, suite.name, 1)] = test
+                suite.tests[test.replace(suite.base, suite.name)] = test
         return suites
 
     def _virtual_tests(self, paths, suites):
@@ -1313,7 +1292,7 @@ class Port(object):
     def lookup_virtual_test_base(self, test_name):
         for suite in self.populated_virtual_test_suites():
             if test_name.startswith(suite.name):
-                return test_name.replace(suite.name, suite.base, 1)
+                return test_name.replace(suite.name, suite.base)
         return None
 
     def lookup_virtual_test_args(self, test_name):

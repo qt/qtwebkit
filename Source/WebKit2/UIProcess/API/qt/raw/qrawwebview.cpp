@@ -167,11 +167,6 @@ void QRawWebViewPrivate::toolTipChanged(const String&, const String& newTooltip)
     notImplemented();
 }
 
-void QRawWebViewPrivate::pageTransitionViewportReady()
-{
-    m_webPageProxy->commitPageTransitionViewport();
-}
-
 void QRawWebViewPrivate::startDrag(const WebCore::DragData& dragData, PassRefPtr<WebKit::ShareableBitmap> dragImage)
 {
     notImplemented();
@@ -324,7 +319,6 @@ void QRawWebView::setActive(bool active)
 {
     d->m_active = active;
     d->m_webPageProxy->viewStateDidChange(WebKit::WebPageProxy::ViewWindowIsActive);
-    layerTreeRenderer()->setActive(active);
 }
 
 QSize QRawWebView::size() const
@@ -358,20 +352,17 @@ WKPageRef QRawWebView::pageRef()
     return toAPI(d->m_webPageProxy.get());
 }
 
-WebKit::LayerTreeRenderer* QRawWebView::layerTreeRenderer() const
+void QRawWebView::paint(const QMatrix4x4& transform, float opacity, unsigned paintFlags)
 {
     WebKit::DrawingAreaProxy* drawingArea = d->m_webPageProxy->drawingArea();
     if (!drawingArea)
-        return 0;
-    WebKit::LayerTreeCoordinatorProxy* layerTreeCoordinatorProxy = drawingArea->layerTreeCoordinatorProxy();
-    if (!layerTreeCoordinatorProxy)
-        return 0;
-    return layerTreeCoordinatorProxy->layerTreeRenderer();
-}
+        return;
 
-void QRawWebView::paint(const QMatrix4x4& transform, float opacity, unsigned paintFlags)
-{
-    WebKit::LayerTreeRenderer* renderer = layerTreeRenderer();
+    WebKit::LayerTreeCoordinatorProxy* coordinatorProxy = drawingArea->layerTreeCoordinatorProxy();
+    if (!coordinatorProxy)
+        return;
+
+    WebKit::LayerTreeRenderer* renderer = coordinatorProxy->layerTreeRenderer();
     if (!renderer)
         return;
 

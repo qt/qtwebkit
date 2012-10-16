@@ -43,20 +43,11 @@
 #include "SkUtils.h"
 
 #include "hb.h"
-#include <wtf/HashMap.h>
 
 namespace WebCore {
 
 // Our implementation of the callbacks which Harfbuzz requires by using Skia
 // calls. See the Harfbuzz source for references about what these callbacks do.
-
-struct HarfBuzzFontData {
-    HarfBuzzFontData(WTF::HashMap<uint32_t, uint16_t>* glyphCacheForFaceCacheEntry)
-        : m_glyphCacheForFaceCacheEntry(glyphCacheForFaceCacheEntry)
-    { }
-    SkPaint m_paint;
-    WTF::HashMap<uint32_t, uint16_t>* m_glyphCacheForFaceCacheEntry;
-};
 
 static hb_position_t SkiaScalarToHarfbuzzPosition(SkScalar value)
 {
@@ -65,7 +56,8 @@ static hb_position_t SkiaScalarToHarfbuzzPosition(SkScalar value)
 
 static void SkiaGetGlyphWidthAndExtents(SkPaint* paint, hb_codepoint_t codepoint, hb_position_t* width, hb_glyph_extents_t* extents)
 {
-    ASSERT(codepoint <= 0xFFFF);
+    if (codepoint > 0xFFFF)
+        return;
     paint->setTextEncoding(SkPaint::kGlyphID_TextEncoding);
 
     SkScalar skWidth;
@@ -86,27 +78,23 @@ static void SkiaGetGlyphWidthAndExtents(SkPaint* paint, hb_codepoint_t codepoint
 
 static hb_bool_t harfbuzzGetGlyph(hb_font_t* hbFont, void* fontData, hb_codepoint_t unicode, hb_codepoint_t variationSelector, hb_codepoint_t* glyph, void* userData)
 {
-    HarfBuzzFontData* hbFontData = reinterpret_cast<HarfBuzzFontData*>(fontData);
+    SkPaint* paint = reinterpret_cast<SkPaint*>(fontData);
 
-    WTF::HashMap<uint32_t, uint16_t>::AddResult result = hbFontData->m_glyphCacheForFaceCacheEntry->add(unicode, 0);
-    if (result.isNewEntry) {
-        SkPaint* paint = &hbFontData->m_paint;
-        paint->setTextEncoding(SkPaint::kUTF32_TextEncoding);
-        uint16_t glyph16;
-        paint->textToGlyphs(&unicode, sizeof(hb_codepoint_t), &glyph16);
-        result.iterator->value = glyph16;
-        *glyph = glyph16;
-    }
-    *glyph = result.iterator->value;
+    paint->setTextEncoding(SkPaint::kUTF16_TextEncoding);
+    uint16_t text[4];
+    size_t length = SkUTF16_FromUnichar(unicode, text);
+    uint16_t glyph16;
+    paint->textToGlyphs(text, length, &glyph16);
+    *glyph = glyph16;
     return !!*glyph;
 }
 
 static hb_position_t harfbuzzGetGlyphHorizontalAdvance(hb_font_t* hbFont, void* fontData, hb_codepoint_t glyph, void* userData)
 {
-    HarfBuzzFontData* hbFontData = reinterpret_cast<HarfBuzzFontData*>(fontData);
+    SkPaint* paint = reinterpret_cast<SkPaint*>(fontData);
     hb_position_t advance = 0;
 
-    SkiaGetGlyphWidthAndExtents(&hbFontData->m_paint, glyph, &advance, 0);
+    SkiaGetGlyphWidthAndExtents(paint, glyph, &advance, 0);
     return advance;
 }
 
@@ -119,9 +107,9 @@ static hb_bool_t harfbuzzGetGlyphHorizontalOrigin(hb_font_t* hbFont, void* fontD
 
 static hb_bool_t harfbuzzGetGlyphExtents(hb_font_t* hbFont, void* fontData, hb_codepoint_t glyph, hb_glyph_extents_t* extents, void* userData)
 {
-    HarfBuzzFontData* hbFontData = reinterpret_cast<HarfBuzzFontData*>(fontData);
+    SkPaint* paint = reinterpret_cast<SkPaint*>(fontData);
 
-    SkiaGetGlyphWidthAndExtents(&hbFontData->m_paint, glyph, 0, extents);
+    SkiaGetGlyphWidthAndExtents(paint, glyph, 0, extents);
     return true;
 }
 
@@ -163,10 +151,10 @@ static hb_blob_t* harfbuzzSkiaGetTable(hb_face_t* face, hb_tag_t tag, void* user
                           HB_MEMORY_MODE_WRITABLE, buffer, fastFree);
 }
 
-static void destroyHarfBuzzFontData(void* userData)
+static void destroyPaint(void* userData)
 {
-    HarfBuzzFontData* hbFontData = reinterpret_cast<HarfBuzzFontData*>(userData);
-    delete hbFontData;
+    SkPaint* paint = reinterpret_cast<SkPaint*>(userData);
+    delete paint;
 }
 
 hb_face_t* HarfBuzzNGFace::createFace()
@@ -178,10 +166,10 @@ hb_face_t* HarfBuzzNGFace::createFace()
 
 hb_font_t* HarfBuzzNGFace::createFont()
 {
-    HarfBuzzFontData* hbFontData = new HarfBuzzFontData(m_glyphCacheForFaceCacheEntry);
-    m_platformData->setupPaint(&hbFontData->m_paint);
     hb_font_t* font = hb_font_create(m_face);
-    hb_font_set_funcs(font, harfbuzzSkiaGetFontFuncs(), hbFontData, destroyHarfBuzzFontData);
+    SkPaint* paint = new SkPaint;
+    m_platformData->setupPaint(paint);
+    hb_font_set_funcs(font, harfbuzzSkiaGetFontFuncs(), paint, destroyPaint);
     float size = m_platformData->size();
     int scale = SkiaScalarToHarfbuzzPosition(size);
     hb_font_set_scale(font, scale, scale);

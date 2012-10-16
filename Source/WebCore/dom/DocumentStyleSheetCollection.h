@@ -102,12 +102,7 @@ public:
 private:
     void collectActiveStyleSheets(Vector<RefPtr<StyleSheet> >&);
     bool testAddedStyleSheetRequiresStyleRecalc(StyleSheetContents*);
-    enum StyleResolverUpdateType {
-        Reconstruct,
-        Reset,
-        Additive
-    };
-    void analyzeStyleSheetChange(UpdateFlag, const Vector<RefPtr<StyleSheet> >& newStylesheets, StyleResolverUpdateType&, bool& requiresFullStyleRecalc);
+    void analyzeStyleSheetChange(UpdateFlag, const Vector<RefPtr<StyleSheet> >& newStylesheets, bool& requiresStyleResolverReset, bool& requiresFullStyleRecalc);
 
     Document* m_document;
 

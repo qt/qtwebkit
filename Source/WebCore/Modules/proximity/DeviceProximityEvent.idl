@@ -17,12 +17,15 @@
  *  Boston, MA 02110-1301, USA.
  */
 
-[
-    Conditional=PROXIMITY_EVENTS,
-    ConstructorTemplate=Event
-] interface DeviceProximityEvent : Event {
-    [InitializedByEventConstructor] readonly attribute double value;
-    [InitializedByEventConstructor] readonly attribute double min;
-    [InitializedByEventConstructor] readonly attribute double max;
-};
+module core {
 
+    interface [
+        Conditional=PROXIMITY_EVENTS,
+        ConstructorTemplate=Event
+    ] DeviceProximityEvent : Event {
+        readonly attribute [InitializedByEventConstructor] double value;
+        readonly attribute [InitializedByEventConstructor] double min;
+        readonly attribute [InitializedByEventConstructor] double max;
+    };
+
+}

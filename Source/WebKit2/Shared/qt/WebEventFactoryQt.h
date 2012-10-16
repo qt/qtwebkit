@@ -38,7 +38,6 @@ class QTouchEvent;
 class QMouseEvent;
 class QWheelEvent;
 class QKeyEvent;
-class QTransform;
 
 QT_END_NAMESPACE
 

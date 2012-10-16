@@ -108,7 +108,6 @@ TestShell::TestShell()
     , m_dumpPixelsForCurrentTest(false)
     , m_allowExternalPages(false)
     , m_acceleratedCompositingForVideoEnabled(false)
-    , m_softwareCompositingEnabled(false)
     , m_threadedCompositingEnabled(false)
     , m_forceCompositingMode(false)
     , m_accelerated2dCanvasEnabled(false)
@@ -400,7 +399,7 @@ static string dumpFramesAsText(WebFrame* frame, bool recursive)
     // Add header for all but the main frame. Skip empty frames.
     if (frame->parent() && !frame->document().documentElement().isNull()) {
         result.append("\n--------\nFrame: '");
-        result.append(frame->uniqueName().utf8().data());
+        result.append(frame->name().utf8().data());
         result.append("'\n--------\n");
     }
 
@@ -426,7 +425,7 @@ static string dumpFramesAsPrintedText(WebFrame* frame, bool recursive)
     // Add header for all but the main frame. Skip empty frames.
     if (frame->parent() && !frame->document().documentElement().isNull()) {
         result.append("\n--------\nFrame: '");
-        result.append(frame->uniqueName().utf8().data());
+        result.append(frame->name().utf8().data());
         result.append("'\n--------\n");
     }
 
@@ -446,7 +445,7 @@ static void dumpFrameScrollPosition(WebFrame* frame, bool recursive)
     WebSize offset = frame->scrollOffset();
     if (offset.width > 0 || offset.height > 0) {
         if (frame->parent())
-            printf("frame '%s' ", frame->uniqueName().utf8().data());
+            printf("frame '%s' ", frame->name().utf8().data());
         printf("scrolled to %d,%d\n", offset.width, offset.height);
     }
 

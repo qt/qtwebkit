@@ -23,10 +23,14 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-interface TextInputController {
-    void setMarkedText(in DOMString string, in long from, in long length);
-    boolean hasMarkedText();
-    void unmarkText();
-    void insertText(in DOMString string);
-};
+module WTR {
+
+    interface TextInputController {
+        void setMarkedText(in DOMString string, in long from, in long length);
+        boolean hasMarkedText();
+        void unmarkText();
+        void insertText(in DOMString string);
+    };
+
+}
 

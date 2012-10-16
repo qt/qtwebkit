@@ -46,7 +46,6 @@
 #include "OpenGLShims.h"
 #endif
 
-#include <wtf/MainThread.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
@@ -54,46 +53,7 @@ namespace WebCore {
 Extensions3DOpenGLCommon::Extensions3DOpenGLCommon(GraphicsContext3D* context)
     : m_initializedAvailableExtensions(false)
     , m_context(context)
-    , m_isNVIDIA(false)
-    , m_isAMD(false)
-    , m_isIntel(false)
-    , m_maySupportMultisampling(true)
-    , m_requiresBuiltInFunctionEmulation(false)
 {
-    m_vendor = String(reinterpret_cast<const char*>(::glGetString(GL_VENDOR)));
-
-    Vector<String> vendorComponents;
-    m_vendor.lower().split(' ', vendorComponents);
-    if (vendorComponents.contains("nvidia"))
-        m_isNVIDIA = true;
-    if (vendorComponents.contains("ati") || vendorComponents.contains("amd"))
-        m_isAMD = true;
-    if (vendorComponents.contains("intel"))
-        m_isIntel = true;
-
-#if PLATFORM(MAC)
-    if (m_isAMD || m_isIntel)
-        m_requiresBuiltInFunctionEmulation = true;
-
-    // Currently in Mac we only allow multisampling if the vendor is NVIDIA,
-    // or if the vendor is AMD/ATI and the system is 10.7.2 and above.
-
-    bool systemSupportsMultisampling = true;
-#if !PLATFORM(IOS) && __MAC_OS_X_VERSION_MIN_REQUIRED < 1080
-    ASSERT(isMainThread());
-    static SInt32 version;
-    if (!version) {
-        if (Gestalt(gestaltSystemVersion, &version) != noErr)
-            systemSupportsMultisampling = false;
-    }
-    // See https://bugs.webkit.org/show_bug.cgi?id=77922 for more details
-    if (systemSupportsMultisampling)
-        systemSupportsMultisampling = version >= 0x1072;
-#endif // SNOW_LEOPARD and LION
-
-    if (m_isNVIDIA || (m_isAMD && systemSupportsMultisampling))
-        m_maySupportMultisampling = true;
-#endif
 }
 
 Extensions3DOpenGLCommon::~Extensions3DOpenGLCommon()
@@ -157,27 +117,22 @@ String Extensions3DOpenGLCommon::getTranslatedShaderSourceANGLE(Platform3DObject
     if (result == m_context->m_shaderSourceMap.end())
         return "";
 
-    GraphicsContext3D::ShaderSourceEntry& entry = result->value;
+    GraphicsContext3D::ShaderSourceEntry& entry = result->second;
 
     String translatedShaderSource;
     String shaderInfoLog;
-    int extraCompileOptions = SH_MAP_LONG_VARIABLE_NAMES;
+    int extraCompileOptions = 0;
 
-    if (m_requiresBuiltInFunctionEmulation)
+#if PLATFORM(MAC)
+    const char* vendor = reinterpret_cast<const char*>(::glGetString(GL_VENDOR));
+    if (vendor && (std::strstr(vendor, "ATI") || std::strstr(vendor, "AMD") || std::strstr(vendor, "Intel")))
         extraCompileOptions |= SH_EMULATE_BUILT_IN_FUNCTIONS;
+#endif
 
-    Vector<ANGLEShaderSymbol> symbols;
-    bool isValid = compiler.compileShaderSource(entry.source.utf8().data(), shaderType, translatedShaderSource, shaderInfoLog, symbols, extraCompileOptions);
+    bool isValid = compiler.validateShaderSource(entry.source.utf8().data(), shaderType, translatedShaderSource, shaderInfoLog, extraCompileOptions);
 
     entry.log = shaderInfoLog;
     entry.isValid = isValid;
-
-    size_t numSymbols = symbols.size();
-    for (size_t i = 0; i < numSymbols; ++i) {
-        ANGLEShaderSymbol shaderSymbol = symbols[i];
-        GraphicsContext3D::SymbolInfo symbolInfo(shaderSymbol.dataType, shaderSymbol.size, shaderSymbol.mappedName);
-        entry.symbolMap(shaderSymbol.symbolType).set(shaderSymbol.name, symbolInfo);
-    }
 
     if (!isValid)
         return "";

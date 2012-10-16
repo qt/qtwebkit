@@ -68,9 +68,9 @@ bool AcceleratedCompositingContext::initialize(HostWindow* hostWindow)
 void AcceleratedCompositingContext::syncLayersNow()
 {
     if (m_rootGraphicsLayer)
-        m_rootGraphicsLayer->flushCompositingStateForThisLayerOnly();
+        m_rootGraphicsLayer->syncCompositingStateForThisLayerOnly();
 
-    EWKPrivate::corePage(m_view)->mainFrame()->view()->flushCompositingStateIncludingSubframes();
+    EWKPrivate::corePage(m_view)->mainFrame()->view()->syncCompositingStateIncludingSubframes();
 }
 
 void AcceleratedCompositingContext::renderLayers()
@@ -109,7 +109,7 @@ void AcceleratedCompositingContext::attachRootGraphicsLayer(GraphicsLayer* rootL
     m_textureMapper = TextureMapperGL::create();
     m_rootTextureMapperLayer->setTextureMapper(m_textureMapper.get());
 
-    m_rootGraphicsLayer->flushCompositingStateForThisLayerOnly();
+    m_rootGraphicsLayer->syncCompositingStateForThisLayerOnly();
 }
 
 GraphicsContext3D* AcceleratedCompositingContext::context()

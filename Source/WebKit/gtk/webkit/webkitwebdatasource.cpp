@@ -25,7 +25,6 @@
 #include "FrameLoader.h"
 #include "FrameLoaderClientGtk.h"
 #include "KURL.h"
-#include "ResourceBuffer.h"
 #include "ResourceRequest.h"
 #include "SharedBuffer.h"
 #include "SubstituteData.h"
@@ -337,7 +336,7 @@ GString* webkit_web_data_source_get_data(WebKitWebDataSource* webDataSource)
 
     WebKitWebDataSourcePrivate* priv = webDataSource->priv;
 
-    RefPtr<ResourceBuffer> mainResourceData = priv->loader->mainResourceData();
+    RefPtr<SharedBuffer> mainResourceData = priv->loader->mainResourceData();
 
     if (!mainResourceData)
         return NULL;

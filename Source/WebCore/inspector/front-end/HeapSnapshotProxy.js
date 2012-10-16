@@ -42,10 +42,10 @@ WebInspector.HeapSnapshotWorkerWrapper.prototype =  {
     },
     terminate: function()
     {
-    },
-
-    __proto__: WebInspector.Object.prototype
+    }
 }
+
+WebInspector.HeapSnapshotWorkerWrapper.prototype.__proto__ = WebInspector.Object.prototype;
 
 /**
  * @constructor
@@ -84,11 +84,10 @@ WebInspector.HeapSnapshotRealWorker.prototype = {
     terminate: function()
     {
         this._worker.terminate();
-    },
+    }
+};
 
-    __proto__: WebInspector.HeapSnapshotWorkerWrapper.prototype
-}
-
+WebInspector.HeapSnapshotRealWorker.prototype.__proto__ = WebInspector.HeapSnapshotWorkerWrapper.prototype;
 
 /**
  * @constructor
@@ -166,11 +165,10 @@ WebInspector.HeapSnapshotFakeWorker.prototype = {
             this.dispatchEventToListeners("message", message);
         }
         this._asyncTaskQueue.addTask(send.bind(this));
-    },
+    }
+};
 
-    __proto__: WebInspector.HeapSnapshotWorkerWrapper.prototype
-}
-
+WebInspector.HeapSnapshotFakeWorker.prototype.__proto__ = WebInspector.HeapSnapshotWorkerWrapper.prototype;
 
 /**
  * @constructor
@@ -297,11 +295,10 @@ WebInspector.HeapSnapshotWorker.prototype = {
     _postMessage: function(message)
     {
         this._worker.postMessage(message);
-    },
+    }
+};
 
-    __proto__: WebInspector.Object.prototype
-}
-
+WebInspector.HeapSnapshotWorker.prototype.__proto__ = WebInspector.Object.prototype;
 
 /**
  * @constructor
@@ -363,10 +360,21 @@ WebInspector.HeapSnapshotProxyObject.prototype = {
 WebInspector.HeapSnapshotLoaderProxy = function(worker, objectId)
 {
     WebInspector.HeapSnapshotProxyObject.call(this, worker, objectId);
+    this._started = false;
     this._pendingSnapshotConsumers = [];
 }
 
 WebInspector.HeapSnapshotLoaderProxy.prototype = {
+    startTransfer: function()
+    {
+        this._started = true;
+    },
+
+    isStarted: function()
+    {
+        return this._started;
+    },
+
     /**
      * @param {function(WebInspector.HeapSnapshotProxy)} callback
      */
@@ -377,11 +385,10 @@ WebInspector.HeapSnapshotLoaderProxy.prototype = {
 
     /**
      * @param {string} chunk
-     * @param {function(WebInspector.OutputStream)=} callback
      */
-    write: function(chunk, callback)
+    write: function(chunk)
     {
-        this.callMethod(callback, "write", chunk);
+        this.callMethod(null, "write", chunk);
     },
 
     close: function()
@@ -399,14 +406,15 @@ WebInspector.HeapSnapshotLoaderProxy.prototype = {
         {
             for (var i = 0; i < this._pendingSnapshotConsumers.length; ++i)
                 this._pendingSnapshotConsumers[i](snapshotProxy);
+
+            this._started = false;
             this._pendingSnapshotConsumers = [];
         }
         this.callMethod(buildSnapshot.bind(this), "close");
-    },
+    }
+};
 
-    __proto__: WebInspector.HeapSnapshotProxyObject.prototype
-}
-
+WebInspector.HeapSnapshotLoaderProxy.prototype.__proto__ = WebInspector.HeapSnapshotProxyObject.prototype;
 
 /**
  * @constructor
@@ -516,11 +524,10 @@ WebInspector.HeapSnapshotProxy.prototype = {
     get uid()
     {
         return this._staticData.uid;
-    },
+    }
+};
 
-    __proto__: WebInspector.HeapSnapshotProxyObject.prototype
-}
-
+WebInspector.HeapSnapshotProxy.prototype.__proto__ = WebInspector.HeapSnapshotProxyObject.prototype;
 
 /**
  * @constructor
@@ -550,8 +557,7 @@ WebInspector.HeapSnapshotProviderProxy.prototype = {
     sortAndRewind: function(comparator, callback)
     {
         this.callMethod(callback, "sortAndRewind", comparator);
-    },
+    }
+};
 
-    __proto__: WebInspector.HeapSnapshotProxyObject.prototype
-}
-
+WebInspector.HeapSnapshotProviderProxy.prototype.__proto__ = WebInspector.HeapSnapshotProxyObject.prototype;

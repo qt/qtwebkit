@@ -116,10 +116,10 @@ public:
     virtual void setDebugBackgroundColor(const Color&);
     virtual void setDebugBorder(const Color&, float borderWidth);
 
-    void notifyFlushRequired()
+    void notifySyncRequired()
     {
         if (m_client)
-            m_client->notifyFlushRequired(this);
+            m_client->notifySyncRequired(this);
     }
 
     void notifyAnimationStarted(double time)

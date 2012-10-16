@@ -31,7 +31,6 @@
 #include "RenderBox.h"
 #include "RenderLayer.h"
 #include "RenderLayerBacking.h"
-#include "RenderLayerCompositor.h"
 #include "RenderObject.h"
 #include "RenderView.h"
 #include "SelectionHandler.h"
@@ -65,13 +64,12 @@ bool InRegionScroller::setScrollPositionCompositingThread(unsigned camouflagedLa
     return d->setScrollPositionCompositingThread(camouflagedLayer, d->m_webPage->mapFromTransformed(scrollPosition));
 }
 
-bool InRegionScroller::setScrollPositionWebKitThread(unsigned camouflagedLayer, const Platform::IntPoint& scrollPosition,
-    bool supportsAcceleratedScrolling, Platform::ScrollViewBase::ScrollTarget scrollTarget)
+bool InRegionScroller::setScrollPositionWebKitThread(unsigned camouflagedLayer, const Platform::IntPoint& scrollPosition, bool supportsAcceleratedScrolling)
 {
     ASSERT(Platform::webKitThreadMessageClient()->isCurrentThread());
 
     // FIXME: Negative values won't work with map{To,From}Transform methods.
-    return d->setScrollPositionWebKitThread(camouflagedLayer, d->m_webPage->mapFromTransformed(scrollPosition), supportsAcceleratedScrolling, scrollTarget);
+    return d->setScrollPositionWebKitThread(camouflagedLayer, d->m_webPage->mapFromTransformed(scrollPosition), supportsAcceleratedScrolling);
 }
 
 InRegionScrollerPrivate::InRegionScrollerPrivate(WebPagePrivate* webPagePrivate)
@@ -134,8 +132,7 @@ bool InRegionScrollerPrivate::setScrollPositionCompositingThread(unsigned camouf
     return true;
 }
 
-bool InRegionScrollerPrivate::setScrollPositionWebKitThread(unsigned camouflagedLayer, const WebCore::IntPoint& scrollPosition,
-    bool supportsAcceleratedScrolling, Platform::ScrollViewBase::ScrollTarget scrollTarget)
+bool InRegionScrollerPrivate::setScrollPositionWebKitThread(unsigned camouflagedLayer, const WebCore::IntPoint& scrollPosition, bool supportsAcceleratedScrolling)
 {
     RenderLayer* layer = 0;
 
@@ -144,14 +141,8 @@ bool InRegionScrollerPrivate::setScrollPositionWebKitThread(unsigned camouflaged
         ASSERT(layerWebKitThread);
         if (layerWebKitThread->owner()) {
             GraphicsLayer* graphicsLayer = layerWebKitThread->owner();
-
-            if (scrollTarget == Platform::ScrollViewBase::BlockElement) {
-                RenderLayerBacking* backing = static_cast<RenderLayerBacking*>(graphicsLayer->client());
-                layer = backing->owningLayer();
-            } else {
-                RenderLayerCompositor* compositor = static_cast<RenderLayerCompositor*>(graphicsLayer->client());
-                layer = compositor->rootRenderLayer();
-            }
+            RenderLayerBacking* backing = static_cast<RenderLayerBacking*>(graphicsLayer->client());
+            layer = backing->owningLayer();
         }
     } else {
         Node* node = reinterpret_cast<Node*>(camouflagedLayer);

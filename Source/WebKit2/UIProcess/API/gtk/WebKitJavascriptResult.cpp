@@ -21,16 +21,15 @@
 #include "WebKitJavascriptResult.h"
 
 #include "WebKitJavascriptResultPrivate.h"
-#include "WebSerializedScriptValue.h"
 #include <wtf/gobject/GRefPtr.h>
 
 struct _WebKitJavascriptResult {
-    _WebKitJavascriptResult(WebKitWebView* view, WebSerializedScriptValue* serializedScriptValue)
+    _WebKitJavascriptResult(WebKitWebView* view, WKSerializedScriptValueRef wkSerializedScriptValue)
         : webView(view)
         , referenceCount(1)
-    {
-        value = serializedScriptValue->deserialize(webkit_web_view_get_javascript_global_context(view), 0);
-    }
+        {
+            value = WKSerializedScriptValueDeserialize(wkSerializedScriptValue, webkit_web_view_get_javascript_global_context(view), 0);
+        }
 
     GRefPtr<WebKitWebView> webView;
     JSValueRef value;
@@ -40,10 +39,10 @@ struct _WebKitJavascriptResult {
 
 G_DEFINE_BOXED_TYPE(WebKitJavascriptResult, webkit_javascript_result, webkit_javascript_result_ref, webkit_javascript_result_unref)
 
-WebKitJavascriptResult* webkitJavascriptResultCreate(WebKitWebView* webView, WebSerializedScriptValue* serializedScriptValue)
+WebKitJavascriptResult* webkitJavascriptResultCreate(WebKitWebView* webView, WKSerializedScriptValueRef wkSerializedScriptValue)
 {
     WebKitJavascriptResult* result = g_slice_new(WebKitJavascriptResult);
-    new (result) WebKitJavascriptResult(webView, serializedScriptValue);
+    new (result) WebKitJavascriptResult(webView, wkSerializedScriptValue);
     return result;
 }
 

@@ -215,10 +215,10 @@ StackTraceV8.prototype = {
         this._stackTrace = this._error.stack;
         Error.prepareStackTrace = oldPrepareStackTrace;
         delete this._error; // No longer needed, free memory.
-    },
-
-    __proto__: StackTrace.prototype
+    }
 }
+
+StackTraceV8.prototype.__proto__ = StackTrace.prototype;
 
 /**
  * @constructor
@@ -288,9 +288,6 @@ function Call(thisObject, functionName, args, result, stackTrace)
     this._args = Array.prototype.slice.call(args, 0);
     this._result = result;
     this._stackTrace = stackTrace || null;
-
-    if (!this._functionName)
-        console.assert(this._args.length === 2 && typeof this._args[0] === "string");
 }
 
 Call.prototype = {
@@ -310,14 +307,6 @@ Call.prototype = {
         return this._functionName;
     },
 
-    /**
-     * @return {boolean}
-     */
-    isPropertySetter: function()
-    {
-        return !this._functionName;
-    },
-    
     /**
      * @return {Array}
      */
@@ -393,24 +382,18 @@ Call.prototype = {
     replay: function(replayableCall, cache)
     {
         var replayObject = ReplayableResource.replay(replayableCall.resource(), cache);
+        var replayFunction = replayObject[replayableCall.functionName()];
+        console.assert(typeof replayFunction === "function", "Expected a function to replay");
         var replayArgs = replayableCall.args().map(function(obj) {
             return ReplayableResource.replay(obj, cache);
         });
-        var replayResult = undefined;
-
-        if (replayableCall.isPropertySetter())
-            replayObject[replayArgs[0]] = replayArgs[1];
-        else {
-            var replayFunction = replayObject[replayableCall.functionName()];
-            console.assert(typeof replayFunction === "function", "Expected a function to replay");
-            replayResult = replayFunction.apply(replayObject, replayArgs);
-            if (replayableCall.result() instanceof ReplayableResource) {
-                var resource = replayableCall.result().replay(cache);
-                if (!resource.wrappedObject())
-                    resource.setWrappedObject(replayResult);
-            }
+        var replayResult = replayFunction.apply(replayObject, replayArgs);
+        if (replayableCall.result() instanceof ReplayableResource) {
+            var resource = replayableCall.result().replay(cache);
+            if (!resource.wrappedObject())
+                resource.setWrappedObject(replayResult);
         }
-    
+
         this._thisObject = replayObject;
         this._functionName = replayableCall.functionName();
         this._args = replayArgs;
@@ -453,14 +436,6 @@ ReplayableCall.prototype = {
     functionName: function()
     {
         return this._functionName;
-    },
-
-    /**
-     * @return {boolean}
-     */
-    isPropertySetter: function()
-    {
-        return !this._functionName;
     },
 
     /**
@@ -569,7 +544,7 @@ Resource.prototype = {
     },
 
     /**
-     * @param {*} value
+     * @param {Object} value
      */
     setWrappedObject: function(value)
     {
@@ -619,7 +594,7 @@ Resource.prototype = {
      */
     toReplayable: function(cache)
     {
-        var result = /** @type {ReplayableResource} */ cache.get(this._id);
+        var result = cache.get(this._id);
         if (result)
             return result;
         var data = {
@@ -646,11 +621,11 @@ Resource.prototype = {
     /**
      * @param {Object} data
      * @param {Cache} cache
-     * @return {Resource|ReplayableResource}
+     * @return {Resource}
      */
     replay: function(data, cache)
     {
-        var resource = /** @type {ReplayableResource} */ cache.get(data.id);
+        var resource = cache.get(data.id);
         if (resource)
             return resource;
         this._id = data.id;
@@ -683,11 +658,11 @@ Resource.prototype = {
     },
 
     /**
-     * @param {*} object
+     * @param {!Object} object
      */
     _bindObjectToResource: function(object)
     {
-        Object.defineProperty(/** @type {!Object} */ (object), "__resourceObject", {
+        Object.defineProperty(object, "__resourceObject", {
             value: this,
             writable: false,
             enumerable: false,
@@ -724,7 +699,12 @@ Resource.prototype = {
                     {
                         return wrappedObject[property];
                     },
-                    set: self._wrapPropertySetter(self, wrappedObject, property),
+                    set: function(value)
+                    {
+                        // FIXME: Log the setter calls.
+                        console.error("FIXME: Setting an attribute %s was not logged.", property);
+                        wrappedObject[property] = value;
+                    },
                     enumerable: true
                 });
             }
@@ -789,30 +769,6 @@ Resource.prototype = {
             var call = new Call(resource, functionName, arguments, result, stackTrace);
             manager.captureCall(call);
             return result;
-        };
-    },
-
-    /**
-     * @param {Resource} resource
-     * @param {Object} originalObject
-     * @param {string} propertyName
-     * @return {Function}
-     */
-    _wrapPropertySetter: function(resource, originalObject, propertyName)
-    {
-        return function(value)
-        {
-            var manager = resource.manager();
-            if (!manager || !manager.capturing()) {
-                originalObject[propertyName] = value;
-                return;
-            }
-            var args = [propertyName, value];
-            manager.captureArguments(resource, args);
-            originalObject[propertyName] = value;
-            var stackTrace = StackTrace.create(1, arguments.callee);
-            var call = new Call(resource, "", args, undefined, stackTrace);
-            manager.captureCall(call);
         };
     },
 
@@ -1020,10 +976,10 @@ WebGLBoundResource.prototype = {
             this._state.BINDING = target;
             this.pushCall(new Call(WebGLRenderingContextResource.forObject(this), bindMethodName, [target, this]));
         }
-    },
-
-    __proto__: Resource.prototype
+    }
 }
+
+WebGLBoundResource.prototype.__proto__ = Resource.prototype;
 
 /**
  * @constructor
@@ -1107,14 +1063,13 @@ WebGLTextureResource.prototype = {
             console.error("ASSERT_NOT_REACHED: Could not properly process a gl." + call.functionName() + " call while the DRAWING BUFFER is bound.");
         }
         this.pushCall(call);
-    },
-
-    pushCall_texParameteri: WebGLTextureResource.prototype.pushCall_texParameterf,
-
-    pushCall_copyTexSubImage2D: WebGLTextureResource.prototype.pushCall_copyTexImage2D,
-
-    __proto__: WebGLBoundResource.prototype
+    }
 }
+
+WebGLTextureResource.prototype.pushCall_texParameteri = WebGLTextureResource.prototype.pushCall_texParameterf;
+WebGLTextureResource.prototype.pushCall_copyTexSubImage2D = WebGLTextureResource.prototype.pushCall_copyTexImage2D;
+
+WebGLTextureResource.prototype.__proto__ = WebGLBoundResource.prototype;
 
 /**
  * @constructor
@@ -1235,10 +1190,10 @@ WebGLProgramResource.prototype = {
         // FIXME: remove any older calls that no longer contribute to the resource state.
         // FIXME: handle multiple attachShader && detachShader.
         Resource.prototype.pushCall.call(this, call);
-    },
-
-    __proto__: Resource.prototype
+    }
 }
+
+WebGLProgramResource.prototype.__proto__ = Resource.prototype;
 
 /**
  * @constructor
@@ -1259,10 +1214,10 @@ WebGLShaderResource.prototype = {
         // FIXME: remove any older calls that no longer contribute to the resource state.
         // FIXME: handle multiple shaderSource calls.
         Resource.prototype.pushCall.call(this, call);
-    },
-
-    __proto__: Resource.prototype
+    }
 }
+
+WebGLShaderResource.prototype.__proto__ = Resource.prototype;
 
 /**
  * @constructor
@@ -1283,10 +1238,10 @@ WebGLBufferResource.prototype = {
         // FIXME: remove any older calls that no longer contribute to the resource state.
         // FIXME: Optimize memory for bufferSubData.
         WebGLBoundResource.prototype.pushCall.call(this, call);
-    },
-
-    __proto__: WebGLBoundResource.prototype
+    }
 }
+
+WebGLBufferResource.prototype.__proto__ = WebGLBoundResource.prototype;
 
 /**
  * @constructor
@@ -1306,10 +1261,10 @@ WebGLFramebufferResource.prototype = {
     {
         // FIXME: remove any older calls that no longer contribute to the resource state.
         WebGLBoundResource.prototype.pushCall.call(this, call);
-    },
-
-    __proto__: WebGLBoundResource.prototype
+    }
 }
+
+WebGLFramebufferResource.prototype.__proto__ = WebGLBoundResource.prototype;
 
 /**
  * @constructor
@@ -1329,10 +1284,10 @@ WebGLRenderbufferResource.prototype = {
     {
         // FIXME: remove any older calls that no longer contribute to the resource state.
         WebGLBoundResource.prototype.pushCall.call(this, call);
-    },
-
-    __proto__: WebGLBoundResource.prototype
+    }
 }
+
+WebGLRenderbufferResource.prototype.__proto__ = WebGLBoundResource.prototype;
 
 /**
  * @constructor
@@ -1800,10 +1755,10 @@ WebGLRenderingContextResource.prototype = {
             WebGLRenderingContextResource._wrapFunctions = wrapFunctions;
         }
         return wrapFunctions;
-    },
-
-    __proto__: Resource.prototype
+    }
 }
+
+WebGLRenderingContextResource.prototype.__proto__ = Resource.prototype;
 
 ////////////////////////////////////////////////////////////////////////////////
 // 2D Canvas
@@ -2021,10 +1976,10 @@ CanvasRenderingContext2DResource.prototype = {
             CanvasRenderingContext2DResource._wrapFunctions = wrapFunctions;
         }
         return wrapFunctions;
-    },
+    }
+};
 
-    __proto__: Resource.prototype
-}
+CanvasRenderingContext2DResource.prototype.__proto__ = Resource.prototype;
 
 /**
  * @constructor
@@ -2315,20 +2270,14 @@ InjectedScript.prototype = {
             var stackTrace = call.stackTrace();
             var callFrame = stackTrace ? stackTrace.callFrame(0) || {} : {};
             var traceLogItem = {
+                functionName: call.functionName(),
+                arguments: args,
                 sourceURL: callFrame.sourceURL,
                 lineNumber: callFrame.lineNumber,
                 columnNumber: callFrame.columnNumber
             };
-            if (call.functionName()) {
-                traceLogItem.functionName = call.functionName();
-                traceLogItem.arguments = args;
-            } else {
-                traceLogItem.property = args[0];
-                traceLogItem.value = args[1];
-            }
-            var callResult = call.result();
-            if (callResult !== undefined && callResult !== null)
-                traceLogItem.result = callResult + "";
+            if (call.result())
+                traceLogItem.result = call.result() + "";
             result.calls.push(traceLogItem);
         }
         return result;

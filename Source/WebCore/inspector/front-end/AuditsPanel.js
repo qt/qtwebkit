@@ -239,10 +239,10 @@ WebInspector.AuditsPanel.prototype = {
     {
         this.auditsItemTreeElement.revealAndSelect();
         this.auditResultsTreeElement.removeChildren();
-    },
-
-    __proto__: WebInspector.Panel.prototype
+    }
 }
+
+WebInspector.AuditsPanel.prototype.__proto__ = WebInspector.Panel.prototype;
 
 /**
  * @constructor
@@ -497,10 +497,10 @@ WebInspector.AuditsSidebarTreeElement.prototype = {
     refresh: function()
     {
         this.refreshTitles();
-    },
-
-    __proto__: WebInspector.SidebarTreeElement.prototype
+    }
 }
+
+WebInspector.AuditsSidebarTreeElement.prototype.__proto__ = WebInspector.SidebarTreeElement.prototype;
 
 /**
  * @constructor
@@ -524,10 +524,10 @@ WebInspector.AuditResultSidebarTreeElement.prototype = {
     get selectable()
     {
         return true;
-    },
-
-    __proto__: WebInspector.SidebarTreeElement.prototype
+    }
 }
+
+WebInspector.AuditResultSidebarTreeElement.prototype.__proto__ = WebInspector.SidebarTreeElement.prototype;
 
 // Contributed audit rules should go into this namespace.
 WebInspector.AuditRules = {};

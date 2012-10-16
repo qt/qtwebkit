@@ -123,10 +123,10 @@ WebInspector.ObjectPropertiesSection.prototype = {
             var infoElement = new TreeElement(title, null, false);
             this.propertiesTreeOutline.appendChild(infoElement);
         }
-    },
-
-    __proto__: WebInspector.PropertiesSection.prototype
+    }
 }
+
+WebInspector.ObjectPropertiesSection.prototype.__proto__ = WebInspector.PropertiesSection.prototype;
 
 WebInspector.ObjectPropertiesSection.CompareProperties = function(propertyA, propertyB)
 {
@@ -370,9 +370,7 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
             }
         };
         this.property.parentObject.setPropertyValue(this.property.name, expression.trim(), callback.bind(this));
-    },
-
-    __proto__: TreeElement.prototype
+    }
 }
 
 /**
@@ -408,6 +406,8 @@ WebInspector.ObjectPropertyTreeElement.populate = function(treeElement, value) {
 
     value.getOwnProperties(callback);
 }
+
+WebInspector.ObjectPropertyTreeElement.prototype.__proto__ = TreeElement.prototype;
 
 /**
  * @constructor
@@ -482,10 +482,10 @@ WebInspector.FunctionScopeMainTreeElement.prototype = {
 
         }
         DebuggerAgent.getFunctionDetails(this._remoteObject.objectId, didGetDetails.bind(this));
-    },
+    }
+};
 
-    __proto__: TreeElement.prototype
-}
+WebInspector.FunctionScopeMainTreeElement.prototype.__proto__ = TreeElement.prototype;
 
 /**
  * @constructor
@@ -506,10 +506,10 @@ WebInspector.ScopeTreeElement.prototype = {
     onpopulate: function()
     {
         return WebInspector.ObjectPropertyTreeElement.populate(this, this._remoteObject);
-    },
+    }
+};
 
-    __proto__: TreeElement.prototype
-}
+WebInspector.ScopeTreeElement.prototype.__proto__ = TreeElement.prototype;
 
 /**
  * @constructor
@@ -730,10 +730,10 @@ WebInspector.ArrayGroupingTreeElement.prototype = {
     onattach: function()
     {
         this.listItemElement.addStyleClass("name");
-    },
-
-    __proto__: TreeElement.prototype
+    }
 }
+
+WebInspector.ArrayGroupingTreeElement.prototype.__proto__ = TreeElement.prototype;
 
 /**
  * @constructor
@@ -742,12 +742,11 @@ WebInspector.ArrayGroupingTreeElement.prototype = {
  */
 WebInspector.ObjectPropertyPrompt = function(commitHandler, cancelHandler, renderAsBlock)
 {
-    WebInspector.TextPrompt.call(this, WebInspector.runtimeModel.completionsForTextPrompt.bind(WebInspector.runtimeModel));
+    const ExpressionStopCharacters = " =:[({;,!+-*/&|^<>."; // Same as in ConsoleView.js + "."
+    WebInspector.TextPrompt.call(this, WebInspector.consoleView.completionsForTextPrompt.bind(WebInspector.consoleView), ExpressionStopCharacters);
     this.setSuggestBoxEnabled("generic-suggest");
     if (renderAsBlock)
         this.renderAsBlock();
 }
 
-WebInspector.ObjectPropertyPrompt.prototype = {
-    __proto__: WebInspector.TextPrompt.prototype
-}
+WebInspector.ObjectPropertyPrompt.prototype.__proto__ = WebInspector.TextPrompt.prototype;

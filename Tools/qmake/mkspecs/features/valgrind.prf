@@ -5,6 +5,8 @@
 # See 'Tools/qmake/README' for an overview of the build system
 # -------------------------------------------------------------------
 
+contains(JAVASCRIPTCORE_JIT,yes): error("'JAVASCRIPTCORE_JIT=yes' not supported with valgrind")
+
 QMAKE_CXXFLAGS += -g
 QMAKE_LFLAGS += -g
 DEFINES += USE_SYSTEM_MALLOC=1

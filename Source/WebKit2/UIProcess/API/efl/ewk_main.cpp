@@ -31,10 +31,6 @@
 #include <glib-object.h>
 #include <glib.h>
 
-#ifdef HAVE_ECORE_X
-#include <Ecore_X.h>
-#endif
-
 static int _ewkInitCount = 0;
 
 /**
@@ -72,13 +68,6 @@ int ewk_init(void)
         goto error_ecore_evas;
     }
 
-#ifdef HAVE_ECORE_X
-    if (!ecore_x_init(0)) {
-        CRITICAL("could not init ecore_x.");
-        goto error_ecore_x;
-    }
-#endif
-
     g_type_init();
 
     if (!ecore_main_loop_glib_integrate()) {
@@ -88,10 +77,6 @@ int ewk_init(void)
 
     return ++_ewkInitCount;
 
-#ifdef HAVE_ECORE_X
-error_ecore_x:
-    ecore_evas_shutdown();
-#endif
 error_ecore_evas:
     ecore_shutdown();
 error_ecore:
@@ -110,9 +95,6 @@ int ewk_shutdown(void)
     if (--_ewkInitCount)
         return _ewkInitCount;
 
-#ifdef HAVE_ECORE_X
-    ecore_x_shutdown();
-#endif
     ecore_evas_shutdown();
     ecore_shutdown();
     evas_shutdown();

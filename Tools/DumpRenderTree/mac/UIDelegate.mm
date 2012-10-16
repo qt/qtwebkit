@@ -293,19 +293,8 @@ DumpRenderTreeDraggingInfo *draggingInfo = nil;
 
 - (void)webView:(WebView *)webView decidePolicyForNotificationRequestFromOrigin:(WebSecurityOrigin *)origin listener:(id<WebAllowDenyPolicyListener>)listener
 {
-    MockWebNotificationProvider *provider = (MockWebNotificationProvider *)[webView _notificationProvider];
-    switch ([provider policyForOrigin:origin]) {
-    case WebNotificationPermissionAllowed:
-        [listener allow];
-        break;
-    case WebNotificationPermissionDenied:
-        [listener deny];
-        break;
-    case WebNotificationPermissionNotAllowed:
-        [provider setWebNotificationOrigin:[origin stringValue] permission:YES];
-        [listener allow];
-        break;
-    }
+    [(MockWebNotificationProvider *)[webView _notificationProvider] setWebNotificationOrigin:[origin stringValue] permission:YES];
+    [listener allow];
 }
 
 - (void)dealloc

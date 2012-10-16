@@ -147,6 +147,7 @@ PassRefPtr<Element> InsertParagraphSeparatorCommand::cloneHierarchyUnderNewBlock
 
 void InsertParagraphSeparatorCommand::doApply()
 {
+    bool splitText = false;
     if (!endingSelection().isNonOrphanedCaretOrRange())
         return;
     
@@ -328,15 +329,14 @@ void InsertParagraphSeparatorCommand::doApply()
     }
     
     // Split at pos if in the middle of a text node.
-    Position positionAfterSplit;
-    if (insertionPosition.anchorType() == Position::PositionIsOffsetInAnchor && insertionPosition.containerNode()->isTextNode()) {
-        RefPtr<Text> textNode = toText(insertionPosition.containerNode());
-        bool atEnd = static_cast<unsigned>(insertionPosition.offsetInContainerNode()) >= textNode->length();
+    if (insertionPosition.deprecatedNode()->isTextNode()) {
+        Text* textNode = toText(insertionPosition.deprecatedNode());
+        bool atEnd = (unsigned)insertionPosition.deprecatedEditingOffset() >= textNode->length();
         if (insertionPosition.deprecatedEditingOffset() > 0 && !atEnd) {
-            splitTextNode(textNode, insertionPosition.offsetInContainerNode());
-            positionAfterSplit = firstPositionInNode(textNode.get());
-            insertionPosition.moveToPosition(textNode->previousSibling(), insertionPosition.offsetInContainerNode());
+            splitTextNode(textNode, insertionPosition.deprecatedEditingOffset());
+            insertionPosition.moveToOffset(0);
             visiblePos = VisiblePosition(insertionPosition);
+            splitText = true;
         }
     }
 
@@ -380,14 +380,16 @@ void InsertParagraphSeparatorCommand::doApply()
     }            
 
     // Handle whitespace that occurs after the split
-    if (positionAfterSplit.isNotNull()) {
+    if (splitText) {
         document()->updateLayoutIgnorePendingStylesheets();
-        if (!positionAfterSplit.isRenderedCharacter()) {
+        if (insertionPosition.anchorType() == Position::PositionIsOffsetInAnchor)
+            insertionPosition.moveToOffset(0);
+        if (!insertionPosition.isRenderedCharacter()) {
             // Clear out all whitespace and insert one non-breaking space
-            ASSERT(!positionAfterSplit.containerNode()->renderer() || positionAfterSplit.containerNode()->renderer()->style()->collapseWhiteSpace());
-            deleteInsignificantTextDownstream(positionAfterSplit);
-            if (positionAfterSplit.deprecatedNode()->isTextNode())
-                insertTextIntoNode(toText(positionAfterSplit.containerNode()), 0, nonBreakingSpaceString());
+            ASSERT(!insertionPosition.deprecatedNode()->renderer() || insertionPosition.deprecatedNode()->renderer()->style()->collapseWhiteSpace());
+            deleteInsignificantTextDownstream(insertionPosition);
+            if (insertionPosition.deprecatedNode()->isTextNode())
+                insertTextIntoNode(toText(insertionPosition.deprecatedNode()), 0, nonBreakingSpaceString());
         }
     }
 

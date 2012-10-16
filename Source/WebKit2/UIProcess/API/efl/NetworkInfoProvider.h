@@ -37,7 +37,7 @@
 class NetworkInfoProvider : public RefCounted<NetworkInfoProvider>, public WebCore::NetworkInfoClient {
 public:
     virtual ~NetworkInfoProvider();
-    static PassRefPtr<NetworkInfoProvider> create(WKContextRef);
+    static PassRefPtr<NetworkInfoProvider> create(WKNetworkInfoManagerRef);
 
     // NetworkInfoClient interface.
     virtual double bandwidth() const;
@@ -47,9 +47,9 @@ public:
     virtual void stopUpdating();
 
 private:
-    NetworkInfoProvider(WKContextRef);
+    NetworkInfoProvider(WKNetworkInfoManagerRef);
 
-    WKRetainPtr<WKContextRef> m_wkContext;
+    WKRetainPtr<WKNetworkInfoManagerRef> m_wkNetworkInfoManager;
     WebCore::NetworkInfoProviderEfl m_provider;
 };
 

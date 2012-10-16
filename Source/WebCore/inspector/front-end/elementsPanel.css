@@ -33,7 +33,6 @@
 
 #elements-content > ol {
     display: inline-block;
-    min-height: 100%;
 }
 
 #elements-content .editing {

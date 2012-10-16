@@ -36,8 +36,8 @@
 #include "DFGBasicBlock.h"
 #include "DFGDominators.h"
 #include "DFGNode.h"
-#include "JSStack.h"
 #include "MethodOfGettingAValueProfile.h"
+#include "RegisterFile.h"
 #include <wtf/BitVector.h>
 #include <wtf/HashMap.h>
 #include <wtf/Vector.h>
@@ -479,11 +479,8 @@ public:
     {
         switch (node.arrayMode()) {
         case Array::Generic:
-        case OUT_OF_BOUNDS_CONTIGUOUS_MODES:
-        case ARRAY_STORAGE_TO_HOLE_MODES:
         case OUT_OF_BOUNDS_ARRAY_STORAGE_MODES:
-        case SLOW_PUT_ARRAY_STORAGE_MODES:
-        case ALL_EFFECTFUL_MODES:
+        case ALL_EFFECTFUL_ARRAY_STORAGE_MODES:
             return false;
         case Array::String:
             return node.op() == GetByVal;

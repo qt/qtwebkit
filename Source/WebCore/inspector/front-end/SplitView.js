@@ -442,7 +442,7 @@ WebInspector.SplitView.prototype = {
     elementsToRestoreScrollPositionsFor: function()
     {
         return [ this.mainElement, this.sidebarElement ];
-    },
-
-    __proto__: WebInspector.View.prototype
+    }
 }
+
+WebInspector.SplitView.prototype.__proto__ = WebInspector.View.prototype;

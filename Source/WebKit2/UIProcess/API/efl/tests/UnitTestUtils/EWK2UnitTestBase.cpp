@@ -50,7 +50,10 @@ void EWK2UnitTestBase::SetUp()
     unsigned int width = environment->defaultWidth();
     unsigned int height = environment->defaultHeight();
 
-    m_ecoreEvas = ecore_evas_new(0, 0, 0, width, height, 0);
+    if (environment->useX11Window())
+        m_ecoreEvas = ecore_evas_new(0, 0, 0, width, height, 0);
+    else
+        m_ecoreEvas = ecore_evas_buffer_new(width, height);
 
     ecore_evas_show(m_ecoreEvas);
     Evas* evas = ecore_evas_get(m_ecoreEvas);
@@ -71,17 +74,17 @@ void EWK2UnitTestBase::TearDown()
     ewk_shutdown();
 }
 
-bool EWK2UnitTestBase::loadUrlSync(const char* url, double timeoutSeconds)
+void EWK2UnitTestBase::loadUrlSync(const char* url)
 {
-    ewk_view_url_set(m_webView, url);
-    return waitUntilLoadFinished(timeoutSeconds);
+    ewk_view_uri_set(m_webView, url);
+    waitUntilLoadFinished();
 }
 
 class CallbackDataTimer {
 public:
-    explicit CallbackDataTimer(double timeoutSeconds)
+    CallbackDataTimer(double timeoutSeconds, Ecore_Task_Cb callback)
         : m_done(false)
-        , m_timer(timeoutSeconds >= 0 ? ecore_timer_add(timeoutSeconds, reinterpret_cast<Ecore_Task_Cb>(timeOutCallback), this) : 0)
+        , m_timer(timeoutSeconds >= 0 ? ecore_timer_add(timeoutSeconds, callback, this) : 0)
         , m_didTimeOut(false)
     {
     }
@@ -105,19 +108,6 @@ public:
 
     bool didTimeOut() const { return m_didTimeOut; }
 
-protected:
-    bool m_done;
-    Ecore_Timer* m_timer;
-    bool m_didTimeOut;
-
-private:
-    static bool timeOutCallback(void* userData)
-    {
-        CallbackDataTimer* data = static_cast<CallbackDataTimer*>(userData);
-        data->setTimedOut();
-        return ECORE_CALLBACK_CANCEL;
-    }
-
     void setTimedOut()
     {
         m_done = true;
@@ -125,13 +115,17 @@ private:
         m_didTimeOut = true;
     }
 
+protected:
+    bool m_done;
+    Ecore_Timer* m_timer;
+    bool m_didTimeOut;
 };
 
 template <class T>
 class CallbackDataExpectedValue : public CallbackDataTimer {
 public:
-    CallbackDataExpectedValue(const T& expectedValue, double timeoutSeconds)
-        : CallbackDataTimer(timeoutSeconds)
+    CallbackDataExpectedValue(const T& expectedValue, double timeoutSeconds, Ecore_Task_Cb callback)
+        : CallbackDataTimer(timeoutSeconds, callback)
         , m_expectedValue(expectedValue)
     {
     }
@@ -151,9 +145,17 @@ static void onLoadFinished(void* userData, Evas_Object* webView, void* eventInfo
     data->setDone();
 }
 
+static bool timeOutWhileWaitingUntilLoadFinished(void* userData)
+{
+    CallbackDataTimer* data = static_cast<CallbackDataTimer*>(userData);
+    data->setTimedOut();
+
+    return ECORE_CALLBACK_CANCEL;
+}
+
 bool EWK2UnitTestBase::waitUntilLoadFinished(double timeoutSeconds)
 {
-    CallbackDataTimer data(timeoutSeconds);
+    CallbackDataTimer data(timeoutSeconds, reinterpret_cast<Ecore_Task_Cb>(timeOutWhileWaitingUntilLoadFinished));
 
     evas_object_smart_callback_add(m_webView, "load,finished", onLoadFinished, &data);
 
@@ -175,9 +177,17 @@ static void onTitleChanged(void* userData, Evas_Object* webView, void*)
     data->setDone();
 }
 
+static bool timeOutWhileWaitingUntilTitleChangedTo(void* userData)
+{
+    CallbackDataExpectedValue<CString>* data = static_cast<CallbackDataExpectedValue<CString>*>(userData);
+    data->setTimedOut();
+
+    return ECORE_CALLBACK_CANCEL;
+}
+
 bool EWK2UnitTestBase::waitUntilTitleChangedTo(const char* expectedTitle, double timeoutSeconds)
 {
-    CallbackDataExpectedValue<CString> data(expectedTitle, timeoutSeconds);
+    CallbackDataExpectedValue<CString> data(expectedTitle, timeoutSeconds, reinterpret_cast<Ecore_Task_Cb>(timeOutWhileWaitingUntilTitleChangedTo));
 
     evas_object_smart_callback_add(m_webView, "title,changed", onTitleChanged, &data);
 
@@ -189,26 +199,34 @@ bool EWK2UnitTestBase::waitUntilTitleChangedTo(const char* expectedTitle, double
     return !data.didTimeOut();
 }
 
-static void onURLChanged(void* userData, Evas_Object* webView, void*)
+static void onURIChanged(void* userData, Evas_Object* webView, void*)
 {
     CallbackDataExpectedValue<CString>* data = static_cast<CallbackDataExpectedValue<CString>*>(userData);
 
-    if (strcmp(ewk_view_url_get(webView), data->expectedValue().data()))
+    if (strcmp(ewk_view_uri_get(webView), data->expectedValue().data()))
         return;
 
     data->setDone();
 }
 
-bool EWK2UnitTestBase::waitUntilURLChangedTo(const char* expectedURL, double timeoutSeconds)
+static bool timeOutWhileWaitingUntilURIChangedTo(void* userData)
 {
-    CallbackDataExpectedValue<CString> data(expectedURL, timeoutSeconds);
+    CallbackDataExpectedValue<CString>* data = static_cast<CallbackDataExpectedValue<CString>*>(userData);
+    data->setTimedOut();
 
-    evas_object_smart_callback_add(m_webView, "url,changed", onURLChanged, &data);
+    return ECORE_CALLBACK_CANCEL;
+}
+
+bool EWK2UnitTestBase::waitUntilURIChangedTo(const char* expectedURI, double timeoutSeconds)
+{
+    CallbackDataExpectedValue<CString> data(expectedURI, timeoutSeconds, reinterpret_cast<Ecore_Task_Cb>(timeOutWhileWaitingUntilURIChangedTo));
+
+    evas_object_smart_callback_add(m_webView, "uri,changed", onURIChanged, &data);
 
     while (!data.isDone())
         ecore_main_loop_iterate();
 
-    evas_object_smart_callback_del(m_webView, "url,changed", onURLChanged);
+    evas_object_smart_callback_del(m_webView, "uri,changed", onURIChanged);
 
     return !data.didTimeOut();
 }
@@ -219,40 +237,6 @@ void EWK2UnitTestBase::mouseClick(int x, int y)
     evas_event_feed_mouse_move(evas, x, y, 0, 0);
     evas_event_feed_mouse_down(evas, /* Left */ 1, EVAS_BUTTON_NONE, 0, 0);
     evas_event_feed_mouse_up(evas, /* Left */ 1, EVAS_BUTTON_NONE, 0, 0);
-}
-
-void EWK2UnitTestBase::mouseDown(int x, int y)
-{
-    Evas* evas = evas_object_evas_get(m_webView);
-    evas_event_feed_mouse_move(evas, x, y, 0, 0);
-    evas_event_feed_mouse_down(evas, /* Left */ 1, EVAS_BUTTON_NONE, 0, 0);
-}
-
-void EWK2UnitTestBase::mouseUp(int x, int y)
-{
-    Evas* evas = evas_object_evas_get(m_webView);
-    evas_event_feed_mouse_move(evas, x, y, 0, 0);
-    evas_event_feed_mouse_up(evas, /* Left */ 1, EVAS_BUTTON_NONE, 0, 0);
-}
-
-void EWK2UnitTestBase::mouseMove(int x, int y)
-{
-    evas_event_feed_mouse_move(evas_object_evas_get(m_webView), x, y, 0, 0);
-}
-
-void EWK2UnitTestBase::multiDown(int id, int x, int y)
-{
-    evas_event_feed_multi_down(evas_object_evas_get(m_webView), id, x, y, 0, 0, 0, 0, 0, 0, 0, EVAS_BUTTON_NONE, 0, 0);
-}
-
-void EWK2UnitTestBase::multiUp(int id, int x, int y)
-{
-    evas_event_feed_multi_up(evas_object_evas_get(m_webView), id, x, y, 0, 0, 0, 0, 0, 0, 0, EVAS_BUTTON_NONE, 0, 0);
-}
-
-void EWK2UnitTestBase::multiMove(int id, int x, int y)
-{
-    evas_event_feed_multi_move(evas_object_evas_get(m_webView), id, x, y, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 }
 
 } // namespace EWK2UnitTest

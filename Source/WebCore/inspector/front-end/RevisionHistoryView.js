@@ -55,8 +55,8 @@ WebInspector.RevisionHistoryView = function()
 
     WebInspector.workspace.uiSourceCodes().forEach(populateRevisions.bind(this));
     WebInspector.workspace.addEventListener(WebInspector.Workspace.Events.UISourceCodeContentCommitted, this._revisionAdded, this);
+    WebInspector.workspace.addEventListener(WebInspector.UISourceCodeProvider.Events.UISourceCodeReplaced, this._uiSourceCodeReplaced, this);
     WebInspector.workspace.addEventListener(WebInspector.UISourceCodeProvider.Events.UISourceCodeRemoved, this._uiSourceCodeRemoved, this);
-    WebInspector.workspace.addEventListener(WebInspector.UISourceCodeProvider.Events.TemporaryUISourceCodeRemoved, this._uiSourceCodeRemoved, this);
     WebInspector.workspace.addEventListener(WebInspector.Workspace.Events.ProjectWillReset, this._reset, this);
 
     this._statusElement = document.createElement("span");
@@ -161,13 +161,22 @@ WebInspector.RevisionHistoryView.prototype = {
     },
 
     /**
+     * @param {WebInspector.Event} event
+     */
+    _uiSourceCodeReplaced: function(event)
+    {
+        var oldUISourceCode = /** @type {WebInspector.UISourceCode} */ event.data.oldUISourceCode;
+        var uiSourceCode = /** @type {WebInspector.UISourceCode} */ event.data.uiSourceCode;
+        this._removeUISourceCode(oldUISourceCode);
+        this._revealUISourceCode(uiSourceCode);
+    },
+
+    /**
      * @param {WebInspector.UISourceCode} uiSourceCode
      */
     _removeUISourceCode: function(uiSourceCode)
     {
         var uiSourceCodeItem = this._uiSourceCodeItems.get(uiSourceCode);
-        if (!uiSourceCodeItem)
-            return;
         this._treeOutline.removeChild(uiSourceCodeItem);
         this._uiSourceCodeItems.remove(uiSourceCode);
     },
@@ -176,10 +185,10 @@ WebInspector.RevisionHistoryView.prototype = {
     {
         this._treeOutline.removeChildren();
         this._uiSourceCodeItems.clear();
-    },
-
-    __proto__: WebInspector.View.prototype
+    }
 }
+
+WebInspector.RevisionHistoryView.prototype.__proto__ = WebInspector.View.prototype;
 
 /**
  * @constructor
@@ -313,7 +322,7 @@ WebInspector.RevisionHistoryTreeElement.prototype = {
     allowRevert: function()
     {
         this._revertElement.removeStyleClass("hidden");
-    },
-
-    __proto__: TreeElement.prototype
+    }
 }
+
+WebInspector.RevisionHistoryTreeElement.prototype.__proto__ = TreeElement.prototype;

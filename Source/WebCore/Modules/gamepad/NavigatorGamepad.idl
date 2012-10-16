@@ -17,10 +17,13 @@
  * Boston, MA 02110-1301, USA.
  */
 
-[
-    Conditional=GAMEPAD,
-    Supplemental=Navigator
-] interface NavigatorGamepad {
-    [V8EnabledAtRuntime] GamepadList webkitGetGamepads();
-};
+module window {
 
+    interface [
+        Conditional=GAMEPAD,
+        Supplemental=Navigator
+    ] NavigatorGamepad {
+        [V8EnabledAtRuntime] GamepadList webkitGetGamepads();
+    };
+
+}

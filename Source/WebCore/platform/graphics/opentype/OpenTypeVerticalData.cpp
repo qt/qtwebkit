@@ -256,15 +256,6 @@ struct FeatureList : TableBase {
             return validateOffset<FeatureTable>(buffer, features[index].featureOffset);
         return 0;
     }
-
-    const FeatureTable* findFeature(OpenType::Tag tag, const SharedBuffer& buffer) const
-    {
-        for (uint16_t i = 0; i < featureCount; ++i) {
-            if (isValidEnd(buffer, &features[i]) && features[i].featureTag == tag)
-                return validateOffset<FeatureTable>(buffer, features[i].featureOffset);
-        }
-        return 0;
-    }
 };
 
 struct LangSysTable : TableBase {
@@ -370,17 +361,9 @@ struct GSUBTable : TableBase {
     {
         const LangSysTable* langSys = defaultLangSys(buffer);
         const FeatureList* features = featureList(buffer);
-        if (!features)
+        if (!langSys || !features)
             return 0;
-        const FeatureTable* feature = 0;
-        if (langSys)
-            feature = langSys->feature(featureTag, features, buffer);
-        if (!feature) {
-            // If the font has no langSys table, or has no default script and the first script doesn't
-            // have the requested feature, then use the first matching feature directly.
-            feature = features->findFeature(featureTag, buffer);
-        }
-        return feature;
+        return langSys->feature(featureTag, features, buffer);
     }
 
     bool getVerticalGlyphSubstitutions(HashMap<Glyph, Glyph>* map, const SharedBuffer& buffer) const

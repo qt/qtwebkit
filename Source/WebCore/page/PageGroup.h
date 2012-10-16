@@ -83,10 +83,10 @@ namespace WebCore {
         bool hasLocalStorage() { return m_localStorage; }
 
         void addUserScriptToWorld(DOMWrapperWorld*, const String& source, const KURL&,
-                                  const Vector<String>& whitelist, const Vector<String>& blacklist,
+                                  PassOwnPtr<Vector<String> > whitelist, PassOwnPtr<Vector<String> > blacklist,
                                   UserScriptInjectionTime, UserContentInjectedFrames);
         void addUserStyleSheetToWorld(DOMWrapperWorld*, const String& source, const KURL&,
-                                      const Vector<String>& whitelist, const Vector<String>& blacklist,
+                                      PassOwnPtr<Vector<String> > whitelist, PassOwnPtr<Vector<String> > blacklist,
                                       UserContentInjectedFrames,
                                       UserStyleLevel level = UserStyleUserLevel,
                                       UserStyleInjectionTime injectionTime = InjectInExistingDocuments);

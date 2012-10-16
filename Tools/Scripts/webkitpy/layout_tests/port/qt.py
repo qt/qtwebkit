@@ -88,9 +88,9 @@ class QtPort(Port):
 
     def _path_to_webcore_library(self):
         if self.operating_system() == 'mac':
-            return self._build_path('lib/QtWebKitWidgets.framework/QtWebKitWidgets')
+            return self._build_path('lib/QtWebKit.framework/QtWebKit')
         else:
-            return self._build_path('lib/libQtWebKitWidgets.so')
+            return self._build_path('lib/libQtWebKit.so')
 
     def _modules_to_search_for_symbols(self):
         # We search in every library to be reliable in the case of building with CONFIG+=force_static_libs_as_shared.
@@ -135,21 +135,23 @@ class QtPort(Port):
             search_paths.append('qt-4.8')
         elif version:
             search_paths.append('qt-5.0')
-        search_paths.append(self.port_name + '-' + self.operating_system())
+        search_paths.append(self.port_name + '-' + self.host.platform.os_name)
         search_paths.append(self.port_name)
         return search_paths
 
     def default_baseline_search_path(self):
         return map(self._webkit_baseline_path, self._search_paths())
 
-    def expectations_files(self):
-        paths = self._search_paths()
-        if self.get_option('webkit_test_runner'):
-            paths.append('wk2')
+    def _skipped_file_search_paths(self):
+        skipped_path = self._search_paths()
+        if self.get_option('webkit_test_runner') and '5.0' in self.qt_version():
+            skipped_path.append('wk2')
+        return skipped_path
 
+    def expectations_files(self):
         # expectations_files() uses the directories listed in _search_paths reversed.
         # e.g. qt -> qt-linux -> qt-4.8
-        return list(reversed([self._filesystem.join(self._webkit_baseline_path(p), 'TestExpectations') for p in paths]))
+        return list(reversed([self._filesystem.join(self._webkit_baseline_path(p), 'TestExpectations') for p in self._search_paths()]))
 
     def setup_environ_for_server(self, server_name=None):
         clean_env = super(QtPort, self).setup_environ_for_server(server_name)

@@ -31,16 +31,15 @@
 #ifndef V8DOMMap_h
 #define V8DOMMap_h
 
-#include "Node.h"
 #include "WebCoreMemoryInstrumentation.h"
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
-#include <wtf/MemoryInstrumentationHashMap.h>
 #include <wtf/OwnPtr.h>
 #include <v8.h>
 
 namespace WebCore {
     class DOMDataStore;
+    class Node;
 
     template <class KeyType, class ValueType> class AbstractWeakReferenceMap {
     public:
@@ -111,7 +110,7 @@ namespace WebCore {
         bool removeIfPresent(KeyType* key, v8::Persistent<ValueType> value)
         {
             typename HashMap<KeyType*, ValueType*>::iterator it = m_map.find(key);
-            if (it == m_map.end() || it->value != *value)
+            if (it == m_map.end() || it->second != *value)
                 return false;
 
             m_map.remove(it);
@@ -131,14 +130,14 @@ namespace WebCore {
             visitor->startMap();
             typename HashMap<KeyType*, ValueType*>::iterator it = m_map.begin();
             for (; it != m_map.end(); ++it)
-                visitor->visitDOMWrapper(store, it->key, v8::Persistent<ValueType>(it->value));
+                visitor->visitDOMWrapper(store, it->first, v8::Persistent<ValueType>(it->second));
             visitor->endMap();
         }
 
         virtual void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const OVERRIDE
         {
             MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Binding);
-            info.addMember(m_map);
+            info.addHashMap(m_map);
         }
 
     protected:

@@ -23,8 +23,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=SVG&FILTERS
-] interface SVGFEFloodElement : SVGElement,
-                                                SVGFilterPrimitiveStandardAttributes {
-};
+module svg {
+
+    interface [
+        Conditional=SVG&FILTERS
+    ] SVGFEFloodElement : SVGElement,
+                                                    SVGFilterPrimitiveStandardAttributes {
+    };
+}

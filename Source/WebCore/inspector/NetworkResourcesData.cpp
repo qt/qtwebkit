@@ -291,8 +291,8 @@ void NetworkResourcesData::setXHRReplayData(const String& requestId, XHRReplayDa
         ReusedRequestIds::iterator it;
         ReusedRequestIds::iterator end = m_reusedXHRReplayDataRequestIds.end();
         for (it = m_reusedXHRReplayDataRequestIds.begin(); it != end; ++it) {
-            if (it->value == requestId)
-                setXHRReplayData(it->key, xhrReplayData);
+            if (it->second == requestId)
+                setXHRReplayData(it->first, xhrReplayData);
         }
         return;
     }
@@ -318,10 +318,10 @@ Vector<String> NetworkResourcesData::removeCachedResource(CachedResource* cached
     ResourceDataMap::iterator it;
     ResourceDataMap::iterator end = m_requestIdToResourceDataMap.end();
     for (it = m_requestIdToResourceDataMap.begin(); it != end; ++it) {
-        ResourceData* resourceData = it->value;
+        ResourceData* resourceData = it->second;
         if (resourceData->cachedResource() == cachedResource) {
             resourceData->setCachedResource(0);
-            result.append(it->key);
+            result.append(it->first);
         }
     }
 
@@ -338,9 +338,9 @@ void NetworkResourcesData::clear(const String& preservedLoaderId)
     ResourceDataMap::iterator it;
     ResourceDataMap::iterator end = m_requestIdToResourceDataMap.end();
     for (it = m_requestIdToResourceDataMap.begin(); it != end; ++it) {
-        ResourceData* resourceData = it->value;
+        ResourceData* resourceData = it->second;
         if (!preservedLoaderId.isNull() && resourceData->loaderId() == preservedLoaderId)
-            preservedMap.set(it->key, it->value);
+            preservedMap.set(it->first, it->second);
         else
             delete resourceData;
     }

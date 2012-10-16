@@ -34,11 +34,14 @@
 #include "BMPImageDecoder.h"
 #include "ICOImageDecoder.h"
 #include "SharedBuffer.h"
-#include <public/WebData.h>
+#include "platform/WebData.h"
+#include "platform/WebSize.h"
+
 #include <public/WebImage.h>
-#include <public/WebSize.h>
+
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
+
 #include <wtf/PassRefPtr.h>
 
 using namespace WebCore;

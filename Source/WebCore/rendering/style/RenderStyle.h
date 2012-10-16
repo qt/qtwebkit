@@ -77,7 +77,7 @@
 #include "StyleFilterData.h"
 #endif
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
 #include "StyleDashboardRegion.h"
 #endif
 
@@ -523,12 +523,12 @@ public:
     Length minHeight() const { return m_box->minHeight(); }
     Length maxHeight() const { return m_box->maxHeight(); }
     
-    Length logicalWidth() const { return isHorizontalWritingMode() ? width() : height(); }
-    Length logicalHeight() const { return isHorizontalWritingMode() ? height() : width(); }
-    Length logicalMinWidth() const { return isHorizontalWritingMode() ? minWidth() : minHeight(); }
-    Length logicalMaxWidth() const { return isHorizontalWritingMode() ? maxWidth() : maxHeight(); }
-    Length logicalMinHeight() const { return isHorizontalWritingMode() ? minHeight() : minWidth(); }
-    Length logicalMaxHeight() const { return isHorizontalWritingMode() ? maxHeight() : maxWidth(); }
+    Length logicalWidth() const;
+    Length logicalHeight() const;
+    Length logicalMinWidth() const;
+    Length logicalMaxWidth() const;
+    Length logicalMinHeight() const;
+    Length logicalMaxHeight() const;
 
     const BorderData& border() const { return surround->border; }
     const BorderValue& borderLeft() const { return surround->border.left(); }
@@ -819,7 +819,6 @@ public:
 
     const ShadowData* boxShadow() const { return rareNonInheritedData->m_boxShadow.get(); }
     void getBoxShadowExtent(LayoutUnit& top, LayoutUnit& right, LayoutUnit& bottom, LayoutUnit& left) const { getShadowExtent(boxShadow(), top, right, bottom, left); }
-    LayoutBoxExtent getBoxShadowInsetExtent() const { return getShadowInsetExtent(boxShadow()); }
     void getBoxShadowHorizontalExtent(LayoutUnit& left, LayoutUnit& right) const { getShadowHorizontalExtent(boxShadow(), left, right); }
     void getBoxShadowVerticalExtent(LayoutUnit& top, LayoutUnit& bottom) const { getShadowVerticalExtent(boxShadow(), top, bottom); }
     void getBoxShadowInlineDirectionExtent(LayoutUnit& logicalLeft, LayoutUnit& logicalRight) { getShadowInlineDirectionExtent(boxShadow(), logicalLeft, logicalRight); }
@@ -1020,7 +1019,7 @@ public:
     void setMinHeight(Length v) { SET_VAR(m_box, m_minHeight, v) }
     void setMaxHeight(Length v) { SET_VAR(m_box, m_maxHeight, v) }
 
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
     Vector<StyleDashboardRegion> dashboardRegions() const { return rareNonInheritedData->m_dashboardRegions; }
     void setDashboardRegions(Vector<StyleDashboardRegion> regions) { SET_VAR(rareNonInheritedData, m_dashboardRegions, regions); }
 
@@ -1037,11 +1036,6 @@ public:
             rareNonInheritedData.access()->m_dashboardRegions.clear();
         rareNonInheritedData.access()->m_dashboardRegions.append(region);
     }
-#endif
-
-#if ENABLE(WIDGET_REGION)
-    DraggableRegionMode getDraggableRegionMode() const { return rareNonInheritedData->m_draggableRegionMode; }
-    void setDraggableRegionMode(DraggableRegionMode v) { SET_VAR(rareNonInheritedData, m_draggableRegionMode, v); }
 #endif
 
     void resetBorder() { resetBorderImage(); resetBorderTop(); resetBorderRight(); resetBorderBottom(); resetBorderLeft(); resetBorderRadius(); }
@@ -1451,22 +1445,22 @@ public:
     void setKerning(SVGLength k) { accessSVGStyle()->setKerning(k); }
 #endif
 
-    void setShapeInside(PassRefPtr<BasicShape> shape)
+    void setWrapShapeInside(PassRefPtr<BasicShape> shape)
     {
-        if (rareNonInheritedData->m_shapeInside != shape)
-            rareNonInheritedData.access()->m_shapeInside = shape;
+        if (rareNonInheritedData->m_wrapShapeInside != shape)
+            rareNonInheritedData.access()->m_wrapShapeInside = shape;
     }
-    BasicShape* shapeInside() const { return rareNonInheritedData->m_shapeInside.get(); }
+    BasicShape* wrapShapeInside() const { return rareNonInheritedData->m_wrapShapeInside.get(); }
 
-    void setShapeOutside(PassRefPtr<BasicShape> shape)
+    void setWrapShapeOutside(PassRefPtr<BasicShape> shape)
     {
-        if (rareNonInheritedData->m_shapeOutside != shape)
-            rareNonInheritedData.access()->m_shapeOutside = shape;
+        if (rareNonInheritedData->m_wrapShapeOutside != shape)
+            rareNonInheritedData.access()->m_wrapShapeOutside = shape;
     }
-    BasicShape* shapeOutside() const { return rareNonInheritedData->m_shapeOutside.get(); }
+    BasicShape* wrapShapeOutside() const { return rareNonInheritedData->m_wrapShapeOutside.get(); }
 
-    static BasicShape* initialShapeInside() { return 0; }
-    static BasicShape* initialShapeOutside() { return 0; }
+    static BasicShape* initialWrapShapeInside() { return 0; }
+    static BasicShape* initialWrapShapeOutside() { return 0; }
 
     void setClipPath(PassRefPtr<ClipPathOperation> operation)
     {
@@ -1732,7 +1726,7 @@ public:
 #if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
     static bool initialUseTouchOverflowScrolling() { return false; }
 #endif
-#if ENABLE(DASHBOARD_SUPPORT)
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
     static const Vector<StyleDashboardRegion>& initialDashboardRegions();
     static const Vector<StyleDashboardRegion>& noneDashboardRegions();
 #endif
@@ -1757,7 +1751,6 @@ private:
 
     void inheritUnicodeBidiFrom(const RenderStyle* parent) { noninherited_flags._unicodeBidi = parent->noninherited_flags._unicodeBidi; }
     void getShadowExtent(const ShadowData*, LayoutUnit& top, LayoutUnit& right, LayoutUnit& bottom, LayoutUnit& left) const;
-    LayoutBoxExtent getShadowInsetExtent(const ShadowData*) const;
     void getShadowHorizontalExtent(const ShadowData*, LayoutUnit& left, LayoutUnit& right) const;
     void getShadowVerticalExtent(const ShadowData*, LayoutUnit& top, LayoutUnit& bottom) const;
     void getShadowInlineDirectionExtent(const ShadowData* shadow, LayoutUnit& logicalLeft, LayoutUnit& logicalRight) const

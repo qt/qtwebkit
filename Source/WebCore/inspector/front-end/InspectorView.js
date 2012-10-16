@@ -132,23 +132,10 @@ WebInspector.InspectorView.prototype = {
 
     _keyDown: function(event)
     {
-        if (!WebInspector.KeyboardShortcut.eventHasCtrlOrMeta(event))
-            return;
-
-        // Ctrl/Cmd + 1-9 should show corresponding panel.
-        if (!event.shiftKey && !event.altKey && event.keyCode > 0x30 && event.keyCode < 0x3A) {
-            var panelName = this._panelOrder[event.keyCode - 0x31];
-            if (panelName) {
-                this.showPanel(panelName);
-                event.consume(true);
-            }
-            return;
-        }
-
         // BUG85312: On French AZERTY keyboards, AltGr-]/[ combinations (synonymous to Ctrl-Alt-]/[ on Windows) are used to enter ]/[,
         // so for a ]/[-related keydown we delay the panel switch using a timer, to see if there is a keypress event following this one.
         // If there is, we cancel the timer and do not consider this a panel switch.
-        if (!WebInspector.isWin() || (!this._openBracketIdentifiers[event.keyIdentifier] && !this._closeBracketIdentifiers[event.keyIdentifier])) {
+        if (!WebInspector.isWin() || (!this._openBracketIdentifiers.hasOwnProperty(event.keyIdentifier) && !this._closeBracketIdentifiers.hasOwnProperty(event.keyIdentifier))) {
             this._keyDownInternal(event);
             return;
         }
@@ -158,8 +145,8 @@ WebInspector.InspectorView.prototype = {
 
     _keyDownInternal: function(event)
     {
-        if (this._openBracketIdentifiers[event.keyIdentifier]) {
-            var isRotateLeft = !event.shiftKey && !event.altKey;
+        if (this._openBracketIdentifiers.hasOwnProperty(event.keyIdentifier)) {
+            var isRotateLeft = WebInspector.KeyboardShortcut.eventHasCtrlOrMeta(event) && !event.shiftKey && !event.altKey;
             if (isRotateLeft) {
                 var index = this._panelOrder.indexOf(this.currentPanel().name);
                 index = (index === 0) ? this._panelOrder.length - 1 : index - 1;
@@ -168,7 +155,7 @@ WebInspector.InspectorView.prototype = {
                 return;
             }
 
-            var isGoBack = event.altKey;
+            var isGoBack = WebInspector.KeyboardShortcut.eventHasCtrlOrMeta(event) && event.altKey;
             if (isGoBack && this._canGoBackInHistory()) {
                 this._goBackInHistory();
                 event.consume(true);
@@ -176,8 +163,8 @@ WebInspector.InspectorView.prototype = {
             return;
         }
 
-        if (this._closeBracketIdentifiers[event.keyIdentifier]) {
-            var isRotateRight = !event.shiftKey && !event.altKey;
+        if (this._closeBracketIdentifiers.hasOwnProperty(event.keyIdentifier)) {
+            var isRotateRight = WebInspector.KeyboardShortcut.eventHasCtrlOrMeta(event) && !event.shiftKey && !event.altKey;
             if (isRotateRight) {
                 var index = this._panelOrder.indexOf(this.currentPanel().name);
                 index = (index + 1) % this._panelOrder.length;
@@ -186,7 +173,7 @@ WebInspector.InspectorView.prototype = {
                 return;
             }
 
-            var isGoForward = event.altKey;
+            var isGoForward = WebInspector.KeyboardShortcut.eventHasCtrlOrMeta(event) && event.altKey;
             if (isGoForward && this._canGoForwardInHistory()) {
                 this._goForwardInHistory();
                 event.consume(true);
@@ -259,10 +246,10 @@ WebInspector.InspectorView.prototype = {
     {
         WebInspector.searchController.disableSearchUntilExplicitAction();
         this.setCurrentPanel(panel);
-    },
-
-    __proto__: WebInspector.View.prototype
+    }
 }
+
+WebInspector.InspectorView.prototype.__proto__ = WebInspector.View.prototype;
 
 /**
  * @type {WebInspector.InspectorView}

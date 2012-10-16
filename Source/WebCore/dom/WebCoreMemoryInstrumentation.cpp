@@ -38,6 +38,7 @@ MemoryObjectType WebCoreMemoryTypes::DOM = "Page.DOM";
 MemoryObjectType WebCoreMemoryTypes::CSS = "Page.CSS";
 MemoryObjectType WebCoreMemoryTypes::Binding = "Page.Binding";
 
+MemoryObjectType WebCoreMemoryTypes::MemoryCache = "MemoryCache";
 MemoryObjectType WebCoreMemoryTypes::MemoryCacheStructures = "MemoryCache.InternalStructures";
 MemoryObjectType WebCoreMemoryTypes::CachedResource = "MemoryCache.Resource";
 MemoryObjectType WebCoreMemoryTypes::CachedResourceRaw = "MemoryCache.RawResource";
@@ -48,25 +49,5 @@ MemoryObjectType WebCoreMemoryTypes::CachedResourceScript = "MemoryCache.Script"
 MemoryObjectType WebCoreMemoryTypes::CachedResourceSVG = "MemoryCache.SVG";
 MemoryObjectType WebCoreMemoryTypes::CachedResourceShader = "MemoryCache.Shader";
 MemoryObjectType WebCoreMemoryTypes::CachedResourceXSLT = "MemoryCache.XSLT";
-
-MemoryObjectType WebCoreMemoryTypes::ExternalStrings = "JSExternalResources.Strings";
-MemoryObjectType WebCoreMemoryTypes::ExternalArrays = "JSExternalResources.Arrays";
-
-MemoryObjectType WebCoreMemoryTypes::Inspector = "WebInspector";
-MemoryObjectType WebCoreMemoryTypes::InspectorController = "WebInspector.Controller";
-MemoryObjectType WebCoreMemoryTypes::InspectorMemoryAgent = "WebInspector.MemoryAgent";
-MemoryObjectType WebCoreMemoryTypes::InspectorDOMStorageAgent = "WebInspector.DOMStorageAgent";
-MemoryObjectType WebCoreMemoryTypes::InspectorDOMStorageResources = "WebInspector.DOMStorageAgent.Resources";
-MemoryObjectType WebCoreMemoryTypes::InspectorProfilerAgent = "WebInspector.ProfilerAgent";
-
-MemoryObjectType WebCoreMemoryTypes::JSHeapUsed = "JSHeap.Used";
-MemoryObjectType WebCoreMemoryTypes::JSHeapUnused = "JSHeap.Unused";
-
-MemoryObjectType WebCoreMemoryTypes::DOMStorageCache = "DOMStorageCache";
-
-MemoryObjectType WebCoreMemoryTypes::RenderTreeUsed = "RenderTree.Used";
-MemoryObjectType WebCoreMemoryTypes::RenderTreeUnused = "RenderTree.Unused";
-
-MemoryObjectType WebCoreMemoryTypes::ProcessPrivateMemory = "ProcessPrivateMemory";
 
 } // namespace WebCore

@@ -83,10 +83,7 @@ public:
             return;
         }
 
-        if (other.is8Bit())
-            append(other.characters8(), other.m_length);
-        else
-            append(other.characters16(), other.m_length);
+        append(other.characters(), other.m_length);
     }
 
     void append(const String& string, unsigned offset, unsigned length)

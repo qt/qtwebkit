@@ -23,13 +23,16 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    JSGenerateIsReachable=Impl,
-    CustomConstructor,
-    ConstructorParameters=1,
-    JSNoStaticTables
-] interface ArrayBuffer {
-    readonly attribute unsigned long byteLength;
-    ArrayBuffer slice(in long begin, in [Optional] long end);
-};
+module html {
 
+    interface [
+        JSGenerateIsReachable=Impl,
+        CustomConstructor,
+        ConstructorParameters=1,
+        JSNoStaticTables
+    ] ArrayBuffer {
+        readonly attribute unsigned long byteLength;
+        ArrayBuffer slice(in long begin, in [Optional] long end);
+    };
+
+}

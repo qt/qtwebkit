@@ -61,9 +61,9 @@ void WidgetHierarchyUpdatesSuspensionScope::moveWidgets()
     widgetNewParentMap().clear();
     WidgetToParentMap::iterator end = map.end();
     for (WidgetToParentMap::iterator it = map.begin(); it != end; ++it) {
-        Widget* child = it->key.get();
+        Widget* child = it->first.get();
         ScrollView* currentParent = child->parent();
-        FrameView* newParent = it->value;
+        FrameView* newParent = it->second;
         if (newParent != currentParent) {
             if (currentParent)
                 currentParent->removeChild(child);
@@ -169,7 +169,7 @@ bool RenderWidget::updateWidgetGeometry()
     if (!m_widget->transformsAffectFrameRect())
         return setWidgetGeometry(absoluteContentBox());
 
-    LayoutRect absoluteContentBox(localToAbsoluteQuad(FloatQuad(contentBox), SnapOffsetForTransforms).boundingBox());
+    LayoutRect absoluteContentBox(localToAbsoluteQuad(FloatQuad(contentBox)).boundingBox());
     if (m_widget->isFrameView()) {
         contentBox.setLocation(absoluteContentBox.location());
         return setWidgetGeometry(contentBox);

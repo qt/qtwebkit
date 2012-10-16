@@ -96,7 +96,7 @@ void PlatformCALayerWinInternal::displayCallback(CACFLayerRef caLayer, CGContext
     }
 #endif
 
-    if (owner()->owner()->platformCALayerShowRepaintCounter(owner())) {
+    if (owner()->owner()->platformCALayerShowRepaintCounter()) {
         FontCachePurgePreventer fontCachePurgePreventer;
 
         String text = String::number(owner()->owner()->platformCALayerIncrementRepaintCount());
@@ -165,14 +165,14 @@ void PlatformCALayerWinInternal::setNeedsDisplay(const FloatRect* dirtyRect)
         for (int i = 0; i < numTileLayers; ++i)
             CACFLayerSetNeedsDisplay(tileAtIndex(i), dirtyRect ? &rect : 0);
 
-        if (m_owner->owner() && m_owner->owner()->platformCALayerShowRepaintCounter(m_owner)) {
+        if (m_owner->owner() && m_owner->owner()->platformCALayerShowRepaintCounter()) {
             CGRect layerBounds = m_owner->bounds();
             CGRect indicatorRect = CGRectMake(layerBounds.origin.x, layerBounds.origin.y, 80, 25);
             CACFLayerSetNeedsDisplay(tileAtIndex(0), &indicatorRect);
         }
     } else if (owner()->layerType() == PlatformCALayer::LayerTypeWebLayer) {
         if (owner() && owner()->owner()) {
-            if (owner()->owner()->platformCALayerShowRepaintCounter(owner())) {
+            if (owner()->owner()->platformCALayerShowRepaintCounter()) {
                 FloatRect layerBounds = owner()->bounds();
                 FloatRect repaintCounterRect = layerBounds;
 

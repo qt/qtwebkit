@@ -23,35 +23,38 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-[
-    Conditional=VIDEO_TRACK,
-    V8EnabledAtRuntime=webkitVideoTrack,
-    EventTarget,
-    JSCustomMarkFunction,
-    JSCustomIsReachable
-] interface TextTrack {
-    readonly attribute DOMString kind;
-    readonly attribute DOMString label;
-    readonly attribute DOMString language;
+module html {
 
-    attribute DOMString mode;
+    interface [
+        Conditional=VIDEO_TRACK,
+        V8EnabledAtRuntime=webkitVideoTrack,
+        EventTarget,
+        JSCustomMarkFunction,
+        JSCustomIsReachable
+    ] TextTrack {
+        readonly attribute DOMString kind;
+        readonly attribute DOMString label;
+        readonly attribute DOMString language;
 
-    readonly attribute TextTrackCueList cues;
-    readonly attribute TextTrackCueList activeCues;
-             attribute EventListener oncuechange;
+        attribute DOMString mode;
 
-    void addCue(in TextTrackCue cue)
-        raises (DOMException);
-    void removeCue(in TextTrackCue cue)
-        raises (DOMException);
+        readonly attribute TextTrackCueList cues;
+        readonly attribute TextTrackCueList activeCues;
+                 attribute EventListener oncuechange;
 
-    // EventTarget interface
-    void addEventListener(in DOMString type, 
-                          in EventListener listener, 
-                          in [Optional] boolean useCapture);
-    void removeEventListener(in DOMString type, 
-                             in EventListener listener, 
-                             in [Optional] boolean useCapture);
-    boolean dispatchEvent(in Event evt)
-        raises(EventException);
-};
+        void addCue(in TextTrackCue cue)
+            raises (DOMException);
+        void removeCue(in TextTrackCue cue)
+            raises (DOMException);
+
+        // EventTarget interface
+        void addEventListener(in DOMString type, 
+                              in EventListener listener, 
+                              in [Optional] boolean useCapture);
+        void removeEventListener(in DOMString type, 
+                                 in EventListener listener, 
+                                 in [Optional] boolean useCapture);
+        boolean dispatchEvent(in Event evt)
+            raises(EventException);
+    };
+}

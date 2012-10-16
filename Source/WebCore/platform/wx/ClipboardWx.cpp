@@ -71,10 +71,10 @@ bool ClipboardWx::setData(const String& type, const String& data)
 }
 
 // extensions beyond IE's API
-ListHashSet<String> ClipboardWx::types() const
+HashSet<String> ClipboardWx::types() const 
 {
     notImplemented();
-    ListHashSet<String> result;
+    HashSet<String> result;
     return result;
 }
 

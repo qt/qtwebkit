@@ -67,10 +67,10 @@
 #include "MemoryCache.h"
 #include "Page.h"
 #include "RegularExpression.h"
-#include "ResourceBuffer.h"
 #include "ScriptObject.h"
 #include "SecurityOrigin.h"
 #include "Settings.h"
+#include "SharedBuffer.h"
 #include "TextEncoding.h"
 #include "TextResourceDecoder.h"
 #include "UserGestureIndicator.h"
@@ -98,13 +98,13 @@ static const char touchEventEmulationEnabled[] = "touchEventEmulationEnabled";
 #endif
 }
 
-static bool decodeBuffer(const char* buffer, unsigned size, const String& textEncodingName, String* result)
+static bool decodeSharedBuffer(PassRefPtr<SharedBuffer> buffer, const String& textEncodingName, String* result)
 {
     if (buffer) {
         TextEncoding encoding(textEncodingName);
         if (!encoding.isValid())
             encoding = WindowsLatin1Encoding();
-        *result = encoding.decode(buffer, size);
+        *result = encoding.decode(buffer->data(), buffer->size());
         return true;
     }
     return false;
@@ -166,7 +166,7 @@ bool InspectorPageAgent::cachedResourceContent(CachedResource* cachedResource, S
 
     *base64Encoded = !hasTextContent(cachedResource);
     if (*base64Encoded) {
-        RefPtr<SharedBuffer> buffer = hasZeroSize ? SharedBuffer::create() : cachedResource->resourceBuffer()->sharedBuffer();
+        RefPtr<SharedBuffer> buffer = hasZeroSize ? SharedBuffer::create() : cachedResource->data();
 
         if (!buffer)
             return false;
@@ -189,7 +189,7 @@ bool InspectorPageAgent::cachedResourceContent(CachedResource* cachedResource, S
             *result = static_cast<CachedScript*>(cachedResource)->script();
             return true;
         case CachedResource::RawResource: {
-            ResourceBuffer* buffer = cachedResource->resourceBuffer();
+            SharedBuffer* buffer = cachedResource->data();
             if (!buffer)
                 return false;
             RefPtr<TextResourceDecoder> decoder = createXHRTextDecoder(cachedResource->response().mimeType(), cachedResource->response().textEncodingName());
@@ -201,37 +201,31 @@ bool InspectorPageAgent::cachedResourceContent(CachedResource* cachedResource, S
             return true;
         }
         default:
-            ResourceBuffer* buffer = cachedResource->resourceBuffer();
-            return decodeBuffer(buffer ? buffer->data() : 0, buffer ? buffer->size() : 0, cachedResource->encoding(), result);
+            return decodeSharedBuffer(cachedResource->data(), cachedResource->encoding(), result);
         }
     }
     return false;
 }
 
-bool InspectorPageAgent::mainResourceContent(Frame* frame, bool withBase64Encode, String* result)
+static bool mainResourceContent(Frame* frame, bool withBase64Encode, String* result)
 {
-    RefPtr<ResourceBuffer> buffer = frame->loader()->documentLoader()->mainResourceData();
+    RefPtr<SharedBuffer> buffer = frame->loader()->documentLoader()->mainResourceData();
     if (!buffer)
         return false;
     String textEncodingName = frame->document()->inputEncoding();
 
-    return InspectorPageAgent::dataContent(buffer->data(), buffer->size(), textEncodingName, withBase64Encode, result);
+    return InspectorPageAgent::sharedBufferContent(buffer, textEncodingName, withBase64Encode, result);
 }
 
 // static
 bool InspectorPageAgent::sharedBufferContent(PassRefPtr<SharedBuffer> buffer, const String& textEncodingName, bool withBase64Encode, String* result)
 {
-    return dataContent(buffer ? buffer->data() : 0, buffer ? buffer->size() : 0, textEncodingName, withBase64Encode, result);
-}
-
-bool InspectorPageAgent::dataContent(const char* data, unsigned size, const String& textEncodingName, bool withBase64Encode, String* result)
-{
     if (withBase64Encode) {
-        *result = base64Encode(data, size);
+        *result = base64Encode(buffer->data(), buffer->size());
         return true;
     }
 
-    return decodeBuffer(data, size, textEncodingName, result);
+    return decodeSharedBuffer(buffer, textEncodingName, result);
 }
 
 PassOwnPtr<InspectorPageAgent> InspectorPageAgent::create(InstrumentingAgents* instrumentingAgents, Page* page, InspectorAgent* inspectorAgent, InspectorState* state, InjectedScriptManager* injectedScriptManager, InspectorClient* client, InspectorOverlay* overlay)
@@ -458,7 +452,7 @@ static Vector<CachedResource*> cachedResourcesForFrame(Frame* frame)
     const CachedResourceLoader::DocumentResourceMap& allResources = frame->document()->cachedResourceLoader()->allCachedResources();
     CachedResourceLoader::DocumentResourceMap::const_iterator end = allResources.end();
     for (CachedResourceLoader::DocumentResourceMap::const_iterator it = allResources.begin(); it != end; ++it) {
-        CachedResource* cachedResource = it->value.get();
+        CachedResource* cachedResource = it->second.get();
 
         switch (cachedResource->type()) {
         case CachedResource::ImageResource:
@@ -762,7 +756,7 @@ void InspectorPageAgent::didClearWindowObjectInWorld(Frame* frame, DOMWrapperWor
         InspectorObject::const_iterator end = scripts->end();
         for (InspectorObject::const_iterator it = scripts->begin(); it != end; ++it) {
             String scriptText;
-            if (it->value->asString(&scriptText))
+            if (it->second->asString(&scriptText))
                 m_injectedScriptManager->injectScript(scriptText, mainWorldScriptState(frame));
         }
     }
@@ -794,8 +788,8 @@ void InspectorPageAgent::frameDetached(Frame* frame)
 {
     HashMap<Frame*, String>::iterator iterator = m_frameToIdentifier.find(frame);
     if (iterator != m_frameToIdentifier.end()) {
-        m_frontend->frameDetached(iterator->value);
-        m_identifierToFrame.remove(iterator->value);
+        m_frontend->frameDetached(iterator->second);
+        m_identifierToFrame.remove(iterator->second);
         m_frameToIdentifier.remove(iterator);
     }
 }
@@ -1106,16 +1100,6 @@ void InspectorPageAgent::setTouchEmulationEnabled(ErrorString* error, bool enabl
     *error = "Touch events emulation not supported";
     UNUSED_PARAM(enabled);
 #endif
-}
-
-void InspectorPageAgent::setCompositingBordersVisible(ErrorString*, bool visible)
-{
-    Settings* settings = m_page->settings();
-    if (!settings)
-        return;
-
-    settings->setShowDebugBorders(visible);
-    settings->setShowRepaintCounter(visible);
 }
 
 } // namespace WebCore

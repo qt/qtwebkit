@@ -125,7 +125,7 @@ WebInspector.Linkifier.DefaultFormatter.prototype = {
         if (this._maxLength)
             text = text.trimMiddle(this._maxLength);
         anchor.textContent = text;
-    },
-
-    __proto__: WebInspector.LinkifierFormatter.prototype
+    }
 }
+
+WebInspector.Linkifier.DefaultFormatter.prototype.__proto__ = WebInspector.LinkifierFormatter.prototype;

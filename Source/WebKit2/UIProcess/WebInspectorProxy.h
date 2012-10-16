@@ -189,7 +189,7 @@ private:
     virtual void windowReceivedMessage(HWND, UINT message, WPARAM, LPARAM);
 #endif
 
-#if PLATFORM(GTK) || PLATFORM(EFL)
+#if PLATFORM(GTK)
     void createInspectorWindow();
 #endif
 

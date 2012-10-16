@@ -102,23 +102,23 @@ static void on_download_requested(void* userData, Evas_Object* webview, void* ev
 {
     DownloadTestData* testData = static_cast<DownloadTestData*>(userData);
     Ewk_Download_Job* download = static_cast<Ewk_Download_Job*>(eventInfo);
-    ASSERT_EQ(EWK_DOWNLOAD_JOB_STATE_NOT_STARTED, ewk_download_job_state_get(download));
-    ASSERT_EQ(0, ewk_download_job_estimated_progress_get(download));
-    ASSERT_EQ(0, ewk_download_job_elapsed_time_get(download));
+    ASSERT_EQ(ewk_download_job_state_get(download), EWK_DOWNLOAD_JOB_STATE_NOT_STARTED);
+    ASSERT_EQ(ewk_download_job_estimated_progress_get(download), 0);
+    ASSERT_EQ(ewk_download_job_elapsed_time_get(download), 0);
 
     Ewk_Url_Request* request = ewk_download_job_request_get(download);
     ASSERT_TRUE(request);
-    EXPECT_STREQ(testData->fileUrl, ewk_url_request_url_get(request));
+    EXPECT_STREQ(ewk_url_request_url_get(request), testData->fileUrl);
 
     Ewk_Url_Response* response = ewk_download_job_response_get(download);
     ASSERT_TRUE(response);
-    EXPECT_STREQ("application/pdf", ewk_url_response_mime_type_get(response));
+    EXPECT_STREQ(ewk_url_response_mime_type_get(response), "application/pdf");
 
-    EXPECT_STREQ(serverSuggestedFilename, ewk_download_job_suggested_filename_get(download));
+    EXPECT_STREQ(ewk_download_job_suggested_filename_get(download), serverSuggestedFilename);
 
     ASSERT_FALSE(fileExists(testData->destinationPath));
     ewk_download_job_destination_set(download, testData->destinationPath);
-    EXPECT_STREQ(testData->destinationPath, ewk_download_job_destination_get(download));
+    EXPECT_STREQ(ewk_download_job_destination_get(download), testData->destinationPath);
 }
 
 static void on_download_cancelled(void* userData, Evas_Object* webview, void* eventInfo)
@@ -131,7 +131,7 @@ static void on_download_cancelled(void* userData, Evas_Object* webview, void* ev
 static void on_download_failed(void* userData, Evas_Object* webview, void* eventInfo)
 {
     Ewk_Download_Job_Error* downloadError = static_cast<Ewk_Download_Job_Error*>(eventInfo);
-    fprintf(stderr, "Download error: %s\n", ewk_error_description_get(downloadError->error));
+    fprintf(stderr, "Download error: %s\n", ewk_web_error_description_get(downloadError->error));
     ecore_main_loop_quit();
     FAIL();
 }
@@ -141,8 +141,8 @@ static void on_download_finished(void* userData, Evas_Object* webview, void* eve
     DownloadTestData* testData = static_cast<DownloadTestData*>(userData);
     Ewk_Download_Job* download = static_cast<Ewk_Download_Job*>(eventInfo);
 
-    ASSERT_EQ(1, ewk_download_job_estimated_progress_get(download));
-    ASSERT_EQ(EWK_DOWNLOAD_JOB_STATE_FINISHED, ewk_download_job_state_get(download));
+    ASSERT_EQ(ewk_download_job_estimated_progress_get(download), 1);
+    ASSERT_EQ(ewk_download_job_state_get(download), EWK_DOWNLOAD_JOB_STATE_FINISHED);
     ASSERT_GT(ewk_download_job_elapsed_time_get(download), 0);
 
     ASSERT_TRUE(fileExists(testData->destinationPath));
@@ -159,7 +159,7 @@ TEST_F(EWK2UnitTestBase, ewk_download)
     char destinationPath[] = "/tmp/pdf-file.XXXXXX";
     ASSERT_TRUE(mktemp(destinationPath));
 
-    CString fileUrl = httpServer->getURLForPath(testFilePath);
+    CString fileUrl = httpServer->getURIForPath(testFilePath);
 
     DownloadTestData userData = { fileUrl.data(), destinationPath };
     ASSERT_FALSE(fileExists(destinationPath));
@@ -170,7 +170,7 @@ TEST_F(EWK2UnitTestBase, ewk_download)
     evas_object_smart_callback_add(webView(), "download,finished", on_download_finished, &userData);
 
     // Download test pdf
-    ewk_view_url_set(webView(), fileUrl.data());
+    ewk_view_uri_set(webView(), fileUrl.data());
     ecore_main_loop_begin();
 
     // Clean up

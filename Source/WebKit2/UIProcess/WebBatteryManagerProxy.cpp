@@ -42,7 +42,6 @@ WebBatteryManagerProxy::WebBatteryManagerProxy(WebContext* context)
     : m_isUpdating(false)
     , m_context(context)
 {
-    m_context->addMessageReceiver(CoreIPC::MessageClassWebBatteryManagerProxy, this);
 }
 
 WebBatteryManagerProxy::~WebBatteryManagerProxy()

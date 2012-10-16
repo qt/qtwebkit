@@ -333,7 +333,7 @@ void ChromeClientWinCE::setNeedsOneShotDrawingSynchronization()
     notImplemented();
 }
 
-void ChromeClientWinCE::scheduleCompositingLayerFlush()
+void ChromeClientWinCE::scheduleCompositingLayerSync()
 {
     notImplemented();
 }

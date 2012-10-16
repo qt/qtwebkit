@@ -697,7 +697,6 @@ void WebPrintOperationGtk::print(cairo_surface_t* surface, double xDPI, double y
 
     OwnPtr<PrintPagesData> data = adoptPtr(new PrintPagesData(this));
     if (!data->isValid) {
-        cairo_surface_finish(surface);
         printDone(invalidPageRangeToPrint(m_printContext));
         return;
     }

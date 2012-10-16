@@ -79,7 +79,6 @@ class SelectionHandler;
 class TouchEventHandler;
 class WebCookieJar;
 class WebPageClient;
-class WebKitThreadViewportAccessor;
 
 #if USE(ACCELERATED_COMPOSITING)
 class FrameLayers;
@@ -153,6 +152,7 @@ public:
     void setScrollPosition(const WebCore::IntPoint&);
     void scrollBy(int deltaX, int deltaY);
 
+    void enqueueRenderingOfClippedContentOfScrollableAreaAfterInRegionScrolling();
     void notifyInRegionScrollStopped();
     void setScrollOriginPoint(const Platform::IntPoint&);
     void setHasInRegionScrollableAreas(bool);
@@ -202,7 +202,7 @@ public:
     virtual int showAlertDialog(WebPageClient::AlertType atype);
     virtual bool isActive() const;
     virtual bool isVisible() const { return m_visible; }
-    virtual void authenticationChallenge(const WebCore::KURL&, const WebCore::ProtectionSpace&, const WebCore::Credential&);
+    virtual void authenticationChallenge(const WebCore::KURL&, const WebCore::ProtectionSpace&, const WebCore::Credential&, WebCore::AuthenticationChallengeClient*);
     virtual SaveCredentialType notifyShouldSaveCredential(bool);
     virtual void syncProxyCredential(const WebCore::Credential&);
 
@@ -398,7 +398,7 @@ public:
 
     // Fallback GraphicsLayerClient implementation, used for various overlay layers.
     virtual void notifyAnimationStarted(const WebCore::GraphicsLayer*, double time) { }
-    virtual void notifyFlushRequired(const WebCore::GraphicsLayer*);
+    virtual void notifySyncRequired(const WebCore::GraphicsLayer*);
     virtual void paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext&, WebCore::GraphicsLayerPaintingPhase, const WebCore::IntRect& inClip) { }
     virtual bool showDebugBorders(const WebCore::GraphicsLayer*) const;
     virtual bool showRepaintCounter(const WebCore::GraphicsLayer*) const;
@@ -510,7 +510,6 @@ public:
     WebCore::TransformationMatrix* m_transformationMatrix;
     BackingStore* m_backingStore;
     BackingStoreClient* m_backingStoreClient;
-    WebKitThreadViewportAccessor* m_webkitThreadViewportAccessor;
     InPageSearchManager* m_inPageSearchManager;
     InputHandler* m_inputHandler;
     SelectionHandler* m_selectionHandler;
@@ -524,7 +523,7 @@ public:
 #if ENABLE(FULLSCREEN_API)
 #if ENABLE(VIDEO)
     double m_scaleBeforeFullScreen;
-    WebCore::IntPoint m_scrollOffsetBeforeFullScreen;
+    int m_xScrollOffsetBeforeFullScreen;
 #endif
     bool m_isTogglingFullScreenState;
 #endif

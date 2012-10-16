@@ -54,8 +54,6 @@ FeatureObserver::~FeatureObserver()
 
 void FeatureObserver::observe(DOMWindow* domWindow, Feature feature)
 {
-    ASSERT(domWindow);
-
     Document* document = domWindow->document();
     if (!document)
         return;

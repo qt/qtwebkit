@@ -105,7 +105,7 @@ bool NetworkManager::startJob(int playerId, const String& pageGroupName, PassRef
         String password = credential.password();
 
         BlackBerry::Platform::NetworkRequest::AuthType authType = BlackBerry::Platform::NetworkRequest::AuthNone;
-        if (type == ProtectionSpaceServerHTTP || type == ProtectionSpaceServerHTTPS) {
+        if (type == ProtectionSpaceServerHTTP) {
             switch (protectionSpace.authenticationScheme()) {
             case ProtectionSpaceAuthenticationSchemeHTTPBasic:
                 authType = BlackBerry::Platform::NetworkRequest::AuthHTTPBasic;
@@ -124,9 +124,9 @@ bool NetworkManager::startJob(int playerId, const String& pageGroupName, PassRef
                 // Defaults to AuthNone as per above.
                 break;
             }
-        } else if (type == ProtectionSpaceServerFTP || type == ProtectionSpaceServerFTPS)
+        } else if (type == ProtectionSpaceServerFTP)
             authType = BlackBerry::Platform::NetworkRequest::AuthFTP;
-        else if (type == ProtectionSpaceProxyHTTP || type == ProtectionSpaceProxyHTTPS)
+        else if (type == ProtectionSpaceProxyHTTP)
             authType = BlackBerry::Platform::NetworkRequest::AuthProxy;
 
         if (authType != BlackBerry::Platform::NetworkRequest::AuthNone)

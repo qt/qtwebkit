@@ -25,6 +25,7 @@
 #include "GLContext.h"
 
 typedef struct __GLXcontextRec* GLXContext;
+typedef struct _XDisplay Display;
 typedef struct __GLXcontextRec *GLXContext;
 typedef unsigned long GLXPbuffer;
 typedef unsigned long GLXPixmap;
@@ -44,9 +45,10 @@ public:
     virtual ~GLContextGLX();
     virtual bool makeContextCurrent();
     virtual void swapBuffers();
-    virtual void waitNative();
     virtual bool canRenderToDefaultFramebuffer();
     virtual IntSize defaultFrameBufferSize();
+
+    static Display* sharedDisplay();
 
 #if USE(3D_GRAPHICS)
     virtual PlatformGraphicsContext3D platformContext();
@@ -55,6 +57,10 @@ public:
 private:
     static PassOwnPtr<GLContextGLX> createPbufferContext(GLXContext sharingContext);
     static PassOwnPtr<GLContextGLX> createPixmapContext(GLXContext sharingContext);
+    static void removeActiveContext(GLContext*);
+
+    static void addActiveContext(GLContextGLX*);
+    static void cleanupActiveContextsAtExit();
 
     GLContextGLX(GLXContext);
     GLContextGLX(GLXContext, Pixmap, GLXPixmap);

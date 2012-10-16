@@ -404,7 +404,7 @@ String WebSocket::binaryType() const
     return String();
 }
 
-void WebSocket::setBinaryType(const String& binaryType)
+void WebSocket::setBinaryType(const String& binaryType, ExceptionCode& ec)
 {
     if (binaryType == "blob") {
         m_binaryType = BinaryTypeBlob;
@@ -414,7 +414,8 @@ void WebSocket::setBinaryType(const String& binaryType)
         m_binaryType = BinaryTypeArrayBuffer;
         return;
     }
-    scriptExecutionContext()->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, "'" + binaryType + "' is not a valid value for binaryType; binaryType remains unchanged.");
+    ec = SYNTAX_ERR;
+    return;
 }
 
 const AtomicString& WebSocket::interfaceName() const

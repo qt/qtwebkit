@@ -53,7 +53,7 @@ WebInspector.ScriptsPanelDescriptor.prototype = {
         }
 
         this.panel().appendApplicableItems(contextMenu, target);
-    },
-
-    __proto__: WebInspector.PanelDescriptor.prototype
+    }
 }
+
+WebInspector.ScriptsPanelDescriptor.prototype.__proto__ = WebInspector.PanelDescriptor.prototype;

@@ -404,14 +404,6 @@
                 ],
                 "description": "Toggles mouse event-based touch event emulation.",
                 "hidden": true
-            },
-            {
-                "name": "setCompositingBordersVisible",
-                "description": "Controls the visibility of compositing borders.",
-                "parameters": [
-                    { "name": "visible", "type": "boolean", "description": "True for showing compositing borders." }
-                ],
-                "hidden": true
             }
         ],
         "events": [
@@ -506,15 +498,6 @@
                 ]
             },
             {
-                "id": "InternalPropertyDescriptor",
-                "type": "object",
-                "description": "Object internal property descriptor. This property isn't normally visible in JavaScript code.",
-                "properties": [
-                    { "name": "name", "type": "string", "description": "Conventional property name." },
-                    { "name": "value", "$ref": "RemoteObject", "optional": true, "description": "The value associated with the property." }
-                ]
-            },
-            {
                 "id": "CallArgument",
                 "type": "object",
                 "description": "Represents function call argument. Either remote object id <code>objectId</code> or primitive <code>value</code> or neither of (for undefined) them should be specified.",
@@ -582,8 +565,7 @@
                     { "name": "ownProperties", "optional": true, "type": "boolean", "description": "If true, returns properties belonging only to the element itself, not to its prototype chain." }
                 ],
                 "returns": [
-                    { "name": "result", "type": "array", "items": { "$ref": "PropertyDescriptor"}, "description": "Object properties." },
-                    { "name": "internalProperties", "optional": true, "type": "array", "items": { "$ref": "InternalPropertyDescriptor"}, "description": "Internal object properties." }
+                    { "name": "result", "type": "array", "items": { "$ref": "PropertyDescriptor"}, "description": "Object properties." }
                 ],
                 "description": "Returns properties of a given object. Object group of the result is inherited from the target object."
             },
@@ -607,15 +589,14 @@
                 "description": "Tells inspected instance(worker or page) that it can run in case it was started paused."
             },
             {
-                "name": "enable",
+                "name": "setReportExecutionContextCreation",
+                "parameters": [
+                    { "name": "enabled", "type": "boolean", "description": "Reporting enabled state." }
+                ],
                 "hidden": true,
-                "description": "Enables reporting of execution contexts creation by means of <code>executionContextCreated</code> event. When the reporting gets enabled the event will be sent immediately for each existing execution context."
-            },
-            {
-                "name": "disable",
-                "hidden": true,
-                "description": "Disables reporting of execution contexts creation."
+                "description": "Enables reporting about creation of execution contexts by means of <code>executionContextCreated</code> event. When the reporting gets enabled the event will be sent immediately for each existing execution context."
             }
+
         ],
         "events": [
             {
@@ -1168,8 +1149,7 @@
                 "description": "Database with an array of object stores.",
                 "properties": [
                     { "name": "name", "type": "string", "description": "Database name." },
-                    { "name": "version", "type": "string", "description": "Deprecated string database version." },
-                    { "name": "intVersion", "type": "integer", "description": "Integer database version." },
+                    { "name": "version", "type": "string", "description": "Database version." },
                     { "name": "objectStores", "type": "array", "items": { "$ref": "ObjectStore" }, "description": "Object stores in this database." }
                 ]
             },
@@ -2780,8 +2760,7 @@
                     { "name": "endLine", "type": "integer", "description": "Last line of the script." },
                     { "name": "endColumn", "type": "integer", "description": "Length of the last line of the script." },
                     { "name": "isContentScript", "type": "boolean", "optional": true, "description": "Determines whether this script is a user extension script." },
-                    { "name": "sourceMapURL", "type": "string", "optional": true, "description": "URL of source map associated with script (if any)." },
-                    { "name": "hasSourceURL", "type": "boolean", "optional": true, "description": "True, if this script has sourceURL." }
+                    { "name": "sourceMapURL", "type": "string", "optional": true, "description": "URL of source map associated with script (if any)." }
                 ],
                 "description": "Fired when virtual machine parses script. This event is also fired for all known and uncollected scripts upon enabling debugger."
             },
@@ -3121,10 +3100,8 @@
                 "id": "Call",
                 "type": "object",
                 "properties": [
-                    { "name": "functionName", "type": "string", "optional": true },
-                    { "name": "arguments", "type": "array", "items": { "type": "string" }, "optional": true },
-                    { "name": "property", "type": "string", "optional": true },
-                    { "name": "value", "type": "string", "optional": true },
+                    { "name": "functionName", "type": "string" },
+                    { "name": "arguments", "type": "array", "items": { "type": "string" } },
                     { "name": "result", "type": "string", "optional": true },
                     { "name": "sourceURL", "type": "string", "optional": true },
                     { "name": "lineNumber", "type": "integer", "optional": true },

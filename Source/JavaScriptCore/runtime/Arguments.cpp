@@ -33,7 +33,9 @@ using namespace std;
 
 namespace JSC {
 
-const ClassInfo Arguments::s_info = { "Arguments", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(Arguments) };
+ASSERT_CLASS_FITS_IN_CELL(Arguments);
+
+const ClassInfo Arguments::s_info = { "Arguments", &JSNonFinalObject::s_info, 0, 0, CREATE_METHOD_TABLE(Arguments) };
 
 void Arguments::visitChildren(JSCell* cell, SlotVisitor& visitor)
 {
@@ -404,19 +406,19 @@ void Arguments::tearOffForInlineCallFrame(JSGlobalData& globalData, Register* re
         JSValue value;
         Register* location = &registers[CallFrame::argumentOffset(i)];
         switch (recovery.technique()) {
-        case AlreadyInJSStack:
+        case AlreadyInRegisterFile:
             value = location->jsValue();
             break;
-        case AlreadyInJSStackAsUnboxedInt32:
+        case AlreadyInRegisterFileAsUnboxedInt32:
             value = jsNumber(location->unboxedInt32());
             break;
-        case AlreadyInJSStackAsUnboxedCell:
+        case AlreadyInRegisterFileAsUnboxedCell:
             value = location->unboxedCell();
             break;
-        case AlreadyInJSStackAsUnboxedBoolean:
+        case AlreadyInRegisterFileAsUnboxedBoolean:
             value = jsBoolean(location->unboxedBoolean());
             break;
-        case AlreadyInJSStackAsUnboxedDouble:
+        case AlreadyInRegisterFileAsUnboxedDouble:
 #if USE(JSVALUE64)
             value = jsNumber(*bitwise_cast<double*>(location));
 #else

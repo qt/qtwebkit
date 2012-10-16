@@ -22,12 +22,15 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-[
-    Conditional=MEDIA_STREAM,
-    IndexedGetter
-] interface MediaStreamList {
-    MediaStream item(in [IsIndex] unsigned long index);
+module core {
 
-    readonly attribute unsigned long length;
-};
+    interface [
+        Conditional=MEDIA_STREAM,
+        IndexedGetter
+    ] MediaStreamList {
+        MediaStream item(in [IsIndex] unsigned long index);
 
+        readonly attribute unsigned long length;
+    };
+
+}

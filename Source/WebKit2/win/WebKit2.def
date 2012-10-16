@@ -142,8 +142,7 @@ EXPORTS
         ?waitForThreadCompletion@WTF@@YAHI@Z
         ?waitForThreadCompletion@WTF@@YAHIPAPAX@Z
         ?createThread@WTF@@YAIP6APAXPAX@Z0@Z
-
-; Re-exports from WebCore for test harnesses
+        ; Re-exports from WebCore for test harnesses
         ??0NodeRenderingContext@WebCore@@QAE@PAVNode@1@@Z
         ??1NodeRenderingContext@WebCore@@QAE@XZ
         ??1Range@WebCore@@QAE@XZ
@@ -157,7 +156,7 @@ EXPORTS
         ??0String@WTF@@QAE@PB_W@Z
         ?absoluteBoundingBoxRect@RenderObject@WebCore@@QBE?AVIntRect@2@_N@Z
         ?absoluteBoundingBoxRectIgnoringTransforms@RenderObject@WebCore@@QBE?AVIntRect@2@XZ
-        ?description@DocumentMarker@WebCore@@QBEABVString@WTF@@XZ
+	?description@DocumentMarker@WebCore@@QBEABVString@WTF@@XZ
         ?add@AtomicString@WTF@@CA?AV?$PassRefPtr@VStringImpl@WTF@@@2@PBD@Z
         ?add@AtomicString@WTF@@CA?AV?$PassRefPtr@VStringImpl@WTF@@@2@PBE@Z
         ?addSlowCase@AtomicString@WTF@@CA?AV?$PassRefPtr@VStringImpl@WTF@@@2@PAVStringImpl@2@@Z
@@ -167,7 +166,6 @@ EXPORTS
         ?create@Range@WebCore@@SA?AV?$PassRefPtr@VRange@WebCore@@@WTF@@V?$PassRefPtr@VDocument@WebCore@@@4@V?$PassRefPtr@VNode@WebCore@@@4@H1H@Z
         ?create@ShadowRoot@WebCore@@SA?AV?$PassRefPtr@VShadowRoot@WebCore@@@WTF@@PAVElement@2@AAH@Z
         ?createWrapper@WebCore@@YA?AVJSValue@JSC@@PAVExecState@3@PAVJSDOMGlobalObject@1@PAVNode@1@@Z
-        ?distributedNodes@InsertionPoint@WebCore@@QBE?AV?$PassRefPtr@VNodeList@WebCore@@@WTF@@XZ
         ?documentState@HistoryItem@WebCore@@QBEABV?$Vector@VString@WTF@@$0A@@WTF@@XZ
         ?equal@WTF@@YA_NPBVStringImpl@1@PBE@Z
         ?equal@WTF@@YA_NPBVStringImpl@1@0@Z
@@ -311,6 +309,4 @@ EXPORTS
         ?setInspectorFrontendClient@InspectorController@WebCore@@QAEXV?$PassOwnPtr@VInspectorFrontendClient@WebCore@@@WTF@@@Z
         ?setProperty@Settings@InspectorFrontendClientLocal@WebCore@@UAEXABVString@WTF@@0@Z
         ?toJS@WebCore@@YA?AVJSValue@JSC@@PAVExecState@3@PAVJSDOMGlobalObject@1@PAVDOMWindow@1@@Z
-        ?windowObjectCleared@InspectorFrontendClientLocal@WebCore@@UAEXXZ
-        ?layerTreeAsText@Frame@WebCore@@QBE?AVString@WTF@@I@Z
-
+        ?windowObjectCleared@InspectorFrontendClientLocal@WebCore@@UAEXXZ        

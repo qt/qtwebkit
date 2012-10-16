@@ -33,7 +33,6 @@
 #include "Image.h"
 #include "NotImplemented.h"
 #include "PlatformStrategiesQt.h"
-#include "QStyleFacadeImp.h"
 #include "RenderThemeQStyle.h"
 #include "ScriptController.h"
 #include "ScrollbarThemeQStyle.h"
@@ -53,10 +52,8 @@ namespace WebKit {
 // Called also from WebKit2's WebProcess.
 Q_DECL_EXPORT void initializeWebKit2Theme()
 {
-    if (qgetenv("QT_WEBKIT_THEME_NAME") == "qstyle") {
-        WebCore::RenderThemeQStyle::setStyleFactoryFunction(WebKit::QStyleFacadeImp::create);
+    if (qgetenv("QT_WEBKIT_THEME_NAME") == "qstyle")
         WebCore::RenderThemeQt::setCustomTheme(WebCore::RenderThemeQStyle::create, new WebCore::ScrollbarThemeQStyle);
-    }
 }
 
 }
@@ -79,7 +76,6 @@ void initializeWebCoreQt()
     PlatformStrategiesQt::initialize();
     QtWebElementRuntime::initialize();
 
-    RenderThemeQStyle::setStyleFactoryFunction(WebKit::QStyleFacadeImp::create);
     RenderThemeQt::setCustomTheme(RenderThemeQStyle::create, new ScrollbarThemeQStyle);
 
 #if USE(QTKIT)
@@ -87,9 +83,9 @@ void initializeWebCoreQt()
 #endif
 
     // QWebSettings::SearchCancelButtonGraphic
-    Image::setPlatformResource("searchCancelButton", QApplication::style()->standardPixmap(QStyle::SP_DialogCloseButton));
+    Image::setPlatformResource("searchCancelButton", QApplication::style()->standardPixmap(QStyle::SP_DialogCloseButton).toImage());
     // QWebSettings::SearchCancelButtonPressedGraphic
-    Image::setPlatformResource("searchCancelButtonPressed", QApplication::style()->standardPixmap(QStyle::SP_DialogCloseButton));
+    Image::setPlatformResource("searchCancelButtonPressed", QApplication::style()->standardPixmap(QStyle::SP_DialogCloseButton).toImage());
 
     initialized = true;
 }
