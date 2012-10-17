@@ -75,10 +75,14 @@ JIT::JIT(JSGlobalData* globalData, CodeBlock* codeBlock)
     , m_codeBlock(codeBlock)
     , m_labels(codeBlock ? codeBlock->numberOfInstructions() : 0)
     , m_bytecodeOffset((unsigned)-1)
+    , m_propertyAccessInstructionIndex(UINT_MAX)
+    , m_byValInstructionIndex(UINT_MAX)
+    , m_globalResolveInfoIndex(UINT_MAX)
+    , m_callLinkInfoIndex(UINT_MAX)
 #if USE(JSVALUE32_64)
     , m_jumpTargetIndex(0)
     , m_mappedBytecodeOffset((unsigned)-1)
-    , m_mappedVirtualRegisterIndex(RegisterFile::ReturnPC)
+    , m_mappedVirtualRegisterIndex(JSStack::ReturnPC)
     , m_mappedTag((RegisterID)-1)
     , m_mappedPayload((RegisterID)-1)
 #else
@@ -89,6 +93,10 @@ JIT::JIT(JSGlobalData* globalData, CodeBlock* codeBlock)
     , m_randomGenerator(cryptographicallyRandomNumber())
 #else
     , m_randomGenerator(static_cast<unsigned>(randomNumber() * 0xFFFFFFF))
+#endif
+#if ENABLE(VALUE_PROFILER)
+    , m_canBeOptimized(false)
+    , m_shouldEmitProfiling(false)
 #endif
 {
 }
@@ -400,6 +408,7 @@ void JIT::privateCompileSlowCases()
     Instruction* instructionsBegin = m_codeBlock->instructions().begin();
 
     m_propertyAccessInstructionIndex = 0;
+    m_byValInstructionIndex = 0;
     m_globalResolveInfoIndex = 0;
     m_callLinkInfoIndex = 0;
     
@@ -606,8 +615,8 @@ JITCode JIT::privateCompile(CodePtr* functionEntryArityCheck, JITCompilationEffo
         nop();
 
     preserveReturnAddressAfterCall(regT2);
-    emitPutToCallFrameHeader(regT2, RegisterFile::ReturnPC);
-    emitPutImmediateToCallFrameHeader(m_codeBlock, RegisterFile::CodeBlock);
+    emitPutToCallFrameHeader(regT2, JSStack::ReturnPC);
+    emitPutImmediateToCallFrameHeader(m_codeBlock, JSStack::CodeBlock);
 
     Label beginLabel(this);
 
@@ -616,7 +625,7 @@ JITCode JIT::privateCompile(CodePtr* functionEntryArityCheck, JITCompilationEffo
     sampleInstruction(m_codeBlock->instructions().begin());
 #endif
 
-    Jump registerFileCheck;
+    Jump stackCheck;
     if (m_codeBlock->codeType() == FunctionCode) {
 #if ENABLE(DFG_JIT)
 #if DFG_ENABLE(SUCCESS_STATS)
@@ -646,7 +655,7 @@ JITCode JIT::privateCompile(CodePtr* functionEntryArityCheck, JITCompilationEffo
 #endif
 
         addPtr(TrustedImm32(m_codeBlock->m_numCalleeRegisters * sizeof(Register)), callFrameRegister, regT1);
-        registerFileCheck = branchPtr(Below, AbsoluteAddress(m_globalData->interpreter->registerFile().addressOfEnd()), regT1);
+        stackCheck = branchPtr(Below, AbsoluteAddress(m_globalData->interpreter->stack().addressOfEnd()), regT1);
     }
 
     Label functionBody = label();
@@ -662,9 +671,9 @@ JITCode JIT::privateCompile(CodePtr* functionEntryArityCheck, JITCompilationEffo
 
     Label arityCheck;
     if (m_codeBlock->codeType() == FunctionCode) {
-        registerFileCheck.link(this);
+        stackCheck.link(this);
         m_bytecodeOffset = 0;
-        JITStubCall(this, cti_register_file_check).call();
+        JITStubCall(this, cti_stack_check).call();
 #ifndef NDEBUG
         m_bytecodeOffset = (unsigned)-1; // Reset this, in order to guard its use with ASSERTs.
 #endif
@@ -672,10 +681,10 @@ JITCode JIT::privateCompile(CodePtr* functionEntryArityCheck, JITCompilationEffo
 
         arityCheck = label();
         preserveReturnAddressAfterCall(regT2);
-        emitPutToCallFrameHeader(regT2, RegisterFile::ReturnPC);
-        emitPutImmediateToCallFrameHeader(m_codeBlock, RegisterFile::CodeBlock);
+        emitPutToCallFrameHeader(regT2, JSStack::ReturnPC);
+        emitPutImmediateToCallFrameHeader(m_codeBlock, JSStack::CodeBlock);
 
-        load32(payloadFor(RegisterFile::ArgumentCount), regT1);
+        load32(payloadFor(JSStack::ArgumentCount), regT1);
         branch32(AboveOrEqual, regT1, TrustedImm32(m_codeBlock->m_numParameters)).linkTo(beginLabel, this);
 
         m_bytecodeOffset = 0;
@@ -715,8 +724,8 @@ JITCode JIT::privateCompile(CodePtr* functionEntryArityCheck, JITCompilationEffo
 
             StringJumpTable::StringOffsetTable::iterator end = record.jumpTable.stringJumpTable->offsetTable.end();            
             for (StringJumpTable::StringOffsetTable::iterator it = record.jumpTable.stringJumpTable->offsetTable.begin(); it != end; ++it) {
-                unsigned offset = it->second.branchOffset;
-                it->second.ctiOffset = offset ? patchBuffer.locationOf(m_labels[bytecodeOffset + offset]) : record.jumpTable.stringJumpTable->ctiDefault;
+                unsigned offset = it->value.branchOffset;
+                it->value.ctiOffset = offset ? patchBuffer.locationOf(m_labels[bytecodeOffset + offset]) : record.jumpTable.stringJumpTable->ctiDefault;
             }
         }
     }
@@ -738,6 +747,20 @@ JITCode JIT::privateCompile(CodePtr* functionEntryArityCheck, JITCompilationEffo
     m_codeBlock->setNumberOfStructureStubInfos(m_propertyAccessCompilationInfo.size());
     for (unsigned i = 0; i < m_propertyAccessCompilationInfo.size(); ++i)
         m_propertyAccessCompilationInfo[i].copyToStubInfo(m_codeBlock->structureStubInfo(i), patchBuffer);
+    m_codeBlock->setNumberOfByValInfos(m_byValCompilationInfo.size());
+    for (unsigned i = 0; i < m_byValCompilationInfo.size(); ++i) {
+        CodeLocationJump badTypeJump = CodeLocationJump(patchBuffer.locationOf(m_byValCompilationInfo[i].badTypeJump));
+        CodeLocationLabel doneTarget = patchBuffer.locationOf(m_byValCompilationInfo[i].doneTarget);
+        CodeLocationLabel slowPathTarget = patchBuffer.locationOf(m_byValCompilationInfo[i].slowPathTarget);
+        CodeLocationCall returnAddress = patchBuffer.locationOf(m_byValCompilationInfo[i].returnAddress);
+        
+        m_codeBlock->byValInfo(i) = ByValInfo(
+            m_byValCompilationInfo[i].bytecodeIndex,
+            badTypeJump,
+            m_byValCompilationInfo[i].arrayMode,
+            differenceBetweenCodePtr(badTypeJump, doneTarget),
+            differenceBetweenCodePtr(returnAddress, slowPathTarget));
+    }
     m_codeBlock->setNumberOfCallLinkInfos(m_callStructureStubCompilationInfo.size());
     for (unsigned i = 0; i < m_codeBlock->numberOfCallLinkInfos(); ++i) {
         CallLinkInfo& info = m_codeBlock->callLinkInfo(i);

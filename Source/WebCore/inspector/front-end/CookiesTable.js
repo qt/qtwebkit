@@ -202,7 +202,7 @@ WebInspector.CookiesTable.prototype = {
         data[2] = cookie.domain || "";
         data[3] = cookie.path || "";
         data[4] = cookie.type === WebInspector.Cookie.Type.Request ? "" :
-            (cookie.session ? WebInspector.UIString("Session") : cookie.expires().toUTCString());
+            (cookie.session ? WebInspector.UIString("Session") : new Date(cookie.expires).toGMTString());
         data[5] = cookie.size;
         const checkmark = "\u2713";
         data[6] = (cookie.httpOnly ? checkmark : "");
@@ -217,7 +217,7 @@ WebInspector.CookiesTable.prototype = {
     _onDeleteFromGrid: function(deleteCallback, node)
     {
         deleteCallback(node.cookie);
-    }
-}
+    },
 
-WebInspector.CookiesTable.prototype.__proto__ = WebInspector.View.prototype;
+    __proto__: WebInspector.View.prototype
+}

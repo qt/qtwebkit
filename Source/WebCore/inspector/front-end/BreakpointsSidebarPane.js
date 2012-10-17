@@ -45,6 +45,11 @@ WebInspector.JavaScriptBreakpointsSidebarPane = function(breakpointManager, show
     this.bodyElement.appendChild(this.emptyElement);
 
     this._items = new Map();
+    
+    var breakpointLocations = this._breakpointManager.allBreakpointLocations();
+    for (var i = 0; i < breakpointLocations.length; ++i)
+        this._addBreakpoint(breakpointLocations[i].breakpoint, breakpointLocations[i].uiLocation);
+
     this._breakpointManager.addEventListener(WebInspector.BreakpointManager.Events.BreakpointAdded, this._breakpointAdded, this);
     this._breakpointManager.addEventListener(WebInspector.BreakpointManager.Events.BreakpointRemoved, this._breakpointRemoved, this);
 }
@@ -59,7 +64,15 @@ WebInspector.JavaScriptBreakpointsSidebarPane.prototype = {
 
         var breakpoint = /** @type {WebInspector.BreakpointManager.Breakpoint} */ event.data.breakpoint;
         var uiLocation = /** @type {WebInspector.UILocation} */ event.data.uiLocation;
+        this._addBreakpoint(breakpoint, uiLocation);
+    },
 
+    /**
+     * @param {WebInspector.BreakpointManager.Breakpoint} breakpoint
+     * @param {WebInspector.UILocation} uiLocation
+     */
+    _addBreakpoint: function(breakpoint, uiLocation)
+    {
         var element = document.createElement("li");
         element.addStyleClass("cursor-pointer");
         element.addEventListener("contextmenu", this._breakpointContextMenu.bind(this, breakpoint), true);
@@ -239,10 +252,10 @@ WebInspector.JavaScriptBreakpointsSidebarPane.prototype = {
             this.bodyElement.appendChild(this.emptyElement);
         }
         this._items.clear();
-    }
-}
+    },
 
-WebInspector.JavaScriptBreakpointsSidebarPane.prototype.__proto__ = WebInspector.SidebarPane.prototype;
+    __proto__: WebInspector.SidebarPane.prototype
+}
 
 /**
  * @constructor
@@ -419,10 +432,10 @@ WebInspector.XHRBreakpointsSidebarPane.prototype = {
             if (breakpoint && typeof breakpoint.url === "string")
                 this._setBreakpoint(breakpoint.url, breakpoint.enabled);
         }
-    }
-}
+    },
 
-WebInspector.XHRBreakpointsSidebarPane.prototype.__proto__ = WebInspector.NativeBreakpointsSidebarPane.prototype;
+    __proto__: WebInspector.NativeBreakpointsSidebarPane.prototype
+}
 
 /**
  * @constructor
@@ -620,7 +633,7 @@ WebInspector.EventListenerBreakpointsSidebarPane.prototype = {
             if (breakpoint && typeof breakpoint.eventName === "string")
                 this._setBreakpoint(breakpoint.eventName);
         }
-    }
-}
+    },
 
-WebInspector.EventListenerBreakpointsSidebarPane.prototype.__proto__ = WebInspector.SidebarPane.prototype;
+    __proto__: WebInspector.SidebarPane.prototype
+}

@@ -28,59 +28,18 @@
 
 #include "DownloadProxy.h"
 #include "WKAPICast.h"
-#include "WKEinaSharedString.h"
 #include "WKRetainPtr.h"
 #include "WebURLRequest.h"
 #include "ewk_download_job_private.h"
-#include "ewk_url_request_private.h"
 #include <Ecore.h>
 
 using namespace WebKit;
-
-/**
- * \struct  _Ewk_Download_Job
- * @brief   Contains the download data.
- */
-struct _Ewk_Download_Job {
-    unsigned int __ref; /**< the reference count of the object */
-    DownloadProxy* downloadProxy;
-    Evas_Object* view;
-    Ewk_Download_Job_State state;
-    Ewk_Url_Request* request;
-    Ewk_Url_Response* response;
-    double startTime;
-    double endTime;
-    uint64_t downloaded; /**< length already downloaded */
-    WKEinaSharedString destination;
-    WKEinaSharedString suggestedFilename;
-
-    _Ewk_Download_Job(DownloadProxy* download, Evas_Object* ewkView)
-        : __ref(1)
-        , downloadProxy(download)
-        , view(ewkView)
-        , state(EWK_DOWNLOAD_JOB_STATE_NOT_STARTED)
-        , request(0)
-        , response(0)
-        , startTime(-1)
-        , endTime(-1)
-        , downloaded(0)
-    { }
-
-    ~_Ewk_Download_Job()
-    {
-        ASSERT(!__ref);
-        if (request)
-            ewk_url_request_unref(request);
-        if (response)
-            ewk_url_response_unref(response);
-    }
-};
 
 Ewk_Download_Job* ewk_download_job_ref(Ewk_Download_Job* download)
 {
     EINA_SAFETY_ON_NULL_RETURN_VAL(download, 0);
 
-    ++download->__ref;
+    download->ref();
 
     return download;
 }
@@ -89,10 +48,7 @@ void ewk_download_job_unref(Ewk_Download_Job* download)
 {
     EINA_SAFETY_ON_NULL_RETURN(download);
 
-    if (--download->__ref)
-        return;
-
-    delete download;
+    download->deref();
 }
 
 /**
@@ -133,17 +89,17 @@ Ewk_Url_Request* ewk_download_job_request_get(const Ewk_Download_Job* download)
     if (!download->request) {
         EINA_SAFETY_ON_NULL_RETURN_VAL(download->downloadProxy, 0);
         WKRetainPtr<WKURLRequestRef> wkURLRequest(AdoptWK, toAPI(WebURLRequest::create(download->downloadProxy->request()).leakRef()));
-        const_cast<Ewk_Download_Job*>(download)->request = ewk_url_request_new(wkURLRequest.get());
+        const_cast<Ewk_Download_Job*>(download)->request = Ewk_Url_Request::create(wkURLRequest.get());
     }
 
-    return download->request;
+    return download->request.get();
 }
 
 Ewk_Url_Response* ewk_download_job_response_get(const Ewk_Download_Job* download)
 {
     EINA_SAFETY_ON_NULL_RETURN_VAL(download, 0);
 
-    return download->response;
+    return download->response.get();
 }
 
 const char* ewk_download_job_destination_get(const Ewk_Download_Job* download)
@@ -190,7 +146,7 @@ double ewk_download_job_estimated_progress_get(const Ewk_Download_Job* download)
     if (!download->response)
         return 0;
 
-    const unsigned long contentLength = ewk_url_response_content_length_get(download->response);
+    const unsigned long contentLength = ewk_url_response_content_length_get(download->response.get());
     if (!contentLength)
         return 0;
 
@@ -265,16 +221,4 @@ void ewk_download_job_state_set(Ewk_Download_Job* download, Ewk_Download_Job_Sta
         || state == EWK_DOWNLOAD_JOB_STATE_CANCELLED
         || state == EWK_DOWNLOAD_JOB_STATE_FINISHED)
         download->endTime = ecore_time_get();
-}
-
-/**
- * @internal
- * Constructs a Ewk_Download_Job from a DownloadProxy.
- */
-Ewk_Download_Job* ewk_download_job_new(DownloadProxy* download, Evas_Object* ewkView)
-{
-    EINA_SAFETY_ON_NULL_RETURN_VAL(download, 0);
-    EINA_SAFETY_ON_NULL_RETURN_VAL(ewkView, 0);
-
-    return new _Ewk_Download_Job(download, ewkView);
 }

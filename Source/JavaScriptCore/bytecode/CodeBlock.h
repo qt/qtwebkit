@@ -31,6 +31,7 @@
 #define CodeBlock_h
 
 #include "ArrayProfile.h"
+#include "ByValInfo.h"
 #include "BytecodeConventions.h"
 #include "CallLinkInfo.h"
 #include "CallReturnOffsetToBytecodeOffset.h"
@@ -159,7 +160,7 @@ namespace JSC {
             return result;
         }
 #endif
-        
+
         void visitAggregate(SlotVisitor&);
 
         static void dumpStatistics();
@@ -209,6 +210,11 @@ namespace JSC {
         }
         
         void resetStub(StructureStubInfo&);
+        
+        ByValInfo& getByValInfo(unsigned bytecodeIndex)
+        {
+            return *(binarySearch<ByValInfo, unsigned, getByValInfoBytecodeIndex>(m_byValInfos.begin(), m_byValInfos.size(), bytecodeIndex));
+        }
 
         CallLinkInfo& getCallLinkInfo(ReturnAddressPtr returnAddress)
         {
@@ -610,6 +616,10 @@ namespace JSC {
         void setNumberOfStructureStubInfos(size_t size) { m_structureStubInfos.grow(size); }
         size_t numberOfStructureStubInfos() const { return m_structureStubInfos.size(); }
         StructureStubInfo& structureStubInfo(int index) { return m_structureStubInfos[index]; }
+        
+        void setNumberOfByValInfos(size_t size) { m_byValInfos.grow(size); }
+        size_t numberOfByValInfos() const { return m_byValInfos.size(); }
+        ByValInfo& byValInfo(size_t index) { return m_byValInfos[index]; }
 
         void addGlobalResolveInfo(unsigned globalResolveInstruction)
         {
@@ -915,18 +925,32 @@ namespace JSC {
         }
         RegExp* regexp(int index) const { ASSERT(m_rareData); return m_rareData->m_regexps[index].get(); }
 
-        unsigned addConstantBuffer(unsigned length)
+        unsigned numberOfConstantBuffers() const
+        {
+            if (!m_rareData)
+                return 0;
+            return m_rareData->m_constantBuffers.size();
+        }
+        unsigned addConstantBuffer(const Vector<JSValue>& buffer)
         {
             createRareDataIfNecessary();
             unsigned size = m_rareData->m_constantBuffers.size();
-            m_rareData->m_constantBuffers.append(Vector<JSValue>(length));
+            m_rareData->m_constantBuffers.append(buffer);
             return size;
         }
+        unsigned addConstantBuffer(unsigned length)
+        {
+            return addConstantBuffer(Vector<JSValue>(length));
+        }
 
-        JSValue* constantBuffer(unsigned index)
+        Vector<JSValue>& constantBufferAsVector(unsigned index)
         {
             ASSERT(m_rareData);
-            return m_rareData->m_constantBuffers[index].data();
+            return m_rareData->m_constantBuffers[index];
+        }
+        JSValue* constantBuffer(unsigned index)
+        {
+            return constantBufferAsVector(index).data();
         }
 
         JSGlobalObject* globalObject() { return m_globalObject.get(); }
@@ -1289,6 +1313,7 @@ namespace JSC {
 #endif
 #if ENABLE(JIT)
         Vector<StructureStubInfo> m_structureStubInfos;
+        Vector<ByValInfo> m_byValInfos;
         Vector<GlobalResolveInfo> m_globalResolveInfos;
         Vector<CallLinkInfo> m_callLinkInfos;
         Vector<MethodCallLinkInfo> m_methodCallLinkInfos;

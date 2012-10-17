@@ -79,6 +79,7 @@ class SelectionHandler;
 class TouchEventHandler;
 class WebCookieJar;
 class WebPageClient;
+class WebKitThreadViewportAccessor;
 
 #if USE(ACCELERATED_COMPOSITING)
 class FrameLayers;
@@ -105,21 +106,21 @@ public:
 
     WebPageClient* client() const { return m_client; }
 
-    void init(const WebString& pageGroupName);
+    void init(const BlackBerry::Platform::String& pageGroupName);
     bool handleMouseEvent(WebCore::PlatformMouseEvent&);
     bool handleWheelEvent(WebCore::PlatformWheelEvent&);
 
-    void load(const char* url, const char* networkToken, const char* method, Platform::NetworkRequest::CachePolicy, const char* data, size_t dataLength, const char* const* headers, size_t headersLength, bool isInitial, bool mustHandleInternally = false, bool forceDownload = false, const char* overrideContentType = "", const char* suggestedSaveName = "");
-    void loadString(const char* string, const char* baseURL, const char* mimeType, const char* failingURL = 0);
-    bool executeJavaScript(const char* script, JavaScriptDataType& returnType, WebString& returnValue);
-    bool executeJavaScriptInIsolatedWorld(const WebCore::ScriptSourceCode&, JavaScriptDataType& returnType, WebString& returnValue);
+    void load(const BlackBerry::Platform::String& url, const BlackBerry::Platform::String& networkToken, const BlackBerry::Platform::String& method, Platform::NetworkRequest::CachePolicy, const char* data, size_t dataLength, const char* const* headers, size_t headersLength, bool isInitial, bool mustHandleInternally = false, bool forceDownload = false, const BlackBerry::Platform::String& overrideContentType = BlackBerry::Platform::String::emptyString(), const BlackBerry::Platform::String& suggestedSaveName = BlackBerry::Platform::String::emptyString());
+    void loadString(const BlackBerry::Platform::String&, const BlackBerry::Platform::String& baseURL, const BlackBerry::Platform::String& mimeType, const BlackBerry::Platform::String& failingURL);
+    bool executeJavaScript(const BlackBerry::Platform::String& script, JavaScriptDataType& returnType, BlackBerry::Platform::String& returnValue);
+    bool executeJavaScriptInIsolatedWorld(const WebCore::ScriptSourceCode&, JavaScriptDataType& returnType, BlackBerry::Platform::String& returnValue);
 
     void stopCurrentLoad();
     void prepareToDestroy();
 
     void enableCrossSiteXHR();
-    void addOriginAccessWhitelistEntry(const char* sourceOrigin, const char* destinationOrigin, bool allowDestinationSubdomains);
-    void removeOriginAccessWhitelistEntry(const char* sourceOrigin, const char* destinationOrigin, bool allowDestinationSubdomains);
+    void addOriginAccessWhitelistEntry(const BlackBerry::Platform::String& sourceOrigin, const BlackBerry::Platform::String& destinationOrigin, bool allowDestinationSubdomains);
+    void removeOriginAccessWhitelistEntry(const BlackBerry::Platform::String& sourceOrigin, const BlackBerry::Platform::String& destinationOrigin, bool allowDestinationSubdomains);
 
     LoadState loadState() const { return m_loadState; }
     bool isLoading() const { return m_loadState == WebPagePrivate::Provisional || m_loadState == WebPagePrivate::Committed; }
@@ -152,7 +153,6 @@ public:
     void setScrollPosition(const WebCore::IntPoint&);
     void scrollBy(int deltaX, int deltaY);
 
-    void enqueueRenderingOfClippedContentOfScrollableAreaAfterInRegionScrolling();
     void notifyInRegionScrollStopped();
     void setScrollOriginPoint(const Platform::IntPoint&);
     void setHasInRegionScrollableAreas(bool);
@@ -202,7 +202,7 @@ public:
     virtual int showAlertDialog(WebPageClient::AlertType atype);
     virtual bool isActive() const;
     virtual bool isVisible() const { return m_visible; }
-    virtual void authenticationChallenge(const WebCore::KURL&, const WebCore::ProtectionSpace&, const WebCore::Credential&, WebCore::AuthenticationChallengeClient*);
+    virtual void authenticationChallenge(const WebCore::KURL&, const WebCore::ProtectionSpace&, const WebCore::Credential&);
     virtual SaveCredentialType notifyShouldSaveCredential(bool);
     virtual void syncProxyCredential(const WebCore::Credential&);
 
@@ -398,7 +398,7 @@ public:
 
     // Fallback GraphicsLayerClient implementation, used for various overlay layers.
     virtual void notifyAnimationStarted(const WebCore::GraphicsLayer*, double time) { }
-    virtual void notifySyncRequired(const WebCore::GraphicsLayer*);
+    virtual void notifyFlushRequired(const WebCore::GraphicsLayer*);
     virtual void paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext&, WebCore::GraphicsLayerPaintingPhase, const WebCore::IntRect& inClip) { }
     virtual bool showDebugBorders(const WebCore::GraphicsLayer*) const;
     virtual bool showRepaintCounter(const WebCore::GraphicsLayer*) const;
@@ -432,9 +432,7 @@ public:
     bool dispatchTouchPointAsMouseEventToFullScreenPlugin(WebCore::PluginView*, const Platform::TouchPoint&);
     bool dispatchMouseEventToFullScreenPlugin(WebCore::PluginView*, const Platform::MouseEvent&);
 
-    BackingStoreClient* backingStoreClientForFrame(const WebCore::Frame*) const;
-    void addBackingStoreClientForFrame(const WebCore::Frame*, BackingStoreClient*);
-    void removeBackingStoreClientForFrame(const WebCore::Frame*);
+    BackingStoreClient* backingStoreClient() const;
 
     void setParentPopup(WebCore::PagePopupBlackBerry* webPopup);
 
@@ -446,7 +444,7 @@ public:
     static WebCore::RenderLayer* enclosingPositionedAncestorOrSelfIfPositioned(WebCore::RenderLayer*);
     static WebCore::RenderLayer* enclosingFixedPositionedAncestorOrSelfIfFixedPositioned(WebCore::RenderLayer*);
 
-    static const String& defaultUserAgent();
+    static const BlackBerry::Platform::String& defaultUserAgent();
 
     void setVisible(bool);
 #if ENABLE(PAGE_VISIBILITY_API)
@@ -510,6 +508,7 @@ public:
     WebCore::TransformationMatrix* m_transformationMatrix;
     BackingStore* m_backingStore;
     BackingStoreClient* m_backingStoreClient;
+    WebKitThreadViewportAccessor* m_webkitThreadViewportAccessor;
     InPageSearchManager* m_inPageSearchManager;
     InputHandler* m_inputHandler;
     SelectionHandler* m_selectionHandler;
@@ -523,7 +522,7 @@ public:
 #if ENABLE(FULLSCREEN_API)
 #if ENABLE(VIDEO)
     double m_scaleBeforeFullScreen;
-    int m_xScrollOffsetBeforeFullScreen;
+    WebCore::IntPoint m_scrollOffsetBeforeFullScreen;
 #endif
     bool m_isTogglingFullScreenState;
 #endif
@@ -602,14 +601,13 @@ public:
     bool m_wouldLoadManualScript;
     bool m_wouldSetFocused;
     bool m_wouldSetPageVisibilityState;
+    bool m_cachedFocused;
+    bool m_enableQnxJavaScriptObject;
     Vector<bool> m_cachedPopupListSelecteds;
     int m_cachedPopupListSelectedIndex;
-    WebString m_cachedDateTimeInput;
-    WebString m_cachedColorInput;
+    BlackBerry::Platform::String m_cachedDateTimeInput;
+    BlackBerry::Platform::String m_cachedColorInput;
     WebCore::KURL m_cachedManualScript;
-    bool m_cachedFocused;
-
-    bool m_enableQnxJavaScriptObject;
 
     class DeferredTaskBase {
     public:

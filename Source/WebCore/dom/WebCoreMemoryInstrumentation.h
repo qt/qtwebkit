@@ -32,6 +32,7 @@
 #define WebCoreMemoryInstrumentation_h
 
 #include "PlatformMemoryInstrumentation.h"
+#include <wtf/MemoryInstrumentationString.h>
 
 namespace WebCore {
 
@@ -45,7 +46,6 @@ public:
     static MemoryObjectType CSS;
     static MemoryObjectType Binding;
 
-    static MemoryObjectType MemoryCache;
     static MemoryObjectType MemoryCacheStructures;
     static MemoryObjectType CachedResource;
     static MemoryObjectType CachedResourceRaw;
@@ -56,6 +56,27 @@ public:
     static MemoryObjectType CachedResourceSVG;
     static MemoryObjectType CachedResourceShader;
     static MemoryObjectType CachedResourceXSLT;
+
+    static MemoryObjectType ExternalStrings;
+    static MemoryObjectType ExternalArrays;
+
+    static MemoryObjectType Inspector;
+    static MemoryObjectType InspectorController;
+    static MemoryObjectType InspectorMemoryAgent;
+    static MemoryObjectType InspectorDOMStorageAgent;
+    static MemoryObjectType InspectorDOMStorageResources;
+    static MemoryObjectType InspectorOverlay;
+    static MemoryObjectType InspectorProfilerAgent;
+
+    static MemoryObjectType JSHeapUsed;
+    static MemoryObjectType JSHeapUnused;
+
+    static MemoryObjectType DOMStorageCache;
+
+    static MemoryObjectType RenderTreeUsed;
+    static MemoryObjectType RenderTreeUnused;
+
+    static MemoryObjectType ProcessPrivateMemory;
 };
 
 } // namespace WebCore

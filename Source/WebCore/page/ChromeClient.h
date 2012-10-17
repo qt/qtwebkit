@@ -78,6 +78,7 @@ namespace WebCore {
 
 #if USE(ACCELERATED_COMPOSITING)
     class GraphicsLayer;
+    class GraphicsLayerFactory;
 #endif
 
 #if ENABLE(INPUT_TYPE_COLOR)
@@ -206,8 +207,8 @@ namespace WebCore {
         // the new cache.
         virtual void reachedApplicationCacheOriginQuota(SecurityOrigin*, int64_t totalSpaceNeeded) = 0;
 
-#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(WIDGET_REGION)
-        virtual void dashboardRegionsChanged();
+#if ENABLE(DASHBOARD_SUPPORT) || ENABLE(DRAGGABLE_REGION)
+        virtual void annotatedRegionsChanged();
 #endif
 
         virtual void populateVisitedLinks();
@@ -246,6 +247,9 @@ namespace WebCore {
         virtual void elementDidBlur(const Node*) { };
 
 #if USE(ACCELERATED_COMPOSITING)
+        // Allows ports to customize the type of graphics layers created by this page.
+        virtual GraphicsLayerFactory* graphicsLayerFactory() const { return 0; }
+
         // Pass 0 as the GraphicsLayer to detatch the root layer.
         virtual void attachRootGraphicsLayer(Frame*, GraphicsLayer*) = 0;
         // Sets a flag to specify that the next time content is drawn to the window,
@@ -253,7 +257,7 @@ namespace WebCore {
         virtual void setNeedsOneShotDrawingSynchronization() = 0;
         // Sets a flag to specify that the view needs to be updated, so we need
         // to do an eager layout before the drawing.
-        virtual void scheduleCompositingLayerSync() = 0;
+        virtual void scheduleCompositingLayerFlush() = 0;
         // Returns whether or not the client can render the composited layer,
         // regardless of the settings.
         virtual bool allowsAcceleratedCompositing() const { return true; }

@@ -522,6 +522,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\runtime\IndexingType.cpp"
+				>
+			</File>
+			<File
 				RelativePath="..\..\runtime\IndexingType.h"
 				>
 			</File>
@@ -842,6 +846,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\runtime\JSDestructibleObject.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\runtime\JSFunction.cpp"
 				>
 			</File>
@@ -874,11 +882,11 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\runtime\JSGlobalThis.cpp"
+				RelativePath="..\..\runtime\JSProxy.cpp"
 				>
 			</File>
 			<File
-				RelativePath="..\..\runtime\JSGlobalThis.h"
+				RelativePath="..\..\runtime\JSProxy.h"
 				>
 			</File>
 			<File
@@ -1330,6 +1338,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\runtime\TypedArrayDescriptor.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\runtime\WeakGCMap.h"
 				>
 			</File>
@@ -1570,6 +1582,10 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\bytecode\ByValInfo.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\bytecode\CallLinkInfo.cpp"
 				>
 			</File>
@@ -1698,6 +1714,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\bytecode\SpecialPointer.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\bytecode\SpecialPointer.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\bytecode\SpeculatedType.cpp"
 				>
 			</File>
@@ -1799,6 +1823,10 @@
 			</File>
 			<File
 				RelativePath="..\..\assembler\LinkBuffer.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\assembler\MacroAssembler.cpp"
 				>
 			</File>
 			<File
@@ -2130,15 +2158,15 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\interpreter\JSStack.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\interpreter\JSStack.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\interpreter\Register.h"
-				>
-			</File>
-			<File
-				RelativePath="..\..\interpreter\RegisterFile.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\interpreter\RegisterFile.h"
 				>
 			</File>
 			<File
@@ -2326,6 +2354,18 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\heap\CopyVisitor.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\heap\CopyVisitor.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\heap\CopyVisitorInlineMethods.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\heap\DFGCodeBlocks.cpp"
 				>
 			</File>
@@ -2422,6 +2462,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\heap\GCThread.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\heap\GCThread.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\heap\GCThreadSharedData.cpp"
 				>
 			</File>
@@ -2445,6 +2493,14 @@
 				RelativePath="..\..\heap\HeapRootVisitor.h"
 				>
 			</File>
+            <File
+                RelativePath="..\..\heap\HeapStatistics.cpp"
+            >
+            </File>
+            <File
+                RelativePath="..\..\heap\HeapStatistics.h"
+            >
+            </File>
 			<File
 				RelativePath="..\..\heap\Local.h"
 				>

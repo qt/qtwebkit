@@ -53,22 +53,30 @@ TEST_F(EWK2UnitTestBase, ewk_context_cookie_manager_get)
     ASSERT_EQ(cookieManager, ewk_context_cookie_manager_get(context));
 }
 
+TEST_F(EWK2UnitTestBase, ewk_context_favicon_database_get)
+{
+    Ewk_Context* context = ewk_view_context_get(webView());
+    Ewk_Favicon_Database* faviconDatabase = ewk_context_favicon_database_get(context);
+    ASSERT_TRUE(faviconDatabase);
+    ASSERT_EQ(faviconDatabase, ewk_context_favicon_database_get(context));
+}
+
 static void schemeRequestCallback(Ewk_Url_Scheme_Request* request, void* userData)
 {
     const char* scheme = ewk_url_scheme_request_scheme_get(request);
-    ASSERT_STREQ(scheme, "fooscheme");
+    ASSERT_STREQ("fooscheme", scheme);
     const char* url = ewk_url_scheme_request_url_get(request);
-    ASSERT_STREQ(url, "fooscheme:MyPath");
+    ASSERT_STREQ("fooscheme:MyPath", url);
     const char* path = ewk_url_scheme_request_path_get(request);
-    ASSERT_STREQ(path, "MyPath");
+    ASSERT_STREQ("MyPath", path);
     ASSERT_TRUE(ewk_url_scheme_request_finish(request, htmlReply, strlen(htmlReply), "text/html"));
 }
 
-TEST_F(EWK2UnitTestBase, ewk_context_uri_scheme_register)
+TEST_F(EWK2UnitTestBase, ewk_context_url_scheme_register)
 {
-    ewk_context_uri_scheme_register(ewk_view_context_get(webView()), "fooscheme", schemeRequestCallback, 0);
-    loadUrlSync("fooscheme:MyPath");
-    ASSERT_STREQ(ewk_view_title_get(webView()), "Foo");
+    ewk_context_url_scheme_register(ewk_view_context_get(webView()), "fooscheme", schemeRequestCallback, 0);
+    ASSERT_TRUE(loadUrlSync("fooscheme:MyPath"));
+    ASSERT_STREQ("Foo", ewk_view_title_get(webView()));
 }
 
 struct VibrationCbData {
@@ -128,7 +136,7 @@ TEST_F(EWK2UnitTestBase, ewk_context_vibration_client_callbacks_set)
 
     // This case the pattern will cause the device to vibrate for 200 ms, be still for 100 ms, and then vibrate for 5000 ms.
     loadVibrationHTMLString(webView(), "[200, 100, 5000]", true, &data);
-    ASSERT_EQ(data.vibrateCalledCount, 2);
+    ASSERT_EQ(2, data.vibrateCalledCount);
     ASSERT_TRUE(data.didReceiveVibrateCallback);
 
     // Cancel outstanding vibration pattern.
@@ -141,14 +149,30 @@ TEST_F(EWK2UnitTestBase, ewk_context_vibration_client_callbacks_set)
     // Make sure we don't receive vibration event.
     loadVibrationHTMLString(webView(), "[5000]", false, &data);
     ASSERT_TRUE(waitUntilTitleChangedTo("Loaded"));
-    ASSERT_STREQ(ewk_view_title_get(webView()), "Loaded");
+    ASSERT_STREQ("Loaded", ewk_view_title_get(webView()));
     ASSERT_FALSE(data.didReceiveVibrateCallback);
 
     // Make sure we don't receive cancel vibration event.
     loadVibrationHTMLString(webView(), "0", false, &data);
     ASSERT_TRUE(waitUntilTitleChangedTo("Loaded"));
-    ASSERT_STREQ(ewk_view_title_get(webView()), "Loaded");
+    ASSERT_STREQ("Loaded", ewk_view_title_get(webView()));
     ASSERT_FALSE(data.didReceiveCancelVibrationCallback);
+}
+
+TEST_F(EWK2UnitTestBase, ewk_context_cache_model)
+{
+    Ewk_Context* context = ewk_view_context_get(webView());
+
+    ASSERT_EQ(EWK_CACHE_MODEL_DOCUMENT_VIEWER, ewk_context_cache_model_get(context));
+
+    ASSERT_TRUE(ewk_context_cache_model_set(context, EWK_CACHE_MODEL_DOCUMENT_BROWSER));
+    ASSERT_EQ(EWK_CACHE_MODEL_DOCUMENT_BROWSER, ewk_context_cache_model_get(context));
+
+    ASSERT_TRUE(ewk_context_cache_model_set(context, EWK_CACHE_MODEL_PRIMARY_WEBBROWSER));
+    ASSERT_EQ(EWK_CACHE_MODEL_PRIMARY_WEBBROWSER, ewk_context_cache_model_get(context));
+
+    ASSERT_TRUE(ewk_context_cache_model_set(context, EWK_CACHE_MODEL_DOCUMENT_VIEWER));
+    ASSERT_EQ(EWK_CACHE_MODEL_DOCUMENT_VIEWER, ewk_context_cache_model_get(context));
 }
 
 TEST_F(EWK2UnitTestBase, ewk_context_new)
@@ -172,3 +196,4 @@ TEST_F(EWK2UnitTestBase, ewk_context_ref)
     ewk_context_unref(context);
     ewk_context_unref(context);
 }
+

@@ -37,13 +37,8 @@
 #include "Frame.h"
 #include "Page.h"
 #include "ScriptExecutionContext.h"
+#include "ScriptState.h"
 #include "StorageArea.h"
-
-#if USE(JSC)
-namespace JSC {
-class ExecState;
-}
-#endif
 
 namespace WebCore {
 
@@ -82,12 +77,6 @@ class WorkerContext;
 class WorkerContextProxy;
 class XMLHttpRequest;
 
-#if USE(JSC)
-typedef JSC::ExecState ScriptState;
-#else
-class ScriptState;
-#endif
-
 #if ENABLE(WEB_SOCKETS)
 struct WebSocketFrame;
 class WebSocketHandshakeRequest;
@@ -121,6 +110,7 @@ public:
 
     static void mouseDidMoveOverElement(Page*, const HitTestResult&, unsigned modifierFlags);
     static bool handleMousePress(Page*);
+    static bool handleTouchEvent(Page*, Node*);
     static bool forcePseudoState(Element*, CSSSelector::PseudoType);
 
     static void willSendXMLHttpRequest(ScriptExecutionContext*, const String& url);
@@ -263,11 +253,17 @@ public:
     static void frontendCreated() { s_frontendCounter += 1; }
     static void frontendDeleted() { s_frontendCounter -= 1; }
     static bool hasFrontends() { return s_frontendCounter; }
-    static bool hasFrontendForScriptContext(ScriptExecutionContext*);
+    static bool canvasAgentEnabled(ScriptExecutionContext*);
+    static bool consoleAgentEnabled(ScriptExecutionContext*);
+    static bool runtimeAgentEnabled(Frame*);
+    static bool timelineAgentEnabled(ScriptExecutionContext*);
     static bool collectingHTMLParseErrors(Page*);
 #else
     static bool hasFrontends() { return false; }
-    static bool hasFrontendForScriptContext(ScriptExecutionContext*) { return false; }
+    static bool canvasAgentEnabled(ScriptExecutionContext*) { return false; }
+    static bool consoleAgentEnabled(ScriptExecutionContext*) { return false; }
+    static bool runtimeAgentEnabled(Frame*) { return false; }
+    static bool timelineAgentEnabled(ScriptExecutionContext*) { return false; }
     static bool collectingHTMLParseErrors(Page*) { return false; }
 #endif
 
@@ -303,6 +299,7 @@ private:
     static void didUpdateRegionLayoutImpl(InstrumentingAgents*, Document*, WebKitNamedFlow*);
 
     static void mouseDidMoveOverElementImpl(InstrumentingAgents*, const HitTestResult&, unsigned modifierFlags);
+    static bool handleTouchEventImpl(InstrumentingAgents*, Node*);
     static bool handleMousePressImpl(InstrumentingAgents*);
     static bool forcePseudoStateImpl(InstrumentingAgents*, Element*, CSSSelector::PseudoType);
 
@@ -608,6 +605,16 @@ inline void InspectorInstrumentation::mouseDidMoveOverElement(Page* page, const 
     if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForPage(page))
         mouseDidMoveOverElementImpl(instrumentingAgents, result, modifierFlags);
 #endif
+}
+
+inline bool InspectorInstrumentation::handleTouchEvent(Page* page, Node* node)
+{
+#if ENABLE(INSPECTOR)
+    FAST_RETURN_IF_NO_FRONTENDS(false);
+    if (InstrumentingAgents* instrumentingAgents = instrumentingAgentsForPage(page))
+        return handleTouchEventImpl(instrumentingAgents, node);
+#endif
+    return false;
 }
 
 inline bool InspectorInstrumentation::handleMousePress(Page* page)

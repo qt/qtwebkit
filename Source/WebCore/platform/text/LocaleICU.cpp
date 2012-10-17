@@ -33,6 +33,7 @@
 
 #include "LocalizedStrings.h"
 #include <limits>
+#include <unicode/uloc.h>
 #include <wtf/DateMath.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/text/StringBuilder.h>
@@ -56,7 +57,7 @@ LocaleICU::LocaleICU(const char* locale)
 #if ENABLE(CALENDAR_PICKER)
     , m_firstDayOfWeek(0)
 #endif
-#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
+#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
     , m_mediumTimeFormat(0)
     , m_shortTimeFormat(0)
     , m_didCreateTimeFormat(false)
@@ -68,7 +69,7 @@ LocaleICU::~LocaleICU()
 {
     unum_close(m_numberFormat);
     udat_close(m_shortDateFormat);
-#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
+#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
     udat_close(m_mediumTimeFormat);
     udat_close(m_shortTimeFormat);
 #endif
@@ -77,17 +78,6 @@ LocaleICU::~LocaleICU()
 PassOwnPtr<LocaleICU> LocaleICU::create(const char* localeString)
 {
     return adoptPtr(new LocaleICU(localeString));
-}
-
-PassOwnPtr<LocaleICU> LocaleICU::createForCurrentLocale()
-{
-    return adoptPtr(new LocaleICU(0));
-}
-
-LocaleICU* LocaleICU::currentLocale()
-{
-    static LocaleICU* currentLocale = LocaleICU::createForCurrentLocale().leakPtr();
-    return currentLocale;
 }
 
 String LocaleICU::decimalSymbol(UNumberFormatSymbol symbol)
@@ -164,8 +154,10 @@ UDateFormat* LocaleICU::openDateFormat(UDateFormatStyle timeStyle, UDateFormatSt
     return udat_open(timeStyle, dateStyle, m_locale.data(), gmtTimezone, WTF_ARRAY_LENGTH(gmtTimezone), 0, -1, &status);
 }
 
-double LocaleICU::parseLocalizedDate(const String& input)
+double LocaleICU::parseDateTime(const String& input, DateComponents::Type type)
 {
+    if (type != DateComponents::Date)
+        return std::numeric_limits<double>::quiet_NaN();
     if (!initializeShortDateFormat())
         return numeric_limits<double>::quiet_NaN();
     if (input.length() > static_cast<unsigned>(numeric_limits<int32_t>::max()))
@@ -180,24 +172,7 @@ double LocaleICU::parseLocalizedDate(const String& input)
     return date;
 }
 
-String LocaleICU::formatLocalizedDate(const DateComponents& dateComponents)
-{
-    if (!initializeShortDateFormat())
-        return String();
-    double input = dateComponents.millisecondsSinceEpoch();
-    UErrorCode status = U_ZERO_ERROR;
-    int32_t length = udat_format(m_shortDateFormat, input, 0, 0, 0, &status);
-    if (status != U_BUFFER_OVERFLOW_ERROR)
-        return String();
-    Vector<UChar> buffer(length);
-    status = U_ZERO_ERROR;
-    udat_format(m_shortDateFormat, input, buffer.data(), length, 0, &status);
-    if (U_FAILURE(status))
-        return String();
-    return String::adopt(buffer);
-}
-
-#if ENABLE(CALENDAR_PICKER) || ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
+#if ENABLE(CALENDAR_PICKER) || ENABLE(INPUT_MULTIPLE_FIELDS_UI)
 static String getDateFormatPattern(const UDateFormat* dateFormat)
 {
     if (!dateFormat)
@@ -281,7 +256,7 @@ void LocaleICU::initializeLocalizedDateFormatText()
     m_localizedDateFormatText = localizeFormat(getDateFormatPattern(m_shortDateFormat));
 }
 
-String LocaleICU::localizedDateFormatText()
+String LocaleICU::dateFormatText()
 {
     initializeLocalizedDateFormatText();
     return m_localizedDateFormatText;
@@ -373,9 +348,15 @@ unsigned LocaleICU::firstDayOfWeek()
     initializeCalendar();
     return m_firstDayOfWeek;
 }
+
+bool LocaleICU::isRTL()
+{
+    UErrorCode status = U_ZERO_ERROR;
+    return uloc_getCharacterOrientation(m_locale.data(), &status) == ULOC_LAYOUT_RTL;
+}
 #endif
 
-#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
+#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
 static PassOwnPtr<Vector<String> > createFallbackAMPMLabels()
 {
     OwnPtr<Vector<String> > labels = adoptPtr(new Vector<String>());
@@ -405,6 +386,16 @@ void LocaleICU::initializeDateTimeFormat()
     m_timeAMPMLabels = *timeAMPMLabels;
 
     m_didCreateTimeFormat = true;
+}
+
+String LocaleICU::dateFormat()
+{
+    if (!m_dateFormat.isEmpty())
+        return m_dateFormat;
+    if (!initializeShortDateFormat())
+        return ASCIILiteral("dd/MM/yyyy");
+    m_dateFormat = getDateFormatPattern(m_shortDateFormat);
+    return m_dateFormat;
 }
 
 String LocaleICU::timeFormat()

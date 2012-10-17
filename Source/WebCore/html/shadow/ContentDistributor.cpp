@@ -57,8 +57,21 @@ void ContentDistributor::distribute(Element* host)
     m_validity = Valid;
 
     ContentDistribution pool;
-    for (Node* node = host->firstChild(); node; node = node->nextSibling())
-        pool.append(node);
+    for (Node* node = host->firstChild(); node; node = node->nextSibling()) {
+        if (!isInsertionPoint(node)) {
+            pool.append(node);
+            continue;
+        }
+
+        InsertionPoint* insertionPoint = toInsertionPoint(node);
+        if (insertionPoint->hasDistribution()) {
+            for (size_t i = 0; i < insertionPoint->size(); ++i)
+                pool.append(insertionPoint->at(i));
+        } else {
+            for (Node* fallbackNode = insertionPoint->firstChild(); fallbackNode; fallbackNode = fallbackNode->nextSibling())
+                pool.append(fallbackNode);
+        }
+    }
     Vector<bool> distributed(pool.size());
     distributed.fill(false);
 
@@ -117,10 +130,10 @@ void ContentDistributor::distributeSelectionsTo(InsertionPoint* insertionPoint, 
         if (distributed[i])
             continue;
 
-        Node* child = pool[i].get();
-        if (!query.matches(child))
+        if (!query.matches(pool, i))
             continue;
 
+        Node* child = pool[i].get();
         distribution.append(child);
         m_nodeToInsertionPoint.add(child, insertionPoint);
         distributed[i] = true;

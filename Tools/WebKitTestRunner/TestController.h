@@ -27,6 +27,7 @@
 #define TestController_h
 
 #include "WebNotificationProvider.h"
+#include "WorkQueueManager.h"
 #include <GeolocationProviderMock.h>
 #include <WebKit2/WKRetainPtr.h>
 #include <string>
@@ -69,11 +70,16 @@ public:
 
     // Geolocation.
     void setGeolocationPermission(bool);
-    void setMockGeolocationPosition(double latitude, double longitude, double accuracy);
+    void setMockGeolocationPosition(double latitude, double longitude, double accuracy, bool providesAltitude, double altitude, bool providesAltitudeAccuracy, double altitudeAccuracy, bool providesHeading, double heading, bool providesSpeed, double speed);
     void setMockGeolocationPositionUnavailableError(WKStringRef errorMessage);
     void handleGeolocationPermissionRequest(WKGeolocationPermissionRequestRef);
 
+    // Policy delegate.
+    void setCustomPolicyDelegate(bool enabled, bool permissive);
+
     bool resetStateToConsistentValues();
+
+    WorkQueueManager& workQueueManager() { return m_workQueueManager; }
 
 private:
     void initialize(int argc, const char* argv[]);
@@ -109,6 +115,13 @@ private:
 
     static void decidePolicyForNotificationPermissionRequest(WKPageRef, WKSecurityOriginRef, WKNotificationPermissionRequestRef, const void*);
     void decidePolicyForNotificationPermissionRequest(WKPageRef, WKSecurityOriginRef, WKNotificationPermissionRequestRef);
+
+    // WKPagePolicyClient
+    static void decidePolicyForNavigationAction(WKPageRef, WKFrameRef, WKFrameNavigationType, WKEventModifiers, WKEventMouseButton, WKURLRequestRef, WKFramePolicyListenerRef, WKTypeRef, const void*);
+    void decidePolicyForNavigationAction(WKFramePolicyListenerRef);
+
+    static void decidePolicyForResponse(WKPageRef, WKFrameRef, WKURLResponseRef, WKURLRequestRef, WKFramePolicyListenerRef, WKTypeRef, const void*);
+    void decidePolicyForResponse(WKFrameRef, WKURLResponseRef, WKFramePolicyListenerRef);
 
     static WKPageRef createOtherPage(WKPageRef oldPage, WKURLRequestRef, WKDictionaryRef, WKEventModifiers, WKEventMouseButton, const void*);
 
@@ -154,11 +167,16 @@ private:
     bool m_beforeUnloadReturnValue;
 
     OwnPtr<GeolocationProviderMock> m_geolocationProvider;
-    Vector<WKGeolocationPermissionRequestRef> m_geolocationPermissionRequests;
+    Vector<WKRetainPtr<WKGeolocationPermissionRequestRef> > m_geolocationPermissionRequests;
     bool m_isGeolocationPermissionSet;
     bool m_isGeolocationPermissionAllowed;
 
+    bool m_policyDelegateEnabled;
+    bool m_policyDelegatePermissive;
+
     EventSenderProxy* m_eventSenderProxy;
+
+    WorkQueueManager m_workQueueManager;
 };
 
 } // namespace WTR

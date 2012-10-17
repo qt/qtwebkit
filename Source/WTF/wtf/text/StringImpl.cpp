@@ -28,7 +28,6 @@
 #include "AtomicString.h"
 #include "StringBuffer.h"
 #include "StringHash.h"
-#include <wtf/MemoryInstrumentation.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/WTFThreadData.h>
 #include <wtf/unicode/CharacterNames.h>
@@ -1022,14 +1021,9 @@ size_t StringImpl::find(StringImpl* matchString, unsigned index)
 
     // Optimization 1: fast case for strings of length 1.
     if (matchLength == 1) {
-        if (is8Bit()) {
-            if (matchString->is8Bit())
-                return WTF::find(characters8(), length(), matchString->characters8()[0], index);
-            return WTF::find(characters8(), length(), matchString->characters16()[0], index);
-        }
-        if (matchString->is8Bit())
-            return WTF::find(characters16(), length(), matchString->characters8()[0], index);
-        return WTF::find(characters16(), length(), matchString->characters16()[0], index);
+        if (is8Bit())
+            return WTF::find(characters8(), length(), (*matchString)[0], index);
+        return WTF::find(characters16(), length(), (*matchString)[0], index);
     }
 
     if (UNLIKELY(!matchLength))
@@ -1131,9 +1125,9 @@ size_t StringImpl::reverseFind(StringImpl* matchString, unsigned index)
 
     // Optimization 1: fast case for strings of length 1.
     if (matchLength == 1) {
-        if (is8Bit() && matchString->is8Bit())
-            return WTF::reverseFind(characters8(), ourLength, matchString->characters8()[0], index);
-        return WTF::reverseFind(characters(), ourLength, matchString->characters()[0], index);
+        if (is8Bit())
+            return WTF::reverseFind(characters8(), ourLength, (*matchString)[0], index);
+        return WTF::reverseFind(characters16(), ourLength, (*matchString)[0], index);
     }
 
     // Check index & matchLength are in range.
@@ -1790,26 +1784,6 @@ size_t StringImpl::sizeInBytes() const
     } else
         size *= 2;
     return size + sizeof(*this);
-}
-
-void StringImpl::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    size_t selfSize = sizeof(StringImpl);
-
-        // Count size used by internal buffer but skip strings that were constructed from literals.
-    if ((m_hashAndFlags & BufferInternal) && !hasTerminatingNullCharacter())
-        // Three cases are covered here:
-        // 1) a normal 8-bit string with internal storage (BufferInternal)
-        // 2) a normal 16-bit string with internal storage (BufferInternal)
-        // 3) empty unique string with length = 0 (BufferInternal)
-        selfSize += m_length * (m_hashAndFlags & s_hashFlag8BitBuffer ? sizeof(LChar) : sizeof(UChar));
-
-    MemoryClassInfo info(memoryObjectInfo, this, 0, selfSize);
-
-    if (m_hashAndFlags & BufferSubstring)
-        info.addMember(m_substringBuffer);
-    else if (m_hashAndFlags & s_hashFlagHas16BitShadow) // Substring never has its own shadow.
-        info.addRawBuffer(m_copyData16, (m_length + (hasTerminatingNullCharacter() ? 1 : 0)) * sizeof(UChar));
 }
 
 } // namespace WTF

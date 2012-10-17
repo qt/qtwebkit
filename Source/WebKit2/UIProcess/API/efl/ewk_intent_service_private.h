@@ -28,11 +28,40 @@
 
 #if ENABLE(WEB_INTENTS_TAG)
 
+#include "WKEinaSharedString.h"
+#include "WKIntentServiceInfo.h"
 #include <WebKit2/WKBase.h>
+#include <wtf/PassRefPtr.h>
+#include <wtf/RefCounted.h>
 
 typedef struct _Ewk_Intent_Service Ewk_Intent_Service;
 
-Ewk_Intent_Service* ewk_intent_service_new(WKIntentServiceInfoRef wkService);
+/**
+ * \struct _Ewk_Intent_Service
+ * @brief Contains the intent service data.
+ */
+class _Ewk_Intent_Service : public RefCounted<_Ewk_Intent_Service> {
+public:
+    WKEinaSharedString action;
+    WKEinaSharedString type;
+    WKEinaSharedString href;
+    WKEinaSharedString title;
+    WKEinaSharedString disposition;
+
+    static PassRefPtr<_Ewk_Intent_Service> create(WKIntentServiceInfoRef serviceRef)
+    {
+        return adoptRef(new _Ewk_Intent_Service(serviceRef));
+    }
+
+private:
+    explicit _Ewk_Intent_Service(WKIntentServiceInfoRef serviceRef)
+        : action(AdoptWK, WKIntentServiceInfoCopyAction(serviceRef))
+        , type(AdoptWK, WKIntentServiceInfoCopyType(serviceRef))
+        , href(AdoptWK, WKIntentServiceInfoCopyHref(serviceRef))
+        , title(AdoptWK, WKIntentServiceInfoCopyTitle(serviceRef))
+        , disposition(AdoptWK, WKIntentServiceInfoCopyDisposition(serviceRef))
+    { }
+};
 
 #endif // ENABLE(WEB_INTENTS_TAG)
 

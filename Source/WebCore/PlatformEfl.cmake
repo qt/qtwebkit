@@ -15,6 +15,7 @@ LIST(APPEND WebCore_SOURCES
   page/efl/DragControllerEfl.cpp
   page/efl/EventHandlerEfl.cpp
   platform/Cursor.cpp
+  platform/efl/AsyncFileSystemEfl.cpp
   platform/efl/BatteryProviderEfl.cpp
   platform/efl/ClipboardEfl.cpp
   platform/efl/ContextMenuEfl.cpp
@@ -51,6 +52,7 @@ LIST(APPEND WebCore_SOURCES
   platform/efl/TemporaryLinkStubs.cpp
   platform/efl/WidgetEfl.cpp
   platform/graphics/ImageSource.cpp
+  platform/graphics/efl/CairoUtilitiesEfl.cpp
   platform/graphics/efl/IconEfl.cpp
   platform/graphics/efl/ImageEfl.cpp
   platform/graphics/efl/IntPointEfl.cpp
@@ -74,6 +76,7 @@ LIST(APPEND WebCore_SOURCES
   platform/network/soup/GOwnPtrSoup.cpp
   platform/network/soup/ProxyResolverSoup.cpp
   platform/network/soup/ProxyServerSoup.cpp
+  platform/network/soup/ResourceErrorSoup.cpp
   platform/network/soup/ResourceHandleSoup.cpp
   platform/network/soup/ResourceRequestSoup.cpp
   platform/network/soup/ResourceResponseSoup.cpp
@@ -82,6 +85,7 @@ LIST(APPEND WebCore_SOURCES
   platform/PlatformStrategies.cpp
   platform/posix/FileSystemPOSIX.cpp
   platform/text/efl/TextBreakIteratorInternalICUEfl.cpp
+  platform/text/enchant/TextCheckerEnchant.cpp
 )
 
 IF (ENABLE_BATTERY_STATUS)
@@ -179,10 +183,6 @@ ENDIF ()
 IF (WTF_USE_TEXTURE_MAPPER)
   LIST(APPEND WebCore_SOURCES
     platform/graphics/texmap/GraphicsLayerTextureMapper.cpp
-  )
-ELSE ()
-  LIST(APPEND WebCore_SOURCES
-    platform/graphics/efl/GraphicsLayerEfl.cpp
   )
 ENDIF ()
 
@@ -291,9 +291,8 @@ IF (WTF_USE_3D_GRAPHICS)
   LIST(APPEND WebCore_SOURCES
     platform/graphics/OpenGLShims.cpp
     platform/graphics/cairo/DrawingBufferCairo.cpp
-    platform/graphics/cairo/GLContext.cpp
-    platform/graphics/cairo/GraphicsContext3DCairo.cpp
-    platform/graphics/cairo/GraphicsContext3DPrivate.cpp
+    platform/graphics/efl/GraphicsContext3DEfl.cpp
+    platform/graphics/efl/GraphicsContext3DPrivate.cpp
     platform/graphics/opengl/Extensions3DOpenGL.cpp
     platform/graphics/opengl/Extensions3DOpenGLCommon.cpp
     platform/graphics/opengl/GraphicsContext3DOpenGL.cpp
@@ -329,3 +328,11 @@ IF (ENABLE_WEB_AUDIO)
   ADD_DEFINITIONS(-DUNINSTALLED_AUDIO_RESOURCES_DIR="${WEBCORE_DIR}/platform/audio/resources")
 ENDIF ()
 
+IF (ENABLE_SPELLCHECK)
+    LIST(APPEND WebCore_INCLUDE_DIRECTORIES
+        ${ENCHANT_INCLUDE_DIRS}
+    )
+    LIST(APPEND WebCore_LIBRARIES
+        ${ENCHANT_LIBRARIES}
+    )
+ENDIF()

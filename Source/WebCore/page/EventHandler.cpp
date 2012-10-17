@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
  * Copyright (C) 2006 Alexey Proskuryakov (ap@webkit.org)
+ * Copyright (C) 2012 Digia Plc. and/or its subsidiary(-ies)
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,6 +40,7 @@
 #include "DragController.h"
 #include "DragState.h"
 #include "Editor.h"
+#include "EditorClient.h"
 #include "EventNames.h"
 #include "FloatPoint.h"
 #include "FloatRect.h"
@@ -428,22 +430,30 @@ bool EventHandler::updateSelectionForMouseDownDispatchingSelectStart(Node* targe
     return true;
 }
 
-void EventHandler::selectClosestWordFromMouseEvent(const MouseEventWithHitTestResults& result)
+void EventHandler::selectClosestWordFromHitTestResult(const HitTestResult& result, AppendTrailingWhitespace appendTrailingWhitespace)
 {
     Node* innerNode = result.targetNode();
     VisibleSelection newSelection;
 
-    if (innerNode && innerNode->renderer() && m_mouseDownMayStartSelect) {
+    if (innerNode && innerNode->renderer()) {
         VisiblePosition pos(innerNode->renderer()->positionForPoint(result.localPoint()));
         if (pos.isNotNull()) {
             newSelection = VisibleSelection(pos);
             newSelection.expandUsingGranularity(WordGranularity);
         }
 
-        if (newSelection.isRange() && result.event().clickCount() == 2 && m_frame->editor()->isSelectTrailingWhitespaceEnabled()) 
+        if (appendTrailingWhitespace == ShouldAppendTrailingWhitespace && newSelection.isRange())
             newSelection.appendTrailingWhitespace();
 
         updateSelectionForMouseDownDispatchingSelectStart(innerNode, newSelection, WordGranularity);
+    }
+}
+
+void EventHandler::selectClosestWordFromMouseEvent(const MouseEventWithHitTestResults& result)
+{
+    if (m_mouseDownMayStartSelect) {
+        selectClosestWordFromHitTestResult(result.hitTestResult(),
+            (result.event().clickCount() == 2 && m_frame->editor()->isSelectTrailingWhitespaceEnabled()) ? ShouldAppendTrailingWhitespace : DontAppendTrailingWhitespace);
     }
 }
 
@@ -559,7 +569,13 @@ bool EventHandler::handleMousePressEventSingleClick(const MouseEventWithHitTestR
     } else
         newSelection = VisibleSelection(visiblePos);
     
-    return updateSelectionForMouseDownDispatchingSelectStart(innerNode, newSelection, granularity);
+    bool handled = updateSelectionForMouseDownDispatchingSelectStart(innerNode, newSelection, granularity);
+
+    if (event.event().button() == MiddleButton) {
+        // Ignore handled, since we want to paste to where the caret was placed anyway.
+        handled = handlePasteGlobalSelection(event.event()) || handled;
+    }
+    return handled;
 }
 
 static inline bool canMouseDownStartSelect(Node* node)
@@ -903,6 +919,11 @@ bool EventHandler::handleMouseReleaseEvent(const MouseEventWithHitTestResults& e
     m_frame->selection()->notifyRendererOfSelectionChange(UserTriggered);
 
     m_frame->selection()->selectFrameElementInParentIfFullySelected();
+
+    if (event.event().button() == MiddleButton) {
+        // Ignore handled, since we want to paste to where the caret was placed anyway.
+        handled = handlePasteGlobalSelection(event.event()) || handled;
+    }
 
     return handled;
 }
@@ -1671,8 +1692,8 @@ static RenderLayer* layerForNode(Node* node)
 
 bool EventHandler::mouseMoved(const PlatformMouseEvent& event)
 {
-    MaximumDurationTracker maxDurationTracker(&m_maxMouseMovedDuration);
     RefPtr<FrameView> protector(m_frame->view());
+    MaximumDurationTracker maxDurationTracker(&m_maxMouseMovedDuration);
 
 
 #if ENABLE(TOUCH_EVENTS)
@@ -1896,6 +1917,41 @@ bool EventHandler::handleMouseReleaseEvent(const PlatformMouseEvent& mouseEvent)
     return swallowMouseUpEvent || swallowClickEvent || swallowMouseReleaseEvent;
 }
 
+bool EventHandler::handlePasteGlobalSelection(const PlatformMouseEvent& mouseEvent)
+{
+    // If the event was a middle click, attempt to copy global selection in after
+    // the newly set caret position.
+    //
+    // This code is called from either the mouse up or mouse down handling. There
+    // is some debate about when the global selection is pasted:
+    //   xterm: pastes on up.
+    //   GTK: pastes on down.
+    //   Qt: pastes on up.
+    //   Firefox: pastes on up.
+    //   Chromium: pastes on up.
+    //
+    // There is something of a webcompat angle to this well, as highlighted by
+    // crbug.com/14608. Pages can clear text boxes 'onclick' and, if we paste on
+    // down then the text is pasted just before the onclick handler runs and
+    // clears the text box. So it's important this happens after the event
+    // handlers have been fired.
+#if PLATFORM(GTK)
+    if (mouseEvent.type() != PlatformEvent::MousePressed)
+        return false;
+#else
+    if (mouseEvent.type() != PlatformEvent::MouseReleased)
+        return false;
+#endif
+
+    Frame* focusFrame = m_frame->page()->focusController()->focusedOrMainFrame();
+    // Do not paste here if the focus was moved somewhere else.
+    if (m_frame == focusFrame && m_frame->editor()->client()->supportsGlobalSelection())
+        return m_frame->editor()->command(AtomicString("PasteGlobalSelection")).execute();
+
+    return false;
+}
+
+
 #if ENABLE(DRAG_SUPPORT)
 bool EventHandler::dispatchDragEvent(const AtomicString& eventType, Node* dragTarget, const PlatformMouseEvent& event, Clipboard* clipboard)
 {
@@ -2118,8 +2174,8 @@ void EventHandler::updateMouseEventTargetNode(Node* targetNode, const PlatformMo
     else {
         // If the target node is a text node, dispatch on the parent node - rdar://4196646
         if (result && result->isTextNode()) {
-            ComposedShadowTreeParentWalker walker(result);
-            walker.parentIncludingInsertionPointAndShadowRoot();
+            AncestorChainWalker walker(result);
+            walker.parent();
             result = walker.get();
         }
     }
@@ -2465,8 +2521,9 @@ bool EventHandler::handleGestureEvent(const PlatformGestureEvent& gestureEvent)
         return handleGestureTap(gestureEvent);
     case PlatformEvent::GestureTapDown:
         return handleGestureTapDown();
-    case PlatformEvent::GestureDoubleTap:
     case PlatformEvent::GestureLongPress:
+        return handleGestureLongPress(gestureEvent);
+    case PlatformEvent::GestureDoubleTap:
     case PlatformEvent::GesturePinchBegin:
     case PlatformEvent::GesturePinchEnd:
     case PlatformEvent::GesturePinchUpdate:
@@ -2511,6 +2568,25 @@ bool EventHandler::handleGestureTap(const PlatformGestureEvent& gestureEvent)
     defaultPrevented |= handleMouseReleaseEvent(fakeMouseUp);
 
     return defaultPrevented;
+}
+
+bool EventHandler::handleGestureLongPress(const PlatformGestureEvent& gestureEvent)
+{
+#if OS(ANDROID)
+    IntPoint hitTestPoint = m_frame->view()->windowToContents(gestureEvent.position());
+    HitTestResult result = hitTestResultAtPoint(hitTestPoint, true);
+    Node* innerNode = result.targetNode();
+    if (!result.isLiveLink() && innerNode && (innerNode->isContentEditable() || innerNode->isTextNode())) {
+        selectClosestWordFromHitTestResult(result, DontAppendTrailingWhitespace);
+        if (m_frame->selection()->isRange())
+            return true;
+    }
+#endif
+#if ENABLE(CONTEXT_MENUS)
+    return sendContextMenuEventForGesture(gestureEvent);
+#else
+    return false;
+#endif
 }
 
 bool EventHandler::handleGestureScrollUpdate(const PlatformGestureEvent& gestureEvent)
@@ -3623,6 +3699,9 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
             if (node->isTextNode())
                 node = node->parentNode();
 
+            if (InspectorInstrumentation::handleTouchEvent(m_frame->page(), node))
+                return true;
+
             Document* doc = node->document();
             if (!doc)
                 continue;
@@ -3676,7 +3755,7 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
         // released or cancelled it will only appear in the changedTouches list.
         if (pointState != PlatformTouchPoint::TouchReleased && pointState != PlatformTouchPoint::TouchCancelled) {
             touches->append(touch);
-            targetTouchesIterator->second->append(touch);
+            targetTouchesIterator->value->append(touch);
         }
 
         // Now build up the correct list for changedTouches.

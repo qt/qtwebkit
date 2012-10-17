@@ -53,7 +53,7 @@ namespace WebCore {
     class IDBRequest;
     class IDBTransaction;
     class IDBVersionChangeRequest;
-    class JavaScriptAudioNode;
+    class ScriptProcessorNode;
     class LocalMediaStream;
     class MediaController;
     class MediaSource;
@@ -175,15 +175,6 @@ namespace WebCore {
     #define DEFINE_FORWARDING_ATTRIBUTE_EVENT_LISTENER(recipient, attribute) \
         EventListener* on##attribute() { return recipient ? recipient->getAttributeEventListener(eventNames().attribute##Event) : 0; } \
         void setOn##attribute(PassRefPtr<EventListener> listener) { if (recipient) recipient->setAttributeEventListener(eventNames().attribute##Event, listener); } \
-
-#ifndef NDEBUG
-    void forbidEventDispatch();
-    void allowEventDispatch();
-    bool eventDispatchForbidden();
-#else
-    inline void forbidEventDispatch() { }
-    inline void allowEventDispatch() { }
-#endif
 
 #if USE(JSC)
     inline void EventTarget::visitJSEventListeners(JSC::SlotVisitor& visitor)

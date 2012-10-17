@@ -66,14 +66,14 @@ void LayerTreeCoordinatorProxy::updateTileForLayer(int layerID, int tileID, cons
 {
     RefPtr<ShareableSurface> surface;
 #if USE(GRAPHICS_SURFACE)
-    uint64_t token = updateInfo.surfaceHandle.graphicsSurfaceToken();
-    if (token) {
-        HashMap<uint64_t, RefPtr<ShareableSurface> >::iterator it = m_surfaces.find(token);
+    GraphicsSurfaceToken token = updateInfo.surfaceHandle.graphicsSurfaceToken();
+    if (token.isValid()) {
+        HashMap<GraphicsSurfaceToken::BufferHandle, RefPtr<ShareableSurface> >::iterator it = m_surfaces.find(token.frontBufferHandle);
         if (it == m_surfaces.end()) {
             surface = ShareableSurface::create(updateInfo.surfaceHandle);
-            m_surfaces.add(token, surface);
+            m_surfaces.add(token.frontBufferHandle, surface);
         } else
-            surface = it->second;
+            surface = it->value;
     } else
         surface = ShareableSurface::create(updateInfo.surfaceHandle);
 #else
@@ -116,10 +116,16 @@ void LayerTreeCoordinatorProxy::setCompositingLayerFilters(WebLayerID id, const 
 }
 #endif
 
-void LayerTreeCoordinatorProxy::didRenderFrame()
+void LayerTreeCoordinatorProxy::didRenderFrame(const WebCore::IntSize& contentsSize, const WebCore::IntRect& coveredRect)
 {
     dispatchUpdate(bind(&LayerTreeRenderer::flushLayerChanges, m_renderer.get()));
     updateViewport();
+#if PLATFORM(QT)
+    m_drawingAreaProxy->page()->didRenderFrame(contentsSize, coveredRect);
+#else
+    UNUSED_PARAM(contentsSize);
+    UNUSED_PARAM(coveredRect);
+#endif
 }
 
 void LayerTreeCoordinatorProxy::createDirectlyCompositedImage(int64_t key, const WebKit::ShareableBitmap::Handle& handle)
@@ -174,10 +180,12 @@ void LayerTreeCoordinatorProxy::didChangeScrollPosition(const IntPoint& position
     dispatchUpdate(bind(&LayerTreeRenderer::didChangeScrollPosition, m_renderer.get(), position));
 }
 
-void LayerTreeCoordinatorProxy::syncCanvas(uint32_t id, const IntSize& canvasSize, uint64_t graphicsSurfaceToken, uint32_t frontBuffer)
+#if USE(GRAPHICS_SURFACE)
+void LayerTreeCoordinatorProxy::syncCanvas(uint32_t id, const IntSize& canvasSize, const GraphicsSurfaceToken& token, uint32_t frontBuffer)
 {
-    dispatchUpdate(bind(&LayerTreeRenderer::syncCanvas, m_renderer.get(), id, canvasSize, graphicsSurfaceToken, frontBuffer));
+    dispatchUpdate(bind(&LayerTreeRenderer::syncCanvas, m_renderer.get(), id, canvasSize, token, frontBuffer));
 }
+#endif
 
 void LayerTreeCoordinatorProxy::purgeBackingStores()
 {

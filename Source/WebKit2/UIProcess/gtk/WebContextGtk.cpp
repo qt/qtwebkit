@@ -27,6 +27,7 @@
 #include "config.h"
 #include "WebContext.h"
 #include <WebCore/FileSystem.h>
+#include <WebCore/NotImplemented.h>
 #include <wtf/gobject/GOwnPtr.h>
 
 namespace WebKit {
@@ -53,14 +54,26 @@ String WebContext::platformDefaultDatabaseDirectory() const
 
 String WebContext::platformDefaultIconDatabasePath() const
 {
-    // FIXME: Implement.
-    return WTF::String();
+    GOwnPtr<gchar> databaseDirectory(g_build_filename(g_get_user_data_dir(), "webkitgtk", "icondatabase", NULL));
+    return WebCore::filenameToString(databaseDirectory.get());
 }
 
 String WebContext::platformDefaultLocalStorageDirectory() const
 {
     GOwnPtr<gchar> storageDirectory(g_build_filename(g_get_user_data_dir(), "webkitgtk", "localstorage", NULL));
     return WebCore::filenameToString(storageDirectory.get());
+}
+
+String WebContext::platformDefaultDiskCacheDirectory() const
+{
+    notImplemented();
+    return String();
+}
+
+String WebContext::platformDefaultCookieStorageDirectory() const
+{
+    notImplemented();
+    return String();
 }
 
 } // namespace WebKit

@@ -43,6 +43,10 @@ typedef const struct __CFString * CFStringRef;
 @class NSString;
 #endif
 
+#if PLATFORM(BLACKBERRY)
+#include <BlackBerryPlatformString.h>
+#endif
+
 // FIXME: This is a temporary layering violation while we move string code to WTF.
 // Landing the file moves in one patch, will follow on with patches to change the namespaces.
 namespace JSC {
@@ -453,6 +457,9 @@ public:
 
     unsigned length() const { return m_length; }
     bool is8Bit() const { return m_hashAndFlags & s_hashFlag8BitBuffer; }
+    bool hasInternalBuffer() const { return bufferOwnership() == BufferInternal; }
+    bool hasOwnedBuffer() const { return bufferOwnership() == BufferOwned; }
+    StringImpl* baseString() const { return bufferOwnership() == BufferSubstring ? m_substringBuffer : 0; }
 
     // FIXME: Remove all unnecessary usages of characters()
     ALWAYS_INLINE const LChar* characters8() const { ASSERT(is8Bit()); return m_data8; }
@@ -715,8 +722,6 @@ public:
 #ifdef STRING_STATS
     ALWAYS_INLINE static StringStats& stringStats() { return m_stringStats; }
 #endif
-
-    WTF_EXPORT_STRING_API void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     // This number must be at least 2 to avoid sharing empty, null as well as 1 character strings from SmallStrings.
@@ -997,7 +1002,8 @@ inline size_t find(const UChar* characters, unsigned length, CharacterMatchFunct
     return notFound;
 }
 
-inline size_t reverseFind(const LChar* characters, unsigned length, LChar matchCharacter, unsigned index = UINT_MAX)
+template <typename CharacterType>
+inline size_t reverseFind(const CharacterType* characters, unsigned length, CharacterType matchCharacter, unsigned index = UINT_MAX)
 {
     if (!length)
         return notFound;
@@ -1010,17 +1016,16 @@ inline size_t reverseFind(const LChar* characters, unsigned length, LChar matchC
     return index;
 }
 
-inline size_t reverseFind(const UChar* characters, unsigned length, UChar matchCharacter, unsigned index = UINT_MAX)
+ALWAYS_INLINE size_t reverseFind(const UChar* characters, unsigned length, LChar matchCharacter, unsigned index = UINT_MAX)
 {
-    if (!length)
+    return reverseFind(characters, length, static_cast<UChar>(matchCharacter), index);
+}
+
+inline size_t reverseFind(const LChar* characters, unsigned length, UChar matchCharacter, unsigned index = UINT_MAX)
+{
+    if (matchCharacter & ~0xFF)
         return notFound;
-    if (index >= length)
-        index = length - 1;
-    while (characters[index] != matchCharacter) {
-        if (!index--)
-            return notFound;
-    }
-    return index;
+    return reverseFind(characters, length, static_cast<LChar>(matchCharacter), index);
 }
 
 inline size_t StringImpl::find(LChar character, unsigned start)

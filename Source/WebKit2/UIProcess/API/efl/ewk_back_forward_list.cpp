@@ -29,34 +29,10 @@
 #include "WKAPICast.h"
 #include "WKArray.h"
 #include "WKBackForwardList.h"
-#include "WKRetainPtr.h"
-#include "ewk_back_forward_list_item_private.h"
+#include "ewk_back_forward_list_private.h"
 #include <wtf/text/CString.h>
 
 using namespace WebKit;
-
-typedef HashMap<WKBackForwardListItemRef, Ewk_Back_Forward_List_Item*> ItemsMap;
-
-/**
- * \struct  _Ewk_Back_Forward_List
- * @brief   Contains the Back Forward List data.
- */
-struct _Ewk_Back_Forward_List {
-    WKRetainPtr<WKBackForwardListRef> wkList;
-    mutable ItemsMap wrapperCache;
-
-    _Ewk_Back_Forward_List(WKBackForwardListRef listRef)
-        : wkList(listRef)
-    { }
-
-    ~_Ewk_Back_Forward_List()
-    {
-        ItemsMap::iterator it = wrapperCache.begin();
-        ItemsMap::iterator end = wrapperCache.end();
-        for (; it != end; ++it)
-            ewk_back_forward_list_item_unref(it->second);
-    }
-};
 
 #define EWK_BACK_FORWARD_LIST_WK_GET_OR_RETURN(list, wkList_, ...)  \
     if (!(list)) {                                             \
@@ -75,13 +51,13 @@ static inline Ewk_Back_Forward_List_Item* addItemToWrapperCache(const Ewk_Back_F
     EINA_SAFETY_ON_NULL_RETURN_VAL(list, 0);
     EINA_SAFETY_ON_NULL_RETURN_VAL(wkItem, 0);
 
-    Ewk_Back_Forward_List_Item* item = list->wrapperCache.get(wkItem);
+    RefPtr<Ewk_Back_Forward_List_Item> item = list->wrapperCache.get(wkItem);
     if (!item) {
-        item = ewk_back_forward_list_item_new(wkItem);
+        item = Ewk_Back_Forward_List_Item::create(wkItem);
         list->wrapperCache.set(wkItem, item);
     }
 
-    return item;
+    return item.get();
 }
 
 static inline Eina_List* createEinaList(const Ewk_Back_Forward_List* list, WKArrayRef wkList)
@@ -174,29 +150,6 @@ void ewk_back_forward_list_changed(Ewk_Back_Forward_List* list, WKBackForwardLis
     const size_t removedItemsSize = wkRemovedItems ? WKArrayGetSize(wkRemovedItems) : 0;
     for (size_t i = 0; i < removedItemsSize; ++i) {
         WKBackForwardListItemRef wkItem = static_cast<WKBackForwardListItemRef>(WKArrayGetItemAtIndex(wkRemovedItems, i));
-        if (Ewk_Back_Forward_List_Item* item = list->wrapperCache.take(wkItem))
-            ewk_back_forward_list_item_unref(item);
+        list->wrapperCache.remove(wkItem);
     }
-}
-
-/**
- * @internal
- * Constructs a Ewk_Back_Forward_List from a WKBackForwardListRef.
- */
-Ewk_Back_Forward_List* ewk_back_forward_list_new(WKBackForwardListRef wkBackForwardListRef)
-{
-    EINA_SAFETY_ON_NULL_RETURN_VAL(wkBackForwardListRef, 0);
-
-    return new Ewk_Back_Forward_List(wkBackForwardListRef);
-}
-
-/**
- * @internal
- * Frees a Ewk_Back_Forward_List object.
- */
-void ewk_back_forward_list_free(Ewk_Back_Forward_List* list)
-{
-    EINA_SAFETY_ON_NULL_RETURN(list);
-
-    delete list;
 }

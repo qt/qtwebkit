@@ -141,6 +141,7 @@ WebInspector.HandlerRegistry.prototype = {
                 var uiSourceCode = /** @type {WebInspector.UISourceCode} */ contentProvider;
                 if (uiSourceCode.isDirty()) {
                     doSave(forceSaveAs, uiSourceCode.workingCopy());
+                    uiSourceCode.commitWorkingCopy(function() { });
                     return;
                 }
             }
@@ -175,14 +176,15 @@ WebInspector.HandlerRegistry.prototype = {
         if (WebInspector.resourceForURL(resourceURL))
             contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Open link in Resources panel" : "Open Link in Resources Panel"), WebInspector.openResource.bind(null, resourceURL, true));
         contextMenu.appendItem(WebInspector.copyLinkAddressLabel(), InspectorFrontendHost.copyText.bind(InspectorFrontendHost, resourceURL));
-    }
+    },
+
+    __proto__: WebInspector.Object.prototype
 }
+
 
 WebInspector.HandlerRegistry.EventTypes = {
     HandlersUpdated: "HandlersUpdated"
 }
-
-WebInspector.HandlerRegistry.prototype.__proto__ = WebInspector.Object.prototype;
 
 /**
  * @constructor

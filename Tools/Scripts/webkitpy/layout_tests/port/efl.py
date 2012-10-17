@@ -32,7 +32,7 @@ import os
 from webkitpy.layout_tests.models.test_configuration import TestConfiguration
 from webkitpy.layout_tests.port.base import Port
 from webkitpy.layout_tests.port.pulseaudio_sanitizer import PulseAudioSanitizer
-
+from webkitpy.layout_tests.port.xvfbdriver import XvfbDriver
 
 class EflPort(Port, PulseAudioSanitizer):
     port_name = 'efl'
@@ -80,6 +80,9 @@ class EflPort(Port, PulseAudioSanitizer):
     def _generate_all_test_configurations(self):
         return [TestConfiguration(version=self._version, architecture='x86', build_type=build_type) for build_type in self.ALL_BUILD_TYPES]
 
+    def _driver_class(self):
+        return XvfbDriver
+
     def _path_to_driver(self):
         return self._build_path('bin', self.driver_name())
 
@@ -98,18 +101,22 @@ class EflPort(Port, PulseAudioSanitizer):
         search_paths = []
         if self.get_option('webkit_test_runner'):
             search_paths.append(self.port_name + '-wk2')
+            search_paths.append('wk2')
         else:
             search_paths.append(self.port_name + '-wk1')
         search_paths.append(self.port_name)
         return search_paths
 
     def expectations_files(self):
+        # FIXME: We should be able to use the default algorithm here.
         return list(reversed([self._filesystem.join(self._webkit_baseline_path(p), 'TestExpectations') for p in self._search_paths()]))
 
     def show_results_html_file(self, results_filename):
         # FIXME: We should find a way to share this implmentation with Gtk,
         # or teach run-launcher how to call run-safari and move this down to WebKitPort.
         run_launcher_args = ["file://%s" % results_filename]
+        if self.get_option('webkit_test_runner'):
+            run_launcher_args.append('-2')
         # FIXME: old-run-webkit-tests also added ["-graphicssystem", "raster", "-style", "windows"]
         # FIXME: old-run-webkit-tests converted results_filename path for cygwin.
         self._run_script("run-launcher", run_launcher_args)

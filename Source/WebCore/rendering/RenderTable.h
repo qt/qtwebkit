@@ -143,8 +143,16 @@ public:
         recalcSections();
     }
 
-    Vector<ColumnStruct>& columns() { return m_columns; }
-    Vector<int>& columnPositions() { return m_columnPos; }
+    const Vector<ColumnStruct>& columns() const { return m_columns; }
+    const Vector<int>& columnPositions() const { return m_columnPos; }
+    void setColumnPosition(unsigned index, int position)
+    {
+        // Note that if our horizontal border-spacing changed, our position will change but not
+        // our column's width. In practice, horizontal border-spacing won't change often.
+        m_columnLogicalWidthChanged |= m_columnPos[index] != position;
+        m_columnPos[index] = position;
+    }
+
     RenderTableSection* header() const { return m_head; }
     RenderTableSection* footer() const { return m_foot; }
     RenderTableSection* firstBody() const { return m_firstBody; }
@@ -198,7 +206,13 @@ public:
     // Return the first column or column-group.
     RenderTableCol* firstColumn() const;
 
-    RenderTableCol* colElement(unsigned col, bool* startEdge = 0, bool* endEdge = 0) const;
+    RenderTableCol* colElement(unsigned col, bool* startEdge = 0, bool* endEdge = 0) const
+    {
+        // The common case is to not have columns, make that case fast.
+        if (!m_hasColElements)
+            return 0;
+        return slowColElement(col, startEdge, endEdge);
+    }
 
     bool needsSectionRecalc() const { return m_needsSectionRecalc; }
     void setNeedsSectionRecalc()
@@ -267,11 +281,11 @@ private:
     virtual LayoutUnit firstLineBoxBaseline() const OVERRIDE;
     virtual LayoutUnit lastLineBoxBaseline() const OVERRIDE;
 
+    RenderTableCol* slowColElement(unsigned col, bool* startEdge, bool* endEdge) const;
+
     virtual RenderBlock* firstLineBlock() const;
     virtual void updateFirstLetter();
     
-    virtual void setCellLogicalWidths();
-
     virtual void updateLogicalWidth() OVERRIDE;
 
     LayoutUnit convertStyleLogicalWidthToComputedWidth(const Length& styleLogicalWidth, LayoutUnit availableWidth);
@@ -304,7 +318,8 @@ private:
     
     mutable bool m_hasColElements : 1;
     mutable bool m_needsSectionRecalc : 1;
-    
+    bool m_columnLogicalWidthChanged : 1;
+
     short m_hSpacing;
     short m_vSpacing;
     int m_borderStart;

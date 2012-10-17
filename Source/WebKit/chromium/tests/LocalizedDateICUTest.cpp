@@ -30,7 +30,7 @@
 
 #include "config.h"
 
-#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
+#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
 
 #include "LocaleICU.h"
 #include <gtest/gtest.h>
@@ -105,11 +105,25 @@ protected:
         OwnPtr<LocaleICU> locale = LocaleICU::create(localeString);
         return Labels(locale->timeAMPMLabels());
     }
+
+    bool isRTL(const char* localeString)
+    {
+        OwnPtr<LocaleICU> locale = LocaleICU::create(localeString);
+        return locale->isRTL();
+    }
 };
 
 std::ostream& operator<<(std::ostream& os, const LocalizedDateICUTest::Labels& labels)
 {
     return os << labels.toString().utf8().data();
+}
+
+TEST_F(LocalizedDateICUTest, isRTL)
+{
+    EXPECT_TRUE(isRTL("ar-EG"));
+    EXPECT_FALSE(isRTL("en-us"));
+    EXPECT_FALSE(isRTL("ja-jp"));
+    EXPECT_FALSE(isRTL("**invalid**"));
 }
 
 TEST_F(LocalizedDateICUTest, localizedDateFormatText)

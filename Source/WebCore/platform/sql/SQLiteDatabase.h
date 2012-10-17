@@ -50,6 +50,7 @@ extern const int SQLResultRow;
 extern const int SQLResultSchema;
 extern const int SQLResultFull;
 extern const int SQLResultInterrupt;
+extern const int SQLResultConstraint;
 
 class SQLiteDatabase {
     WTF_MAKE_NONCOPYABLE(SQLiteDatabase);
@@ -63,6 +64,8 @@ public:
     void close();
     void interrupt();
     bool isInterrupted();
+
+    void updateLastChangesCount();
 
     bool executeCommand(const String&);
     bool returnsAtLeastOneResult(const String&);
@@ -157,6 +160,8 @@ private:
 
     int m_openError;
     CString m_openErrorMessage;
+
+    int m_lastChangesCount;
 };
 
 } // namespace WebCore

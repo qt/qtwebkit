@@ -23,6 +23,7 @@
 
 #include "GraphicsContext.h"
 #include "Image.h"
+#include "LengthFunctions.h"
 #include "NotImplemented.h"
 #include "TextureMapperShaderManager.h"
 #include "Timer.h"
@@ -72,7 +73,7 @@ public:
         {
             GLContextDataMap::iterator it = glContextDataMap().find(context->platformGraphicsContext3D());
             if (it != glContextDataMap().end())
-                return it->second;
+                return it->value;
 
             return adoptRef(new SharedGLData(context));
         }
@@ -92,7 +93,7 @@ public:
             GLContextDataMap::const_iterator end = glContextDataMap().end();
             GLContextDataMap::iterator it;
             for (it = glContextDataMap().begin(); it != end; ++it) {
-                if (it->second == this)
+                if (it->value == this)
                     break;
             }
 
@@ -266,7 +267,7 @@ void TextureMapperGL::endPainting()
 
 void TextureMapperGL::drawQuad(const DrawQuad& quadToDraw, const TransformationMatrix& modelViewMatrix, TextureMapperShaderProgram* shaderProgram, GC3Denum drawingMode, bool needsBlending)
 {
-    m_context3D->enableVertexAttribArray(shaderProgram->vertexAttrib());
+    m_context3D->enableVertexAttribArray(shaderProgram->vertexLocation());
     m_context3D->bindBuffer(GraphicsContext3D::ARRAY_BUFFER, 0);
 
     const GC3Dfloat quad[] = {
@@ -275,7 +276,7 @@ void TextureMapperGL::drawQuad(const DrawQuad& quadToDraw, const TransformationM
         quadToDraw.targetRectMappedToUnitSquare.p3().x(), quadToDraw.targetRectMappedToUnitSquare.p3().y(),
         quadToDraw.targetRectMappedToUnitSquare.p4().x(), quadToDraw.targetRectMappedToUnitSquare.p4().y()
     };
-    m_context3D->vertexAttribPointer(shaderProgram->vertexAttrib(), 2, GraphicsContext3D::FLOAT, false, 0, GC3Dintptr(quad));
+    m_context3D->vertexAttribPointer(shaderProgram->vertexLocation(), 2, GraphicsContext3D::FLOAT, false, 0, GC3Dintptr(quad));
 
     TransformationMatrix matrix = TransformationMatrix(data().projectionMatrix).multiply(modelViewMatrix).multiply(TransformationMatrix(
             quadToDraw.originalTargetRect.width(), 0, 0, 0,
@@ -297,7 +298,7 @@ void TextureMapperGL::drawQuad(const DrawQuad& quadToDraw, const TransformationM
         m_context3D->disable(GraphicsContext3D::BLEND);
 
     m_context3D->drawArrays(drawingMode, 0, 4);
-    m_context3D->disableVertexAttribArray(shaderProgram->vertexAttrib());
+    m_context3D->disableVertexAttribArray(shaderProgram->vertexLocation());
 }
 
 void TextureMapperGL::drawBorder(const Color& color, float width, const FloatRect& targetRect, const TransformationMatrix& modelViewMatrix)
@@ -305,15 +306,12 @@ void TextureMapperGL::drawBorder(const Color& color, float width, const FloatRec
     if (clipStack().current().scissorBox.isEmpty())
         return;
 
-    RefPtr<TextureMapperShaderProgramSolidColor> program = data().sharedGLData().textureMapperShaderManager.solidColorProgram();
-    m_context3D->useProgram(program->id());
+    RefPtr<TextureMapperShaderProgram> program = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::SolidColor);
+    m_context3D->useProgram(program->programID());
 
-    float alpha = color.alpha() / 255.0;
-    m_context3D->uniform4f(program->colorLocation(),
-                       (color.red() / 255.0) * alpha,
-                       (color.green() / 255.0) * alpha,
-                       (color.blue() / 255.0) * alpha,
-                       alpha);
+    float r, g, b, a;
+    color.getRGBA(r, g, b, a);
+    m_context3D->uniform4f(program->colorLocation(), r, g, b, a);
     m_context3D->lineWidth(width);
 
     drawQuad(targetRect, modelViewMatrix, program.get(), GraphicsContext3D::LINE_LOOP, color.hasAlpha());
@@ -368,27 +366,25 @@ void TextureMapperGL::drawTextureRectangleARB(uint32_t texture, Flags flags, con
 {
     RefPtr<TextureMapperShaderProgram> program;
     if (maskTexture)
-        program = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::RectOpacityAndMask);
+        program = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::MaskedRect);
     else
-        program = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::RectSimple);
-    m_context3D->useProgram(program->id());
+        program = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::Rect);
+    m_context3D->useProgram(program->programID());
 
-    m_context3D->enableVertexAttribArray(program->vertexAttrib());
+    m_context3D->enableVertexAttribArray(program->vertexLocation());
     m_context3D->activeTexture(GraphicsContext3D::TEXTURE0);
     m_context3D->bindTexture(GL_TEXTURE_RECTANGLE_ARB, texture);
-    m_context3D->uniform1i(program->sourceTextureLocation(), 0);
+    m_context3D->uniform1i(program->samplerLocation(), 0);
 
     m_context3D->uniform1f(program->flipLocation(), !!(flags & ShouldFlipTexture));
     m_context3D->uniform2f(program->textureSizeLocation(), textureSize.width(), textureSize.height());
+    m_context3D->uniform1f(program->opacityLocation(), opacity);
 
-    if (TextureMapperShaderProgram::isValidUniformLocation(program->opacityLocation()))
-        m_context3D->uniform1f(program->opacityLocation(), opacity);
-
-    if (maskTexture && maskTexture->isValid() && TextureMapperShaderProgram::isValidUniformLocation(program->maskTextureLocation())) {
+    if (maskTexture && maskTexture->isValid()) {
         const BitmapTextureGL* maskTextureGL = static_cast<const BitmapTextureGL*>(maskTexture);
         m_context3D->activeTexture(GraphicsContext3D::TEXTURE1);
         m_context3D->bindTexture(GraphicsContext3D::TEXTURE_2D, maskTextureGL->id());
-        m_context3D->uniform1i(program->maskTextureLocation(), 1);
+        m_context3D->uniform1i(program->maskLocation(), 1);
         m_context3D->activeTexture(GraphicsContext3D::TEXTURE0);
     }
 
@@ -405,10 +401,10 @@ void TextureMapperGL::drawTexture(uint32_t texture, Flags flags, const IntSize& 
 
     RefPtr<TextureMapperShaderProgram> program;
     if (maskTexture)
-        program = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::OpacityAndMask);
+        program = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::Masked);
     else
-        program = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::Simple);
-    m_context3D->useProgram(program->id());
+        program = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::Default);
+    m_context3D->useProgram(program->programID());
 
     drawTexturedQuadWithProgram(program.get(), texture, flags, targetRect, modelViewMatrix, opacity, maskTexture);
 }
@@ -536,8 +532,8 @@ bool TextureMapperGL::drawTextureWithAntialiasing(uint32_t texture, Flags flags,
     quadToEdgeArray(expandedQuadInScreenSpace, targetQuadEdges);
     quadToEdgeArray(inflateQuad(quadInScreenSpace.boundingBox(),  inflationDistance), targetQuadEdges + 12);
 
-    RefPtr<TextureMapperShaderProgramAntialiasingNoMask> program = data().sharedGLData().textureMapperShaderManager.antialiasingNoMaskProgram();
-    m_context3D->useProgram(program->id());
+    RefPtr<TextureMapperShaderProgram> program = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::Antialiased);
+    m_context3D->useProgram(program->programID());
     m_context3D->uniform3fv(program->expandedQuadEdgesInScreenSpaceLocation(), 8, targetQuadEdges);
 
     drawTexturedQuadWithProgram(program.get(), texture, flags, DrawQuad(originalTargetRect, expandedQuadInTextureCoordinates), modelViewMatrix, opacity, 0 /* maskTexture */);
@@ -546,26 +542,33 @@ bool TextureMapperGL::drawTextureWithAntialiasing(uint32_t texture, Flags flags,
 
 void TextureMapperGL::drawTexturedQuadWithProgram(TextureMapperShaderProgram* program, uint32_t texture, Flags flags, const DrawQuad& quadToDraw, const TransformationMatrix& modelViewMatrix, float opacity, const BitmapTexture* maskTexture)
 {
-    m_context3D->enableVertexAttribArray(program->vertexAttrib());
+    m_context3D->enableVertexAttribArray(program->vertexLocation());
     m_context3D->activeTexture(GraphicsContext3D::TEXTURE0);
     m_context3D->bindTexture(GraphicsContext3D::TEXTURE_2D, texture);
-    m_context3D->uniform1i(program->sourceTextureLocation(), 0);
+    m_context3D->uniform1i(program->samplerLocation(), 0);
 
     m_context3D->uniform1f(program->flipLocation(), !!(flags & ShouldFlipTexture));
+    m_context3D->uniform1f(program->opacityLocation(), opacity);
 
-    if (TextureMapperShaderProgram::isValidUniformLocation(program->opacityLocation()))
-        m_context3D->uniform1f(program->opacityLocation(), opacity);
-
-    if (maskTexture && maskTexture->isValid() && TextureMapperShaderProgram::isValidUniformLocation(program->maskTextureLocation())) {
+    if (maskTexture && maskTexture->isValid()) {
         const BitmapTextureGL* maskTextureGL = static_cast<const BitmapTextureGL*>(maskTexture);
         m_context3D->activeTexture(GraphicsContext3D::TEXTURE1);
         m_context3D->bindTexture(GraphicsContext3D::TEXTURE_2D, maskTextureGL->id());
-        m_context3D->uniform1i(program->maskTextureLocation(), 1);
+        m_context3D->uniform1i(program->maskLocation(), 1);
         m_context3D->activeTexture(GraphicsContext3D::TEXTURE0);
     }
 
     bool needsBlending = (flags & SupportsBlending) || opacity < 0.99 || maskTexture;
     drawQuad(quadToDraw, modelViewMatrix, program, GraphicsContext3D::TRIANGLE_FAN, needsBlending);
+}
+
+BitmapTextureGL::BitmapTextureGL(TextureMapperGL* textureMapper)
+    : m_id(0)
+    , m_fbo(0)
+    , m_rbo(0)
+    , m_shouldClear(true)
+    , m_context3D(textureMapper->graphicsContext3D())
+{
 }
 
 bool BitmapTextureGL::canReuseWith(const IntSize& contentsSize, Flags)
@@ -611,10 +614,8 @@ static bool driverSupportsSubImage()
 
 void BitmapTextureGL::didReset()
 {
-    GraphicsContext3D* context3D = m_textureMapper->graphicsContext3D();
-
     if (!m_id)
-        m_id = context3D->createTexture();
+        m_id = m_context3D->createTexture();
 
     m_shouldClear = true;
     if (m_textureSize == contentSize())
@@ -623,21 +624,19 @@ void BitmapTextureGL::didReset()
     Platform3DObject format = driverSupportsBGRASwizzling() ? GraphicsContext3D::BGRA : GraphicsContext3D::RGBA;
 
     m_textureSize = contentSize();
-    context3D->bindTexture(GraphicsContext3D::TEXTURE_2D, m_id);
-    context3D->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MIN_FILTER, GraphicsContext3D::LINEAR);
-    context3D->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MAG_FILTER, GraphicsContext3D::LINEAR);
-    context3D->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_WRAP_S, GraphicsContext3D::CLAMP_TO_EDGE);
-    context3D->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_WRAP_T, GraphicsContext3D::CLAMP_TO_EDGE);
-    context3D->texImage2DDirect(GraphicsContext3D::TEXTURE_2D, 0, GraphicsContext3D::RGBA, m_textureSize.width(), m_textureSize.height(), 0, format, DEFAULT_TEXTURE_PIXEL_TRANSFER_TYPE, 0);
+    m_context3D->bindTexture(GraphicsContext3D::TEXTURE_2D, m_id);
+    m_context3D->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MIN_FILTER, GraphicsContext3D::LINEAR);
+    m_context3D->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MAG_FILTER, GraphicsContext3D::LINEAR);
+    m_context3D->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_WRAP_S, GraphicsContext3D::CLAMP_TO_EDGE);
+    m_context3D->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_WRAP_T, GraphicsContext3D::CLAMP_TO_EDGE);
+    m_context3D->texImage2DDirect(GraphicsContext3D::TEXTURE_2D, 0, GraphicsContext3D::RGBA, m_textureSize.width(), m_textureSize.height(), 0, format, DEFAULT_TEXTURE_PIXEL_TRANSFER_TYPE, 0);
 }
 
 
 void BitmapTextureGL::updateContents(const void* data, const IntRect& targetRect, const IntPoint& sourceOffset, int bytesPerLine)
 {
-    GraphicsContext3D* context3D = m_textureMapper->graphicsContext3D();
-
     Platform3DObject glFormat = GraphicsContext3D::RGBA;
-    context3D->bindTexture(GraphicsContext3D::TEXTURE_2D, m_id);
+    m_context3D->bindTexture(GraphicsContext3D::TEXTURE_2D, m_id);
 
     const unsigned bytesPerPixel = 4;
     if (driverSupportsBGRASwizzling())
@@ -645,8 +644,8 @@ void BitmapTextureGL::updateContents(const void* data, const IntRect& targetRect
     else
         swizzleBGRAToRGBA(reinterpret_cast<uint32_t*>(const_cast<void*>(data)), IntRect(sourceOffset, targetRect.size()), bytesPerLine / bytesPerPixel);
 
-    if (bytesPerLine == targetRect.width() / 4 && sourceOffset == IntPoint::zero()) {
-        context3D->texSubImage2D(GraphicsContext3D::TEXTURE_2D, 0, targetRect.x(), targetRect.y(), targetRect.width(), targetRect.height(), glFormat, DEFAULT_TEXTURE_PIXEL_TRANSFER_TYPE, (const char*)data);
+    if (bytesPerLine == targetRect.width() * bytesPerPixel && sourceOffset == IntPoint::zero()) {
+        m_context3D->texSubImage2D(GraphicsContext3D::TEXTURE_2D, 0, targetRect.x(), targetRect.y(), targetRect.width(), targetRect.height(), glFormat, DEFAULT_TEXTURE_PIXEL_TRANSFER_TYPE, (const char*)data);
         return;
     }
 
@@ -664,19 +663,19 @@ void BitmapTextureGL::updateContents(const void* data, const IntRect& targetRect
             dst += targetBytesPerLine;
         }
 
-        context3D->texSubImage2D(GraphicsContext3D::TEXTURE_2D, 0, targetRect.x(), targetRect.y(), targetRect.width(), targetRect.height(), glFormat, DEFAULT_TEXTURE_PIXEL_TRANSFER_TYPE, temporaryData.data());
+        m_context3D->texSubImage2D(GraphicsContext3D::TEXTURE_2D, 0, targetRect.x(), targetRect.y(), targetRect.width(), targetRect.height(), glFormat, DEFAULT_TEXTURE_PIXEL_TRANSFER_TYPE, temporaryData.data());
         return;
     }
 
 #if !defined(TEXMAP_OPENGL_ES_2)
     // Use the OpenGL sub-image extension, now that we know it's available.
-    context3D->pixelStorei(GL_UNPACK_ROW_LENGTH, bytesPerLine / bytesPerPixel);
-    context3D->pixelStorei(GL_UNPACK_SKIP_ROWS, sourceOffset.y());
-    context3D->pixelStorei(GL_UNPACK_SKIP_PIXELS, sourceOffset.x());
-    context3D->texSubImage2D(GraphicsContext3D::TEXTURE_2D, 0, targetRect.x(), targetRect.y(), targetRect.width(), targetRect.height(), glFormat, DEFAULT_TEXTURE_PIXEL_TRANSFER_TYPE, (const char*)data);
-    context3D->pixelStorei(GL_UNPACK_ROW_LENGTH, 0);
-    context3D->pixelStorei(GL_UNPACK_SKIP_ROWS, 0);
-    context3D->pixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
+    m_context3D->pixelStorei(GL_UNPACK_ROW_LENGTH, bytesPerLine / bytesPerPixel);
+    m_context3D->pixelStorei(GL_UNPACK_SKIP_ROWS, sourceOffset.y());
+    m_context3D->pixelStorei(GL_UNPACK_SKIP_PIXELS, sourceOffset.x());
+    m_context3D->texSubImage2D(GraphicsContext3D::TEXTURE_2D, 0, targetRect.x(), targetRect.y(), targetRect.width(), targetRect.height(), glFormat, DEFAULT_TEXTURE_PIXEL_TRANSFER_TYPE, (const char*)data);
+    m_context3D->pixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+    m_context3D->pixelStorei(GL_UNPACK_SKIP_ROWS, 0);
+    m_context3D->pixelStorei(GL_UNPACK_SKIP_PIXELS, 0);
 #endif
 }
 
@@ -692,8 +691,9 @@ void BitmapTextureGL::updateContents(Image* image, const IntRect& targetRect, co
     const char* imageData;
 
 #if PLATFORM(QT)
-    imageData = reinterpret_cast<const char*>(frameImage->constBits());
-    bytesPerLine = frameImage->bytesPerLine();
+    QImage qImage = frameImage->toImage();
+    imageData = reinterpret_cast<const char*>(qImage.constBits());
+    bytesPerLine = qImage.bytesPerLine();
 #elif USE(CAIRO)
     cairo_surface_t* surface = frameImage->surface();
     imageData = reinterpret_cast<const char*>(cairo_image_surface_get_data(surface));
@@ -704,48 +704,193 @@ void BitmapTextureGL::updateContents(Image* image, const IntRect& targetRect, co
 }
 
 #if ENABLE(CSS_FILTERS)
-void TextureMapperGL::drawFiltered(const BitmapTexture& sourceTexture, const BitmapTexture& contentTexture, const FilterOperation& filter, int pass)
+
+static TextureMapperShaderManager::ShaderKey keyForFilterType(FilterOperation::OperationType type, unsigned pass)
 {
-    // For standard filters, we always draw the whole texture without transformations.
-    RefPtr<StandardFilterProgram> program = data().sharedGLData().textureMapperShaderManager.getShaderForFilter(filter, pass);
-    ASSERT(program);
-
-    program->prepare(filter, pass, sourceTexture.contentSize(), static_cast<const BitmapTextureGL&>(contentTexture).id());
-
-    m_context3D->enableVertexAttribArray(program->vertexAttrib());
-    m_context3D->enableVertexAttribArray(program->texCoordAttrib());
-    m_context3D->activeTexture(GraphicsContext3D::TEXTURE0);
-    m_context3D->bindTexture(GraphicsContext3D::TEXTURE_2D, static_cast<const BitmapTextureGL&>(sourceTexture).id());
-    m_context3D->uniform1i(program->textureUniform(), 0);
-    const GC3Dfloat targetVertices[] = {-1, -1, 1, -1, 1, 1, -1, 1};
-    const GC3Dfloat sourceVertices[] = {0, 0, 1, 0, 1, 1, 0, 1};
-    m_context3D->vertexAttribPointer(program->vertexAttrib(), 2, GraphicsContext3D::FLOAT, false, 0, GC3Dintptr(targetVertices));
-    m_context3D->vertexAttribPointer(program->texCoordAttrib(), 2, GraphicsContext3D::FLOAT, false, 0, GC3Dintptr(sourceVertices));
-    m_context3D->disable(GraphicsContext3D::BLEND);
-    m_context3D->drawArrays(GraphicsContext3D::TRIANGLE_FAN, 0, 4);
-    m_context3D->disableVertexAttribArray(program->vertexAttrib());
-    m_context3D->disableVertexAttribArray(program->texCoordAttrib());
+    switch (type) {
+    case FilterOperation::GRAYSCALE:
+        return TextureMapperShaderManager::GrayscaleFilter;
+    case FilterOperation::SEPIA:
+        return TextureMapperShaderManager::SepiaFilter;
+    case FilterOperation::SATURATE:
+        return TextureMapperShaderManager::SaturateFilter;
+    case FilterOperation::HUE_ROTATE:
+        return TextureMapperShaderManager::HueRotateFilter;
+    case FilterOperation::INVERT:
+        return TextureMapperShaderManager::InvertFilter;
+    case FilterOperation::BRIGHTNESS:
+        return TextureMapperShaderManager::BrightnessFilter;
+    case FilterOperation::CONTRAST:
+        return TextureMapperShaderManager::ContrastFilter;
+    case FilterOperation::OPACITY:
+        return TextureMapperShaderManager::OpacityFilter;
+    case FilterOperation::BLUR:
+        return TextureMapperShaderManager::BlurFilter;
+    case FilterOperation::DROP_SHADOW:
+        return pass ? TextureMapperShaderManager::ShadowFilterPass2 : TextureMapperShaderManager::ShadowFilterPass1;
+    default:
+        ASSERT_NOT_REACHED();
+        return TextureMapperShaderManager::Invalid;
+    }
 }
 
-PassRefPtr<BitmapTexture> BitmapTextureGL::applyFilters(const BitmapTexture& contentTexture, const FilterOperations& filters)
+static unsigned getPassesRequiredForFilter(FilterOperation::OperationType type)
 {
-    RefPtr<BitmapTexture> previousSurface = m_textureMapper->data().currentSurface;
+    switch (type) {
+    case FilterOperation::GRAYSCALE:
+    case FilterOperation::SEPIA:
+    case FilterOperation::SATURATE:
+    case FilterOperation::HUE_ROTATE:
+    case FilterOperation::INVERT:
+    case FilterOperation::BRIGHTNESS:
+    case FilterOperation::CONTRAST:
+    case FilterOperation::OPACITY:
+        return 1;
+    case FilterOperation::BLUR:
+    case FilterOperation::DROP_SHADOW:
+        // We use two-passes (vertical+horizontal) for blur and drop-shadow.
+        return 2;
+    default:
+        return 0;
+    }
+}
+
+// Create a normal distribution of 21 values between -2 and 2.
+static const int GaussianKernelHalfWidth = 11;
+static const float GaussianKernelStep = 0.2;
+
+static inline float gauss(float x)
+{
+    return exp(-(x * x) / 2.);
+}
+
+static float* gaussianKernel()
+{
+    static bool prepared = false;
+    static float kernel[GaussianKernelHalfWidth] = {0, };
+
+    if (prepared)
+        return kernel;
+
+    kernel[0] = gauss(0);
+    float sum = kernel[0];
+    for (unsigned i = 1; i < GaussianKernelHalfWidth; ++i) {
+        kernel[i] = gauss(i * GaussianKernelStep);
+        sum += 2 * kernel[i];
+    }
+
+    // Normalize the kernel.
+    float scale = 1 / sum;
+    for (unsigned i = 0; i < GaussianKernelHalfWidth; ++i)
+        kernel[i] *= scale;
+
+    prepared = true;
+    return kernel;
+}
+
+static void prepareFilterProgram(TextureMapperShaderProgram* program, const FilterOperation& operation, unsigned pass, const IntSize& size, GC3Duint contentTexture)
+{
+    RefPtr<GraphicsContext3D> context = program->context();
+    context->useProgram(program->programID());
+
+    switch (operation.getOperationType()) {
+    case FilterOperation::GRAYSCALE:
+    case FilterOperation::SEPIA:
+    case FilterOperation::SATURATE:
+    case FilterOperation::HUE_ROTATE:
+        context->uniform1f(program->amountLocation(), static_cast<const BasicColorMatrixFilterOperation&>(operation).amount());
+        break;
+    case FilterOperation::INVERT:
+    case FilterOperation::BRIGHTNESS:
+    case FilterOperation::CONTRAST:
+    case FilterOperation::OPACITY:
+        context->uniform1f(program->amountLocation(), static_cast<const BasicComponentTransferFilterOperation&>(operation).amount());
+        break;
+    case FilterOperation::BLUR: {
+        const BlurFilterOperation& blur = static_cast<const BlurFilterOperation&>(operation);
+        FloatSize radius;
+
+        // Blur is done in two passes, first horizontally and then vertically. The same shader is used for both.
+        if (pass)
+            radius.setHeight(floatValueForLength(blur.stdDeviation(), size.height()) / size.height());
+        else
+            radius.setWidth(floatValueForLength(blur.stdDeviation(), size.width()) / size.width());
+
+        context->uniform2f(program->blurRadiusLocation(), radius.width(), radius.height());
+        context->uniform1fv(program->gaussianKernelLocation(), GaussianKernelHalfWidth, gaussianKernel());
+        break;
+    }
+    case FilterOperation::DROP_SHADOW: {
+        const DropShadowFilterOperation& shadow = static_cast<const DropShadowFilterOperation&>(operation);
+        context->uniform1fv(program->gaussianKernelLocation(), GaussianKernelHalfWidth, gaussianKernel());
+        switch (pass) {
+        case 0:
+            // First pass: vertical alpha blur.
+            context->uniform2f(program->shadowOffsetLocation(), float(shadow.location().x()) / float(size.width()), float(shadow.location().y()) / float(size.height()));
+            context->uniform1f(program->blurRadiusLocation(), shadow.stdDeviation() / float(size.width()));
+            break;
+        case 1:
+            // Second pass: we need the shadow color and the content texture for compositing.
+            context->uniform1f(program->blurRadiusLocation(), shadow.stdDeviation() / float(size.height()));
+            context->activeTexture(GraphicsContext3D::TEXTURE1);
+            context->bindTexture(GraphicsContext3D::TEXTURE_2D, contentTexture);
+            context->uniform1i(program->contentTextureLocation(), 1);
+            float r, g, b, a;
+            shadow.color().getRGBA(r, g, b, a);
+            context->uniform4f(program->shadowColorLocation(), r, g, b, a);
+            break;
+        }
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+void TextureMapperGL::drawFiltered(const BitmapTexture& sampler, const BitmapTexture& contentTexture, const FilterOperation& filter, int pass)
+{
+    // For standard filters, we always draw the whole texture without transformations.
+    TextureMapperShaderManager::ShaderKey key = keyForFilterType(filter.getOperationType(), pass);
+    RefPtr<TextureMapperShaderProgram> program = data().sharedGLData().textureMapperShaderManager.getShaderProgram(key);
+    ASSERT(program);
+
+    prepareFilterProgram(program.get(), filter, pass, sampler.contentSize(), static_cast<const BitmapTextureGL&>(contentTexture).id());
+
+    m_context3D->enableVertexAttribArray(program->vertexLocation());
+    m_context3D->enableVertexAttribArray(program->texCoordLocation());
+    m_context3D->activeTexture(GraphicsContext3D::TEXTURE0);
+    m_context3D->bindTexture(GraphicsContext3D::TEXTURE_2D, static_cast<const BitmapTextureGL&>(sampler).id());
+    m_context3D->uniform1i(program->samplerLocation(), 0);
+    const GC3Dfloat targetVertices[] = {-1, -1, 1, -1, 1, 1, -1, 1};
+    const GC3Dfloat sourceVertices[] = {0, 0, 1, 0, 1, 1, 0, 1};
+    m_context3D->vertexAttribPointer(program->vertexLocation(), 2, GraphicsContext3D::FLOAT, false, 0, GC3Dintptr(targetVertices));
+    m_context3D->vertexAttribPointer(program->texCoordLocation(), 2, GraphicsContext3D::FLOAT, false, 0, GC3Dintptr(sourceVertices));
+    m_context3D->disable(GraphicsContext3D::BLEND);
+    m_context3D->drawArrays(GraphicsContext3D::TRIANGLE_FAN, 0, 4);
+    m_context3D->disableVertexAttribArray(program->vertexLocation());
+    m_context3D->disableVertexAttribArray(program->texCoordLocation());
+}
+
+PassRefPtr<BitmapTexture> BitmapTextureGL::applyFilters(TextureMapper* textureMapper, const BitmapTexture& contentTexture, const FilterOperations& filters)
+{
+    TextureMapperGL* textureMapperGL = static_cast<TextureMapperGL*>(textureMapper);
+    RefPtr<BitmapTexture> previousSurface = textureMapperGL->data().currentSurface;
 
     RefPtr<BitmapTexture> source = this;
-    RefPtr<BitmapTexture> target = m_textureMapper->acquireTextureFromPool(m_textureSize);
-    for (int i = 0; i < filters.size(); ++i) {
+    RefPtr<BitmapTexture> target = textureMapper->acquireTextureFromPool(m_textureSize);
+    for (size_t i = 0; i < filters.size(); ++i) {
         const FilterOperation* filter = filters.at(i);
         ASSERT(filter);
 
-        int numPasses = m_textureMapper->data().sharedGLData().textureMapperShaderManager.getPassesRequiredForFilter(*filter);
+        int numPasses = getPassesRequiredForFilter(filter->getOperationType());
         for (int j = 0; j < numPasses; ++j) {
-            m_textureMapper->bindSurface(target.get());
-            m_textureMapper->drawFiltered((i || j) ? *source : contentTexture, contentTexture, *filter, j);
+            textureMapperGL->bindSurface(target.get());
+            textureMapperGL->drawFiltered((i || j) ? *source : contentTexture, contentTexture, *filter, j);
             std::swap(source, target);
         }
     }
 
-    m_textureMapper->bindSurface(previousSurface.get());
+    textureMapperGL->bindSurface(previousSurface.get());
     return source;
 }
 #endif
@@ -766,18 +911,17 @@ void BitmapTextureGL::initializeStencil()
     if (m_rbo)
         return;
 
-    GraphicsContext3D* context3D = m_textureMapper->graphicsContext3D();
-    m_rbo = context3D->createRenderbuffer();
-    context3D->bindRenderbuffer(GraphicsContext3D::RENDERBUFFER, m_rbo);
+    m_rbo = m_context3D->createRenderbuffer();
+    m_context3D->bindRenderbuffer(GraphicsContext3D::RENDERBUFFER, m_rbo);
 #ifdef TEXMAP_OPENGL_ES_2
-    context3D->renderbufferStorage(GraphicsContext3D::RENDERBUFFER, GraphicsContext3D::STENCIL_INDEX8, m_textureSize.width(), m_textureSize.height());
+    m_context3D->renderbufferStorage(GraphicsContext3D::RENDERBUFFER, GraphicsContext3D::STENCIL_INDEX8, m_textureSize.width(), m_textureSize.height());
 #else
-    context3D->renderbufferStorage(GraphicsContext3D::RENDERBUFFER, GraphicsContext3D::DEPTH_STENCIL, m_textureSize.width(), m_textureSize.height());
+    m_context3D->renderbufferStorage(GraphicsContext3D::RENDERBUFFER, GraphicsContext3D::DEPTH_STENCIL, m_textureSize.width(), m_textureSize.height());
 #endif
-    context3D->bindRenderbuffer(GraphicsContext3D::RENDERBUFFER, 0);
-    context3D->framebufferRenderbuffer(GraphicsContext3D::FRAMEBUFFER, GraphicsContext3D::STENCIL_ATTACHMENT, GraphicsContext3D::RENDERBUFFER, m_rbo);
-    context3D->clearStencil(0);
-    context3D->clear(GraphicsContext3D::STENCIL_BUFFER_BIT);
+    m_context3D->bindRenderbuffer(GraphicsContext3D::RENDERBUFFER, 0);
+    m_context3D->framebufferRenderbuffer(GraphicsContext3D::FRAMEBUFFER, GraphicsContext3D::STENCIL_ATTACHMENT, GraphicsContext3D::RENDERBUFFER, m_rbo);
+    m_context3D->clearStencil(0);
+    m_context3D->clear(GraphicsContext3D::STENCIL_BUFFER_BIT);
 }
 
 void BitmapTextureGL::clearIfNeeded()
@@ -785,12 +929,10 @@ void BitmapTextureGL::clearIfNeeded()
     if (!m_shouldClear)
         return;
 
-    GraphicsContext3D* context3D = m_textureMapper->graphicsContext3D();
-
     m_clipStack.init(IntRect(IntPoint::zero(), m_textureSize));
-    m_clipStack.apply(context3D);
-    context3D->clearColor(0, 0, 0, 0);
-    context3D->clear(GraphicsContext3D::COLOR_BUFFER_BIT);
+    m_clipStack.apply(m_context3D.get());
+    m_context3D->clearColor(0, 0, 0, 0);
+    m_context3D->clear(GraphicsContext3D::COLOR_BUFFER_BIT);
     m_shouldClear = false;
 }
 
@@ -799,37 +941,33 @@ void BitmapTextureGL::createFboIfNeeded()
     if (m_fbo)
         return;
 
-    GraphicsContext3D* context3D = m_textureMapper->graphicsContext3D();
-    m_fbo = context3D->createFramebuffer();
-    context3D->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, m_fbo);
-    context3D->framebufferTexture2D(GraphicsContext3D::FRAMEBUFFER, GraphicsContext3D::COLOR_ATTACHMENT0, GraphicsContext3D::TEXTURE_2D, id(), 0);
+    m_fbo = m_context3D->createFramebuffer();
+    m_context3D->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, m_fbo);
+    m_context3D->framebufferTexture2D(GraphicsContext3D::FRAMEBUFFER, GraphicsContext3D::COLOR_ATTACHMENT0, GraphicsContext3D::TEXTURE_2D, id(), 0);
     m_shouldClear = true;
 }
 
-void BitmapTextureGL::bind()
+void BitmapTextureGL::bind(TextureMapperGL* textureMapper)
 {
-    GraphicsContext3D* context3D = m_textureMapper->graphicsContext3D();
-    context3D->bindTexture(GraphicsContext3D::TEXTURE_2D, 0);
+    m_context3D->bindTexture(GraphicsContext3D::TEXTURE_2D, 0);
     createFboIfNeeded();
-    context3D->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, m_fbo);
-    context3D->viewport(0, 0, m_textureSize.width(), m_textureSize.height());
+    m_context3D->bindFramebuffer(GraphicsContext3D::FRAMEBUFFER, m_fbo);
+    m_context3D->viewport(0, 0, m_textureSize.width(), m_textureSize.height());
     clearIfNeeded();
-    m_textureMapper->data().projectionMatrix = createProjectionMatrix(m_textureSize, true /* mirrored */);
-    m_clipStack.apply(context3D);
+    textureMapper->data().projectionMatrix = createProjectionMatrix(m_textureSize, true /* mirrored */);
+    m_clipStack.apply(m_context3D.get());
 }
 
 BitmapTextureGL::~BitmapTextureGL()
 {
-    GraphicsContext3D* context3D = m_textureMapper->graphicsContext3D();
-
     if (m_id)
-        context3D->deleteTexture(m_id);
+        m_context3D->deleteTexture(m_id);
 
     if (m_fbo)
-        context3D->deleteFramebuffer(m_fbo);
+        m_context3D->deleteFramebuffer(m_fbo);
 
     if (m_rbo)
-        context3D->deleteRenderbuffer(m_rbo);
+        m_context3D->deleteRenderbuffer(m_rbo);
 }
 
 bool BitmapTextureGL::isValid() const
@@ -864,7 +1002,7 @@ void TextureMapperGL::bindSurface(BitmapTexture *surface)
         return;
     }
 
-    static_cast<BitmapTextureGL*>(surface)->bind();
+    static_cast<BitmapTextureGL*>(surface)->bind(this);
     data().currentSurface = surface;
 }
 
@@ -895,12 +1033,12 @@ void TextureMapperGL::beginClip(const TransformationMatrix& modelViewMatrix, con
 
     data().initializeStencil();
 
-    RefPtr<TextureMapperShaderProgram> program = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::Simple);
+    RefPtr<TextureMapperShaderProgram> program = data().sharedGLData().textureMapperShaderManager.getShaderProgram(TextureMapperShaderManager::Default);
 
-    m_context3D->useProgram(program->id());
-    m_context3D->enableVertexAttribArray(program->vertexAttrib());
+    m_context3D->useProgram(program->programID());
+    m_context3D->enableVertexAttribArray(program->vertexLocation());
     const GC3Dfloat unitRect[] = {0, 0, 1, 0, 1, 1, 0, 1};
-    m_context3D->vertexAttribPointer(program->vertexAttrib(), 2, GraphicsContext3D::FLOAT, false, 0, GC3Dintptr(unitRect));
+    m_context3D->vertexAttribPointer(program->vertexLocation(), 2, GraphicsContext3D::FLOAT, false, 0, GC3Dintptr(unitRect));
 
     TransformationMatrix matrix = TransformationMatrix(data().projectionMatrix)
             .multiply(modelViewMatrix)
@@ -944,7 +1082,7 @@ void TextureMapperGL::beginClip(const TransformationMatrix& modelViewMatrix, con
     m_context3D->drawArrays(GraphicsContext3D::TRIANGLE_FAN, 0, 4);
 
     // Clear the state.
-    m_context3D->disableVertexAttribArray(program->vertexAttrib());
+    m_context3D->disableVertexAttribArray(program->vertexLocation());
     m_context3D->stencilMask(0);
 
     // Increase stencilIndex and apply stencil testing.

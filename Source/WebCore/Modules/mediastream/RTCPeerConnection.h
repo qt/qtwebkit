@@ -47,10 +47,13 @@
 namespace WebCore {
 
 class MediaConstraints;
+class MediaStreamTrack;
 class RTCConfiguration;
+class RTCDataChannel;
 class RTCErrorCallback;
 class RTCSessionDescription;
 class RTCSessionDescriptionCallback;
+class RTCStatsCallback;
 class VoidCallback;
 
 class RTCPeerConnection : public RefCounted<RTCPeerConnection>, public RTCPeerConnectionHandlerClient, public EventTarget, public ActiveDOMObject {
@@ -84,6 +87,10 @@ public:
 
     void removeStream(MediaStream*, ExceptionCode&);
 
+    void getStats(PassRefPtr<RTCStatsCallback> successCallback, PassRefPtr<MediaStreamTrack> selector);
+
+    PassRefPtr<RTCDataChannel> createDataChannel(String label, const Dictionary& dataChannelDict, ExceptionCode&);
+
     void close(ExceptionCode&);
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(negotiationneeded);
@@ -93,6 +100,7 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(addstream);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(removestream);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(icechange);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(datachannel);
 
     // RTCPeerConnectionHandlerClient
     virtual void negotiationNeeded() OVERRIDE;
@@ -101,6 +109,7 @@ public:
     virtual void didChangeIceState(IceState) OVERRIDE;
     virtual void didAddRemoteStream(PassRefPtr<MediaStreamDescriptor>) OVERRIDE;
     virtual void didRemoveRemoteStream(MediaStreamDescriptor*) OVERRIDE;
+    virtual void didAddRemoteDataChannel(PassRefPtr<RTCDataChannelDescriptor>) OVERRIDE;
 
     // EventTarget
     virtual const AtomicString& interfaceName() const OVERRIDE;
@@ -132,6 +141,8 @@ private:
 
     RefPtr<MediaStreamList> m_localStreams;
     RefPtr<MediaStreamList> m_remoteStreams;
+
+    Vector<RefPtr<RTCDataChannel> > m_dataChannels;
 
     OwnPtr<RTCPeerConnectionHandler> m_peerHandler;
 };

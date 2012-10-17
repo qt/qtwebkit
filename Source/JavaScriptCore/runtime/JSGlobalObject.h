@@ -24,10 +24,10 @@
 
 #include "JSArray.h"
 #include "JSGlobalData.h"
-#include "JSGlobalThis.h"
 #include "JSSegmentedVariableObject.h"
 #include "JSWeakObjectMapRefInternal.h"
 #include "NumberPrototype.h"
+#include "SpecialPointer.h"
 #include "StringPrototype.h"
 #include "StructureChain.h"
 #include "Watchpoint.h"
@@ -46,12 +46,12 @@ namespace JSC {
     class FunctionPrototype;
     class GetterSetter;
     class GlobalCodeBlock;
+    class JSStack;
     class LLIntOffsetsExtractor;
     class NativeErrorConstructor;
     class ProgramCodeBlock;
     class RegExpConstructor;
     class RegExpPrototype;
-    class RegisterFile;
 
     struct ActivationStackNode;
     struct HashTable;
@@ -77,7 +77,6 @@ namespace JSC {
 
     class JSGlobalObject : public JSSegmentedVariableObject {
     private:
-        typedef JSSegmentedVariableObject Base;
         typedef HashSet<RefPtr<OpaqueJSWeakObjectMap> > WeakMapSet;
 
         struct JSGlobalObjectRareData {
@@ -92,7 +91,7 @@ namespace JSC {
 
     protected:
 
-        Register m_globalCallFrame[RegisterFile::CallFrameHeaderSize];
+        Register m_globalCallFrame[JSStack::CallFrameHeaderSize];
 
         WriteBarrier<JSObject> m_globalThis;
         WriteBarrier<JSObject> m_methodCallDummy;
@@ -127,6 +126,7 @@ namespace JSC {
         WriteBarrier<Structure> m_nameScopeStructure;
         WriteBarrier<Structure> m_argumentsStructure;
         WriteBarrier<Structure> m_arrayStructure; // This gets set to m_arrayStructureForSlowPut as soon as we decide to have a bad time.
+        WriteBarrier<Structure> m_arrayStructureWithArrayStorage; // This gets set to m_arrayStructureForSlowPut as soon as we decide to have a bad time.
         WriteBarrier<Structure> m_arrayStructureForSlowPut;
         WriteBarrier<Structure> m_booleanObjectStructure;
         WriteBarrier<Structure> m_callbackConstructorStructure;
@@ -146,6 +146,8 @@ namespace JSC {
         WriteBarrier<Structure> m_regExpStructure;
         WriteBarrier<Structure> m_stringObjectStructure;
         WriteBarrier<Structure> m_internalFunctionStructure;
+        
+        void* m_specialPointers[Special::TableSize]; // Special pointers used by the LLInt and JIT.
 
         Debugger* m_debugger;
 
@@ -168,14 +170,16 @@ namespace JSC {
             if (m_rareData)
                 return;
             m_rareData = adoptPtr(new JSGlobalObjectRareData);
-            Heap::heap(this)->addFinalizer(this, clearRareData);
         }
         
     public:
+        typedef JSSegmentedVariableObject Base;
+
         static JSGlobalObject* create(JSGlobalData& globalData, Structure* structure)
         {
             JSGlobalObject* globalObject = new (NotNull, allocateCell<JSGlobalObject>(globalData.heap)) JSGlobalObject(globalData, structure);
             globalObject->finishCreation(globalData);
+            globalData.heap.addFinalizer(globalObject, destroy);
             return globalObject;
         }
 
@@ -192,7 +196,7 @@ namespace JSC {
             init(this);
         }
 
-        void finishCreation(JSGlobalData& globalData, JSGlobalThis* thisValue)
+        void finishCreation(JSGlobalData& globalData, JSObject* thisValue)
         {
             Base::finishCreation(globalData);
             structure()->setGlobalObject(globalData, this);
@@ -203,6 +207,8 @@ namespace JSC {
     public:
         JS_EXPORT_PRIVATE ~JSGlobalObject();
         JS_EXPORT_PRIVATE static void destroy(JSCell*);
+        // We don't need a destructor because we use a finalizer instead.
+        static const bool needsDestruction = false;
 
         JS_EXPORT_PRIVATE static void visitChildren(JSCell*, SlotVisitor&);
 
@@ -262,7 +268,9 @@ namespace JSC {
         Structure* nameScopeStructure() const { return m_nameScopeStructure.get(); }
         Structure* argumentsStructure() const { return m_argumentsStructure.get(); }
         Structure* arrayStructure() const { return m_arrayStructure.get(); }
+        Structure* arrayStructureWithArrayStorage() const { return m_arrayStructureWithArrayStorage.get(); }
         void* addressOfArrayStructure() { return &m_arrayStructure; }
+        void* addressOfArrayStructureWithArrayStorage() { return &m_arrayStructureWithArrayStorage; }
         Structure* booleanObjectStructure() const { return m_booleanObjectStructure.get(); }
         Structure* callbackConstructorStructure() const { return m_callbackConstructorStructure.get(); }
         Structure* callbackFunctionStructure() const { return m_callbackFunctionStructure.get(); }
@@ -281,6 +289,12 @@ namespace JSC {
         Structure* regExpMatchesArrayStructure() const { return m_regExpMatchesArrayStructure.get(); }
         Structure* regExpStructure() const { return m_regExpStructure.get(); }
         Structure* stringObjectStructure() const { return m_stringObjectStructure.get(); }
+
+        void* actualPointerFor(Special::Pointer pointer)
+        {
+            ASSERT(pointer < Special::TableSize);
+            return m_specialPointers[pointer];
+        }
 
         WatchpointSet* masqueradesAsUndefinedWatchpoint() { return m_masqueradesAsUndefinedWatchpoint.get(); }
         WatchpointSet* havingABadTimeWatchpoint() { return m_havingABadTimeWatchpoint.get(); }
@@ -366,13 +380,16 @@ namespace JSC {
         };
         JS_EXPORT_PRIVATE void addStaticGlobals(GlobalPropertyInfo*, int count);
 
+        JS_EXPORT_PRIVATE static JSC::JSObject* toThisObject(JSC::JSCell*, JSC::ExecState*);
+
+        JS_EXPORT_PRIVATE void setGlobalThis(JSGlobalData&, JSObject* globalThis);
+
     private:
         friend class LLIntOffsetsExtractor;
         
         // FIXME: Fold reset into init.
         JS_EXPORT_PRIVATE void init(JSObject* thisValue);
         void reset(JSValue prototype);
-        void setGlobalThis(JSGlobalData&, JSObject* globalThis);
 
         void createThrowTypeError(ExecState*);
 
@@ -465,7 +482,7 @@ namespace JSC {
 
     inline JSArray* constructEmptyArray(ExecState* exec, JSGlobalObject* globalObject, unsigned initialLength = 0)
     {
-        return JSArray::create(exec->globalData(), globalObject->arrayStructure(), initialLength);
+        return JSArray::create(exec->globalData(), initialLength >= MIN_SPARSE_ARRAY_INDEX ? globalObject->arrayStructureWithArrayStorage() : globalObject->arrayStructure(), initialLength);
     }
 
     inline JSArray* constructEmptyArray(ExecState* exec, unsigned initialLength = 0)

@@ -120,6 +120,9 @@ typedef enum {
     wkPatternTilingConstantSpacing
 } wkPatternTiling;
 extern void (*wkCGContextResetClip)(CGContextRef);
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
+extern bool (*wkCGContextDrawsWithCorrectShadowOffsets)(CGContextRef);
+#endif
 extern CGPatternRef (*wkCGPatternCreateWithImageAndTransform)(CGImageRef, CGAffineTransform, int);
 extern CFReadStreamRef (*wkCreateCustomCFReadStream)(void *(*formCreate)(CFReadStreamRef, void *), 
     void (*formFinalize)(CFReadStreamRef, void *), 
@@ -231,6 +234,17 @@ extern int (*wkGetNSEventMomentumPhase)(NSEvent *);
 #endif
 
 extern CTLineRef (*wkCreateCTLineWithUniCharProvider)(const UniChar* (*provide)(CFIndex stringIndex, CFIndex* charCount, CFDictionaryRef* attributes, void*), void (*dispose)(const UniChar* chars, void*), void*);
+
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+enum {
+    wkCTFontTransformApplyShaping = (1 << 0),
+    wkCTFontTransformApplyPositioning = (1 << 1)
+};
+
+typedef int wkCTFontTransformOptions;
+
+extern bool (*wkCTFontTransformGlyphs)(CTFontRef font, CGGlyph glyphs[], CGSize advances[], CFIndex count, wkCTFontTransformOptions options);
+#endif
 
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
 

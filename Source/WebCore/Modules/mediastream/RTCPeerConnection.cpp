@@ -35,11 +35,16 @@
 #include "RTCPeerConnection.h"
 
 #include "ArrayValue.h"
+#include "Document.h"
 #include "Event.h"
 #include "ExceptionCode.h"
+#include "Frame.h"
+#include "FrameLoaderClient.h"
 #include "MediaConstraintsImpl.h"
 #include "MediaStreamEvent.h"
 #include "RTCConfiguration.h"
+#include "RTCDataChannel.h"
+#include "RTCDataChannelEvent.h"
 #include "RTCErrorCallback.h"
 #include "RTCIceCandidate.h"
 #include "RTCIceCandidateDescriptor.h"
@@ -48,6 +53,8 @@
 #include "RTCSessionDescriptionCallback.h"
 #include "RTCSessionDescriptionDescriptor.h"
 #include "RTCSessionDescriptionRequestImpl.h"
+#include "RTCStatsCallback.h"
+#include "RTCStatsRequestImpl.h"
 #include "RTCVoidRequestImpl.h"
 #include "ScriptExecutionContext.h"
 #include "VoidCallback.h"
@@ -128,9 +135,26 @@ RTCPeerConnection::RTCPeerConnection(ScriptExecutionContext* context, PassRefPtr
     , m_localStreams(MediaStreamList::create())
     , m_remoteStreams(MediaStreamList::create())
 {
-    m_peerHandler = RTCPeerConnectionHandler::create(this);
-    if (!m_peerHandler || !m_peerHandler->initialize(configuration, constraints))
+    ASSERT(m_scriptExecutionContext->isDocument());
+    Document* document = static_cast<Document*>(m_scriptExecutionContext);
+
+    if (!document->frame()) {
         ec = NOT_SUPPORTED_ERR;
+        return;
+    }
+
+    m_peerHandler = RTCPeerConnectionHandler::create(this);
+    if (!m_peerHandler) {
+        ec = NOT_SUPPORTED_ERR;
+        return;
+    }
+
+    document->frame()->loader()->client()->dispatchWillStartUsingPeerConnectionHandler(m_peerHandler.get());
+
+    if (!m_peerHandler->initialize(configuration, constraints)) {
+        ec = NOT_SUPPORTED_ERR;
+        return;
+    }
 }
 
 RTCPeerConnection::~RTCPeerConnection()
@@ -379,6 +403,29 @@ MediaStreamList* RTCPeerConnection::remoteStreams() const
     return m_remoteStreams.get();
 }
 
+void RTCPeerConnection::getStats(PassRefPtr<RTCStatsCallback> successCallback, PassRefPtr<MediaStreamTrack> selector)
+{
+    RefPtr<RTCStatsRequestImpl> statsRequest = RTCStatsRequestImpl::create(scriptExecutionContext(), successCallback, selector);
+    // FIXME: Add passing selector as part of the statsRequest.
+    m_peerHandler->getStats(statsRequest.release());
+}
+
+PassRefPtr<RTCDataChannel> RTCPeerConnection::createDataChannel(String label, const Dictionary& options, ExceptionCode& ec)
+{
+    if (m_readyState == ReadyStateClosed) {
+        ec = INVALID_STATE_ERR;
+        return 0;
+    }
+
+    bool reliable = true;
+    options.get("reliable", reliable);
+    RefPtr<RTCDataChannel> channel = RTCDataChannel::create(scriptExecutionContext(), m_peerHandler.get(), label, reliable, ec);
+    if (ec)
+        return 0;
+    m_dataChannels.append(channel);
+    return channel.release();
+}
+
 void RTCPeerConnection::close(ExceptionCode& ec)
 {
     if (m_readyState == ReadyStateClosing || m_readyState == ReadyStateClosed) {
@@ -386,9 +433,10 @@ void RTCPeerConnection::close(ExceptionCode& ec)
         return;
     }
 
+    m_peerHandler->stop();
+
     changeIceState(IceStateClosed);
     changeReadyState(ReadyStateClosed);
-    stop();
 }
 
 void RTCPeerConnection::negotiationNeeded()
@@ -449,6 +497,19 @@ void RTCPeerConnection::didRemoveRemoteStream(MediaStreamDescriptor* streamDescr
     dispatchEvent(MediaStreamEvent::create(eventNames().removestreamEvent, false, false, stream.release()));
 }
 
+void RTCPeerConnection::didAddRemoteDataChannel(PassRefPtr<RTCDataChannelDescriptor> channelDescriptor)
+{
+    ASSERT(scriptExecutionContext()->isContextThread());
+
+    if (m_readyState == ReadyStateClosed)
+        return;
+
+    RefPtr<RTCDataChannel> channel = RTCDataChannel::create(scriptExecutionContext(), m_peerHandler.get(), channelDescriptor);
+    m_dataChannels.append(channel);
+
+    dispatchEvent(RTCDataChannelEvent::create(eventNames().datachannelEvent, false, false, channel.release()));
+}
+
 const AtomicString& RTCPeerConnection::interfaceName() const
 {
     return eventNames().interfaceForRTCPeerConnection;
@@ -461,13 +522,17 @@ ScriptExecutionContext* RTCPeerConnection::scriptExecutionContext() const
 
 void RTCPeerConnection::stop()
 {
+    if (m_readyState != ReadyStateClosed)
+        m_peerHandler->stop();
+
+    m_peerHandler.clear();
+
     m_iceState = IceStateClosed;
     m_readyState = ReadyStateClosed;
 
-    if (m_peerHandler) {
-        m_peerHandler->stop();
-        m_peerHandler.clear();
-    }
+    Vector<RefPtr<RTCDataChannel> >::iterator i = m_dataChannels.begin();
+    for (; i != m_dataChannels.end(); ++i)
+        (*i)->stop();
 }
 
 EventTargetData* RTCPeerConnection::eventTargetData()

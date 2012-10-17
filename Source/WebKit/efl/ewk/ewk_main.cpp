@@ -35,6 +35,7 @@
 #include "ewk_network.h"
 #include "ewk_private.h"
 #include "ewk_settings.h"
+#include "ewk_settings_private.h"
 #include "runtime/InitializeThreading.h"
 #include <Ecore.h>
 #include <Ecore_Evas.h>
@@ -48,6 +49,10 @@
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <wtf/Threading.h>
+
+#ifdef HAVE_ECORE_X
+#include <Ecore_X.h>
+#endif
 
 static int _ewkInitCount = 0;
 
@@ -93,6 +98,13 @@ int ewk_init(void)
         goto error_edje;
     }
 
+#ifdef HAVE_ECORE_X
+    if (!ecore_x_init(0)) {
+        CRITICAL("could not init ecore_x.");
+        goto error_ecore_x;
+    }
+#endif
+
     if (!_ewk_init_body()) {
         CRITICAL("could not init body");
         goto error_edje;
@@ -100,6 +112,10 @@ int ewk_init(void)
 
     return ++_ewkInitCount;
 
+#ifdef HAVE_ECORE_X
+error_ecore_x:
+    edje_shutdown();
+#endif
 error_edje:
     ecore_evas_shutdown();
 error_ecore_evas:
@@ -121,6 +137,10 @@ int ewk_shutdown(void)
     if (_ewkInitCount)
         return _ewkInitCount;
 
+#ifdef HAVE_ECORE_X
+    ecore_x_shutdown();
+#endif
+    edje_shutdown();
     ecore_evas_shutdown();
     ecore_shutdown();
     evas_shutdown();
@@ -163,10 +183,12 @@ Eina_Bool _ewk_init_body(void)
     String localStorageDirectory = String::fromUTF8(efreet_data_home_get()) + "/WebKitEfl/LocalStorage";
     String webDatabaseDirectory = String::fromUTF8(efreet_cache_home_get()) + "/WebKitEfl/Databases";
     String applicationCacheDirectory = String::fromUTF8(efreet_cache_home_get()) + "/WebKitEfl/Applications";
+    String fileSystemDirectory = String::fromUTF8(efreet_data_home_get()) + "/WebKitEfl/FileSystem";
 
     ewk_settings_local_storage_path_set(localStorageDirectory.utf8().data());
     ewk_settings_web_database_path_set(webDatabaseDirectory.utf8().data());
     ewk_settings_application_cache_path_set(applicationCacheDirectory.utf8().data());
+    ewk_settings_file_system_path_set(fileSystemDirectory.utf8().data());
 
     ewk_network_tls_certificate_check_set(false);
 

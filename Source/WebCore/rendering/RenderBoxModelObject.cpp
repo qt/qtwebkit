@@ -53,11 +53,6 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-bool RenderBoxModelObject::s_wasFloating = false;
-bool RenderBoxModelObject::s_hadLayer = false;
-bool RenderBoxModelObject::s_hadTransform = false;
-bool RenderBoxModelObject::s_layerWasSelfPainting = false;
-
 static const double cInterpolationCutoff = 800. * 800.;
 static const double cLowQualityTimeThreshold = 0.500; // 500 ms
 
@@ -138,7 +133,7 @@ void ImageQualityController::highQualityRepaintTimerFired(Timer<ImageQualityCont
     if (m_animatedResizeIsActive) {
         m_animatedResizeIsActive = false;
         for (ObjectLayerSizeMap::iterator it = m_objectLayerSizeMap.begin(); it != m_objectLayerSizeMap.end(); ++it)
-            it->first->repaint();
+            it->key->repaint();
     }
 }
 
@@ -163,14 +158,14 @@ bool ImageQualityController::shouldPaintAtLowQuality(GraphicsContext* context, R
 
     // Look ourselves up in the hashtables.
     ObjectLayerSizeMap::iterator i = m_objectLayerSizeMap.find(object);
-    LayerSizeMap* innerMap = i != m_objectLayerSizeMap.end() ? &i->second : 0;
+    LayerSizeMap* innerMap = i != m_objectLayerSizeMap.end() ? &i->value : 0;
     LayoutSize oldSize;
     bool isFirstResize = true;
     if (innerMap) {
         LayerSizeMap::iterator j = innerMap->find(layer);
         if (j != innerMap->end()) {
             isFirstResize = false;
-            oldSize = j->second;
+            oldSize = j->value;
         }
     }
 
@@ -317,16 +312,12 @@ bool RenderBoxModelObject::shouldPaintAtLowQuality(GraphicsContext* context, Ima
 }
 
 RenderBoxModelObject::RenderBoxModelObject(Node* node)
-    : RenderObject(node)
-    , m_layer(0)
+    : RenderLayerModelObject(node)
 {
 }
 
 RenderBoxModelObject::~RenderBoxModelObject()
 {
-    // Our layer should have been destroyed and cleared by now
-    ASSERT(!hasLayer());
-    ASSERT(!m_layer);
     if (gImageQualityController) {
         gImageQualityController->objectDestroyed(this);
         if (gImageQualityController->isEmpty()) {
@@ -334,14 +325,6 @@ RenderBoxModelObject::~RenderBoxModelObject()
             gImageQualityController = 0;
         }
     }
-}
-
-void RenderBoxModelObject::destroyLayer()
-{
-    ASSERT(!hasLayer()); // Callers should have already called setHasLayer(false)
-    ASSERT(m_layer);
-    m_layer->destroy(renderArena());
-    m_layer = 0;
 }
 
 void RenderBoxModelObject::willBeDestroyed()
@@ -363,114 +346,13 @@ void RenderBoxModelObject::willBeDestroyed()
     if (firstLetterRemainingText())
         setFirstLetterRemainingText(0);
 
-    // RenderObject::willBeDestroyed calls back to destroyLayer() for layer destruction
-    RenderObject::willBeDestroyed();
+    RenderLayerModelObject::willBeDestroyed();
 }
 
-bool RenderBoxModelObject::hasSelfPaintingLayer() const
+void RenderBoxModelObject::updateFromStyle()
 {
-    return m_layer && m_layer->isSelfPaintingLayer();
-}
+    RenderLayerModelObject::updateFromStyle();
 
-void RenderBoxModelObject::styleWillChange(StyleDifference diff, const RenderStyle* newStyle)
-{
-    s_wasFloating = isFloating();
-    s_hadLayer = hasLayer();
-    s_hadTransform = hasTransform();
-    if (s_hadLayer)
-        s_layerWasSelfPainting = layer()->isSelfPaintingLayer();
-
-    // If our z-index changes value or our visibility changes,
-    // we need to dirty our stacking context's z-order list.
-    RenderStyle* oldStyle = style();
-    if (oldStyle && newStyle) {
-        if (parent()) {
-            // Do a repaint with the old style first, e.g., for example if we go from
-            // having an outline to not having an outline.
-            if (diff == StyleDifferenceRepaintLayer) {
-                layer()->repaintIncludingDescendants();
-                if (!(oldStyle->clip() == newStyle->clip()))
-                    layer()->clearClipRectsIncludingDescendants();
-            } else if (diff == StyleDifferenceRepaint || newStyle->outlineSize() < oldStyle->outlineSize())
-                repaint();
-        }
-        
-        if (diff == StyleDifferenceLayout || diff == StyleDifferenceSimplifiedLayout) {
-            // When a layout hint happens, we go ahead and do a repaint of the layer, since the layer could
-            // end up being destroyed.
-            if (hasLayer()) {
-                if (oldStyle->position() != newStyle->position()
-                    || oldStyle->zIndex() != newStyle->zIndex()
-                    || oldStyle->hasAutoZIndex() != newStyle->hasAutoZIndex()
-                    || !(oldStyle->clip() == newStyle->clip())
-                    || oldStyle->hasClip() != newStyle->hasClip()
-                    || oldStyle->opacity() != newStyle->opacity()
-                    || oldStyle->transform() != newStyle->transform()
-#if ENABLE(CSS_FILTERS)
-                    || oldStyle->filter() != newStyle->filter()
-#endif
-                    )
-                layer()->repaintIncludingDescendants();
-            } else if (newStyle->hasTransform() || newStyle->opacity() < 1 || newStyle->hasFilter()) {
-                // If we don't have a layer yet, but we are going to get one because of transform or opacity,
-                //  then we need to repaint the old position of the object.
-                repaint();
-            }
-        }
-    }
-
-    RenderObject::styleWillChange(diff, newStyle);
-}
-
-void RenderBoxModelObject::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
-{
-    RenderObject::styleDidChange(diff, oldStyle);
-    updateBoxModelInfoFromStyle();
-    
-    if (requiresLayer()) {
-        if (!layer() && layerCreationAllowedForSubtree()) {
-            if (s_wasFloating && isFloating())
-                setChildNeedsLayout(true);
-            m_layer = new (renderArena()) RenderLayer(this);
-            setHasLayer(true);
-            m_layer->insertOnlyThisLayer();
-            if (parent() && !needsLayout() && containingBlock()) {
-                m_layer->setRepaintStatus(NeedsFullRepaint);
-                // There is only one layer to update, it is not worth using |cachedOffset| since
-                // we are not sure the value will be used.
-                m_layer->updateLayerPositions(0);
-            }
-        }
-    } else if (layer() && layer()->parent()) {
-        setHasTransform(false); // Either a transform wasn't specified or the object doesn't support transforms, so just null out the bit.
-        setHasReflection(false);
-        m_layer->removeOnlyThisLayer(); // calls destroyLayer() which clears m_layer
-        if (s_wasFloating && isFloating())
-            setChildNeedsLayout(true);
-        if (s_hadTransform)
-            setNeedsLayoutAndPrefWidthsRecalc();
-    }
-
-    if (layer()) {
-        layer()->styleChanged(diff, oldStyle);
-        if (s_hadLayer && layer()->isSelfPaintingLayer() != s_layerWasSelfPainting)
-            setChildNeedsLayout(true);
-    }
-
-    if (FrameView *frameView = view()->frameView()) {
-        bool newStyleIsViewportConstained = style()->hasViewportConstrainedPosition();
-        bool oldStyleIsViewportConstrained = oldStyle && oldStyle->hasViewportConstrainedPosition();
-        if (newStyleIsViewportConstained != oldStyleIsViewportConstrained) {
-            if (newStyleIsViewportConstained && layer())
-                frameView->addViewportConstrainedObject(this);
-            else
-                frameView->removeViewportConstrainedObject(this);
-        }
-    }
-}
-
-void RenderBoxModelObject::updateBoxModelInfoFromStyle()
-{
     // Set the appropriate bits for a box model object.  Since all bits are cleared in styleWillChange,
     // we only check for bits that could possibly be set to true.
     RenderStyle* styleToUse = style();
@@ -588,7 +470,7 @@ void RenderBoxModelObject::computeStickyPositionConstraints(StickyPositionViewpo
     // Compute the container-relative area within which the sticky element is allowed to move.
     containerContentRect.move(minLeftMargin, minTopMargin);
     containerContentRect.contract(minLeftMargin + minRightMargin, minTopMargin + minBottomMargin);
-    constraints.setAbsoluteContainingBlockRect(containingBlock->localToAbsoluteQuad(FloatRect(containerContentRect)).boundingBox());
+    constraints.setAbsoluteContainingBlockRect(containingBlock->localToAbsoluteQuad(FloatRect(containerContentRect), SnapOffsetForTransforms).boundingBox());
 
     LayoutRect stickyBoxRect = frameRectForStickyPositioning();
     LayoutRect flippedStickyBoxRect = stickyBoxRect;
@@ -596,7 +478,7 @@ void RenderBoxModelObject::computeStickyPositionConstraints(StickyPositionViewpo
     LayoutPoint stickyLocation = flippedStickyBoxRect.location();
 
     // FIXME: sucks to call localToAbsolute again, but we can't just offset from the previously computed rect if there are transforms.
-    FloatRect absContainerFrame = containingBlock->localToAbsoluteQuad(FloatRect(FloatPoint(), containingBlock->size())).boundingBox();
+    FloatRect absContainerFrame = containingBlock->localToAbsoluteQuad(FloatRect(FloatPoint(), containingBlock->size()), SnapOffsetForTransforms).boundingBox();
     // We can't call localToAbsolute on |this| because that will recur. FIXME: For now, assume that |this| is not transformed.
     FloatRect absoluteStickyBoxRect(absContainerFrame.location() + stickyLocation, flippedStickyBoxRect.size());
     constraints.setAbsoluteStickyBoxRect(absoluteStickyBoxRect);
@@ -777,6 +659,38 @@ RoundedRect RenderBoxModelObject::getBackgroundRoundedRect(const LayoutRect& bor
     return border;
 }
 
+void RenderBoxModelObject::clipRoundedInnerRect(GraphicsContext * context, const LayoutRect& rect, const RoundedRect& clipRect)
+{
+    if (clipRect.isRenderable())
+        context->addRoundedRectClip(clipRect);
+    else {
+        // We create a rounded rect for each of the corners and clip it, while making sure we clip opposing corners together.
+        if (!clipRect.radii().topLeft().isEmpty() || !clipRect.radii().bottomRight().isEmpty()) {
+            IntRect topCorner(clipRect.rect().x(), clipRect.rect().y(), rect.maxX() - clipRect.rect().x(), rect.maxY() - clipRect.rect().y());
+            RoundedRect::Radii topCornerRadii;
+            topCornerRadii.setTopLeft(clipRect.radii().topLeft());
+            context->addRoundedRectClip(RoundedRect(topCorner, topCornerRadii));
+
+            IntRect bottomCorner(rect.x(), rect.y(), clipRect.rect().maxX() - rect.x(), clipRect.rect().maxY() - rect.y());
+            RoundedRect::Radii bottomCornerRadii;
+            bottomCornerRadii.setBottomRight(clipRect.radii().bottomRight());
+            context->addRoundedRectClip(RoundedRect(bottomCorner, bottomCornerRadii));
+        } 
+
+        if (!clipRect.radii().topRight().isEmpty() || !clipRect.radii().bottomLeft().isEmpty()) {
+            IntRect topCorner(rect.x(), clipRect.rect().y(), clipRect.rect().maxX() - rect.x(), rect.maxY() - clipRect.rect().y());
+            RoundedRect::Radii topCornerRadii;
+            topCornerRadii.setTopRight(clipRect.radii().topRight());
+            context->addRoundedRectClip(RoundedRect(topCorner, topCornerRadii));
+
+            IntRect bottomCorner(clipRect.rect().x(), rect.y(), rect.maxX() - clipRect.rect().x(), clipRect.rect().maxY() - rect.y());
+            RoundedRect::Radii bottomCornerRadii;
+            bottomCornerRadii.setBottomLeft(clipRect.radii().bottomLeft());
+            context->addRoundedRectClip(RoundedRect(bottomCorner, bottomCornerRadii));
+        }
+    }
+}
+
 static LayoutRect backgroundRectAdjustedForBleedAvoidance(GraphicsContext* context, const LayoutRect& borderRect, BackgroundBleedAvoidance bleedAvoidance)
 {
     if (bleedAvoidance != BackgroundBleedShrinkBackground)
@@ -867,11 +781,21 @@ void RenderBoxModelObject::paintFillLayerExtended(const PaintInfo& paintInfo, co
         return;
     }
 
-    bool clipToBorderRadius = hasRoundedBorder && bleedAvoidance != BackgroundBleedUseTransparencyLayer;
+    // BorderFillBox radius clipping is taken care of by BackgroundBleedUseTransparencyLayer
+    bool clipToBorderRadius = hasRoundedBorder && !(isBorderFill && bleedAvoidance == BackgroundBleedUseTransparencyLayer);
     GraphicsContextStateSaver clipToBorderStateSaver(*context, clipToBorderRadius);
     if (clipToBorderRadius) {
-        RoundedRect border = getBackgroundRoundedRect(backgroundRectAdjustedForBleedAvoidance(context, rect, bleedAvoidance), box, boxSize.width(), boxSize.height(), includeLeftEdge, includeRightEdge);
-        context->addRoundedRectClip(border);
+        LayoutRect adjustedRect = isBorderFill ? backgroundRectAdjustedForBleedAvoidance(context, rect, bleedAvoidance) : rect;
+        RoundedRect border = getBackgroundRoundedRect(adjustedRect, box, boxSize.width(), boxSize.height(), includeLeftEdge, includeRightEdge);
+
+        // Clip to the padding or content boxes as necessary.
+        if (bgLayer->clip() == ContentFillBox) {
+            border = style()->getRoundedInnerBorderFor(border.rect(),
+                paddingTop() + borderTop(), paddingBottom() + borderBottom(), paddingLeft() + borderLeft(), paddingRight() + borderRight(), includeLeftEdge, includeRightEdge);
+        } else if (bgLayer->clip() == PaddingFillBox)
+            border = style()->getRoundedInnerBorderFor(border.rect(), includeLeftEdge, includeRightEdge);
+
+        clipRoundedInnerRect(context, rect, border);
     }
     
     int bLeft = includeLeftEdge ? borderLeft() : 0;
@@ -899,17 +823,15 @@ void RenderBoxModelObject::paintFillLayerExtended(const PaintInfo& paintInfo, co
 
     if (bgLayer->clip() == PaddingFillBox || bgLayer->clip() == ContentFillBox) {
         // Clip to the padding or content boxes as necessary.
-        bool includePadding = bgLayer->clip() == ContentFillBox;
-        LayoutRect clipRect = LayoutRect(scrolledPaintRect.x() + bLeft + (includePadding ? pLeft : ZERO_LAYOUT_UNIT),
-                                   scrolledPaintRect.y() + borderTop() + (includePadding ? paddingTop() : ZERO_LAYOUT_UNIT),
-                                   scrolledPaintRect.width() - bLeft - bRight - (includePadding ? pLeft + pRight : ZERO_LAYOUT_UNIT),
-                                   scrolledPaintRect.height() - borderTop() - borderBottom() - (includePadding ? paddingTop() + paddingBottom() : ZERO_LAYOUT_UNIT));
-        backgroundClipStateSaver.save();
-        if (clipToBorderRadius && includePadding) {
-            RoundedRect rounded = getBackgroundRoundedRect(clipRect, box, boxSize.width(), boxSize.height(), includeLeftEdge, includeRightEdge);
-            context->addRoundedRectClip(rounded);
-        } else
+        if (!clipToBorderRadius) {
+            bool includePadding = bgLayer->clip() == ContentFillBox;
+            LayoutRect clipRect = LayoutRect(scrolledPaintRect.x() + bLeft + (includePadding ? pLeft : ZERO_LAYOUT_UNIT),
+                scrolledPaintRect.y() + borderTop() + (includePadding ? paddingTop() : ZERO_LAYOUT_UNIT),
+                scrolledPaintRect.width() - bLeft - bRight - (includePadding ? pLeft + pRight : ZERO_LAYOUT_UNIT),
+                scrolledPaintRect.height() - borderTop() - borderBottom() - (includePadding ? paddingTop() + paddingBottom() : ZERO_LAYOUT_UNIT));
+            backgroundClipStateSaver.save();
             context->clip(clipRect);
+        }
     } else if (bgLayer->clip() == TextFillBox) {
         // We have to draw our text into a mask that can then be used to clip background drawing.
         // First figure out how big the mask has to be.  It should be no bigger than what we need
@@ -2814,13 +2736,13 @@ bool RenderBoxModelObject::shouldAntialiasLines(GraphicsContext* context)
     return !context->getCTM().isIdentityOrTranslationOrFlipped();
 }
 
-void RenderBoxModelObject::mapAbsoluteToLocalPoint(bool fixed, bool useTransforms, TransformState& transformState) const
+void RenderBoxModelObject::mapAbsoluteToLocalPoint(MapCoordinatesFlags mode, TransformState& transformState) const
 {
     RenderObject* o = container();
     if (!o)
         return;
 
-    o->mapAbsoluteToLocalPoint(fixed, useTransforms, transformState);
+    o->mapAbsoluteToLocalPoint(mode, transformState);
 
     LayoutSize containerOffset = offsetFromContainer(o, LayoutPoint());
 
@@ -2831,8 +2753,8 @@ void RenderBoxModelObject::mapAbsoluteToLocalPoint(bool fixed, bool useTransform
         block->adjustForColumnRect(containerOffset, point);
     }
 
-    bool preserve3D = useTransforms && (o->style()->preserves3D() || style()->preserves3D());
-    if (useTransforms && shouldUseTransformFromContainer(o)) {
+    bool preserve3D = mode & UseTransforms && (o->style()->preserves3D() || style()->preserves3D());
+    if (mode & UseTransforms && shouldUseTransformFromContainer(o)) {
         TransformationMatrix t;
         getTransformFromContainer(o, containerOffset, t);
         transformState.applyTransform(t, preserve3D ? TransformState::AccumulateTransform : TransformState::FlattenTransform);

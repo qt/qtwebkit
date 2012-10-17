@@ -211,7 +211,7 @@ WebInspector.Resource.prototype = {
     },
 
     /**
-     * @return {?string}
+     * @return {string}
      */
     contentURL: function()
     {
@@ -276,25 +276,14 @@ WebInspector.Resource.prototype = {
     {
         function onResourceContent()
         {
-            image.src = this._contentURL();
+            var imageSrc = WebInspector.contentAsDataURL(this._content, this.mimeType, this._contentEncoded);
+            if (imageSrc === null)
+                imageSrc = this.url;
+            image.src = imageSrc;
         }
 
         this.requestContent(onResourceContent.bind(this));
     },
-
-    /**
-     * @return {string}
-     */
-    _contentURL: function()
-    {
-        const maxDataUrlSize = 1024 * 1024;
-        // If resource content is not available or won't fit a data URL, fall back to using original URL.
-        if (this._content == null || this._content.length > maxDataUrlSize)
-            return this.url;
-
-        return "data:" + this.mimeType + (this._contentEncoded ? ";base64," : ",") + this._content;
-    },
-
 
     _requestFinished: function()
     {
@@ -360,8 +349,8 @@ WebInspector.Resource.prototype = {
     isHidden: function()
     {
         return !!this._isHidden;
-    }
-}
+    },
 
-WebInspector.Resource.prototype.__proto__ = WebInspector.Object.prototype;
+    __proto__: WebInspector.Object.prototype
+}
 

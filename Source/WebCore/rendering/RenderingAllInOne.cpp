@@ -66,6 +66,7 @@
 #include "RenderInline.cpp"
 #include "RenderLayer.cpp"
 #include "RenderLayerCompositor.cpp"
+#include "RenderLayerModelObject.cpp"
 #include "RenderLineBoxList.cpp"
 #include "RenderListBox.cpp"
 #include "RenderListItem.cpp"
@@ -94,6 +95,7 @@
 #include "RenderScrollbarTheme.cpp"
 #include "RenderSearchField.cpp"
 #include "RenderSlider.cpp"
+#include "RenderSnapshottedPlugIn.cpp"
 #include "RenderTable.cpp"
 #include "RenderTableCaption.cpp"
 #include "RenderTableCell.cpp"
@@ -117,3 +119,4 @@
 #include "RootInlineBox.cpp"
 #include "ScrollBehavior.cpp"
 #include "break_lines.cpp"
+

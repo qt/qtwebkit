@@ -313,6 +313,8 @@ SOURCES += \
     css/MediaQueryMatcher.cpp \
     css/PropertySetCSSStyleDeclaration.cpp \
     css/RGBColor.cpp \
+    css/RuleFeature.cpp \
+    css/RuleSet.cpp \
     css/SelectorChecker.cpp \
     css/ShadowValue.cpp \
     css/StyleBuilder.cpp \
@@ -322,6 +324,7 @@ SOURCES += \
     css/StyleResolver.cpp \
     css/StyleRule.cpp \
     css/StyleRuleImport.cpp \
+    css/StyleScopeResolver.cpp \
     css/StyleSheet.cpp \
     css/StyleSheetContents.cpp \
     css/StyleSheetList.cpp \
@@ -555,6 +558,7 @@ SOURCES += \
     html/BaseCheckableInputType.cpp \
     html/BaseClickableWithKeyInputType.cpp \
     html/BaseDateAndTimeInputType.cpp \
+    html/BaseMultipleFieldsDateAndTimeInputType.cpp \
     html/BaseTextInputType.cpp \
     html/ButtonInputType.cpp \
     html/CheckboxInputType.cpp \
@@ -714,6 +718,11 @@ SOURCES += \
     html/parser/XSSAuditor.cpp \
     html/shadow/ContentDistributor.cpp \
     html/shadow/ContentSelectorQuery.cpp \
+    html/shadow/DateTimeEditElement.cpp \
+    html/shadow/DateTimeFieldElement.cpp \
+    html/shadow/DateTimeFieldElements.cpp \
+    html/shadow/DateTimeNumericFieldElement.cpp \
+    html/shadow/DateTimeSymbolicFieldElement.cpp \
     html/shadow/DetailsMarkerControl.cpp \
     html/shadow/HTMLContentElement.cpp \
     html/shadow/HTMLShadowElement.cpp \
@@ -834,6 +843,7 @@ SOURCES += \
     loader/Prerenderer.cpp \
     loader/PrerendererClient.cpp \
     loader/NavigationScheduler.cpp \
+    loader/ResourceBuffer.cpp \
     loader/ResourceLoader.cpp \
     loader/ResourceLoadNotifier.cpp \
     loader/ResourceLoadScheduler.cpp \
@@ -896,7 +906,6 @@ SOURCES += \
     page/Screen.cpp \
     page/scrolling/ScrollingConstraints.cpp \
     page/scrolling/ScrollingCoordinator.cpp \
-    page/scrolling/ScrollingCoordinatorNone.cpp \
     page/SecurityOrigin.cpp \
     page/SecurityPolicy.cpp \
     page/Settings.cpp \
@@ -920,8 +929,6 @@ SOURCES += \
     platform/text/Hyphenation.cpp \
     platform/text/LocaleNone.cpp \
     platform/text/LocaleToScriptMappingDefault.cpp \
-    platform/text/LocalizedDateNone.cpp \
-    platform/text/LocalizedNumberNone.cpp \
     platform/text/Localizer.cpp \
     platform/text/QuotedPrintable.cpp \
     platform/CalculationValue.cpp \
@@ -1101,8 +1108,10 @@ SOURCES += \
     rendering/CounterNode.cpp \
     rendering/EllipsisBox.cpp \
     rendering/ExclusionInterval.cpp \
+    rendering/ExclusionPolygon.cpp \
     rendering/ExclusionRectangle.cpp \
     rendering/ExclusionShape.cpp \
+    rendering/ExclusionShapeInsideInfo.cpp \
     rendering/FilterEffectRenderer.cpp \
     rendering/FixedTableLayout.cpp \
     rendering/FlowThreadController.cpp \
@@ -1146,6 +1155,7 @@ SOURCES += \
     rendering/RenderLayerBacking.cpp \
     rendering/RenderLayerCompositor.cpp \
     rendering/RenderLayerFilterInfo.cpp \
+    rendering/RenderLayerModelObject.cpp \
     rendering/RenderLineBoxList.cpp \
     rendering/RenderListBox.cpp \
     rendering/RenderListItem.cpp \
@@ -1175,6 +1185,7 @@ SOURCES += \
     rendering/RenderScrollbarTheme.cpp \
     rendering/RenderSearchField.cpp \
     rendering/RenderSlider.cpp \
+    rendering/RenderSnapshottedPlugIn.cpp \
     rendering/RenderTable.cpp \
     rendering/RenderTableCaption.cpp \
     rendering/RenderTableCell.cpp \
@@ -1194,7 +1205,6 @@ SOURCES += \
     rendering/RenderWordBreak.cpp \
     rendering/RootInlineBox.cpp \
     rendering/ScrollBehavior.cpp \
-    rendering/WrapShapeInfo.cpp \
     rendering/style/BasicShapes.cpp \
     rendering/style/ContentData.cpp \
     rendering/style/CounterDirectives.cpp \
@@ -1475,6 +1485,7 @@ HEADERS += \
     css/RGBColor.h \
     css/SelectorChecker.h \
     css/ShadowValue.h \
+    css/SiblingTraversalStrategies.h \
     css/StyleMedia.h \
     css/StyleBuilder.h \
     css/StylePropertySet.h \
@@ -1953,6 +1964,7 @@ HEADERS += \
     loader/Prerenderer.h \
     loader/PrerendererClient.h \
     loader/ProgressTracker.h \
+    loader/ResourceBuffer.h \
     loader/ResourceLoader.h \
     loader/SubresourceLoader.h \
     loader/SubstituteData.h \
@@ -2050,6 +2062,7 @@ HEADERS += \
     platform/graphics/Color.h \
     platform/graphics/CrossfadeGeneratedImage.h \
     platform/graphics/filters/CustomFilterArrayParameter.h \
+    platform/graphics/filters/CustomFilterConstants.h \
     platform/graphics/filters/CustomFilterGlobalContext.h \
     platform/graphics/filters/CustomFilterMesh.h \
     platform/graphics/filters/CustomFilterMeshGenerator.h \
@@ -2136,6 +2149,7 @@ HEADERS += \
     platform/graphics/ShadowBlur.h \
     platform/graphics/SimpleFontData.h \
     platform/graphics/surfaces/GraphicsSurface.h \
+    platform/graphics/surfaces/GraphicsSurfaceToken.h \
     platform/graphics/SurrogatePairAwareTextIterator.h \
     platform/graphics/texmap/GraphicsLayerTextureMapper.h \
     platform/graphics/texmap/TextureMapper.h \
@@ -2229,8 +2243,11 @@ HEADERS += \
     platform/qt/ClipboardQt.h \
     platform/qt/CookieJarQt.h \
     platform/qt/QWebPageClient.h \
+    platform/qt/QStyleFacade.h \
+    platform/qt/RenderThemeQStyle.h \
     platform/qt/RenderThemeQt.h \
     platform/qt/RenderThemeQtMobile.h \
+    platform/qt/ScrollbarThemeQStyle.h \
     platform/qt/UserAgentQt.h \
     platform/ScrollableArea.h \
     platform/ScrollAnimator.h \
@@ -2291,8 +2308,10 @@ HEADERS += \
     rendering/CounterNode.h \
     rendering/EllipsisBox.h \
     rendering/ExclusionInterval.h \
+    rendering/ExclusionPolygon.h \
     rendering/ExclusionRectangle.h \
     rendering/ExclusionShape.h \
+    rendering/ExclusionShapeInsideInfo.h \
     rendering/FilterEffectRenderer.h \
     rendering/FixedTableLayout.h \
     rendering/HitTestingTransformState.h \
@@ -2347,6 +2366,7 @@ HEADERS += \
     rendering/RenderLayer.h \
     rendering/RenderLayerBacking.h \
     rendering/RenderLayerCompositor.h \
+    rendering/RenderLayerModelObject.h \
     rendering/RenderLineBoxList.h \
     rendering/RenderListBox.h \
     rendering/RenderListItem.h \
@@ -2372,6 +2392,7 @@ HEADERS += \
     rendering/RenderScrollbarTheme.h \
     rendering/RenderSearchField.h \
     rendering/RenderSlider.h \
+    rendering/RenderSnapshottedPlugIn.h \
     rendering/RenderTableCaption.h \
     rendering/RenderTableCell.h \
     rendering/RenderTableCol.h \
@@ -2391,7 +2412,6 @@ HEADERS += \
     rendering/RenderWordBreak.h \
     rendering/RootInlineBox.h \
     rendering/ScrollBehavior.h \
-    rendering/WrapShapeInfo.h \
     rendering/style/BasicShapes.h \
     rendering/style/ContentData.h \
     rendering/style/CounterDirectives.h \
@@ -2801,8 +2821,11 @@ SOURCES += \
     platform/qt/PasteboardQt.cpp \
     platform/qt/PlatformKeyboardEventQt.cpp \
     platform/qt/PlatformScreenQt.cpp \
+    platform/qt/QStyleFacade.cpp \
+    platform/qt/RenderThemeQStyle.cpp \
     platform/qt/RenderThemeQt.cpp \
     platform/qt/RenderThemeQtMobile.cpp \
+    platform/qt/ScrollbarThemeQStyle.cpp \
     platform/qt/ScrollbarThemeQt.cpp \
     platform/qt/ScrollViewQt.cpp \
     platform/qt/SharedTimerQt.cpp \
@@ -2841,6 +2864,7 @@ win32-*|wince* {
 mac {
     SOURCES += \
         platform/text/cf/StringCF.cpp \
+        platform/cf/SharedBufferCF.cpp \
         platform/text/cf/StringImplCF.cpp
 }
 
@@ -3184,7 +3208,6 @@ enable?(VIDEO) {
             platform/mac/DisplaySleepDisabler.cpp \
             platform/graphics/cg/IntRectCG.cpp \
             platform/graphics/cg/FloatSizeCG.cpp \
-            platform/cf/SharedBufferCF.cpp \
             platform/cf/KURLCFNet.cpp
 
          OBJECTIVE_SOURCES += \
@@ -3243,17 +3266,17 @@ enable?(WEB_AUDIO) {
         Modules/webaudio/AudioBufferCallback.h \
         Modules/webaudio/AudioBuffer.h \
         Modules/webaudio/AudioBufferSourceNode.h \
-        Modules/webaudio/AudioChannelMerger.h \
-        Modules/webaudio/AudioChannelSplitter.h \
+        Modules/webaudio/ChannelMergerNode.h \
+        Modules/webaudio/ChannelSplitterNode.h \
         Modules/webaudio/AudioContext.h \
         Modules/webaudio/AudioDestinationNode.h \
         Modules/webaudio/AudioGain.h \
-        Modules/webaudio/AudioGainNode.h \
+        Modules/webaudio/GainNode.h \
         Modules/webaudio/AudioListener.h \
         Modules/webaudio/AudioNode.h \
         Modules/webaudio/AudioNodeInput.h \
         Modules/webaudio/AudioNodeOutput.h \
-        Modules/webaudio/AudioPannerNode.h \
+        Modules/webaudio/PannerNode.h \
         Modules/webaudio/AudioParam.h \
         Modules/webaudio/AudioParamTimeline.h \
         Modules/webaudio/AudioProcessingEvent.h \
@@ -3269,14 +3292,14 @@ enable?(WEB_AUDIO) {
         Modules/webaudio/DelayNode.h \
         Modules/webaudio/DelayProcessor.h \
         Modules/webaudio/DynamicsCompressorNode.h \
-        Modules/webaudio/JavaScriptAudioNode.h \
+        Modules/webaudio/ScriptProcessorNode.h \
         Modules/webaudio/MediaElementAudioSourceNode.h \
         Modules/webaudio/MediaStreamAudioSourceNode.h \
         Modules/webaudio/OfflineAudioCompletionEvent.h \
         Modules/webaudio/OfflineAudioDestinationNode.h \
-        Modules/webaudio/Oscillator.h \
+        Modules/webaudio/OscillatorNode.h \
         Modules/webaudio/RealtimeAnalyser.h \
-        Modules/webaudio/RealtimeAnalyserNode.h \
+        Modules/webaudio/AnalyserNode.h \
         Modules/webaudio/WaveShaperDSPKernel.h \
         Modules/webaudio/WaveShaperNode.h \
         Modules/webaudio/WaveShaperProcessor.h \
@@ -3327,22 +3350,22 @@ enable?(WEB_AUDIO) {
         bindings/js/JSAudioBufferSourceNodeCustom.cpp \
         bindings/js/JSAudioContextCustom.cpp \
         bindings/js/JSDOMWindowWebAudioCustom.cpp \
-        bindings/js/JSJavaScriptAudioNodeCustom.cpp \
+        bindings/js/JSScriptProcessorNodeCustom.cpp \
         Modules/webaudio/AsyncAudioDecoder.cpp \
         Modules/webaudio/AudioBasicInspectorNode.cpp \
         Modules/webaudio/AudioBasicProcessorNode.cpp \
         Modules/webaudio/AudioBuffer.cpp \
         Modules/webaudio/AudioBufferSourceNode.cpp \
-        Modules/webaudio/AudioChannelMerger.cpp \
-        Modules/webaudio/AudioChannelSplitter.cpp \
+        Modules/webaudio/ChannelMergerNode.cpp \
+        Modules/webaudio/ChannelSplitterNode.cpp \
         Modules/webaudio/AudioContext.cpp \
         Modules/webaudio/AudioDestinationNode.cpp \
-        Modules/webaudio/AudioGainNode.cpp \
+        Modules/webaudio/GainNode.cpp \
         Modules/webaudio/AudioListener.cpp \
         Modules/webaudio/AudioNode.cpp \
         Modules/webaudio/AudioNodeInput.cpp \
         Modules/webaudio/AudioNodeOutput.cpp \
-        Modules/webaudio/AudioPannerNode.cpp \
+        Modules/webaudio/PannerNode.cpp \
         Modules/webaudio/AudioParam.cpp \
         Modules/webaudio/AudioParamTimeline.cpp \
         Modules/webaudio/AudioProcessingEvent.cpp \
@@ -3357,14 +3380,14 @@ enable?(WEB_AUDIO) {
         Modules/webaudio/DelayNode.cpp \
         Modules/webaudio/DelayProcessor.cpp \
         Modules/webaudio/DynamicsCompressorNode.cpp \
-        Modules/webaudio/JavaScriptAudioNode.cpp \
+        Modules/webaudio/ScriptProcessorNode.cpp \
         Modules/webaudio/MediaElementAudioSourceNode.cpp \
         Modules/webaudio/MediaStreamAudioSourceNode.cpp \
         Modules/webaudio/OfflineAudioCompletionEvent.cpp \
         Modules/webaudio/OfflineAudioDestinationNode.cpp \
-        Modules/webaudio/Oscillator.cpp \
+        Modules/webaudio/OscillatorNode.cpp \
         Modules/webaudio/RealtimeAnalyser.cpp \
-        Modules/webaudio/RealtimeAnalyserNode.cpp \
+        Modules/webaudio/AnalyserNode.cpp \
         Modules/webaudio/WaveShaperDSPKernel.cpp \
         Modules/webaudio/WaveShaperNode.cpp \
         Modules/webaudio/WaveShaperProcessor.cpp \
@@ -3801,6 +3824,7 @@ enable?(WEB_SOCKETS) {
         Modules/websockets/WebSocketDeflateFramer.h \
         Modules/websockets/WebSocketDeflater.h \
         Modules/websockets/WebSocketExtensionDispatcher.h \
+        Modules/websockets/WebSocketExtensionParser.h \
         Modules/websockets/WebSocketExtensionProcessor.h \
         Modules/websockets/WebSocketFrame.h \
         Modules/websockets/WebSocketHandshake.h \
@@ -3815,6 +3839,7 @@ enable?(WEB_SOCKETS) {
         Modules/websockets/WebSocketDeflateFramer.cpp \
         Modules/websockets/WebSocketDeflater.cpp \
         Modules/websockets/WebSocketExtensionDispatcher.cpp \
+        Modules/websockets/WebSocketExtensionParser.cpp \
         Modules/websockets/WebSocketFrame.cpp \
         Modules/websockets/WebSocketHandshake.cpp \
         Modules/websockets/WebSocketHandshakeRequest.cpp \

@@ -1,3 +1,429 @@
+2012-10-17  Byungwoo Lee  <bw80.lee@samsung.com>
+
+        [EFL] Add background color to the checkbox theme.
+        https://bugs.webkit.org/show_bug.cgi?id=98788
+
+        Reviewed by Gyuyoung Kim.
+
+        Background color is added to the checkbox theme for identifying
+        checkbox status easily.
+
+        Checkbox theme uses images which has transparent background, and the
+        theme itself doesn't have the background color.
+
+        When the background of checkbox is black, checked/unchecked status
+        cannot be distinguished because check mark color is black.
+
+        And it is hard to identify whether the checkbox is disabled or not,
+        because there is no background color in the checkbox theme.
+
+        Instead of adding background color to the edc script, background
+        images are added because the shape of the check box can be various.
+
+        * DefaultTheme/widget/check/check.edc:
+        * DefaultTheme/widget/check/img_check_bg_enabled.png: Added.
+        * DefaultTheme/widget/check/img_check_bg_disabled.png: Added.
+
+2012-10-17  Byungwoo Lee  <bw80.lee@samsung.com>
+
+        [EFL] Add background color to the radio button theme.
+        https://bugs.webkit.org/show_bug.cgi?id=98852
+
+        Reviewed by Gyuyoung Kim.
+
+        Background color is added to the radio button theme for identifying
+        radio button status easily.
+
+        Radio button theme uses images which has transparent background.
+
+        When the background of radio button is black, checked/unchecked status
+        cannot be distinguished because check mark color is black.
+
+        And it is hard to identify whether the radio button is disabled or not,
+        because there is no background color in the radio button theme.
+
+        * DefaultTheme/widget/radio/img_radio_bg_disabled.png: Added.
+        * DefaultTheme/widget/radio/img_radio_bg_enabled.png: Added.
+        * DefaultTheme/widget/radio/radio.edc:
+
+2012-10-15  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Implement Favicons API
+        https://bugs.webkit.org/show_bug.cgi?id=99087
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Remove ewk_util now that its code has been moved
+        to CairoUtilitiesEfl in WebCore.
+
+        * ewk/ewk_history.cpp:
+        (ewk_history_item_icon_object_add):
+        * ewk/ewk_settings.cpp:
+        (ewk_settings_icon_database_icon_object_get):
+
+2012-10-15  Dongwoo Joshua Im  <dw.im@samsung.com>
+
+        [EFL] Set the basepath of the File System API.
+        https://bugs.webkit.org/show_bug.cgi?id=98344
+
+        Reviewed by Gyuyoung Kim.
+
+        Set the basepath of the File System API using the internal setter function.
+
+        * ewk/ewk_main.cpp:
+        (_ewk_init_body): Call the setter function with the default path.
+        * ewk/ewk_settings.cpp:
+        (ewk_settings_file_system_path_set): Set the given path as the base path of the file system.
+        * ewk/ewk_settings_private.h: Add ewk_settings_file_system_path_set.
+
+2012-10-14  Sam Weinig  <sam@webkit.org>
+
+        Make UserScript and UserStyleSheet value objects that are copyable
+        https://bugs.webkit.org/show_bug.cgi?id=99275
+
+        Reviewed by Tim Horton.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::addUserScript):
+        (DumpRenderTreeSupportEfl::addUserStyleSheet):
+        Update for new PageGroup function signatures.
+
+2012-10-11  Gyuyoung Kim  <gyuyoung.kim@samsung.com>
+
+        [EFL] Remove "web" word in web inspector
+        https://bugs.webkit.org/show_bug.cgi?id=98724
+
+        Reviewed by Laszlo Gombos.
+
+        *web* word is redundant in web inspector. Beside r130494 and r130479 removed *web* from EFL WK2.
+
+        * WebCoreSupport/InspectorClientEfl.cpp:
+        (WebCore::notifyInspectorDestroy):
+        (WebCore::InspectorClientEfl::openInspectorFrontend):
+        (WebCore::InspectorFrontendClientEfl::InspectorFrontendClientEfl):
+        (WebCore::InspectorFrontendClientEfl::~InspectorFrontendClientEfl):
+        * ewk/ewk_view.cpp:
+        (ewk_view_inspector_show):
+        (ewk_view_inspector_close):
+        (ewk_view_inspector_view_get):
+        (ewk_view_inspector_view_set):
+        * ewk/ewk_view.h:
+
+2012-10-10  Jon Lee  <jonlee@apple.com>
+
+        [WK2] Activate plugins when user clicks on snapshot
+        https://bugs.webkit.org/show_bug.cgi?id=98328
+        <rdar://problem/12426681>
+
+        Reviewed by Brady Eidson.
+
+        * WebCoreSupport/FrameLoaderClientEfl.h:
+        (WebCore::FrameLoaderClientEfl::recreatePlugin): Stub implementation of recreatePlugin().
+
+2012-10-10  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Use ewk_view_paint instead of ewk_view_paint_contents in ewk_view_single.
+        https://bugs.webkit.org/show_bug.cgi?id=98716
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        ewk_view_paint is the wrapper of ScrollView::paint and
+        ewk_view_paint_contents is the wrapper of FrameView::paintContents.
+
+        Because FrameView::paintContents just draw contents,
+        ewk_view_single should use ewk_view_paint instead of ewk_view_paint_contents
+        like other ports.
+
+        * ewk/ewk_view.cpp:
+        (ewk_view_paint):
+        Moved updateLayoutAndStyleIfNeededRecursive to share ewk_view_paint.
+        * ewk/ewk_view_single.cpp:
+        (_ewk_view_single_smart_repaints_process):
+        Modified to call ewk_view_paint.
+
+2012-10-10  Jaehun Lim  <ljaehun.lim@samsung.com>
+
+        [EFL] Use Evas function instead of memcpy
+        https://bugs.webkit.org/show_bug.cgi?id=98483
+
+        Reviewed by Gyuyoung Kim.
+
+        Evas supports evas_object_image_data_copy_set() to copy raw image data.
+        Change memcpy() with evas_object_image_data_copy_set().
+
+        Spell out variable names and refactor variable declaration statements.
+
+        No new tests, no functionality was changed.
+
+        * ewk/ewk_util.cpp:
+        (ewk_util_image_from_cairo_surface_add):
+
+2012-10-07  Caio Marcelo de Oliveira Filho  <caio.oliveira@openbossa.org>
+
+        Rename first/second to key/value in HashMap iterators
+        https://bugs.webkit.org/show_bug.cgi?id=82784
+
+        Reviewed by Eric Seidel.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::evaluateScriptInIsolatedWorld):
+        * WebCoreSupport/PlatformStrategiesEfl.cpp:
+        (PlatformStrategiesEfl::getPluginInfo):
+        * ewk/ewk_intent.cpp:
+        (ewk_intent_extra_get):
+
+2012-10-05  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Fix window resizing / moving in WK1 and WKTR
+        https://bugs.webkit.org/show_bug.cgi?id=98486
+
+        Reviewed by Gyuyoung Kim.
+
+        Fix ChromeClientEfl::windowRect() code to use
+        ecore_evas_request_geometry_get() instead of
+        evas_object_geometry_get() and therefore avoid
+        returning incorrect values when the engine has
+        not processed a call to ecore_evas_move_resize()
+        yet. This fixes a couple of layout tests.
+
+        The code was also refactored a bit for
+        consistency with the WebKit2 EFL implementation.
+
+        * WebCoreSupport/ChromeClientEfl.cpp:
+        (WebCore::ChromeClientEfl::windowRect):
+        (WebCore::ChromeClientEfl::setWindowRect):
+
+2012-10-04  Simon Fraser  <simon.fraser@apple.com>
+
+        Final part of "sync" to "flush" renaming
+        https://bugs.webkit.org/show_bug.cgi?id=98430
+
+        Reviewed by Tim Horton.
+
+        Change method names on GraphicsLayer and GraphicsLayerClient that
+        refer to "sync" to use the term "flush" instead, to be consistent
+        with the rest of the code.
+
+        * WebCoreSupport/AcceleratedCompositingContextEfl.cpp:
+        (WebCore::AcceleratedCompositingContext::syncLayersNow):
+        (WebCore::AcceleratedCompositingContext::attachRootGraphicsLayer):
+
+2012-10-04  Simon Fraser  <simon.fraser@apple.com>
+
+        Standardize on "flush" terminology for compositing layer flushing/syncing
+        https://bugs.webkit.org/show_bug.cgi?id=98321
+
+        Reviewed by Simon Fraser.
+
+        Rename compositing-related methods that refer to "syncing" to instead
+        refer to "flushing".
+
+        * WebCoreSupport/ChromeClientEfl.cpp:
+        (WebCore::ChromeClientEfl::scheduleCompositingLayerFlush):
+        * WebCoreSupport/ChromeClientEfl.h:
+        (ChromeClientEfl):
+
+2012-10-04  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] webintents/web-intents-failure.html is failing
+        https://bugs.webkit.org/show_bug.cgi?id=98349
+
+        Reviewed by Gyuyoung Kim.
+
+        After r130344, OpaqueJSString().string() returns
+        an empty string instead of a null one. Therefore,
+        we need to update the check in
+        DumpRenderTreeSupportEfl::sendWebIntentResponse().
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::sendWebIntentResponse):
+
+2012-10-04  Christophe Dumez  <christophe.dumez@intel.com>
+
+        Regression(r130363): Broke unit tests
+        https://bugs.webkit.org/show_bug.cgi?id=98341
+
+        Reviewed by Gyuyoung Kim.
+
+        Fix WebKitEFL unit tests to use X11 as
+        well.
+
+        * tests/UnitTestUtils/EWKTestBase.cpp:
+        (EWKUnitTests::EWKTestBase::SetUp):
+        * tests/UnitTestUtils/EWKTestEnvironment.h:
+        (EWKTestEnvironment):
+        * tests/UnitTestUtils/EWKTestView.cpp:
+        (EWKUnitTests::EWKTestView::init):
+        * tests/UnitTestUtils/EWKTestView.h:
+        (EWKTestView):
+
+2012-10-03  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Default.edj should be generated although ENABLE_WEBKIT disabled.
+        https://bugs.webkit.org/show_bug.cgi?id=97753
+
+        Reviewed by Laszlo Gombos.
+
+        default.edj is used in both webkit/efl and webkit2/efl.
+        However, it has been generated only when ENABLE_WEBKIT is enabled.
+
+        This patch separates the script which generates default.edj
+        from source/webkit/platformefl.cmake.
+
+        * DefaultTheme/CMakeLists.txt:
+        Extracted from Source/WebKit/PlatformEfl.cmake and sanitized.
+
+2012-10-03  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Enable use of X11 in DumpRenderTree / WebKitTestRunner
+        https://bugs.webkit.org/show_bug.cgi?id=98231
+
+        Reviewed by Gyuyoung Kim.
+
+        Initialize ecore_x library in ewk_main since it is used by
+        WebKitEFL.
+
+        * ewk/ewk_main.cpp:
+        (ewk_init):
+        (ewk_shutdown):
+
+2012-10-03  Kangil Han  <kangil.han@samsung.com>
+
+        Fix unused parameter compile warnings.
+        https://bugs.webkit.org/show_bug.cgi?id=98243
+
+        Reviewed by Alexey Proskuryakov.
+
+        Fixed unused parameter compile warning by removing page parameter name and UNUSED_PARAM usage.
+
+        * WebCoreSupport/PlatformStrategiesEfl.cpp:
+        (PlatformStrategiesEfl::getPluginInfo):
+
+2012-10-03  Jinwoo Song  <jinwoo7.song@samsung.com>
+
+        [EFL] Change the reversed expected and actual parameter in WebKit1 unit tests
+        https://bugs.webkit.org/show_bug.cgi?id=98276
+
+        Reviewed by Laszlo Gombos.
+
+        Expected value should be at first and actual value be followed in ASSERT_STREQ().
+
+        * tests/test_ewk_view.cpp:
+        (TEST_F):
+
+2012-10-02  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Add API to get the web view that initiated a custom URI request to WebKit2 GTK+
+        https://bugs.webkit.org/show_bug.cgi?id=97895
+
+        Reviewed by Martin Robinson.
+
+        * WebCoreSupport/FrameNetworkingContextEfl.cpp:
+        (WebCore::FrameNetworkingContextEfl::initiatingPageID): Stub
+        implementation.
+        * WebCoreSupport/FrameNetworkingContextEfl.h:
+        (FrameNetworkingContextEfl): Added.
+
+2012-10-02  Krzysztof Czech  <k.czech@samsung.com>
+
+        [EFL][UT] Refactoring an implementation of testing framework for wk1.
+        https://bugs.webkit.org/show_bug.cgi?id=94925
+
+        Reviewed by Gyuyoung Kim.
+
+        The reason of changing, was to adjust current implementation to use gtest features
+        related to cleaning (SetUp, TearDown), cleaning code in terms of useless methods
+        and lastly to make framework easier to use.
+
+        * tests/UnitTestUtils/EWKTestBase.cpp:
+        (EWKUnitTests::EWKTestBase::EWKTestBase):
+        (EWKUnitTests::EWKTestBase::webView): Returns current webview.
+        (EWKUnitTests::EWKTestBase::SetUp):
+        Before test is started, SetUp is called.
+        Used this to initialize test view.
+        (EWKUnitTests::EWKTestBase::onLoadFinished):
+        (EWKUnitTests::EWKTestBase::waitUntilLoadFinished): It waits till test page will be properly loaded.
+        (EWKUnitTests::EWKTestBase::loadUrl): Starts loading test page.
+        * tests/UnitTestUtils/EWKTestBase.h:
+        * tests/UnitTestUtils/EWKTestEnvironment.cpp:
+        Used to have global SetUp and TearDown.
+        Global SetUp starts initialization of webkit wherease
+        global TearDown shuts it down. Generally we would like to have
+        only one initialization of webkit while tests are executed.
+        (EWKUnitTests):
+        (EWKUnitTests::EWKTestEnvironment::EWKTestEnvironment):
+        (EWKUnitTests::EWKTestEnvironment::SetUp): Starts initialization of webkit.
+        (EWKUnitTests::EWKTestEnvironment::TearDown): Shuts down of webkit.
+        * tests/UnitTestUtils/EWKTestEnvironment.h:
+        (EWKUnitTests):
+        (EWKTestEnvironment):
+        (EWKUnitTests::EWKTestEnvironment::useX11Window):
+        * tests/UnitTestUtils/EWKTestView.cpp:
+        (EWKUnitTests::EWKTestView::EWKTestView):
+        (EWKUnitTests::EWKTestView::init): Starts initialization of test view.
+        * tests/UnitTestUtils/EWKTestView.h:
+        (EWKTestView):
+        * tests/test_ewk_view.cpp: adjusted current unit tests to new implementation.
+        (TEST_F):
+        * tests/test_runner.cpp: entry point of all tests.
+        (parseCustomArguments):
+        (main):
+
+2012-10-01  Brady Eidson  <beidson@apple.com>
+
+        Remove the Safari 2 -> Safari 3 icon database import code.
+        https://bugs.webkit.org/show_bug.cgi?id=98113
+
+        Reviewed by Maciej Stachowiak.
+
+        Nuke the performImport() IconDatabaseClient method.
+
+        * WebCoreSupport/IconDatabaseClientEfl.cpp:
+        * WebCoreSupport/IconDatabaseClientEfl.h:
+
+2012-09-28  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        Code inside FrameLoaderClient::canShowMIMEType() implementations can be shared among different WK ports
+        https://bugs.webkit.org/show_bug.cgi?id=97547
+
+        Reviewed by Adam Barth.
+
+        Newly added WebCore::MIMETypeRegistry::canShowMIMEType() function is used
+        inside WebCore::FrameLoaderClientEfl::canShowMIMEType().
+
+        * WebCoreSupport/FrameLoaderClientEfl.cpp:
+        (WebCore::FrameLoaderClientEfl::canShowMIMEType):
+
+2012-09-28  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL][DRT] EFL DRT should disable visited links tracking by default
+        https://bugs.webkit.org/show_bug.cgi?id=97881
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Added aux DumpRenderTreeSupportEfl::setShouldTrackVisitedLinks() function.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::setShouldTrackVisitedLinks):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-09-27  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] No way to exit video fullscreen mode once entered
+        https://bugs.webkit.org/show_bug.cgi?id=97631
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Fix default theme so that we have 2 fullscreen buttons, one
+        to enter fullscreen mode and another to exit it.
+
+        New icon by Alexander Shalamov.
+
+        * DefaultTheme/widget/mediacontrol/fullscreenbutton/enterfullscreenbutton.png: Added.
+        * DefaultTheme/widget/mediacontrol/fullscreenbutton/exitfullscreenbutton.png: Added.
+        * DefaultTheme/widget/mediacontrol/fullscreenbutton/fullscreen_button.edc:
+        * DefaultTheme/widget/mediacontrol/fullscreenbutton/fullscreenbutton.png: Removed.
+
 2012-09-26  Jinwoo Song  <jinwoo7.song@samsung.com>
 
         [EFL] Fix the typo in the ewk_view_fullscreen_exit()

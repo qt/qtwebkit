@@ -485,7 +485,7 @@ void PluginView::performRequest(PluginRequest* request)
 
 void PluginView::requestTimerFired(Timer<PluginView>* timer)
 {
-    ASSERT(timer == &m_requestTimer);
+    ASSERT_UNUSED(timer, timer == &m_requestTimer);
     ASSERT(m_requests.size() > 0);
     ASSERT(!m_isJavaScriptPaused);
 
@@ -587,14 +587,14 @@ NPError PluginView::postURL(const char* url, const char* target, uint32_t len, c
     return handlePost(url, target, len, buf, file, 0, false, file);
 }
 
-NPError PluginView::newStream(NPMIMEType type, const char* target, NPStream** stream)
+NPError PluginView::newStream(NPMIMEType, const char* /* target */, NPStream**)
 {
     notImplemented();
     // Unsupported
     return NPERR_GENERIC_ERROR;
 }
 
-int32_t PluginView::write(NPStream* stream, int32_t len, void* buffer)
+int32_t PluginView::write(NPStream*, int32_t /* len */, void* /* buffer */)
 {
     notImplemented();
     // Unsupported
@@ -681,7 +681,7 @@ NPError PluginView::setValue(NPPVariable variable, void* value)
 
 void PluginView::invalidateTimerFired(Timer<PluginView>* timer)
 {
-    ASSERT(timer == &m_invalidateTimer);
+    ASSERT_UNUSED(timer, timer == &m_invalidateTimer);
 
     for (unsigned i = 0; i < m_invalidRects.size(); i++)
         invalidateRect(m_invalidRects[i]);
@@ -1472,7 +1472,7 @@ NPError PluginView::setValueForURL(NPNURLVariable variable, const char* url, con
     return result;
 }
 
-NPError PluginView::getAuthenticationInfo(const char* protocol, const char* host, int32_t port, const char* scheme, const char* realm, char** username, uint32_t* ulen, char** password, uint32_t* plen)
+NPError PluginView::getAuthenticationInfo(const char* protocol, const char* host, int32_t port, const char* /* scheme */, const char* /* realm */, char**  /* username */, uint32_t* /* ulen */, char** /* password */, uint32_t* /* plen */)
 {
     LOG(Plugins, "PluginView::getAuthenticationInfo: protocol=%s, host=%s, port=%d", protocol, host, port);
     notImplemented();

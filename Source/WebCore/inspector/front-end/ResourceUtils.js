@@ -177,8 +177,7 @@ WebInspector.linkifyURLAsNode = function(url, linkText, classes, isExternal, too
         a.title = url;
     else if (typeof tooltipText !== "string" || tooltipText.length)
         a.title = tooltipText;
-    a.textContent = linkText;
-    a.style.maxWidth = "100%";
+    a.textContent = linkText.trimMiddle(150);
     if (isExternal)
         a.setAttribute("target", "_blank");
 
@@ -225,4 +224,19 @@ WebInspector.linkifyRequestAsNode = function(request, classes)
     anchor.preferredPanel = "network";
     anchor.requestId  = request.requestId;
     return anchor;
+}
+
+/**
+ * @param {string} content
+ * @param {string} mimeType
+ * @param {boolean} contentEncoded
+ * @return {?string}
+ */
+WebInspector.contentAsDataURL = function(content, mimeType, contentEncoded)
+{
+    const maxDataUrlSize = 1024 * 1024;
+    if (content == null || content.length > maxDataUrlSize)
+        return null;
+
+    return "data:" + mimeType + (contentEncoded ? ";base64," : ",") + content;
 }

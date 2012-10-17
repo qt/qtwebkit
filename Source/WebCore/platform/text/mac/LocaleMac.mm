@@ -34,7 +34,6 @@
 #import <Foundation/NSDateFormatter.h>
 #import <Foundation/NSLocale.h>
 #include "Language.h"
-#include "LocalizedDate.h"
 #include "LocalizedStrings.h"
 #include <wtf/DateMath.h>
 #include <wtf/PassOwnPtr.h>
@@ -71,19 +70,20 @@ PassOwnPtr<Localizer> Localizer::create(const AtomicString& locale)
     return LocaleMac::create(determineLocale(locale.string()));
 }
 
-static NSDateFormatter* createDateTimeFormatter(NSLocale* locale, NSDateFormatterStyle dateStyle, NSDateFormatterStyle timeStyle)
+static RetainPtr<NSDateFormatter> createDateTimeFormatter(NSLocale* locale, NSCalendar* calendar, NSDateFormatterStyle dateStyle, NSDateFormatterStyle timeStyle)
 {
     NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
     [formatter setLocale:locale];
     [formatter setDateStyle:dateStyle];
     [formatter setTimeStyle:timeStyle];
     [formatter setTimeZone:[NSTimeZone timeZoneWithAbbreviation:@"UTC"]];
-    [formatter setCalendar:[[NSCalendar alloc] initWithCalendarIdentifier:NSGregorianCalendar]];
-    return formatter;
+    [formatter setCalendar:calendar];
+    return adoptNS(formatter);
 }
 
 LocaleMac::LocaleMac(NSLocale* locale)
     : m_locale(locale)
+    , m_gregorianCalendar(AdoptNS, [[NSCalendar alloc] initWithCalendarIdentifier:NSGregorianCalendar])
     , m_didInitializeNumberData(false)
 {
     NSArray* availableLanguages = [NSLocale ISOLanguageCodes];
@@ -91,6 +91,7 @@ LocaleMac::LocaleMac(NSLocale* locale)
     NSString* language = [m_locale.get() objectForKey:NSLocaleLanguageCode];
     if ([availableLanguages indexOfObject:language] == NSNotFound)
         m_locale = [[NSLocale alloc] initWithLocaleIdentifier:defaultLanguage()];
+    [m_gregorianCalendar.get() setLocale:m_locale.get()];
 }
 
 LocaleMac::~LocaleMac()
@@ -107,31 +108,19 @@ PassOwnPtr<LocaleMac> LocaleMac::create(NSLocale* locale)
     return adoptPtr(new LocaleMac(locale));
 }
 
-LocaleMac* LocaleMac::currentLocale()
+RetainPtr<NSDateFormatter> LocaleMac::shortDateFormatter()
 {
-    static LocaleMac* currentLocale = new LocaleMac(determineLocale(defaultLanguage()));
-    return currentLocale;
+    return createDateTimeFormatter(m_locale.get(), m_gregorianCalendar.get(), NSDateFormatterShortStyle, NSDateFormatterNoStyle);
 }
 
-NSDateFormatter* LocaleMac::createShortDateFormatter()
+double LocaleMac::parseDateTime(const String& input, DateComponents::Type type)
 {
-    return createDateTimeFormatter(m_locale.get(), NSDateFormatterShortStyle, NSDateFormatterNoStyle);
-}
-
-double LocaleMac::parseDate(const String& input)
-{
-    RetainPtr<NSDateFormatter> formatter(AdoptNS, createShortDateFormatter());
-    NSDate *date = [formatter.get() dateFromString:input];
+    if (type != DateComponents::Date)
+        return std::numeric_limits<double>::quiet_NaN();
+    NSDate *date = [shortDateFormatter().get() dateFromString:input];
     if (!date)
         return std::numeric_limits<double>::quiet_NaN();
     return [date timeIntervalSince1970] * msPerSecond;
-}
-
-String LocaleMac::formatDate(const DateComponents& dateComponents)
-{
-    RetainPtr<NSDateFormatter> formatter(AdoptNS, createShortDateFormatter());
-    NSTimeInterval interval = dateComponents.millisecondsSinceEpoch() / msPerSecond;
-    return String([formatter.get() stringFromDate:[NSDate dateWithTimeIntervalSince1970:interval]]);
 }
 
 #if ENABLE(CALENDAR_PICKER)
@@ -184,10 +173,9 @@ static String localizeDateFormat(const String& format)
 
 String LocaleMac::dateFormatText()
 {
-    if (!m_localizedDateFormatText.isEmpty())
+    if (!m_localizedDateFormatText.isNull())
         return m_localizedDateFormatText;
-    RetainPtr<NSDateFormatter> formatter(AdoptNS, createShortDateFormatter());
-    m_localizedDateFormatText = localizeDateFormat(String([formatter.get() dateFormat]));
+    m_localizedDateFormatText = localizeDateFormat([shortDateFormatter().get() dateFormat]);
     return  m_localizedDateFormatText;
 }
 
@@ -196,8 +184,7 @@ const Vector<String>& LocaleMac::monthLabels()
     if (!m_monthLabels.isEmpty())
         return m_monthLabels;
     m_monthLabels.reserveCapacity(12);
-    RetainPtr<NSDateFormatter> formatter(AdoptNS, createShortDateFormatter());
-    NSArray *array = [formatter.get() monthSymbols];
+    NSArray *array = [shortDateFormatter().get() monthSymbols];
     if ([array count] == 12) {
         for (unsigned i = 0; i < 12; ++i)
             m_monthLabels.append(String([array objectAtIndex:i]));
@@ -213,8 +200,7 @@ const Vector<String>& LocaleMac::weekDayShortLabels()
     if (!m_weekDayShortLabels.isEmpty())
         return m_weekDayShortLabels;
     m_weekDayShortLabels.reserveCapacity(7);
-    RetainPtr<NSDateFormatter> formatter(AdoptNS, createShortDateFormatter());
-    NSArray *array = [formatter.get() shortWeekdaySymbols];
+    NSArray *array = [shortDateFormatter().get() shortWeekdaySymbols];
     if ([array count] == 7) {
         for (unsigned i = 0; i < 7; ++i)
             m_weekDayShortLabels.append(String([array objectAtIndex:i]));
@@ -229,41 +215,50 @@ const Vector<String>& LocaleMac::weekDayShortLabels()
 
 unsigned LocaleMac::firstDayOfWeek()
 {
-    RetainPtr<NSCalendar> calendar(AdoptNS, [[NSCalendar alloc] initWithCalendarIdentifier:NSGregorianCalendar]);
-    [calendar.get() setLocale:m_locale.get()];
     // The document for NSCalendar - firstWeekday doesn't have an explanation of
     // firstWeekday value. We can guess it by the document of NSDateComponents -
     // weekDay, so it can be 1 through 7 and 1 is Sunday.
-    return [calendar.get() firstWeekday] - 1;
+    return [m_gregorianCalendar.get() firstWeekday] - 1;
+}
+
+bool LocaleMac::isRTL()
+{
+    return NSLocaleLanguageDirectionRightToLeft == [NSLocale characterDirectionForLanguage:[NSLocale canonicalLanguageIdentifierFromString:[m_locale.get() localeIdentifier]]];
 }
 #endif
 
-#if ENABLE(INPUT_TYPE_TIME_MULTIPLE_FIELDS)
-NSDateFormatter* LocaleMac::createTimeFormatter()
+#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+RetainPtr<NSDateFormatter> LocaleMac::timeFormatter()
 {
-    return createDateTimeFormatter(m_locale.get(), NSDateFormatterNoStyle, NSDateFormatterMediumStyle);
+    return createDateTimeFormatter(m_locale.get(), m_gregorianCalendar.get(), NSDateFormatterNoStyle, NSDateFormatterMediumStyle);
 }
 
-NSDateFormatter* LocaleMac::createShortTimeFormatter()
+RetainPtr<NSDateFormatter> LocaleMac::shortTimeFormatter()
 {
-    return createDateTimeFormatter(m_locale.get(), NSDateFormatterNoStyle, NSDateFormatterShortStyle);
+    return createDateTimeFormatter(m_locale.get(), m_gregorianCalendar.get(), NSDateFormatterNoStyle, NSDateFormatterShortStyle);
+}
+
+String LocaleMac::dateFormat()
+{
+    if (!m_dateFormat.isNull())
+        return m_dateFormat;
+    m_dateFormat = [shortDateFormatter().get() dateFormat];
+    return m_dateFormat;
 }
 
 String LocaleMac::timeFormat()
 {
-    if (!m_localizedTimeFormatText.isEmpty())
+    if (!m_localizedTimeFormatText.isNull())
         return m_localizedTimeFormatText;
-    RetainPtr<NSDateFormatter> formatter(AdoptNS, createTimeFormatter());
-    m_localizedTimeFormatText = String([formatter.get() dateFormat]);
+    m_localizedTimeFormatText = [timeFormatter().get() dateFormat];
     return m_localizedTimeFormatText;
 }
 
 String LocaleMac::shortTimeFormat()
 {
-    if (!m_localizedShortTimeFormatText.isEmpty())
+    if (!m_localizedShortTimeFormatText.isNull())
         return m_localizedShortTimeFormatText;
-    RetainPtr<NSDateFormatter> formatter(AdoptNS, createShortTimeFormatter());
-    m_localizedShortTimeFormatText = String([formatter.get() dateFormat]);
+    m_localizedShortTimeFormatText = [shortTimeFormatter().get() dateFormat];
     return m_localizedShortTimeFormatText;
 }
 
@@ -272,9 +267,9 @@ const Vector<String>& LocaleMac::timeAMPMLabels()
     if (!m_timeAMPMLabels.isEmpty())
         return m_timeAMPMLabels;
     m_timeAMPMLabels.reserveCapacity(2);
-    RetainPtr<NSDateFormatter> formatter(AdoptNS, createShortTimeFormatter());
-    m_timeAMPMLabels.append(String([formatter.get() AMSymbol]));
-    m_timeAMPMLabels.append(String([formatter.get() PMSymbol]));
+    RetainPtr<NSDateFormatter> formatter = shortTimeFormatter();
+    m_timeAMPMLabels.append([formatter.get() AMSymbol]);
+    m_timeAMPMLabels.append([formatter.get() PMSymbol]);
     return m_timeAMPMLabels;
 }
 #endif
@@ -298,9 +293,9 @@ void LocaleMac::initializeLocalizerData()
     for (unsigned i = 0; i < 10; ++i)
         symbols.append(nineToZero.substring(9 - i, 1));
     ASSERT(symbols.size() == DecimalSeparatorIndex);
-    symbols.append(String([formatter.get() decimalSeparator]));
+    symbols.append([formatter.get() decimalSeparator]);
     ASSERT(symbols.size() == GroupSeparatorIndex);
-    symbols.append(String([formatter.get() groupingSeparator]));
+    symbols.append([formatter.get() groupingSeparator]);
     ASSERT(symbols.size() == DecimalSymbolsSize);
 
     String positivePrefix([formatter.get() positivePrefix]);

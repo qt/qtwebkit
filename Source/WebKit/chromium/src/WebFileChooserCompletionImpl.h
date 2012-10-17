@@ -31,11 +31,10 @@
 #ifndef WebFileChooserCompletionImpl_h
 #define WebFileChooserCompletionImpl_h
 
-#include "WebFileChooserCompletion.h"
-#include "platform/WebString.h"
-#include "platform/WebVector.h"
-
 #include "FileChooser.h"
+#include "WebFileChooserCompletion.h"
+#include <public/WebString.h>
+#include <public/WebVector.h>
 #include <wtf/PassRefPtr.h>
 
 using WebKit::WebFileChooserCompletion;

@@ -31,6 +31,14 @@
 #include "WebProcessMain.h"
 #include <wtf/text/CString.h>
 
+#if ENABLE(NETWORK_PROCESS)
+#include "NetworkProcessMain.h"
+#endif
+
+#if ENABLE(SHARED_WORKER_PROCESS)
+#include "SharedWorkerProcessMain.h"
+#endif
+
 #if PLATFORM(MAC)
 #include <objc/objc-auto.h>
 #elif PLATFORM(WIN)
@@ -53,6 +61,16 @@ static int WebKitMain(const CommandLine& commandLine)
             return PluginProcessMain(commandLine);
 #else
             break;
+#endif
+        case ProcessLauncher::NetworkProcess:
+#if ENABLE(NETWORK_PROCESS)
+            return NetworkProcessMain(commandLine);
+#else
+            break;
+#endif
+#if ENABLE(SHARED_WORKER_PROCESS)
+        case ProcessLauncher::SharedWorkerProcess:
+            return SharedWorkerProcessMain(commandLine);
 #endif
     }
 

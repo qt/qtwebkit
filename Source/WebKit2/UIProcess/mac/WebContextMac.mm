@@ -30,6 +30,7 @@
 #import "WebProcessCreationParameters.h"
 #import <WebCore/Color.h>
 #import <WebCore/FileSystem.h>
+#include <WebCore/NotImplemented.h>
 #import <WebCore/PlatformPasteboard.h>
 #import <sys/param.h>
 
@@ -77,21 +78,7 @@ void WebContext::platformInitializeWebProcess(WebProcessCreationParameters& para
 {
     parameters.presenterApplicationPid = getpid();
 
-    if (!omitPDFSupport()) {
-        // We want to use a PDF view in the UI process for PDF MIME types.
-        HashSet<String, CaseFoldingHash> mimeType = pdfAndPostScriptMIMETypes();
-        parameters.mimeTypesWithCustomRepresentation.appendRange(mimeType.begin(), mimeType.end());
-    }
-
     parameters.parentProcessName = [[NSProcessInfo processInfo] processName];    
-
-    RetainPtr<CFStringRef> cachePath(AdoptCF, WKCopyFoundationCacheDirectory());
-    if (!cachePath)
-        cachePath = reinterpret_cast<CFStringRef>(NSHomeDirectory());
-
-    parameters.nsURLCachePath = [(NSString *)cachePath.get() stringByStandardizingPath];
-    SandboxExtension::createHandleForReadWriteDirectory(parameters.nsURLCachePath, parameters.nsURLCachePathExtensionHandle);
-    ASSERT(!parameters.nsURLCachePath.isEmpty());
 
     NSURLCache *urlCache = [NSURLCache sharedURLCache];
     parameters.nsURLCacheMemoryCapacity = [urlCache memoryCapacity];
@@ -100,10 +87,7 @@ void WebContext::platformInitializeWebProcess(WebProcessCreationParameters& para
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
     parameters.shouldForceScreenFontSubstitution = [[NSUserDefaults standardUserDefaults] boolForKey:@"NSFontDefaultScreenFontSubstitutionEnabled"];
 #endif
-
-#if ENABLE(PLUGIN_PROCESS)
-    parameters.disablePluginProcessMessageTimeout = [[NSUserDefaults standardUserDefaults] boolForKey:@"WebKitDisablePluginProcessMessageTimeout"];
-#endif
+    parameters.shouldEnableKerningAndLigaturesByDefault = [[NSUserDefaults standardUserDefaults] boolForKey:@"WebKitKerningAndLigaturesEnabledByDefault"];
 
 #if USE(ACCELERATED_COMPOSITING) && HAVE(HOSTED_CORE_ANIMATION)
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
@@ -131,7 +115,22 @@ void WebContext::platformInvalidateContext()
 {
     [[NSNotificationCenter defaultCenter] removeObserver:(id)m_enhancedAccessibilityObserver.get()];
 }
-    
+
+String WebContext::platformDefaultDiskCacheDirectory() const
+{
+    RetainPtr<NSString> cachePath(AdoptNS, (NSString *)WKCopyFoundationCacheDirectory());
+    if (!cachePath)
+        cachePath = @"~/Library/Caches/com.apple.WebKit2.WebProcess";
+
+    return [cachePath.get() stringByStandardizingPath];
+}
+
+String WebContext::platformDefaultCookieStorageDirectory() const
+{
+    notImplemented();
+    return [@"" stringByStandardizingPath];
+}
+
 String WebContext::platformDefaultDatabaseDirectory() const
 {
     NSString *databasesDirectory = [[NSUserDefaults standardUserDefaults] objectForKey:WebDatabaseDirectoryDefaultsKey];

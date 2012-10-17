@@ -94,8 +94,7 @@ bool PageClientImpl::isViewFocused()
 
 bool PageClientImpl::isViewVisible()
 {
-    notImplemented();
-    return true;
+    return evas_object_visible_get(m_viewWidget);
 }
 
 bool PageClientImpl::isViewInWindow()
@@ -124,9 +123,9 @@ void PageClientImpl::pageClosed()
     notImplemented();
 }
 
-void PageClientImpl::toolTipChanged(const String&, const String&)
+void PageClientImpl::toolTipChanged(const String&, const String& newToolTip)
 {
-    notImplemented();
+    ewk_view_tooltip_text_set(m_viewWidget, newToolTip.utf8().data());
 }
 
 void PageClientImpl::setCursor(const Cursor& cursor)
@@ -284,9 +283,8 @@ void PageClientImpl::countStringMatchesInCustomRepresentation(const String&, Fin
 
 void PageClientImpl::handleDownloadRequest(DownloadProxy* download)
 {
-    Ewk_Download_Job* ewkDownload = ewk_download_job_new(download, m_viewWidget);
-    ewk_context_download_job_add(ewk_view_context_get(m_viewWidget), ewkDownload);
-    ewk_download_job_unref(ewkDownload);
+    RefPtr<Ewk_Download_Job> ewkDownload = Ewk_Download_Job::create(download, m_viewWidget);
+    ewk_context_download_job_add(ewk_view_context_get(m_viewWidget), ewkDownload.get());
 }
 
 #if USE(TILED_BACKING_STORE)

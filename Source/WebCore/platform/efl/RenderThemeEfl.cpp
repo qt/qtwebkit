@@ -28,6 +28,7 @@
 #include "RenderThemeEfl.h"
 
 #include "CSSValueKeywords.h"
+#include "CairoUtilitiesEfl.h"
 #include "FontDescription.h"
 #include "GraphicsContext.h"
 #include "HTMLInputElement.h"
@@ -160,27 +161,6 @@ void RenderThemeEfl::adjustSizeConstraints(RenderStyle* style, FormType type) co
     style->setPaddingBottom(desc->padding.bottom());
     style->setPaddingLeft(desc->padding.left());
     style->setPaddingRight(desc->padding.right());
-}
-
-static PassRefPtr<cairo_surface_t> createSurfaceForBackingStore(Ecore_Evas* ee)
-{
-    ASSERT(ee);
-
-    int width;
-    int height;
-    ecore_evas_geometry_get(ee, 0, 0, &width, &height);
-    ASSERT(width > 0 && height > 0);
-
-    unsigned char* buffer = static_cast<unsigned char*>(const_cast<void*>(ecore_evas_buffer_pixels_get(ee)));
-    RefPtr<cairo_surface_t> surface = adoptRef(cairo_image_surface_create_for_data(buffer, CAIRO_FORMAT_ARGB32, width, height, width * 4));
-
-    cairo_status_t status = cairo_surface_status(surface.get());
-    if (status != CAIRO_STATUS_SUCCESS) {
-        EINA_LOG_ERR("Could not create cairo surface: %s", cairo_status_to_string(status));
-        return 0;
-    }
-
-    return surface;
 }
 
 static bool isFormElementTooLargeToDisplay(const IntSize& elementSize)
@@ -1063,7 +1043,9 @@ bool RenderThemeEfl::emitMediaButtonSignal(FormType formType, MediaControlElemen
     else if (mediaElementType == MediaSeekBackButton)
         edje_object_signal_emit(entry->edje(), "seekbackward", "");
     else if (mediaElementType == MediaEnterFullscreenButton)
-        edje_object_signal_emit(entry->edje(), "fullscreen", "");
+        edje_object_signal_emit(entry->edje(), "fullscreen_enter", "");
+    else if (mediaElementType == MediaExitFullscreenButton)
+        edje_object_signal_emit(entry->edje(), "fullscreen_exit", "");
 #if ENABLE(VIDEO_TRACK)
     else if (mediaElementType == MediaShowClosedCaptionsButton)
         edje_object_signal_emit(entry->edje(), "show_captions", "");
@@ -1093,15 +1075,21 @@ String RenderThemeEfl::formatMediaControlsCurrentTime(float currentTime, float d
     return formatMediaControlsTime(currentTime) + " / " + formatMediaControlsTime(duration);
 }
 
+bool RenderThemeEfl::hasOwnDisabledStateHandlingFor(ControlPart part) const
+{
+    return (part != MediaMuteButtonPart);
+}
+
 bool RenderThemeEfl::paintMediaFullscreenButton(RenderObject* object, const PaintInfo& info, const IntRect& rect)
 {
     Node* mediaNode = object->node() ? object->node()->shadowHost() : 0;
     if (!mediaNode)
         mediaNode = object->node();
-    if (!mediaNode || (!mediaNode->hasTagName(videoTag)))
+    if (!mediaNode || !mediaNode->isElementNode() || !static_cast<Element*>(mediaNode)->isMediaElement())
         return false;
 
-    if (!emitMediaButtonSignal(FullScreenButton, MediaEnterFullscreenButton, rect))
+    HTMLMediaElement* mediaElement = static_cast<HTMLMediaElement*>(mediaNode);
+    if (!emitMediaButtonSignal(FullScreenButton, mediaElement->isFullscreen() ? MediaExitFullscreenButton : MediaEnterFullscreenButton, rect))
         return false;
 
     return paintThemePart(object, FullScreenButton, info, rect);

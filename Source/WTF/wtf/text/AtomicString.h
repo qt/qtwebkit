@@ -149,6 +149,10 @@ public:
     AtomicString(const QString& s) : m_string(add(String(s).impl())) { }
     operator QString() const { return m_string; }
 #endif
+#if PLATFORM(BLACKBERRY)
+    AtomicString(const BlackBerry::Platform::String& s) : m_string(add(String(s).impl())) { }
+    operator BlackBerry::Platform::String() const { return m_string; }
+#endif
 
     // AtomicString::fromUTF8 will return a null string if
     // the input data contains invalid UTF-8 sequences.
@@ -158,8 +162,6 @@ public:
 #ifndef NDEBUG
     void show() const;
 #endif
-
-    WTF_EXPORT_STRING_API void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     // The explicit constructors with AtomicString::ConstructFromLiteral must be used for literals.

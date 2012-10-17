@@ -41,6 +41,42 @@ namespace Private {
     void addChildNodesToDeletionQueue(GenericNode*& head, GenericNode*& tail, GenericNodeContainer*);
 };
 
+class NoEventDispatchAssertion {
+public:
+    NoEventDispatchAssertion()
+    {
+#ifndef NDEBUG
+        if (!isMainThread())
+            return;
+        s_count++;
+#endif
+    }
+
+    ~NoEventDispatchAssertion()
+    {
+#ifndef NDEBUG
+        if (!isMainThread())
+            return;
+        ASSERT(s_count);
+        s_count--;
+#endif
+    }
+
+#ifndef NDEBUG
+    static bool isEventDispatchForbidden()
+    {
+        if (!isMainThread())
+            return false;
+        return s_count;
+    }
+#endif
+
+private:
+#ifndef NDEBUG
+    static unsigned s_count;
+#endif
+};
+
 class ContainerNode : public Node {
 public:
     virtual ~ContainerNode();

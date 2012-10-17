@@ -93,13 +93,13 @@ OpaqueJSClass::~OpaqueJSClass()
     if (m_staticValues) {
         OpaqueJSClassStaticValuesTable::const_iterator end = m_staticValues->end();
         for (OpaqueJSClassStaticValuesTable::const_iterator it = m_staticValues->begin(); it != end; ++it)
-            ASSERT(!it->first->isIdentifier());
+            ASSERT(!it->key->isIdentifier());
     }
 
     if (m_staticFunctions) {
         OpaqueJSClassStaticFunctionsTable::const_iterator end = m_staticFunctions->end();
         for (OpaqueJSClassStaticFunctionsTable::const_iterator it = m_staticFunctions->begin(); it != end; ++it)
-            ASSERT(!it->first->isIdentifier());
+            ASSERT(!it->key->isIdentifier());
     }
 #endif
     
@@ -133,8 +133,8 @@ OpaqueJSClassContextData::OpaqueJSClassContextData(JSC::JSGlobalData&, OpaqueJSC
         staticValues = adoptPtr(new OpaqueJSClassStaticValuesTable);
         OpaqueJSClassStaticValuesTable::const_iterator end = jsClass->m_staticValues->end();
         for (OpaqueJSClassStaticValuesTable::const_iterator it = jsClass->m_staticValues->begin(); it != end; ++it) {
-            ASSERT(!it->first->isIdentifier());
-            staticValues->add(StringImpl::create(it->first->characters(), it->first->length()), adoptPtr(new StaticValueEntry(it->second->getProperty, it->second->setProperty, it->second->attributes)));
+            ASSERT(!it->key->isIdentifier());
+            staticValues->add(StringImpl::create(it->key->characters(), it->key->length()), adoptPtr(new StaticValueEntry(it->value->getProperty, it->value->setProperty, it->value->attributes)));
         }
     }
 
@@ -142,15 +142,15 @@ OpaqueJSClassContextData::OpaqueJSClassContextData(JSC::JSGlobalData&, OpaqueJSC
         staticFunctions = adoptPtr(new OpaqueJSClassStaticFunctionsTable);
         OpaqueJSClassStaticFunctionsTable::const_iterator end = jsClass->m_staticFunctions->end();
         for (OpaqueJSClassStaticFunctionsTable::const_iterator it = jsClass->m_staticFunctions->begin(); it != end; ++it) {
-            ASSERT(!it->first->isIdentifier());
-            staticFunctions->add(StringImpl::create(it->first->characters(), it->first->length()), adoptPtr(new StaticFunctionEntry(it->second->callAsFunction, it->second->attributes)));
+            ASSERT(!it->key->isIdentifier());
+            staticFunctions->add(StringImpl::create(it->key->characters(), it->key->length()), adoptPtr(new StaticFunctionEntry(it->value->callAsFunction, it->value->attributes)));
         }
     }
 }
 
 OpaqueJSClassContextData& OpaqueJSClass::contextData(ExecState* exec)
 {
-    OwnPtr<OpaqueJSClassContextData>& contextData = exec->globalData().opaqueJSClassData.add(this, nullptr).iterator->second;
+    OwnPtr<OpaqueJSClassContextData>& contextData = exec->globalData().opaqueJSClassData.add(this, nullptr).iterator->value;
     if (!contextData)
         contextData = adoptPtr(new OpaqueJSClassContextData(exec->globalData(), this));
     return *contextData;
@@ -199,7 +199,7 @@ JSObject* OpaqueJSClass::prototype(ExecState* exec)
         return prototype;
 
     // Recursive, but should be good enough for our purposes
-    JSObject* prototype = JSCallbackObject<JSNonFinalObject>::create(exec, exec->lexicalGlobalObject(), exec->lexicalGlobalObject()->callbackObjectStructure(), prototypeClass, &jsClassData); // set jsClassData as the object's private data, so it can clear our reference on destruction
+    JSObject* prototype = JSCallbackObject<JSDestructibleObject>::create(exec, exec->lexicalGlobalObject(), exec->lexicalGlobalObject()->callbackObjectStructure(), prototypeClass, &jsClassData); // set jsClassData as the object's private data, so it can clear our reference on destruction
     if (parentClass) {
         if (JSObject* parentPrototype = parentClass->prototype(exec))
             prototype->setPrototype(exec->globalData(), parentPrototype);

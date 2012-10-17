@@ -66,7 +66,7 @@ public:
     static const AtomicString& modeReadOnlyLegacy();
     static const AtomicString& modeReadWriteLegacy();
 
-    static Mode stringToMode(const String&, ExceptionCode&);
+    static Mode stringToMode(const String&, ScriptExecutionContext*, ExceptionCode&);
     static const AtomicString& modeToString(Mode, ExceptionCode&);
 
     IDBTransactionBackendInterface* backend() const;
@@ -104,7 +104,7 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(error);
 
     // IDBTransactionCallbacks
-    virtual void onAbort();
+    virtual void onAbort(PassRefPtr<IDBDatabaseError>);
     virtual void onComplete();
 
     // EventTarget
@@ -157,6 +157,9 @@ private:
 
     typedef HashMap<String, RefPtr<IDBObjectStore> > IDBObjectStoreMap;
     IDBObjectStoreMap m_objectStoreMap;
+
+    typedef HashSet<RefPtr<IDBObjectStore> > IDBObjectStoreSet;
+    IDBObjectStoreSet m_deletedObjectStores;
 
     typedef HashMap<RefPtr<IDBObjectStore>, IDBObjectStoreMetadata> IDBObjectStoreMetadataMap;
     IDBObjectStoreMetadataMap m_objectStoreCleanupMap;

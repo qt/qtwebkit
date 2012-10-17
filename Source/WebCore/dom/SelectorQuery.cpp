@@ -39,8 +39,13 @@ void SelectorDataList::initialize(const CSSSelectorList& selectorList)
 {
     ASSERT(m_selectors.isEmpty());
 
+    unsigned selectorCount = 0;
     for (CSSSelector* selector = selectorList.first(); selector; selector = CSSSelectorList::next(selector))
-        m_selectors.append(SelectorData(selector, SelectorChecker::isFastCheckableSelector(selector)));
+        selectorCount++;
+
+    m_selectors.reserveInitialCapacity(selectorCount);
+    for (CSSSelector* selector = selectorList.first(); selector; selector = CSSSelectorList::next(selector))
+        m_selectors.uncheckedAppend(SelectorData(selector, SelectorChecker::isFastCheckableSelector(selector)));
 }
 
 bool SelectorDataList::matches(const SelectorChecker& selectorChecker, Element* targetElement) const
@@ -169,7 +174,7 @@ SelectorQuery* SelectorQueryCache::add(const AtomicString& selectors, Document* 
 {
     HashMap<AtomicString, OwnPtr<SelectorQuery> >::iterator it = m_entries.find(selectors);
     if (it != m_entries.end())
-        return it->second.get();
+        return it->value.get();
 
     CSSParser parser(document);
     CSSSelectorList selectorList;
@@ -185,6 +190,10 @@ SelectorQuery* SelectorQueryCache::add(const AtomicString& selectors, Document* 
         ec = NAMESPACE_ERR;
         return 0;
     }
+
+    const int maximumSelectorQueryCacheSize = 256;
+    if (m_entries.size() == maximumSelectorQueryCacheSize)
+        m_entries.remove(m_entries.begin());
     
     OwnPtr<SelectorQuery> selectorQuery = adoptPtr(new SelectorQuery(selectorList));
     SelectorQuery* rawSelectorQuery = selectorQuery.get();

@@ -1598,7 +1598,7 @@ void GraphicsContext::drawText(const SimpleFontData* fontData, const GlyphBuffer
     double scaleY = m_data->m_transform.d();
 
     int height = fontData->platformData().size() * scaleY;
-    int width = fontData->platformData().averageCharWidth() * scaleX;
+    int width = fontData->avgCharWidth() * scaleX;
 
     if (!height || !width)
         return;
@@ -1626,10 +1626,10 @@ void GraphicsContext::drawText(const SimpleFontData* fontData, const GlyphBuffer
         const GlyphBufferAdvance* advance = glyphBuffer.advances(from);
         if (scaleX == 1.)
             for (int i = 1; i < numGlyphs; ++i)
-                offset += *advance++;
+                offset += (*advance++).width();
         else
             for (int i = 1; i < numGlyphs; ++i)
-                offset += *advance++ * scaleX;
+                offset += (*advance++).width() * scaleX;
 
         offset += width;
 
@@ -1687,7 +1687,7 @@ void GraphicsContext::drawText(const SimpleFontData* fontData, const GlyphBuffer
         bool drawOneByOne = false;
         if (scaleX == 1.) {
             for (; srcChar < srcCharEnd; ++srcChar) {
-                offset += *advance++;
+                offset += (*advance++).width();
                 int offsetInt = stableRound(offset);
                 if (isCharVisible(*srcChar)) {
                     if (!drawOneByOne && WTF::Unicode::direction(*srcChar) == WTF::Unicode::RightToLeft)
@@ -1699,7 +1699,7 @@ void GraphicsContext::drawText(const SimpleFontData* fontData, const GlyphBuffer
             }
         } else {
             for (; srcChar < srcCharEnd; ++srcChar) {
-                offset += *advance++ * scaleX;
+                offset += (*advance++).width() * scaleX;
                 int offsetInt = stableRound(offset);
                 if (isCharVisible(*srcChar)) {
                     if (!drawOneByOne && WTF::Unicode::direction(*srcChar) == WTF::Unicode::RightToLeft)

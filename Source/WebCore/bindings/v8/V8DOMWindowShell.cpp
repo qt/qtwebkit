@@ -368,8 +368,11 @@ bool V8DOMWindowShell::initializeIfNeeded()
     if (isMainWorld) {
         updateDocument();
         setSecurityToken();
-        if (m_frame->document())
-            context->AllowCodeGenerationFromStrings(m_frame->document()->contentSecurityPolicy()->allowEval(0, ContentSecurityPolicy::SuppressReport));
+        if (m_frame->document()) {
+            ContentSecurityPolicy* csp = m_frame->document()->contentSecurityPolicy();
+            context->AllowCodeGenerationFromStrings(csp->allowEval(0, ContentSecurityPolicy::SuppressReport));
+            context->SetErrorMessageForCodeGenerationFromStrings(v8String(csp->evalDisabledErrorMessage()));
+        }
     } else {
         // Using the default security token means that the canAccess is always
         // called, which is slow.
@@ -433,8 +436,9 @@ void V8DOMWindowShell::createContext()
 
 bool V8DOMWindowShell::installDOMWindow()
 {
-    DOMWindow* window = m_frame->document()->domWindow();
-    v8::Local<v8::Object> windowWrapper = V8ObjectConstructor::newInstance(V8PerContextData::from(m_context.get())->constructorForType(&V8DOMWindow::info));
+    Document* document = m_frame->document();
+    DOMWindow* window = document->domWindow();
+    v8::Local<v8::Object> windowWrapper = V8ObjectConstructor::newInstance(V8PerContextData::from(m_context.get())->constructorForType(&V8DOMWindow::info, document));
     if (windowWrapper.IsEmpty())
         return false;
 
@@ -611,7 +615,7 @@ void V8DOMWindowShell::setIsolatedWorldSecurityOrigin(PassRefPtr<SecurityOrigin>
 {
     ASSERT(!m_world->isMainWorld());
     // FIXME: Should this be here?
-    if (!m_isolatedWorldShellSecurityOrigin && !context().IsEmpty() && InspectorInstrumentation::hasFrontends()) {
+    if (!m_isolatedWorldShellSecurityOrigin && !context().IsEmpty() && InspectorInstrumentation::runtimeAgentEnabled(m_frame)) {
         v8::HandleScope handleScope;
         ScriptState* scriptState = ScriptState::forContext(v8::Local<v8::Context>::New(context()));
         InspectorInstrumentation::didCreateIsolatedContext(m_frame, scriptState, securityOrigin.get());

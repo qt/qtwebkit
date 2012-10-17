@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,11 +28,13 @@
 
 #include "APIObject.h"
 #include "GenericCallback.h"
+#include "MessageReceiver.h"
+#include "MessageReceiverMap.h"
 #include "PluginInfoStore.h"
 #include "ProcessModel.h"
 #include "VisitedLinkProvider.h"
-#include "WebContextInjectedBundleClient.h"
 #include "WebContextConnectionClient.h"
+#include "WebContextInjectedBundleClient.h"
 #include "WebDownloadClient.h"
 #include "WebHistoryClient.h"
 #include "WebProcessProxy.h"
@@ -43,6 +45,10 @@
 #include <wtf/RefPtr.h>
 #include <wtf/text/StringHash.h>
 #include <wtf/text/WTFString.h>
+
+#if ENABLE(NETWORK_PROCESS)
+#include "NetworkProcessProxy.h"
+#endif
 
 namespace WebKit {
 
@@ -75,7 +81,7 @@ struct WebProcessCreationParameters;
     
 typedef GenericCallback<WKDictionaryRef> DictionaryCallback;
 
-class WebContext : public APIObject {
+class WebContext : public APIObject, private CoreIPC::MessageReceiver {
 public:
     static const Type APIType = TypeContext;
 
@@ -83,6 +89,10 @@ public:
     virtual ~WebContext();
 
     static const Vector<WebContext*>& allContexts();
+
+    void addMessageReceiver(CoreIPC::MessageClass, CoreIPC::MessageReceiver*);
+    bool dispatchMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    bool dispatchSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
 
     void initializeInjectedBundleClient(const WKContextInjectedBundleClient*);
     void initializeConnectionClient(const WKContextConnectionClient*);
@@ -140,8 +150,9 @@ public:
     void addVisitedLink(const String&);
     void addVisitedLinkHash(WebCore::LinkHash);
 
-    void didReceiveMessage(WebProcessProxy*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-    void didReceiveSyncMessage(WebProcessProxy*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
+    // MessageReceiver.
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*) OVERRIDE;
+    virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&) OVERRIDE;
 
     void setCacheModel(CacheModel);
     CacheModel cacheModel() const { return m_cacheModel; }
@@ -204,6 +215,8 @@ public:
     void setIconDatabasePath(const String&);
     String iconDatabasePath() const;
     void setLocalStorageDirectory(const String& dir) { m_overrideLocalStorageDirectory = dir; }
+    void setDiskCacheDirectory(const String& dir) { m_overrideDiskCacheDirectory = dir; }
+    void setCookieStorageDirectory(const String& dir) { m_overrideCookieStorageDirectory = dir; }
 
     void ensureSharedWebProcess();
     PassRefPtr<WebProcessProxy> createNewWebProcess();
@@ -230,6 +243,8 @@ public:
 
     void textCheckerStateChanged();
 
+    void setUsesNetworkProcess(bool);
+
 private:
     WebContext(ProcessModel, const String& injectedBundlePath);
 
@@ -237,7 +252,11 @@ private:
 
     void platformInitializeWebProcess(WebProcessCreationParameters&);
     void platformInvalidateContext();
-    
+
+#if ENABLE(NETWORK_PROCESS)
+    void ensureNetworkProcess();
+#endif
+
 #if PLATFORM(MAC)
     void getPasteboardTypes(const String& pasteboardName, Vector<String>& pasteboardTypes);
     void getPasteboardPathnamesForType(const String& pasteboardName, const String& pasteboardType, Vector<String>& pathnames);
@@ -278,6 +297,12 @@ private:
     String localStorageDirectory() const;
     String platformDefaultLocalStorageDirectory() const;
 
+    String diskCacheDirectory() const;
+    String platformDefaultDiskCacheDirectory() const;
+
+    String cookieStorageDirectory() const;
+    String platformDefaultCookieStorageDirectory() const;
+
     ProcessModel m_processModel;
     
     Vector<RefPtr<WebProcessProxy> > m_processes;
@@ -306,6 +331,10 @@ private:
 
     bool m_alwaysUsesComplexTextCodePath;
     bool m_shouldUseFontSmoothing;
+
+    // Messages that were posted before any pages were created.
+    // The client should use initialization messages instead, so that a restarted process would get the same state.
+    Vector<pair<String, RefPtr<APIObject> > > m_messagesToInjectedBundlePostedToEmptyContext;
 
     CacheModel m_cacheModel;
 
@@ -352,10 +381,19 @@ private:
     String m_overrideDatabaseDirectory;
     String m_overrideIconDatabasePath;
     String m_overrideLocalStorageDirectory;
+    String m_overrideDiskCacheDirectory;
+    String m_overrideCookieStorageDirectory;
 
     bool m_processTerminationEnabled;
+
+#if ENABLE(NETWORK_PROCESS)
+    RefPtr<NetworkProcessProxy> m_networkProcess;
+    bool m_usesNetworkProcess;
+#endif
     
     HashMap<uint64_t, RefPtr<DictionaryCallback> > m_dictionaryCallbacks;
+
+    CoreIPC::MessageReceiverMap m_messageReceiverMap;
 };
 
 template<typename U> inline void WebContext::sendToAllProcesses(const U& message)
@@ -370,7 +408,9 @@ template<typename U> inline void WebContext::sendToAllProcesses(const U& message
 
 template<typename U> void WebContext::sendToAllProcessesRelaunchingThemIfNecessary(const U& message)
 {
-    relaunchProcessIfNecessary();
+// FIXME (Multi-WebProcess): WebContext doesn't track processes that have exited, so it cannot relaunch these. Perhaps this functionality won't be needed in this mode.
+    if (m_processModel == ProcessModelSharedSecondaryProcess)
+        relaunchProcessIfNecessary();
     sendToAllProcesses(message);
 }
 

@@ -38,8 +38,10 @@
 namespace WebKit {
 
 struct WebDraggableRegion {
-    WebString label;
+    bool draggable;
     WebRect bounds;
+    // FIXME: to be removed after chromium change is done.
+    WebString label;
     WebRect clip;
 };
 

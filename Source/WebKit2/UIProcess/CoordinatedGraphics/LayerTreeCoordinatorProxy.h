@@ -29,6 +29,7 @@
 #include "WebLayerTreeInfo.h"
 #include <WebCore/GraphicsContext.h>
 #include <WebCore/GraphicsLayer.h>
+#include <WebCore/GraphicsSurfaceToken.h>
 #include <WebCore/IntRect.h>
 #include <WebCore/IntSize.h>
 #include <WebCore/RunLoop.h>
@@ -63,7 +64,7 @@ public:
     void purgeGLResources();
     void setContentsSize(const WebCore::FloatSize&);
     void setVisibleContentsRect(const WebCore::FloatRect&, float scale, const WebCore::FloatPoint& trajectoryVector);
-    void didRenderFrame();
+    void didRenderFrame(const WebCore::IntSize& contentsSize, const WebCore::IntRect& coveredRect);
     void createTileForLayer(int layerID, int tileID, const WebCore::IntRect&, const SurfaceUpdateInfo&);
     void updateTileForLayer(int layerID, int tileID, const WebCore::IntRect&, const SurfaceUpdateInfo&);
     void removeTileForLayer(int layerID, int tileID);
@@ -73,7 +74,9 @@ public:
     void updateViewport();
     void renderNextFrame();
     void didChangeScrollPosition(const WebCore::IntPoint& position);
-    void syncCanvas(uint32_t id, const WebCore::IntSize& canvasSize, uint64_t graphicsSurfaceToken, uint32_t frontBuffer);
+#if USE(GRAPHICS_SURFACE)
+    void syncCanvas(uint32_t id, const WebCore::IntSize& canvasSize, const WebCore::GraphicsSurfaceToken&, uint32_t frontBuffer);
+#endif
     void purgeBackingStores();
     LayerTreeRenderer* layerTreeRenderer() const { return m_renderer.get(); }
     void setLayerAnimatedOpacity(uint32_t, float);
@@ -88,7 +91,7 @@ protected:
     float m_lastSentScale;
     WebCore::FloatPoint m_lastSentTrajectoryVector;
 #if USE(GRAPHICS_SURFACE)
-    HashMap<uint64_t, RefPtr<ShareableSurface> > m_surfaces;
+    HashMap<WebCore::GraphicsSurfaceToken::BufferHandle, RefPtr<ShareableSurface> > m_surfaces;
 #endif
 };
 

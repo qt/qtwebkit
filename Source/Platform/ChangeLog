@@ -1,3 +1,350 @@
+2012-10-17  Harald Alvestrand  <hta@google.com>
+
+        Implement the Selector argument to RTCPeerConnection.getStats
+        https://bugs.webkit.org/show_bug.cgi?id=99460
+
+        Reviewed by Adam Barth.
+
+        * chromium/public/WebRTCStatsRequest.h:
+        (WebKit):
+        (WebRTCStatsRequest):
+
+2012-10-16  Tommy Widenflycht  <tommyw@google.com>
+
+        MediaStream API: Add the chromium API for RTCDataChannel
+        https://bugs.webkit.org/show_bug.cgi?id=99435
+
+        Reviewed by Adam Barth.
+
+        Adding WebRTCDataChannel.
+
+        * Platform.gypi:
+        * chromium/public/WebRTCDataChannel.h: Added.
+        (WebCore):
+        (WebKit):
+        (WebRTCDataChannel):
+        (ExtraData):
+        (WebKit::WebRTCDataChannel::ExtraData::~ExtraData):
+        (WebKit::WebRTCDataChannel::WebRTCDataChannel):
+        (WebKit::WebRTCDataChannel::~WebRTCDataChannel):
+        (WebKit::WebRTCDataChannel::operator=):
+        (WebKit::WebRTCDataChannel::isNull):
+        * chromium/public/WebRTCPeerConnectionHandler.h:
+        (WebKit):
+        (WebRTCPeerConnectionHandler):
+        (WebKit::WebRTCPeerConnectionHandler::openDataChannel):
+        (WebKit::WebRTCPeerConnectionHandler::sendStringData):
+        (WebKit::WebRTCPeerConnectionHandler::sendRawData):
+        (WebKit::WebRTCPeerConnectionHandler::closeDataChannel):
+
+2012-10-13  Chris Rogers  <crogers@google.com>
+
+        WebAudioBus needs support for resizing bus to a smaller size
+        https://bugs.webkit.org/show_bug.cgi?id=99215
+
+        Reviewed by Dimitri Glazkov.
+
+        Upgrade AudioBus and WebAudioBus to support resizing to a smaller size, once it has been created.
+        This is useful, for example, when decoding VBR formats and the actual length can't be exactly determined
+        until the entire file is decoded.
+
+        * chromium/public/WebAudioBus.h:
+        (WebAudioBus):
+
+2012-10-10  Scott Violet  <sky@google.com>
+
+        Expose background color in WebLayer https://bugs.webkit.org/show_bug.cgi?id=98707
+
+        Reviewed by James Robinson.
+
+        * chromium/public/WebLayer.h:
+        (WebLayer): Adds backgroundColor.
+
+2012-10-10  Antoine Labour  <piman@chromium.org>
+
+        [chromium] Add entrypoints to set frame contents and recycle resources in WebDelegatedRendererLayer
+        https://bugs.webkit.org/show_bug.cgi?id=98833
+
+        Reviewed by James Robinson.
+
+        This is needed for https://codereview.chromium.org/10915298
+
+        * chromium/public/WebDelegatedRendererLayer.h:
+        (cc):
+        (WebKit):
+        (WebDelegatedRendererLayer):
+
+2012-10-10  Antoine Labour  <piman@chromium.org>
+
+        [chromium] Add empty WebCompositorFrame/WebCompositorFrameAck
+        https://bugs.webkit.org/show_bug.cgi?id=98841
+
+        Reviewed by James Robinson.
+
+        These were used in the WebKit API but never defined.
+
+        * chromium/public/WebCompositorFrame.h: Added.
+        (WebKit):
+        * chromium/public/WebCompositorFrameAck.h: Added.
+        (WebKit):
+
+2012-10-10  John Bauman  <jbauman@chromium.org>
+
+        [chromium] Add attribute for disabling automatic flushes
+        https://bugs.webkit.org/show_bug.cgi?id=98834
+
+        Reviewed by Kenneth Russell.
+
+        This attribute allows the compositor context to specify that it wants
+        to handle flushing itself.
+
+        * chromium/public/WebGraphicsContext3D.h:
+        (WebKit::WebGraphicsContext3D::Attributes::Attributes):
+        (Attributes):
+
+2012-10-09  Harald Alvestrand  <hta@google.com>
+
+        Change PeerConnection getStats function to single value local / remote
+        elements in RTCStatsReport.
+        https://bugs.webkit.org/show_bug.cgi?id=98753
+
+        Reviewed by Adam Barth.
+
+        * chromium/public/WebRTCStatsResponse.h:
+        (WebRTCStatsResponse):
+
+2012-10-04  Harald Alvestrand  <hta@google.com>
+
+        Change RTCPeerConnection GetStats to use Date timestamp format
+        https://bugs.webkit.org/show_bug.cgi?id=98263
+
+        Reviewed by Yury Semikhatsky.
+
+        * chromium/public/WebRTCStatsResponse.h:
+        (WebRTCStatsResponse):
+
+2012-10-04  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r130377.
+        http://trac.webkit.org/changeset/130377
+        https://bugs.webkit.org/show_bug.cgi?id=98392
+
+        Chromium Win compilation is broken (Requested by yurys on
+        #webkit).
+
+        * chromium/public/WebRTCStatsResponse.h:
+        (WebRTCStatsResponse):
+
+2012-10-04  Harald Alvestrand  <hta@google.com>
+
+        Change RTCPeerConnection GetStats to use Date timestamp format
+        https://bugs.webkit.org/show_bug.cgi?id=98263
+
+        Reviewed by Adam Barth.
+
+        * chromium/public/WebRTCStatsResponse.h:
+        (WebRTCStatsResponse):
+
+2012-10-03  Glenn Hartmann  <hartmanng@chromium.org>
+
+        Adding total pixels painted and rasterized stats.
+        https://bugs.webkit.org/show_bug.cgi?id=98269
+
+        Reviewed by James Robinson.
+
+        * chromium/public/WebRenderingStats.h:
+        (WebRenderingStats):
+        (WebKit::WebRenderingStats::WebRenderingStats):
+        (WebKit::WebRenderingStats::enumerateFields):
+
+2012-10-03  Jeff Timanus  <twiz@chromium.org>
+
+        [chromium] Expose settings value to conditionally enable pinch-zoom scaling in the Chromium compositor.  The
+        flag defaults to disabled, so this change should be a no-op for scaling/scrolling behaviour.
+        https://bugs.webkit.org/show_bug.cgi?id=93292
+
+        Reviewed by James Robinson.
+
+        * chromium/public/WebCompositor.h:
+        (WebCompositor):
+        * chromium/public/WebCompositorSupport.h:
+        (WebKit::WebCompositorSupport::setPageScalePinchZoomEnabled):
+
+2012-10-03  Harald Alvestrand  <hta@google.com>
+
+        Add data passing to the GetStats interface of RTCPeerConnection
+        https://bugs.webkit.org/show_bug.cgi?id=98003
+
+        Reviewed by Adam Barth.
+
+        * Platform.gypi:
+        * chromium/public/WebRTCStatsRequest.h:
+        (WebKit):
+        (WebRTCStatsRequest):
+        * chromium/public/WebRTCStatsResponse.h: Added.
+        (WebCore):
+        (WebKit):
+        (WebRTCStatsResponse):
+        (WebKit::WebRTCStatsResponse::WebRTCStatsResponse):
+        (WebKit::WebRTCStatsResponse::~WebRTCStatsResponse):
+        (WebKit::WebRTCStatsResponse::operator=):
+
+2012-10-02  Terry Anderson  <tdanderson@chromium.org>
+
+        [chromium] Add field to WebRenderingStats to track if we have impl-thread scrolled
+        https://bugs.webkit.org/show_bug.cgi?id=97919
+
+        Reviewed by James Robinson.
+
+        Add two new members |numImplThreadScrolls| and |numMainThreadScrolls| to track
+        the total number of times we have impl-thread scrolled and main-thread scrolled,
+        respectively.
+
+        * chromium/public/WebRenderingStats.h:
+        (WebRenderingStats):
+        (WebKit::WebRenderingStats::WebRenderingStats):
+        (WebKit::WebRenderingStats::enumerateFields):
+
+2012-09-28  Harald Tveit Alvestrand  <harald@alvestrand.no>
+
+        Implement the GetStats interface on PeerConnection
+        https://bugs.webkit.org/show_bug.cgi?id=95193
+
+        Reviewed by Adam Barth.
+
+        * chromium/public/WebRTCPeerConnectionHandler.h:
+        (WebKit):
+        (WebRTCPeerConnectionHandler):
+        (WebKit::WebRTCPeerConnectionHandler::getStats):
+        * chromium/public/WebRTCStatsRequest.h: added.
+        (WebCore):
+        (WebKit):
+        (WebRTCStatsRequest):
+        (WebKit::WebRTCStatsRequest::WebRTCStatsRequest):
+        (WebKit::WebRTCStatsRequest::~WebRTCStatsRequest):
+        (WebKit::WebRTCStatsRequest::operator=):
+
+2012-09-28  Kentaro Hara  <haraken@chromium.org>
+
+        Unreviewed, rolling out r129825.
+        http://trac.webkit.org/changeset/129825
+        https://bugs.webkit.org/show_bug.cgi?id=97474
+
+        DOMWindow.resizeTo() is broken. Asked by Mark Pilgrim.
+
+        * Platform.gypi:
+        * chromium/public/WebScreenInfo.h: Removed.
+
+2012-09-28  Yoshifumi Inoue  <yosin@chromium.org>
+
+        [Forms] Add localized strings for multiple fields date/time input UI
+        https://bugs.webkit.org/show_bug.cgi?id=97878
+
+        Reviewed by Kent Tamura.
+
+        This patch introduces following localized string identifier for
+        month, time and week pickers:
+            - OtherMonthLabel - appeared at the last entry in suggestion list.
+            - OtherTimeLabel - ditto
+            - OtherWeekLabel - ditto
+            - ThisMonthButtonLabel - used in month picker
+            - ThisWeekButtonLabel - used in week picker
+
+        * chromium/public/WebLocalizedString.h: Added OtherMonthLabel, OtherTimeLabel, OtherWeekLabel, ThiMonthkButtonLabel, and ThisWeekButtonLabel.
+
+2012-09-27  Mark Pilgrim  <pilgrim@chromium.org>
+
+        [Chromium] Remove screen-related functions from PlatformSupport
+        https://bugs.webkit.org/show_bug.cgi?id=97474
+
+        Reviewed by Adam Barth.
+
+        Screen-related functions like screenHorizontalDPI that
+        used to be on PlatformSupport are now accessed through a new
+        PlatformPageClient attached to Widget in WebCore-land, which is
+        implemented by ChromeClientImpl in WebKit-land, which proxies
+        calls to WebWidgetClient, which is actually implemented in
+        Chromium-land.
+
+        * Platform.gypi:
+        * chromium/public/WebScreenInfo.h: Added.
+        (WebKit):
+        (WebScreenInfo):
+        (WebKit::WebScreenInfo::WebScreenInfo):
+
+2012-09-27  Tommy Widenflycht  <tommyw@google.com>
+
+        MediaStream API: Enhance MediaConstraints to make it easier to get the constraint data
+        https://bugs.webkit.org/show_bug.cgi?id=97559
+
+        Reviewed by Adam Barth.
+
+        Refactored to mimic the new MediaConstraints api.
+
+        * chromium/public/WebMediaConstraints.h:
+        (WebCore):
+        (WebKit::WebMediaConstraint::WebMediaConstraint):
+        (WebMediaConstraint):
+        (WebKit):
+        (WebMediaConstraints):
+
+2012-09-27  Tommy Widenflycht  <tommyw@google.com>
+
+        MediaStream API: Update getUserMedia to match the latest specification
+        https://bugs.webkit.org/show_bug.cgi?id=97540
+
+        Reviewed by Adam Barth.
+
+        * chromium/public/WebMediaConstraints.h:
+        (WebMediaConstraints):
+
+2012-09-26  Yoshifumi Inoue  <yosin@chromium.org>
+
+        [Forms] Adding localization texts for multiple fields date/time input UI
+        https://bugs.webkit.org/show_bug.cgi?id=97633
+
+        Reviewed by Kent Tamura.
+
+        This patch adds localized string enum fields for getting localized
+        strings used in multiple fields date/time input UI.
+
+        * chromium/public/WebLocalizedString.h: Added PlaceholderForDayOfMonthField,
+        PlaceholderForMonthField, PlaceholderForYearField, MonthFormatInLDML,
+        and WeekFormatInLDML.
+
+2012-09-26  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r129654.
+        http://trac.webkit.org/changeset/129654
+        https://bugs.webkit.org/show_bug.cgi?id=97702
+
+        breaks chromium windows build (Requested by schenney on
+        #webkit).
+
+        * chromium/public/WebRTCPeerConnectionHandler.h:
+        (WebKit):
+        (WebRTCPeerConnectionHandler):
+        * chromium/public/WebRTCStatsRequest.h: Removed.
+
+2012-09-26  Harald Tveit Alvestrand  <harald@alvestrand.no>
+
+        Implement the GetStats interface on PeerConnection
+        https://bugs.webkit.org/show_bug.cgi?id=95193
+
+        Reviewed by Adam Barth.
+
+        * chromium/public/WebRTCPeerConnectionHandler.h:
+        (WebKit):
+        (WebRTCPeerConnectionHandler):
+        (WebKit::WebRTCPeerConnectionHandler::getStats):
+        * chromium/public/WebRTCStatsRequest.h: added.
+        (WebCore):
+        (WebKit):
+        (WebRTCStatsRequest):
+        (WebKit::WebRTCStatsRequest::WebRTCStatsRequest):
+        (WebKit::WebRTCStatsRequest::~WebRTCStatsRequest):
+        (WebKit::WebRTCStatsRequest::operator=):
+
 2012-09-25  Sheriff Bot  <webkit.review.bot@gmail.com>
 
         Unreviewed, rolling out r129517.

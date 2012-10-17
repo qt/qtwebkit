@@ -131,8 +131,8 @@ bool JSValueIsObjectOfClass(JSContextRef ctx, JSValueRef value, JSClassRef jsCla
     if (JSObject* o = jsValue.getObject()) {
         if (o->inherits(&JSCallbackObject<JSGlobalObject>::s_info))
             return jsCast<JSCallbackObject<JSGlobalObject>*>(o)->inherits(jsClass);
-        if (o->inherits(&JSCallbackObject<JSNonFinalObject>::s_info))
-            return jsCast<JSCallbackObject<JSNonFinalObject>*>(o)->inherits(jsClass);
+        if (o->inherits(&JSCallbackObject<JSDestructibleObject>::s_info))
+            return jsCast<JSCallbackObject<JSDestructibleObject>*>(o)->inherits(jsClass);
     }
     return false;
 }
@@ -235,11 +235,12 @@ JSValueRef JSValueMakeFromJSONString(JSContextRef ctx, JSStringRef string)
     ExecState* exec = toJS(ctx);
     APIEntryShim entryShim(exec);
     String str = string->string();
-    if (str.is8Bit()) {
-        LiteralParser<LChar> parser(exec, str.characters8(), str.length(), StrictJSON);
+    unsigned length = str.length();
+    if (length && str.is8Bit()) {
+        LiteralParser<LChar> parser(exec, str.characters8(), length, StrictJSON);
         return toRef(exec, parser.tryLiteralParse());
     }
-    LiteralParser<UChar> parser(exec, str.characters16(), str.length(), StrictJSON);
+    LiteralParser<UChar> parser(exec, str.characters(), length, StrictJSON);
     return toRef(exec, parser.tryLiteralParse());
 }
 

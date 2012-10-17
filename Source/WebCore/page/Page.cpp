@@ -44,7 +44,6 @@
 #include "FrameTree.h"
 #include "FrameView.h"
 #include "HTMLElement.h"
-#include "HistogramSupport.h"
 #include "HistoryItem.h"
 #include "InspectorController.h"
 #include "InspectorInstrumentation.h"
@@ -72,6 +71,7 @@
 #include "StyleResolver.h"
 #include "TextResourceDecoder.h"
 #include "VoidCallback.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include "Widget.h"
 #include <wtf/HashMap.h>
 #include <wtf/RefCountedLeakCounter.h>
@@ -82,6 +82,7 @@
 namespace WebCore {
 
 static HashSet<Page*>* allPages;
+static const double hiddenPageTimerAlignmentInterval = 1.0; // once a second
 
 DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, pageCounter, ("Page"));
 
@@ -134,7 +135,7 @@ Page::Page(PageClients& pageClients)
     , m_theme(RenderTheme::themeForPage(this))
     , m_editorClient(pageClients.editorClient)
     , m_validationMessageClient(pageClients.validationMessageClient)
-    , m_frameCount(0)
+    , m_subframeCount(0)
     , m_openedByDOM(false)
     , m_tabKeyCyclesThroughElements(true)
     , m_defersLoading(false)
@@ -156,6 +157,7 @@ Page::Page(PageClients& pageClients)
     , m_canStartMedia(true)
     , m_viewMode(ViewModeWindowed)
     , m_minimumTimerInterval(Settings::defaultMinDOMTimerInterval())
+    , m_timerAlignmentInterval(Settings::defaultDOMTimerAlignmentInterval())
     , m_isEditable(false)
     , m_isOnscreen(true)
 #if ENABLE(PAGE_VISIBILITY_API)
@@ -651,7 +653,7 @@ void Page::setPageScaleFactor(float scale, const IntPoint& origin)
     FrameView* view = document->view();
 
     if (scale == m_pageScaleFactor) {
-        if (view && view->scrollPosition() != origin) {
+        if (view && (view->scrollPosition() != origin || view->delegatesScrolling())) {
             document->updateLayoutIgnorePendingStylesheets();
             view->setScrollPosition(origin);
         }
@@ -1025,6 +1027,23 @@ double Page::minimumTimerInterval() const
     return m_minimumTimerInterval;
 }
 
+void Page::setTimerAlignmentInterval(double interval)
+{
+    if (interval == m_timerAlignmentInterval)
+        return;
+
+    m_timerAlignmentInterval = interval;
+    for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNextWithWrap(false)) {
+        if (frame->document())
+            frame->document()->didChangeTimerAlignmentInterval();
+    }
+}
+
+double Page::timerAlignmentInterval() const
+{
+    return m_timerAlignmentInterval;
+}
+
 void Page::dnsPrefetchingStateChanged()
 {
     for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext())
@@ -1081,35 +1100,43 @@ void Page::privateBrowsingStateChanged()
 }
 
 #if !ASSERT_DISABLED
-void Page::checkFrameCountConsistency() const
+void Page::checkSubframeCountConsistency() const
 {
-    ASSERT(m_frameCount >= 0);
+    ASSERT(m_subframeCount >= 0);
 
-    int frameCount = 0;
+    int subframeCount = 0;
     for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext())
-        ++frameCount;
+        ++subframeCount;
 
-    ASSERT(m_frameCount + 1 == frameCount);
+    ASSERT(m_subframeCount + 1 == subframeCount);
 }
 #endif
 
-#if ENABLE(PAGE_VISIBILITY_API)
+#if ENABLE(PAGE_VISIBILITY_API) || ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
 void Page::setVisibilityState(PageVisibilityState visibilityState, bool isInitialState)
 {
+#if ENABLE(PAGE_VISIBILITY_API)
     if (m_visibilityState == visibilityState)
         return;
     m_visibilityState = visibilityState;
 
-    if (!isInitialState && m_mainFrame) {
-        if (visibilityState == PageVisibilityStateHidden) {
-            ArenaSize size = renderTreeSize();
-            HistogramSupport::histogramCustomCounts("WebCore.Page.renderTreeSizeBytes", size.treeSize, 1000, 500000000, 50);
-            HistogramSupport::histogramCustomCounts("WebCore.Page.renderTreeAllocatedBytes", size.allocated, 1000, 500000000, 50);
-        }
+    if (!isInitialState && m_mainFrame)
         m_mainFrame->dispatchVisibilityStateChangeEvent();
-    }
-}
+#endif
 
+#if ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
+    if (visibilityState == WebCore::PageVisibilityStateHidden)
+        setTimerAlignmentInterval(hiddenPageTimerAlignmentInterval);
+    else
+        setTimerAlignmentInterval(Settings::defaultDOMTimerAlignmentInterval());
+#if !ENABLE(PAGE_VISIBILITY_API)
+    UNUSED_PARAM(isInitialState);
+#endif
+#endif
+}
+#endif // ENABLE(PAGE_VISIBILITY_API) || ENABLE(HIDDEN_PAGE_DOM_TIMER_THROTTLING)
+
+#if ENABLE(PAGE_VISIBILITY_API)
 PageVisibilityState Page::visibilityState() const
 {
     return m_visibilityState;
@@ -1231,6 +1258,49 @@ void Page::sawPlugin(const String& serviceType)
 void Page::resetSeenPlugins()
 {
     m_seenPlugins.clear();
+}
+
+void Page::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Page);
+    info.addMember(m_chrome);
+    info.addMember(m_dragCaretController);
+
+#if ENABLE(DRAG_SUPPORT)
+    info.addMember(m_dragController);
+#endif
+    info.addMember(m_focusController);
+#if ENABLE(CONTEXT_MENUS)
+    info.addMember(m_contextMenuController);
+#endif
+#if ENABLE(INSPECTOR)
+    info.addMember(m_inspectorController);
+#endif
+#if ENABLE(POINTER_LOCK)
+    info.addMember(m_pointerLockController);
+#endif
+    info.addMember(m_scrollingCoordinator);
+    info.addMember(m_settings);
+    info.addMember(m_progress);
+    info.addMember(m_backForwardController);
+    info.addMember(m_mainFrame);
+    info.addMember(m_pluginData);
+    info.addMember(m_theme);
+    info.addMember(m_editorClient);
+    info.addMember(m_featureObserver);
+    info.addMember(m_groupName);
+    info.addMember(m_pagination);
+    info.addMember(m_userStyleSheetPath);
+    info.addMember(m_userStyleSheet);
+    info.addMember(m_singlePageGroup);
+    info.addMember(m_group);
+    info.addWeakPointer(m_debugger);
+    info.addMember(m_sessionStorage);
+    info.addMember(m_relevantUnpaintedRenderObjects);
+    info.addMember(m_relevantPaintedRegion);
+    info.addMember(m_relevantUnpaintedRegion);
+    info.addMember(m_alternativeTextClient);
+    info.addMember(m_seenPlugins);
 }
 
 Page::PageClients::PageClients()

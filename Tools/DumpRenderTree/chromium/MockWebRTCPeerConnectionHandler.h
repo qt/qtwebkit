@@ -34,9 +34,11 @@
 #if ENABLE(MEDIA_STREAM)
 
 #include "Task.h"
+#include <public/WebRTCDataChannel.h>
 #include <public/WebRTCPeerConnectionHandler.h>
 #include <public/WebRTCSessionDescription.h>
 #include <public/WebRTCSessionDescriptionRequest.h>
+#include <public/WebRTCStatsRequest.h>
 
 namespace WebKit {
 class WebRTCPeerConnectionHandlerClient;
@@ -58,7 +60,13 @@ public:
     virtual bool addICECandidate(const WebKit::WebRTCICECandidate&) OVERRIDE;
     virtual bool addStream(const WebKit::WebMediaStreamDescriptor&, const WebKit::WebMediaConstraints&) OVERRIDE;
     virtual void removeStream(const WebKit::WebMediaStreamDescriptor&) OVERRIDE;
+    virtual void getStats(const WebKit::WebRTCStatsRequest&) OVERRIDE;
     virtual void stop() OVERRIDE;
+
+    virtual bool openDataChannel(const WebKit::WebRTCDataChannel&) OVERRIDE;
+    virtual bool sendStringData(const WebKit::WebRTCDataChannel&, const WebKit::WebString&) OVERRIDE;
+    virtual bool sendRawData(const WebKit::WebRTCDataChannel&, const char*, size_t) OVERRIDE;
+    virtual void closeDataChannel(const WebKit::WebRTCDataChannel&) OVERRIDE;
 
     // Task related methods
     TaskList* taskList() { return &m_taskList; }
@@ -67,9 +75,11 @@ private:
     MockWebRTCPeerConnectionHandler() { }
 
     WebKit::WebRTCPeerConnectionHandlerClient* m_client;
+    bool m_stopped;
     TaskList m_taskList;
     WebKit::WebRTCSessionDescription m_localDescription;
     WebKit::WebRTCSessionDescription m_remoteDescription;
+    int m_streamCount;
 };
 
 #endif // ENABLE(MEDIA_STREAM)

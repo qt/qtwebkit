@@ -51,7 +51,6 @@ class FontMetrics;
 class FontPlatformData;
 class FontSelector;
 class GlyphBuffer;
-class GlyphPageTreeNode;
 class GraphicsContext;
 class RenderText;
 class TextLayout;
@@ -106,7 +105,7 @@ public:
 
     PassOwnPtr<TextLayout> createLayout(RenderText*, float xPos, bool collapseWhiteSpace) const;
     static void deleteLayout(TextLayout*);
-    static float width(TextLayout&, unsigned from, unsigned len);
+    static float width(TextLayout&, unsigned from, unsigned len, HashSet<const SimpleFontData*>* fallbackFonts = 0);
 
     int offsetForPosition(const TextRun&, float position, bool includePartialGlyphs) const;
     FloatRect selectionRectForText(const TextRun&, const FloatPoint&, int h, int from = 0, int to = -1) const;
@@ -125,7 +124,19 @@ public:
     TypesettingFeatures typesettingFeatures() const
     {
         TextRenderingMode textRenderingMode = m_fontDescription.textRenderingMode();
-        TypesettingFeatures features = textRenderingMode == OptimizeLegibility || textRenderingMode == GeometricPrecision ? Kerning | Ligatures : 0;
+        TypesettingFeatures features = s_defaultTypesettingFeatures;
+
+        switch(textRenderingMode) {
+        case AutoTextRendering:
+            break;
+        case OptimizeSpeed:
+            features &= ~(Kerning | Ligatures);
+            break;
+        case GeometricPrecision:
+        case OptimizeLegibility:
+            features |= Kerning | Ligatures;
+            break;
+        }
 
         switch (m_fontDescription.kerning()) {
         case FontDescription::NoneKerning:
@@ -173,7 +184,10 @@ public:
 
     const SimpleFontData* primaryFont() const;
     const FontData* fontDataAt(unsigned) const;
-    GlyphData glyphDataForCharacter(UChar32, bool mirror, FontDataVariant = AutoVariant) const;
+    inline GlyphData glyphDataForCharacter(UChar32 c, bool mirror, FontDataVariant variant = AutoVariant) const
+    {
+        return glyphDataAndPageForCharacter(c, mirror, variant).first;
+    }
 #if PLATFORM(MAC) || (PLATFORM(CHROMIUM) && OS(DARWIN))
     const SimpleFontData* fontDataForCombiningCharacterSequence(const UChar*, size_t length, FontDataVariant) const;
 #endif
@@ -209,7 +223,7 @@ private:
     void drawGlyphs(GraphicsContext*, const SimpleFontData*, const GlyphBuffer&, int from, int to, const FloatPoint&) const;
     void drawGlyphBuffer(GraphicsContext*, const TextRun&, const GlyphBuffer&, const FloatPoint&) const;
     void drawEmphasisMarks(GraphicsContext*, const TextRun&, const GlyphBuffer&, const AtomicString&, const FloatPoint&) const;
-    float floatWidthForSimpleText(const TextRun&, GlyphBuffer*, HashSet<const SimpleFontData*>* fallbackFonts = 0, GlyphOverflow* = 0) const;
+    float floatWidthForSimpleText(const TextRun&, HashSet<const SimpleFontData*>* fallbackFonts = 0, GlyphOverflow* = 0) const;
     int offsetForPositionForSimpleText(const TextRun&, float position, bool includePartialGlyphs) const;
     FloatRect selectionRectForSimpleText(const TextRun&, const FloatPoint&, int h, int from, int to) const;
 
@@ -234,6 +248,9 @@ public:
     static void setCodePath(CodePath);
     static CodePath codePath();
     static CodePath s_codePath;
+
+    static void setDefaultTypesettingFeatures(TypesettingFeatures);
+    static TypesettingFeatures defaultTypesettingFeatures();
 
     static const uint8_t s_roundingHackCharacterTable[256];
     static bool isRoundingHackCharacter(UChar32 c)
@@ -262,20 +279,22 @@ public:
     static String normalizeSpaces(const UChar*, unsigned length);
 
     bool needsTranscoding() const { return m_needsTranscoding; }
-    FontFallbackList* fontList() const { return m_fontList.get(); }
+    FontFallbackList* fontList() const { return m_fontFallbackList.get(); }
 
 private:
     bool loadingCustomFonts() const
     {
-        return m_fontList && m_fontList->loadingCustomFonts();
+        return m_fontFallbackList && m_fontFallbackList->loadingCustomFonts();
     }
 
 #if PLATFORM(QT)
     void initFormatForTextLayout(QTextLayout*) const;
 #endif
 
+    static TypesettingFeatures s_defaultTypesettingFeatures;
+
     FontDescription m_fontDescription;
-    mutable RefPtr<FontFallbackList> m_fontList;
+    mutable RefPtr<FontFallbackList> m_fontFallbackList;
     short m_letterSpacing;
     short m_wordSpacing;
     bool m_isPlatformFont;
@@ -288,25 +307,25 @@ inline Font::~Font()
 
 inline const SimpleFontData* Font::primaryFont() const
 {
-    ASSERT(m_fontList);
-    return m_fontList->primarySimpleFontData(this);
+    ASSERT(m_fontFallbackList);
+    return m_fontFallbackList->primarySimpleFontData(this);
 }
 
 inline const FontData* Font::fontDataAt(unsigned index) const
 {
-    ASSERT(m_fontList);
-    return m_fontList->fontDataAt(this, index);
+    ASSERT(m_fontFallbackList);
+    return m_fontFallbackList->fontDataAt(this, index);
 }
 
 inline bool Font::isFixedPitch() const
 {
-    ASSERT(m_fontList);
-    return m_fontList->isFixedPitch(this);
+    ASSERT(m_fontFallbackList);
+    return m_fontFallbackList->isFixedPitch(this);
 }
 
 inline FontSelector* Font::fontSelector() const
 {
-    return m_fontList ? m_fontList->fontSelector() : 0;
+    return m_fontFallbackList ? m_fontFallbackList->fontSelector() : 0;
 }
 
 inline float Font::tabWidth(const SimpleFontData& fontData, unsigned tabSize, float position) const

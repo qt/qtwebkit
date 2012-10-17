@@ -35,8 +35,8 @@
 #include "MemoryCache.h"
 #include "Page.h"
 #include "RenderObject.h"
+#include "ResourceBuffer.h"
 #include "Settings.h"
-#include "SharedBuffer.h"
 #include "SubresourceLoader.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/StdLibExtras.h>
@@ -88,7 +88,7 @@ void CachedImage::didAddClient(CachedResourceClient* c)
 {
     if (m_data && !m_image && !errorOccurred()) {
         createImage();
-        m_image->setData(m_data, true);
+        m_image->setData(m_data->sharedBuffer(), true);
     }
     
     ASSERT(c->resourceClientType() == CachedImageClient::expectedType());
@@ -263,7 +263,12 @@ IntSize CachedImage::imageSizeForRenderer(const RenderObject* renderer, float mu
     float widthScale = m_image->hasRelativeWidth() ? 1.0f : multiplier;
     float heightScale = m_image->hasRelativeHeight() ? 1.0f : multiplier;
     IntSize minimumSize(imageSize.width() > 0 ? 1 : 0, imageSize.height() > 0 ? 1 : 0);
+#if ENABLE(SUBPIXEL_LAYOUT)
+    imageSize.setWidth(lroundf(imageSize.width() * widthScale));
+    imageSize.setHeight(lroundf(imageSize.height() * heightScale));
+#else
     imageSize.scale(widthScale, heightScale);
+#endif
     imageSize.clampToMinimumSize(minimumSize);
     return imageSize;
 }
@@ -338,7 +343,7 @@ size_t CachedImage::maximumDecodedImageSize()
     return settings ? settings->maximumDecodedImageSize() : 0;
 }
 
-void CachedImage::data(PassRefPtr<SharedBuffer> data, bool allDataReceived)
+void CachedImage::data(PassRefPtr<ResourceBuffer> data, bool allDataReceived)
 {
     m_data = data;
 
@@ -349,7 +354,7 @@ void CachedImage::data(PassRefPtr<SharedBuffer> data, bool allDataReceived)
     // Have the image update its data from its internal buffer.
     // It will not do anything now, but will delay decoding until 
     // queried for info (like size or specific image frames).
-    sizeAvailable = m_image->setData(m_data, allDataReceived);
+    sizeAvailable = m_image->setData(m_data ? m_data->sharedBuffer() : 0, allDataReceived);
 
     // Go ahead and tell our observers to try to draw if we have either
     // received all the data or the size is known.  Each chunk from the
@@ -417,17 +422,6 @@ void CachedImage::decodedSizeChanged(const Image* image, int delta)
     setDecodedSize(decodedSize() + delta);
 }
 
-bool CachedImage::likelyToBeUsedSoon()
-{
-    CachedResourceClientWalker<CachedImageClient> walker(m_clients);
-    while (CachedImageClient* client = walker.next()) {
-        if (client->willRenderImage(this))
-            return true;
-    }
-
-    return false;
-}
-
 void CachedImage::didDraw(const Image* image)
 {
     if (!image || image != m_image)
@@ -445,7 +439,13 @@ bool CachedImage::shouldPauseAnimation(const Image* image)
     if (!image || image != m_image)
         return false;
     
-    return !likelyToBeUsedSoon();
+    CachedResourceClientWalker<CachedImageClient> w(m_clients);
+    while (CachedImageClient* c = w.next()) {
+        if (c->willRenderImage(this))
+            return false;
+    }
+
+    return true;
 }
 
 void CachedImage::animationAdvanced(const Image* image)

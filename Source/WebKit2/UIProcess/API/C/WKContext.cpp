@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -266,6 +266,16 @@ void WKContextSetLocalStorageDirectory(WKContextRef contextRef, WKStringRef loca
     toImpl(contextRef)->setLocalStorageDirectory(toImpl(localStorageDirectory)->string());
 }
 
+WK_EXPORT void WKContextSetDiskCacheDirectory(WKContextRef contextRef, WKStringRef diskCacheDirectory)
+{
+    toImpl(contextRef)->setDiskCacheDirectory(toImpl(diskCacheDirectory)->string());
+}
+
+WK_EXPORT void WKContextSetCookieStorageDirectory(WKContextRef contextRef, WKStringRef cookieStorageDirectory)
+{
+    toImpl(contextRef)->setCookieStorageDirectory(toImpl(cookieStorageDirectory)->string());
+}
+
 void WKContextDisableProcessTermination(WKContextRef contextRef)
 {
     toImpl(contextRef)->disableProcessTermination();
@@ -300,6 +310,12 @@ void WKContextSetJavaScriptGarbageCollectorTimerEnabled(WKContextRef contextRef,
 {
     toImpl(contextRef)->setJavaScriptGarbageCollectorTimerEnabled(enable);
 }
+
+void WKContextSetUsesNetworkProcess(WKContextRef contextRef, bool usesNetworkProcess)
+{
+    toImpl(contextRef)->setUsesNetworkProcess(usesNetworkProcess);
+}
+
 // Deprecated functions.
 void _WKContextSetAdditionalPluginsDirectory(WKContextRef context, WKStringRef pluginsDirectory)
 {

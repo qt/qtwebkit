@@ -33,12 +33,12 @@
 #include "ewk_context_private.h"
 #include "ewk_download_job.h"
 #include "ewk_download_job_private.h"
+#include "ewk_error_private.h"
 #include "ewk_url_response.h"
 #include "ewk_url_response_private.h"
 #include "ewk_view_private.h"
-#include "ewk_web_error.h"
-#include "ewk_web_error_private.h"
 #include <string.h>
+#include <wtf/OwnPtr.h>
 #include <wtf/text/CString.h>
 
 using namespace WebKit;
@@ -59,7 +59,7 @@ static WKStringRef decideDestinationWithSuggestedFilename(WKContextRef, WKDownlo
     // and the suggested file name.
     ewk_view_download_job_requested(ewk_download_job_view_get(download), download);
 
-    // DownloadSoup expects the destination to be a URI.
+    // DownloadSoup expects the destination to be a URL.
     String destination = String("file://") + String::fromUTF8(ewk_download_job_destination_get(download));
 
     return WKStringCreateWithUTF8CString(destination.utf8().data());
@@ -69,9 +69,8 @@ static void didReceiveResponse(WKContextRef, WKDownloadRef wkDownload, WKURLResp
 {
     Ewk_Download_Job* download = ewk_context_download_job_get(toEwkContext(clientInfo), toImpl(wkDownload)->downloadID());
     ASSERT(download);
-    Ewk_Url_Response* response = ewk_url_response_new(toImpl(wkResponse)->resourceResponse());
-    ewk_download_job_response_set(download, response);
-    ewk_url_response_unref(response);
+    RefPtr<Ewk_Url_Response> response = Ewk_Url_Response::create(wkResponse);
+    ewk_download_job_response_set(download, response.get());
 }
 
 static void didCreateDestination(WKContextRef, WKDownloadRef wkDownload, WKStringRef /*path*/, const void* clientInfo)
@@ -95,10 +94,9 @@ static void didFail(WKContextRef, WKDownloadRef wkDownload, WKErrorRef error, co
     Ewk_Download_Job* download = ewk_context_download_job_get(toEwkContext(clientInfo), downloadId);
     ASSERT(download);
 
-    Ewk_Web_Error* ewkError = ewk_web_error_new(error);
+    OwnPtr<Ewk_Error> ewkError = Ewk_Error::create(error);
     ewk_download_job_state_set(download, EWK_DOWNLOAD_JOB_STATE_FAILED);
-    ewk_view_download_job_failed(ewk_download_job_view_get(download), download, ewkError);
-    ewk_web_error_free(ewkError);
+    ewk_view_download_job_failed(ewk_download_job_view_get(download), download, ewkError.get());
     ewk_context_download_job_remove(toEwkContext(clientInfo), downloadId);
 }
 

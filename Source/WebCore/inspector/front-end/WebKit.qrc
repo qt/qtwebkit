@@ -58,6 +58,7 @@
     <file>DOMStorage.js</file>
     <file>DOMStorageItemsView.js</file>
     <file>DOMSyntaxHighlighter.js</file>
+    <file>DockController.js</file>
     <file>Drawer.js</file>
     <file>ElementsPanel.js</file>
     <file>ElementsPanelDescriptor.js</file>
@@ -98,7 +99,6 @@
     <file>InspectorFrontendHostStub.js</file>
     <file>InspectorView.js</file>
     <file>JavaScriptFormatter.js</file>
-    <file>JavaScriptSource.js</file>
     <file>JavaScriptSourceFrame.js</file>
     <file>jsdifflib.js</file>
     <file>KeyboardShortcut.js</file>
@@ -128,7 +128,8 @@
     <file>ProfileDataGridTree.js</file>
     <file>ProfileLauncherView.js</file>
     <file>ProfilesPanel.js</file>
-    <file>ProgressBar.js</file>
+    <file>Progress.js</file>
+    <file>ProgressIndicator.js</file>
     <file>PropertiesSection.js</file>
     <file>PropertiesSidebarPane.js</file>
     <file>RemoteObject.js</file>
@@ -182,7 +183,6 @@
     <file>SplitView.js</file>
     <file>StatusBarButton.js</file>
     <file>StyleSheetOutlineDialog.js</file>
-    <file>StyleSource.js</file>
     <file>StylesSourceMapping.js</file>
     <file>StylesSidebarPane.js</file>
     <file>TabbedEditorContainer.js</file>

@@ -43,7 +43,8 @@ var Preferences = {
     exposeDisableCache: false,
     applicationTitle: "Web Inspector - %s",
     showDockToRight: false,
-    exposeFileSystemInspection: false
+    exposeFileSystemInspection: false,
+    experimentsEnabled: true
 }
 
 var Capabilities = {
@@ -65,7 +66,7 @@ WebInspector.Settings = function()
 {
     this._eventSupport = new WebInspector.Object();
 
-    this.colorFormat = this.createSetting("colorFormat", "hex");
+    this.colorFormat = this.createSetting("colorFormat", "original");
     this.consoleHistory = this.createSetting("consoleHistory", []);
     this.debuggerEnabled = this.createSetting("debuggerEnabled", false);
     this.domWordWrap = this.createSetting("domWordWrap", true);
@@ -92,9 +93,9 @@ WebInspector.Settings = function()
     this.deviceMetrics = this.createSetting("deviceMetrics", "");
     this.deviceFitWindow = this.createSetting("deviceFitWindow", false);
     this.showScriptFolders = this.createSetting("showScriptFolders", true);
-    this.dockToRight = this.createSetting("dockToRight", false);
     this.emulateTouchEvents = this.createSetting("emulateTouchEvents", false);
     this.showPaintRects = this.createSetting("showPaintRects", false);
+    this.showShadowDOM = this.createSetting("showShadowDOM", false);
     this.zoomLevel = this.createSetting("zoomLevel", 0);
     this.savedURLs = this.createSetting("savedURLs", {});
     this.javaScriptDisabled = this.createSetting("javaScriptDisabled", false);
@@ -103,6 +104,7 @@ WebInspector.Settings = function()
     this.showHeapSnapshotObjectsHiddenProperties = this.createSetting("showHeaSnapshotObjectsHiddenProperties", false);
     this.searchInContentScripts = this.createSetting("searchInContentScripts", false);
     this.textEditorIndent = this.createSetting("textEditorIndent", "    ");
+    this.lastDockState = this.createSetting("lastDockState", "");
 
     // If there are too many breakpoints in a storage, it is likely due to a recent bug that caused
     // periodical breakpoints duplication leading to inspector slowness.
@@ -186,7 +188,6 @@ WebInspector.ExperimentsSettings = function()
     this._enabledForTest = {};
     
     // Add currently running experiments here.
-    this.showShadowDOM = this._createExperiment("showShadowDOM", "Show shadow DOM");
     this.snippetsSupport = this._createExperiment("snippetsSupport", "Snippets support");
     this.nativeMemorySnapshots = this._createExperiment("nativeMemorySnapshots", "Native memory profiling");
     this.liveNativeMemoryChart = this._createExperiment("liveNativeMemoryChart", "Live native memory chart");
@@ -216,7 +217,7 @@ WebInspector.ExperimentsSettings.prototype = {
      */
     get experimentsEnabled()
     {
-        return "experiments" in WebInspector.queryParamsObject;
+        return Preferences.experimentsEnabled || ("experiments" in WebInspector.queryParamsObject);
     },
     
     /**

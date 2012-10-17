@@ -123,10 +123,10 @@ WebInspector.ObjectPropertiesSection.prototype = {
             var infoElement = new TreeElement(title, null, false);
             this.propertiesTreeOutline.appendChild(infoElement);
         }
-    }
-}
+    },
 
-WebInspector.ObjectPropertiesSection.prototype.__proto__ = WebInspector.PropertiesSection.prototype;
+    __proto__: WebInspector.PropertiesSection.prototype
+}
 
 WebInspector.ObjectPropertiesSection.CompareProperties = function(propertyA, propertyB)
 {
@@ -370,7 +370,32 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
             }
         };
         this.property.parentObject.setPropertyValue(this.property.name, expression.trim(), callback.bind(this));
-    }
+    },
+
+    propertyPath: function()
+    {
+        if ("_cachedPropertyPath" in this)
+            return this._cachedPropertyPath;
+
+        var current = this;
+        var result;
+
+        do {
+            if (current.property) {
+                if (result)
+                    result = current.property.name + "." + result;
+                else
+                    result = current.property.name;
+            }
+            current = current.parent;
+        } while (current && !current.root);
+
+        this._cachedPropertyPath = result;
+        return result;
+    },
+
+
+    __proto__: TreeElement.prototype
 }
 
 /**
@@ -406,8 +431,6 @@ WebInspector.ObjectPropertyTreeElement.populate = function(treeElement, value) {
 
     value.getOwnProperties(callback);
 }
-
-WebInspector.ObjectPropertyTreeElement.prototype.__proto__ = TreeElement.prototype;
 
 /**
  * @constructor
@@ -482,10 +505,10 @@ WebInspector.FunctionScopeMainTreeElement.prototype = {
 
         }
         DebuggerAgent.getFunctionDetails(this._remoteObject.objectId, didGetDetails.bind(this));
-    }
-};
+    },
 
-WebInspector.FunctionScopeMainTreeElement.prototype.__proto__ = TreeElement.prototype;
+    __proto__: TreeElement.prototype
+}
 
 /**
  * @constructor
@@ -506,10 +529,10 @@ WebInspector.ScopeTreeElement.prototype = {
     onpopulate: function()
     {
         return WebInspector.ObjectPropertyTreeElement.populate(this, this._remoteObject);
-    }
-};
+    },
 
-WebInspector.ScopeTreeElement.prototype.__proto__ = TreeElement.prototype;
+    __proto__: TreeElement.prototype
+}
 
 /**
  * @constructor
@@ -730,10 +753,10 @@ WebInspector.ArrayGroupingTreeElement.prototype = {
     onattach: function()
     {
         this.listItemElement.addStyleClass("name");
-    }
-}
+    },
 
-WebInspector.ArrayGroupingTreeElement.prototype.__proto__ = TreeElement.prototype;
+    __proto__: TreeElement.prototype
+}
 
 /**
  * @constructor
@@ -742,11 +765,12 @@ WebInspector.ArrayGroupingTreeElement.prototype.__proto__ = TreeElement.prototyp
  */
 WebInspector.ObjectPropertyPrompt = function(commitHandler, cancelHandler, renderAsBlock)
 {
-    const ExpressionStopCharacters = " =:[({;,!+-*/&|^<>."; // Same as in ConsoleView.js + "."
-    WebInspector.TextPrompt.call(this, WebInspector.consoleView.completionsForTextPrompt.bind(WebInspector.consoleView), ExpressionStopCharacters);
+    WebInspector.TextPrompt.call(this, WebInspector.runtimeModel.completionsForTextPrompt.bind(WebInspector.runtimeModel));
     this.setSuggestBoxEnabled("generic-suggest");
     if (renderAsBlock)
         this.renderAsBlock();
 }
 
-WebInspector.ObjectPropertyPrompt.prototype.__proto__ = WebInspector.TextPrompt.prototype;
+WebInspector.ObjectPropertyPrompt.prototype = {
+    __proto__: WebInspector.TextPrompt.prototype
+}

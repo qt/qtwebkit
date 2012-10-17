@@ -44,11 +44,11 @@ public:
     DrawingAreaProxy* drawingArea() const;
     WebCore::IntSize viewSize() { return m_viewportSize; }
 
-    void display(const WebCore::IntRect& rect);
+    void display(const WebCore::IntRect& rect, const WebCore::IntPoint& viewPosition);
     void updateViewportSize(const WebCore::IntSize& viewportSize);
     void setVisibleContentsRect(const WebCore::IntPoint&, float, const WebCore::FloatPoint&);
     void didChangeContentsSize(const WebCore::IntSize& size);
-
+    void setRendererActive(bool);
 private:
     explicit EflViewportHandler(Evas_Object*);
 

@@ -29,7 +29,7 @@
 #include "CachedResourceClient.h"
 #include "CachedResourceClientWalker.h"
 #include "CachedResourceLoader.h"
-#include "SharedBuffer.h"
+#include "ResourceBuffer.h"
 #include "SubresourceLoader.h"
 #include "WebCoreMemoryInstrumentation.h"
 #include <wtf/PassRefPtr.h>
@@ -42,29 +42,31 @@ CachedRawResource::CachedRawResource(ResourceRequest& resourceRequest)
 {
 }
 
-void CachedRawResource::data(PassRefPtr<SharedBuffer> data, bool allDataReceived)
+void CachedRawResource::data(PassRefPtr<ResourceBuffer> data, bool allDataReceived)
 {
     CachedResourceHandle<CachedRawResource> protect(this);
+    const char* incrementalData = 0;
+    size_t incrementalDataLength = 0;
     if (data) {
         // If we are buffering data, then we are saving the buffer in m_data and need to manually
         // calculate the incremental data. If we are not buffering, then m_data will be null and
         // the buffer contains only the incremental data.
         size_t previousDataLength = (m_options.shouldBufferData == BufferData) ? encodedSize() : 0;
         ASSERT(data->size() >= previousDataLength);
-        const char* incrementalData = data->data() + previousDataLength;
-        size_t incrementalDataLength = data->size() - previousDataLength;
-
-        if (incrementalDataLength) {
-            CachedResourceClientWalker<CachedRawResourceClient> w(m_clients);
-            while (CachedRawResourceClient* c = w.next())
-                c->dataReceived(this, incrementalData, incrementalDataLength);
-        }
+        incrementalData = data->data() + previousDataLength;
+        incrementalDataLength = data->size() - previousDataLength;
     }
     
     if (m_options.shouldBufferData == BufferData) {
         if (data)
             setEncodedSize(data->size());
         m_data = data;
+    }
+    
+    if (incrementalDataLength) {
+        CachedResourceClientWalker<CachedRawResourceClient> w(m_clients);
+        while (CachedRawResourceClient* c = w.next())
+            c->dataReceived(this, incrementalData, incrementalDataLength);
     }
     CachedResource::data(m_data, allDataReceived);
 }
@@ -153,8 +155,8 @@ bool CachedRawResource::canReuse(const ResourceRequest& newRequest) const
 
     HTTPHeaderMap::const_iterator end = newHeaders.end();
     for (HTTPHeaderMap::const_iterator i = newHeaders.begin(); i != end; ++i) {
-        AtomicString headerName = i->first;
-        if (i->second != oldHeaders.get(headerName))
+        AtomicString headerName = i->key;
+        if (i->value != oldHeaders.get(headerName))
             return false;
     }
     return true;

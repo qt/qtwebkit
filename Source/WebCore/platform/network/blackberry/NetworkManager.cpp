@@ -28,7 +28,6 @@
 #include "FrameLoaderClientBlackBerry.h"
 #include "NetworkJob.h"
 #include "Page.h"
-#include "ReadOnlyLatin1String.h"
 #if ENABLE(BLACKBERRY_CREDENTIAL_PERSIST)
 #include "ResourceHandleClient.h"
 #endif
@@ -87,12 +86,10 @@ bool NetworkManager::startJob(int playerId, const String& pageGroupName, PassRef
 
     const String& documentUrl = frame.document()->url().string();
     if (!documentUrl.isEmpty()) {
-        ReadOnlyLatin1String referrer(documentUrl);
-        platformRequest.setReferrer(referrer.data(), referrer.length());
+        platformRequest.setReferrer(documentUrl);
     }
 
-    ReadOnlyLatin1String securityOrigin(frame.document()->securityOrigin()->toRawString());
-    platformRequest.setSecurityOrigin(securityOrigin.data(), securityOrigin.length());
+    platformRequest.setSecurityOrigin(frame.document()->securityOrigin()->toRawString());
 
     // Attach any applicable auth credentials to the NetworkRequest.
     AuthenticationChallenge& challenge = guardJob->getInternal()->m_currentWebChallenge;
@@ -105,7 +102,7 @@ bool NetworkManager::startJob(int playerId, const String& pageGroupName, PassRef
         String password = credential.password();
 
         BlackBerry::Platform::NetworkRequest::AuthType authType = BlackBerry::Platform::NetworkRequest::AuthNone;
-        if (type == ProtectionSpaceServerHTTP) {
+        if (type == ProtectionSpaceServerHTTP || type == ProtectionSpaceServerHTTPS) {
             switch (protectionSpace.authenticationScheme()) {
             case ProtectionSpaceAuthenticationSchemeHTTPBasic:
                 authType = BlackBerry::Platform::NetworkRequest::AuthHTTPBasic;
@@ -124,9 +121,9 @@ bool NetworkManager::startJob(int playerId, const String& pageGroupName, PassRef
                 // Defaults to AuthNone as per above.
                 break;
             }
-        } else if (type == ProtectionSpaceServerFTP)
+        } else if (type == ProtectionSpaceServerFTP || type == ProtectionSpaceServerFTPS)
             authType = BlackBerry::Platform::NetworkRequest::AuthFTP;
-        else if (type == ProtectionSpaceProxyHTTP)
+        else if (type == ProtectionSpaceProxyHTTP || type == ProtectionSpaceProxyHTTPS)
             authType = BlackBerry::Platform::NetworkRequest::AuthProxy;
 
         if (authType != BlackBerry::Platform::NetworkRequest::AuthNone)

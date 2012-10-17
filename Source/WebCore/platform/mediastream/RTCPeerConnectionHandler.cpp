@@ -59,7 +59,14 @@ public:
     virtual bool addIceCandidate(PassRefPtr<RTCIceCandidateDescriptor>) OVERRIDE;
     virtual bool addStream(PassRefPtr<MediaStreamDescriptor>, PassRefPtr<MediaConstraints>) OVERRIDE;
     virtual void removeStream(PassRefPtr<MediaStreamDescriptor>) OVERRIDE;
+    virtual void getStats(PassRefPtr<RTCStatsRequest>) OVERRIDE;
     virtual void stop() OVERRIDE;
+
+    // RTCDataChannel.
+    virtual bool openDataChannel(PassRefPtr<RTCDataChannelDescriptor>) OVERRIDE;
+    virtual bool sendStringData(PassRefPtr<RTCDataChannelDescriptor>, const String&) OVERRIDE;
+    virtual bool sendRawData(PassRefPtr<RTCDataChannelDescriptor>, const char*, size_t) OVERRIDE;
+    virtual void closeDataChannel(PassRefPtr<RTCDataChannelDescriptor>) OVERRIDE;
 
 private:
     RTCPeerConnectionHandlerClient* m_client;
@@ -130,7 +137,30 @@ bool RTCPeerConnectionHandlerDummy::addIceCandidate(PassRefPtr<RTCIceCandidateDe
     return false;
 }
 
+void RTCPeerConnectionHandlerDummy::getStats(PassRefPtr<RTCStatsRequest>)
+{
+}
+
 void RTCPeerConnectionHandlerDummy::stop()
+{
+}
+
+bool RTCPeerConnectionHandlerDummy::openDataChannel(PassRefPtr<RTCDataChannelDescriptor>)
+{
+    return false;
+}
+
+bool RTCPeerConnectionHandlerDummy::sendStringData(PassRefPtr<RTCDataChannelDescriptor>, const String&)
+{
+    return false;
+}
+
+bool RTCPeerConnectionHandlerDummy::sendRawData(PassRefPtr<RTCDataChannelDescriptor>, const char*, size_t)
+{
+    return false;
+}
+
+void RTCPeerConnectionHandlerDummy::closeDataChannel(PassRefPtr<RTCDataChannelDescriptor>)
 {
 }
 

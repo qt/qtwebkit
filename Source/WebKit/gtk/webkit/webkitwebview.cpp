@@ -351,7 +351,7 @@ static gboolean webkit_web_view_forward_context_menu_event(WebKitWebView* webVie
         return FALSE;
 
     mainFrame->view()->setCursor(pointerCursor());
-    if (page->frameCount()) {
+    if (page->subframeCount()) {
         MouseEventWithHitTestResults mev = prepareMouseEventForFrame(mainFrame, event);
         Frame* targetFrame = EventHandler::subframeForHitTestResult(mev);
         if (!targetFrame)
@@ -746,21 +746,6 @@ static gboolean webkit_web_view_button_press_event(GtkWidget* widget, GdkEventBu
     priv->imFilter.notifyMouseButtonPress();
     gboolean result = frame->eventHandler()->handleMousePressEvent(platformEvent);
 
-#if PLATFORM(X11)
-    /* Copy selection to the X11 selection clipboard */
-    if (event->button == 2) {
-        PasteboardHelper* helper = PasteboardHelper::defaultPasteboardHelper();
-        bool wasUsingPrimary = helper->usePrimarySelectionClipboard();
-        helper->setUsePrimarySelectionClipboard(true);
-
-        Editor* editor = webView->priv->corePage->focusController()->focusedOrMainFrame()->editor();
-        result = result || editor->canPaste() || editor->canDHTMLPaste();
-        editor->paste();
-
-        helper->setUsePrimarySelectionClipboard(wasUsingPrimary);
-    }
-#endif
-
     return result;
 }
 
@@ -864,16 +849,20 @@ static void updateChildAllocationFromPendingAllocation(GtkWidget* child, void*)
     *allocation = IntRect();
 }
 
-static void resizeWebViewFromAllocation(WebKitWebView* webView, GtkAllocation* allocation)
+static void resizeWebViewFromAllocation(WebKitWebView* webView, GtkAllocation* allocation, bool sizeChanged)
 {
     Page* page = core(webView);
     IntSize oldSize;
-    if (FrameView* frameView = page->mainFrame()->view()) {
+    FrameView* frameView = page->mainFrame()->view();
+    if (sizeChanged && frameView) {
         oldSize = frameView->size();
         frameView->resize(allocation->width, allocation->height);
     }
 
     gtk_container_forall(GTK_CONTAINER(webView), updateChildAllocationFromPendingAllocation, 0);
+
+    if (!sizeChanged)
+        return;
 
     WebKit::ChromeClient* chromeClient = static_cast<WebKit::ChromeClient*>(page->chrome()->client());
     chromeClient->widgetSizeChanged(oldSize, IntSize(allocation->width, allocation->height));
@@ -884,17 +873,16 @@ static void webkit_web_view_size_allocate(GtkWidget* widget, GtkAllocation* allo
 {
     GtkAllocation oldAllocation;
     gtk_widget_get_allocation(widget, &oldAllocation);
+    bool sizeChanged = allocation->width != oldAllocation.width || allocation->height != oldAllocation.height;
 
     GTK_WIDGET_CLASS(webkit_web_view_parent_class)->size_allocate(widget, allocation);
-    if (allocation->width == oldAllocation.width && allocation->height == oldAllocation.height)
-        return;
 
     WebKitWebView* webView = WEBKIT_WEB_VIEW(widget);
-    if (!gtk_widget_get_mapped(widget)) {
+    if (sizeChanged && !gtk_widget_get_mapped(widget)) {
         webView->priv->needsResizeOnMap = true;
         return;
     }
-    resizeWebViewFromAllocation(webView, allocation);
+    resizeWebViewFromAllocation(webView, allocation, sizeChanged);
 }
 
 static void webkitWebViewMap(GtkWidget* widget)
@@ -907,7 +895,7 @@ static void webkitWebViewMap(GtkWidget* widget)
 
     GtkAllocation allocation;
     gtk_widget_get_allocation(widget, &allocation);
-    resizeWebViewFromAllocation(webView, &allocation);
+    resizeWebViewFromAllocation(webView, &allocation, true);
     webView->priv->needsResizeOnMap = false;
 }
 

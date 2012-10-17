@@ -58,6 +58,7 @@ class InspectorProfilerAgent;
 class InspectorResourceAgent;
 class InspectorState;
 class InstrumentingAgents;
+class IntSize;
 class Page;
 class PostWorkerNotificationToFrontendTask;
 class Node;
@@ -91,6 +92,7 @@ public:
     void disconnectFrontend();
     void reconnectFrontend(InspectorFrontendChannel*, const String& inspectorStateCookie);
     void setProcessId(long);
+    void webViewResized(const IntSize&);
 
     void inspect(Node*);
     void drawHighlight(GraphicsContext&) const;
@@ -111,6 +113,8 @@ public:
 
     InspectorClient* inspectorClient() const { return m_inspectorClient; }
     InspectorPageAgent* pageAgent() const { return m_pageAgent; }
+
+    void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     InspectorController(Page*, InspectorClient*);

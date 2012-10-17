@@ -33,6 +33,7 @@
 #include "StyleRuleImport.h"
 #include "WebCoreMemoryInstrumentation.h"
 #include <wtf/Deque.h>
+#include <wtf/MemoryInstrumentationHashMap.h>
 #include <wtf/MemoryInstrumentationVector.h>
 
 namespace WebCore {
@@ -252,7 +253,7 @@ void StyleSheetContents::parserAddNamespace(const AtomicString& prefix, const At
     PrefixNamespaceURIMap::AddResult result = m_namespaces.add(prefix, uri);
     if (result.isNewEntry)
         return;
-    result.iterator->second = uri;
+    result.iterator->value = uri;
 }
 
 const AtomicString& StyleSheetContents::determineNamespace(const AtomicString& prefix)
@@ -264,7 +265,7 @@ const AtomicString& StyleSheetContents::determineNamespace(const AtomicString& p
     PrefixNamespaceURIMap::const_iterator it = m_namespaces.find(prefix);
     if (it == m_namespaces.end())
         return nullAtom;
-    return it->second;
+    return it->value;
 }
 
 void StyleSheetContents::parseAuthorStyleSheet(const CachedCSSStyleSheet* cachedStyleSheet, const SecurityOrigin* securityOrigin)
@@ -485,6 +486,12 @@ void StyleSheetContents::removedFromMemoryCache()
     m_isInMemoryCache = false;
 }
 
+void StyleSheetContents::shrinkToFit()
+{
+    m_importRules.shrinkToFit();
+    m_childRules.shrinkToFit();
+}
+
 void StyleSheetContents::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
@@ -492,7 +499,7 @@ void StyleSheetContents::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) c
     info.addMember(m_encodingFromCharsetRule);
     info.addMember(m_importRules);
     info.addMember(m_childRules);
-    info.addHashMap(m_namespaces);
+    info.addMember(m_namespaces);
     info.addMember(m_clients);
 }
 

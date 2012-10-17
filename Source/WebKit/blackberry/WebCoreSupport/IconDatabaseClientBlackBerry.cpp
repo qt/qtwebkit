@@ -22,7 +22,6 @@
 #include "BlackBerryPlatformSettings.h"
 #include "IconDatabase.h"
 #include "WebSettings.h"
-#include "WebString.h"
 
 namespace WebCore {
 
@@ -55,11 +54,6 @@ bool IconDatabaseClientBlackBerry::initIconDatabase(const BlackBerry::WebKit::We
                                       IconDatabase::defaultDatabaseFilename()) ? InitializeSucceeded : InitializeFailed;
 
     return m_initState == InitializeSucceeded;
-}
-
-bool IconDatabaseClientBlackBerry::performImport()
-{
-    return true;
 }
 
 void IconDatabaseClientBlackBerry::didRemoveAllIcons()

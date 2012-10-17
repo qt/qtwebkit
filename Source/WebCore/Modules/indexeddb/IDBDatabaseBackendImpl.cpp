@@ -137,16 +137,18 @@ IDBDatabaseBackendImpl::IDBDatabaseBackendImpl(const String& name, IDBBackingSto
     , m_name(name)
     , m_version(NoStringVersion)
     , m_intVersion(IDBDatabaseMetadata::NoIntVersion)
+    , m_maxObjectStoreId(InvalidId)
     , m_identifier(uniqueIdentifier)
     , m_factory(factory)
     , m_transactionCoordinator(IDBTransactionCoordinator::create())
+    , m_closingConnection(false)
 {
     ASSERT(!m_name.isNull());
 }
 
 bool IDBDatabaseBackendImpl::openInternal()
 {
-    bool success = m_backingStore->getIDBDatabaseMetaData(m_name, m_version, m_intVersion, m_id);
+    bool success = m_backingStore->getIDBDatabaseMetaData(m_name, m_version, m_intVersion, m_id, m_maxObjectStoreId);
     ASSERT_WITH_MESSAGE(success == (m_id != InvalidId), "success = %s, m_id = %lld", success ? "true" : "false", static_cast<long long>(m_id));
     if (success) {
         loadObjectStores();
@@ -166,21 +168,25 @@ PassRefPtr<IDBBackingStore> IDBDatabaseBackendImpl::backingStore() const
 
 IDBDatabaseMetadata IDBDatabaseBackendImpl::metadata() const
 {
-    IDBDatabaseMetadata metadata(m_name, m_version, m_intVersion);
+    IDBDatabaseMetadata metadata(m_name, m_id, m_version, m_intVersion, m_maxObjectStoreId);
     for (ObjectStoreMap::const_iterator it = m_objectStores.begin(); it != m_objectStores.end(); ++it)
-        metadata.objectStores.set(it->first, it->second->metadata());
+        metadata.objectStores.set(it->key, it->value->metadata());
     return metadata;
 }
 
-PassRefPtr<IDBObjectStoreBackendInterface> IDBDatabaseBackendImpl::createObjectStore(const String& name, const IDBKeyPath& keyPath, bool autoIncrement, IDBTransactionBackendInterface* transactionPtr, ExceptionCode& ec)
+PassRefPtr<IDBObjectStoreBackendInterface> IDBDatabaseBackendImpl::createObjectStore(int64_t id, const String& name, const IDBKeyPath& keyPath, bool autoIncrement, IDBTransactionBackendInterface* transactionPtr, ExceptionCode& ec)
 {
     ASSERT(!m_objectStores.contains(name));
 
-    RefPtr<IDBObjectStoreBackendImpl> objectStore = IDBObjectStoreBackendImpl::create(this, name, keyPath, autoIncrement);
+    RefPtr<IDBObjectStoreBackendImpl> objectStore = IDBObjectStoreBackendImpl::create(this, id, name, keyPath, autoIncrement, IDBObjectStoreBackendInterface::MinimumIndexId);
     ASSERT(objectStore->name() == name);
 
     RefPtr<IDBTransactionBackendImpl> transaction = IDBTransactionBackendImpl::from(transactionPtr);
     ASSERT(transaction->mode() == IDBTransaction::VERSION_CHANGE);
+
+    // FIXME: Fix edge cases around transaction aborts that prevent this from just being ASSERT(id == m_maxObjectStoreId + 1)
+    ASSERT(id > m_maxObjectStoreId);
+    m_maxObjectStoreId = id;
 
     RefPtr<IDBDatabaseBackendImpl> database = this;
     if (!transaction->scheduleTask(
@@ -196,14 +202,11 @@ PassRefPtr<IDBObjectStoreBackendInterface> IDBDatabaseBackendImpl::createObjectS
 
 void IDBDatabaseBackendImpl::createObjectStoreInternal(ScriptExecutionContext*, PassRefPtr<IDBDatabaseBackendImpl> database, PassRefPtr<IDBObjectStoreBackendImpl> objectStore, PassRefPtr<IDBTransactionBackendImpl> transaction)
 {
-    int64_t objectStoreId;
-
-    if (!database->m_backingStore->createObjectStore(transaction->backingStoreTransaction(), database->id(), objectStore->name(), objectStore->keyPath(), objectStore->autoIncrement(), objectStoreId)) {
+    if (!database->m_backingStore->createObjectStore(transaction->backingStoreTransaction(), database->id(), objectStore->id(), objectStore->name(), objectStore->keyPath(), objectStore->autoIncrement())) {
         transaction->abort();
         return;
     }
 
-    objectStore->setId(objectStoreId);
     transaction->didCompleteTaskEvents();
 }
 
@@ -286,8 +289,9 @@ void IDBDatabaseBackendImpl::setVersionInternal(ScriptExecutionContext*, PassRef
     database->m_version = version;
     database->m_intVersion = IDBDatabaseMetadata::NoIntVersion;
     if (!database->m_backingStore->updateIDBDatabaseMetaData(transaction->backingStoreTransaction(), databaseId, database->m_version) || !database->m_backingStore->updateIDBDatabaseIntVersion(transaction->backingStoreTransaction(), databaseId, database->m_intVersion)) {
-        callbacks->onError(IDBDatabaseError::create(IDBDatabaseException::UNKNOWN_ERR, "Error writing data to stable storage."));
-        transaction->abort();
+        RefPtr<IDBDatabaseError> error = IDBDatabaseError::create(IDBDatabaseException::UNKNOWN_ERR, "Error writing data to stable storage.");
+        callbacks->onError(error);
+        transaction->abort(error);
         return;
     }
     callbacks->onSuccess(PassRefPtr<IDBTransactionBackendInterface>(transaction));
@@ -300,8 +304,9 @@ void IDBDatabaseBackendImpl::setIntVersionInternal(ScriptExecutionContext*, Pass
     ASSERT(version > oldVersion);
     database->m_intVersion = version;
     if (!database->m_backingStore->updateIDBDatabaseIntVersion(transaction->backingStoreTransaction(), databaseId, database->m_intVersion)) {
-        callbacks->onError(IDBDatabaseError::create(IDBDatabaseException::UNKNOWN_ERR, "Error writing data to stable storage."));
-        transaction->abort();
+        RefPtr<IDBDatabaseError> error = IDBDatabaseError::create(IDBDatabaseException::UNKNOWN_ERR, "Error writing data to stable storage.");
+        callbacks->onError(error);
+        transaction->abort(error);
         return;
     }
     callbacks->onUpgradeNeeded(oldVersion, transaction, database);
@@ -573,9 +578,17 @@ void IDBDatabaseBackendImpl::close(PassRefPtr<IDBDatabaseCallbacks> prpCallbacks
     if (connectionCount() > 1)
         return;
 
+    // processPendingCalls allows the inspector to process a pending open call
+    // and call close, reentering IDBDatabaseBackendImpl::close. Then the
+    // backend would be removed both by the inspector closing its connection, and
+    // by the connection that first called close.
+    // To avoid that situation, don't proceed in case of reentrancy.
+    if (m_closingConnection)
+        return;
+    m_closingConnection = true;
     processPendingCalls();
 
-    // FIXME: Add a test for the m_pendingOpenCalls·and m_pendingOpenWithVersionCalls cases below.
+    // FIXME: Add a test for the m_pendingOpenCalls and m_pendingOpenWithVersionCalls cases below.
     if (!connectionCount() && !m_pendingOpenCalls.size() && !m_pendingOpenWithVersionCalls.size() && !m_pendingDeleteCalls.size()) {
         TransactionSet transactions(m_transactions);
         for (TransactionSet::const_iterator it = transactions.begin(); it != transactions.end(); ++it)
@@ -588,6 +601,7 @@ void IDBDatabaseBackendImpl::close(PassRefPtr<IDBDatabaseCallbacks> prpCallbacks
         if (m_factory)
             m_factory->removeIDBDatabaseBackend(m_identifier);
     }
+    m_closingConnection = false;
 }
 
 void IDBDatabaseBackendImpl::loadObjectStores()
@@ -596,14 +610,16 @@ void IDBDatabaseBackendImpl::loadObjectStores()
     Vector<String> names;
     Vector<IDBKeyPath> keyPaths;
     Vector<bool> autoIncrementFlags;
-    m_backingStore->getObjectStores(m_id, ids, names, keyPaths, autoIncrementFlags);
+    Vector<int64_t> maxIndexIds;
+    m_backingStore->getObjectStores(m_id, ids, names, keyPaths, autoIncrementFlags, maxIndexIds);
 
     ASSERT(names.size() == ids.size());
     ASSERT(keyPaths.size() == ids.size());
     ASSERT(autoIncrementFlags.size() == ids.size());
+    ASSERT(maxIndexIds.size() == ids.size());
 
     for (size_t i = 0; i < ids.size(); i++)
-        m_objectStores.set(names[i], IDBObjectStoreBackendImpl::create(this, ids[i], names[i], keyPaths[i], autoIncrementFlags[i]));
+        m_objectStores.set(names[i], IDBObjectStoreBackendImpl::create(this, ids[i], names[i], keyPaths[i], autoIncrementFlags[i], maxIndexIds[i]));
 }
 
 void IDBDatabaseBackendImpl::removeObjectStoreFromMap(ScriptExecutionContext*, PassRefPtr<IDBDatabaseBackendImpl> database, PassRefPtr<IDBObjectStoreBackendImpl> prpObjectStore)

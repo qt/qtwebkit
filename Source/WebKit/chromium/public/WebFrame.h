@@ -99,23 +99,9 @@ public:
     // Returns the number of live WebFrame objects, used for leak checking.
     WEBKIT_EXPORT static int instanceCount();
 
-    // The two functions below retrieve the WebFrame instances relating the
-    // currently executing JavaScript.  Since JavaScript can make function
-    // calls across frames, though, we need to be more precise.
-    //
-    // For example, imagine that a JS function in frame A calls a function
-    // in frame B, which calls native code, which wants to know what the
-    // 'active' frame is.
-    //
-    // The 'entered context' is the context where execution first entered
-    // the script engine; the context that is at the bottom of the JS
-    // function stack.  frameForEnteredContext() would return frame A in
-    // our example.
-    //
-    // The 'current context' is the context the JS engine is currently
-    // inside of; the context that is at the top of the JS function stack.
-    // frameForCurrentContext() would return frame B in our example.
-    WEBKIT_EXPORT static WebFrame* frameForEnteredContext();
+    // Returns the WebFrame associated with the current V8 context. This
+    // function can return 0 if the context is associated with a Document that
+    // is not currently being displayed in a Frame.
     WEBKIT_EXPORT static WebFrame* frameForCurrentContext();
 
 #if WEBKIT_USING_V8
@@ -132,14 +118,7 @@ public:
 
     // Basic properties ---------------------------------------------------
 
-    // The name of this frame.
-    virtual WebString name() const = 0;
-
     // The unique name of this frame.
-    //
-    // This is temporarily identical to the above name() function. Once this
-    // change makes it over to the Chromium tree, I will change all callers to
-    // use this function and will subsequently move assignedName() to name().
     virtual WebString uniqueName() const = 0;
 
     // The name of this frame. If no name is given, empty string is returned.
@@ -301,8 +280,11 @@ public:
         int argc,
         v8::Handle<v8::Value> argv[]) = 0;
 
-    // Returns the V8 context for this frame, or an empty handle if there
-    // is none.
+    // Returns the V8 context for associated with the main world and this
+    // frame. There can be many V8 contexts associated with this frame, one for
+    // each isolated world and one for the main world. If you don't know what
+    // the "main world" or an "isolated world" is, then you probably shouldn't
+    // be calling this API.
     virtual v8::Local<v8::Context> mainWorldScriptContext() const = 0;
 
     // Creates an instance of file system object.

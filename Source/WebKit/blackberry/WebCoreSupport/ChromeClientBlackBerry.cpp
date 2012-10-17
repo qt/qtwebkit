@@ -61,11 +61,11 @@
 #include "WebPage_p.h"
 #include "WebPopupType.h"
 #include "WebSettings.h"
-#include "WebString.h"
 #include "WindowFeatures.h"
 
 #include <BlackBerryPlatformLog.h>
 #include <BlackBerryPlatformSettings.h>
+#include <BlackBerryPlatformString.h>
 #include <BlackBerryPlatformWindow.h>
 
 #include <wtf/text/CString.h>
@@ -138,7 +138,7 @@ bool ChromeClientBlackBerry::runJavaScriptPrompt(Frame* frame, const String& mes
 
     TimerBase::fireTimersInNestedEventLoop();
     CString latinOrigin = toOriginString(frame);
-    WebString clientResult;
+    BlackBerry::Platform::String clientResult;
     if (m_webPagePrivate->m_client->runJavaScriptPrompt(message.characters(), message.length(), defaultValue.characters(), defaultValue.length(), latinOrigin.data(), latinOrigin.length(), clientResult)) {
         result = clientResult;
         return true;
@@ -248,7 +248,7 @@ Page* ChromeClientBlackBerry::createWindow(Frame*, const FrameLoadRequest& reque
     if (features.dialog)
         flags |= WebPageClient::FlagWindowIsDialog;
 
-    WebPage* webPage = m_webPagePrivate->m_client->createWindow(x, y, width, height, flags, WebString(request.resourceRequest().url().string()), WebString(request.frameName()));
+    WebPage* webPage = m_webPagePrivate->m_client->createWindow(x, y, width, height, flags, request.resourceRequest().url().string(), request.frameName());
     if (!webPage)
         return 0;
 
@@ -392,7 +392,8 @@ bool ChromeClientBlackBerry::runBeforeUnloadConfirmPanel(const String& message, 
 
 void ChromeClientBlackBerry::closeWindowSoon()
 {
-    m_webPagePrivate->m_client->scheduleCloseWindow();
+    if (m_webPagePrivate->m_page->openedByDOM())
+        m_webPagePrivate->m_client->scheduleCloseWindow();
 }
 
 void ChromeClientBlackBerry::setStatusbarText(const String& status)
@@ -506,26 +507,26 @@ void ChromeClientBlackBerry::exceededDatabaseQuota(Frame* frame, const String& n
 
 void ChromeClientBlackBerry::runOpenPanel(Frame*, PassRefPtr<FileChooser> chooser)
 {
-    SharedArray<WebString> initialFiles;
+    SharedArray<BlackBerry::Platform::String> initialFiles;
     unsigned numberOfInitialFiles = chooser->settings().selectedFiles.size();
     if (numberOfInitialFiles > 0)
-        initialFiles.reset(new WebString[numberOfInitialFiles], numberOfInitialFiles);
+        initialFiles.reset(new BlackBerry::Platform::String[numberOfInitialFiles], numberOfInitialFiles);
     for (unsigned i = 0; i < numberOfInitialFiles; ++i)
         initialFiles[i] = chooser->settings().selectedFiles[i];
 
-    SharedArray<WebString> acceptMIMETypes;
+    SharedArray<BlackBerry::Platform::String> acceptMIMETypes;
     unsigned numberOfTypes = chooser->settings().acceptMIMETypes.size();
     if (numberOfTypes > 0)
-        acceptMIMETypes.reset(new WebString[numberOfTypes], numberOfTypes);
+        acceptMIMETypes.reset(new BlackBerry::Platform::String[numberOfTypes], numberOfTypes);
     for (unsigned i = 0; i < numberOfTypes; ++i)
         acceptMIMETypes[i] = chooser->settings().acceptMIMETypes[i];
 
-    WebString capture;
+    BlackBerry::Platform::String capture;
 #if ENABLE(MEDIA_CAPTURE)
     capture = chooser->settings().capture;
 #endif
 
-    SharedArray<WebString> chosenFiles;
+    SharedArray<BlackBerry::Platform::String> chosenFiles;
 
     {
         PageGroupLoadDeferrer deferrer(m_webPagePrivate->m_page, true);
@@ -584,9 +585,9 @@ void ChromeClientBlackBerry::invalidateContentsForSlowScroll(const IntSize& delt
     if (scrollView != m_webPagePrivate->m_mainFrame->view())
         invalidateContentsAndRootView(updateRect, true /*immediate*/);
     else {
-        BackingStoreClient* backingStoreClientForFrame = m_webPagePrivate->backingStoreClientForFrame(m_webPagePrivate->m_mainFrame);
-        ASSERT(backingStoreClientForFrame);
-        backingStoreClientForFrame->checkOriginOfCurrentScrollOperation();
+        BackingStoreClient* backingStoreClient = m_webPagePrivate->backingStoreClient();
+        ASSERT(backingStoreClient);
+        backingStoreClient->checkOriginOfCurrentScrollOperation();
 
         m_webPagePrivate->m_backingStore->d->slowScroll(delta, updateRect, immediate);
     }
@@ -600,9 +601,9 @@ void ChromeClientBlackBerry::scroll(const IntSize& delta, const IntRect& scrollV
     if (!m_webPagePrivate->m_mainFrame->view())
         return;
 
-    BackingStoreClient* backingStoreClientForFrame = m_webPagePrivate->backingStoreClientForFrame(m_webPagePrivate->m_mainFrame);
-    ASSERT(backingStoreClientForFrame);
-    backingStoreClientForFrame->checkOriginOfCurrentScrollOperation();
+    BackingStoreClient* backingStoreClient = m_webPagePrivate->backingStoreClient();
+    ASSERT(backingStoreClient);
+    backingStoreClient->checkOriginOfCurrentScrollOperation();
 
     m_webPagePrivate->m_backingStore->d->scroll(delta, scrollViewRect, clipRect);
 }
@@ -678,7 +679,7 @@ void ChromeClientBlackBerry::overflowExceedsContentsSize(Frame* frame) const
         return;
 
 #if DEBUG_OVERFLOW_DETECTION
-    BlackBerry::Platform::log(BlackBerry::Platform::LogLevelInfo, "ChromeClientBlackBerry::overflowExceedsContentsSize contents=%dx%d overflow=%dx%d",
+    BBLOG(BlackBerry::Platform::LogLevelInfo, "ChromeClientBlackBerry::overflowExceedsContentsSize contents=%dx%d overflow=%dx%d",
                            frame->contentRenderer()->rightLayoutOverflow(),
                            frame->contentRenderer()->bottomLayoutOverflow(),
                            frame->contentRenderer()->rightAbsoluteVisibleOverflow(),
@@ -692,7 +693,7 @@ void ChromeClientBlackBerry::didDiscoverFrameSet(Frame* frame) const
     if (frame != m_webPagePrivate->m_mainFrame)
         return;
 
-    BlackBerry::Platform::log(BlackBerry::Platform::LogLevelInfo, "ChromeClientBlackBerry::didDiscoverFrameSet");
+    BBLOG(BlackBerry::Platform::LogLevelInfo, "ChromeClientBlackBerry::didDiscoverFrameSet");
     if (m_webPagePrivate->loadState() == WebPagePrivate::Committed) {
         m_webPagePrivate->setShouldUseFixedDesktopMode(true);
         m_webPagePrivate->zoomToInitialScaleOnLoad();
@@ -772,16 +773,6 @@ void ChromeClientBlackBerry::fullScreenRendererChanged(RenderBox* fullScreenRend
 }
 #endif
 
-#if ENABLE(WEBGL)
-void ChromeClientBlackBerry::requestWebGLPermission(Frame* frame)
-{
-    if (frame) {
-        CString latinOrigin = toOriginString(frame);
-        m_webPagePrivate->m_client->requestWebGLPermission(latinOrigin.data());
-    }
-}
-#endif
-
 #if ENABLE(SVG)
 void ChromeClientBlackBerry::didSetSVGZoomAndPan(Frame* frame, unsigned short zoomAndPan)
 {
@@ -818,7 +809,7 @@ void ChromeClientBlackBerry::setNeedsOneShotDrawingSynchronization()
     m_webPagePrivate->setNeedsOneShotDrawingSynchronization();
 }
 
-void ChromeClientBlackBerry::scheduleCompositingLayerSync()
+void ChromeClientBlackBerry::scheduleCompositingLayerFlush()
 {
     m_webPagePrivate->scheduleRootLayerCommit();
 }

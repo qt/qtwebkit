@@ -1237,7 +1237,7 @@ sub isCygwin()
 
 sub isAnyWindows()
 {
-    return isWindows() || isCygwin() || isMsys();
+    return isWindows() || isCygwin();
 }
 
 sub determineWinVersion()
@@ -1288,11 +1288,6 @@ sub isDarwin()
 sub isWindows()
 {
     return ($^O eq "MSWin32") || 0;
-}
-
-sub isMsys()
-{
-    return ($^O eq "msys") || 0;
 }
 
 sub isLinux()
@@ -1446,9 +1441,19 @@ sub debugger
 sub determineDebugger
 {
     return if defined($debugger);
-    if (checkForArgumentAndRemoveFromARGV("--use-lldb")) {
+
+    determineXcodeVersion();
+    if (eval "v$xcodeVersion" ge v4.5) {
         $debugger = "lldb";
     } else {
+        $debugger = "gdb";
+    }
+
+    if (checkForArgumentAndRemoveFromARGV("--use-lldb")) {
+        $debugger = "lldb";
+    }
+
+    if (checkForArgumentAndRemoveFromARGV("--use-gdb")) {
         $debugger = "gdb";
     }
 }
@@ -2170,6 +2175,9 @@ sub buildCMakeProjectOrExit($$$$@)
 
     $returnCode = exitStatus(generateBuildSystemFromCMakeProject($port, $prefixPath, @cmakeArgs));
     exit($returnCode) if $returnCode;
+    if (isBlackBerry()) {
+        return 0 if (defined($ENV{"GENERATE_CMAKE_PROJECT_ONLY"}) eq '1');
+    }
     $returnCode = exitStatus(buildCMakeGeneratedProject($makeArgs));
     exit($returnCode) if $returnCode;
     return 0;
@@ -2280,6 +2288,7 @@ sub buildQMakeProjects
                 $previousSvnRevision = $1;
             }
         }
+        close(QMAKECACHE);
     }
 
     my $result = 0;
@@ -2310,14 +2319,34 @@ sub buildQMakeProjects
        die "\nFailed to set up build environment using $qmakebin!\n";
     }
 
-    if ($configChanged) {
-        print "Calling '$command wipeclean' in " . $dir . "\n\n";
-        $result = system "$command wipeclean";
-    }
+    my $needsCleanBuild = 0;
+    my $needsIncrementalBuild = 0;
 
     if ($svnRevision ne $previousSvnRevision) {
         print "Last built revision was " . $previousSvnRevision .
             ", now at revision $svnRevision. Full incremental build needed.\n";
+        $needsIncrementalBuild = 1;
+
+        my @fileList = listOfChangedFilesBetweenRevisions(sourceDir(), $previousSvnRevision, $svnRevision);
+
+        foreach (@fileList) {
+            if (m/\.pr[oif]$/ or
+                m/\.qmake.conf$/ or
+                m/^Tools\/qmake\//
+               ) {
+                print "Change to $_ detected, clean build needed.\n";
+                $needsCleanBuild = 1;
+                last;
+            }
+        }
+    }
+
+    if ($configChanged or $needsCleanBuild) {
+        print "Calling '$command wipeclean' in " . $dir . "\n\n";
+        $result = system "$command wipeclean";
+    }
+
+    if ($needsIncrementalBuild) {
         $command .= " incremental";
     }
 
@@ -2510,7 +2539,7 @@ sub printHelpAndExitForRunAndDebugWebKitAppIfNeeded
     print STDERR <<EOF;
 Usage: @{[basename($0)]} [options] [args ...]
   --help                            Show this help message
-  --no-saved-state                  Disable application resume for the session on Mac OS 10.7
+  --no-saved-state                  Launch the application without state restoration (OS X 10.7 and later)
   --guard-malloc                    Enable Guard Malloc (OS X only)
   --use-web-process-xpc-service     Launch the Web Process as an XPC Service (OS X only)
 EOF
@@ -2518,7 +2547,8 @@ EOF
     if ($includeOptionsForDebugging) {
         print STDERR <<EOF;
   --target-web-process              Debug the web process
-  --use-lldb                        Use LLDB
+  --use-gdb                         Use GDB (this is the default when using Xcode 4.4 or earlier)
+  --use-lldb                        Use LLDB (this is the default when using Xcode 4.5 or later)
 EOF
     }
 

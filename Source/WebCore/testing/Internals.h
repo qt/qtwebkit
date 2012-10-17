@@ -80,6 +80,7 @@ public:
     ShadowRootIfShadowDOMEnabledOrNode* oldestShadowRoot(Element* host, ExceptionCode&);
     ShadowRootIfShadowDOMEnabledOrNode* youngerShadowRoot(Node* shadow, ExceptionCode&);
     ShadowRootIfShadowDOMEnabledOrNode* olderShadowRoot(Node* shadow, ExceptionCode&);
+    bool hasShadowInsertionPoint(const Node*, ExceptionCode&) const;
     Element* includerFor(Node*, ExceptionCode&);
     String shadowPseudoId(Element*, ExceptionCode&);
     void setShadowPseudoId(Element*, const String&, ExceptionCode&);
@@ -89,6 +90,7 @@ public:
     bool isValidContentSelect(Element* insertionPoint, ExceptionCode&);
     Node* treeScopeRootNode(Node*, ExceptionCode&);
     Node* parentTreeScope(Node*, ExceptionCode&);
+    PassRefPtr<NodeList> distributedNodes(Element* insertionPoint, ExceptionCode&);
 
     bool attached(Node*, ExceptionCode&);
 
@@ -185,6 +187,12 @@ public:
 
     void suspendAnimations(Document*, ExceptionCode&) const;
     void resumeAnimations(Document*, ExceptionCode&) const;
+
+    enum {
+        LAYER_TREE_INCLUDES_VISIBLE_RECTS = 1 // Values need to kept in sync with Internals.idl.
+    };
+    String layerTreeAsText(Document*, unsigned flags, ExceptionCode&) const;
+    String layerTreeAsText(Document*, ExceptionCode&) const;
 
     void garbageCollectDocumentResources(Document*, ExceptionCode&) const;
 

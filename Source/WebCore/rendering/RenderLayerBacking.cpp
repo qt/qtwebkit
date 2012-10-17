@@ -95,6 +95,7 @@ bool RenderLayerBacking::m_creatingPrimaryGraphicsLayer = false;
 
 RenderLayerBacking::RenderLayerBacking(RenderLayer* layer)
     : m_owningLayer(layer)
+    , m_scrollLayerID(0)
     , m_artificiallyInflatedBounds(false)
     , m_isMainFrameRenderViewLayer(false)
     , m_usingTiledCacheLayer(false)
@@ -123,9 +124,8 @@ RenderLayerBacking::RenderLayerBacking(RenderLayer* layer)
         if (Page* page = renderer()->frame()->page()) {
             if (TiledBacking* tiledBacking = m_graphicsLayer->tiledBacking()) {
                 Frame* frame = renderer()->frame();
-
                 tiledBacking->setIsInWindow(page->isOnscreen());
-                tiledBacking->setCanHaveScrollbars(frame->view()->canHaveScrollbars());
+                tiledBacking->setTileCoverage(frame->view()->canHaveScrollbars() ? TiledBacking::CoverageForScrolling : TiledBacking::CoverageForVisibleArea);
                 tiledBacking->setScrollingPerformanceLoggingEnabled(frame->settings() && frame->settings()->scrollingPerformanceLoggingEnabled());
             }
         }
@@ -139,12 +139,18 @@ RenderLayerBacking::~RenderLayerBacking()
     updateForegroundLayer(false);
     updateMaskLayer(false);
     updateScrollingLayers(false);
+    detachFromScrollingCoordinator();
     destroyGraphicsLayers();
 }
 
 PassOwnPtr<GraphicsLayer> RenderLayerBacking::createGraphicsLayer(const String& name)
 {
-    OwnPtr<GraphicsLayer> graphicsLayer = GraphicsLayer::create(this);
+    GraphicsLayerFactory* graphicsLayerFactory = 0;
+    if (Page* page = renderer()->frame()->page())
+        graphicsLayerFactory = page->chrome()->client()->graphicsLayerFactory();
+
+    OwnPtr<GraphicsLayer> graphicsLayer = GraphicsLayer::create(graphicsLayerFactory, this);
+
 #ifndef NDEBUG
     graphicsLayer->setName(name);
 #else
@@ -959,6 +965,41 @@ bool RenderLayerBacking::updateScrollingLayers(bool needsScrollingLayers)
     return layerChanged;
 }
 
+void RenderLayerBacking::attachToScrollingCoordinator()
+{
+    // If m_scrollLayerID non-zero, then this backing is already attached to the ScrollingCoordinator.
+    if (m_scrollLayerID)
+        return;
+
+    Page* page = renderer()->frame()->page();
+    if (!page)
+        return;
+
+    ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator();
+    if (!scrollingCoordinator)
+        return;
+    
+    m_scrollLayerID = scrollingCoordinator->attachToStateTree(scrollingCoordinator->uniqueScrollLayerID());
+}
+
+void RenderLayerBacking::detachFromScrollingCoordinator()
+{
+    // If m_scrollLayerID is 0, then this backing is not attached to the ScrollingCoordinator.
+    if (!m_scrollLayerID)
+        return;
+
+    Page* page = renderer()->frame()->page();
+    if (!page)
+        return;
+
+    ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator();
+    if (!scrollingCoordinator)
+        return;
+
+    scrollingCoordinator->detachFromStateTree(m_scrollLayerID);
+    m_scrollLayerID = 0;
+}
+
 GraphicsLayerPaintingPhase RenderLayerBacking::paintingPhaseForPrimaryLayer() const
 {
     unsigned phase = GraphicsLayerPaintBackground;
@@ -1332,10 +1373,12 @@ void RenderLayerBacking::setRequiresOwnBackingStore(bool requiresOwnBacking)
     if (requiresOwnBacking == m_requiresOwnBackingStore)
         return;
     
+    m_requiresOwnBackingStore = requiresOwnBacking;
+
     // This affects the answer to paintsIntoCompositedAncestor(), which in turn affects
     // cached clip rects, so when it changes we have to clear clip rects on descendants.
     m_owningLayer->clearClipRectsIncludingDescendants(PaintingClipRects);
-    m_requiresOwnBackingStore = requiresOwnBacking;
+    m_owningLayer->computeRepaintRectsIncludingDescendants();
     
     compositor()->repaintInCompositedAncestor(m_owningLayer, compositedBounds());
 }
@@ -1672,7 +1715,7 @@ void RenderLayerBacking::notifyAnimationStarted(const GraphicsLayer*, double tim
     renderer()->animation()->notifyAnimationStarted(renderer(), time);
 }
 
-void RenderLayerBacking::notifySyncRequired(const GraphicsLayer*)
+void RenderLayerBacking::notifyFlushRequired(const GraphicsLayer*)
 {
     if (!renderer()->documentBeingDestroyed())
         compositor()->scheduleLayerFlush();
@@ -1824,7 +1867,7 @@ bool RenderLayerBacking::contentsVisible(const GraphicsLayer*, const IntRect& lo
         return false;
 
     IntRect visibleContentRect(view->visibleContentRect());
-    FloatQuad absoluteContentQuad = renderer()->localToAbsoluteQuad(FloatRect(localContentRect));
+    FloatQuad absoluteContentQuad = renderer()->localToAbsoluteQuad(FloatRect(localContentRect), SnapOffsetForTransforms);
     return absoluteContentQuad.enclosingBoundingBox().intersects(visibleContentRect);
 }
 #endif

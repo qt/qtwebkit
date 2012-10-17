@@ -43,8 +43,8 @@ typedef struct _Ewk_Download_Job Ewk_Download_Job;
 typedef struct _Ewk_Form_Submission_Request Ewk_Form_Submission_Request;
 typedef struct _Ewk_Url_Request Ewk_Url_Request;
 typedef struct _Ewk_Url_Response Ewk_Url_Response;
-typedef struct _Ewk_Web_Error Ewk_Web_Error;
-typedef struct _Ewk_Web_Resource Ewk_Web_Resource;
+typedef struct _Ewk_Error Ewk_Error;
+typedef struct _Ewk_Resource Ewk_Resource;
 typedef struct _Ewk_Navigation_Policy_Decision Ewk_Navigation_Policy_Decision;
 #if ENABLE(WEB_INTENTS)
 typedef struct _Ewk_Intent Ewk_Intent;
@@ -56,7 +56,7 @@ typedef struct _Ewk_Intent_Service Ewk_Intent_Service;
 void ewk_view_cursor_set(Evas_Object* ewkView, const WebCore::Cursor& cursor);
 void ewk_view_display(Evas_Object* ewkView, const WebCore::IntRect& rect);
 void ewk_view_download_job_cancelled(Evas_Object* ewkView, Ewk_Download_Job*);
-void ewk_view_download_job_failed(Evas_Object* ewkView, Ewk_Download_Job*, Ewk_Web_Error*);
+void ewk_view_download_job_failed(Evas_Object* ewkView, Ewk_Download_Job*, Ewk_Error*);
 void ewk_view_download_job_finished(Evas_Object* ewkView, Ewk_Download_Job*);
 void ewk_view_download_job_requested(Evas_Object* ewkView, Ewk_Download_Job*);
 void ewk_view_form_submission_request_new(Evas_Object* ewkView, Ewk_Form_Submission_Request*);
@@ -65,10 +65,10 @@ void ewk_view_full_screen_enter(Evas_Object* ewkView);
 void ewk_view_full_screen_exit(Evas_Object* ewkView);
 #endif
 void ewk_view_image_data_set(Evas_Object* ewkView, void* imageData, const WebCore::IntSize& size);
-void ewk_view_load_error(Evas_Object* ewkView, const Ewk_Web_Error* error);
+void ewk_view_load_error(Evas_Object* ewkView, const Ewk_Error* error);
 void ewk_view_load_finished(Evas_Object* ewkView);
 void ewk_view_load_progress_changed(Evas_Object* ewkView, double progress);
-void ewk_view_load_provisional_failed(Evas_Object* ewkView, const Ewk_Web_Error* error);
+void ewk_view_load_provisional_failed(Evas_Object* ewkView, const Ewk_Error* error);
 void ewk_view_load_provisional_redirect(Evas_Object* ewkView);
 void ewk_view_load_provisional_started(Evas_Object* ewkView);
 void ewk_view_navigation_policy_decision(Evas_Object* ewkView, Ewk_Navigation_Policy_Decision* decision);
@@ -76,14 +76,17 @@ void ewk_view_new_window_policy_decision(Evas_Object* ewkView, Ewk_Navigation_Po
 void ewk_view_page_close(Evas_Object* ewkView);
 WKPageRef ewk_view_page_create(Evas_Object* ewkView);
 void ewk_view_title_changed(Evas_Object* ewkView, const char* title);
-void ewk_view_resource_load_failed(Evas_Object* ewkView, uint64_t resourceIdentifier, Ewk_Web_Error* error);
+void ewk_view_tooltip_text_set(Evas_Object* ewkView, const char* text);
+void ewk_view_resource_load_failed(Evas_Object* ewkView, uint64_t resourceIdentifier, Ewk_Error* error);
 void ewk_view_resource_load_finished(Evas_Object* ewkView, uint64_t resourceIdentifier);
-void ewk_view_resource_load_initiated(Evas_Object* ewkView, uint64_t resourceIdentifier, Ewk_Web_Resource* resource, Ewk_Url_Request* request);
+void ewk_view_resource_load_initiated(Evas_Object* ewkView, uint64_t resourceIdentifier, Ewk_Resource* resource, Ewk_Url_Request* request);
 void ewk_view_resource_load_response(Evas_Object* ewkView, uint64_t resourceIdentifier, Ewk_Url_Response* response);
 void ewk_view_resource_request_sent(Evas_Object* ewkView, uint64_t resourceIdentifier, Ewk_Url_Request* request, Ewk_Url_Response* redirectResponse);
 void ewk_view_text_found(Evas_Object* ewkView, unsigned int matchCount);
-void ewk_view_uri_update(Evas_Object* ewkView);
+void ewk_view_url_update(Evas_Object* ewkView);
 void ewk_view_contents_size_changed(const Evas_Object* ewkView, const WebCore::IntSize&);
+void ewk_view_back_forward_list_changed(Evas_Object* ewkView);
+void ewk_view_update_icon(Evas_Object* ewkView);
 
 Evas_Object* ewk_view_base_add(Evas* canvas, WKContextRef, WKPageGroupRef);
 
@@ -94,6 +97,7 @@ void ewk_view_intent_request_new(Evas_Object* ewkView, const Ewk_Intent* ewkInte
 void ewk_view_intent_service_register(Evas_Object* ewkView, const Ewk_Intent_Service* ewkIntentService);
 #endif
 
+const Evas_Object* ewk_view_from_page_get(const WebKit::WebPageProxy*);
 WebKit::WebPageProxy* ewk_view_page_get(const Evas_Object* ewkView);
 WebCore::IntSize ewk_view_size_get(const Evas_Object* ewkView);
 
@@ -112,6 +116,10 @@ WKEinaSharedString ewk_view_run_javascript_prompt(Evas_Object* ewkView, const WK
 #if ENABLE(INPUT_TYPE_COLOR)
 void ewk_view_color_picker_request(Evas_Object* ewkView, int r, int g, int b, int a, WKColorPickerResultListenerRef listener);
 void ewk_view_color_picker_dismiss(Evas_Object* ewkView);
+#endif
+
+#if ENABLE(SQL_DATABASE)
+unsigned long long ewk_view_database_quota_exceeded(Evas_Object* ewkView, const char* databaseName, const char* displayName, unsigned long long currentQuota, unsigned long long currentOriginUsage, unsigned long long currentDatabaseUsage, unsigned long long expectedUsage);
 #endif
 
 #endif // ewk_view_private_h

@@ -356,6 +356,7 @@ public:
     bool maintainsInactiveSelection() const { return m_maintainsInactiveSelection; }
     void setMaintainsInactiveSelection(bool);
 #if PLATFORM(QT)
+    void didRenderFrame(const WebCore::IntSize& contentsSize, const WebCore::IntRect& coveredRect);
     void registerApplicationScheme(const String& scheme);
     void resolveApplicationSchemeRequest(QtNetworkRequestData);
     void sendApplicationSchemeReply(const QQuickNetworkReply*);
@@ -418,6 +419,7 @@ public:
 #endif
 #if USE(TILED_BACKING_STORE)
     void setViewportSize(const WebCore::IntSize&);
+    void commitPageTransitionViewport();
 #endif
 
     void handleMouseEvent(const NativeWebMouseEvent&);
@@ -494,6 +496,8 @@ public:
 
     bool isPinnedToLeftSide() const { return m_mainFrameIsPinnedToLeftSide; }
     bool isPinnedToRightSide() const { return m_mainFrameIsPinnedToRightSide; }
+    bool isPinnedToTopSide() const { return m_mainFrameIsPinnedToTopSide; }
+    bool isPinnedToBottomSide() const { return m_mainFrameIsPinnedToBottomSide; }
 
     void setPaginationMode(WebCore::Pagination::Mode);
     WebCore::Pagination::Mode paginationMode() const { return m_paginationMode; }
@@ -621,6 +625,8 @@ public:
 
     bool isValid();
 
+    PassRefPtr<ImmutableArray> relatedPages() const;
+
     const String& urlAtProcessExit() const { return m_urlAtProcessExit; }
     WebFrameProxy::LoadState loadStateAtProcessExit() const { return m_loadStateAtProcessExit; }
 
@@ -717,7 +723,6 @@ public:
 
 #if PLATFORM(GTK) && USE(TEXTURE_MAPPER_GL)
     void setAcceleratedCompositingWindowId(uint64_t nativeWindowId);
-    void invalidateWidget();
 #endif
 
     void setSuppressVisibilityUpdates(bool flag) { m_suppressVisibilityUpdates = flag; }
@@ -833,7 +838,7 @@ private:
     void notifyScrollerThumbIsVisibleInRect(const WebCore::IntRect&);
     void recommendedScrollbarStyleDidChange(int32_t newStyle);
     void didChangeScrollbarsForMainFrame(bool hasHorizontalScrollbar, bool hasVerticalScrollbar);
-    void didChangeScrollOffsetPinningForMainFrame(bool pinnedToLeftSide, bool pinnedToRightSide);
+    void didChangeScrollOffsetPinningForMainFrame(bool pinnedToLeftSide, bool pinnedToRightSide, bool pinnedToTopSide, bool pinnedToBottomSide);
     void didChangePageCount(unsigned);
     void didFailToInitializePlugin(const String& mimeType);
     void didBlockInsecurePluginVersion(const String& mimeType, const String& urlString);
@@ -850,6 +855,7 @@ private:
 #endif
 
 #if PLATFORM(QT)
+    void pageTransitionViewportReady();
     void didFindZoomableArea(const WebCore::IntPoint&, const WebCore::IntRect&);
 #endif
 
@@ -994,6 +1000,10 @@ private:
     void dictationAlternatives(uint64_t dictationContext, Vector<String>& result);
 #endif
 #endif // PLATFORM(MAC)
+
+#if USE(SOUP)
+    void didReceiveURIRequest(String uriString, uint64_t requestID);
+#endif
 
     void clearLoadDependentCallbacks();
 
@@ -1188,6 +1198,8 @@ private:
 
     bool m_mainFrameIsPinnedToLeftSide;
     bool m_mainFrameIsPinnedToRightSide;
+    bool m_mainFrameIsPinnedToTopSide;
+    bool m_mainFrameIsPinnedToBottomSide;
 
     unsigned m_pageCount;
 

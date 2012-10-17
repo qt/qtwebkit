@@ -47,6 +47,10 @@ typedef struct _GModule GModule;
 #include <Eina.h>
 #endif
 
+#if PLATFORM(MAC)
+OBJC_CLASS NSBundle;
+#endif
+
 namespace CoreIPC {
     class ArgumentDecoder;
     class Connection;
@@ -56,7 +60,7 @@ namespace CoreIPC {
 namespace WebKit {
 
 #if PLATFORM(MAC)
-typedef CFBundleRef PlatformBundle;
+typedef NSBundle *PlatformBundle;
 #elif PLATFORM(WIN)
 typedef HMODULE PlatformBundle;
 #elif PLATFORM(QT)
@@ -164,8 +168,6 @@ public:
     void didReceiveMessage(const String&, APIObject*);
     void didReceiveMessageToPage(WebPage*, const String&, APIObject*);
 
-    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
-
     static void reportException(JSContextRef, JSValueRef exception);
 
     static bool isProcessingUserGesture();
@@ -175,6 +177,8 @@ public:
     static size_t workerThreadCount();
 
     void setTabKeyCyclesThroughElements(WebPage*, bool enabled);
+    void setSerialLoadingEnabled(bool);
+    void dispatchPendingLoadRequests();
 
 private:
     explicit InjectedBundle(const String&);

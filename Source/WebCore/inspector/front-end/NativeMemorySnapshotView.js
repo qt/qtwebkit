@@ -57,10 +57,10 @@ WebInspector.NativeMemorySnapshotView.prototype = {
     get profile()
     {
         return this._profile;
-    }
-}
+    },
 
-WebInspector.NativeMemorySnapshotView.prototype.__proto__ = WebInspector.View.prototype;
+    __proto__: WebInspector.View.prototype
+}
 
 /**
  * @constructor
@@ -145,10 +145,10 @@ WebInspector.NativeMemoryProfileType.prototype = {
     createProfile: function(profile)
     {
         return new WebInspector.NativeMemoryProfileHeader(this, profile.title, -1);
-    }
-}
+    },
 
-WebInspector.NativeMemoryProfileType.prototype.__proto__ = WebInspector.ProfileType.prototype;
+    __proto__: WebInspector.ProfileType.prototype
+}
 
 /**
  * @constructor
@@ -183,10 +183,10 @@ WebInspector.NativeMemoryProfileHeader.prototype = {
     createView: function(profilesPanel)
     {
         return new WebInspector.NativeMemorySnapshotView(this);
-    }
-}
+    },
 
-WebInspector.NativeMemoryProfileHeader.prototype.__proto__ = WebInspector.ProfileHeader.prototype;
+    __proto__: WebInspector.ProfileHeader.prototype
+}
 
 /**
  * @constructor
@@ -219,17 +219,17 @@ WebInspector.MemoryBlockViewProperties._initialize = function()
     addBlock("hsl(  0,  0%,  80%)", "OwnersTypePlaceholder", "OwnersTypePlaceholder");
     addBlock("hsl(  0,  0%,  80%)", "Other", "Other");
     addBlock("hsl(300, 30%,  80%)", "Page", "Page's structures");
-    addBlock("hsl( 90, 60%,  80%)", "JSHeapAllocated", "JavaScript heap");
-    addBlock("hsl( 90, 80%,  80%)", "JSHeapUsed", "Used JavaScript heap");
+    addBlock("hsl( 90, 60%,  80%)", "JSHeap", "JavaScript heap");
+    addBlock("hsl( 90, 80%,  80%)", "JSHeap.Used", "Used JavaScript heap");
     addBlock("hsl( 90, 30%,  80%)", "JSExternalResources", "JavaScript external resources");
     addBlock("hsl( 90, 40%,  80%)", "JSExternalArrays", "JavaScript external arrays");
     addBlock("hsl( 90, 50%,  80%)", "JSExternalStrings", "JavaScript external strings");
-    addBlock("hsl(210, 60%,  80%)", "InspectorData", "Inspector data");
+    addBlock("hsl(210, 60%,  80%)", "WebInspector", "Inspector data");
     addBlock("hsl( 30, 60%,  80%)", "MemoryCache", "Memory cache resources");
     addBlock("hsl( 40, 60%,  80%)", "GlyphCache", "Glyph cache resources");
     addBlock("hsl( 35, 60%,  80%)", "DOMStorageCache", "DOM storage cache");
-    addBlock("hsl( 60, 60%,  80%)", "RenderTreeAllocated", "Render tree");
-    addBlock("hsl( 60, 60%,  80%)", "RenderTreeUsed", "Render tree used");
+    addBlock("hsl( 60, 60%,  80%)", "RenderTree", "Render tree");
+    addBlock("hsl( 60, 60%,  80%)", "RenderTree.Used", "Render tree used");
 }
 
 WebInspector.MemoryBlockViewProperties._forMemoryBlock = function(memoryBlock)
@@ -369,10 +369,10 @@ WebInspector.NativeMemoryPieChart.prototype = {
     _clear: function() {
         var ctx = this._canvas.getContext("2d");
         ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-    }
-}
+    },
 
-WebInspector.NativeMemoryPieChart.prototype.__proto__ = WebInspector.View.prototype;
+    __proto__: WebInspector.View.prototype
+}
 
 /**
  * @constructor
@@ -474,9 +474,13 @@ WebInspector.NativeMemoryBarChart.prototype = {
             }
             var unusedSize = 0;
             if (!!child.children) {
-                unusedSize = child.size;
-                for (var j = 0; j < child.children.length; ++j)
-                    unusedSize -= child.children[j].size;
+                var unusedName = name + ".Unused";
+                for (var j = 0; j < child.children.length; ++j) {
+                    if (child.children[j].name === unusedName) {
+                        unusedSize = child.children[j].size;
+                        break;
+                    }
+                }
             }
             var unusedLength = unusedSize * barLengthSizeRatio;
             var barLength = child.size * barLengthSizeRatio;
@@ -489,7 +493,7 @@ WebInspector.NativeMemoryBarChart.prototype = {
 
         var memoryBlockViewProperties = WebInspector.MemoryBlockViewProperties._forMemoryBlock(memoryBlock);
         this._totalDiv.textContent = memoryBlockViewProperties._description + ": " + (memoryBlock.size / MB).toFixed(1) + "\u2009MB";
-    }
-}
+    },
 
-WebInspector.NativeMemoryBarChart.prototype.__proto__ = WebInspector.View.prototype;
+    __proto__: WebInspector.View.prototype
+}

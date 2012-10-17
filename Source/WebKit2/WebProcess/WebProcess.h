@@ -150,13 +150,11 @@ public:
 #if PLATFORM(MAC)
     pid_t presenterApplicationPid() const { return m_presenterApplicationPid; }
     bool shouldForceScreenFontSubstitution() const { return m_shouldForceScreenFontSubstitution; }
-#endif 
+#endif
     
 #if PLATFORM(QT)
     QNetworkAccessManager* networkAccessManager() { return m_networkAccessManager; }
 #endif
-
-    bool shouldUseCustomRepresentationForResponse(const WebCore::ResourceResponse&) const;
 
     // Text Checking
     const TextCheckerState& textCheckerState() const { return m_textCheckerState; }
@@ -182,7 +180,6 @@ public:
 
 #if ENABLE(PLUGIN_PROCESS)
     PluginProcessConnectionManager& pluginProcessConnectionManager() { return m_pluginProcessConnectionManager; }
-    bool disablePluginProcessMessageTimeout() const { return m_disablePluginProcessMessageTimeout; }
 #endif
 
     EventDispatcher& eventDispatcher() { return m_eventDispatcher; }
@@ -251,6 +248,8 @@ private:
     void garbageCollectJavaScriptObjects();
     void setJavaScriptGarbageCollectorTimerEnabled(bool flag);
 
+    void postInjectedBundleMessage(const CoreIPC::DataReference& messageData);
+
 #if USE(SECURITY_FRAMEWORK)
     void secItemResponse(CoreIPC::Connection*, uint64_t requestID, const SecItemResponseData&);
     void secKeychainItemResponse(CoreIPC::Connection*, uint64_t requestID, const SecKeychainItemResponseData&);
@@ -266,7 +265,6 @@ private:
     virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*, OwnPtr<CoreIPC::ArgumentEncoder>&);
     virtual void didClose(CoreIPC::Connection*);
     virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::MessageID);
-    virtual void syncMessageSendTimedOut(CoreIPC::Connection*);
 #if PLATFORM(WIN)
     virtual Vector<HWND> windowsToReceiveSentMessagesWhileWaitingForSyncReply();
 #endif
@@ -320,8 +318,6 @@ private:
     HashMap<uint64_t, RefPtr<WebCore::PlatformMessagePortChannel> > m_messagePortChannels;
 #endif
 
-    HashSet<String, CaseFoldingHash> m_mimeTypesWithCustomRepresentations;
-
     TextCheckerState m_textCheckerState;
     WebGeolocationManager m_geolocationManager;
 #if ENABLE(BATTERY_STATUS)
@@ -339,7 +335,6 @@ private:
 
 #if ENABLE(PLUGIN_PROCESS)
     PluginProcessConnectionManager m_pluginProcessConnectionManager;
-    bool m_disablePluginProcessMessageTimeout;
 #endif
 
 #if USE(SOUP)

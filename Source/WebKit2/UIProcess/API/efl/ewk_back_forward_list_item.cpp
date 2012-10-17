@@ -28,31 +28,9 @@
 
 #include "WKAPICast.h"
 #include "WKBackForwardListItem.h"
-#include "WKEinaSharedString.h"
+#include "ewk_back_forward_list_item_private.h"
 
 using namespace WebKit;
-
-/**
- * \struct  _Ewk_Back_Forward_List
- * @brief   Contains the Back Forward List data.
- */
-struct _Ewk_Back_Forward_List_Item {
-    unsigned int __ref; /**< the reference count of the object */
-    WKRetainPtr<WKBackForwardListItemRef> wkItem;
-    mutable WKEinaSharedString uri;
-    mutable WKEinaSharedString title;
-    mutable WKEinaSharedString originalUri;
-
-    _Ewk_Back_Forward_List_Item(WKBackForwardListItemRef itemRef)
-        : __ref(1)
-        , wkItem(itemRef)
-    { }
-
-    ~_Ewk_Back_Forward_List_Item()
-    {
-        ASSERT(!__ref);
-    }
-};
 
 #define EWK_BACK_FORWARD_LIST_ITEM_WK_GET_OR_RETURN(item, wkItem_, ...)    \
     if (!(item)) {                                                         \
@@ -68,7 +46,7 @@ struct _Ewk_Back_Forward_List_Item {
 Ewk_Back_Forward_List_Item* ewk_back_forward_list_item_ref(Ewk_Back_Forward_List_Item* item)
 {
     EINA_SAFETY_ON_NULL_RETURN_VAL(item, 0);
-    ++item->__ref;
+    item->ref();
 
     return item;
 }
@@ -77,19 +55,16 @@ void ewk_back_forward_list_item_unref(Ewk_Back_Forward_List_Item* item)
 {
     EINA_SAFETY_ON_NULL_RETURN(item);
 
-    if (--item->__ref)
-        return;
-
-    delete item;
+    item->deref();
 }
 
-const char* ewk_back_forward_list_item_uri_get(const Ewk_Back_Forward_List_Item* item)
+const char* ewk_back_forward_list_item_url_get(const Ewk_Back_Forward_List_Item* item)
 {
     EWK_BACK_FORWARD_LIST_ITEM_WK_GET_OR_RETURN(item, wkItem, 0);
 
-    item->uri = WKEinaSharedString(AdoptWK, WKBackForwardListItemCopyURL(wkItem));
+    item->url = WKEinaSharedString(AdoptWK, WKBackForwardListItemCopyURL(wkItem));
 
-    return item->uri;
+    return item->url;
 }
 
 const char* ewk_back_forward_list_item_title_get(const Ewk_Back_Forward_List_Item* item)
@@ -101,18 +76,11 @@ const char* ewk_back_forward_list_item_title_get(const Ewk_Back_Forward_List_Ite
     return item->title;
 }
 
-const char* ewk_back_forward_list_item_original_uri_get(const Ewk_Back_Forward_List_Item* item)
+const char* ewk_back_forward_list_item_original_url_get(const Ewk_Back_Forward_List_Item* item)
 {
     EWK_BACK_FORWARD_LIST_ITEM_WK_GET_OR_RETURN(item, wkItem, 0);
 
-    item->originalUri = WKEinaSharedString(AdoptWK, WKBackForwardListItemCopyOriginalURL(wkItem));
+    item->originalURL = WKEinaSharedString(AdoptWK, WKBackForwardListItemCopyOriginalURL(wkItem));
 
-    return item->originalUri;
-}
-
-Ewk_Back_Forward_List_Item* ewk_back_forward_list_item_new(WKBackForwardListItemRef backForwardListItemData)
-{
-    EINA_SAFETY_ON_NULL_RETURN_VAL(backForwardListItemData, 0);
-
-    return new Ewk_Back_Forward_List_Item(backForwardListItemData);
+    return item->originalURL;
 }

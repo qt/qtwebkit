@@ -31,6 +31,7 @@
 #include "RenderBox.h"
 #include "RenderLayer.h"
 #include "RenderLayerBacking.h"
+#include "RenderLayerCompositor.h"
 #include "RenderObject.h"
 #include "RenderView.h"
 #include "SelectionHandler.h"
@@ -64,12 +65,13 @@ bool InRegionScroller::setScrollPositionCompositingThread(unsigned camouflagedLa
     return d->setScrollPositionCompositingThread(camouflagedLayer, d->m_webPage->mapFromTransformed(scrollPosition));
 }
 
-bool InRegionScroller::setScrollPositionWebKitThread(unsigned camouflagedLayer, const Platform::IntPoint& scrollPosition, bool supportsAcceleratedScrolling)
+bool InRegionScroller::setScrollPositionWebKitThread(unsigned camouflagedLayer, const Platform::IntPoint& scrollPosition,
+    bool supportsAcceleratedScrolling, Platform::ScrollViewBase::ScrollTarget scrollTarget)
 {
     ASSERT(Platform::webKitThreadMessageClient()->isCurrentThread());
 
     // FIXME: Negative values won't work with map{To,From}Transform methods.
-    return d->setScrollPositionWebKitThread(camouflagedLayer, d->m_webPage->mapFromTransformed(scrollPosition), supportsAcceleratedScrolling);
+    return d->setScrollPositionWebKitThread(camouflagedLayer, d->m_webPage->mapFromTransformed(scrollPosition), supportsAcceleratedScrolling, scrollTarget);
 }
 
 InRegionScrollerPrivate::InRegionScrollerPrivate(WebPagePrivate* webPagePrivate)
@@ -132,7 +134,8 @@ bool InRegionScrollerPrivate::setScrollPositionCompositingThread(unsigned camouf
     return true;
 }
 
-bool InRegionScrollerPrivate::setScrollPositionWebKitThread(unsigned camouflagedLayer, const WebCore::IntPoint& scrollPosition, bool supportsAcceleratedScrolling)
+bool InRegionScrollerPrivate::setScrollPositionWebKitThread(unsigned camouflagedLayer, const WebCore::IntPoint& scrollPosition,
+    bool supportsAcceleratedScrolling, Platform::ScrollViewBase::ScrollTarget scrollTarget)
 {
     RenderLayer* layer = 0;
 
@@ -141,8 +144,14 @@ bool InRegionScrollerPrivate::setScrollPositionWebKitThread(unsigned camouflaged
         ASSERT(layerWebKitThread);
         if (layerWebKitThread->owner()) {
             GraphicsLayer* graphicsLayer = layerWebKitThread->owner();
-            RenderLayerBacking* backing = static_cast<RenderLayerBacking*>(graphicsLayer->client());
-            layer = backing->owningLayer();
+
+            if (scrollTarget == Platform::ScrollViewBase::BlockElement) {
+                RenderLayerBacking* backing = static_cast<RenderLayerBacking*>(graphicsLayer->client());
+                layer = backing->owningLayer();
+            } else {
+                RenderLayerCompositor* compositor = static_cast<RenderLayerCompositor*>(graphicsLayer->client());
+                layer = compositor->rootRenderLayer();
+            }
         }
     } else {
         Node* node = reinterpret_cast<Node*>(camouflagedLayer);
@@ -193,7 +202,7 @@ void InRegionScrollerPrivate::calculateInRegionScrollableAreasForPoint(const Web
     ASSERT(m_activeInRegionScrollableAreas.empty());
     m_needsActiveScrollableAreaCalculation = false;
 
-    HitTestResult result = m_webPage->m_mainFrame->eventHandler()->hitTestResultAtPoint(m_webPage->mapFromViewportToContents(point), false /*allowShadowContent*/);
+    HitTestResult result = m_webPage->m_mainFrame->eventHandler()->hitTestResultAtPoint(m_webPage->mapFromViewportToContents(point));
     Node* node = result.innerNonSharedNode();
     if (!node || !node->renderer())
         return;
@@ -290,19 +299,7 @@ bool InRegionScrollerPrivate::setLayerScrollPosition(RenderLayer* layer, const I
         ASSERT(canScrollInnerFrame(frame));
 
         view->setCanBlitOnScroll(false);
-
-        BackingStoreClient* backingStoreClient = m_webPage->backingStoreClientForFrame(view->frame());
-        if (backingStoreClient) {
-            backingStoreClient->setIsClientGeneratedScroll(true);
-            backingStoreClient->setIsScrollNotificationSuppressed(true);
-        }
-
         view->setScrollPosition(scrollPosition);
-
-        if (backingStoreClient) {
-            backingStoreClient->setIsClientGeneratedScroll(false);
-            backingStoreClient->setIsScrollNotificationSuppressed(false);
-        }
 
     } else {
 

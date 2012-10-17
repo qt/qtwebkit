@@ -67,6 +67,14 @@ WebInspector.DOMNode = function(domAgent, doc, isInShadowTree, payload) {
     this.lastChild = null;
     this.parentNode = null;
 
+    if (payload.shadowRoots && WebInspector.settings.showShadowDOM.get()) {
+        for (var i = 0; i < payload.shadowRoots.length; ++i) {
+            var root = payload.shadowRoots[i];
+            var node = new WebInspector.DOMNode(this._domAgent, this.ownerDocument, true, root);
+            this._shadowRoots.push(node);
+        }
+    }
+
     if (payload.children)
         this._setChildrenPayload(payload.children);
 
@@ -74,14 +82,6 @@ WebInspector.DOMNode = function(domAgent, doc, isInShadowTree, payload) {
         this._contentDocument = new WebInspector.DOMDocument(domAgent, payload.contentDocument);
         this.children = [this._contentDocument];
         this._renumber();
-    }
-
-    if (payload.shadowRoots && WebInspector.experimentsSettings.showShadowDOM.isEnabled()) {
-        for (var i = 0; i < payload.shadowRoots.length; ++i) {
-            var root = payload.shadowRoots[i];
-            var node = new WebInspector.DOMNode(this._domAgent, this.ownerDocument, true, root);
-            this._shadowRoots.push(node);
-        }
     }
 
     if (this._nodeType === Node.ELEMENT_NODE) {
@@ -133,6 +133,14 @@ WebInspector.DOMNode.prototype = {
     hasChildNodes: function()
     {
         return this._childNodeCount > 0 || !!this._shadowRoots.length;
+    },
+
+    /**
+     * @return {boolean}
+     */
+    hasShadowRoots: function()
+    {
+        return !!this._shadowRoots.length;
     },
 
     /**
@@ -764,12 +772,15 @@ WebInspector.DOMDocument = function(domAgent, payload)
 {
     WebInspector.DOMNode.call(this, domAgent, this, false, payload);
     this.documentURL = payload.documentURL || "";
-    this.baseURL = payload.baseURL;
+    this.baseURL = /** @type {string} */ payload.baseURL;
+    console.assert(this.baseURL);
     this.xmlVersion = payload.xmlVersion;
     this._listeners = {};
 }
 
-WebInspector.DOMDocument.prototype.__proto__ = WebInspector.DOMNode.prototype;
+WebInspector.DOMDocument.prototype = {
+    __proto__: WebInspector.DOMNode.prototype
+}
 
 /**
  * @extends {WebInspector.Object}
@@ -1332,10 +1343,10 @@ WebInspector.DOMAgent.prototype = {
 
         this.dispatchEventToListeners(WebInspector.DOMAgent.Events.UndoRedoRequested);
         DOMAgent.redo(callback);
-    }
-}
+    },
 
-WebInspector.DOMAgent.prototype.__proto__ = WebInspector.Object.prototype;
+    __proto__: WebInspector.Object.prototype
+}
 
 /**
  * @constructor

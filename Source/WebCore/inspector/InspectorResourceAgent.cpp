@@ -54,6 +54,7 @@
 #include "NetworkResourcesData.h"
 #include "Page.h"
 #include "ProgressTracker.h"
+#include "ResourceBuffer.h"
 #include "ResourceError.h"
 #include "ResourceLoader.h"
 #include "ResourceRequest.h"
@@ -105,14 +106,14 @@ static PassRefPtr<InspectorObject> buildObjectForHeaders(const HTTPHeaderMap& he
     RefPtr<InspectorObject> headersObject = InspectorObject::create();
     HTTPHeaderMap::const_iterator end = headers.end();
     for (HTTPHeaderMap::const_iterator it = headers.begin(); it != end; ++it)
-        headersObject->setString(it->first.string(), it->second);
+        headersObject->setString(it->key.string(), it->value);
     return headersObject;
 }
 
 static PassRefPtr<TypeBuilder::Network::ResourceTiming> buildObjectForTiming(const ResourceLoadTiming& timing, DocumentLoader* loader)
 {
     return TypeBuilder::Network::ResourceTiming::create()
-        .setRequestTime(timing.convertResourceLoadTimeToDocumentTime(loader->timing(), 0))
+        .setRequestTime(loader->timing()->monotonicTimeToPseudoWallTime(timing.convertResourceLoadTimeToMonotonicTime(0)))
         .setProxyStart(timing.proxyStart)
         .setProxyEnd(timing.proxyEnd)
         .setDnsStart(timing.dnsStart)
@@ -216,8 +217,8 @@ void InspectorResourceAgent::willSendRequest(unsigned long identifier, DocumentL
         InspectorObject::const_iterator end = headers->end();
         for (InspectorObject::const_iterator it = headers->begin(); it != end; ++it) {
             String value;
-            if (it->second->asString(&value))
-                request.setHTTPHeaderField(it->first, value);
+            if (it->value->asString(&value))
+                request.setHTTPHeaderField(it->key, value);
         }
     }
 
@@ -302,8 +303,10 @@ void InspectorResourceAgent::didReceiveData(unsigned long identifier, const char
 void InspectorResourceAgent::didFinishLoading(unsigned long identifier, DocumentLoader* loader, double finishTime)
 {
     String requestId = IdentifiersFactory::requestId(identifier);
-    if (m_resourcesData->resourceType(requestId) == InspectorPageAgent::DocumentResource)
-        m_resourcesData->addResourceSharedBuffer(requestId, loader->frameLoader()->documentLoader()->mainResourceData(), loader->frame()->document()->inputEncoding());
+    if (m_resourcesData->resourceType(requestId) == InspectorPageAgent::DocumentResource) {
+        RefPtr<ResourceBuffer> buffer = loader->frameLoader()->documentLoader()->mainResourceData();
+        m_resourcesData->addResourceSharedBuffer(requestId, buffer ? buffer->sharedBuffer() : 0, loader->frame()->document()->inputEncoding());
+    }
 
     m_resourcesData->maybeDecodeDataToContent(requestId);
 
@@ -319,8 +322,10 @@ void InspectorResourceAgent::didFailLoading(unsigned long identifier, DocumentLo
 
     if (m_resourcesData->resourceType(requestId) == InspectorPageAgent::DocumentResource) {
         Frame* frame = loader ? loader->frame() : 0;
-        if (frame && frame->loader()->documentLoader() && frame->document())
-            m_resourcesData->addResourceSharedBuffer(requestId, frame->loader()->documentLoader()->mainResourceData(), frame->document()->inputEncoding());
+        if (frame && frame->loader()->documentLoader() && frame->document()) {
+            RefPtr<ResourceBuffer> buffer = frame->loader()->documentLoader()->mainResourceData();
+            m_resourcesData->addResourceSharedBuffer(requestId, buffer ? buffer->sharedBuffer() : 0, frame->document()->inputEncoding());
+        }
     }
 
     bool canceled = error.isCancellation();
@@ -365,7 +370,7 @@ void InspectorResourceAgent::documentThreadableLoaderStartedLoadingForClient(uns
     if (it == m_pendingXHRReplayData.end())
         return;
 
-    XHRReplayData* xhrReplayData = it->second.get();
+    XHRReplayData* xhrReplayData = it->value.get();
     String requestId = IdentifiersFactory::requestId(identifier);
     m_resourcesData->setXHRReplayData(requestId, xhrReplayData);
 }
@@ -375,7 +380,7 @@ void InspectorResourceAgent::willLoadXHR(ThreadableLoaderClient* client, const S
     RefPtr<XHRReplayData> xhrReplayData = XHRReplayData::create(method, url, async, formData, includeCredentials);
     HTTPHeaderMap::const_iterator end = headers.end();
     for (HTTPHeaderMap::const_iterator it = headers.begin(); it!= end; ++it)
-        xhrReplayData->addHeader(it->first, it->second);
+        xhrReplayData->addHeader(it->key, it->value);
     m_pendingXHRReplayData.set(client, xhrReplayData);
 }
 
@@ -624,7 +629,7 @@ void InspectorResourceAgent::replayXHR(ErrorString*, const String& requestId)
     xhr->open(xhrReplayData->method(), xhrReplayData->url(), xhrReplayData->async(), code);
     HTTPHeaderMap::const_iterator end = xhrReplayData->headers().end();
     for (HTTPHeaderMap::const_iterator it = xhrReplayData->headers().begin(); it!= end; ++it)
-        xhr->setRequestHeader(it->first, it->second, code);
+        xhr->setRequestHeader(it->key, it->value, code);
     xhr->sendFromInspector(xhrReplayData->formData(), code);
 }
 

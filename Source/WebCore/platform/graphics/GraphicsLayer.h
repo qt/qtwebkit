@@ -47,6 +47,7 @@
 enum LayerTreeAsTextBehaviorFlags {
     LayerTreeAsTextBehaviorNormal = 0,
     LayerTreeAsTextDebug = 1 << 0, // Dump extra debugging info like layer addresses.
+    LayerTreeAsTextIncludeVisibleRects = 1 << 1,
 };
 typedef unsigned LayerTreeAsTextBehavior;
 
@@ -54,6 +55,7 @@ namespace WebCore {
 
 class FloatPoint3D;
 class GraphicsContext;
+class GraphicsLayerFactory;
 class Image;
 class TextStream;
 class TiledBacking;
@@ -191,6 +193,9 @@ protected:
 class GraphicsLayer {
     WTF_MAKE_NONCOPYABLE(GraphicsLayer); WTF_MAKE_FAST_ALLOCATED;
 public:
+    static PassOwnPtr<GraphicsLayer> create(GraphicsLayerFactory*, GraphicsLayerClient*);
+
+    // FIXME: Replace all uses of this create function with the one that takes a GraphicsLayerFactory.
     static PassOwnPtr<GraphicsLayer> create(GraphicsLayerClient*);
     
     virtual ~GraphicsLayer();
@@ -241,6 +246,9 @@ public:
     // The position of the layer (the location of its top-left corner in its parent)
     const FloatPoint& position() const { return m_position; }
     virtual void setPosition(const FloatPoint& p) { m_position = p; }
+
+    // For platforms that move underlying platform layers on a different thread for scrolling; just update the GraphicsLayer state.
+    virtual void syncPosition(const FloatPoint& p) { m_position = p; }
     
     // Anchor point: (0, 0) is top left, (1, 1) is bottom right. The anchor point
     // affects the origin of the transforms.
@@ -381,8 +389,8 @@ public:
     // Some compositing systems may do internal batching to synchronize compositing updates
     // with updates drawn into the window. These methods flush internal batched state on this layer
     // and descendant layers, and this layer only.
-    virtual void syncCompositingState(const FloatRect& /* clipRect */) { }
-    virtual void syncCompositingStateForThisLayerOnly() { }
+    virtual void flushCompositingState(const FloatRect& /* clipRect */) { }
+    virtual void flushCompositingStateForThisLayerOnly() { }
     
     // Return a string with a human readable form of the layer tree, If debug is true 
     // pointers for the layers and timing data will be included in the returned string.
@@ -398,8 +406,8 @@ public:
 #if PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
     // This allows several alternative GraphicsLayer implementations in the same port,
     // e.g. if a different GraphicsLayer implementation is needed in WebKit1 vs. WebKit2.
-    typedef PassOwnPtr<GraphicsLayer> GraphicsLayerFactory(GraphicsLayerClient*);
-    static void setGraphicsLayerFactory(GraphicsLayerFactory);
+    typedef PassOwnPtr<GraphicsLayer> GraphicsLayerFactoryCallback(GraphicsLayerClient*);
+    static void setGraphicsLayerFactory(GraphicsLayerFactoryCallback);
 #endif
 
 protected:
@@ -431,7 +439,12 @@ protected:
 
     GraphicsLayer(GraphicsLayerClient*);
 
+    static void writeIndent(TextStream&, int indent);
+
     void dumpProperties(TextStream&, int indent, LayerTreeAsTextBehavior) const;
+    virtual void dumpAdditionalProperties(TextStream&, int /*indent*/, LayerTreeAsTextBehavior) const { }
+
+    virtual void getDebugBorderInfo(Color&, float& width) const;
 
     GraphicsLayerClient* m_client;
     String m_name;
@@ -467,7 +480,6 @@ protected:
     bool m_acceleratesDrawing : 1;
     bool m_maintainsPixelAlignment : 1;
     bool m_appliesPageScale : 1; // Set for the layer which has the page scale applied to it.
-    bool m_usingTileCache : 1;
 
     GraphicsLayerPaintingPhase m_paintingPhase;
     CompositingCoordinatesOrientation m_contentsOrientation; // affects orientation of layer contents
@@ -487,7 +499,7 @@ protected:
     int m_repaintCount;
 
 #if PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
-    static GraphicsLayer::GraphicsLayerFactory* s_graphicsLayerFactory;
+    static GraphicsLayer::GraphicsLayerFactoryCallback* s_graphicsLayerFactory;
 #endif
 };
 

@@ -28,6 +28,7 @@
 #include "LinkHash.h"
 #include "MediaQueryExp.h"
 #include "RenderStyle.h"
+#include "RuleFeature.h"
 #include "SelectorChecker.h"
 #include "StyleInheritedData.h"
 #include <wtf/HashMap.h>
@@ -73,6 +74,7 @@ class RuleSet;
 class Settings;
 class StaticCSSRuleList;
 class StyleBuilder;
+class StyleScopeResolver;
 class StyleImage;
 class StyleKeyframe;
 class StylePendingImage;
@@ -159,7 +161,8 @@ public:
     void setEffectiveZoom(float f) { m_fontDirty |= style()->setEffectiveZoom(f); }
     void setTextSizeAdjust(bool b) { m_fontDirty |= style()->setTextSizeAdjust(b); }
     bool hasParentNode() const { return m_parentNode; }
-    
+
+    void resetAuthorStyle();
     void appendAuthorStylesheets(unsigned firstNew, const Vector<RefPtr<StyleSheet> >&);
     
     // Find the ids or classes the selectors on a stylesheet are scoped to. The selectors only apply to elements in subtrees where the root element matches the scope.
@@ -170,20 +173,12 @@ private:
     void initElement(Element*);
     void collectFeatures();
     RenderStyle* locateSharedStyle();
-    bool matchesRuleSet(RuleSet*);
+    bool styleSharingCandidateMatchesRuleSet(RuleSet*);
     Node* locateCousinList(Element* parent, unsigned& visitedNodeCount) const;
     StyledElement* findSiblingForStyleSharing(Node*, unsigned& count) const;
     bool canShareStyleWithElement(StyledElement*) const;
 
     PassRefPtr<RenderStyle> styleForKeyframe(const RenderStyle*, const StyleKeyframe*, KeyframeValue&);
-
-#if ENABLE(STYLE_SCOPED)
-    void pushScope(const ContainerNode* scope, const ContainerNode* scopeParent);
-    void popScope(const ContainerNode* scope);
-#else
-    void pushScope(const ContainerNode*, const ContainerNode*) { }
-    void popScope(const ContainerNode*) { }
-#endif
 
 public:
     // These methods will give back the set of rules that matched for a given element (or a pseudo-element).
@@ -231,7 +226,7 @@ public:
     CSSFontSelector* fontSelector() const { return m_fontSelector.get(); }
 
     void addViewportDependentMediaQueryResult(const MediaQueryExp*, bool result);
-
+    bool hasViewportDependentMediaQueries() const { return !m_viewportDependentMediaQueryResults.isEmpty(); }
     bool affectedByViewportChange() const;
 
     void allVisitedStateChanged() { m_checker.allVisitedStateChanged(); }
@@ -272,31 +267,6 @@ public:
 #endif // ENABLE(CSS_FILTERS)
 
     void loadPendingResources();
-
-    struct RuleFeature {
-        RuleFeature(StyleRule* rule, unsigned selectorIndex, bool hasDocumentSecurityOrigin)
-            : rule(rule)
-            , selectorIndex(selectorIndex)
-            , hasDocumentSecurityOrigin(hasDocumentSecurityOrigin) 
-        { 
-        }
-        StyleRule* rule;
-        unsigned selectorIndex;
-        bool hasDocumentSecurityOrigin;
-    };
-    struct Features {
-        Features();
-        ~Features();
-        void add(const StyleResolver::Features&);
-        void clear();
-        void reportMemoryUsage(MemoryObjectInfo*) const;
-        HashSet<AtomicStringImpl*> idsInRules;
-        HashSet<AtomicStringImpl*> attrsInRules;
-        Vector<RuleFeature> siblingRules;
-        Vector<RuleFeature> uncommonAttributeRules;
-        bool usesFirstLineRules;
-        bool usesBeforeAfterRules;
-    };
 
 private:
     // This function fixes up the default font size if it detects that the current generic font family has changed. -dwh
@@ -394,7 +364,7 @@ private:
     OwnPtr<RuleSet> m_authorStyle;
     OwnPtr<RuleSet> m_userStyle;
 
-    Features m_features;
+    RuleFeatureSet m_features;
     OwnPtr<RuleSet> m_siblingRuleSet;
     OwnPtr<RuleSet> m_uncommonAttributeRuleSet;
 
@@ -459,12 +429,14 @@ private:
 
     // Every N additions to the matched declaration cache trigger a sweep where entries holding
     // the last reference to a style declaration are garbage collected.
-    void sweepMatchedPropertiesCache();
+    void sweepMatchedPropertiesCache(Timer<StyleResolver>*);
 
     unsigned m_matchedPropertiesCacheAdditionsSinceLastSweep;
 
     typedef HashMap<unsigned, MatchedPropertiesCacheItem> MatchedPropertiesCache;
     MatchedPropertiesCache m_matchedPropertiesCache;
+
+    Timer<StyleResolver> m_matchedPropertiesCacheSweepTimer;
 
     // A buffer used to hold the set of matched rules for an element, and a temporary buffer used for
     // merge sorting.
@@ -516,34 +488,7 @@ private:
     HashMap<FilterOperation*, RefPtr<WebKitCSSSVGDocumentValue> > m_pendingSVGDocuments;
 #endif
 
-#if ENABLE(STYLE_SCOPED)
-    const ContainerNode* determineScope(const CSSStyleSheet*);
-
-    typedef HashMap<const ContainerNode*, OwnPtr<RuleSet> > ScopedRuleSetMap;
-
-    RuleSet* ruleSetForScope(const ContainerNode*) const;
-
-    void setupScopeStack(const ContainerNode*);
-    bool scopeStackIsConsistent(const ContainerNode* parent) const { return parent && parent == m_scopeStackParent; }
-
-    ScopedRuleSetMap m_scopedAuthorStyles;
-    
-    struct ScopeStackFrame {
-        ScopeStackFrame() : m_scope(0), m_authorStyleBoundsIndex(0), m_ruleSet(0) { }
-        ScopeStackFrame(const ContainerNode* scope, int authorStyleBoundsIndex, RuleSet* ruleSet) : m_scope(scope), m_authorStyleBoundsIndex(authorStyleBoundsIndex), m_ruleSet(ruleSet) { }
-        const ContainerNode* m_scope;
-        int m_authorStyleBoundsIndex;
-        RuleSet* m_ruleSet;
-    };
-    // Vector (used as stack) that keeps track of scoping elements (i.e., elements with a <style scoped> child)
-    // encountered during tree iteration for style resolution.
-    Vector<ScopeStackFrame> m_scopeStack;
-    // Element last seen as parent element when updating m_scopingElementStack.
-    // This is used to decide whether m_scopingElementStack is consistent, separately from SelectorChecker::m_parentStack.
-    const ContainerNode* m_scopeStackParent;
-    int m_scopeStackParentBoundsIndex;
-#endif
-
+    OwnPtr<StyleScopeResolver> m_scopeResolver;
     CSSToStyleMap m_styleMap;
 
     friend class StyleBuilder;

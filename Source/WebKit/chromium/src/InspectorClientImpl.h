@@ -34,7 +34,7 @@
 #include "InspectorClient.h"
 #include "InspectorController.h"
 #include "InspectorFrontendChannel.h"
-#include "platform/WebThread.h"
+#include <public/WebThread.h>
 #include <wtf/OwnPtr.h>
 
 namespace WebKit {
@@ -77,6 +77,8 @@ public:
     virtual void autoZoomPageToFitWidth();
 
     virtual bool supportsFrameInstrumentation();
+
+    virtual void getAllocatedObjects(HashSet<const void*>&);
 
 private:
     // WebThread::TaskObserver

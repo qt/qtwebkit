@@ -110,10 +110,10 @@ WebInspector.WatchExpressionsSidebarPane.prototype = {
     {
         event.consume();
         this.refreshExpressions();
-    }
-}
+    },
 
-WebInspector.WatchExpressionsSidebarPane.prototype.__proto__ = WebInspector.SidebarPane.prototype;
+    __proto__: WebInspector.SidebarPane.prototype
+}
 
 /**
  * @constructor
@@ -124,6 +124,10 @@ WebInspector.WatchExpressionsSection = function()
     this._watchObjectGroupId = "watch-group";
 
     WebInspector.ObjectPropertiesSection.call(this, WebInspector.RemoteObject.fromPrimitiveValue(""));
+
+    this.treeElementConstructor = WebInspector.WatchedPropertyTreeElement;
+    this._expandedExpressions = {};
+    this._expandedProperties = {};
 
     this.emptyElement = document.createElement("div");
     this.emptyElement.className = "info";
@@ -206,7 +210,7 @@ WebInspector.WatchExpressionsSection.prototype = {
             if (!expression)
                 continue;
 
-            WebInspector.consoleView.evalInInspectedWindow(expression, this._watchObjectGroupId, false, true, false, appendResult.bind(this, expression, i));
+            WebInspector.runtimeModel.evaluate(expression, this._watchObjectGroupId, false, true, false, appendResult.bind(this, expression, i));
         }
 
         if (!propertyCount) {
@@ -320,10 +324,10 @@ WebInspector.WatchExpressionsSection.prototype = {
         }
 
         this._lastMouseMovePageY = pageY;
-    }
-}
+    },
 
-WebInspector.WatchExpressionsSection.prototype.__proto__ = WebInspector.ObjectPropertiesSection.prototype;
+    __proto__: WebInspector.ObjectPropertiesSection.prototype
+}
 
 WebInspector.WatchExpressionsSection.CompareProperties = function(propertyA, propertyB)
 {
@@ -338,6 +342,7 @@ WebInspector.WatchExpressionsSection.CompareProperties = function(propertyA, pro
 /**
  * @constructor
  * @extends {WebInspector.ObjectPropertyTreeElement}
+ * @param {WebInspector.RemoteObjectProperty} property
  */
 WebInspector.WatchExpressionTreeElement = function(property)
 {
@@ -345,6 +350,30 @@ WebInspector.WatchExpressionTreeElement = function(property)
 }
 
 WebInspector.WatchExpressionTreeElement.prototype = {
+    onexpand: function()
+    {
+        WebInspector.ObjectPropertyTreeElement.prototype.onexpand.call(this);
+        this.treeOutline.section._expandedExpressions[this._expression()] = true;
+    },
+
+    oncollapse: function()
+    {
+        WebInspector.ObjectPropertyTreeElement.prototype.oncollapse.call(this);
+        delete this.treeOutline.section._expandedExpressions[this._expression()];
+    },
+
+    onattach: function()
+    {
+        WebInspector.ObjectPropertyTreeElement.prototype.onattach.call(this);
+        if (this.treeOutline.section._expandedExpressions[this._expression()])
+            this.expanded = true;
+    },
+
+    _expression: function()
+    {
+        return this.property.name;
+    },
+
     update: function()
     {
         WebInspector.ObjectPropertyTreeElement.prototype.update.call(this);
@@ -411,7 +440,41 @@ WebInspector.WatchExpressionTreeElement.prototype = {
 
         this.property.name = expression;
         this.treeOutline.section.updateExpression(this, expression);
-    }
+    },
+
+    __proto__: WebInspector.ObjectPropertyTreeElement.prototype
 }
 
-WebInspector.WatchExpressionTreeElement.prototype.__proto__ = WebInspector.ObjectPropertyTreeElement.prototype;
+
+/**
+ * @constructor
+ * @extends {WebInspector.ObjectPropertyTreeElement}
+ * @param {WebInspector.RemoteObjectProperty} property
+ */
+WebInspector.WatchedPropertyTreeElement = function(property)
+{
+    WebInspector.ObjectPropertyTreeElement.call(this, property);
+}
+
+WebInspector.WatchedPropertyTreeElement.prototype = {
+    onattach: function()
+    {
+        WebInspector.ObjectPropertyTreeElement.prototype.onattach.call(this);
+        if (this.hasChildren && this.propertyPath() in this.treeOutline.section._expandedProperties)
+            this.expand();
+    },
+
+    onexpand: function()
+    {
+        WebInspector.ObjectPropertyTreeElement.prototype.onexpand.call(this);
+        this.treeOutline.section._expandedProperties[this.propertyPath()] = true;
+    },
+
+    oncollapse: function()
+    {
+        WebInspector.ObjectPropertyTreeElement.prototype.oncollapse.call(this);
+        delete this.treeOutline.section._expandedProperties[this.propertyPath()];
+    },
+
+    __proto__: WebInspector.ObjectPropertyTreeElement.prototype
+}

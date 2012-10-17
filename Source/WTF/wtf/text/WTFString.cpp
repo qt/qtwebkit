@@ -28,7 +28,6 @@
 #include <wtf/DataLog.h>
 #include <wtf/HexNumber.h>
 #include <wtf/MathExtras.h>
-#include <wtf/MemoryInstrumentation.h>
 #include <wtf/text/CString.h>
 #include <wtf/StringExtras.h>
 #include <wtf/Vector.h>
@@ -168,7 +167,7 @@ void String::insert(const String& str, unsigned pos)
     insert(str.characters(), str.length(), pos);
 }
 
-void String::append(const UChar* charactersToAppend, unsigned lengthToAppend)
+void String::append(const LChar* charactersToAppend, unsigned lengthToAppend)
 {
     if (!m_impl) {
         if (!charactersToAppend)
@@ -181,14 +180,56 @@ void String::append(const UChar* charactersToAppend, unsigned lengthToAppend)
         return;
 
     ASSERT(charactersToAppend);
-    UChar* data;
-    if (lengthToAppend > numeric_limits<unsigned>::max() - length())
+
+    unsigned strLength = m_impl->length();
+
+    if (m_impl->is8Bit()) {
+        if (lengthToAppend > numeric_limits<unsigned>::max() - strLength)
+            CRASH();
+        LChar* data;
+        RefPtr<StringImpl> newImpl = StringImpl::createUninitialized(strLength + lengthToAppend, data);
+        StringImpl::copyChars(data, m_impl->characters8(), strLength);
+        StringImpl::copyChars(data + strLength, charactersToAppend, lengthToAppend);
+        m_impl = newImpl.release();
+        return;
+    }
+
+    if (lengthToAppend > numeric_limits<unsigned>::max() - strLength)
         CRASH();
+    UChar* data;
     RefPtr<StringImpl> newImpl = StringImpl::createUninitialized(length() + lengthToAppend, data);
-    memcpy(data, characters(), length() * sizeof(UChar));
-    memcpy(data + length(), charactersToAppend, lengthToAppend * sizeof(UChar));
+    StringImpl::copyChars(data, m_impl->characters16(), strLength);
+    StringImpl::copyChars(data + strLength, charactersToAppend, lengthToAppend);
     m_impl = newImpl.release();
 }
+
+void String::append(const UChar* charactersToAppend, unsigned lengthToAppend)
+{
+    if (!m_impl) {
+        if (!charactersToAppend)
+            return;
+        m_impl = StringImpl::create(charactersToAppend, lengthToAppend);
+        return;
+    }
+
+    if (!lengthToAppend)
+        return;
+
+    unsigned strLength = m_impl->length();
+    
+    ASSERT(charactersToAppend);
+    if (lengthToAppend > numeric_limits<unsigned>::max() - strLength)
+        CRASH();
+    UChar* data;
+    RefPtr<StringImpl> newImpl = StringImpl::createUninitialized(strLength + lengthToAppend, data);
+    if (m_impl->is8Bit())
+        StringImpl::copyChars(data, characters8(), strLength);
+    else
+        StringImpl::copyChars(data, characters16(), strLength);
+    StringImpl::copyChars(data + strLength, charactersToAppend, lengthToAppend);
+    m_impl = newImpl.release();
+}
+
 
 void String::insert(const UChar* charactersToInsert, unsigned lengthToInsert, unsigned position)
 {
@@ -230,6 +271,18 @@ void String::truncate(unsigned position)
     m_impl = newImpl.release();
 }
 
+template <typename CharacterType>
+inline void String::removeInternal(const CharacterType* characters, unsigned position, int lengthToRemove)
+{
+    CharacterType* data;
+    RefPtr<StringImpl> newImpl = StringImpl::createUninitialized(length() - lengthToRemove, data);
+    memcpy(data, characters, position * sizeof(CharacterType));
+    memcpy(data + position, characters + position + lengthToRemove,
+        (length() - lengthToRemove - position) * sizeof(CharacterType));
+
+    m_impl = newImpl.release();
+}
+
 void String::remove(unsigned position, int lengthToRemove)
 {
     if (lengthToRemove <= 0)
@@ -238,12 +291,14 @@ void String::remove(unsigned position, int lengthToRemove)
         return;
     if (static_cast<unsigned>(lengthToRemove) > length() - position)
         lengthToRemove = length() - position;
-    UChar* data;
-    RefPtr<StringImpl> newImpl = StringImpl::createUninitialized(length() - lengthToRemove, data);
-    memcpy(data, characters(), position * sizeof(UChar));
-    memcpy(data + position, characters() + position + lengthToRemove,
-        (length() - lengthToRemove - position) * sizeof(UChar));
-    m_impl = newImpl.release();
+
+    if (is8Bit()) {
+        removeInternal(characters8(), position, lengthToRemove);
+
+        return;
+    }
+
+    removeInternal(characters16(), position, lengthToRemove);
 }
 
 String String::substring(unsigned pos, unsigned len) const
@@ -778,6 +833,19 @@ String String::make8BitFrom16BitSource(const UChar* source, size_t length)
     return result;
 }
 
+String String::make16BitFrom8BitSource(const LChar* source, size_t length)
+{
+    if (!length)
+        return String();
+    
+    UChar* destination;
+    String result = String::createUninitialized(length, destination);
+    
+    StringImpl::copyChars(destination, source, length);
+    
+    return result;
+}
+
 String String::fromUTF8(const LChar* stringStart, size_t length)
 {
     if (length > numeric_limits<unsigned>::max())
@@ -820,12 +888,6 @@ String String::fromUTF8WithLatin1Fallback(const LChar* string, size_t size)
     if (!utf8)
         return String(string, size);
     return utf8;
-}
-
-void String::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this);
-    info.addMember(m_impl);
 }
 
 // String Operations

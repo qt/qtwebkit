@@ -94,7 +94,13 @@ WebInspector.NavigatorView.prototype = {
         this._updateScriptTitle(uiSourceCode)
     },
 
-    _uiSourceCodeContentChanged: function(event)
+    _uiSourceCodeWorkingCopyCommitted: function(event)
+    {
+        var uiSourceCode = /** @type {WebInspector.UISourceCode} */ event.target;
+        this._updateScriptTitle(uiSourceCode)
+    },
+
+    _uiSourceCodeFormattedChanged: function(event)
     {
         var uiSourceCode = /** @type {WebInspector.UISourceCode} */ event.target;
         this._updateScriptTitle(uiSourceCode);
@@ -149,29 +155,6 @@ WebInspector.NavigatorView.prototype = {
     },
 
     /**
-     * @param {WebInspector.UISourceCode} oldUISourceCode
-     * @param {WebInspector.UISourceCode} uiSourceCode
-     */
-    replaceUISourceCode: function(oldUISourceCode, uiSourceCode)
-    {
-        var added = false;
-        var selected = false;
-        if (this._scriptTreeElementsByUISourceCode.get(oldUISourceCode)) {
-            added = true;
-
-            if (this._lastSelectedUISourceCode === oldUISourceCode)
-                selected = true;
-            this.removeUISourceCode(oldUISourceCode);
-        }
-
-        if (!added)
-            return;
-        this.addUISourceCode(uiSourceCode);
-        if (selected)
-            this.revealUISourceCode(uiSourceCode);
-    },
-
-    /**
      * @param {WebInspector.UISourceCode} uiSourceCode
      * @param {boolean} focusSource
      */
@@ -210,7 +193,8 @@ WebInspector.NavigatorView.prototype = {
     {
         uiSourceCode.addEventListener(WebInspector.UISourceCode.Events.TitleChanged, this._uiSourceCodeTitleChanged, this);
         uiSourceCode.addEventListener(WebInspector.UISourceCode.Events.WorkingCopyChanged, this._uiSourceCodeWorkingCopyChanged, this);
-        uiSourceCode.addEventListener(WebInspector.UISourceCode.Events.ContentChanged, this._uiSourceCodeContentChanged, this);
+        uiSourceCode.addEventListener(WebInspector.UISourceCode.Events.WorkingCopyCommitted, this._uiSourceCodeWorkingCopyCommitted, this);
+        uiSourceCode.addEventListener(WebInspector.UISourceCode.Events.FormattedChanged, this._uiSourceCodeFormattedChanged, this);
     },
 
     /**
@@ -220,7 +204,8 @@ WebInspector.NavigatorView.prototype = {
     {
         uiSourceCode.removeEventListener(WebInspector.UISourceCode.Events.TitleChanged, this._uiSourceCodeTitleChanged, this);
         uiSourceCode.removeEventListener(WebInspector.UISourceCode.Events.WorkingCopyChanged, this._uiSourceCodeWorkingCopyChanged, this);
-        uiSourceCode.removeEventListener(WebInspector.UISourceCode.Events.ContentChanged, this._uiSourceCodeContentChanged, this);
+        uiSourceCode.removeEventListener(WebInspector.UISourceCode.Events.WorkingCopyCommitted, this._uiSourceCodeWorkingCopyCommitted, this);
+        uiSourceCode.removeEventListener(WebInspector.UISourceCode.Events.FormattedChanged, this._uiSourceCodeFormattedChanged, this);
     },
 
     _showScriptFoldersSettingChanged: function()
@@ -347,10 +332,10 @@ WebInspector.NavigatorView.prototype = {
         var contextMenu = new WebInspector.ContextMenu();
         contextMenu.appendApplicableItems(uiSourceCode);
         contextMenu.show(event);
-    }
-}
+    },
 
-WebInspector.NavigatorView.prototype.__proto__ = WebInspector.View.prototype;
+    __proto__: WebInspector.View.prototype
+}
 
 /**
  * @constructor
@@ -429,10 +414,10 @@ WebInspector.NavigatorTreeOutline.prototype = {
    {
        this._treeSearchBoxElement.removeChild(this.searchInputElement);
        this._treeSearchBoxElement.removeStyleClass("visible");
-   }
-}
+   },
 
-WebInspector.NavigatorTreeOutline.prototype.__proto__ = TreeOutline.prototype;
+    __proto__: TreeOutline.prototype
+}
 
 /**
  * @constructor
@@ -505,10 +490,10 @@ WebInspector.BaseNavigatorTreeElement.prototype = {
     matchesSearchText: function(searchText)
     {
         return this.titleText.match(new RegExp("^" + searchText.escapeForRegExp(), "i"));
-    }
-}
+    },
 
-WebInspector.BaseNavigatorTreeElement.prototype.__proto__ = TreeElement.prototype;
+    __proto__: TreeElement.prototype
+}
 
 /**
  * @constructor
@@ -553,10 +538,10 @@ WebInspector.NavigatorFolderTreeElement.prototype = {
             this.collapse();
         else
             this.expand();
-    }
-}
+    },
 
-WebInspector.NavigatorFolderTreeElement.prototype.__proto__ = WebInspector.BaseNavigatorTreeElement.prototype;
+    __proto__: WebInspector.BaseNavigatorTreeElement.prototype
+}
 
 /**
  * @constructor
@@ -645,7 +630,7 @@ WebInspector.NavigatorSourceTreeElement.prototype = {
     _handleContextMenuEvent: function(event)
     {
         this._navigatorView.handleContextMenu(event, this._uiSourceCode);
-    }
-}
+    },
 
-WebInspector.NavigatorSourceTreeElement.prototype.__proto__ = WebInspector.BaseNavigatorTreeElement.prototype;
+    __proto__: WebInspector.BaseNavigatorTreeElement.prototype
+}
