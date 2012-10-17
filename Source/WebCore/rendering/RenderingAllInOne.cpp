@@ -106,7 +106,9 @@
 #include "RenderTextControlSingleLine.cpp"
 #include "RenderTextFragment.cpp"
 #include "RenderTheme.cpp"
+#if PLATFORM(WIN)
 #include "RenderThemeWin.cpp"
+#endif
 #include "RenderTreeAsText.cpp"
 #include "RenderVideo.cpp"
 #include "RenderView.cpp"
