@@ -33,6 +33,7 @@
 #include "IntPoint.h"
 #include "IntSize.h"
 #include "MIMETypeRegistry.h"
+#include "PlatformMemoryInstrumentation.h"
 #include "SharedBuffer.h"
 #include <ApplicationServices/ApplicationServices.h>
 #include <wtf/UnusedParam.h>
@@ -394,6 +395,12 @@ unsigned ImageSource::frameBytesAtIndex(size_t index) const
 {
     IntSize frameSize = frameSizeAtIndex(index, RespectImageOrientation);
     return frameSize.width() * frameSize.height() * 4;
+}
+
+void ImageSource::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
+    // FIXME: addMember call required for m_decoder.
 }
 
 }
