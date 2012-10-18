@@ -1,5 +1,133 @@
 2012-10-18  Simon Hausmann  <simon.hausmann@digia.com>
 
+        [Qt] Reduce memory pressure at link time with less compromise on speed of linking
+
+        Reviewed by Csaba Osztrogonác.
+
+        Revert r131718 that made us pass -fno-keep-memory to the linker for any
+        i386 builds. The downside of passing that option is that it slows down
+        the process of linking and as Ossy determined, release builds do _not_
+        take as much memory (2.x GB) for linking but much less (~350MB).
+
+        However there is one condition where even release builds do take up too
+        much memory, and that is when Qt is configured with
+        -separate-debug-info, because it adds a -g next to -O2. The recent
+        introduction of loading qt_build_config enabled us to read qmodule.pri,
+        which adds the -g if Qt is configured with -separate-debug-info. So
+        instead of playing with -fno-keep-memory (which is a last resort
+        measure for debug builds) we should tweak our existing mechanism of
+        dealing with the debug info:
+
+        production_build.prf tries to ensure that we use -g only in static
+        libraries that contain API facing code, so that we get nice backtraces
+        at least into the API layer. For other static libraries such as WebCore
+        we skip -g via CONFIG += no_debug_info. One of the conditions for
+        enabling this tweak is CONFIG(debug, debug|release). This patch adds
+        contains(QT_CONFIG,separate_debug_info) to the conditions.
+
+        The patch also extend the CONFIG += no_debug_info part with the removal
+        of no_separate_debug_info. There is no point in running an extra
+        build step to strip out debug info into a separate file if at the same
+        time we tell the compiler to not generate any debug info altogether.
+
+        * qmake/mkspecs/features/production_build.prf:
+        * qmake/mkspecs/features/unix/default_post.prf:
+
+2012-10-18  Balazs Kelemen  <kbalazs@webkit.org>
+
+        [Qt] OpenGL rendering is not possible on bots using Xvfb
+        https://bugs.webkit.org/show_bug.cgi?id=99463
+
+        Reviewed by Jocelyn Turcotte.
+
+        Added a workaround to be able to disallow UI side OpenGL rendering
+        if the environment is not suitable because it can be extremely slow
+        with a software backend.
+
+        * Scripts/webkitpy/layout_tests/port/qt.py:
+        (QtPort.setup_environ_for_server): Let the environment variable
+        QT_WEBKIT_DISABLE_UIPROCESS_DUMPPIXELS reach the driver. This variable
+        should be defined on bots that don't have a suitable OpenGL environment.
+        * WebKitTestRunner/PlatformWebView.h:
+        (PlatformWebView):
+        * WebKitTestRunner/qt/PlatformWebViewQt.cpp:
+        (WTR::WrapperWindow::handleStatusChanged): Don't try to create an OpenGL
+        surface and set the setRenderWithoutShowing flag on the window if the
+        variable is set.
+        (WTR::PlatformWebView::windowSnapshotImage):
+        (WTR::PlatformWebView::windowShapshotEnabled):
+        (WTR):
+        * WebKitTestRunner/qt/TestInvocationQt.cpp:
+        (WTR::TestInvocation::dumpPixelsAndCompareWithExpected): Use the old method
+        of evaluating pixel results if the snapshot is not supported, that is to check
+        the image we got from the web process. This is necessary for the bots to be able
+        to run ref tests.
+
+2012-10-15  Balazs Kelemen  <kbalazs@webkit.org>
+
+        [Qt] Implement pixel snapshot generation in WTR
+        https://bugs.webkit.org/show_bug.cgi?id=95992
+
+        Reviewed by Jocelyn Turcotte.
+
+        Switch the Qt implementation of the PlatformWebView to use
+        QQuickWindow::grabWindow to generate the pixel results. This way
+        we will go through the scenegraph and test the actual rendering backend.
+        We use QQuickWindowPrivate::setRenderWithoutShowing to avoid the need of
+        showing the window.
+
+        * WebKitTestRunner/Target.pri: Had to added a bunch
+        of modules to be able to use QQuickWindowPrivate.
+        * WebKitTestRunner/qt/PlatformWebViewQt.cpp:
+        (WTR::WrapperWindow::handleStatusChanged):
+        (WTR::PlatformWebView::windowSnapshotImage):
+
+2012-10-15  Balazs Kelemen  <kbalazs@webkit.org>
+
+        [Qt][WTR] Do a forced repaint before generating pixel results
+        https://bugs.webkit.org/show_bug.cgi?id=98654
+
+        Reviewed by Jocelyn Turcotte.
+
+        Do a forced repaint before grabbing the pixel snapshot. This extra
+        synchronisation is necessary with the CoordinatedGraphics rendering
+        backend because it has a fully asynchronous nature. This patch make
+        us using the window snapshot for pixel results which is necessary to
+        capture animations and other dynamic content. The actual grabbing of
+        the window has not been implemented in this patch. It will come in
+        a follow-up.
+
+        * WebKitTestRunner/TestInvocation.cpp:
+        (WTR::TestInvocation::invoke):
+        (WTR::TestInvocation::dump): Store results in member variables.
+        Don't close output channels yet.
+        (WTR::TestInvocation::dumpResults): Added. This is where we dump
+        the results if no error happened.
+        (WTR):
+        (WTR::TestInvocation::didReceiveMessageFromInjectedBundle):
+        * WebKitTestRunner/TestInvocation.h:
+        (TestInvocation):
+        * WebKitTestRunner/qt/PlatformWebViewQt.cpp:
+        (WTR::PlatformWebView::windowSnapshotImage):
+        * WebKitTestRunner/qt/TestInvocationQt.cpp:
+        (WTR::TestInvocation::forceRepaintDoneCallback):
+        (WTR):
+        (WTR::TestInvocation::dumpPixelsAndCompareWithExpected):
+
+2012-10-18  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Clean up variables controlling Qt module creation/handling
+
+        Reviewed by Tor Arne Vestbø.
+
+        We now depend on a Qt 5 version that is new enough to allow us to
+        clean this up. Qt's default_pre.prf uses MODULE_QMAKE_OUTDIR, but
+        the other MODULE_BASE_* variables are onl used in qmodule.prf.
+
+        * qmake/mkspecs/features/default_pre.prf:
+
+2012-10-18  Simon Hausmann  <simon.hausmann@digia.com>
+
         [Qt] Reduce memory pressure during link time
 
         Reviewed by Tor Arne Vestbø.

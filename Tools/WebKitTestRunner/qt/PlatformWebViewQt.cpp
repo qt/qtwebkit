@@ -34,6 +34,7 @@
 #include <QEventLoop>
 #include <QQmlProperty>
 #include <QtQuick/QQuickView>
+#include <QtQuick/private/qquickwindow_p.h>
 #include <WebKit2/WKImageQt.h>
 #include <qpa/qwindowsysteminterface.h>
 
@@ -60,6 +61,12 @@ private Q_SLOTS:
         setResizeMode(QQuickView::SizeRootObjectToView);
         m_view->setParentItem(rootObject());
         QQmlProperty::write(m_view, "anchors.fill", qVariantFromValue(rootObject()));
+
+        if (PlatformWebView::windowShapshotEnabled()) {
+            setSurfaceType(OpenGLSurface);
+            create();
+            QQuickWindowPrivate::get(this)->setRenderWithoutShowing(true);
+        }
 
         QWindowSystemInterface::handleWindowActivated(this);
         m_view->page()->setFocus(true);
@@ -152,9 +159,16 @@ void PlatformWebView::makeWebViewFirstResponder()
 
 WKRetainPtr<WKImageRef> PlatformWebView::windowSnapshotImage()
 {
-    // FIXME: implement to capture pixels in the UI process,
-    // which may be necessary to capture things like 3D transforms.
-    return 0;
+    return adoptWK(WKImageCreateFromQImage(m_window->grabWindow()));
+}
+
+bool PlatformWebView::windowShapshotEnabled()
+{
+    static bool result;
+    static bool hasChecked = false;
+    if (!hasChecked)
+        result = qgetenv("QT_WEBKIT_DISABLE_UIPROCESS_DUMPPIXELS") != "1";
+    return result;
 }
 
 } // namespace WTR

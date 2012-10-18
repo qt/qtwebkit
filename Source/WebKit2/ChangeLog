@@ -1,3 +1,49 @@
+2012-10-15  Balazs Kelemen  <kbalazs@webkit.org>
+
+        [Qt][WTR] Do a forced repaint before generating pixel results
+        https://bugs.webkit.org/show_bug.cgi?id=98654
+
+        Reviewed by Jocelyn Turcotte.
+
+        Added API to convert a QImage to a WKImage so we can
+        pass it to cross-platform code.
+
+        * Shared/API/c/qt/WKImageQt.cpp:
+        (WKImageCreateFromQImage):
+        * Shared/API/c/qt/WKImageQt.h:
+
+2012-10-18  Raphael Kubo da Costa  <raphael.kubo.da.costa@intel.com>
+
+        [CMake] Depend on the Python scripts in WebKit2/Scripts/webkit2 when regenerating messages.
+        https://bugs.webkit.org/show_bug.cgi?id=99702
+
+        Reviewed by Gyuyoung Kim.
+
+        Be in line with most (or all) the other build systems and
+        explicitly depend on all the scripts in
+        ${WEBKIT2_DIR}/Scripts/webkit2 for the custom command that
+        generates messages.
+
+        This helps fix the build after the recent change to messages.py,
+        which did not trigger a regeneration of the required files --
+        people were just removing their DerivedSources directory
+        altogether.
+
+        * CMakeLists.txt:
+
+2012-10-18  Byungwoo Lee  <bw80.lee@samsung.com>
+
+        [WK2] Fix incorrect test expectations of messages_unittest.py.
+        https://bugs.webkit.org/show_bug.cgi?id=99699
+
+        Reviewed by Gyuyoung Kim.
+
+        Fix the expected results of messages_unittest.py.
+
+        The expected result of messages_unittest.py has bugs, and it makes failure on python test.
+
+        * Scripts/webkit2/messages_unittest.py:
+
 2012-10-18  Jussi Kukkonen  <jussi.kukkonen@intel.com>
 
         Add PluginProcessProxy::platformInitializeLaunchOptions
