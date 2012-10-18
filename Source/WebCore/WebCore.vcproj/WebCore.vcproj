@@ -27615,6 +27615,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\loader\MixedContentChecker.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\loader\MixedContentChecker.h"
+				>
+			</File>
+			<File
 				RelativePath="..\loader\NavigationAction.cpp"
 				>
 			</File>
@@ -29603,6 +29611,14 @@
 				</File>
 				<File
 					RelativePath="..\platform\graphics\GraphicsLayerClient.h"
+					>
+				</File>
+				<File
+					RelativePath="..\platform\graphics\GraphicsLayerUpdater.h"
+					>
+				</File>
+				<File
+					RelativePath="..\platform\graphics\GraphicsLayerUpdater.cpp"
 					>
 				</File>
 				<File

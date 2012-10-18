@@ -25,6 +25,7 @@
 #include "NativeWebMouseEvent.h"
 #include "NativeWebWheelEvent.h"
 #include "PageClientImpl.h"
+#include "RefPtrEfl.h"
 #include "WKAPICast.h"
 #include "WKColorPickerResultListener.h"
 #include "WKEinaSharedString.h"
@@ -111,7 +112,7 @@ static inline void removeFromPageViewMap(const Evas_Object* ewkView)
     pageViewMap().remove(ewk_view_page_get(ewkView));
 }
 
-struct _Ewk_View_Private_Data {
+struct Ewk_View_Private_Data {
     OwnPtr<PageClientImpl> pageClient;
 #if USE(COORDINATED_GRAPHICS)
     OwnPtr<EflViewportHandler> viewportHandler;
@@ -124,12 +125,12 @@ struct _Ewk_View_Private_Data {
     WKEinaSharedString customEncoding;
     WKEinaSharedString cursorGroup;
     WKEinaSharedString faviconURL;
-    Evas_Object* cursorObject;
+    RefPtr<Evas_Object> cursorObject;
     LoadingResourcesMap loadingResourcesMap;
     OwnPtr<Ewk_Back_Forward_List> backForwardList;
     OwnPtr<Ewk_Settings> settings;
     bool areMouseEventsEnabled;
-    WKColorPickerResultListenerRef colorPickerResultListener;
+    WKRetainPtr<WKColorPickerResultListenerRef> colorPickerResultListener;
     Ewk_Context* context;
 #if ENABLE(TOUCH_EVENTS)
     bool areTouchEventsEnabled;
@@ -148,10 +149,8 @@ struct _Ewk_View_Private_Data {
     Evas_GL_Surface* evasGlSurface;
 #endif
 
-    _Ewk_View_Private_Data()
-        : cursorObject(0)
-        , areMouseEventsEnabled(false)
-        , colorPickerResultListener(0)
+    Ewk_View_Private_Data()
+        : areMouseEventsEnabled(false)
         , context(0)
 #if ENABLE(TOUCH_EVENTS)
         , areTouchEventsEnabled(false)
@@ -168,14 +167,11 @@ struct _Ewk_View_Private_Data {
 #endif
     { }
 
-    ~_Ewk_View_Private_Data()
+    ~Ewk_View_Private_Data()
     {
         /* Unregister icon change callback */
         Ewk_Favicon_Database* iconDatabase = ewk_context_favicon_database_get(context);
         ewk_favicon_database_icon_change_callback_del(iconDatabase, _ewk_view_on_favicon_changed);
-
-        if (cursorObject)
-            evas_object_del(cursorObject);
 
         void* item;
         EINA_LIST_FREE(popupMenuItems, item)
@@ -507,7 +503,7 @@ static void _ewk_view_smart_add(Evas_Object* ewkView)
 
     smartData->priv = _ewk_view_priv_new(smartData);
     if (!smartData->priv) {
-        EINA_LOG_CRIT("could not allocate _Ewk_View_Private_Data");
+        EINA_LOG_CRIT("could not allocate Ewk_View_Private_Data");
         evas_object_smart_data_set(ewkView, 0);
         free(smartData);
         return;
@@ -659,11 +655,14 @@ static void _ewk_view_smart_calculate(Evas_Object* ewkView)
 {
     EWK_VIEW_SD_GET_OR_RETURN(ewkView, smartData);
     EWK_VIEW_PRIV_GET_OR_RETURN(smartData, priv);
-    Evas_Coord x, y, width, height;
+
+#if USE(ACCELERATED_COMPOSITING)
     bool needsNewSurface = false;
+#endif
 
     smartData->changed.any = false;
 
+    Evas_Coord x, y, width, height;
     evas_object_geometry_get(ewkView, &x, &y, &width, &height);
 
     if (smartData->changed.size) {
@@ -1248,15 +1247,11 @@ void ewk_view_cursor_set(Evas_Object* ewkView, const Cursor& cursor)
         return;
 
     priv->cursorGroup = group;
-
-    if (priv->cursorObject)
-        evas_object_del(priv->cursorObject);
-    priv->cursorObject = edje_object_add(smartData->base.evas);
+    priv->cursorObject = adoptRef(edje_object_add(smartData->base.evas));
 
     Ecore_Evas* ecoreEvas = ecore_evas_ecore_evas_get(smartData->base.evas);
-    if (!priv->theme || !edje_object_file_set(priv->cursorObject, priv->theme, group)) {
-        evas_object_del(priv->cursorObject);
-        priv->cursorObject = 0;
+    if (!priv->theme || !edje_object_file_set(priv->cursorObject.get(), priv->theme, group)) {
+        priv->cursorObject.clear();
 
         ecore_evas_object_cursor_set(ecoreEvas, 0, 0, 0, 0);
 #ifdef HAVE_ECORE_X
@@ -1267,27 +1262,27 @@ void ewk_view_cursor_set(Evas_Object* ewkView, const Cursor& cursor)
     }
 
     Evas_Coord width, height;
-    edje_object_size_min_get(priv->cursorObject, &width, &height);
+    edje_object_size_min_get(priv->cursorObject.get(), &width, &height);
     if (width <= 0 || height <= 0)
-        edje_object_size_min_calc(priv->cursorObject, &width, &height);
+        edje_object_size_min_calc(priv->cursorObject.get(), &width, &height);
     if (width <= 0 || height <= 0) {
         width = defaultCursorSize;
         height = defaultCursorSize;
     }
-    evas_object_resize(priv->cursorObject, width, height);
+    evas_object_resize(priv->cursorObject.get(), width, height);
 
     const char* data;
     int hotspotX = 0;
-    data = edje_object_data_get(priv->cursorObject, "hot.x");
+    data = edje_object_data_get(priv->cursorObject.get(), "hot.x");
     if (data)
         hotspotX = atoi(data);
 
     int hotspotY = 0;
-    data = edje_object_data_get(priv->cursorObject, "hot.y");
+    data = edje_object_data_get(priv->cursorObject.get(), "hot.y");
     if (data)
         hotspotY = atoi(data);
 
-    ecore_evas_object_cursor_set(ecoreEvas, priv->cursorObject, EVAS_LAYER_MAX, hotspotX, hotspotY);
+    ecore_evas_object_cursor_set(ecoreEvas, priv->cursorObject.get(), EVAS_LAYER_MAX, hotspotX, hotspotY);
 }
 
 void ewk_view_display(Evas_Object* ewkView, const IntRect& rect)
@@ -1909,7 +1904,7 @@ WKEinaSharedString ewk_view_run_javascript_prompt(Evas_Object* ewkView, const WK
 #if ENABLE(INPUT_TYPE_COLOR)
 /**
  * @internal
- * Reqeusts to show external color picker.
+ * Requests to show external color picker.
  */
 void ewk_view_color_picker_request(Evas_Object* ewkView, int r, int g, int b, int a, WKColorPickerResultListenerRef listener)
 {
@@ -1924,7 +1919,7 @@ void ewk_view_color_picker_request(Evas_Object* ewkView, int r, int g, int b, in
 
 /**
  * @internal
- * Reqeusts to hide external color picker.
+ * Requests to hide external color picker.
  */
 void ewk_view_color_picker_dismiss(Evas_Object* ewkView)
 {
@@ -1932,7 +1927,7 @@ void ewk_view_color_picker_dismiss(Evas_Object* ewkView)
     EWK_VIEW_PRIV_GET_OR_RETURN(smartData, priv);
     EINA_SAFETY_ON_NULL_RETURN(smartData->api->input_picker_color_dismiss);
 
-    priv->colorPickerResultListener = 0;
+    priv->colorPickerResultListener.clear();
 
     smartData->api->input_picker_color_dismiss(smartData);
 }
@@ -1947,8 +1942,8 @@ Eina_Bool ewk_view_color_picker_color_set(Evas_Object* ewkView, int r, int g, in
 
     WebCore::Color color = WebCore::Color(r, g, b, a);
     const WKStringRef colorString = WKStringCreateWithUTF8CString(color.serialized().utf8().data());
-    WKColorPickerResultListenerSetColor(priv->colorPickerResultListener, colorString);
-    priv->colorPickerResultListener = 0;
+    WKColorPickerResultListenerSetColor(priv->colorPickerResultListener.get(), colorString);
+    priv->colorPickerResultListener.clear();
 
     return true;
 #else

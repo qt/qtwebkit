@@ -1,3 +1,194 @@
+2012-10-18  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Reduce memory pressure during link time
+
+        Reviewed by Tor Arne Vestbø.
+
+        If possible always pass -fkeep-memory to the linker on i386. The
+        library has grown so big that we need this not only for i386 debug
+        builds but at least also for release.
+
+        * qmake/mkspecs/features/unix/default_post.prf:
+
+2012-10-17  Tor Arne Vestbø  <tor.arne.vestbo@digia.com>
+
+        [Qt] Modularize documentation for QtWebKit
+
+        Running 'make docs' would fail unless 'make qmake_all' was ran first,
+        but qmake_all involved generating all the derived sources, which seems
+        overly complex just for building documentation.
+
+        We solve this by preventing all subdirs except QtWebKit from having a
+        docs target. This would normally work fine on its own, but since we
+        use CONFIG += ordered, there's now a missing doc target for the
+        immediate dependency of the QtWebKit subdir. We solve this by adding
+        a dummy-target ourselves.
+
+        Finally, we clean up the qdocconf file to match the rest of the Qt
+        documentation modularization efforts.
+
+        Reviewed by Simon Hausmann.
+
+        * qmake/mkspecs/features/default_post.prf:
+
+2012-10-17  Zoltan Horvath  <zoltan@webkit.org>
+
+        Remove the JSHeap memory measurement of the PageLoad performacetests since it creates bogus JSGlobalDatas
+        https://bugs.webkit.org/show_bug.cgi?id=99609 
+
+        Reviewed by Ryosuke Niwa.
+
+        Remove the implementation since it creates bogus JSGlobalDatas in the layout tests.
+
+        * DumpRenderTree/mac/DumpRenderTree.mm:
+        (dump):
+
+2012-10-17  Dirk Pranke  <dpranke@chromium.org>
+
+        [chromium] stop falling back to platform/mac for LayoutTest results
+        https://bugs.webkit.org/show_bug.cgi?id=99666
+
+        Reviewed by James Robinson.
+
+        Previously the Chromium ports would fall back to results in
+        platform/mac if a result was not found in platform/chromium-*.
+        This allowed us to share a lot of results w/ the Apple Mac port,
+        but often surprised people (especially at Apple ;) when changing
+        something in that directory would break a Chromium build.
+
+        The tests that are deleted in baselineoptimizer were for cases
+        that are no longer relevant or possible in the current fallback
+        graph.
+
+        * Scripts/webkitpy/common/checkout/baselineoptimizer_unittest.py:
+        (BaselineOptimizerTest.test_move_baselines):
+        (BaselineOptimizerTest.test_chromium_covers_mac_win_linux):
+        * Scripts/webkitpy/layout_tests/port/chromium_android.py:
+        (ChromiumAndroidPort):
+        * Scripts/webkitpy/layout_tests/port/chromium_linux.py:
+        (ChromiumLinuxPort):
+        * Scripts/webkitpy/layout_tests/port/chromium_mac.py:
+        (ChromiumMacPort):
+        * Scripts/webkitpy/layout_tests/port/chromium_win.py:
+        (ChromiumWinPort):
+        * TestResultServer/static-dashboards/flakiness_dashboard.js:
+
+2012-10-17  Shashi Shekhar  <shashishekhar@google.com>
+
+        Remove redundant sdk_build parameter.
+        https://bugs.webkit.org/show_bug.cgi?id=99648
+
+        Reviewed by Adam Barth.
+
+        sdk_build parameter is no longer needed.
+
+        * DumpRenderTree/DumpRenderTree.gyp/DumpRenderTree.gyp:
+        * TestWebKitAPI/TestWebKitAPI.gyp/TestWebKitAPI.gyp:
+
+2012-10-17  Joanmarie Diggs  <jdiggs@igalia.com>
+
+        [GTK] AccessibilityUIElement::role() should be consistent across platforms wherever possible
+        https://bugs.webkit.org/show_bug.cgi?id=99640
+
+        Reviewed by Chris Fleizach.
+
+        Convert AtkRole instances to the Mac/Safari-style AXRole string.
+
+        * DumpRenderTree/gtk/AccessibilityUIElementGtk.cpp:
+        (roleToString): New method to convert AtkRole instances to the Mac/Safari-style AXRole string
+        (AccessibilityUIElement::role): Output the Mac/Safair-style AXRole string rather than the AtkRole's name
+
+2012-10-17  Anders Carlsson  <andersca@apple.com>
+
+        Clean up Vector.h
+        https://bugs.webkit.org/show_bug.cgi?id=99622
+
+        Reviewed by Benjamin Poulain.
+
+        Remove ReversedProxy test.
+
+        * TestWebKitAPI/Tests/WTF/Vector.cpp:
+
+2012-10-17  Scott Graham  <scottmg@chromium.org>
+
+        Integer overflows/underflows in all Gamepad controller api calls.
+        https://bugs.webkit.org/show_bug.cgi?id=97262
+
+        Reviewed by Abhishek Arya.
+
+        Range check controller inputs. This code is not exposed to the web,
+        but makes fuzzers try less hard to break uninteresting code.
+
+        * DumpRenderTree/chromium/TestRunner/GamepadController.cpp:
+        (GamepadController::setButtonCount):
+        (GamepadController::setButtonData):
+        (GamepadController::setAxisCount):
+        (GamepadController::setAxisData):
+
+2012-10-17  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Unreviewed watchlist email change.
+
+        * Scripts/webkitpy/common/config/watchlist:
+
+2012-10-17  Dan Carney  <dcarney@google.com>
+
+        Bind isolatedWorldSecurityOrigin to world
+        https://bugs.webkit.org/show_bug.cgi?id=99582
+
+        Reviewed by Adam Barth.
+
+        Added ability to unset isolatedWorldSecurityOrigin.
+
+        * DumpRenderTree/chromium/DRTTestRunner.cpp:
+        (DRTTestRunner::setIsolatedWorldSecurityOrigin):
+
+2012-10-17  Joseph Pecoraro  <pecoraro@apple.com>
+
+        Unreviewed watchlist addition.
+
+        * Scripts/webkitpy/common/config/watchlist:
+
+2012-10-17  Sadrul Habib Chowdhury  <sadrul@chromium.org>
+
+        plugins: Allow a plugin to dictate whether it can receive drag events or not.
+        https://bugs.webkit.org/show_bug.cgi?id=99355
+
+        Reviewed by Tony Chang.
+
+        Update the TestWebPlugin to implement the new |canProcessDrag| interface.
+
+        * DumpRenderTree/chromium/TestWebPlugin.h:
+        (TestWebPlugin::canProcessDrag):
+
+2012-10-17  Dominic Mazzoni  <dmazzoni@google.com>
+
+        Unreviewed. Create an accessibility watchlist.
+
+        * Scripts/webkitpy/common/config/committers.py:
+        * Scripts/webkitpy/common/config/watchlist:
+
+2012-10-17  Jochen Eisinger  <jochen@chromium.org>
+
+        [gyp] fix bundle resources for DumpRenderTree on mac
+        https://bugs.webkit.org/show_bug.cgi?id=99558
+
+        Reviewed by Adam Barth.
+
+        mac_bundle_resources doesn't propagate to targets that depend on it,
+        so I'm wrapping it in an all_dependent_settings block.
+
+        * DumpRenderTree/DumpRenderTree.gyp/DumpRenderTree.gyp:
+
+2012-10-17  Harald Alvestrand  <hta@google.com>
+
+        Add myself to the MediaStream watchlist
+        https://bugs.webkit.org/show_bug.cgi?id=99589
+
+        Reviewed by Adam Barth.
+
+        * Scripts/webkitpy/common/config/watchlist:
+
 2012-10-17  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
 
         [WK2][WTR] InjectedBundlePage::decidePolicyForNavigationAction() should print only filename part of local URLs

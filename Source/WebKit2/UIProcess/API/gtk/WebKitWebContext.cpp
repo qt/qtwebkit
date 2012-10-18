@@ -164,7 +164,7 @@ static gpointer createDefaultWebContext(gpointer)
     attachRequestManagerClientToContext(webContext.get());
 
 #if ENABLE(GEOLOCATION)
-    priv->geolocationProvider = WebKitGeolocationProvider::create(toAPI(priv->context->geolocationManagerProxy()));
+    priv->geolocationProvider = WebKitGeolocationProvider::create(priv->context->geolocationManagerProxy());
 #endif
 #if ENABLE(SPELLCHECK)
     priv->textChecker = WebKitTextChecker::create();
@@ -299,7 +299,7 @@ WebKitDownload* webkit_web_context_download_uri(WebKitWebContext* context, const
     g_return_val_if_fail(uri, 0);
 
     DownloadProxy* downloadProxy = context->priv->context->download(0, WebCore::ResourceRequest(String::fromUTF8(uri)));
-    WebKitDownload* download = webkitDownloadCreate(toAPI(downloadProxy));
+    WebKitDownload* download = webkitDownloadCreate(downloadProxy);
     downloadsMap().set(downloadProxy, download);
     return download;
 }
@@ -318,7 +318,7 @@ WebKitCookieManager* webkit_web_context_get_cookie_manager(WebKitWebContext* con
 
     WebKitWebContextPrivate* priv = context->priv;
     if (!priv->cookieManager)
-        priv->cookieManager = adoptGRef(webkitCookieManagerCreate(toAPI(priv->context->cookieManagerProxy())));
+        priv->cookieManager = adoptGRef(webkitCookieManagerCreate(priv->context->cookieManagerProxy()));
 
     return priv->cookieManager.get();
 }
@@ -688,7 +688,7 @@ WebKitDownload* webkitWebContextGetOrCreateDownload(DownloadProxy* downloadProxy
     if (download)
         return download.get();
 
-    download = adoptGRef(webkitDownloadCreate(toAPI(downloadProxy)));
+    download = adoptGRef(webkitDownloadCreate(downloadProxy));
     downloadsMap().set(downloadProxy, download.get());
     return download.get();
 }

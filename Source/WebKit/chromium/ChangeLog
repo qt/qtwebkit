@@ -1,3 +1,96 @@
+2012-10-17  Mike West  <mkwst@chromium.org>
+
+        Move mixed content logic out of FrameLoader
+        https://bugs.webkit.org/show_bug.cgi?id=45638
+
+        Reviewed by Eric Seidel.
+
+        * src/WebFrameImpl.cpp:
+        (WebKit::WebFrameImpl::checkIfRunInsecureContent):
+            Use the new method location.
+
+2012-10-17  Shashi Shekhar  <shashishekhar@google.com>
+
+        Remove redundant sdk_build parameter.
+        https://bugs.webkit.org/show_bug.cgi?id=99648
+
+        Reviewed by Adam Barth.
+
+        sdk_build parameter is no longer needed.
+
+        * WebKitUnitTests.gyp:
+
+2012-10-17  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
+2012-10-17  Alec Flett  <alecflett@chromium.org>
+
+        IndexedDB: Explicitly send null/undefined/integers to frontend IDBCallbacks
+        https://bugs.webkit.org/show_bug.cgi?id=99619
+
+        Reviewed by Adam Barth.
+
+        Hook up new undefined/integer-based onSuccess handlers.
+
+        * src/IDBCallbacksProxy.cpp:
+        (WebKit::IDBCallbacksProxy::onSuccess):
+        (WebKit):
+        * src/IDBCallbacksProxy.h:
+        (IDBCallbacksProxy):
+        * src/WebIDBCallbacksImpl.cpp:
+        (WebKit::WebIDBCallbacksImpl::onSuccess):
+        (WebKit):
+        * src/WebIDBCallbacksImpl.h:
+        (WebIDBCallbacksImpl):
+        * tests/IDBAbortOnCorruptTest.cpp:
+        * tests/IDBDatabaseBackendTest.cpp:
+
+2012-10-17  Sadrul Habib Chowdhury  <sadrul@chromium.org>
+
+        plugins: Allow a plugin to dictate whether it can receive drag events or not.
+        https://bugs.webkit.org/show_bug.cgi?id=99355
+
+        Reviewed by Tony Chang.
+
+        Introduce WebPlugin::canProcessDrag() and use that to implement PluginViewBase::canProcessDrag.
+
+        * public/WebPlugin.h:
+        (WebKit::WebPlugin::canProcessDrag):
+        (WebPlugin):
+        * src/WebPluginContainerImpl.cpp:
+        (WebKit::WebPluginContainerImpl::canProcessDrag):
+        (WebKit):
+        (WebKit::WebPluginContainerImpl::handleMouseEvent):
+        * src/WebPluginContainerImpl.h:
+        (WebPluginContainerImpl):
+
+2012-10-17  Jian Li  <jianli@chromium.org>
+
+        [chromium] Remove legacy members from WebDraggableRegion
+        https://bugs.webkit.org/show_bug.cgi?id=99612
+
+        Reviewed by Adam Barth.
+
+        Those legacy members to support old syntax are not longer needed after
+        chromium side changes landed.
+
+        * public/WebDraggableRegion.h:
+        (WebDraggableRegion):
+
+2012-10-17  Joshua Bell  <jsbell@chromium.org>
+
+        [Chromium] IndexedDB: Delete obsolete public API method
+        https://bugs.webkit.org/show_bug.cgi?id=99603
+
+        Reviewed by Dimitri Glazkov.
+
+        Remove a stub that was necessary while the Chromium side of webkit.org/b/99097 was landing.
+
+        * public/WebIDBTransactionCallbacks.h:
+
 2012-10-17  Keishi Hattori  <keishi@webkit.org>
 
         Localized date should be based on LDML

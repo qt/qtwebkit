@@ -1,3 +1,769 @@
+2012-10-18  Jussi Kukkonen  <jussi.kukkonen@intel.com>
+
+        Add PluginProcessProxy::platformInitializeLaunchOptions
+        https://bugs.webkit.org/show_bug.cgi?id=99583
+
+        Reviewed by Sam Weinig.
+
+        Add a platform specific launch options initializer. This enables
+        fixing bug 99297 "[EFL] Make plugin process debugging easier
+        (PLUGIN_PROCESS_COMMAND_PREFIX)".
+
+        * UIProcess/Plugins/PluginProcessProxy.cpp:
+        (WebKit::PluginProcessProxy::PluginProcessProxy):
+        * UIProcess/Plugins/PluginProcessProxy.h:
+        (PluginProcessProxy):
+        * UIProcess/Plugins/mac/PluginProcessProxyMac.mm:
+        (WebKit::PluginProcessProxy::platformInitializeLaunchOptions):
+        (WebKit):
+        * UIProcess/Plugins/qt/PluginProcessProxyQt.cpp:
+        (WebKit::PluginProcessProxy::platformInitializeLaunchOptions):
+        (WebKit):
+        * UIProcess/Plugins/unix/PluginProcessProxyUnix.cpp:
+        (WebKit::PluginProcessProxy::platformInitializeLaunchOptions):
+        (WebKit):
+
+2012-10-18  Byungwoo Lee  <bw80.lee@samsung.com>
+
+        [WK2] Update test expectation for the python message test after r131700
+        https://bugs.webkit.org/show_bug.cgi?id=99689
+
+        Reviewed by Gyuyoung Kim.
+
+        Need to update test expectations about including headers and forwarding
+        declarations on derived sources for ipc message. (after r131700 : build fix)
+
+        * Scripts/webkit2/messages_unittest.py:
+
+2012-10-18  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL][WK2] Remove '_' prefix from private API structure names
+        https://bugs.webkit.org/show_bug.cgi?id=99575
+
+        Reviewed by Gyuyoung Kim.
+
+        Removed underscore prefix from WK2 EFL internal structure names.
+
+        * UIProcess/API/efl/VibrationProvider.cpp:
+        (Ewk_Vibration_Client::Ewk_Vibration_Client):
+        * UIProcess/API/efl/VibrationProvider.h:
+        * UIProcess/API/efl/ewk_back_forward_list.h:
+        * UIProcess/API/efl/ewk_back_forward_list_item.h:
+        * UIProcess/API/efl/ewk_back_forward_list_item_private.h:
+        (Ewk_Back_Forward_List_Item::create):
+        (Ewk_Back_Forward_List_Item::Ewk_Back_Forward_List_Item):
+        * UIProcess/API/efl/ewk_back_forward_list_private.h:
+        (Ewk_Back_Forward_List::create):
+        (Ewk_Back_Forward_List::Ewk_Back_Forward_List):
+        * UIProcess/API/efl/ewk_context.cpp:
+        (Ewk_Url_Scheme_Handler::Ewk_Url_Scheme_Handler):
+        (Ewk_Context::Ewk_Context):
+        (ewk_context_url_scheme_request_received):
+        (ewk_context_url_scheme_register):
+        * UIProcess/API/efl/ewk_context.h:
+        * UIProcess/API/efl/ewk_context_download_client_private.h:
+        * UIProcess/API/efl/ewk_context_history_client_private.h:
+        * UIProcess/API/efl/ewk_context_private.h:
+        * UIProcess/API/efl/ewk_context_request_manager_client_private.h:
+        * UIProcess/API/efl/ewk_cookie_manager.cpp:
+        (Ewk_Cookie_Manager::Ewk_Cookie_Manager):
+        (Ewk_Cookie_Manager::~Ewk_Cookie_Manager):
+        * UIProcess/API/efl/ewk_cookie_manager.h:
+        * UIProcess/API/efl/ewk_cookie_manager_private.h:
+        (Ewk_Cookie_Manager::create):
+        (Ewk_Cookie_Manager):
+        * UIProcess/API/efl/ewk_download_job.h:
+        * UIProcess/API/efl/ewk_download_job_private.h:
+        (Ewk_Download_Job::create):
+        (Ewk_Download_Job::Ewk_Download_Job):
+        * UIProcess/API/efl/ewk_error.cpp:
+        (Ewk_Error::Ewk_Error):
+        * UIProcess/API/efl/ewk_error.h:
+        * UIProcess/API/efl/ewk_error_private.h:
+        (Ewk_Error::create):
+        (Ewk_Error):
+        * UIProcess/API/efl/ewk_favicon_database.cpp:
+        (Ewk_Favicon_Database::Ewk_Favicon_Database):
+        * UIProcess/API/efl/ewk_favicon_database.h:
+        * UIProcess/API/efl/ewk_favicon_database_private.h:
+        (Ewk_Favicon_Database::create):
+        (Ewk_Favicon_Database):
+        * UIProcess/API/efl/ewk_form_submission_request.h:
+        * UIProcess/API/efl/ewk_form_submission_request_private.h:
+        (Ewk_Form_Submission_Request::~Ewk_Form_Submission_Request):
+        (Ewk_Form_Submission_Request::create):
+        (Ewk_Form_Submission_Request::Ewk_Form_Submission_Request):
+        * UIProcess/API/efl/ewk_intent.h:
+        * UIProcess/API/efl/ewk_intent_private.h:
+        (Ewk_Intent::create):
+        (Ewk_Intent::Ewk_Intent):
+        * UIProcess/API/efl/ewk_intent_service.h:
+        * UIProcess/API/efl/ewk_intent_service_private.h:
+        (Ewk_Intent_Service::create):
+        (Ewk_Intent_Service::Ewk_Intent_Service):
+        * UIProcess/API/efl/ewk_navigation_data.h:
+        * UIProcess/API/efl/ewk_navigation_data_private.h:
+        (Ewk_Navigation_Data::create):
+        (Ewk_Navigation_Data::Ewk_Navigation_Data):
+        * UIProcess/API/efl/ewk_navigation_policy_decision.h:
+        * UIProcess/API/efl/ewk_navigation_policy_decision_private.h:
+        (Ewk_Navigation_Policy_Decision::~Ewk_Navigation_Policy_Decision):
+        (Ewk_Navigation_Policy_Decision::create):
+        (Ewk_Navigation_Policy_Decision::Ewk_Navigation_Policy_Decision):
+        * UIProcess/API/efl/ewk_popup_menu_item.cpp:
+        (Ewk_Popup_Menu_Item::Ewk_Popup_Menu_Item):
+        * UIProcess/API/efl/ewk_popup_menu_item.h:
+        * UIProcess/API/efl/ewk_popup_menu_item_private.h:
+        (Ewk_Popup_Menu_Item::create):
+        (Ewk_Popup_Menu_Item):
+        * UIProcess/API/efl/ewk_resource.h:
+        * UIProcess/API/efl/ewk_resource_private.h:
+        (Ewk_Resource::create):
+        (Ewk_Resource::Ewk_Resource):
+        * UIProcess/API/efl/ewk_settings.h:
+        * UIProcess/API/efl/ewk_settings_private.h:
+        (Ewk_Settings::Ewk_Settings):
+        * UIProcess/API/efl/ewk_text_checker_private.h:
+        * UIProcess/API/efl/ewk_touch.h:
+        * UIProcess/API/efl/ewk_url_request.h:
+        * UIProcess/API/efl/ewk_url_request_private.h:
+        (Ewk_Url_Request::create):
+        (Ewk_Url_Request::Ewk_Url_Request):
+        * UIProcess/API/efl/ewk_url_response.h:
+        * UIProcess/API/efl/ewk_url_response_private.h:
+        (Ewk_Url_Response::create):
+        (Ewk_Url_Response::Ewk_Url_Response):
+        * UIProcess/API/efl/ewk_url_scheme_request.h:
+        * UIProcess/API/efl/ewk_url_scheme_request_private.h:
+        * UIProcess/API/efl/ewk_view.cpp:
+        (Ewk_View_Private_Data::Ewk_View_Private_Data):
+        (Ewk_View_Private_Data::~Ewk_View_Private_Data):
+        (_ewk_view_smart_add):
+        * UIProcess/API/efl/ewk_view.h:
+        * UIProcess/API/efl/ewk_view_private.h:
+
+2012-10-18  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Lion build fix after r131686. Add back if-def around #imports.
+
+        * UIProcess/API/mac/WKView.mm:
+
+2012-10-17  Byungwoo Lee  <bw80.lee@samsung.com>
+
+        [WK2] Fix build break
+        https://bugs.webkit.org/show_bug.cgi?id=99670
+
+        Reviewed by Anders Carlsson.
+
+        Unreviewed build fix.
+
+        Include MessageEncoder.h instead of forwarding declaration for
+        MessageEncoder class.
+
+        * Scripts/webkit2/messages.py:
+        (forward_declarations_and_headers):
+
+2012-10-17  Darin Adler  <darin@apple.com>
+
+        Make subclassing of WKView safer by namespacing methods and eliminating its use as an observer and delegate
+        https://bugs.webkit.org/show_bug.cgi?id=99251
+
+        Reviewed by Anders Carlsson.
+
+        Apps that subclass WKView should be able to freely choose method names without conflicting with a name
+        we chose to use internally in WKView's own implementation. Thus, it's a good idea to add a "_wk_" prefix
+        to any method names that are solely for internal WebKit2 use. Exceptions to this are method names that
+        are predetermined by AppKit, or names that are part of API or SPI.
+
+        Apps that subclass WKView should be able to add observers or use the WKView as a delegate without
+        conflicting with similar use in the WKView implementations. Thus, changed to use separate block-style
+        observers for the window notifications and a separate delegate for the tool tip implementation.
+
+        The challenging aspect of this patch was to research which method names were determined by AppKit.
+        There's nothing in the WebKit2 source code that necessarily states this explicitly.
+
+        * UIProcess/API/mac/PageClientImpl.mm:
+        (WebKit::PageClientImpl::createDrawingAreaProxy): Updated for new method name.
+        (WebKit::PageClientImpl::scrollView): Ditto.
+        (WebKit::PageClientImpl::isViewFocused): Ditto.
+        (WebKit::PageClientImpl::colorSpace): Ditto.
+        (WebKit::PageClientImpl::processDidCrash): Ditto.
+        (WebKit::PageClientImpl::pageClosed): Ditto.
+        (WebKit::PageClientImpl::didRelaunchProcess): Ditto.
+        (WebKit::PageClientImpl::toolTipChanged): Ditto.
+        (WebKit::PageClientImpl::setCursor): Ditto.
+        (WebKit::PageClientImpl::interpretKeyEvent): Ditto.
+        (WebKit::PageClientImpl::setDragImage): Ditto.
+        (WebKit::PageClientImpl::setPromisedData): Ditto.
+        (WebKit::PageClientImpl::updateTextInputState): Ditto.
+        (WebKit::PageClientImpl::resetTextInputState): Ditto.
+        (WebKit::PageClientImpl::convertToDeviceSpace): Ditto.
+        (WebKit::PageClientImpl::convertToUserSpace): Ditto.
+        (WebKit::PageClientImpl::doneWithKeyEvent): Ditto.
+        (WebKit::PageClientImpl::setFindIndicator): Ditto.
+        (WebKit::PageClientImpl::accessibilityWebProcessTokenReceived): Ditto.
+        (WebKit::PageClientImpl::enterAcceleratedCompositingMode): Ditto.
+        (WebKit::PageClientImpl::exitAcceleratedCompositingMode): Ditto.
+        (WebKit::PageClientImpl::updateAcceleratedCompositingMode): Ditto.
+        (WebKit::PageClientImpl::pluginFocusOrWindowFocusChanged): Ditto.
+        (WebKit::PageClientImpl::setPluginComplexTextInputState): Ditto.
+        (WebKit::PageClientImpl::didChangeScrollbarsForMainFrame): Ditto.
+        (WebKit::PageClientImpl::didCommitLoadForMainFrame): Ditto.
+        (WebKit::PageClientImpl::didFinishLoadingDataForCustomRepresentation): Ditto.
+        (WebKit::PageClientImpl::customRepresentationZoomFactor): Ditto.
+        (WebKit::PageClientImpl::setCustomRepresentationZoomFactor): Ditto.
+        (WebKit::PageClientImpl::findStringInCustomRepresentation): Ditto.
+        (WebKit::PageClientImpl::countStringMatchesInCustomRepresentation): Ditto.
+        (WebKit::PageClientImpl::executeSavedCommandBySelector): Ditto.
+        (WebKit::PageClientImpl::showDictationAlternativeUI): Ditto.
+
+        * UIProcess/API/mac/WKView.mm: Simplified imports a bit. No need for conditional imports of basic classes
+        like NSTextAlternatives.h and NSAttributedString.h. No need to put internal headers in a separate paragraph.
+        Added WKToolTipDelegate class and added _toolTipDelegate and _observers fields to WKViewData.
+        (-[WKView becomeFirstResponder]): Updated for new method name.
+        (-[WKView resignFirstResponder]): Ditto.
+        (-[WKView setFrameSize:]): Ditto.
+        (-[WKView _wk_updateWindowAndViewFrames]): Ditto.
+        (-[WKView renewGState]): Ditto.
+        (-[WKView _wk_setPluginComplexTextInputState:]): Ditto.
+        (validateCommandCallback): Ditto.
+        (-[WKView displayIfNeeded]): Fixed a comment typo.
+        (-[WKView _wk_setMouseDownEvent:]): Updated for new method name.
+        (-[WKView mouseDown:]): Ditto.
+        (-[WKView mouseUp:]): Ditto.
+        (-[WKView acceptsFirstMouse:]): Ditto.
+        (-[WKView shouldDelayWindowOrderingForEvent:]): Ditto.
+        (-[WKView _wk_handleStyleKeyEquivalent:]): Ditto.
+        (-[WKView performKeyEquivalent:]): Ditto.
+        (-[WKView _wk_disableComplexTextInputIfNecessary]): Ditto.
+        (-[WKView _wk_handlePluginComplexTextInputKeyDown:]): Ditto.
+        (-[WKView _wk_tryHandlePluginComplexTextInputKeyDown:]): Ditto.
+        (-[WKView keyDown:]): Ditto.
+        (-[WKView _wk_executeSavedKeypressCommands]): Ditto.
+        (-[WKView _wk_notifyInputContextAboutDiscardedComposition]): Ditto.
+        (-[WKView selectedRange]): Ditto.
+        (-[WKView hasMarkedText]): Ditto.
+        (-[WKView unmarkText]): Ditto.
+        (-[WKView setMarkedText:selectedRange:replacementRange:]): Ditto.
+        (-[WKView markedRange]): Ditto.
+        (-[WKView attributedSubstringForProposedRange:actualRange:]): Ditto.
+        (-[WKView characterIndexForPoint:]): Ditto.
+        (-[WKView firstRectForCharacterRange:actualRange:]): Ditto.
+        (-[WKView _wk_updateWindowVisibility]): Ditto.
+        (-[WKView _wk_updateWindowObserversForWindow:]): Replaced the two separate methods
+        addWindowObserversForWindow and removeWindowObservers with this single method, since
+        the two are only used in tandem. Changed code to use blocks for the observers and to
+        keep the observers in an array.
+        (-[WKView viewWillMoveToWindow:]): Updated to use _wk_updateWindowObserversForWindow.
+        (-[WKView viewDidMoveToWindow]): Updated for new method names.
+        (-[WKView _wk_windowScreenDidChange]): Ditto.
+        (-[WKView _wk_windowDidBecomeKey:]): Ditto.
+        (-[WKView _wk_windowDidChangeScreen:]): Ditto.
+        (-[WKView _wk_windowDidResignKey:]): Ditto.
+        (-[WKView _wk_windowDidMiniaturize:]): Ditto.
+        (-[WKView _wk_windowDidDeminiaturize:]): Ditto.
+        (-[WKView _wk_windowDidMove:]): Ditto.
+        (-[WKView _wk_windowDidResize:]): Ditto.
+        (-[WKView _wk_windowDidOrderOffScreen:]): Ditto.
+        (-[WKView _wk_windowDidOrderOnScreen:]): Ditto.
+        (-[WKView _wk_windowDidChangeBackingProperties:]): Ditto.
+        (-[WKView drawRect:]): Ditto.
+        (-[WKView _wk_accessibilityRegisterUIProcessTokens]): Ditto.
+        (-[WKView _wk_updateRemoteAccessibilityRegistration:]): Ditto.
+        (-[WKView _wk_postFakeMouseMovedEventForFlagsChangedEvent:]): Ditto.
+        (-[WKView _wk_intrinsicDeviceScaleFactor]): Ditto.
+        (-[WKView _wk_setDrawingAreaSize:]): Ditto.
+        (-[WKView _wk_shouldUseTiledDrawingArea]): Ditto.
+        (-[WKView _wk_createDrawingAreaProxy]): Ditto.
+        (-[WKView _wk_isFocused]): Ditto.
+        (-[WKView _wk_processDidCrash]): Ditto.
+        (-[WKView _wk_pageClosed]): Ditto.
+        (-[WKView _wk_didRelaunchProcess]): Ditto.
+        (-[WKView _wk_setCursor:]): Ditto.
+        (-[WKView _wk_setUserInterfaceItemState:enabled:state:]): Ditto.
+        (-[WKView _wk_tryPostProcessPluginComplexTextInputKeyDown:]): Ditto.
+        (-[WKView _wk_doneWithKeyEvent:eventWasHandled:]): Ditto.
+        (-[WKView _wk_interpretKeyEvent:savingCommandsTo:]): Ditto.
+        (-[WKView _wk_convertToDeviceSpace:]): Ditto.
+        (-[WKView _wk_convertToUserSpace:]): Ditto.
+        (-[WKView _wk_addTrackingRect:owner:userData:assumeInside:useTrackingNum:]): Ditto.
+        (-[WKView _wk_addTrackingRects:owner:userDataList:assumeInsideList:trackingNums:count:]): Ditto.
+        (-[WKView _wk_removeTrackingRects:count:]): Ditto.
+        (-[WKView _wk_sendToolTipMouseExited]): Ditto.
+        (-[WKView _wk_sendToolTipMouseEntered]): Ditto.
+        (-[WKView _wk_toolTipChangedFrom:to:]): Changed to use the data object as the tool tip owner so
+        the delegate method can be there rather than on WKView.
+        (-[WKView _wk_setFindIndicator:fadeOut:animate:]): Updated for new method names.
+        (-[WKView _wk_enterAcceleratedCompositingMode:]): Ditto.
+        (-[WKView _wk_exitAcceleratedCompositingMode]): Ditto.
+        (-[WKView _wk_updateAcceleratedCompositingMode:]): Ditto.
+        (-[WKView _wk_setAccessibilityWebProcessToken:]): Ditto.
+        (-[WKView _wk_pluginFocusOrWindowFocusChanged:pluginComplexTextInputIdentifier:]): Ditto.
+        (-[WKView _wk_setPluginComplexTextInputState:pluginComplexTextInputIdentifier:]): Ditto.
+        (-[WKView _wk_setPageHasCustomRepresentation:]): Ditto.
+        (-[WKView _wk_didFinishLoadingDataForCustomRepresentationWithSuggestedFilename:dataReference:]): Ditto.
+        (-[WKView _wk_customRepresentationZoomFactor]): Ditto.
+        (-[WKView _wk_setCustomRepresentationZoomFactor:]): Ditto.
+        (-[WKView _wk_findStringInCustomRepresentation:withFindOptions:maxMatchCount:]): Ditto.
+        (-[WKView _wk_countStringMatchesInCustomRepresentation:withFindOptions:maxMatchCount:]): Ditto.
+        (-[WKView _wk_setDragImage:at:linkDrag:]): Ditto.
+        (-[WKView _wk_setPromisedData:withFileName:withExtension:withTitle:withURL:withVisibleURL:withArchive:forPasteboard:]): Ditto.
+        (-[WKView _wk_updateSecureInputState]): Ditto.
+        (-[WKView _wk_updateTextInputStateIncludingSecureInputState:]): Ditto.
+        (-[WKView _wk_resetTextInputState]): Ditto.
+        (-[WKView _wk_didChangeScrollbarsForMainFrame]): Ditto.
+        (-[WKView _wk_hasFullScreenWindowController]): Ditto.
+        (-[WKView _wk_fullScreenWindowController]): Ditto.
+        (-[WKView _wk_closeFullScreenWindowController]): Ditto.
+        (-[WKView _wk_executeSavedCommandBySelector:]): Ditto.
+        (-[WKView _wk_cacheWindowBottomCornerRect]): Ditto.
+        (-[WKView _wk_spellCheckerDocumentTag]): Ditto.
+        (-[WKView _wk_handleAcceptedAlternativeText:]): Ditto.
+        (-[WKView _wk_setSuppressVisibilityUpdates:]): Ditto.
+        (-[WKView _wk_suppressVisibilityUpdates]): Ditto.
+        (-[WKView _wk_registerDraggedTypes]): Ditto.
+        (-[WKView initWithFrame:contextRef:pageGroupRef:relatedToPage:]): Ditto.
+        (-[WKView wantsUpdateLayer]): Ditto.
+        (-[WKView enableFrameSizeUpdates]): Ditto.
+        (-[WKToolTipDelegate initWithPage:]): Added.
+        (-[WKToolTipDelegate view:stringForToolTip:point:userData:]): Added.
+
+
+        * UIProcess/API/mac/WKViewInternal.h: Changed all internal method names to have a _wk_ prefix.
+        * UIProcess/API/mac/WKViewPrivate.h: Expose the _shouldUseTiledDrawingArea method formally as SPI
+        since Safari is currently overriding this method.
+
+        * UIProcess/mac/CorrectionPanel.mm:
+        (WebKit::CorrectionPanel::recordAutocorrectionResponse): Updated for new method names.
+        (WebKit::CorrectionPanel::handleAcceptedReplacement): Ditto.
+
+        * UIProcess/mac/WKFullScreenWindowController.mm:
+        (-[WKFullScreenWindowController enterFullScreen:]): Updated for new method names.
+        (-[WKFullScreenWindowController exitFullScreen]): Ditto.
+        (-[WKFullScreenWindowController _startEnterFullScreenAnimationWithDuration:]): Ditto.
+        (-[WKFullScreenWindowController _startExitFullScreenAnimationWithDuration:]): Ditto.
+
+        * UIProcess/mac/WebFullScreenManagerProxyMac.mm:
+        (WebKit::WebFullScreenManagerProxy::invalidate): Updated for new method names.
+        (WebKit::WebFullScreenManagerProxy::close): Ditto.
+        (WebKit::WebFullScreenManagerProxy::isFullScreen): Ditto.
+        (WebKit::WebFullScreenManagerProxy::enterFullScreen): Ditto.
+        (WebKit::WebFullScreenManagerProxy::exitFullScreen): Ditto.
+        (WebKit::WebFullScreenManagerProxy::beganEnterFullScreen): Ditto.
+        (WebKit::WebFullScreenManagerProxy::beganExitFullScreen): Ditto.
+
+2012-10-15  Anders Carlsson  <andersca@apple.com>
+
+        Add MessageEncoder and MessageDecoder subclasses
+        https://bugs.webkit.org/show_bug.cgi?id=99365
+
+        Reviewed by Andreas Kling.
+
+        This is the first step towards cleaning up IPC handling in WebKit2. The idea is that MessageEncoder and MessageDecoder
+        will handle all the IPC specific parts of encoding and decoding (such as attachments), whereas the ArgumentEncoder and ArgumentDecoder
+        classes are only used for serializing simpler data types.
+
+        * CMakeLists.txt:
+        * GNUmakefile.list.am:
+        * Platform/CoreIPC/ArgumentDecoder.cpp:
+        (CoreIPC::ArgumentDecoder::create):
+        (CoreIPC::ArgumentDecoder::initialize):
+        * Platform/CoreIPC/ArgumentDecoder.h:
+        (ArgumentDecoder):
+        * Platform/CoreIPC/ArgumentEncoder.cpp:
+        (CoreIPC::ArgumentEncoder::create):
+        (CoreIPC::ArgumentEncoder::ArgumentEncoder):
+        * Platform/CoreIPC/ArgumentEncoder.h:
+        (ArgumentEncoder):
+        * Platform/CoreIPC/Connection.cpp:
+        (CoreIPC::Connection::createSyncMessageEncoder):
+        (CoreIPC::Connection::sendMessage):
+        (CoreIPC::Connection::sendSyncReply):
+        (CoreIPC::Connection::waitForMessage):
+        (CoreIPC::Connection::sendSyncMessage):
+        (CoreIPC::Connection::waitForSyncReply):
+        (CoreIPC::Connection::processIncomingSyncReply):
+        (CoreIPC::Connection::processIncomingMessage):
+        (CoreIPC::Connection::dispatchSyncMessage):
+        (CoreIPC::Connection::dispatchMessage):
+        * Platform/CoreIPC/Connection.h:
+        (Connection):
+        (PendingSyncReply):
+        (CoreIPC::Connection::PendingSyncReply::releaseReplyDecoder):
+        (CoreIPC::Connection::send):
+        (CoreIPC::Connection::sendSync):
+        (CoreIPC::Connection::waitForAndDispatchImmediately):
+        (CoreIPC::Connection::deprecatedSendSync):
+        (CoreIPC::Connection::deprecatedSend):
+        * Platform/CoreIPC/MessageDecoder.cpp:
+        (CoreIPC::MessageDecoder::create):
+        (CoreIPC::MessageDecoder::~MessageDecoder):
+        (CoreIPC::MessageDecoder::MessageDecoder):
+        * Platform/CoreIPC/MessageDecoder.h:
+        (CoreIPC):
+        (MessageDecoder):
+        * Platform/CoreIPC/MessageEncoder.cpp:
+        (CoreIPC):
+        (CoreIPC::MessageEncoder::create):
+        (CoreIPC::MessageEncoder::MessageEncoder):
+        (CoreIPC::MessageEncoder::~MessageEncoder):
+        * Platform/CoreIPC/MessageEncoder.h:
+        (CoreIPC):
+        (MessageEncoder):
+        * Platform/CoreIPC/MessageSender.h:
+        (CoreIPC::MessageSender::send):
+        (CoreIPC::MessageSender::sendMessage):
+        * Platform/CoreIPC/mac/ConnectionMac.cpp:
+        (CoreIPC::Connection::open):
+        (CoreIPC::Connection::sendOutgoingMessage):
+        (CoreIPC::createMessageDecoder):
+        (CoreIPC::Connection::receiveSourceEventHandler):
+        * Platform/CoreIPC/unix/ConnectionUnix.cpp:
+        (CoreIPC::Connection::processMessage):
+        (CoreIPC::Connection::sendOutgoingMessage):
+        * Platform/CoreIPC/win/ConnectionWin.cpp:
+        (CoreIPC::Connection::readEventHandler):
+        (CoreIPC::Connection::writeEventHandler):
+        (CoreIPC::Connection::platformCanSendOutgoingMessages):
+        (CoreIPC::Connection::sendOutgoingMessage):
+        * Scripts/webkit2/messages.py:
+        (generate_message_handler):
+        * Scripts/webkit2/messages_unittest.py:
+        (MessageEncoder):
+        * Shared/WebConnection.cpp:
+        (WebKit::WebConnection::postMessage):
+        (WebKit::WebConnection::handleMessage):
+        * Shared/WebConnection.h:
+        (CoreIPC):
+        * Target.pri:
+        * UIProcess/WebContext.cpp:
+        (WebKit::WebContext::createNewWebProcess):
+        (WebKit::WebContext::postMessageToInjectedBundle):
+        * UIProcess/WebProcessProxy.cpp:
+        (WebKit::WebProcessProxy::sendMessage):
+        * UIProcess/WebProcessProxy.h:
+        (WebProcessProxy):
+        (WebKit::WebProcessProxy::deprecatedSend):
+        (WebKit::WebProcessProxy::send):
+        * WebKit2.xcodeproj/project.pbxproj:
+        * WebProcess/WebPage/DecoderAdapter.cpp:
+        (WebKit::DecoderAdapter::DecoderAdapter):
+        (WebKit::DecoderAdapter::decodeBytes):
+        (WebKit::DecoderAdapter::decodeBool):
+        (WebKit::DecoderAdapter::decodeUInt16):
+        (WebKit::DecoderAdapter::decodeUInt32):
+        (WebKit::DecoderAdapter::decodeUInt64):
+        (WebKit::DecoderAdapter::decodeInt32):
+        (WebKit::DecoderAdapter::decodeInt64):
+        (WebKit::DecoderAdapter::decodeFloat):
+        (WebKit::DecoderAdapter::decodeDouble):
+        (WebKit::DecoderAdapter::decodeString):
+        * WebProcess/WebPage/DecoderAdapter.h:
+        (DecoderAdapter):
+        * WebProcess/WebPage/EncoderAdapter.cpp:
+        (WebKit::EncoderAdapter::EncoderAdapter):
+        * WebProcess/WebProcess.cpp:
+        (WebKit::WebProcess::postInjectedBundleMessage):
+        * win/WebKit2.vcproj:
+
+2012-10-17  Andy Estes  <aestes@apple.com>
+
+        [WebKit2] Add removeChild: to WKDOMNode and make WKDOMText.data read/write
+        https://bugs.webkit.org/show_bug.cgi?id=99662
+
+        Reviewed by Sam Weinig.
+
+        * WebProcess/InjectedBundle/API/mac/WKDOMNode.h:
+        * WebProcess/InjectedBundle/API/mac/WKDOMNode.mm:
+        (-[WKDOMNode removeChild:]):
+        * WebProcess/InjectedBundle/API/mac/WKDOMText.h:
+        * WebProcess/InjectedBundle/API/mac/WKDOMText.mm:
+        (-[WKDOMText setData:]):
+
+2012-10-17  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Memory leak in ewk_download_job_response_set()
+        https://bugs.webkit.org/show_bug.cgi?id=99621
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        No longer call ewk_url_response_ref() on the response
+        object in ewk_download_job_response_set() since it will
+        be ref'd when assigning to the RefPtr member already.
+
+        * UIProcess/API/efl/ewk_context_download_client.cpp:
+        (didReceiveResponse):
+        * UIProcess/API/efl/ewk_download_job.cpp:
+        (ewk_download_job_response_set):
+        * UIProcess/API/efl/ewk_download_job_private.h: Remove several unimplemented functions.
+
+2012-10-17  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Compilation warning in Ewk_View when accelerated compositing is disabled
+        https://bugs.webkit.org/show_bug.cgi?id=99613
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Fix compilation warning in _ewk_view_smart_calculate() when
+        the ACCELERATED_COMPOSITING flag is not set.
+
+        * UIProcess/API/efl/ewk_view.cpp:
+        (_ewk_view_smart_calculate):
+
+2012-10-17  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Use smart pointers inside Ewk_View
+        https://bugs.webkit.org/show_bug.cgi?id=99611
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Use smart pointers instead of raw ones for several
+        Ewk_View members to avoid handling memory manually.
+
+        * PlatformEfl.cmake:
+        * UIProcess/API/efl/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (_Ewk_View_Private_Data::_Ewk_View_Private_Data):
+        (_Ewk_View_Private_Data::~_Ewk_View_Private_Data):
+        (ewk_view_cursor_set):
+        (ewk_view_color_picker_dismiss):
+        (ewk_view_color_picker_color_set):
+
+2012-10-17  Byungwoo Lee  <bw80.lee@samsung.com>
+
+        Fix build warnings : -Wunused-parameter, -Wunused-variable
+        https://bugs.webkit.org/show_bug.cgi?id=99539
+
+        Reviewed by Kentaro Hara.
+
+        Fix build warnings about unused parameter or unused variable when
+        WTF_USE_TILED_BACKING_STORE option is enabled.
+
+        * UIProcess/CoordinatedGraphics/CoordinatedBackingStore.cpp:
+        (WebKit::CoordinatedBackingStore::paintToTextureMapper):
+        * UIProcess/CoordinatedGraphics/LayerTreeRenderer.cpp:
+        (WebKit::LayerTreeRenderer::createLayer):
+        * UIProcess/DrawingAreaProxy.cpp:
+        (WebKit::DrawingAreaProxy::didReceiveLayerTreeCoordinatorProxyMessage):
+        * UIProcess/DrawingAreaProxy.h:
+        (WebKit::DrawingAreaProxy::setVisibleContentsRect):
+        (WebKit::DrawingAreaProxy::createTileForLayer):
+        (WebKit::DrawingAreaProxy::updateTileForLayer):
+        (WebKit::DrawingAreaProxy::removeTileForLayer):
+        (WebKit::DrawingAreaProxy::update):
+        (WebKit::DrawingAreaProxy::didUpdateBackingStoreState):
+        (WebKit::DrawingAreaProxy::enterAcceleratedCompositingMode):
+        (WebKit::DrawingAreaProxy::exitAcceleratedCompositingMode):
+        (WebKit::DrawingAreaProxy::updateAcceleratedCompositingMode):
+        * WebProcess/WebPage/CoordinatedGraphics/CoordinatedGraphicsLayer.cpp:
+        (WebCore::CoordinatedGraphicsLayer::tiledBackingStorePaintEnd):
+        * WebProcess/WebPage/CoordinatedGraphics/CoordinatedTile.cpp:
+        (WebKit::CoordinatedTile::paint):
+        * WebProcess/WebPage/CoordinatedGraphics/LayerTreeCoordinator.cpp:
+        (WebKit::LayerTreeCoordinator::scrollNonCompositedContents):
+        (WebKit::LayerTreeCoordinator::notifyAnimationStarted):
+        * WebProcess/WebPage/LayerTreeHost.h:
+        (WebKit::LayerTreeHost::setVisibleContentsRect):
+        (WebKit::LayerTreeHost::setVisibleContentsRectForLayer):
+
+2012-10-17  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Don't use the C API internally in WebKitDownload
+        https://bugs.webkit.org/show_bug.cgi?id=96773
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Using the C++ classes directly instead of the C API wrappers we
+        avoid a lot of toImpl/toAPI casts, string conversions and
+        allocations. The code is also a lot simpler and easier to read.
+
+        * UIProcess/API/gtk/WebKitDownload.cpp:
+        (_WebKitDownloadPrivate):
+        (webkitDownloadCreate):
+        (webkit_download_get_request):
+        (webkit_download_cancel):
+        * UIProcess/API/gtk/WebKitDownloadPrivate.h:
+        * UIProcess/API/gtk/WebKitWebContext.cpp:
+        (webkit_web_context_download_uri):
+        (webkitWebContextGetOrCreateDownload):
+
+2012-10-17  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Don't use the C API internally in WebKitCookieManager
+        https://bugs.webkit.org/show_bug.cgi?id=96772
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Using the C++ classes directly instead of the C API wrappers we
+        avoid a lot of toImpl/toAPI casts, string conversions and
+        allocations. The code is also a lot simpler and easier to read.
+
+        * UIProcess/API/gtk/WebKitCookieManager.cpp:
+        (_WebKitCookieManagerPrivate):
+        (webkitCookieManagerFinalize):
+        (webkitCookieManagerCreate):
+        (webkit_cookie_manager_set_persistent_storage):
+        (webkit_cookie_manager_set_accept_policy):
+        (webkit_cookie_manager_get_accept_policy):
+        (webkitCookieManagerGetDomainsWithCookiesCallback):
+        (webkit_cookie_manager_get_domains_with_cookies):
+        (webkit_cookie_manager_delete_cookies_for_domain):
+        (webkit_cookie_manager_delete_all_cookies):
+        * UIProcess/API/gtk/WebKitCookieManagerPrivate.h:
+        * UIProcess/API/gtk/WebKitWebContext.cpp:
+        (webkit_web_context_get_cookie_manager):
+
+2012-10-17  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Don't use the C API internally in WebKitContextMenu
+        https://bugs.webkit.org/show_bug.cgi?id=96770
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Using the C++ classes directly instead of the C API wrappers we
+        avoid a lot of toImpl/toAPI casts, string conversions and
+        allocations. The code is also a lot simpler and easier to read.
+
+        * UIProcess/API/gtk/WebKitContextMenu.cpp:
+        (webkitContextMenuCreate):
+        * UIProcess/API/gtk/WebKitContextMenuItem.cpp:
+        (webkitContextMenuItemCreate):
+        * UIProcess/API/gtk/WebKitContextMenuItemPrivate.h:
+        * UIProcess/API/gtk/WebKitContextMenuPrivate.h:
+        * UIProcess/API/gtk/WebKitWebView.cpp:
+        (webkitWebViewPopulateContextMenu):
+
+2012-10-17  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Don't use the C API internally in WebKitBackForwardList
+        https://bugs.webkit.org/show_bug.cgi?id=96769
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Using the C++ classes directly instead of the C API wrappers we
+        avoid a lot of toImpl/toAPI casts, string conversions and
+        allocations. The code is also a lot simpler and easier to read.
+
+        * UIProcess/API/gtk/WebKitBackForwardList.cpp:
+        (_WebKitBackForwardListPrivate):
+        (webkitBackForwardListGetOrCreateItem):
+        (webkitBackForwardListCreateList):
+        (webkitBackForwardListCreate):
+        (webkitBackForwardListChanged):
+        (webkit_back_forward_list_get_current_item):
+        (webkit_back_forward_list_get_back_item):
+        (webkit_back_forward_list_get_forward_item):
+        (webkit_back_forward_list_get_nth_item):
+        (webkit_back_forward_list_get_length):
+        (webkit_back_forward_list_get_back_list):
+        (webkit_back_forward_list_get_back_list_with_limit):
+        (webkit_back_forward_list_get_forward_list):
+        (webkit_back_forward_list_get_forward_list_with_limit):
+        * UIProcess/API/gtk/WebKitBackForwardListItem.cpp:
+        (_WebKitBackForwardListItemPrivate):
+        (webkitBackForwardListItemFinalized):
+        (webkitBackForwardListItemGetOrCreate):
+        (webkitBackForwardListItemGetItem):
+        (webkit_back_forward_list_item_get_uri):
+        (webkit_back_forward_list_item_get_title):
+        (webkit_back_forward_list_item_get_original_uri):
+        * UIProcess/API/gtk/WebKitBackForwardListPrivate.h:
+        * UIProcess/API/gtk/WebKitLoaderClient.cpp:
+        (didChangeBackForwardList):
+        * UIProcess/API/gtk/WebKitWebView.cpp:
+        (webkitWebViewConstructed):
+        (webkit_web_view_go_to_back_forward_list_item):
+
+2012-10-17  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Don't use the C API internally in WebKitURISchemeRequest
+        https://bugs.webkit.org/show_bug.cgi?id=96787
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Using the C++ classes directly instead of the C API wrappers we
+        avoid a lot of toImpl/toAPI casts, string conversions and
+        allocations. The code is also a lot simpler and easier to read.
+
+        * UIProcess/API/gtk/WebKitRequestManagerClient.cpp:
+        (didReceiveURIRequest):
+        * UIProcess/API/gtk/WebKitURISchemeRequest.cpp:
+        (_WebKitURISchemeRequestPrivate):
+        (webkitURISchemeRequestCreate):
+        (webkit_uri_scheme_request_get_web_view):
+        (webkitURISchemeRequestReadCallback):
+        * UIProcess/API/gtk/WebKitURISchemeRequestPrivate.h:
+
+2012-10-17  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Make sure the favicon database path is set only once
+        https://bugs.webkit.org/show_bug.cgi?id=99597
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Make sure the icon database path is set only once by checking
+        that the database is not already open before settign the path.
+        This avoids printing error message on stderr.
+
+        * UIProcess/API/efl/ewk_context.cpp:
+        (ewk_context_favicon_database_get):
+
+2012-10-17  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Don't use the C API internally in WebKitWebInspector
+        https://bugs.webkit.org/show_bug.cgi?id=96786
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Using the C++ classes directly instead of the C API wrappers we
+        avoid a lot of toImpl/toAPI casts, string conversions and
+        allocations. The code is also a lot simpler and easier to read.
+
+        * UIProcess/API/gtk/WebKitWebInspector.cpp:
+        (_WebKitWebInspectorPrivate):
+        (webkitWebInspectorFinalize):
+        (webkitWebInspectorCreate):
+        (webkit_web_inspector_get_web_view):
+        (webkit_web_inspector_is_attached):
+        (webkit_web_inspector_attach):
+        (webkit_web_inspector_detach):
+        (webkit_web_inspector_show):
+        (webkit_web_inspector_close):
+        (webkit_web_inspector_get_attached_height):
+        * UIProcess/API/gtk/WebKitWebInspectorPrivate.h:
+        * UIProcess/API/gtk/WebKitWebView.cpp:
+        (webkit_web_view_get_inspector):
+
+2012-10-17  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Don't use the C API internally in WebKitGeolocation classes
+        https://bugs.webkit.org/show_bug.cgi?id=96778
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Using the C++ classes directly instead of the C API wrappers we
+        avoid a lot of toImpl/toAPI casts, string conversions and
+        allocations. The code is also a lot simpler and easier to read.
+
+        * UIProcess/API/gtk/WebKitGeolocationPermissionRequest.cpp:
+        (_WebKitGeolocationPermissionRequestPrivate):
+        (webkitGeolocationPermissionRequestAllow):
+        (webkitGeolocationPermissionRequestDeny):
+        (webkitGeolocationPermissionRequestFinalize):
+        (webkitGeolocationPermissionRequestCreate):
+        * UIProcess/API/gtk/WebKitGeolocationPermissionRequestPrivate.h:
+        * UIProcess/API/gtk/WebKitGeolocationProvider.cpp:
+        (WebKitGeolocationProvider::create):
+        (WebKitGeolocationProvider::WebKitGeolocationProvider):
+        (WebKitGeolocationProvider::notifyPositionChanged):
+        (WebKitGeolocationProvider::notifyErrorOccurred):
+        * UIProcess/API/gtk/WebKitGeolocationProvider.h:
+        (WebKitGeolocationProvider):
+        * UIProcess/API/gtk/WebKitUIClient.cpp:
+        (decidePolicyForGeolocationPermissionRequest):
+        * UIProcess/API/gtk/WebKitWebContext.cpp:
+        (createDefaultWebContext):
+
 2012-10-17  Grzegorz Czajkowski  <g.czajkowski@samsung.com>
 
         [WK2][EFL] Add unit tests for Spelling

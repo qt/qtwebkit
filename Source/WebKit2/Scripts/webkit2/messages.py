@@ -224,13 +224,14 @@ def forward_declarations_and_headers(receiver):
 
     headers = set([
         '"Arguments.h"',
+        '"MessageEncoder.h"',
         '"MessageID.h"',
     ])
 
     for message in receiver.messages:
         if message.reply_parameters != None and message.has_attribute(DELAYED_ATTRIBUTE):
             headers.add('<wtf/ThreadSafeRefCounted.h>')
-            types_by_namespace['CoreIPC'].update(['ArgumentEncoder', 'Connection'])
+            types_by_namespace['CoreIPC'].update(['Connection'])
 
     for parameter in receiver.iterparameters():
         type = parameter.type
@@ -502,7 +503,7 @@ def generate_message_handler(file):
             result.append('{\n')
             result.append('    ASSERT(m_arguments);\n')
             result += ['    m_arguments->encode(%s);\n' % x.name for x in message.reply_parameters]
-            result.append('    bool result = m_connection->sendSyncReply(m_arguments.release());\n')
+            result.append('    bool result = m_connection->sendSyncReply(static_pointer_cast<CoreIPC::MessageEncoder>(m_arguments.release()));\n')
             result.append('    m_connection = nullptr;\n')
             result.append('    return result;\n')
             result.append('}\n')
