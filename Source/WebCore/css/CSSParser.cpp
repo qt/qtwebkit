@@ -2121,7 +2121,7 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
         // none | [ underline || overline || line-through || blink ] | inherit
         return parseTextDecoration(propId, important);
 
-#if ENABLE(CSS3_TEXT_DECORATION)
+#if ENABLE(CSS3_TEXT)
     case CSSPropertyWebkitTextDecorationLine:
         // none | [ underline || overline || line-through ] | inherit
         return parseTextDecoration(propId, important);
@@ -2131,7 +2131,7 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
         if (id == CSSValueSolid || id == CSSValueDouble || id == CSSValueDotted || id == CSSValueDashed || id == CSSValueWavy)
             validPrimitive = true;
         break;
-#endif // CSS3_TEXT_DECORATION
+#endif // CSS3_TEXT
 
     case CSSPropertyZoom:          // normal | reset | document | <number> | <percentage> | inherit
         if (id == CSSValueNormal || id == CSSValueReset || id == CSSValueDocument)
@@ -8033,7 +8033,7 @@ bool CSSParser::parsePerspectiveOrigin(CSSPropertyID propId, CSSPropertyID& prop
 
 void CSSParser::addTextDecorationProperty(CSSPropertyID propId, PassRefPtr<CSSValue> value, bool important)
 {
-#if ENABLE(CSS3_TEXT_DECORATION)
+#if ENABLE(CSS3_TEXT)
     // The text-decoration-line property takes priority over text-decoration, unless the latter has important priority set.
     if (propId == CSSPropertyTextDecoration && !important && m_currentShorthand == CSSPropertyInvalid) {
         for (unsigned i = 0; i < m_parsedProperties->size(); ++i) {
@@ -8041,7 +8041,7 @@ void CSSParser::addTextDecorationProperty(CSSPropertyID propId, PassRefPtr<CSSVa
                 return;
         }
     }
-#endif // CSS3_TEXT_DECORATION
+#endif // CSS3_TEXT
     addProperty(propId, value, important);
 }
 
@@ -8059,11 +8059,11 @@ bool CSSParser::parseTextDecoration(CSSPropertyID propId, bool important)
     while (isValid && value) {
         switch (value->id) {
         case CSSValueBlink:
-#if ENABLE(CSS3_TEXT_DECORATION)
+#if ENABLE(CSS3_TEXT)
             // Blink value is not accepted by -webkit-text-decoration-line.
             isValid = propId != CSSPropertyWebkitTextDecorationLine;
             break;
-#endif // CSS3_TEXT_DECORATION
+#endif // CSS3_TEXT
         case CSSValueUnderline:
         case CSSValueOverline:
         case CSSValueLineThrough:
@@ -9140,7 +9140,7 @@ inline void CSSParser::detectAtToken(int length, bool hasEscape)
     CharacterType* name = tokenStart<CharacterType>();
     ASSERT(name[0] == '@' && length >= 2);
 
-    // charset, font-face, import, media, namespace, page,
+    // charset, font-face, import, media, namespace, page, supports,
     // -webkit-keyframes, and -webkit-mediaquery are not affected by hasEscape.
     switch (toASCIILowerUnchecked(name[1])) {
     case 'b':
@@ -9241,6 +9241,15 @@ inline void CSSParser::detectAtToken(int length, bool hasEscape)
         }
         return;
 
+#if ENABLE(CSS3_CONDITIONAL_RULES)
+    case 's':
+        if (length == 9 && isEqualToCSSIdentifier(name + 2, "upports")) {
+            m_parsingMode = SupportsMode;
+            m_token = SUPPORTS_SYM;
+        }
+        return;
+#endif
+
     case 't':
         if (hasEscape)
             return;
@@ -9323,6 +9332,25 @@ inline void CSSParser::detectAtToken(int length, bool hasEscape)
     }
 }
 
+#if ENABLE(CSS3_CONDITIONAL_RULES)
+template <typename CharacterType>
+inline void CSSParser::detectSupportsToken(int length)
+{
+    ASSERT(m_parsingMode == SupportsMode);
+    CharacterType* name = tokenStart<CharacterType>();
+
+    if (length == 2) {
+        if (isASCIIAlphaCaselessEqual(name[0], 'o') && isASCIIAlphaCaselessEqual(name[1], 'r'))
+            m_token = SUPPORTS_OR;
+    } else if (length == 3) {
+        if (isASCIIAlphaCaselessEqual(name[0], 'a') && isASCIIAlphaCaselessEqual(name[1], 'n') && isASCIIAlphaCaselessEqual(name[2], 'd'))
+            m_token = SUPPORTS_AND;
+        else if (isASCIIAlphaCaselessEqual(name[0], 'n') && isASCIIAlphaCaselessEqual(name[1], 'o') && isASCIIAlphaCaselessEqual(name[2], 't'))
+            m_token = SUPPORTS_NOT;
+    }
+}
+#endif
+
 template <typename SrcCharacterType>
 int CSSParser::realLex(void* yylvalWithoutType)
 {
@@ -9361,6 +9389,14 @@ restartAfterComment:
         m_token = IDENT;
 
         if (UNLIKELY(*currentCharacter<SrcCharacterType>() == '(')) {
+#if ENABLE(CSS3_CONDITIONAL_RULES)
+            if (m_parsingMode == SupportsMode && !hasEscape) {
+                detectSupportsToken<SrcCharacterType>(result - tokenStart<SrcCharacterType>());
+                if (m_token != IDENT)
+                    break;
+            }
+#endif
+
             m_token = FUNCTION;
             if (!hasEscape)
                 detectFunctionTypeToken<SrcCharacterType>(result - tokenStart<SrcCharacterType>());
@@ -9379,6 +9415,10 @@ restartAfterComment:
         } else if (UNLIKELY(m_parsingMode != NormalMode) && !hasEscape) {
             if (m_parsingMode == MediaQueryMode)
                 detectMediaQueryToken<SrcCharacterType>(result - tokenStart<SrcCharacterType>());
+#if ENABLE(CSS3_CONDITIONAL_RULES)
+            else if (m_parsingMode == SupportsMode)
+                detectSupportsToken<SrcCharacterType>(result - tokenStart<SrcCharacterType>());
+#endif
             else if (m_parsingMode == NthChildMode && isASCIIAlphaCaselessEqual(tokenStart<SrcCharacterType>()[0], 'n')) {
                 if (result - tokenStart<SrcCharacterType>() == 1) {
                     // String "n" is IDENT but "n+1" is NTH.

@@ -38,6 +38,7 @@
 #include "ScaleTransformOperation.h"
 #include "SystemTime.h"
 #include "TextStream.h"
+#include "TiledBacking.h"
 #include "TransformState.h"
 #include "TranslateTransformOperation.h"
 #include <QuartzCore/CATransform3D.h>
@@ -905,7 +906,7 @@ void GraphicsLayerCA::flushCompositingStateForThisLayerOnly()
 {
     float pageScaleFactor;
     FloatPoint offset = computePositionRelativeToBase(pageScaleFactor);
-    commitLayerChangesBeforeSublayers(pageScaleFactor, offset);
+    commitLayerChangesBeforeSublayers(pageScaleFactor, offset, m_visibleRect);
     commitLayerChangesAfterSublayers();
 }
 
@@ -914,7 +915,7 @@ TiledBacking* GraphicsLayerCA::tiledBacking()
     return m_layer->tiledBacking();
 }
 
-void GraphicsLayerCA::computeVisibleRect(TransformState& state)
+FloatRect GraphicsLayerCA::computeVisibleRect(TransformState& state) const
 {
     bool preserve3D = preserves3D() || (parent() ? parent()->preserves3D() : false);
     TransformState::TransformAccumulation accumulation = preserve3D ? TransformState::AccumulateTransform : TransformState::FlattenTransform;
@@ -954,13 +955,19 @@ void GraphicsLayerCA::computeVisibleRect(TransformState& state)
         state.setQuad(clipRectForSelf);
     }
 
-    m_visibleRect = clipRectForSelf;
+    return clipRectForSelf;
 }
 
 void GraphicsLayerCA::recursiveCommitChanges(const TransformState& state, float pageScaleFactor, const FloatPoint& positionRelativeToBase, bool affectedByPageScale)
 {
     TransformState localState = state;
-    computeVisibleRect(localState);
+    
+    FloatRect visibleRect = computeVisibleRect(localState);
+    FloatRect oldVisibleRect = m_visibleRect;
+    if (visibleRect != m_visibleRect) {
+        m_uncommittedChanges |= VisibleRectChanged;
+        m_visibleRect = visibleRect;
+    }
 
 #ifdef VISIBLE_TILE_WASH
     // Use having a transform as a key to making the tile wash layer. If every layer gets a wash,
@@ -995,10 +1002,12 @@ void GraphicsLayerCA::recursiveCommitChanges(const TransformState& state, float 
     if (affectedByPageScale)
         baseRelativePosition += m_position;
     
-    commitLayerChangesBeforeSublayers(pageScaleFactor, baseRelativePosition);
+    commitLayerChangesBeforeSublayers(pageScaleFactor, baseRelativePosition, oldVisibleRect);
 
-    if (m_maskLayer)
-        static_cast<GraphicsLayerCA*>(m_maskLayer)->commitLayerChangesBeforeSublayers(pageScaleFactor, baseRelativePosition);
+    if (m_maskLayer) {
+        GraphicsLayerCA* maskLayerCA = static_cast<GraphicsLayerCA*>(m_maskLayer);
+        maskLayerCA->commitLayerChangesBeforeSublayers(pageScaleFactor, baseRelativePosition, maskLayerCA->visibleRect());
+    }
 
     const Vector<GraphicsLayer*>& childLayers = children();
     size_t numChildren = childLayers.size();
@@ -1055,7 +1064,7 @@ float GraphicsLayerCA::platformCALayerDeviceScaleFactor()
     return deviceScaleFactor();
 }
 
-void GraphicsLayerCA::commitLayerChangesBeforeSublayers(float pageScaleFactor, const FloatPoint& positionRelativeToBase)
+void GraphicsLayerCA::commitLayerChangesBeforeSublayers(float pageScaleFactor, const FloatPoint& positionRelativeToBase, const FloatRect& oldVisibleRect)
 {
     if (!m_uncommittedChanges)
         return;
@@ -1063,6 +1072,12 @@ void GraphicsLayerCA::commitLayerChangesBeforeSublayers(float pageScaleFactor, c
     // Need to handle Preserves3DChanged first, because it affects which layers subsequent properties are applied to
     if (m_uncommittedChanges & (Preserves3DChanged | ReplicatedLayerChanged))
         updateStructuralLayer(pageScaleFactor, positionRelativeToBase);
+
+    if (m_uncommittedChanges & GeometryChanged)
+        updateGeometry(pageScaleFactor, positionRelativeToBase);
+
+    if (m_uncommittedChanges & DrawsContentChanged)
+        updateLayerDrawsContent(pageScaleFactor, positionRelativeToBase);
 
     if (m_uncommittedChanges & NameChanged)
         updateLayerNames();
@@ -1079,12 +1094,6 @@ void GraphicsLayerCA::commitLayerChangesBeforeSublayers(float pageScaleFactor, c
     if (m_uncommittedChanges & BackgroundColorChanged) // Needs to happen before ChildrenChanged, and after updating image or video
         updateLayerBackgroundColor();
 
-    if (m_uncommittedChanges & ChildrenChanged)
-        updateSublayerList();
-
-    if (m_uncommittedChanges & GeometryChanged)
-        updateGeometry(pageScaleFactor, positionRelativeToBase);
-
     if (m_uncommittedChanges & TransformChanged)
         updateTransform();
 
@@ -1094,9 +1103,6 @@ void GraphicsLayerCA::commitLayerChangesBeforeSublayers(float pageScaleFactor, c
     if (m_uncommittedChanges & MasksToBoundsChanged)
         updateMasksToBounds();
     
-    if (m_uncommittedChanges & DrawsContentChanged)
-        updateLayerDrawsContent(pageScaleFactor, positionRelativeToBase);
-
     if (m_uncommittedChanges & ContentsVisibilityChanged)
         updateContentsVisibility();
 
@@ -1122,6 +1128,9 @@ void GraphicsLayerCA::commitLayerChangesBeforeSublayers(float pageScaleFactor, c
     if (m_uncommittedChanges & ContentsScaleChanged)
         updateContentsScale(pageScaleFactor, positionRelativeToBase);
 
+    if (m_uncommittedChanges & VisibleRectChanged)
+        updateVisibleRect(oldVisibleRect);
+
     if (m_uncommittedChanges & DirtyRectsChanged)
         repaintLayerDirtyRects();
     
@@ -1136,12 +1145,21 @@ void GraphicsLayerCA::commitLayerChangesBeforeSublayers(float pageScaleFactor, c
     
     if (m_uncommittedChanges & AcceleratesDrawingChanged)
         updateAcceleratesDrawing();
+
+    if (m_uncommittedChanges & ChildrenChanged) {
+        updateSublayerList();
+        // Sublayers may set this flag again, so clear it to avoid always updating sublayers in commitLayerChangesAfterSublayers().
+        m_uncommittedChanges &= ~ChildrenChanged;
+    }
 }
 
 void GraphicsLayerCA::commitLayerChangesAfterSublayers()
 {
     if (!m_uncommittedChanges)
         return;
+
+    if (m_uncommittedChanges & ChildrenChanged)
+        updateSublayerList();
 
     if (m_uncommittedChanges & ReplicatedLayerChanged)
         updateReplicatedLayers();
@@ -1402,8 +1420,19 @@ void GraphicsLayerCA::updateStructuralLayer(float pageScaleFactor, const FloatPo
     ensureStructuralLayer(structuralLayerPurpose(), pageScaleFactor, positionRelativeToBase);
 }
 
-void GraphicsLayerCA::ensureStructuralLayer(StructuralLayerPurpose purpose, float pageScaleFactor, const FloatPoint& positionRelativeToBase)
+void GraphicsLayerCA::ensureStructuralLayer(StructuralLayerPurpose purpose, float /*pageScaleFactor*/, const FloatPoint& /*positionRelativeToBase*/)
 {
+    const LayerChangeFlags structuralLayerChangeFlags = NameChanged
+        | GeometryChanged
+        | TransformChanged
+        | ChildrenTransformChanged
+        | ChildrenChanged
+        | BackfaceVisibilityChanged
+#if ENABLE(CSS_FILTERS)
+        | FiltersChanged
+#endif
+        | OpacityChanged;
+
     if (purpose == NoStructuralLayer) {
         if (m_structuralLayer) {
             // Replace the transformLayer in the parent with this layer.
@@ -1419,17 +1448,7 @@ void GraphicsLayerCA::ensureStructuralLayer(StructuralLayerPurpose purpose, floa
             // Release the structural layer.
             m_structuralLayer = 0;
 
-            // Update the properties of m_layer now that we no longer have a structural layer.
-            updateGeometry(pageScaleFactor, positionRelativeToBase);
-            updateTransform();
-            updateChildrenTransform();
-            
-#if ENABLE(CSS_FILTERS)
-            updateFilters();
-#endif
-
-            updateSublayerList();
-            updateOpacityOnLayer();
+            m_uncommittedChanges |= structuralLayerChangeFlags;
         }
         return;
     }
@@ -1457,19 +1476,12 @@ void GraphicsLayerCA::ensureStructuralLayer(StructuralLayerPurpose purpose, floa
     if (!structuralLayerChanged)
         return;
     
-    updateLayerNames();
+    m_uncommittedChanges |= structuralLayerChangeFlags;
 
-    // Update the properties of the structural layer.
-    updateGeometry(pageScaleFactor, positionRelativeToBase);
-    updateTransform();
-    updateChildrenTransform();
-    updateBackfaceVisibility();
-#if ENABLE(CSS_FILTERS)
-    // Filters cause flattening, so we should never have a layer for preserve-3d.
-    if (purpose != StructuralLayerForPreserves3D)
-        updateFilters();
-#endif
-    
+    // We've changed the layer that our parent added to its sublayer list, so tell it to update
+    // sublayers again in its commitLayerChangesAfterSublayers().
+    static_cast<GraphicsLayerCA*>(parent())->noteSublayersChanged();
+
     // Set properties of m_layer to their default values, since these are expressed on on the structural layer.
     FloatPoint point(m_size.width() / 2.0f, m_size.height() / 2.0f);
     FloatPoint3D anchorPoint(0.5f, 0.5f, 0);
@@ -1488,17 +1500,7 @@ void GraphicsLayerCA::ensureStructuralLayer(StructuralLayerPurpose purpose, floa
         }
     }
 
-    // Move this layer to be a child of the transform layer.
-    // If m_layer doesn't have a parent, it means it's the root layer and
-    // is likely hosted by something that is not expecting to be changed
-    ASSERT(m_layer->superlayer());
-    m_layer->superlayer()->replaceSublayer(m_layer.get(), m_structuralLayer.get());
-    m_structuralLayer->appendSublayer(m_layer.get());
-
     moveOrCopyAnimations(Move, m_layer.get(), m_structuralLayer.get());
-    
-    updateSublayerList();
-    updateOpacityOnLayer();
 }
 
 GraphicsLayerCA::StructuralLayerPurpose GraphicsLayerCA::structuralLayerPurpose() const
@@ -1535,7 +1537,78 @@ void GraphicsLayerCA::updateAcceleratesDrawing()
 {
     m_layer->setAcceleratesDrawing(m_acceleratesDrawing);
 }
+
+FloatRect GraphicsLayerCA::adjustTiledLayerVisibleRect(TiledBacking* tiledBacking, const FloatRect& oldVisibleRect, const FloatSize& oldSize) const
+{
+    // If the old visible rect is empty, we have no information about how the visible area is changing
+    // (maybe the layer was just created), so don't attempt to expand. Also don't attempt to expand
+    // if the size changed.
+    if (oldVisibleRect.isEmpty() || m_size != oldSize)
+        return m_visibleRect;
+
+    const float paddingMultiplier = 2;
+
+    float leftEdgeDelta = paddingMultiplier * (m_visibleRect.x() - oldVisibleRect.x());
+    float rightEdgeDelta = paddingMultiplier * (m_visibleRect.maxX() - oldVisibleRect.maxX());
+
+    float topEdgeDelta = paddingMultiplier * (m_visibleRect.y() - oldVisibleRect.y());
+    float bottomEdgeDelta = paddingMultiplier * (m_visibleRect.maxY() - oldVisibleRect.maxY());
     
+    FloatRect existingTileBackingRect = tiledBacking->visibleRect();
+    FloatRect expandedRect = m_visibleRect;
+
+    // More exposed on left side.
+    if (leftEdgeDelta < 0) {
+        float newLeft = expandedRect.x() + leftEdgeDelta;
+        // Pad to the left, but don't reduce padding that's already in the backing store (since we're still exposing to the left).
+        if (newLeft < existingTileBackingRect.x())
+            expandedRect.shiftXEdgeTo(newLeft);
+        else
+            expandedRect.shiftXEdgeTo(existingTileBackingRect.x());
+    }
+
+    // More exposed on right.
+    if (rightEdgeDelta > 0) {
+        float newRight = expandedRect.maxX() + rightEdgeDelta;
+        // Pad to the right, but don't reduce padding that's already in the backing store (since we're still exposing to the right).
+        if (newRight > existingTileBackingRect.maxX())
+            expandedRect.setWidth(newRight - expandedRect.x());
+        else
+            expandedRect.setWidth(existingTileBackingRect.maxX() - expandedRect.x());
+    }
+
+    // More exposed at top.
+    if (topEdgeDelta < 0) {
+        float newTop = expandedRect.y() + topEdgeDelta;
+        if (newTop < existingTileBackingRect.y())
+            expandedRect.shiftYEdgeTo(newTop);
+        else
+            expandedRect.shiftYEdgeTo(existingTileBackingRect.y());
+    }
+
+    // More exposed on bottom.
+    if (bottomEdgeDelta > 0) {
+        float newBottom = expandedRect.maxY() + bottomEdgeDelta;
+        if (newBottom > existingTileBackingRect.maxY())
+            expandedRect.setHeight(newBottom - expandedRect.y());
+        else
+            expandedRect.setHeight(existingTileBackingRect.maxY() - expandedRect.y());
+    }
+    
+    return expandedRect;
+}
+
+void GraphicsLayerCA::updateVisibleRect(const FloatRect& oldVisibleRect)
+{
+    if (m_layer->layerType() != PlatformCALayer::LayerTypeTileCacheLayer)
+        return;
+
+    FloatRect tileArea = adjustTiledLayerVisibleRect(tiledBacking(), oldVisibleRect, m_sizeAtLastVisibleRectUpdate);
+    tiledBacking()->setVisibleRect(enclosingIntRect(tileArea));
+
+    m_sizeAtLastVisibleRectUpdate = m_size;
+}
+
 void GraphicsLayerCA::updateLayerBackgroundColor()
 {
     if (m_isPageTileCacheLayer) {
@@ -2495,13 +2568,13 @@ bool GraphicsLayerCA::requiresTiledLayer(float pageScaleFactor) const
     return m_size.width() * pageScaleFactor > cMaxPixelDimension || m_size.height() * pageScaleFactor > cMaxPixelDimension;
 }
 
-void GraphicsLayerCA::swapFromOrToTiledLayer(bool useTiledLayer, float pageScaleFactor, const FloatPoint& positionRelativeToBase)
+void GraphicsLayerCA::swapFromOrToTiledLayer(bool useTiledLayer, float /*pageScaleFactor*/, const FloatPoint& /*positionRelativeToBase*/)
 {
     ASSERT(m_layer->layerType() != PlatformCALayer::LayerTypePageTileCacheLayer);
     ASSERT(useTiledLayer != m_usingTiledLayer);
     RefPtr<PlatformCALayer> oldLayer = m_layer;
     
-    m_layer = PlatformCALayer::create(useTiledLayer ? PlatformCALayer::LayerTypeWebTiledLayer : PlatformCALayer::LayerTypeWebLayer, this);
+    m_layer = PlatformCALayer::create(useTiledLayer ? PlatformCALayer::LayerTypeTileCacheLayer : PlatformCALayer::LayerTypeWebLayer, this);
     m_usingTiledLayer = useTiledLayer;
     
     m_layer->adoptSublayers(oldLayer.get());
@@ -2517,19 +2590,20 @@ void GraphicsLayerCA::swapFromOrToTiledLayer(bool useTiledLayer, float pageScale
     if (oldLayer->superlayer())
         oldLayer->superlayer()->replaceSublayer(oldLayer.get(), m_layer.get());
 
-    updateGeometry(pageScaleFactor, positionRelativeToBase);
-    updateTransform();
-    updateChildrenTransform();
-    updateMasksToBounds();
+    m_uncommittedChanges |= ChildrenChanged
+        | GeometryChanged
+        | TransformChanged
+        | ChildrenTransformChanged
+        | MasksToBoundsChanged
+        | ContentsOpaqueChanged
+        | BackfaceVisibilityChanged
+        | BackgroundColorChanged
+        | ContentsScaleChanged
+        | AcceleratesDrawingChanged
 #if ENABLE(CSS_FILTERS)
-    updateFilters();
+        | FiltersChanged
 #endif
-    updateContentsOpaque();
-    updateBackfaceVisibility();
-    updateLayerBackgroundColor();
-    updateContentsScale(pageScaleFactor, positionRelativeToBase);
-    updateAcceleratesDrawing();
-    updateOpacityOnLayer();
+        | OpacityChanged;
     
 #ifndef NDEBUG
     String name = String::format("%sCALayer(%p) GraphicsLayer(%p) ", (m_layer->layerType() == PlatformCALayer::LayerTypeWebTiledLayer) ? "Tiled " : "", m_layer->platformLayer(), this) + m_name;

@@ -27,14 +27,14 @@
 #define MessageReceiverMap_h
 
 #include "MessageID.h"
-#include <wtf/Forward.h>
 #include <wtf/HashMap.h>
+#include <wtf/text/CString.h>
 
 namespace CoreIPC {
 
-class ArgumentEncoder;
-class ArgumentDecoder;
 class Connection;
+class MessageDecoder;
+class MessageEncoder;
 class MessageReceiver;
 
 class MessageReceiverMap {
@@ -42,17 +42,17 @@ public:
     MessageReceiverMap();
     ~MessageReceiverMap();
 
-    void addMessageReceiver(MessageClass, MessageReceiver*);
+    // FIXME: Stop using this deprecated function and get rid of it.
+    void deprecatedAddMessageReceiver(MessageClass, MessageReceiver*);
 
     void invalidate();
-    bool knowsHowToHandleMessage(MessageID) const;
 
-    bool dispatchMessage(Connection*, MessageID, ArgumentDecoder*);
-    bool dispatchSyncMessage(Connection*, MessageID, ArgumentDecoder*, OwnPtr<ArgumentEncoder>&);
+    bool dispatchMessage(Connection*, MessageID, MessageDecoder&);
+    bool dispatchSyncMessage(Connection*, MessageID, MessageDecoder&, OwnPtr<MessageEncoder>&);
 
 private:
     // Message receivers that don't require a destination ID.
-    HashMap<unsigned, MessageReceiver*> m_globalMessageReceivers;
+    HashMap<unsigned, MessageReceiver*> m_deprecatedGlobalMessageReceivers;
 };
 
 };

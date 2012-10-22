@@ -1031,7 +1031,7 @@ static v8::Handle<v8::Value> TestObjConstructorGetter(v8::Local<v8::String> name
     V8PerContextData* perContextData = V8PerContextData::from(info.Holder()->CreationContext());
     if (!perContextData)
         return v8Undefined();
-    return perContextData->constructorForType(WrapperTypeInfo::unwrap(data), 0);
+    return perContextData->constructorForType(WrapperTypeInfo::unwrap(data));
 }
 static void TestObjReplaceableAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
 {
@@ -2326,27 +2326,29 @@ bool V8TestObj::HasInstance(v8::Handle<v8::Value> value)
 void V8TestObj::installPerContextProperties(v8::Handle<v8::Object> instance, TestObj* impl)
 {
     v8::Local<v8::Object> proto = v8::Local<v8::Object>::Cast(instance->GetPrototype());
+    ScriptExecutionContext* context = toScriptExecutionContext(proto->CreationContext());
     // When building QtWebkit with V8 this variable is unused when none of the features are enabled.
-    UNUSED_PARAM(proto);
-    if (ContextFeatures::enabledPerContextAttr1Enabled(impl->document())) {
+    UNUSED_PARAM(context);
+    if (context && context->isDocument() && ContextFeatures::enabledPerContextAttr1Enabled(static_cast<Document*>(context))) {
         static const V8DOMConfiguration::BatchedAttribute attrData =\
         // Attribute 'enabledPerContextAttr1' (Type: 'attribute' ExtAttr: 'V8EnabledPerContext')
         {"enabledPerContextAttr1", TestObjV8Internal::enabledPerContextAttr1AttrGetter, TestObjV8Internal::enabledPerContextAttr1AttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */};
         V8DOMConfiguration::configureAttribute(instance, proto, attrData);
     }
-    if (ContextFeatures::featureNameEnabled(impl->document())) {
+    if (context && context->isDocument() && ContextFeatures::featureNameEnabled(static_cast<Document*>(context))) {
         static const V8DOMConfiguration::BatchedAttribute attrData =\
         // Attribute 'enabledPerContextAttr2' (Type: 'attribute' ExtAttr: 'V8EnabledPerContext')
         {"enabledPerContextAttr2", TestObjV8Internal::enabledPerContextAttr2AttrGetter, TestObjV8Internal::enabledPerContextAttr2AttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */};
         V8DOMConfiguration::configureAttribute(instance, proto, attrData);
     }
 }
-void V8TestObj::installPerContextPrototypeProperties(v8::Handle<v8::Object> proto, ScriptExecutionContext* context)
+void V8TestObj::installPerContextPrototypeProperties(v8::Handle<v8::Object> proto)
 {
     UNUSED_PARAM(proto);
-    UNUSED_PARAM(context);
     v8::Local<v8::Signature> defaultSignature = v8::Signature::New(GetTemplate());
     UNUSED_PARAM(defaultSignature); // In some cases, it will not be used.
+
+    ScriptExecutionContext* context = toScriptExecutionContext(proto->CreationContext());
     if (context && context->isDocument() && ContextFeatures::enabledPerContextMethod1Enabled(static_cast<Document*>(context))) {
         proto->Set(v8::String::NewSymbol("enabledPerContextMethod1"), v8::FunctionTemplate::New(TestObjV8Internal::enabledPerContextMethod1Callback, v8Undefined(), defaultSignature)->GetFunction());
     }
@@ -2358,8 +2360,9 @@ void V8TestObj::installPerContextPrototypeProperties(v8::Handle<v8::Object> prot
 v8::Handle<v8::Object> V8TestObj::wrapSlow(PassRefPtr<TestObj> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     v8::Handle<v8::Object> wrapper;
-    Document* document = 0;
-    UNUSED_PARAM(document);
+    // Please don't add any more uses of this variable.
+    Document* deprecatedDocument = 0;
+    UNUSED_PARAM(deprecatedDocument);
 
     v8::Handle<v8::Context> context;
     if (!creationContext.IsEmpty() && creationContext->CreationContext() != v8::Context::GetCurrent()) {
@@ -2370,7 +2373,7 @@ v8::Handle<v8::Object> V8TestObj::wrapSlow(PassRefPtr<TestObj> impl, v8::Handle<
         context->Enter();
     }
 
-    wrapper = V8DOMWrapper::instantiateV8Object(document, &info, impl.get());
+    wrapper = V8DOMWrapper::instantiateV8Object(deprecatedDocument, &info, impl.get());
 
     if (!context.IsEmpty())
         context->Exit();

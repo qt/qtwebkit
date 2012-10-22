@@ -45,6 +45,10 @@
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 
+#if ENABLE(NETWORK_PROCESS)
+#include "NetworkProcessManager.h"
+#endif
+
 #if PLATFORM(MAC)
 #include "SimplePDFPlugin.h"
 #if ENABLE(PDFKIT_PLUGIN)
@@ -72,11 +76,13 @@ static uint64_t generatePageID()
     return uniquePageID++;
 }
 
+#if ENABLE(NETSCAPE_PLUGIN_API)
 static WorkQueue& pluginWorkQueue()
 {
     DEFINE_STATIC_LOCAL(WorkQueue, queue, ("com.apple.CoreIPC.PluginQueue"));
     return queue;
 }
+#endif // ENABLE(NETSCAPE_PLUGIN_API)
 
 PassRefPtr<WebProcessProxy> WebProcessProxy::create(PassRefPtr<WebContext> context)
 {
@@ -309,6 +315,7 @@ void WebProcessProxy::addBackForwardItem(uint64_t itemID, const String& original
     result.iterator->value->setBackForwardData(backForwardData.data(), backForwardData.size());
 }
 
+#if ENABLE(NETSCAPE_PLUGIN_API)
 void WebProcessProxy::sendDidGetPlugins(uint64_t requestID, PassOwnPtr<Vector<PluginInfo> > pluginInfos)
 {
     ASSERT(isMainThread());
@@ -336,9 +343,11 @@ void WebProcessProxy::handleGetPlugins(uint64_t requestID, bool refresh)
 
     OwnPtr<Vector<PluginInfo> > pluginInfos = adoptPtr(new Vector<PluginInfo>);
 
-    Vector<PluginModuleInfo> plugins = m_context->pluginInfoStore().plugins();
-    for (size_t i = 0; i < plugins.size(); ++i)
-        pluginInfos->append(plugins[i].info);
+    {
+        Vector<PluginModuleInfo> plugins = m_context->pluginInfoStore().plugins();
+        for (size_t i = 0; i < plugins.size(); ++i)
+            pluginInfos->append(plugins[i].info);
+    }
 
     // NOTE: We have to pass the PluginInfo vector to the secondary thread via a pointer as otherwise
     //       we'd end up with a deref() race on all the WTF::Strings it contains.
@@ -368,6 +377,7 @@ void WebProcessProxy::getPluginPath(const String& mimeType, const String& urlStr
 
     pluginPath = plugin.path;
 }
+#endif // ENABLE(NETSCAPE_PLUGIN_API)
 
 #if ENABLE(PLUGIN_PROCESS)
 
@@ -376,7 +386,7 @@ void WebProcessProxy::getPluginProcessConnection(const String& pluginPath, PassR
     PluginProcessManager::shared().getPluginProcessConnection(m_context->pluginInfoStore(), pluginPath, reply);
 }
 
-#else
+#elif ENABLE(NETSCAPE_PLUGIN_API)
 
 void WebProcessProxy::didGetSitesWithPluginData(const Vector<String>& sites, uint64_t callbackID)
 {
@@ -390,22 +400,31 @@ void WebProcessProxy::didClearPluginSiteData(uint64_t callbackID)
 
 #endif
 
+#if ENABLE(SHARED_WORKER_PROCESS)
 void WebProcessProxy::getSharedWorkerProcessConnection(const String& /* url */, const String& /* name */, PassRefPtr<Messages::WebProcessProxy::GetSharedWorkerProcessConnection::DelayedReply>)
 {
     // FIXME: Implement
 }
+#endif // ENABLE(SHARED_WORKER_PROCESS)
 
-void WebProcessProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
+#if ENABLE(NETWORK_PROCESS)
+void WebProcessProxy::getNetworkProcessConnection(PassRefPtr<Messages::WebProcessProxy::GetNetworkProcessConnection::DelayedReply> reply)
 {
-    if (m_context->dispatchMessage(connection, messageID, arguments))
+    NetworkProcessManager::shared().getNetworkProcessConnection(reply);
+}
+#endif // ENABLE(NETWORK_PROCESS)
+
+void WebProcessProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
+{
+    if (m_context->dispatchMessage(connection, messageID, decoder))
         return;
 
     if (messageID.is<CoreIPC::MessageClassWebProcessProxy>()) {
-        didReceiveWebProcessProxyMessage(connection, messageID, arguments);
+        didReceiveWebProcessProxyMessage(connection, messageID, decoder);
         return;
     }
 
-    uint64_t pageID = arguments->destinationID();
+    uint64_t pageID = decoder.destinationID();
     if (!pageID)
         return;
 
@@ -413,20 +432,20 @@ void WebProcessProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC
     if (!pageProxy)
         return;
     
-    pageProxy->didReceiveMessage(connection, messageID, arguments);
+    pageProxy->didReceiveMessage(connection, messageID, decoder);
 }
 
-void WebProcessProxy::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments, OwnPtr<CoreIPC::ArgumentEncoder>& reply)
+void WebProcessProxy::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder, OwnPtr<CoreIPC::MessageEncoder>& replyEncoder)
 {
-    if (m_context->dispatchSyncMessage(connection, messageID, arguments, reply))
+    if (m_context->dispatchSyncMessage(connection, messageID, decoder, replyEncoder))
         return;
 
     if (messageID.is<CoreIPC::MessageClassWebProcessProxy>()) {
-        didReceiveSyncWebProcessProxyMessage(connection, messageID, arguments, reply);
+        didReceiveSyncWebProcessProxyMessage(connection, messageID, decoder, replyEncoder);
         return;
     }
 
-    uint64_t pageID = arguments->destinationID();
+    uint64_t pageID = decoder.destinationID();
     if (!pageID)
         return;
     
@@ -434,13 +453,13 @@ void WebProcessProxy::didReceiveSyncMessage(CoreIPC::Connection* connection, Cor
     if (!pageProxy)
         return;
     
-    pageProxy->didReceiveSyncMessage(connection, messageID, arguments, reply);
+    pageProxy->didReceiveSyncMessage(connection, messageID, decoder, replyEncoder);
 }
 
-void WebProcessProxy::didReceiveMessageOnConnectionWorkQueue(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments, bool& didHandleMessage)
+void WebProcessProxy::didReceiveMessageOnConnectionWorkQueue(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder, bool& didHandleMessage)
 {
     if (messageID.is<CoreIPC::MessageClassWebProcessProxy>())
-        didReceiveWebProcessProxyMessageOnConnectionWorkQueue(connection, messageID, arguments, didHandleMessage);
+        didReceiveWebProcessProxyMessageOnConnectionWorkQueue(connection, messageID, decoder, didHandleMessage);
 }
 
 void WebProcessProxy::didClose(CoreIPC::Connection*)

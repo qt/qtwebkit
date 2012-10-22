@@ -40,7 +40,7 @@ PassRefPtr<WebMediaCacheManagerProxy> WebMediaCacheManagerProxy::create(WebConte
 WebMediaCacheManagerProxy::WebMediaCacheManagerProxy(WebContext* context)
     : m_webContext(context)
 {
-    m_webContext->addMessageReceiver(CoreIPC::MessageClassWebMediaCacheManagerProxy, this);
+    m_webContext->deprecatedAddMessageReceiver(CoreIPC::MessageClassWebMediaCacheManagerProxy, this);
 }
 
 WebMediaCacheManagerProxy::~WebMediaCacheManagerProxy()
@@ -57,9 +57,9 @@ bool WebMediaCacheManagerProxy::shouldTerminate(WebProcessProxy*) const
     return m_arrayCallbacks.isEmpty();
 }
 
-void WebMediaCacheManagerProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
+void WebMediaCacheManagerProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
 {
-    didReceiveWebMediaCacheManagerProxyMessage(connection, messageID, arguments);
+    didReceiveWebMediaCacheManagerProxyMessage(connection, messageID, decoder);
 }
 
 void WebMediaCacheManagerProxy::getHostnamesWithMediaCache(PassRefPtr<ArrayCallback> prpCallback)

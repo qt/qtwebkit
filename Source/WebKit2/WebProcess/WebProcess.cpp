@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2009, 2010, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -86,6 +86,10 @@
 #include "WebNetworkInfoManagerMessages.h"
 #endif
 
+#if ENABLE(NETWORK_PROCESS)
+#include "NetworkProcessConnection.h"
+#endif
+
 #if !OS(WINDOWS)
 #include <unistd.h>
 #endif
@@ -158,6 +162,9 @@ WebProcess::WebProcess()
     , m_notificationManager(this)
 #endif
     , m_iconDatabaseProxy(this)
+#if ENABLE(NETWORK_PROCESS)
+    , m_usesNetworkProcess(false)
+#endif
 #if USE(SOUP)
     , m_soupRequestManager(this)
 #endif
@@ -187,17 +194,17 @@ void WebProcess::initialize(CoreIPC::Connection::Identifier serverIdentifier, Ru
     startRandomCrashThreadIfRequested();
 }
 
-void WebProcess::initializeWebProcess(const WebProcessCreationParameters& parameters, CoreIPC::ArgumentDecoder* arguments)
+void WebProcess::initializeWebProcess(const WebProcessCreationParameters& parameters, CoreIPC::MessageDecoder& decoder)
 {
     ASSERT(m_pageMap.isEmpty());
 
-    platformInitializeWebProcess(parameters, arguments);
+    platformInitializeWebProcess(parameters, decoder);
 
     memoryPressureHandler().install();
 
     RefPtr<APIObject> injectedBundleInitializationUserData;
     InjectedBundleUserMessageDecoder messageDecoder(injectedBundleInitializationUserData);
-    if (!arguments->decode(messageDecoder))
+    if (!decoder.decode(messageDecoder))
         return;
 
     if (!parameters.injectedBundlePath.isEmpty()) {
@@ -256,8 +263,39 @@ void WebProcess::initializeWebProcess(const WebProcessCreationParameters& parame
     WebCore::ResourceHandle::setPrivateBrowsingStorageSessionIdentifierBase(parameters.uiProcessBundleIdentifier);
 #endif
 
+#if ENABLE(NETWORK_PROCESS)
+    m_usesNetworkProcess = parameters.usesNetworkProcess;
+    ensureNetworkProcessConnection();
+#endif
     setTerminationTimeout(parameters.terminationTimeout);
 }
+
+#if ENABLE(NETWORK_PROCESS)
+void WebProcess::ensureNetworkProcessConnection()
+{
+    if (!m_usesNetworkProcess)
+        return;
+
+    if (m_networkProcessConnection)
+        return;
+
+    CoreIPC::Attachment encodedConnectionIdentifier;
+
+    if (!connection()->sendSync(Messages::WebProcessProxy::GetNetworkProcessConnection(),
+        Messages::WebProcessProxy::GetNetworkProcessConnection::Reply(encodedConnectionIdentifier), 0))
+        return;
+
+#if PLATFORM(MAC)
+    CoreIPC::Connection::Identifier connectionIdentifier(encodedConnectionIdentifier.port());
+    if (CoreIPC::Connection::identifierIsNull(connectionIdentifier))
+        return;
+#else
+    ASSERT_NOT_REACHED();
+#endif
+
+    RefPtr<NetworkProcessConnection> m_networkProcessConnection = NetworkProcessConnection::create(connectionIdentifier);
+}
+#endif // ENABLE(NETWORK_PROCESS)
 
 void WebProcess::setShouldTrackVisitedLinks(bool shouldTrackVisitedLinks)
 {
@@ -606,9 +644,9 @@ void WebProcess::terminate()
     m_runLoop->stop();
 }
 
-void WebProcess::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments, OwnPtr<CoreIPC::ArgumentEncoder>& reply)
+void WebProcess::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder, OwnPtr<CoreIPC::MessageEncoder>& replyEncoder)
 {   
-    uint64_t pageID = arguments->destinationID();
+    uint64_t pageID = decoder.destinationID();
     if (!pageID)
         return;
     
@@ -616,83 +654,83 @@ void WebProcess::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC:
     if (!page)
         return;
     
-    page->didReceiveSyncMessage(connection, messageID, arguments, reply);
+    page->didReceiveSyncMessage(connection, messageID, decoder, replyEncoder);
 }
 
-void WebProcess::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
+void WebProcess::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
 {
     if (messageID.is<CoreIPC::MessageClassWebProcess>()) {
-        didReceiveWebProcessMessage(connection, messageID, arguments);
+        didReceiveWebProcessMessage(connection, messageID, decoder);
         return;
     }
 
     if (messageID.is<CoreIPC::MessageClassWebApplicationCacheManager>()) {
-        WebApplicationCacheManager::shared().didReceiveMessage(connection, messageID, arguments);
+        WebApplicationCacheManager::shared().didReceiveMessage(connection, messageID, decoder);
         return;
     }
 
     if (messageID.is<CoreIPC::MessageClassWebCookieManager>()) {
-        WebCookieManager::shared().didReceiveMessage(connection, messageID, arguments);
+        WebCookieManager::shared().didReceiveMessage(connection, messageID, decoder);
         return;
     }
 
 #if ENABLE(SQL_DATABASE)
     if (messageID.is<CoreIPC::MessageClassWebDatabaseManager>()) {
-        WebDatabaseManager::shared().didReceiveMessage(connection, messageID, arguments);
+        WebDatabaseManager::shared().didReceiveMessage(connection, messageID, decoder);
         return;
     }
 #endif
 
 #if ENABLE(BATTERY_STATUS)
     if (messageID.is<CoreIPC::MessageClassWebBatteryManager>()) {
-        m_batteryManager.didReceiveMessage(connection, messageID, arguments);
+        m_batteryManager.didReceiveMessage(connection, messageID, decoder);
         return;
     }
 #endif
 
 #if ENABLE(NETWORK_INFO)
     if (messageID.is<CoreIPC::MessageClassWebNetworkInfoManager>()) {
-        m_networkInfoManager.didReceiveMessage(connection, messageID, arguments);
+        m_networkInfoManager.didReceiveMessage(connection, messageID, decoder);
         return;
     }
 #endif
 
     if (messageID.is<CoreIPC::MessageClassWebIconDatabaseProxy>()) {
-        m_iconDatabaseProxy.didReceiveMessage(connection, messageID, arguments);
+        m_iconDatabaseProxy.didReceiveMessage(connection, messageID, decoder);
         return;
     }
 
     if (messageID.is<CoreIPC::MessageClassWebKeyValueStorageManager>()) {
-        WebKeyValueStorageManager::shared().didReceiveMessage(connection, messageID, arguments);
+        WebKeyValueStorageManager::shared().didReceiveMessage(connection, messageID, decoder);
         return;
     }
 
     if (messageID.is<CoreIPC::MessageClassWebMediaCacheManager>()) {
-        WebMediaCacheManager::shared().didReceiveMessage(connection, messageID, arguments);
+        WebMediaCacheManager::shared().didReceiveMessage(connection, messageID, decoder);
         return;
     }
 
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     if (messageID.is<CoreIPC::MessageClassWebNotificationManager>()) {
-        m_notificationManager.didReceiveMessage(connection, messageID, arguments);
+        m_notificationManager.didReceiveMessage(connection, messageID, decoder);
         return;
     }
 #endif
     
     if (messageID.is<CoreIPC::MessageClassWebResourceCacheManager>()) {
-        WebResourceCacheManager::shared().didReceiveMessage(connection, messageID, arguments);
+        WebResourceCacheManager::shared().didReceiveMessage(connection, messageID, decoder);
         return;
     }
 
 #if USE(SOUP)
     if (messageID.is<CoreIPC::MessageClassWebSoupRequestManager>()) {
-        m_soupRequestManager.didReceiveMessage(connection, messageID, arguments);
+        m_soupRequestManager.didReceiveMessage(connection, messageID, decoder);
         return;
     }
 #endif
     
     if (messageID.is<CoreIPC::MessageClassWebPageGroupProxy>()) {
-        uint64_t pageGroupID = arguments->destinationID();
+        uint64_t pageGroupID = decoder.destinationID();
         if (!pageGroupID)
             return;
         
@@ -700,10 +738,10 @@ void WebProcess::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::Mes
         if (!pageGroupProxy)
             return;
         
-        pageGroupProxy->didReceiveMessage(connection, messageID, arguments);
+        pageGroupProxy->didReceiveMessage(connection, messageID, decoder);
     }
 
-    uint64_t pageID = arguments->destinationID();
+    uint64_t pageID = decoder.destinationID();
     if (!pageID)
         return;
     
@@ -711,7 +749,7 @@ void WebProcess::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::Mes
     if (!page)
         return;
     
-    page->didReceiveMessage(connection, messageID, arguments);
+    page->didReceiveMessage(connection, messageID, decoder);
 }
 
 void WebProcess::didClose(CoreIPC::Connection*)
@@ -743,10 +781,10 @@ void WebProcess::didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::Message
     // we'll let it slide.
 }
 
-void WebProcess::didReceiveMessageOnConnectionWorkQueue(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments, bool& didHandleMessage)
+void WebProcess::didReceiveMessageOnConnectionWorkQueue(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder, bool& didHandleMessage)
 {
     if (messageID.is<CoreIPC::MessageClassWebProcess>()) {
-        didReceiveWebProcessMessageOnConnectionWorkQueue(connection, messageID, arguments, didHandleMessage);
+        didReceiveWebProcessMessageOnConnectionWorkQueue(connection, messageID, decoder, didHandleMessage);
         return;
     }
 }
@@ -832,7 +870,7 @@ void WebProcess::clearApplicationCache()
     cacheStorage().empty();
 }
 
-#if !ENABLE(PLUGIN_PROCESS)
+#if ENABLE(NETSCAPE_PLUGIN_API) && !ENABLE(PLUGIN_PROCESS)
 void WebProcess::getSitesWithPluginData(const Vector<String>& pluginPaths, uint64_t callbackID)
 {
     LocalTerminationDisabler terminationDisabler(*this);
@@ -1024,6 +1062,23 @@ void WebProcess::postInjectedBundleMessage(const CoreIPC::DataReference& message
     injectedBundle->didReceiveMessage(messageName, messageBody.get());
 }
 
+#if ENABLE(NETWORK_PROCESS)
+void WebProcess::networkProcessConnectionClosed(NetworkProcessConnection* connection)
+{
+    ASSERT(m_networkProcessConnection);
+    ASSERT(m_networkProcessConnection == connection);
+
+    m_networkProcessConnection = 0;
+}
+
+void WebProcess::networkProcessCrashed(CoreIPC::Connection*)
+{
+    ASSERT(m_networkProcessConnection);
+    
+    networkProcessConnectionClosed(m_networkProcessConnection.get());
+}
+#endif
+
 #if ENABLE(PLUGIN_PROCESS)
 void WebProcess::pluginProcessCrashed(CoreIPC::Connection*, const String& pluginPath)
 {
@@ -1093,6 +1148,7 @@ void WebProcess::setTextCheckerState(const TextCheckerState& textCheckerState)
     }
 }
 
+#if ENABLE(NETSCAPE_PLUGIN_API)
 void WebProcess::didGetPlugins(CoreIPC::Connection*, uint64_t requestID, const Vector<WebCore::PluginInfo>& plugins)
 {
 #if USE(PLATFORM_STRATEGIES)
@@ -1100,5 +1156,6 @@ void WebProcess::didGetPlugins(CoreIPC::Connection*, uint64_t requestID, const V
     handleDidGetPlugins(requestID, plugins);
 #endif
 }
+#endif // ENABLE(PLUGIN_PROCESS)
 
 } // namespace WebKit

@@ -6,6 +6,20 @@
 	objectVersion = 46;
 	objects = {
 
+/* Begin PBXAggregateTarget section */
+		65AFA16F1630B977003D723C /* Copy WTF Headers */ = {
+			isa = PBXAggregateTarget;
+			buildConfigurationList = 65AFA2881630B977003D723C /* Build configuration list for PBXAggregateTarget "Copy WTF Headers" */;
+			buildPhases = (
+				65AFA1701630B977003D723C /* Copy WTF Headers */,
+			);
+			dependencies = (
+			);
+			name = "Copy WTF Headers";
+			productName = "Copy WTF Headers";
+		};
+/* End PBXAggregateTarget section */
+
 /* Begin PBXBuildFile section */
 		0FD81AC5154FB22E00983E72 /* FastBitVector.h in Headers */ = {isa = PBXBuildFile; fileRef = 0FD81AC4154FB22E00983E72 /* FastBitVector.h */; settings = {ATTRIBUTES = (); }; };
 		143F611F1565F0F900DB514A /* RAMSize.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 143F611D1565F0F900DB514A /* RAMSize.cpp */; };
@@ -282,7 +296,19 @@
 		F3525E461619A4EE00278BC1 /* MemoryInstrumentationHashMap.h in Headers */ = {isa = PBXBuildFile; fileRef = F3525E451619A4EE00278BC1 /* MemoryInstrumentationHashMap.h */; };
 		F3FBC71E161AF7BF00BB4BD4 /* MemoryInstrumentationHashCountedSet.h in Headers */ = {isa = PBXBuildFile; fileRef = F3FBC71D161AF7BF00BB4BD4 /* MemoryInstrumentationHashCountedSet.h */; };
 		F3FBC720161AF7CD00BB4BD4 /* MemoryInstrumentationSequence.h in Headers */ = {isa = PBXBuildFile; fileRef = F3FBC71F161AF7CD00BB4BD4 /* MemoryInstrumentationSequence.h */; };
+		FEDACD3D1630F83F00C69634 /* StackStats.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FEDACD3B1630F83F00C69634 /* StackStats.cpp */; };
+		FEDACD3E1630F83F00C69634 /* StackStats.h in Headers */ = {isa = PBXBuildFile; fileRef = FEDACD3C1630F83F00C69634 /* StackStats.h */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		65AFA28D1630B99E003D723C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 5D247B5914689B8600E78B76 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 65AFA16F1630B977003D723C;
+			remoteInfo = "Copy Headers";
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		0FD81AC4154FB22E00983E72 /* FastBitVector.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FastBitVector.h; sourceTree = "<group>"; };
@@ -331,6 +357,7 @@
 		5D247B7014689C4700E78B76 /* DebugRelease.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = DebugRelease.xcconfig; sourceTree = "<group>"; };
 		5D247B7314689C4700E78B76 /* WTF.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = WTF.xcconfig; sourceTree = "<group>"; };
 		5D247EB11468B01500E78B76 /* HeaderDetection.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = HeaderDetection.h; path = DerivedSources/WTF/HeaderDetection.h; sourceTree = BUILT_PRODUCTS_DIR; };
+		6541CAF41630DB26006D0DEC /* CopyWTFHeaders.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; path = CopyWTFHeaders.xcconfig; sourceTree = "<group>"; };
 		7E29C33D15FFD79B00516D61 /* ObjcRuntimeExtras.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ObjcRuntimeExtras.h; sourceTree = "<group>"; };
 		8134013615B092FD001FF0B8 /* Base64.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Base64.cpp; sourceTree = "<group>"; };
 		8134013715B092FD001FF0B8 /* Base64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Base64.h; sourceTree = "<group>"; };
@@ -569,6 +596,8 @@
 		F3525E451619A4EE00278BC1 /* MemoryInstrumentationHashMap.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MemoryInstrumentationHashMap.h; sourceTree = "<group>"; };
 		F3FBC71D161AF7BF00BB4BD4 /* MemoryInstrumentationHashCountedSet.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MemoryInstrumentationHashCountedSet.h; sourceTree = "<group>"; };
 		F3FBC71F161AF7CD00BB4BD4 /* MemoryInstrumentationSequence.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MemoryInstrumentationSequence.h; sourceTree = "<group>"; };
+		FEDACD3B1630F83F00C69634 /* StackStats.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = StackStats.cpp; sourceTree = "<group>"; };
+		FEDACD3C1630F83F00C69634 /* StackStats.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StackStats.h; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -602,6 +631,7 @@
 		5D247B6D14689C4700E78B76 /* Configurations */ = {
 			isa = PBXGroup;
 			children = (
+				6541CAF41630DB26006D0DEC /* CopyWTFHeaders.xcconfig */,
 				5D247B6E14689C4700E78B76 /* Base.xcconfig */,
 				5D247B6F14689C4700E78B76 /* CompilerVersion.xcconfig */,
 				5D247B7014689C4700E78B76 /* DebugRelease.xcconfig */,
@@ -778,6 +808,8 @@
 				A8A4730D151A825B004123FF /* Spectrum.h */,
 				A8A4730E151A825B004123FF /* StackBounds.cpp */,
 				A8A4730F151A825B004123FF /* StackBounds.h */,
+				FEDACD3B1630F83F00C69634 /* StackStats.cpp */,
+				FEDACD3C1630F83F00C69634 /* StackStats.h */,
 				A8A47310151A825B004123FF /* StaticConstructors.h */,
 				A8A47311151A825B004123FF /* StdLibExtras.h */,
 				1A6BB768162F300500DD16DB /* StreamBuffer.h */,
@@ -1124,6 +1156,7 @@
 				A8A47424151A825B004123FF /* SinglyLinkedList.h in Headers */,
 				A8A47426151A825B004123FF /* Spectrum.h in Headers */,
 				A8A47428151A825B004123FF /* StackBounds.h in Headers */,
+				FEDACD3E1630F83F00C69634 /* StackStats.h in Headers */,
 				A8A47429151A825B004123FF /* StaticConstructors.h in Headers */,
 				A8A4742A151A825B004123FF /* StdLibExtras.h in Headers */,
 				1A6BB769162F300500DD16DB /* StreamBuffer.h in Headers */,
@@ -1191,7 +1224,6 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5D247B6614689B8600E78B76 /* Build configuration list for PBXNativeTarget "WTF" */;
 			buildPhases = (
-				5D247CF11468A3CD00E78B76 /* Copy WTF Headers */,
 				5D247E9D1468AEE200E78B76 /* Detect Available Headers */,
 				5D247B5E14689B8600E78B76 /* Sources */,
 				5D247B5F14689B8600E78B76 /* Frameworks */,
@@ -1200,6 +1232,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				65AFA28E1630B99E003D723C /* PBXTargetDependency */,
 			);
 			name = WTF;
 			productName = WTF;
@@ -1227,25 +1260,12 @@
 			projectRoot = "";
 			targets = (
 				5D247B6114689B8600E78B76 /* WTF */,
+				65AFA16F1630B977003D723C /* Copy WTF Headers */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		5D247CF11468A3CD00E78B76 /* Copy WTF Headers */ = {
-			isa = PBXShellScriptBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputPaths = (
-			);
-			name = "Copy WTF Headers";
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "if [[ \"${DEPLOYMENT_LOCATION}\" == \"NO\" ]]; then\n    PRIVATE_HEADERS_PATH=\"${TARGET_BUILD_DIR%%/}${PRIVATE_HEADERS_FOLDER_PATH}\"\nelse\n    PRIVATE_HEADERS_PATH=\"${DSTROOT%%/}${PRIVATE_HEADERS_FOLDER_PATH}\"\nfi;\n\nmkdir -p \"${PRIVATE_HEADERS_PATH}\"\nrsync -av --no-owner --no-group --prune-empty-dirs --exclude \".svn\" --exclude \"usr\" --exclude \"DerivedSources\" --include \"*/\" --include \"*.h\" --exclude \"*\" \"${SRCROOT}/wtf/\" \"${PRIVATE_HEADERS_PATH}\"\n";
-		};
 		5D247E9D1468AEE200E78B76 /* Detect Available Headers */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
@@ -1261,6 +1281,20 @@
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
 			shellScript = "OUTPUT_FILE=\"${BUILT_PRODUCTS_DIR}/DerivedSources/WTF/HeaderDetection.h\"\necho \"/* This is a generated file. Do not edit. */\" > \"${OUTPUT_FILE}\"\n\nif [[ -f \"${SDKROOT}/System/Library/Frameworks/System.framework/PrivateHeaders/pthread_machdep.h\" ]]; then\n    echo \"#define HAVE_PTHREAD_MACHDEP_H 1\" >> \"${OUTPUT_FILE}\"\nfi\n";
+		};
+		65AFA1701630B977003D723C /* Copy WTF Headers */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputPaths = (
+			);
+			name = "Copy WTF Headers";
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [[ \"${DEPLOYMENT_LOCATION}\" == \"NO\" ]]; then\n    PRIVATE_HEADERS_PATH=\"${TARGET_BUILD_DIR%%/}${PRIVATE_HEADERS_FOLDER_PATH}\"\nelse\n    PRIVATE_HEADERS_PATH=\"${DSTROOT%%/}${PRIVATE_HEADERS_FOLDER_PATH}\"\nfi;\n\nmkdir -p \"${PRIVATE_HEADERS_PATH}\"\nrsync -av --no-owner --no-group --prune-empty-dirs --exclude \".svn\" --exclude \"usr\" --exclude \"DerivedSources\" --include \"*/\" --include \"*.h\" --exclude \"*\" \"${SRCROOT}/wtf/\" \"${PRIVATE_HEADERS_PATH}\"\n\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -1314,6 +1348,7 @@
 				A8A47421151A825B004123FF /* SHA1.cpp in Sources */,
 				A8A47425151A825B004123FF /* SizeLimits.cpp in Sources */,
 				A8A47427151A825B004123FF /* StackBounds.cpp in Sources */,
+				FEDACD3D1630F83F00C69634 /* StackStats.cpp in Sources */,
 				A8A4743C151A825B004123FF /* StringBuilder.cpp in Sources */,
 				A8A4742B151A825B004123FF /* StringExtras.cpp in Sources */,
 				A8A47440151A825B004123FF /* StringImpl.cpp in Sources */,
@@ -1350,6 +1385,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		65AFA28E1630B99E003D723C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 65AFA16F1630B977003D723C /* Copy WTF Headers */;
+			targetProxy = 65AFA28D1630B99E003D723C /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		5D247B6414689B8600E78B76 /* Debug */ = {
@@ -1398,6 +1441,30 @@
 			};
 			name = Production;
 		};
+		65AFA2891630B977003D723C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 6541CAF41630DB26006D0DEC /* CopyWTFHeaders.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Debug;
+		};
+		65AFA28A1630B977003D723C /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 6541CAF41630DB26006D0DEC /* CopyWTFHeaders.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Release;
+		};
+		65AFA28B1630B977003D723C /* Production */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 6541CAF41630DB26006D0DEC /* CopyWTFHeaders.xcconfig */;
+			buildSettings = {
+				PRODUCT_NAME = "$(TARGET_NAME)";
+			};
+			name = Production;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -1417,6 +1484,16 @@
 				5D247B6714689B8600E78B76 /* Debug */,
 				5D247B6814689B8600E78B76 /* Release */,
 				5D247B7514689CC900E78B76 /* Production */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Production;
+		};
+		65AFA2881630B977003D723C /* Build configuration list for PBXAggregateTarget "Copy WTF Headers" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				65AFA2891630B977003D723C /* Debug */,
+				65AFA28A1630B977003D723C /* Release */,
+				65AFA28B1630B977003D723C /* Production */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Production;

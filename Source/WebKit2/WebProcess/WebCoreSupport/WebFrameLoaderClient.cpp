@@ -1226,16 +1226,14 @@ void WebFrameLoaderClient::transitionToCommittedForNewPage()
     Color backgroundColor = webPage->drawsTransparentBackground() ? Color::transparent : Color::white;
     bool isMainFrame = webPage->mainWebFrame() == m_frame;
     bool shouldUseFixedLayout = isMainFrame && webPage->useFixedLayout();
-    IntRect currentVisibleContentBounds = m_frame->visibleContentBounds();
+    IntRect currentFixedVisibleContentRect = m_frame->coreFrame()->view() ? m_frame->coreFrame()->view()->fixedVisibleContentRect() : IntRect();
 
     const ResourceResponse& response = m_frame->coreFrame()->loader()->documentLoader()->response();
     m_frameHasCustomRepresentation = isMainFrame && webPage->shouldUseCustomRepresentationForResponse(response);
     m_frameCameFromPageCache = false;
 
-    m_frame->coreFrame()->createView(webPage->size(), backgroundColor, /* transparent */ false, IntSize(), shouldUseFixedLayout);
+    m_frame->coreFrame()->createView(webPage->size(), backgroundColor, /* transparent */ false, IntSize(), currentFixedVisibleContentRect, shouldUseFixedLayout);
     m_frame->coreFrame()->view()->setTransparent(!webPage->drawsBackground());
-    if (shouldUseFixedLayout && !currentVisibleContentBounds.isEmpty())
-        m_frame->coreFrame()->view()->setFixedVisibleContentRect(currentVisibleContentBounds);
 }
 
 void WebFrameLoaderClient::didSaveToPageCache()
@@ -1314,10 +1312,8 @@ PassRefPtr<Frame> WebFrameLoaderClient::createFrame(const KURL& url, const Strin
 PassRefPtr<Widget> WebFrameLoaderClient::createPlugin(const IntSize&, HTMLPlugInElement* pluginElement, const KURL& url, const Vector<String>& paramNames, const Vector<String>& paramValues, const String& mimeType, bool loadManually)
 {
     ASSERT(paramNames.size() == paramValues.size());
-    
-    WebPage* webPage = m_frame->page();
-    ASSERT(webPage);
-    
+    ASSERT(m_frame->page());
+
     Plugin::Parameters parameters;
     parameters.url = url;
     parameters.names = paramNames;
@@ -1326,7 +1322,7 @@ PassRefPtr<Widget> WebFrameLoaderClient::createPlugin(const IntSize&, HTMLPlugIn
     parameters.isFullFramePlugin = loadManually;
     parameters.shouldUseManualLoader = parameters.isFullFramePlugin && !m_frameCameFromPageCache;
 #if PLATFORM(MAC)
-    parameters.layerHostingMode = webPage->layerHostingMode();
+    parameters.layerHostingMode = m_frame->page()->layerHostingMode();
 #endif
 
 #if PLUGIN_ARCHITECTURE(X11)
@@ -1346,21 +1342,27 @@ PassRefPtr<Widget> WebFrameLoaderClient::createPlugin(const IntSize&, HTMLPlugIn
     }
 #endif
 
-    RefPtr<Plugin> plugin = webPage->createPlugin(m_frame, pluginElement, parameters);
+#if ENABLE(NETSCAPE_PLUGIN_API)
+    RefPtr<Plugin> plugin = m_frame->page()->createPlugin(m_frame, pluginElement, parameters);
     if (!plugin)
         return 0;
-    
+
     return PluginView::create(pluginElement, plugin.release(), parameters);
+#else
+    return 0;
+#endif
 }
 
 void WebFrameLoaderClient::recreatePlugin(Widget* widget)
 {
+#if ENABLE(NETSCAPE_PLUGIN_API)
     ASSERT(widget && widget->isPluginViewBase());
     ASSERT(m_frame->page());
 
     PluginView* pluginView = static_cast<PluginView*>(widget);
     RefPtr<Plugin> plugin = m_frame->page()->createPlugin(m_frame, pluginView->pluginElement(), pluginView->initialParameters());
     pluginView->recreateAndInitialize(plugin.release());
+#endif
 }
 
 void WebFrameLoaderClient::redirectDataToPlugin(Widget* pluginWidget)
@@ -1531,7 +1533,11 @@ void WebFrameLoaderClient::registerForIconNotification(bool /*listen*/)
     
 RemoteAXObjectRef WebFrameLoaderClient::accessibilityRemoteObject() 
 {
-    return m_frame->page()->accessibilityRemoteObject();
+    WebPage* webPage = m_frame->page();
+    if (!webPage)
+        return 0;
+    
+    return webPage->accessibilityRemoteObject();
 }
     
 NSCachedURLResponse* WebFrameLoaderClient::willCacheResponse(DocumentLoader*, unsigned long identifier, NSCachedURLResponse* response) const

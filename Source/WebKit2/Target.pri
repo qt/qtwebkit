@@ -73,6 +73,7 @@ HEADERS += \
     Shared/ShareableSurface.h \
     Shared/CacheModel.h \
     Shared/ChildProcess.h \
+    Shared/ConnectionStack.h \
     Shared/DictionaryPopupInfo.h \
     Shared/EditorState.h \
     Shared/FontInfo.h \
@@ -132,6 +133,8 @@ HEADERS += \
     Shared/WebURLRequest.h \
     Shared/WebURLResponse.h \
     Shared/WebUserContentURLPattern.h \
+    Shared/CoordinatedGraphics/CoordinatedGraphicsArgumentCoders.h \
+    Shared/CoordinatedGraphics/WebCustomFilterProgram.h \
     Shared/Plugins/Netscape/NetscapePluginModule.h \
     Shared/Plugins/NPRemoteObjectMap.h \
     Shared/Plugins/NPIdentifierData.h \
@@ -439,6 +442,7 @@ SOURCES += \
     Shared/Plugins/PluginModuleInfo.cpp \
     Shared/Plugins/PluginProcessCreationParameters.cpp \
     Shared/ChildProcess.cpp \
+    Shared/ConnectionStack.cpp \
     Shared/DictionaryPopupInfo.cpp \
     Shared/EditorState.cpp \
     Shared/FontInfo.cpp \
@@ -490,6 +494,7 @@ SOURCES += \
     Shared/WebURLRequest.cpp \
     Shared/WebURLResponse.cpp \
     Shared/WebWheelEvent.cpp \
+    Shared/CoordinatedGraphics/CoordinatedGraphicsArgumentCoders.cpp \
     Shared/qt/ArgumentCodersQt.cpp \
     Shared/qt/LayerTreeContextQt.cpp \
     Shared/qt/ShareableBitmapQt.cpp \

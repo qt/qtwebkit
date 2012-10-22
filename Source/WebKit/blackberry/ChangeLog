@@ -1,3 +1,210 @@
+2012-10-22  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] Fix "ASSERTION FAILED: !document->inPageCache()" when loading a page
+        https://bugs.webkit.org/show_bug.cgi?id=98514
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::transitionToCommittedForNewPage):
+
+2012-10-20  Andrew Lo  <anlo@rim.com>
+
+        [BlackBerry] m_mainFrame should be null checked before use in WebPagePrivate destructor
+        https://bugs.webkit.org/show_bug.cgi?id=99916
+
+        Reviewed by George Staikos.
+        Internally reviewed by Arvid Nilsson.
+
+        Internal PR228029
+        Add null checks for m_mainFrame for things that happen during
+        WebPage destruction.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::setVisible):
+        (BlackBerry::WebKit::WebPagePrivate::setCompositorDrawsRootLayer):
+
+2012-10-19  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Convert input style to int64_t
+        https://bugs.webkit.org/show_bug.cgi?id=99848
+
+        Reviewed by Yong Li.
+
+        PR 227381.
+
+        Switch input style mask to int64_t to match the the updated definition.
+
+        Reviewed Internally by Nima Ghanavatian.
+
+        * Api/WebPageClient.h:
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::inputStyle):
+        * WebKitSupport/InputHandler.h:
+        (InputHandler):
+
+2012-10-19  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Move all keyboard type calculations into InputHandler.
+        https://bugs.webkit.org/show_bug.cgi?id=99847
+
+        Reviewed by Yong Li.
+
+        PR 227381.
+
+        Move all keyboard type calculations into webkit and avoid passing type
+        information to the webview.
+
+        Reviewed Internally by Nima Ghanavatian.
+
+        * Api/WebPageClient.h:
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::convertInputTypeToVKBType):
+        (WebKit):
+        (BlackBerry::WebKit::InputHandler::setElementFocused):
+
+2012-10-19  Jacky Jiang  <zhajiang@rim.com>
+
+        [BlackBerry] Page viewport aspect ratio not kept on navigating back
+        https://bugs.webkit.org/show_bug.cgi?id=99760
+
+        Reviewed by Yong Li.
+        Internally reviewed by Konrad Piascik
+
+        PR: 222437
+        This is to fix the second issue on PR222437 that the viewport not kept
+        when navigating back from google after rotation to bloomberg.
+        We were trying to restore the history contents size and scale of
+        bloomberg which has virtual viewport. The scale would be recalculated
+        based on the new screen size. However, we would still use the current
+        contents size if it was greater than the history contents size in
+        FrameView::setContentsSize which made the contents seem to be scaled
+        too much.
+        Actually when we relayout the contents after rotation change, the
+        current contents size which is based on the virtual viewport has taken
+        the screen size into account. Shrinking the contents size will be
+        expensive. So we can ignore screen size based scale calculation here.
+
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::restoreViewState):
+
+2012-10-19  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Add input logs to InputHandler::ensureFocusTextElementVisible.
+        https://bugs.webkit.org/show_bug.cgi?id=99837
+
+        Reviewed by Antonio Gomes.
+
+        Add input logs for InputHandler::ensureFocusTextElementVisible.
+
+        Reviewed Internally by Nima Ghanavatian.
+
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::ensureFocusTextElementVisible):
+
+2012-10-19  Andrew Lo  <anlo@rim.com>
+
+        [BlackBerry] Should suspend AnimationController when WebPage becomes invisible.
+        https://bugs.webkit.org/show_bug.cgi?id=99844
+
+        Reviewed by Yong Li.
+        Internally reviewed by Arvid Nilsson & Yong Li.
+
+        Suspend animation controller when the tab becomes invisible,
+        in addition to suspending scripted animations.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::setVisible):
+
+2012-10-19  Mike Fenton  <mifenton@rim.com>
+
+        [BlackBerry] Don't attempt to auto scroll on input for Fixed Position elements.
+        https://bugs.webkit.org/show_bug.cgi?id=99833
+
+        Reviewed by Antonio Gomes.
+
+        PR 195024.
+
+        Don't attempt to scroll fixed position elements.
+
+        Reviewed Internally by Arvid Nilsson.
+
+        * WebKitSupport/DOMSupport.cpp:
+        (BlackBerry::WebKit::DOMSupport::isFixedPositionOrHasFixedPositionAncestor):
+        (DOMSupport):
+        * WebKitSupport/DOMSupport.h:
+        (WebCore):
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::ensureFocusTextElementVisible):
+
+2012-10-18  Jacky Jiang  <zhajiang@rim.com>
+
+        [BlackBerry] Page viewport aspect ratio not kept on navigating back
+        https://bugs.webkit.org/show_bug.cgi?id=99760
+
+        Reviewed by Rob Buis.
+        Internally reviewed by Konrad Piascik.
+
+        PR: 190469
+        This was added in r127628 which was trying to fix some rendering
+        defects on maps.google.com and news.qq.com, however it was very harmful
+        and caused regressions.
+        zoomToFitScale() depends on the current contents size. During history
+        navigation and device rotation, if zoomToFitScale() is based on the
+        final contents size which is expected, there will still be a scale
+        calculation like this afterwards
+        screenSize.width()/screenSize.height()*zoomToFitScale() which will
+        result in a wrong scale. During the history navigation, if
+        zoomToFitScale() isn't based on the final contents size, then we will
+        get the wrong scale as well for sure.
+        This issue will be fixed by removing the wrong calculation.
+        The original issue of r127628 was fixed by the patch of PR225981.
+
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::restoreViewState):
+
+2012-10-18  John Griggs  <jgriggs@rim.com>
+
+        2012-10-18  John Griggs  <jgriggs@rim.com>
+
+        Crash in InRegionScrollableArea constructor while loading page
+        https://bugs.webkit.org/show_bug.cgi?id=99733
+
+        Reviewed by Antonio Gomes.
+
+        Check scrollLayer and avoid constructing InRegionScrollableArea when it is NULL.
+
+        * Api/InRegionScroller.cpp:
+        (BlackBerry::WebKit::InRegionScrollerPrivate::calculateInRegionScrollableAreasForPoint):
+
+2012-10-17  Jacky Jiang  <zhajiang@rim.com>
+
+        [BlackBerry] Possible redundant zoomToInitialScaleOnLoad() in WebPagePrivate::setLoadState
+        https://bugs.webkit.org/show_bug.cgi?id=99624
+
+        Reviewed by Rob Buis.
+        Internally reviewed by Arvid Nilsson
+
+        PR: 225981
+        Several reasons to eliminate the ancient unnecessary
+        zoomToInitialScaleOnLoad() in WebPagePrivate::setLoadState committed:
+        - At this point, we have only committed the data we received.
+        - For the new load, we haven't started parsing the tokens and building
+          the DOM tree and the first layout will happen after that.
+        - For the load restored from cache, the first layout will happen after
+          setLoadState committed which is called by
+          FrameLoader::dispatchDidCommitLoad().
+        - zoomToInitialScaleOnLoad() can still be called after the first
+          layout finished.
+        - zoomToInitialScaleOnLoad() is expensive and it will boost the load
+          performance after the removal.
+        - Removal of this can fix some weird rendering defects on yahoo.com,
+          maps.google.com, news.qq.com and so on during load and rotation
+          mentioned on the PR.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::setLoadState):
+
 2012-10-17  Mike Fenton  <mifenton@rim.com>
 
         [BlackBerry] Prevent focus zoom on non-userscalable pages.

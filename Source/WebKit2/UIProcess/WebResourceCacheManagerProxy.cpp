@@ -45,7 +45,7 @@ PassRefPtr<WebResourceCacheManagerProxy> WebResourceCacheManagerProxy::create(We
 WebResourceCacheManagerProxy::WebResourceCacheManagerProxy(WebContext* webContext)
     : m_webContext(webContext)
 {
-    m_webContext->addMessageReceiver(CoreIPC::MessageClassWebResourceCacheManagerProxy, this);
+    m_webContext->deprecatedAddMessageReceiver(CoreIPC::MessageClassWebResourceCacheManagerProxy, this);
 }
 
 WebResourceCacheManagerProxy::~WebResourceCacheManagerProxy()
@@ -95,9 +95,9 @@ void WebResourceCacheManagerProxy::clearCacheForAllOrigins(ResourceCachesToClear
     m_webContext->sendToAllProcessesRelaunchingThemIfNecessary(Messages::WebResourceCacheManager::ClearCacheForAllOrigins(cachesToClear));
 }
 
-void WebResourceCacheManagerProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
+void WebResourceCacheManagerProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
 {
-    didReceiveWebResourceCacheManagerProxyMessage(connection, messageID, arguments);
+    didReceiveWebResourceCacheManagerProxyMessage(connection, messageID, decoder);
 }
 
 } // namespace WebKit

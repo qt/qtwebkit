@@ -40,6 +40,7 @@
 #include "ewk_download_job_private.h"
 #include "ewk_favicon_database_private.h"
 #include "ewk_private.h"
+#include "ewk_url_scheme_request_private.h"
 #include <WebCore/FileSystem.h>
 #include <WebCore/IconDatabase.h>
 #include <wtf/HashMap.h>
@@ -205,7 +206,7 @@ void ewk_context_download_job_add(Ewk_Context* ewkContext, Ewk_Download_Job* ewk
     EINA_SAFETY_ON_NULL_RETURN(ewkContext);
     EINA_SAFETY_ON_NULL_RETURN(ewkDownload);
 
-    uint64_t downloadId = ewk_download_job_id_get(ewkDownload);
+    uint64_t downloadId = ewkDownload->id();
     if (ewkContext->downloadJobs.contains(downloadId))
         return;
 
@@ -257,7 +258,7 @@ void ewk_context_url_scheme_request_received(Ewk_Context* ewkContext, Ewk_Url_Sc
     EINA_SAFETY_ON_NULL_RETURN(ewkContext);
     EINA_SAFETY_ON_NULL_RETURN(schemeRequest);
 
-    Ewk_Url_Scheme_Handler handler = ewkContext->urlSchemeHandlers.get(ewk_url_scheme_request_scheme_get(schemeRequest));
+    Ewk_Url_Scheme_Handler handler = ewkContext->urlSchemeHandlers.get(schemeRequest->scheme());
     if (!handler.callback)
         return;
 

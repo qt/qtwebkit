@@ -129,6 +129,12 @@ protected:
 #endif
 
 #if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+    String monthFormat(LCID lcid)
+    {
+        OwnPtr<LocaleWin> locale = LocaleWin::create(lcid);
+        return locale->monthFormat();
+    }
+
     String timeFormat(LCID lcid)
     {
         OwnPtr<LocaleWin> locale = LocaleWin::create(lcid);
@@ -139,6 +145,12 @@ protected:
     {
         OwnPtr<LocaleWin> locale = LocaleWin::create(lcid);
         return locale->shortTimeFormat();
+    }
+
+    String shortMonthLabel(LCID lcid, unsigned index)
+    {
+        OwnPtr<LocaleWin> locale = LocaleWin::create(lcid);
+        return locale->shortMonthLabels()[index];
     }
 
     String timeAMPMLabel(LCID lcid, unsigned index)
@@ -284,6 +296,13 @@ TEST_F(LocaleWinTest, dateFormat)
     EXPECT_STREQ("yyyy'-'''''MMMM'-'dd", LocaleWin::dateFormat("yyyy-''''MMMM-dd").utf8().data());
 }
 
+TEST_F(LocaleWinTest, monthFormat)
+{
+    EXPECT_STREQ("MMMM', 'yyyy", monthFormat(EnglishUS).utf8().data());
+    EXPECT_STREQ("MMMM' 'yyyy", monthFormat(FrenchFR).utf8().data());
+    EXPECT_STREQ("yyyy'\xE5\xB9\xB4'M'\xE6\x9C\x88'", monthFormat(JapaneseJP).utf8().data());
+}
+
 TEST_F(LocaleWinTest, timeFormat)
 {
     EXPECT_STREQ("h:mm:ss a", timeFormat(EnglishUS).utf8().data());
@@ -296,6 +315,16 @@ TEST_F(LocaleWinTest, shortTimeFormat)
     EXPECT_STREQ("h:mm:ss a", shortTimeFormat(EnglishUS).utf8().data());
     EXPECT_STREQ("HH:mm:ss", shortTimeFormat(FrenchFR).utf8().data());
     EXPECT_STREQ("H:mm:ss", shortTimeFormat(JapaneseJP).utf8().data());
+}
+
+TEST_F(LocaleWinTest, shortMonthLabels)
+{
+    EXPECT_STREQ("Jan", shortMonthLabel(EnglishUS, 0).utf8().data());
+    EXPECT_STREQ("Dec", shortMonthLabel(EnglishUS, 11).utf8().data());
+    EXPECT_STREQ("janv.", shortMonthLabel(FrenchFR, 0).utf8().data());
+    EXPECT_STREQ("d\xC3\xA9" "c.", shortMonthLabel(FrenchFR, 11).utf8().data());
+    EXPECT_STREQ("1", shortMonthLabel(JapaneseJP, 0).utf8().data());
+    EXPECT_STREQ("12", shortMonthLabel(JapaneseJP, 11).utf8().data());
 }
 
 TEST_F(LocaleWinTest, timeAMPMLabels)

@@ -6,6 +6,7 @@ SET(WebKit2_INCLUDE_DIRECTORIES
     "${WEBKIT2_DIR}/Shared"
     "${WEBKIT2_DIR}/Shared/API"
     "${WEBKIT2_DIR}/Shared/API/c"
+    "${WEBKIT2_DIR}/Shared/CoordinatedGraphics"
     "${WEBKIT2_DIR}/Shared/CoreIPCSupport"
     "${WEBKIT2_DIR}/Shared/Plugins"
     "${WEBKIT2_DIR}/Shared/Plugins/Netscape"
@@ -135,6 +136,7 @@ SET(WebKit2_SOURCES
     Shared/APIClientTraits.cpp
     Shared/APIObject.cpp
     Shared/ChildProcess.cpp
+    Shared/ConnectionStack.cpp
     Shared/DictionaryPopupInfo.cpp
     Shared/EditorState.cpp
     Shared/FontInfo.cpp
@@ -213,6 +215,8 @@ SET(WebKit2_SOURCES
     Shared/API/c/WKURLRequest.cpp
     Shared/API/c/WKURLResponse.cpp
     Shared/API/c/WKUserContentURLPattern.cpp
+
+    Shared/CoordinatedGraphics/CoordinatedGraphicsArgumentCoders.cpp
 
     Shared/Plugins/NPIdentifierData.cpp
     Shared/Plugins/NPObjectMessageReceiver.cpp

@@ -143,8 +143,6 @@ public:
     virtual PlainTextRange selectedTextRange() const;
     virtual VisibleSelection selection() const;
     virtual String stringValue() const;
-    virtual String ariaDescribedByAttribute() const;
-    virtual String accessibilityDescription() const;
     virtual String helpText() const;
     virtual String textUnderElement() const;
     virtual String text() const;
@@ -248,6 +246,7 @@ private:
     bool isDescendantOfElementType(const QualifiedName& tagName) const;
     // This returns true if it's focusable but it's not content editable and it's not a control or ARIA control.
 
+    void addHiddenChildren();
     void addTextFieldChildren();
     void addImageMapChildren();
     void addCanvasChildren();
@@ -261,8 +260,6 @@ private:
     bool elementAttributeValue(const QualifiedName&) const;
     void setElementAttributeValue(const QualifiedName&, bool);
     
-    String webAreaAccessibilityDescription() const;
-
     virtual ESpeak speakProperty() const;
     
     virtual const AtomicString& ariaLiveRegionStatus() const;

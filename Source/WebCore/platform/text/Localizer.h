@@ -62,6 +62,9 @@ public:
     // [1] LDML http://unicode.org/reports/tr35/#Date_Format_Patterns
     virtual String dateFormat() = 0;
 
+    // Returns a year-month format in Unicode TR35 LDML.
+    virtual String monthFormat() = 0;
+
     // Returns time format in Unicode TR35 LDML[1] containing hour, minute, and
     // second with optional period(AM/PM), e.g. "h:mm:ss a"
     // [1] LDML http://unicode.org/reports/tr35/#Date_Format_Patterns
@@ -79,6 +82,14 @@ public:
     // Returns a date-time format in Unicode TR35 LDML. It should have no seconds
     // field.
     String dateTimeFormatWithoutSeconds();
+
+    // Returns a vector of string of which size is 12. The first item is a
+    // localized string of Jan and the last item is a localized string of
+    // Dec. These strings should be short.
+    virtual const Vector<String>& shortMonthLabels() = 0;
+
+    // Stand-alone month version of shortMonthLabels.
+    virtual const Vector<String>& shortStandAloneMonthLabels() = 0;
 
     // Returns localized period field(AM/PM) strings.
     virtual const Vector<String>& timeAMPMLabels();

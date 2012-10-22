@@ -448,6 +448,7 @@ void FrameLoaderClientBlackBerry::transitionToCommittedForNewPage()
                         backgroundColor.hasAlpha(),            /* is transparent */
                         m_webPagePrivate->actualVisibleSize(), /* fixed reported size */
                         m_webPagePrivate->fixedLayoutSize(),   /* fixed layout size */
+                        IntRect(),                             /* fixed visible content rect */
                         m_webPagePrivate->useFixedLayout(),    /* use fixed layout */
                         ScrollbarAlwaysOff,                    /* hor mode */
                         true,                                  /* lock the mode */
@@ -1083,12 +1084,6 @@ void FrameLoaderClientBlackBerry::restoreViewState()
     // Also, try to keep the users zoom if any.
     double scale = viewState.scale;
 
-    // If it was zoomToFitScale use the new zoomToFitScale because
-    // the new one may be different to the old one due to contents
-    // size change (e.g. after reloaded).
-    if (viewState.isZoomToFitScale)
-        scale = m_webPagePrivate->zoomToFitScale();
-
     bool shouldReflowBlock = viewState.shouldReflowBlock;
     if (m_webPagePrivate->m_userPerformedManualZoom) {
         scale = m_webPagePrivate->currentScale();
@@ -1103,8 +1098,8 @@ void FrameLoaderClientBlackBerry::restoreViewState()
     if (!scrollChanged && !scaleChanged && !reflowChanged && !orientationChanged)
         return;
 
-    // When rotate happens, only zoom when previous page was zoomToFitScale, otherwise keep old scale.
-    if (orientationChanged && viewState.isZoomToFitScale)
+    // When rotate happens, only zoom when previous page was zoomToFitScale and didn't have virtual viewport, otherwise keep old scale.
+    if (orientationChanged && viewState.isZoomToFitScale && !m_webPagePrivate->hasVirtualViewport())
         scale = BlackBerry::Platform::Graphics::Screen::primaryScreen()->width() * scale / static_cast<double>(BlackBerry::Platform::Graphics::Screen::primaryScreen()->height());
 
     // Don't flash checkerboard before WebPagePrivate::restoreHistoryViewState() finished.

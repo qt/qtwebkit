@@ -1,3 +1,183 @@
+2012-10-22  Simon Hausmann  <simon.hausmann@digia.com>
+
+        Unreviewed: Re-enable LLINT on Qt/Linux after r131932.
+
+        * wtf/Platform.h:
+
+2012-10-22  Yury Semikhatsky  <yurys@chromium.org>
+
+        Web Inspector: do not double count memory of objects with multiple ancestors
+        https://bugs.webkit.org/show_bug.cgi?id=99958
+
+        Reviewed by Alexander Pavlov.
+
+        Make sure memory occupied by objects of classes with multiple inheritance is
+        not double counted.
+
+        * wtf/MemoryInstrumentation.h:
+        (WTF::MemoryObjectInfo::MemoryObjectInfo):
+        (WTF::MemoryObjectInfo::reportedPointer):
+        (WTF::MemoryObjectInfo::reportObjectInfo): 1) Store actual pointer to the instrumented
+        object as it may differ from the original pointer by which it was reported. 2) Make
+        the method non-template and calculate object size on the caller side.
+        (MemoryObjectInfo):
+        (WTF::MemoryInstrumentation::reportObjectMemoryUsage):
+        (WTF::MemoryClassInfo::MemoryClassInfo):
+        (WTF::MemoryInstrumentation::InstrumentedPointer::process): use adjusted pointer
+        returned by reportMemoryUsage to check if the object has already been visited when
+        the pointer differs from the orinal one(it may happen if the object was reported
+        by a pointer to one of its base classes).
+
+2012-10-20  Martin Robinson  <mrobinson@igalia.com>
+
+        Fix 'make dist' for the GTK+ port
+
+        * GNUmakefile.list.am: Add missing files to the source list.
+
+2012-10-19  Mark Lam  <mark.lam@apple.com>
+
+        Added WTF::StackStats mechanism.
+        https://bugs.webkit.org/show_bug.cgi?id=99805.
+
+        Reviewed by Geoffrey Garen.
+
+        Disabled by default. Should have no performance and memory cost when
+        disabled. To enable, #define ENABLE_STACK_STATS 1 in StackStats.h.
+        The output is currently hardcoded to be dumped in /tmp/stack-stats.log,
+        and is in the form of stack sample events. By default, it only logs
+        a sample event when a new high watermark value is encountered.
+
+        Also renamed StackBounds::recursiveCheck() to isSafeToRecurse().
+
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/StackBounds.h:
+        (StackBounds):
+        (WTF::StackBounds::size):
+        (WTF::StackBounds::isSafeToRecurse):
+        * wtf/StackStats.cpp: Added.
+        (WTF):
+        (WTF::StackStats::initialize):
+        (WTF::StackStats::PerThreadStats::PerThreadStats):
+        (WTF::StackStats::CheckPoint::CheckPoint):
+        (WTF::StackStats::CheckPoint::~CheckPoint):
+        (WTF::StackStats::probe):
+        (WTF::StackStats::LayoutCheckPoint::LayoutCheckPoint):
+        (WTF::StackStats::LayoutCheckPoint::~LayoutCheckPoint):
+        * wtf/StackStats.h: Added.
+        (WTF):
+        (StackStats):
+        (CheckPoint):
+        (WTF::StackStats::CheckPoint::CheckPoint):
+        (PerThreadStats):
+        (WTF::StackStats::PerThreadStats::PerThreadStats):
+        (LayoutCheckPoint):
+        (WTF::StackStats::LayoutCheckPoint::LayoutCheckPoint):
+        (WTF::StackStats::initialize):
+        (WTF::StackStats::probe):
+        * wtf/ThreadingPthreads.cpp:
+        (WTF::initializeThreading):
+        * wtf/WTFThreadData.cpp:
+        (WTF::WTFThreadData::WTFThreadData):
+        * wtf/WTFThreadData.h:
+        (WTFThreadData):
+        (WTF::WTFThreadData::stackStats):
+
+2012-10-19  Anders Carlsson  <andersca@apple.com>
+
+        Deque can use std::reverse_iterator for its reverse iterators
+        https://bugs.webkit.org/show_bug.cgi?id=99789
+
+        Reviewed by Andreas Kling.
+
+        Remove DequeReverseIterator and DequeConstReverseIterator and just use std::reverse_iterator directly.
+        Also, remove the DequeIteratorBase<T, inlineCapacity> to Base typedef - We can already use DequeIteratorBase since it's
+        equivalent to the full class template type.
+
+        * wtf/Deque.h:
+        (WTF::Deque::rbegin):
+        (WTF::Deque::rend):
+        (DequeIteratorBase):
+        (WTF::DequeIteratorBase::assign):
+        (DequeIterator):
+        (DequeConstIterator):
+        (WTF::::checkValidity):
+        (WTF::::DequeIteratorBase):
+        (WTF::=):
+        (WTF::::isEqual):
+
+2012-10-19  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Unreviewed buildfix, use C-style comment instead of C++
+
+        * wtf/Platform.h:
+
+2012-10-19  Csaba Osztrogonác  <ossy@webkit.org>
+
+        REGRESSION(r131822): It made 500+ tests crash on 32 bit platforms
+        https://bugs.webkit.org/show_bug.cgi?id=99814
+
+        Reviewed by Simon Hausmann.
+
+        * wtf/Platform.h: Disable LLINT on (PLATFORM(QT) && CPU(X86)) temporarily until proper fix.
+
+2012-10-17  Ilya Tikhonovsky  <loislo@chromium.org>
+
+        Web Inspector: NMI provide data for mixing with tcmalloc heap dumps.
+        https://bugs.webkit.org/show_bug.cgi?id=99457
+
+        Reviewed by Yury Semikhatsky.
+
+        countObjectSize now accepts ptr as the first argument and saves it into HashMap if the binary was ran with HEAPPROFILE env variable.
+        getProcessMemoryDistribution does snapshot and calls the downstream code with the map of counted objects.
+
+        * wtf/MemoryInstrumentation.h:
+        (MemoryInstrumentationClient):
+        (WTF::MemoryInstrumentation::countObjectSize):
+        (WTF::MemoryInstrumentation::addRawBuffer):
+        (WTF::MemoryClassInfo::addPrivateBuffer):
+        (WTF::MemoryInstrumentation::addObjectImpl):
+        (WTF::MemoryInstrumentation::addListHashSet):
+        (WTF::::process):
+
+2012-10-18  Michael Saboff  <msaboff@apple.com>
+
+        convertUTF8ToUTF16() Should Check for ASCII Input
+        ihttps://bugs.webkit.org/show_bug.cgi?id=99739
+
+        Reviewed by Geoffrey Garen.
+
+        Added code to accumulate the "or" of all characters seen during the UTF8 to UTF16 conversion.  This is
+        used to check to see if all characters are ASCII and is returned via a bool*.
+
+        * wtf/unicode/UTF8.cpp:
+        (WTF::Unicode::convertUTF8ToUTF16):
+        * wtf/unicode/UTF8.h:
+
+2012-10-18  Michael Saboff  <msaboff@apple.com>
+
+        Mac WTF build checks dependencies before copying header files
+        https://bugs.webkit.org/show_bug.cgi?id=99770
+
+        Reviewed by Mark Rowe.
+
+        Fixed up build rules per Mark Rowe. Made new target an Aggregate and removed "WTF copy".
+
+        * Configurations/CopyWTFHeaders.xcconfig: Added.
+        * Configurations/WTF.xcconfig:
+        * WTF.xcodeproj/project.pbxproj:
+
+2012-10-18  Michael Saboff  <msaboff@apple.com>
+
+        Mac WTF build checks dependencies before copying header files
+        https://bugs.webkit.org/show_bug.cgi?id=99770
+
+        Reviewed by Geoffrey Garen.
+
+        Added a new build target "Copy WTF HEaders" to copy the header files and made that new target a dependency
+        for the main WTF build target.  Moved the "Copy WTF Headers" phase from WTF target to the new target.
+
+        * WTF.xcodeproj/project.pbxproj:
+
 2012-10-17  Anders Carlsson  <andersca@apple.com>
 
         Clean up Vector.h

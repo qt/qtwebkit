@@ -679,6 +679,7 @@ bool WebViewImpl::handleGestureEvent(const WebGestureEvent& event)
             m_linkHighlight->startHighlightAnimationIfNeeded();
         break;
     case WebInputEvent::GestureTap:
+    case WebInputEvent::GestureLongPress:
         // If a link highlight is active, kill it.
         m_linkHighlight.clear();
         break;
@@ -774,10 +775,12 @@ bool WebViewImpl::handleGestureEvent(const WebGestureEvent& event)
         break;
     }
     case WebInputEvent::GestureDoubleTap:
-        m_client->cancelScheduledContentIntents();
-        animateZoomAroundPoint(WebPoint(event.x, event.y), DoubleTap);
-        eventSwallowed = true;
-        break;
+        if (m_webSettings->doubleTapToZoomEnabled()) {
+            m_client->cancelScheduledContentIntents();
+            animateZoomAroundPoint(WebPoint(event.x, event.y), DoubleTap);
+            eventSwallowed = true;
+            break;
+        }
     case WebInputEvent::GestureScrollBegin:
     case WebInputEvent::GesturePinchBegin:
         m_client->cancelScheduledContentIntents();

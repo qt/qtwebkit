@@ -1,3 +1,457 @@
+2012-10-22  Keishi Hattori  <keishi@webkit.org>
+
+        Remove monthFormatInLDML
+        https://bugs.webkit.org/show_bug.cgi?id=99971
+
+        Reviewed by Kent Tamura.
+
+        * src/LocalizedStrings.cpp:
+
+2012-10-22  Keishi Hattori  <keishi@webkit.org>
+
+        [Chromium] Rename WeekFormatInLDML to WeekFormatTemplate
+        https://bugs.webkit.org/show_bug.cgi?id=99972
+
+        Reviewed by Kent Tamura.
+
+        * src/LocalizedStrings.cpp:
+        (WebCore::weekFormatInLDML):
+
+2012-10-22  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] Fix "ASSERTION FAILED: !document->inPageCache()" when loading a page
+        https://bugs.webkit.org/show_bug.cgi?id=98514
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * src/WebFrameImpl.cpp:
+        (WebKit::WebFrameImpl::createFrameView):
+
+2012-10-22  Pavel Feldman  <pfeldman@chromium.org>
+
+        Web Inspector: merge "docked" state into the "dock side" enum.
+        https://bugs.webkit.org/show_bug.cgi?id=99717
+
+        Reviewed by Vsevolod Vlasov.
+
+        Otherwise, it is hard to manage these inter-dependent flags.
+
+        * src/InspectorFrontendClientImpl.cpp:
+        (WebKit::InspectorFrontendClientImpl::requestSetDockSide):
+        * src/InspectorFrontendClientImpl.h:
+        (InspectorFrontendClientImpl):
+
+2012-10-21  Kent Tamura  <tkent@chromium.org>
+
+        Page popup: Fix crash by events after closing
+        https://bugs.webkit.org/show_bug.cgi?id=99951
+
+        Reviewed by Hajime Morita.
+
+        - We should not handle events after closePopup call.
+        - We should uninstall a DOMWindowPagePopup supplement in closePopup.
+
+        * src/WebPagePopupImpl.cpp:
+        (WebKit::WebPagePopupImpl::WebPagePopupImpl):
+        Initialize m_closing.
+        (WebKit::WebPagePopupImpl::handleGestureEvent):
+        Don't handle events if m_closing.
+        (WebKit::WebPagePopupImpl::handleInputEvent): Ditto.
+        (WebKit::WebPagePopupImpl::handleKeyEvent): Ditto.
+        (WebKit::WebPagePopupImpl::closePopup):
+        - Uninstall a DOMWindowPagePopup supplement.
+        - Set m_closing.
+        * src/WebPagePopupImpl.h:
+        (WebPagePopupImpl): Declare m_closing.
+
+2012-10-21  Terry Anderson  <tdanderson@chromium.org>
+
+        [chromium] Storing the enclosing rect dimensions of the first finger for a two finger tap
+        https://bugs.webkit.org/show_bug.cgi?id=99763
+
+        Reviewed by Adam Barth.
+
+        Add a struct |twoFingerTap| inside the union |data| of a WebGestureEvent. The fields |firstFingerWidth| 
+        and |firstFingerHeight| will represent the dimensions of the enclosing rectangle corresponding to the 
+        first touch point in the gesture. These will be used in a future CL to perform target fuzzing on a 
+        two-finger tap gesture.
+
+        Note: I chose not to name the two fields |width| and |height| so that they aren't confused with the 
+        width and height of the gesture's bounding box, which contains the enclosing rectangles of both touch 
+        points. My future fuzzing CL will only be concerned with the location and enclosing rectangle of the 
+        first touch point.
+
+        * public/WebInputEvent.h:
+
+2012-10-19  Yusuf Ozuysal  <yusufo@google.com>
+
+        [chromium] Double-tap defaults to zoom (should only do this on Android)
+        https://bugs.webkit.org/show_bug.cgi?id=99600
+
+        Reviewed by Adam Barth.
+
+        Adds a web setting for enabling DoubleTapToZoom on a doubleTap gesture.
+        This gesture was just needed for mobile, and the patch that implemented it caused regressions on other platforms.
+
+        * public/WebSettings.h:
+        * src/WebSettingsImpl.cpp:
+        (WebKit::WebSettingsImpl::WebSettingsImpl):
+        (WebKit::WebSettingsImpl::setDoubleTapToZoomEnabled):
+        (WebKit):
+        * src/WebSettingsImpl.h:
+        (WebSettingsImpl):
+        (WebKit::WebSettingsImpl::doubleTapToZoomEnabled):
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::handleGestureEvent):
+        * tests/WebFrameTest.cpp:
+
+2012-10-19  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r131944.
+        http://trac.webkit.org/changeset/131944
+        https://bugs.webkit.org/show_bug.cgi?id=99891
+
+        On second thoughts, not such a great idea (Requested by jamesr
+        on #webkit).
+
+        * public/WebView.h:
+        (WebKit):
+        (WebView):
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::WebViewImpl):
+        (WebKit::WebViewImpl::setIsAcceleratedCompositingActive):
+        (WebKit):
+        * src/WebViewImpl.h:
+        (WebViewImpl):
+        * tests/GraphicsLayerChromiumTest.cpp:
+        (WebKit::GraphicsLayerChromiumTest::GraphicsLayerChromiumTest):
+
+2012-10-19  Jochen Eisinger  <jochen@chromium.org>
+
+        [chromium] when building a shared library component build, we must not depend on WebCore
+
+        Unreviewed build fix.
+
+        * WebKit.gyp:
+
+2012-10-19  Tony Chang  <tony@chromium.org>
+
+        Unreviewed, rolling out r131936.
+        http://trac.webkit.org/changeset/131936
+        https://bugs.webkit.org/show_bug.cgi?id=99717
+
+        Broke the clang build
+
+        * public/WebDevToolsFrontendClient.h:
+        (WebKit::WebDevToolsFrontendClient::requestDockWindow):
+        (WebKit::WebDevToolsFrontendClient::requestUndockWindow):
+        * src/InspectorFrontendClientImpl.cpp:
+        (WebKit::InspectorFrontendClientImpl::requestAttachWindow):
+        (WebKit):
+        (WebKit::InspectorFrontendClientImpl::requestDetachWindow):
+        (WebKit::InspectorFrontendClientImpl::requestSetDockSide):
+        * src/InspectorFrontendClientImpl.h:
+        (InspectorFrontendClientImpl):
+
+2012-10-19  Alexandre Elias  <aelias@chromium.org>
+
+        [chromium] API to pass impl thread via WebLayerTreeView
+        https://bugs.webkit.org/show_bug.cgi?id=99863
+
+        Reviewed by James Robinson.
+
+        This adds an API to pass the compositor impl thread via WebView and
+        WebLayerTreeView. This is currently a no-op change, but in the future
+        this codepath will supercede WebCompositor. The goal is to avoid statics
+        in compositor initialization.
+
+        * public/WebView.h:
+        (WebKit):
+        (WebView):
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::WebViewImpl):
+        (WebKit::WebViewImpl::setCompositorImplThread):
+        (WebKit):
+        (WebKit::WebViewImpl::setIsAcceleratedCompositingActive):
+        * src/WebViewImpl.h:
+        (WebViewImpl):
+        * tests/GraphicsLayerChromiumTest.cpp:
+        (WebKit::GraphicsLayerChromiumTest::GraphicsLayerChromiumTest):
+
+2012-10-19  Pavel Feldman  <pfeldman@chromium.org>
+
+        Web Inspector: merge "docked" state into the "dock side" enum.
+        https://bugs.webkit.org/show_bug.cgi?id=99717
+
+        Reviewed by Vsevolod Vlasov.
+
+        * public/WebDevToolsFrontendClient.h:
+        * src/InspectorFrontendClientImpl.cpp:
+        (WebKit::InspectorFrontendClientImpl::requestSetDockSide):
+        * src/InspectorFrontendClientImpl.h:
+        (InspectorFrontendClientImpl):
+
+2012-09-08  Alpha Lam  <hclam@chromium.org>
+
+        [chromium] Implement deferred image decoding
+        https://bugs.webkit.org/show_bug.cgi?id=94240
+
+        Reviewed by Stephen White.
+
+        Adding new unit tests for deferred image decoding.
+        These tests are defined in DeferredImageDecoderTest.cpp. They verify
+        image decoding happens only when SkPicture is rasterized for both
+        scaled and non-scaled cases.
+
+        Tests: DeferredImageDecoderTest.drawIntoSkPicture
+               DeferredImageDecoderTest.drawScaledIntoSkPicture
+
+        * WebKit.gypi:
+        * public/WebSettings.h:
+        * src/WebKit.cpp:
+        (WebKit::shutdown):
+        * src/WebSettingsImpl.cpp:
+        (WebKit::WebSettingsImpl::setDeferredImageDecodingEnabled):
+        (WebKit):
+        * src/WebSettingsImpl.h:
+        (WebSettingsImpl):
+        * tests/DeferredImageDecoderTest.cpp: Added.
+        (WebCore):
+        (DeferredImageDecoderTest):
+        (WebCore::DeferredImageDecoderTest::SetUp):
+        (WebCore::DeferredImageDecoderTest::TearDown):
+        (WebCore::TEST_F):
+        * tests/MockImageDecoder.h: Added.
+        (WebCore):
+        (MockImageDecoder):
+        (WebCore::MockImageDecoder::MockImageDecoder):
+        (WebCore::MockImageDecoder::filenameExtension):
+        (WebCore::MockImageDecoder::frameBufferAtIndex):
+        (WebCore::MockImageDecoder::frameBufferRequestCount):
+
+2012-10-19  Alpha Lam  <hclam@chromium.org>
+
+        [chromium] Roll DEPS
+
+        Unreviewed DEPS roll.
+
+        * DEPS:
+
+2012-10-19  Dongwoo Joshua Im  <dw.im@samsung.com>
+
+        Rename ENABLE_CSS3_TEXT_DECORATION to ENABLE_CSS3_TEXT
+        https://bugs.webkit.org/show_bug.cgi?id=99804
+
+        Reviewed by Julien Chaffraix.
+
+        CSS3 text related properties will be implemented under this flag,
+        including text decoration, text-align-last, and text-justify.
+
+        * features.gypi:
+
+2012-10-19  Jochen Eisinger  <jochen@chromium.org>
+
+        [chromium] fix the fix
+
+        Unreviewed build fix.
+
+        Forgot to invert the condition when to set the type to none in the
+        previous attempt.
+
+        * WebKit.gyp:
+
+2012-10-19  Jochen Eisinger  <jochen@chromium.org>
+
+        [chromium] Fix inside chromium build on Mac
+
+        Unreviewed build fix.
+
+        Xcode won't create a static library without any sources. So instead of
+        ommitting the sources, just override the webkit_test_support's type
+        with 'none'.
+
+        * WebKit.gyp:
+
+2012-10-17  Ilya Tikhonovsky  <loislo@chromium.org>
+
+        Web Inspector: NMI provide data for mixing with tcmalloc heap dumps.
+        https://bugs.webkit.org/show_bug.cgi?id=99457
+
+        Reviewed by Yury Semikhatsky.
+
+        Embedder's code wraps the map with counted objects info into InstrumentedObjectSizeProvider
+        and forces downstream code to make tcmalloc heap snapshot.
+        The default implementation is empty.
+
+        * public/WebDevToolsAgentClient.h:
+        (InstrumentedObjectSizeProvider):
+        (WebKit::WebDevToolsAgentClient::InstrumentedObjectSizeProvider::~InstrumentedObjectSizeProvider):
+        (WebKit::WebDevToolsAgentClient::dumpUncountedAllocatedObjects):
+        (WebDevToolsAgentClient):
+        * src/InspectorClientImpl.cpp:
+        (WebKit::InspectorClientImpl::dumpUncountedAllocatedObjects):
+        (WebKit):
+        * src/InspectorClientImpl.h:
+        (InspectorClientImpl):
+        * src/WebDevToolsAgentImpl.cpp:
+        (WebKit::WebDevToolsAgentImpl::getAllocatedObjects):
+        (WebKit::WebDevToolsAgentImpl::dumpUncountedAllocatedObjects):
+        (WebKit):
+        * src/WebDevToolsAgentImpl.h:
+        (WebDevToolsAgentImpl):
+
+2012-10-18  Kent Tamura  <tkent@chromium.org>
+
+        Add shortMonthLabels and shortStandAloneMonthLabels to Localizer
+        https://bugs.webkit.org/show_bug.cgi?id=99787
+
+        * tests/LocaleMacTest.cpp:
+        (TEST_F): Disable tests depends on OS X versions.
+
+2012-10-18  Kent Tamura  <tkent@chromium.org>
+
+        Add shortMonthLabels and shortStandAloneMonthLabels to Localizer
+        https://bugs.webkit.org/show_bug.cgi?id=99787
+
+        Reviewed by Kentaro Hara.
+
+        * tests/LocaleMacTest.cpp:
+        (LocaleMacTest::shortMonthLabel): A helper.
+        (LocaleMacTest::shortStandAloneMonthLabel): Ditto.
+        (TEST_F): Added tests for some locales.
+        * tests/LocaleWinTest.cpp:
+        (LocaleWinTest::shortMonthLabel): A helper.
+        (TEST_F): Added tests for some locales. We don't test
+        LocaleWin::shortStandAloneMonthLabels because it is identical to
+        shortMonthLabels.
+        * tests/LocalizedDateICUTest.cpp:
+        (LocalizedDateICUTest::shortMonthLabel): A helper.
+        (LocalizedDateICUTest::shortStandAloneMonthLabel): Ditto.
+        (TEST_F): Added tests for some locales.
+
+2012-10-18  Jochen Eisinger  <jochen@chromium.org>
+
+        [chromium] Add a webkit_test_support target that WebTestingSupport
+        https://bugs.webkit.org/show_bug.cgi?id=99772
+
+        Reviewed by Adam Barth.
+
+        Before, embedders would need to compile the WebTestingSupport.cpp
+        themselves, which in turn depends on WebCore headers.
+
+        * WebKit.gyp:
+
+2012-10-18  W. James MacLean  <wjmaclean@chromium.org>
+
+        [chromium] Re-enable gesture highlight layout tests, fix GestureLongPress regression.
+        https://bugs.webkit.org/show_bug.cgi?id=99632
+
+        Reviewed by James Robinson.
+
+        Re-enable layout tests for gesture highlights. Includes fix for GestureTapCancel test.
+
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::handleGestureEvent):
+
+2012-10-18  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r131810.
+        http://trac.webkit.org/changeset/131810
+        https://bugs.webkit.org/show_bug.cgi?id=99762
+
+        Broke linux debug webkit_unit_tests (Requested by
+        danakj|gardening on #webkit).
+
+        * WebKit.gypi:
+        * public/WebSettings.h:
+        * src/WebKit.cpp:
+        (WebKit::shutdown):
+        * src/WebSettingsImpl.cpp:
+        (WebKit::WebSettingsImpl::WebSettingsImpl):
+        * src/WebSettingsImpl.h:
+        (WebSettingsImpl):
+        * tests/DeferredImageDecoderTest.cpp: Removed.
+        * tests/MockImageDecoder.h: Removed.
+
+2012-10-18  Alpha Lam  <hclam@chromium.org>
+
+        [chromium] Implement deferred image decoding
+        https://bugs.webkit.org/show_bug.cgi?id=94240
+
+        Reviewed by Stephen White.
+
+        Adding new unit tests for deferred image decoding.
+        These tests are defined in DeferredImageDecoderTest.cpp. They verify
+        image decoding happens only when SkPicture is rasterized for both
+        scaled and non-scaled cases.
+
+        Tests: DeferredImageDecoderTest.drawIntoSkPicture
+               DeferredImageDecoderTest.drawScaledIntoSkPicture
+
+        * WebKit.gypi:
+        * public/WebSettings.h:
+        * src/WebKit.cpp:
+        (WebKit::shutdown):
+        * src/WebSettingsImpl.cpp:
+        (WebKit::WebSettingsImpl::setDeferredImageDecodingEnabled):
+        (WebKit):
+        * src/WebSettingsImpl.h:
+        (WebSettingsImpl):
+        * tests/DeferredImageDecoderTest.cpp: Added.
+        (WebCore):
+        (DeferredImageDecoderTest):
+        (WebCore::DeferredImageDecoderTest::SetUp):
+        (WebCore::DeferredImageDecoderTest::TearDown):
+        (WebCore::TEST_F):
+        * tests/MockImageDecoder.h: Added.
+        (WebCore):
+        (MockImageDecoder):
+        (WebCore::MockImageDecoder::MockImageDecoder):
+        (WebCore::MockImageDecoder::filenameExtension):
+        (WebCore::MockImageDecoder::frameBufferAtIndex):
+        (WebCore::MockImageDecoder::frameBufferRequestCount):
+
+2012-10-18  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
+2012-10-18  Pablo Flouret  <pablof@motorola.com>
+
+        Implement css3-conditional's @supports rule
+        https://bugs.webkit.org/show_bug.cgi?id=86146
+
+        Reviewed by Antti Koivisto.
+
+        * features.gypi:
+            Add an ENABLE_CSS3_CONDITIONAL_RULES flag.
+
+2012-10-18  Kent Tamura  <tkent@chromium.org>
+
+        Add Localizer::monthFormat and implementations
+        https://bugs.webkit.org/show_bug.cgi?id=99704
+
+        * tests/LocaleMacTest.cpp:
+        (TEST_F): Remove tests for fr_FR and ru locales for a compatibility reason.
+
+2012-10-18  Kent Tamura  <tkent@chromium.org>
+
+        Add Localizer::monthFormat and implementations
+        https://bugs.webkit.org/show_bug.cgi?id=99704
+
+        Reviewed by Kentaro Hara.
+
+        * tests/LocaleMacTest.cpp:
+        (LocaleMacTest::monthFormat): A helper function.
+        (TEST_F): Added some tests.
+        * tests/LocaleWinTest.cpp:
+        (LocaleWinTest::monthFormat): A helper function.
+        (TEST_F): Added some tests.
+        * tests/LocalizedDateICUTest.cpp:
+        (LocalizedDateICUTest::monthFormat): A helper function.
+        (TEST_F): Added some tests.
+
 2012-10-17  Mike West  <mkwst@chromium.org>
 
         Move mixed content logic out of FrameLoader

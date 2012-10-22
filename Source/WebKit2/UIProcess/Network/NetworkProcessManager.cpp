@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Samsung Electronics. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,44 +23,48 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef EflViewportHandler_h
-#define EflViewportHandler_h
+#include "config.h"
+#include "NetworkProcessManager.h"
 
-#if USE(COORDINATED_GRAPHICS)
-
-#include "PageClientImpl.h"
-#include <wtf/PassOwnPtr.h>
+#include "NetworkProcessProxy.h"
 
 namespace WebKit {
 
-class EflViewportHandler {
-public:
-    static PassOwnPtr<EflViewportHandler> create(Evas_Object* viewWidget)
-    {
-        return adoptPtr(new EflViewportHandler(viewWidget));
-    }
-    ~EflViewportHandler();
+NetworkProcessManager& NetworkProcessManager::shared()
+{
+    DEFINE_STATIC_LOCAL(NetworkProcessManager, networkProcessManager, ());
+    return networkProcessManager;
+}
 
-    DrawingAreaProxy* drawingArea() const;
-    WebCore::IntSize viewSize() { return m_viewportSize; }
+NetworkProcessManager::NetworkProcessManager()
+{
+}
 
-    void display(const WebCore::IntRect& rect, const WebCore::IntPoint& viewPosition);
-    void updateViewportSize(const WebCore::IntSize& viewportSize);
-    void setVisibleContentsRect(const WebCore::IntPoint&, float, const WebCore::FloatPoint&);
-    void didChangeContentsSize(const WebCore::IntSize& size);
-    void setRendererActive(bool);
-private:
-    explicit EflViewportHandler(Evas_Object*);
+void NetworkProcessManager::getNetworkProcessConnection(PassRefPtr<Messages::WebProcessProxy::GetNetworkProcessConnection::DelayedReply> reply)
+{
+    ASSERT(reply);
 
-    Evas_Object* m_viewWidget;
-    WebCore::IntRect m_visibleContentRect;
-    WebCore::IntSize m_contentsSize;
-    WebCore::IntSize m_viewportSize;
-    float m_scaleFactor;
-};
+    ensureNetworkProcess();
+    ASSERT(m_networkProcess);
+
+    m_networkProcess->getNetworkProcessConnection(reply);
+}
+
+void NetworkProcessManager::ensureNetworkProcess()
+{
+    if (m_networkProcess)
+        return;
+
+    m_networkProcess = NetworkProcessProxy::create(this);
+}
+
+void NetworkProcessManager::removeNetworkProcessProxy(NetworkProcessProxy* networkProcessProxy)
+{
+    ASSERT(m_networkProcess);
+    ASSERT(networkProcessProxy == m_networkProcess.get());
+    
+    m_networkProcess = 0;
+}
+
 
 } // namespace WebKit
-
-#endif
-
-#endif // EflViewportHandler_h

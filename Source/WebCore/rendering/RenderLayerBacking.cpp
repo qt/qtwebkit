@@ -125,7 +125,10 @@ RenderLayerBacking::RenderLayerBacking(RenderLayer* layer)
             if (TiledBacking* tiledBacking = m_graphicsLayer->tiledBacking()) {
                 Frame* frame = renderer()->frame();
                 tiledBacking->setIsInWindow(page->isOnscreen());
-                tiledBacking->setTileCoverage(frame->view()->canHaveScrollbars() ? TiledBacking::CoverageForScrolling : TiledBacking::CoverageForVisibleArea);
+                if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator()) {
+                    bool shouldLimitTileCoverage = !frame->view()->canHaveScrollbars() || scrollingCoordinator->shouldUpdateScrollLayerPositionOnMainThread();
+                    tiledBacking->setTileCoverage(shouldLimitTileCoverage ? TiledBacking::CoverageForVisibleArea : TiledBacking::CoverageForScrolling);
+                }
                 tiledBacking->setScrollingPerformanceLoggingEnabled(frame->settings() && frame->settings()->scrollingPerformanceLoggingEnabled());
             }
         }
@@ -965,7 +968,7 @@ bool RenderLayerBacking::updateScrollingLayers(bool needsScrollingLayers)
     return layerChanged;
 }
 
-void RenderLayerBacking::attachToScrollingCoordinator()
+void RenderLayerBacking::attachToScrollingCoordinator(RenderLayerBacking* parent)
 {
     // If m_scrollLayerID non-zero, then this backing is already attached to the ScrollingCoordinator.
     if (m_scrollLayerID)
@@ -978,8 +981,9 @@ void RenderLayerBacking::attachToScrollingCoordinator()
     ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator();
     if (!scrollingCoordinator)
         return;
-    
-    m_scrollLayerID = scrollingCoordinator->attachToStateTree(scrollingCoordinator->uniqueScrollLayerID());
+
+    ScrollingNodeID parentID = parent ? parent->scrollLayerID() : 0;
+    m_scrollLayerID = scrollingCoordinator->attachToStateTree(scrollingCoordinator->uniqueScrollLayerID(), parentID);
 }
 
 void RenderLayerBacking::detachFromScrollingCoordinator()

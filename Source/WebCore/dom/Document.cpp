@@ -797,7 +797,7 @@ void Document::setCompatibilityMode(CompatibilityMode mode)
 {
     if (m_compatibilityModeLocked || mode == m_compatibilityMode)
         return;
-    ASSERT(m_styleSheetCollection->authorStyleSheets().isEmpty());
+    ASSERT(m_styleSheetCollection->activeAuthorStyleSheets().isEmpty());
     bool wasInQuirksMode = inQuirksMode();
     m_compatibilityMode = mode;
     selectorQueryCache()->invalidate();
@@ -1926,6 +1926,7 @@ void Document::updateLayout()
 
     updateStyleIfNeeded();
 
+    StackStats::LayoutCheckPoint layoutCheckPoint;
     // Only do a layout if changes have occurred that make it necessary.      
     FrameView* v = view();
     if (v && renderer() && (v->layoutPending() || renderer()->needsLayout()))
@@ -5240,6 +5241,9 @@ void Document::webkitExitFullscreen()
 
     // 6. Return, and run the remaining steps asynchronously.
     // 7. Optionally, perform some animation.
+
+    if (!page())
+        return;
 
     // Only exit out of full screen window mode if there are no remaining elements in the 
     // full screen stack.

@@ -114,6 +114,7 @@ TestShell::TestShell()
     , m_accelerated2dCanvasEnabled(false)
     , m_deferred2dCanvasEnabled(false)
     , m_acceleratedPaintingEnabled(false)
+    , m_deferredImageDecodingEnabled(false)
     , m_stressOpt(false)
     , m_stressDeopt(false)
     , m_dumpWhenFinished(true)
@@ -135,6 +136,7 @@ TestShell::TestShell()
     WebRuntimeFeatures::enableEncryptedMedia(true);
     WebRuntimeFeatures::enableMediaStream(true);
     WebRuntimeFeatures::enablePeerConnection(true);
+    WebRuntimeFeatures::enableDeprecatedPeerConnection(true);
     WebRuntimeFeatures::enableWebAudio(true);
     WebRuntimeFeatures::enableVideoTrack(true);
     WebRuntimeFeatures::enableGamepad(true);
@@ -152,7 +154,7 @@ TestShell::TestShell()
 void TestShell::initialize()
 {
     m_webPermissions = adoptPtr(new WebPermissions(this));
-    m_testInterfaces = adoptPtr(new TestInterfaces());
+    m_testInterfaces = adoptPtr(new WebTestRunner::WebTestInterfaces());
     m_testRunner = adoptPtr(new DRTTestRunner(this));
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     m_notificationPresenter = adoptPtr(new NotificationPresenter(this));
@@ -229,6 +231,7 @@ void TestShell::resetWebSettings(WebView& webView)
     m_prefs.accelerated2dCanvasEnabled = m_accelerated2dCanvasEnabled;
     m_prefs.deferred2dCanvasEnabled = m_deferred2dCanvasEnabled;
     m_prefs.acceleratedPaintingEnabled = m_acceleratedPaintingEnabled;
+    m_prefs.deferredImageDecodingEnabled = m_deferredImageDecodingEnabled;
     m_prefs.applyTo(&webView);
 }
 

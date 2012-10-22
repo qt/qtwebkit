@@ -1420,9 +1420,15 @@ bool AbstractState::execute(unsigned indexInBlock)
             ASSERT_NOT_REACHED();
             break;
         }
+        forNode(node.child1()).filterArrayModes(arrayModesFor(node.arrayMode()));
         break;
     }
     case Arrayify: {
+        if (modeAlreadyChecked(forNode(node.child1()), node.arrayMode())) {
+            m_foundConstants = true;
+            node.setCanExit(false);
+            break;
+        }
         switch (node.arrayMode()) {
         case ALL_EFFECTFUL_MODES:
             node.setCanExit(true);
@@ -1431,9 +1437,10 @@ bool AbstractState::execute(unsigned indexInBlock)
                 forNode(node.child2()).filter(SpecInt32);
             forNode(nodeIndex).clear();
             clobberStructures(indexInBlock);
+            forNode(node.child1()).filterArrayModes(arrayModesFor(node.arrayMode()));
             break;
         default:
-            ASSERT_NOT_REACHED();
+            CRASH();
             break;
         }
         break;
@@ -1524,7 +1531,12 @@ bool AbstractState::execute(unsigned indexInBlock)
         clobberWorld(node.codeOrigin, indexInBlock);
         forNode(nodeIndex).makeTop();
         break;
-            
+
+    case GarbageValue:
+        clobberWorld(node.codeOrigin, indexInBlock);
+        forNode(nodeIndex).makeTop();
+        break;
+
     case ForceOSRExit:
         node.setCanExit(true);
         m_isValid = false;

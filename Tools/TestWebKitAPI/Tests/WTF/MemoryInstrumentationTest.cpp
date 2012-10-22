@@ -95,7 +95,7 @@ public:
 private:
     class Client : public WTF::MemoryInstrumentationClient {
     public:
-        virtual void countObjectSize(MemoryObjectType objectType, size_t size)
+        virtual void countObjectSize(const void*, MemoryObjectType objectType, size_t size)
         {
             TypeToSizeMap::AddResult result = m_totalSizes.add(objectType, size);
             if (!result.isNewEntry)
@@ -732,6 +732,29 @@ TEST(MemoryInstrumentationTest, arrayBuffer)
     helper.addRootObject(value);
     EXPECT_EQ(sizeof(int) * 1000 + sizeof(ArrayBuffer), helper.reportedSizeForAllTypes());
     EXPECT_EQ(2u, helper.visitedObjects());
+}
+
+class ClassWithTwoAncestors : public NotInstrumented, public Instrumented {
+public:
+    virtual void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+    {
+        MemoryClassInfo info(memoryObjectInfo, this, TestType);
+    }
+};
+
+
+TEST(MemoryInstrumentationTest, instrumentedWithMultipleAncestors)
+{
+    InstrumentationTestHelper helper;
+    OwnPtr<ClassWithTwoAncestors> instance = adoptPtr(new ClassWithTwoAncestors());
+    ClassWithTwoAncestors* descendantPointer = instance.get();
+    InstrumentedOwner<ClassWithTwoAncestors*> descendantPointerOwner(descendantPointer);
+    Instrumented* ancestorPointer = descendantPointer;
+    InstrumentedOwner<Instrumented*> ancestorPointerOwner(ancestorPointer);
+    helper.addRootObject(descendantPointerOwner);
+    helper.addRootObject(ancestorPointerOwner);
+    EXPECT_EQ(sizeof(ClassWithTwoAncestors), helper.reportedSizeForAllTypes());
+    EXPECT_EQ(1u, helper.visitedObjects());
 }
 
 } // namespace

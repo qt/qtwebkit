@@ -308,9 +308,6 @@ namespace WebCore {
         void setMemoryCacheClientCallsEnabled(bool);
         bool areMemoryCacheClientCallsEnabled() const { return m_areMemoryCacheClientCallsEnabled; }
 
-        void setJavaScriptURLsAreAllowed(bool);
-        bool javaScriptURLsAreAllowed() const;
-
         // Don't allow more than a certain number of frames in a page.
         // This seems like a reasonable upper bound, and otherwise mutually
         // recursive frameset pages can quickly bring the program to its knees
@@ -351,6 +348,11 @@ namespace WebCore {
         bool hasSeenAnyPlugin() const;
         void sawPlugin(const String& serviceType);
         void resetSeenPlugins();
+
+        bool hasSeenMediaEngine(const String& engineName) const;
+        bool hasSeenAnyMediaEngine() const;
+        void sawMediaEngine(const String& engineName);
+        void resetSeenMediaEngines();
 
         void reportMemoryUsage(MemoryObjectInfo*) const;
 
@@ -426,8 +428,6 @@ namespace WebCore {
 
         Pagination m_pagination;
 
-        bool m_javaScriptURLsAreAllowed;
-
         String m_userStyleSheetPath;
         mutable String m_userStyleSheet;
         mutable bool m_didLoadUserStyleSheet;
@@ -473,6 +473,7 @@ namespace WebCore {
         bool m_scriptedAnimationsSuspended;
 
         HashSet<String> m_seenPlugins;
+        HashSet<String> m_seenMediaEngines;
     };
 
 } // namespace WebCore

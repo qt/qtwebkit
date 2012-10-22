@@ -63,6 +63,7 @@
 #include <wtf/gobject/GRefPtr.h>
 #include <wtf/text/CString.h>
 
+using namespace WebKit;
 using namespace WebCore;
 
 enum {
@@ -301,7 +302,7 @@ static void iconReadyCallback(WebKitFaviconDatabase* database, const char* uri, 
 static void webkitWebViewSetSettings(WebKitWebView* webView, WebKitSettings* settings)
 {
     webView->priv->settings = settings;
-    webkitSettingsAttachSettingsToPage(webView->priv->settings.get(), toAPI(getPage(webView)));
+    webkitSettingsAttachSettingsToPage(webView->priv->settings.get(), getPage(webView));
     g_signal_connect(settings, "notify::allow-modal-dialogs", G_CALLBACK(allowModalDialogsChanged), webView);
     g_signal_connect(settings, "notify::zoom-text-only", G_CALLBACK(zoomTextOnlyChanged), webView);
     g_signal_connect(settings, "notify::user-agent", G_CALLBACK(userAgentChanged), webView);
@@ -402,7 +403,7 @@ static void webkitWebViewConstructed(GObject* object)
 
     attachLoaderClientToView(webView);
     attachUIClientToView(webView);
-    attachPolicyClientToPage(webView);
+    attachPolicyClientToView(webView);
     attachResourceLoadClientToView(webView);
     attachFullScreenClientToView(webView);
     attachContextMenuClientToView(webView);
@@ -1231,7 +1232,7 @@ static void setCertificateToMainResource(WebKitWebView* webView)
     ASSERT(priv->mainResource.get());
 
     webkitURIResponseSetCertificateInfo(webkit_web_resource_get_response(priv->mainResource.get()),
-                                        WKFrameGetCertificateInfo(webkitWebResourceGetFrame(priv->mainResource.get())));
+                                        webkitWebResourceGetFrame(priv->mainResource.get())->certificateInfo());
 }
 
 static void webkitWebViewEmitLoadChanged(WebKitWebView* webView, WebKitLoadEvent loadEvent)
@@ -1355,7 +1356,7 @@ WebPageProxy* webkitWebViewCreateNewPage(WebKitWebView* webView, ImmutableDictio
     if (!newWebView)
         return 0;
 
-    webkitWindowPropertiesUpdateFromWKWindowFeatures(newWebView->priv->windowProperties.get(), toAPI(windowFeatures));
+    webkitWindowPropertiesUpdateFromWebWindowFeatures(newWebView->priv->windowProperties.get(), windowFeatures);
 
     RefPtr<WebPageProxy> newPage = getPage(newWebView);
     return newPage.release().leakRef();
@@ -1423,11 +1424,11 @@ void webkitWebViewMouseTargetChanged(WebKitWebView* webView, WebHitTestResult* h
     WebKitWebViewPrivate* priv = webView->priv;
     if (priv->mouseTargetHitTestResult
         && priv->mouseTargetModifiers == modifiers
-        && webkitHitTestResultCompare(priv->mouseTargetHitTestResult.get(), toAPI(hitTestResult)))
+        && webkitHitTestResultCompare(priv->mouseTargetHitTestResult.get(), hitTestResult))
         return;
 
     priv->mouseTargetModifiers = modifiers;
-    priv->mouseTargetHitTestResult = adoptGRef(webkitHitTestResultCreate(toAPI(hitTestResult)));
+    priv->mouseTargetHitTestResult = adoptGRef(webkitHitTestResultCreate(hitTestResult));
     g_signal_emit(webView, signals[MOUSE_TARGET_CHANGED], 0, priv->mouseTargetHitTestResult.get(), modifiers);
 }
 
@@ -1467,7 +1468,7 @@ void webkitWebViewResourceLoadStarted(WebKitWebView* webView, WebFrameProxy* fra
 {
     WebKitWebViewPrivate* priv = webView->priv;
     bool isMainResource = frame->isMainFrame() && !priv->mainResource;
-    WebKitWebResource* resource = webkitWebResourceCreate(toAPI(frame), request, isMainResource);
+    WebKitWebResource* resource = webkitWebResourceCreate(frame, request, isMainResource);
     if (isMainResource) {
         priv->mainResource = resource;
         waitForMainResourceResponseIfWaitingForResource(webView);
@@ -1581,7 +1582,7 @@ void webkitWebViewPopulateContextMenu(WebKitWebView* webView, ImmutableArray* pr
     if (webHitTestResult->isContentEditable())
         webkitWebViewCreateAndAppendInputMethodsMenuItem(webView, contextMenu.get());
 
-    GRefPtr<WebKitHitTestResult> hitTestResult = adoptGRef(webkitHitTestResultCreate(toAPI(webHitTestResult)));
+    GRefPtr<WebKitHitTestResult> hitTestResult = adoptGRef(webkitHitTestResultCreate(webHitTestResult));
     GOwnPtr<GdkEvent> contextMenuEvent(webkitWebViewBaseTakeContextMenuEvent(webViewBase));
 
     gboolean returnValue;

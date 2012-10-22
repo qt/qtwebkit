@@ -48,6 +48,7 @@
 #include "HTMLElement.h"
 #include "HTMLFormCollection.h"
 #include "HTMLFrameOwnerElement.h"
+#include "HTMLLabelElement.h"
 #include "HTMLNames.h"
 #include "HTMLOptionsCollection.h"
 #include "HTMLParserIdioms.h"
@@ -959,16 +960,14 @@ Node::InsertionNotificationRequest Element::insertedInto(ContainerNode* insertio
     if (!nameValue.isNull())
         updateName(nullAtom, nameValue);
 
+    if (hasTagName(labelTag)) {
+        TreeScope* scope = treeScope();
+        if (scope->shouldCacheLabelsByForAttribute())
+            updateLabel(scope, nullAtom, fastGetAttribute(forAttr));
+    }
+
     return InsertionDone;
 }
-
-static inline TreeScope* treeScopeOfParent(Node* node, ContainerNode* insertionPoint)
-{
-    if (Node* parent = node->parentNode())
-        parent->treeScope();
-    return insertionPoint->treeScope();
-}
-
 
 void Element::removedFrom(ContainerNode* insertionPoint)
 {
@@ -986,11 +985,17 @@ void Element::removedFrom(ContainerNode* insertionPoint)
     if (insertionPoint->inDocument()) {
         const AtomicString& idValue = getIdAttribute();
         if (!idValue.isNull() && inDocument())
-            updateId(treeScopeOfParent(this, insertionPoint), idValue, nullAtom);
+            updateId(insertionPoint->treeScope(), idValue, nullAtom);
 
         const AtomicString& nameValue = getNameAttribute();
         if (!nameValue.isNull())
             updateName(nameValue, nullAtom);
+
+        if (hasTagName(labelTag)) {
+            TreeScope* treeScope = insertionPoint->treeScope();
+            if (treeScope->shouldCacheLabelsByForAttribute())
+                updateLabel(treeScope, fastGetAttribute(forAttr), nullAtom);
+        }
     }
 
     ContainerNode::removedFrom(insertionPoint);
@@ -1011,7 +1016,7 @@ void Element::attach()
     if (ElementShadow* shadow = this->shadow()) {
         parentPusher.push();
         shadow->attach();
-        attachChildrenIfNeeded();
+        attachChildren();
         attachAsNode();
     } else {
         if (firstChild())
@@ -2133,12 +2138,33 @@ bool Element::hasNamedNodeMap() const
 }
 #endif
 
+void Element::updateLabel(TreeScope* scope, const AtomicString& oldForAttributeValue, const AtomicString& newForAttributeValue)
+{
+    ASSERT(hasTagName(labelTag));
+
+    if (!inDocument())
+        return;
+
+    if (oldForAttributeValue == newForAttributeValue)
+        return;
+
+    if (!oldForAttributeValue.isEmpty())
+        scope->removeLabel(oldForAttributeValue, static_cast<HTMLLabelElement*>(this));
+    if (!newForAttributeValue.isEmpty())
+        scope->addLabel(newForAttributeValue, static_cast<HTMLLabelElement*>(this));
+}
+
 void Element::willModifyAttribute(const QualifiedName& name, const AtomicString& oldValue, const AtomicString& newValue)
 {
     if (isIdAttributeName(name))
         updateId(oldValue, newValue);
     else if (name == HTMLNames::nameAttr)
         updateName(oldValue, newValue);
+    else if (name == HTMLNames::forAttr && hasTagName(labelTag)) {
+        TreeScope* scope = treeScope();
+        if (scope->shouldCacheLabelsByForAttribute())
+            updateLabel(scope, oldValue, newValue);
+    }
 
 #if ENABLE(MUTATION_OBSERVERS)
     if (OwnPtr<MutationObserverInterestGroup> recipients = MutationObserverInterestGroup::createForAttributesMutation(this, name))

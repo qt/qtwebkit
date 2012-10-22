@@ -65,6 +65,7 @@
 #include "StrongInlines.h"
 #include <limits.h>
 #include <stdio.h>
+#include <wtf/StackStats.h>
 #include <wtf/Threading.h>
 #include <wtf/text/StringBuilder.h>
 
@@ -307,11 +308,7 @@ void Interpreter::dumpRegisters(CallFrame* callFrame)
         JSValue v = it->jsValue();
         int registerNumber = it - callFrame->registers();
         String name = codeBlock->nameForRegister(registerNumber);
-#if USE(JSVALUE32_64)
-        dataLog("[r% 3d %14s]      | %10p | %-16s 0x%llx \n", registerNumber, name.ascii().data(), it, v.description(), JSValue::encode(v));
-#else
-        dataLog("[r% 3d %14s]      | %10p | %-16s %p \n", registerNumber, name.ascii().data(), it, v.description(), JSValue::encode(v));
-#endif
+        dataLog("[r% 3d %14s]      | %10p | %-16s 0x%lld \n", registerNumber, name.ascii().data(), it, v.description(), (long long)JSValue::encode(v));
         it++;
     }
     
@@ -346,11 +343,7 @@ void Interpreter::dumpRegisters(CallFrame* callFrame)
             JSValue v = it->jsValue();
             int registerNumber = it - callFrame->registers();
             String name = codeBlock->nameForRegister(registerNumber);
-#if USE(JSVALUE32_64)
-            dataLog("[r% 3d %14s]      | %10p | %-16s 0x%llx \n", registerNumber, name.ascii().data(), it, v.description(), JSValue::encode(v));
-#else
-            dataLog("[r% 3d %14s]      | %10p | %-16s %p \n", registerNumber, name.ascii().data(), it, v.description(), JSValue::encode(v));
-#endif
+            dataLog("[r% 3d %14s]      | %10p | %-16s 0x%lld \n", registerNumber, name.ascii().data(), it, v.description(), (long long)JSValue::encode(v));
             ++it;
             ++registerCount;
         } while (it != end);
@@ -361,11 +354,7 @@ void Interpreter::dumpRegisters(CallFrame* callFrame)
     if (it != end) {
         do {
             JSValue v = (*it).jsValue();
-#if USE(JSVALUE32_64)
-            dataLog("[r% 3d]                     | %10p | %-16s 0x%llx \n", registerCount, it, v.description(), JSValue::encode(v));
-#else
-            dataLog("[r% 3d]                     | %10p | %-16s %p \n", registerCount, it, v.description(), JSValue::encode(v));
-#endif
+            dataLog("[r% 3d]                     | %10p | %-16s 0x%lld \n", registerCount, it, v.description(), (long long)JSValue::encode(v));
             ++it;
             ++registerCount;
         } while (it != end);
@@ -764,6 +753,7 @@ JSValue Interpreter::execute(ProgramExecutable* program, CallFrame* callFrame, J
     if (callFrame->globalData().isCollectorBusy())
         CRASH();
 
+    StackStats::CheckPoint stackCheckPoint;
     if (m_reentryDepth >= MaxSmallThreadReentryDepth && m_reentryDepth >= callFrame->globalData().maxReentryDepth)
         return checkedReturn(throwStackOverflowError(callFrame));
 
@@ -926,6 +916,7 @@ JSValue Interpreter::executeCall(CallFrame* callFrame, JSObject* function, CallT
     if (callFrame->globalData().isCollectorBusy())
         return jsNull();
 
+    StackStats::CheckPoint stackCheckPoint;
     if (m_reentryDepth >= MaxSmallThreadReentryDepth && m_reentryDepth >= callFrame->globalData().maxReentryDepth)
         return checkedReturn(throwStackOverflowError(callFrame));
 
@@ -1021,6 +1012,7 @@ JSObject* Interpreter::executeConstruct(CallFrame* callFrame, JSObject* construc
     if (callFrame->globalData().isCollectorBusy())
         return checkedReturn(throwStackOverflowError(callFrame));
 
+    StackStats::CheckPoint stackCheckPoint;
     if (m_reentryDepth >= MaxSmallThreadReentryDepth && m_reentryDepth >= callFrame->globalData().maxReentryDepth)
         return checkedReturn(throwStackOverflowError(callFrame));
 
@@ -1118,6 +1110,7 @@ CallFrameClosure Interpreter::prepareForRepeatCall(FunctionExecutable* functionE
     if (callFrame->globalData().isCollectorBusy())
         return CallFrameClosure();
 
+    StackStats::CheckPoint stackCheckPoint;
     if (m_reentryDepth >= MaxSmallThreadReentryDepth && m_reentryDepth >= callFrame->globalData().maxReentryDepth) {
         throwStackOverflowError(callFrame);
         return CallFrameClosure();
@@ -1159,6 +1152,8 @@ JSValue Interpreter::execute(CallFrameClosure& closure)
     ASSERT(!closure.oldCallFrame->globalData().isCollectorBusy());
     if (closure.oldCallFrame->globalData().isCollectorBusy())
         return jsNull();
+
+    StackStats::CheckPoint stackCheckPoint;
     closure.resetCallFrame();
     if (Profiler* profiler = closure.oldCallFrame->globalData().enabledProfiler())
         profiler->willExecute(closure.oldCallFrame, closure.function);
@@ -1201,6 +1196,7 @@ JSValue Interpreter::execute(EvalExecutable* eval, CallFrame* callFrame, JSValue
 
     DynamicGlobalObjectScope globalObjectScope(*scope->globalData(), scope->globalObject());
 
+    StackStats::CheckPoint stackCheckPoint;
     if (m_reentryDepth >= MaxSmallThreadReentryDepth && m_reentryDepth >= callFrame->globalData().maxReentryDepth)
         return checkedReturn(throwStackOverflowError(callFrame));
 

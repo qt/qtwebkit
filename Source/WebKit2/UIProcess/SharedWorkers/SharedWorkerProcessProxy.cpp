@@ -26,6 +26,8 @@
 #include "config.h"
 #include "SharedWorkerProcessProxy.h"
 
+#if ENABLE(SHARED_WORKER_PROCESS)
+
 #include "SharedWorkerProcessCreationParameters.h"
 #include "SharedWorkerProcessManager.h"
 #include "SharedWorkerProcessMessages.h"
@@ -113,9 +115,9 @@ void SharedWorkerProcessProxy::sharedWorkerProcessCrashedOrFailedToLaunch()
     m_sharedWorkerProcessManager->removeSharedWorkerProcessProxy(this);
 }
 
-void SharedWorkerProcessProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
+void SharedWorkerProcessProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
 {
-    didReceiveSharedWorkerProcessProxyMessage(connection, messageID, arguments);
+    didReceiveSharedWorkerProcessProxyMessage(connection, messageID, decoder);
 }
 
 void SharedWorkerProcessProxy::didClose(CoreIPC::Connection*)
@@ -181,3 +183,5 @@ void SharedWorkerProcessProxy::didCreateWebProcessConnection(const CoreIPC::Atta
 }
 
 } // namespace WebKit
+
+#endif // ENABLE(SHARED_WORKER_PROCESS)

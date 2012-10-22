@@ -26,6 +26,8 @@
 #ifndef SharedWorkerProcess_h
 #define SharedWorkerProcess_h
 
+#if ENABLE(SHARED_WORKER_PROCESS)
+
 #include "ChildProcess.h"
 #include <wtf/Forward.h>
 
@@ -55,12 +57,12 @@ private:
     virtual bool shouldTerminate();
 
     // CoreIPC::Connection::Client
-    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
     virtual void didClose(CoreIPC::Connection*);
     virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::MessageID);
 
     // Message handlers.
-    void didReceiveSharedWorkerProcessMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::ArgumentDecoder*);
+    void didReceiveSharedWorkerProcessMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
     void initializeSharedWorkerProcess(const SharedWorkerProcessCreationParameters&);
     void createWebProcessConnection();
 
@@ -79,5 +81,7 @@ private:
 };
 
 } // namespace WebKit
+
+#endif // ENABLE(SHARED_WORKER_PROCESS)
 
 #endif // SharedWorkerProcess_h

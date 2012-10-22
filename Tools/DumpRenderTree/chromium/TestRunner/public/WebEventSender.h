@@ -28,34 +28,32 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef TestInterfaces_h
-#define TestInterfaces_h
+#ifndef WebEventSender_h
+#define WebEventSender_h
+
+#include "WebDragOperation.h"
 
 namespace WebKit {
-class WebFrame;
-class WebView;
+class WebDragData;
 }
 
-class AccessibilityController;
+namespace WebTestRunner {
+
 class EventSender;
-class TestDelegate;
 
-class TestInterfaces {
+class WebEventSender {
 public:
-    TestInterfaces();
-    ~TestInterfaces();
+#if WEBTESTRUNNER_IMPLEMENTATION
+    explicit WebEventSender(EventSender*);
+#endif
 
-    void setWebView(WebKit::WebView*);
-    void setDelegate(TestDelegate*);
-    void bindTo(WebKit::WebFrame*);
-    void resetAll();
-
-    AccessibilityController* accessibilityController();
-    EventSender* eventSender();
+    // Simulate drag&drop system call.
+    void doDragDrop(const WebKit::WebDragData&, WebKit::WebDragOperationsMask);
 
 private:
-    class Internal;
-    Internal* m_internal;
+    EventSender* m_private;
 };
 
-#endif // TestInterfaces_h
+}
+
+#endif // WebEventSender_h

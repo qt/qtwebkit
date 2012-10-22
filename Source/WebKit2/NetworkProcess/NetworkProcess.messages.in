@@ -25,6 +25,9 @@
 messages -> NetworkProcess {
     # Initializes the network process.
     InitializeNetworkProcess(WebKit::NetworkProcessCreationParameters processCreationParameters)
+
+    # Creates a connection for communication with a WebProcess
+    CreateNetworkConnectionToWebProcess()
 }
 
 #endif // ENABLE(NETWORK_PROCESS)

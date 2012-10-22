@@ -335,14 +335,25 @@ feature_defines_overrides += ENABLE_SPELLCHECK=0
 endif  # END ENABLE_SPELLCHECK
 
 # ---
+# CSS3 Conditional Rules support
+# ---
+if ENABLE_CSS3_CONDITIONAL_RULES
+feature_defines_overrides += ENABLE_CSS3_CONDITIONAL_RULES=1
+else
+feature_defines_overrides += ENABLE_CSS3_CONDITIONAL_RULES=0
+endif  # END ENABLE_CSS3_CONDITIONAL_RULES
+
+# ---
 # Unstable features
 # If unstable features should not be enabled, their defines should be overriden with a 0 value.
 # ---
 if !ENABLE_UNSTABLE_FEATURES
 feature_defines_unstable += \
-	ENABLE_CSS3_TEXT_DECORATION=0 \
+	ENABLE_CSP_NEXT=0 \
+	ENABLE_CSS3_TEXT=0 \
 	ENABLE_CSS_STICKY_POSITION=0 \
 	ENABLE_LINK_PREFETCH=0 \
+	ENABLE_MICRODATA=0 \
 	ENABLE_MUTATION_OBSERVERS=0 \
 	ENABLE_STYLE_SCOPED=0 \
 	ENABLE_VIDEO_TRACK=0 \
@@ -730,7 +741,8 @@ EXTRA_DIST += \
 	Source/WebCore/bindings/scripts/preprocessor.pm \
 	Source/WebCore/bindings/scripts/preprocess-idls.pl \
 	Source/WebCore/ChangeLog \
-	Source/WebCore/css/CSSGrammar.y \
+	Source/WebCore/css/CSSGrammar.y.in \
+	Source/WebCore/css/CSSGrammar.y.includes \
 	Source/WebCore/css/CSSPropertyNames.in \
 	Source/WebCore/css/CSSValueKeywords.in \
 	Source/WebCore/dom/DOMExceptions.in \

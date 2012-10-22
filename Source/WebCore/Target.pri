@@ -318,6 +318,7 @@ SOURCES += \
     css/SelectorChecker.cpp \
     css/ShadowValue.cpp \
     css/StyleBuilder.cpp \
+    css/StyleInvalidationAnalysis.cpp \
     css/StyleMedia.cpp \
     css/StylePropertySet.cpp \
     css/StylePropertyShorthand.cpp \
@@ -1490,6 +1491,7 @@ HEADERS += \
     css/SiblingTraversalStrategies.h \
     css/StyleMedia.h \
     css/StyleBuilder.h \
+    css/StyleInvalidationAnalysis.h \
     css/StylePropertySet.h \
     css/StylePropertyShorthand.h \
     css/StyleResolver.h \
@@ -3894,6 +3896,7 @@ enable?(WEBGL) {
         html/canvas/OESStandardDerivatives.h \
         html/canvas/OESTextureFloat.h \
         html/canvas/OESVertexArrayObject.h \
+        html/canvas/OESElementIndexUint.h \
         html/canvas/WebGLTexture.h \
         html/canvas/WebGLUniformLocation.h \
         html/canvas/WebGLVertexArrayObjectOES.h \
@@ -3927,6 +3930,7 @@ enable?(WEBGL) {
         html/canvas/OESStandardDerivatives.cpp \
         html/canvas/OESTextureFloat.cpp \
         html/canvas/OESVertexArrayObject.cpp \
+        html/canvas/OESElementIndexUint.cpp \
         html/canvas/WebGLTexture.cpp \
         html/canvas/WebGLUniformLocation.cpp \
         html/canvas/WebGLVertexArrayObjectOES.cpp

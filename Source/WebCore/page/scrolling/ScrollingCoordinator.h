@@ -109,7 +109,7 @@ public:
     virtual bool requestScrollPositionUpdate(FrameView*, const IntPoint&) { return false; }
     virtual bool handleWheelEvent(FrameView*, const PlatformWheelEvent&) { return true; }
     virtual void updateMainFrameScrollPositionAndScrollLayerPosition() { }
-    virtual ScrollingNodeID attachToStateTree(ScrollingNodeID nodeID) { return nodeID; }
+    virtual ScrollingNodeID attachToStateTree(ScrollingNodeID newNodeID, ScrollingNodeID /*parentID*/) { return newNodeID; }
     virtual void detachFromStateTree(ScrollingNodeID) { }
     virtual void clearStateTree() { }
 
@@ -126,6 +126,9 @@ public:
         HasNonLayerFixedObjects = 1 << 3,
         IsImageDocument = 1 << 4
     };
+
+    MainThreadScrollingReasons mainThreadScrollingReasons() const;
+    bool shouldUpdateScrollLayerPositionOnMainThread() const { return mainThreadScrollingReasons() != 0; }
 
     // These virtual functions are currently unique to Chromium's WebLayer approach. Their meaningful
     // implementations are in ScrollingCoordinatorChromium.
@@ -148,7 +151,7 @@ private:
     virtual void recomputeWheelEventHandlerCountForFrameView(FrameView*) { }
     virtual void setShouldUpdateScrollLayerPositionOnMainThread(MainThreadScrollingReasons) { }
 
-    bool hasNonLayerFixedObjects(FrameView*);
+    bool hasNonLayerFixedObjects(FrameView*) const;
     void updateShouldUpdateScrollLayerPositionOnMainThread();
 
     bool m_forceMainThreadScrollLayerPositionUpdates;

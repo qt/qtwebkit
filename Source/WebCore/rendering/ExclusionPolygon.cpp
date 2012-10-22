@@ -57,37 +57,23 @@ ExclusionPolygon::ExclusionPolygon(PassOwnPtr<Vector<FloatPoint> > vertices, Win
     , m_vertices(vertices)
     , m_fillRule(fillRule)
 {
-    // FIXME: Handle polygons defined with less than 3 non-colinear vertices.
-
     unsigned nVertices = numberOfVertices();
     m_edges.resize(nVertices);
+    m_empty = nVertices < 3;
     Vector<ExclusionPolygonEdge*> sortedEdgesMinY(nVertices);
 
-    const FloatPoint& vertex0 = vertexAt(0);
-    float minX = vertex0.x();
-    float minY = vertex0.y();
-    float maxX = minX;
-    float maxY = minY;
+    if (nVertices)
+        m_boundingBox.setLocation(vertexAt(0));
 
     for (unsigned i = 0; i < nVertices; i++) {
         const FloatPoint& vertex = vertexAt(i);
-
-        minX = std::min(vertex.x(), minX);
-        maxX = std::max(vertex.x(), maxX);
-        minY = std::min(vertex.y(), minY);
-        maxY = std::max(vertex.y(), maxY);
-
+        m_boundingBox.extend(vertex);
         m_edges[i].polygon = this;
         m_edges[i].index1 = i;
         m_edges[i].index2 = (i + 1) % nVertices;
 
         sortedEdgesMinY[i] = &m_edges[i];
     }
-
-    m_boundingBox.setX(minX);
-    m_boundingBox.setY(minY);
-    m_boundingBox.setWidth(maxX - minX);
-    m_boundingBox.setHeight(maxY - minY);
 
     std::sort(sortedEdgesMinY.begin(), sortedEdgesMinY.end(), WebCore::compareEdgeMinY);
 
@@ -257,6 +243,9 @@ void ExclusionPolygon::computeEdgeIntersections(float y1, float y2, Vector<Exclu
 
 void ExclusionPolygon::getExcludedIntervals(float logicalTop, float logicalBottom, SegmentList& result) const
 {
+    if (isEmpty())
+        return;
+
     float y1 = minYForLogicalLine(logicalTop, logicalBottom);
     float y2 = maxYForLogicalLine(logicalTop, logicalBottom);
 
@@ -281,6 +270,9 @@ void ExclusionPolygon::getExcludedIntervals(float logicalTop, float logicalBotto
 
 void ExclusionPolygon::getIncludedIntervals(float logicalTop, float logicalBottom, SegmentList& result) const
 {
+    if (isEmpty())
+        return;
+
     float y1 = minYForLogicalLine(logicalTop, logicalBottom);
     float y2 = maxYForLogicalLine(logicalTop, logicalBottom);
 

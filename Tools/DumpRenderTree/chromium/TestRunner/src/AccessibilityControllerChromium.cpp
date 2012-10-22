@@ -40,6 +40,8 @@
 
 using namespace WebKit;
 
+namespace WebTestRunner {
+
 AccessibilityController::AccessibilityController()
     : m_logAccessibilityEvents(false)
 {
@@ -116,6 +118,9 @@ AccessibilityUIElement* AccessibilityController::getAccessibleElementById(const 
 {
     if (m_rootElement.isNull())
         m_rootElement = m_webView->accessibilityObject();
+
+    if (!m_rootElement.updateBackingStoreAndCheckValidity())
+        return 0;
 
     return findAccessibleElementByIdRecursive(m_rootElement, WebString::fromUTF8(id.c_str()));
 }
@@ -195,4 +200,6 @@ void AccessibilityController::fallbackCallback(const CppArgumentList&, CppVarian
     printf("CONSOLE MESSAGE: JavaScript ERROR: unknown method called on "
            "AccessibilityController\n");
     result->setNull();
+}
+
 }

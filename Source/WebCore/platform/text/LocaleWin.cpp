@@ -713,6 +713,14 @@ String LocaleWin::dateFormat(const String& windowsFormat)
     return convertWindowsDateFormatToLDML(parseDateFormat(windowsFormat));
 }
 
+String LocaleWin::monthFormat()
+{
+    if (!m_monthFormat.isNull())
+        return m_monthFormat;
+    m_monthFormat = convertWindowsDateFormatToLDML(parseDateFormat(getLocaleInfoString(LOCALE_SYEARMONTH)));
+    return m_monthFormat;
+}
+
 String LocaleWin::timeFormat()
 {
     if (m_localizedTimeFormatText.isEmpty())
@@ -725,6 +733,18 @@ String LocaleWin::timeFormat()
 String LocaleWin::shortTimeFormat()
 {
     return timeFormat();
+}
+
+const Vector<String>& LocaleWin::shortMonthLabels()
+{
+    ensureShortMonthLabels();
+    return m_shortMonthLabels;
+}
+
+const Vector<String>& LocaleWin::shortStandAloneMonthLabels()
+{
+    // Windows doesn't provide a way to get stand-alone month labels.
+    return shortMonthLabels();
 }
 
 const Vector<String>& LocaleWin::timeAMPMLabels()

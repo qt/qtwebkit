@@ -26,6 +26,8 @@
 #include "config.h"
 #include "SharedWorkerProcess.h"
 
+#if ENABLE(SHARED_WORKER_PROCESS)
+
 #include "ArgumentCoders.h"
 #include "Attachment.h"
 #include "SharedWorkerProcessCreationParameters.h"
@@ -101,9 +103,9 @@ bool SharedWorkerProcess::shouldTerminate()
     return true;
 }
 
-void SharedWorkerProcess::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::ArgumentDecoder* arguments)
+void SharedWorkerProcess::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
 {
-    didReceiveSharedWorkerProcessMessage(connection, messageID, arguments);
+    didReceiveSharedWorkerProcessMessage(connection, messageID, decoder);
 }
 
 void SharedWorkerProcess::didClose(CoreIPC::Connection*)
@@ -192,3 +194,5 @@ void SharedWorkerProcess::minimumLifetimeTimerFired()
 }
 
 } // namespace WebKit
+
+#endif // ENABLE(SHARED_WORKER_PROCESS)

@@ -199,12 +199,6 @@ if (isInitial) { \
     return;\
 }
 
-#define HANDLE_INHERIT_AND_INITIAL_AND_PRIMITIVE(prop, Prop) \
-HANDLE_INHERIT_AND_INITIAL(prop, Prop) \
-if (primitiveValue) \
-    m_style->set##Prop(*primitiveValue);
-
-
 static RuleSet* defaultStyle;
 static RuleSet* defaultQuirksStyle;
 static RuleSet* defaultPrintStyle;
@@ -337,7 +331,7 @@ StyleResolver::StyleResolver(Document* document, bool matchAuthorAndUserStyles)
 #endif
 
     addStylesheetsFromSeamlessParents();
-    appendAuthorStylesheets(0, styleSheetCollection->authorStyleSheets());
+    appendAuthorStyleSheets(0, styleSheetCollection->activeAuthorStyleSheets());
 }
 
 void StyleResolver::addStylesheetsFromSeamlessParents()
@@ -345,14 +339,14 @@ void StyleResolver::addStylesheetsFromSeamlessParents()
     // Build a list of stylesheet lists from our ancestors, and walk that
     // list in reverse order so that the root-most sheets are appended first.
     Document* childDocument = document();
-    Vector<const Vector<RefPtr<StyleSheet> >* > ancestorSheets;
+    Vector<const Vector<RefPtr<CSSStyleSheet> >* > ancestorSheets;
     while (HTMLIFrameElement* parentIFrame = childDocument->seamlessParentIFrame()) {
         Document* parentDocument = parentIFrame->document();
-        ancestorSheets.append(&parentDocument->styleSheetCollection()->authorStyleSheets());
+        ancestorSheets.append(&parentDocument->styleSheetCollection()->activeAuthorStyleSheets());
         childDocument = parentDocument;
     }
     for (int i = ancestorSheets.size() - 1; i >= 0; i--)
-        appendAuthorStylesheets(0, *ancestorSheets[i]);
+        appendAuthorStyleSheets(0, *ancestorSheets[i]);
 }
 
 void StyleResolver::addAuthorRulesAndCollectUserRulesFromSheets(const Vector<RefPtr<CSSStyleSheet> >* userSheets, RuleSet& userStyle)
@@ -405,17 +399,14 @@ void StyleResolver::resetAuthorStyle()
     m_authorStyle->disableAutoShrinkToFit();
 }
 
-void StyleResolver::appendAuthorStylesheets(unsigned firstNew, const Vector<RefPtr<StyleSheet> >& stylesheets)
+void StyleResolver::appendAuthorStyleSheets(unsigned firstNew, const Vector<RefPtr<CSSStyleSheet> >& styleSheets)
 {
     // This handles sheets added to the end of the stylesheet list only. In other cases the style resolver
     // needs to be reconstructed. To handle insertions too the rule order numbers would need to be updated.
-    unsigned size = stylesheets.size();
+    unsigned size = styleSheets.size();
     for (unsigned i = firstNew; i < size; ++i) {
-        if (!stylesheets[i]->isCSSStyleSheet())
-            continue;
-        CSSStyleSheet* cssSheet = static_cast<CSSStyleSheet*>(stylesheets[i].get());
-        if (cssSheet->disabled())
-            continue;
+        CSSStyleSheet* cssSheet = styleSheets[i].get();
+        ASSERT(!cssSheet->disabled());
         if (cssSheet->mediaQueries() && !m_medium->eval(cssSheet->mediaQueries(), this))
             continue;
         StyleSheetContents* sheet = cssSheet->contents();
@@ -1547,8 +1538,8 @@ PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderS
     // be propagated from shadow host to distributed node.
     if (m_distributedToInsertionPoint) {
         ASSERT(element->parentElement());
-        ASSERT(element->parentElement()->renderStyle());
-        m_style->setUserModify(element->parentElement()->renderStyle()->userModify());
+        if (RenderStyle* styleOfShadowHost = element->parentElement()->renderStyle())
+            m_style->setUserModify(styleOfShadowHost->userModify());
     }
 
     if (element->isLink()) {
@@ -2212,33 +2203,6 @@ bool StyleResolver::checkRegionSelector(CSSSelector* regionSelector, Element* re
 
     return false;
 }
-    
-bool StyleResolver::determineStylesheetSelectorScopes(StyleSheetContents* stylesheet, HashSet<AtomicStringImpl*>& idScopes, HashSet<AtomicStringImpl*>& classScopes)
-{
-    ASSERT(!stylesheet->isLoading());
-
-    const Vector<RefPtr<StyleRuleImport> >& importRules = stylesheet->importRules();
-    for (unsigned i = 0; i < importRules.size(); ++i) {
-        if (!importRules[i]->styleSheet())
-            continue;
-        if (!determineStylesheetSelectorScopes(importRules[i]->styleSheet(), idScopes, classScopes))
-            return false;
-    }
-
-    const Vector<RefPtr<StyleRuleBase> >& rules = stylesheet->childRules();
-    for (unsigned i = 0; i < rules.size(); i++) {
-        StyleRuleBase* rule = rules[i].get();
-        if (rule->isStyleRule()) {
-            StyleRule* styleRule = static_cast<StyleRule*>(rule);
-            if (!SelectorChecker::determineSelectorScopes(styleRule->selectorList(), idScopes, classScopes))
-                return false;
-            continue;
-        } 
-        // FIXME: Media rules and maybe some others could be allowed.
-        return false;
-    }
-    return true;
-}
 
 // -------------------------------------------------------------------------------------
 // this is mostly boring stuff on how to apply a certain rule to the renderstyle...
@@ -2608,13 +2572,10 @@ static void collectCSSOMWrappers(HashMap<StyleRule*, RefPtr<CSSStyleRule> >& wra
 
 static void collectCSSOMWrappers(HashMap<StyleRule*, RefPtr<CSSStyleRule> >& wrapperMap, DocumentStyleSheetCollection* styleSheetCollection)
 {
-    const Vector<RefPtr<StyleSheet> >& styleSheets = styleSheetCollection->authorStyleSheets();
-    for (unsigned i = 0; i < styleSheets.size(); ++i) {
-        StyleSheet* styleSheet = styleSheets[i].get();
-        if (!styleSheet->isCSSStyleSheet())
-            continue;
-        collectCSSOMWrappers(wrapperMap, static_cast<CSSStyleSheet*>(styleSheet));
-    }
+    const Vector<RefPtr<CSSStyleSheet> >& styleSheets = styleSheetCollection->activeAuthorStyleSheets();
+    for (unsigned i = 0; i < styleSheets.size(); ++i)
+        collectCSSOMWrappers(wrapperMap, styleSheets[i].get());
+
     collectCSSOMWrappers(wrapperMap, styleSheetCollection->pageUserSheet());
     {
         const Vector<RefPtr<CSSStyleSheet> >* pageGroupUserSheets = styleSheetCollection->pageGroupUserSheets();
@@ -3544,9 +3505,13 @@ void StyleResolver::applyProperty(CSSPropertyID id, CSSValue* value)
 
     // CSS Text Layout Module Level 3: Vertical writing support
     case CSSPropertyWebkitWritingMode: {
-        HANDLE_INHERIT_AND_INITIAL_AND_PRIMITIVE(writingMode, WritingMode)
+        HANDLE_INHERIT_AND_INITIAL(writingMode, WritingMode);
+        
+        if (primitiveValue)
+            m_style->setWritingMode(*primitiveValue);
+        
         // FIXME: It is not ok to modify document state while applying style.
-        if (!isInherit && !isInitial && m_element && m_element == m_element->document()->documentElement())
+        if (m_element && m_element == m_element->document()->documentElement())
             m_element->document()->setWritingModeSetOnDocumentElement(true);
         FontDescription fontDescription = m_style->fontDescription();
         fontDescription.setOrientation(m_style->isHorizontalWritingMode() ? Horizontal : Vertical);
@@ -3868,10 +3833,10 @@ void StyleResolver::applyProperty(CSSPropertyID id, CSSValue* value)
 #endif
     case CSSPropertyWebkitRtlOrdering:
     case CSSPropertyWebkitTextCombine:
-#if ENABLE(CSS3_TEXT_DECORATION)
+#if ENABLE(CSS3_TEXT)
     case CSSPropertyWebkitTextDecorationLine:
     case CSSPropertyWebkitTextDecorationStyle:
-#endif // CSS3_TEXT_DECORATION
+#endif // CSS3_TEXT
     case CSSPropertyWebkitTextEmphasisColor:
     case CSSPropertyWebkitTextEmphasisPosition:
     case CSSPropertyWebkitTextEmphasisStyle:

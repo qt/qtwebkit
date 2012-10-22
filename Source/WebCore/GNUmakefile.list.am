@@ -579,6 +579,8 @@ webcore_built_sources += \
 	DerivedSources/WebCore/JSOESTextureFloat.h \
 	DerivedSources/WebCore/JSOESVertexArrayObject.cpp \
 	DerivedSources/WebCore/JSOESVertexArrayObject.h \
+	DerivedSources/WebCore/JSOESElementIndexUint.cpp \
+	DerivedSources/WebCore/JSOESElementIndexUint.h \
 	DerivedSources/WebCore/JSOfflineAudioCompletionEvent.cpp \
 	DerivedSources/WebCore/JSOfflineAudioCompletionEvent.h \
 	DerivedSources/WebCore/JSOscillatorNode.cpp \
@@ -1522,6 +1524,7 @@ dom_binding_idls += \
 	$(WebCore)/html/canvas/OESStandardDerivatives.idl \
 	$(WebCore)/html/canvas/OESTextureFloat.idl \
 	$(WebCore)/html/canvas/OESVertexArrayObject.idl \
+	$(WebCore)/html/canvas/OESElementIndexUint.idl \
 	$(WebCore)/html/canvas/Uint16Array.idl \
 	$(WebCore)/html/canvas/Uint32Array.idl \
 	$(WebCore)/html/canvas/Uint8Array.idl \
@@ -2639,6 +2642,8 @@ webcore_sources += \
 	Source/WebCore/css/SiblingTraversalStrategies.h \
 	Source/WebCore/css/StyleBuilder.cpp \
 	Source/WebCore/css/StyleBuilder.h \
+	Source/WebCore/css/StyleInvalidationAnalysis.cpp \
+	Source/WebCore/css/StyleInvalidationAnalysis.h \
 	Source/WebCore/css/StyleMedia.cpp \
 	Source/WebCore/css/StyleMedia.h \
 	Source/WebCore/css/StylePropertySet.cpp \
@@ -3200,6 +3205,8 @@ webcore_sources += \
 	Source/WebCore/html/canvas/OESTextureFloat.h \
 	Source/WebCore/html/canvas/OESVertexArrayObject.cpp \
 	Source/WebCore/html/canvas/OESVertexArrayObject.h \
+	Source/WebCore/html/canvas/OESElementIndexUint.cpp \
+	Source/WebCore/html/canvas/OESElementIndexUint.h \
 	Source/WebCore/html/canvas/WebGLActiveInfo.h \
 	Source/WebCore/html/canvas/WebGLBuffer.cpp \
 	Source/WebCore/html/canvas/WebGLBuffer.h \
@@ -4286,6 +4293,7 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/CrossfadeGeneratedImage.h \
 	Source/WebCore/platform/graphics/ColorSpace.h \
 	Source/WebCore/platform/graphics/DashArray.h \
+	Source/WebCore/platform/graphics/DisplayRefreshMonitor.h \
 	Source/WebCore/platform/graphics/Extensions3D.h \
 	Source/WebCore/platform/graphics/NativeImagePtr.h \
 	Source/WebCore/platform/graphics/cairo/BitmapImageCairo.cpp \
@@ -6164,8 +6172,13 @@ webcore_built_sources += \
 	DerivedSources/ANGLE/glslang_tab.h
 
 webcore_sources += \
+	Source/ThirdParty/ANGLE/include/EGL/egl.h \
+	Source/ThirdParty/ANGLE/include/EGL/eglplatform.h \
 	Source/ThirdParty/ANGLE/include/GLSLANG/ShaderLang.h \
+	Source/ThirdParty/ANGLE/include/KHR/khrplatform.h \
 	Source/ThirdParty/ANGLE/src/common/angleutils.h \
+	Source/ThirdParty/ANGLE/src/compiler/ArrayBoundsClamper.cpp \
+	Source/ThirdParty/ANGLE/src/compiler/ArrayBoundsClamper.h \
 	Source/ThirdParty/ANGLE/src/compiler/BaseTypes.h \
 	Source/ThirdParty/ANGLE/src/compiler/BuiltInFunctionEmulator.cpp \
 	Source/ThirdParty/ANGLE/src/compiler/BuiltInFunctionEmulator.h \

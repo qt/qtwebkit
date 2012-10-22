@@ -3879,7 +3879,7 @@ void SpeculativeJIT::compile(Node& node)
         
         if (node.structureSet().size() == 1) {
             speculationCheckWithConditionalDirection(
-                BadCache, JSValueRegs(), NoNode,
+                BadCache, JSValueSource::unboxedCell(base.gpr()), NoNode,
                 m_jit.branchWeakPtr(
                     JITCompiler::NotEqual,
                     JITCompiler::Address(base.gpr(), JSCell::structureOffset()),
@@ -3896,7 +3896,7 @@ void SpeculativeJIT::compile(Node& node)
                 done.append(m_jit.branchWeakPtr(JITCompiler::Equal, structure.gpr(), node.structureSet()[i]));
             
             speculationCheckWithConditionalDirection(
-                BadCache, JSValueRegs(), NoNode,
+                BadCache, JSValueSource::unboxedCell(base.gpr()), NoNode,
                 m_jit.branchWeakPtr(
                     JITCompiler::NotEqual, structure.gpr(), node.structureSet().last()),
                 node.op() == ForwardCheckStructure);
@@ -3910,6 +3910,13 @@ void SpeculativeJIT::compile(Node& node)
         
     case StructureTransitionWatchpoint:
     case ForwardStructureTransitionWatchpoint: {
+        // There is a fascinating question here of what to do about array profiling.
+        // We *could* try to tell the OSR exit about where the base of the access is.
+        // The DFG will have kept it alive, though it may not be in a register, and
+        // we shouldn't really load it since that could be a waste. For now though,
+        // we'll just rely on the fact that when a watchpoint fires then that's
+        // quite a hint already.
+        
         m_jit.addWeakReference(node.structure());
         node.structure()->addTransitionWatchpoint(
             speculationWatchpointWithConditionalDirection(
@@ -4288,7 +4295,8 @@ void SpeculativeJIT::compile(Node& node)
         flushRegisters();
         GPRResult resultPayload(this);
         GPRResult2 resultTag(this);
-        callOperation(operationResolve, resultTag.gpr(), resultPayload.gpr(), identifier(node.identifierNumber()));
+        ResolveOperationData& data = m_jit.graph().m_resolveOperationsData[node.resolveOperationsDataIndex()];
+        callOperation(operationResolve, resultTag.gpr(), resultPayload.gpr(), identifier(data.identifierNumber), resolveOperations(data.resolveOperationsIndex));
         jsValueResult(resultTag.gpr(), resultPayload.gpr(), m_compileIndex);
         break;
     }
@@ -4297,7 +4305,8 @@ void SpeculativeJIT::compile(Node& node)
         flushRegisters();
         GPRResult resultPayload(this);
         GPRResult2 resultTag(this);
-        callOperation(operationResolveBase, resultTag.gpr(), resultPayload.gpr(), identifier(node.identifierNumber()));
+        ResolveOperationData& data = m_jit.graph().m_resolveOperationsData[node.resolveOperationsDataIndex()];
+        callOperation(operationResolveBase, resultTag.gpr(), resultPayload.gpr(), identifier(data.identifierNumber), resolveOperations(data.resolveOperationsIndex), putToBaseOperation(data.putToBaseOperationIndex));
         jsValueResult(resultTag.gpr(), resultPayload.gpr(), m_compileIndex);
         break;
     }
@@ -4306,7 +4315,8 @@ void SpeculativeJIT::compile(Node& node)
         flushRegisters();
         GPRResult resultPayload(this);
         GPRResult2 resultTag(this);
-        callOperation(operationResolveBaseStrictPut, resultTag.gpr(), resultPayload.gpr(), identifier(node.identifierNumber()));
+        ResolveOperationData& data = m_jit.graph().m_resolveOperationsData[node.resolveOperationsDataIndex()];
+        callOperation(operationResolveBaseStrictPut, resultTag.gpr(), resultPayload.gpr(), identifier(data.identifierNumber), resolveOperations(data.resolveOperationsIndex), putToBaseOperation(data.putToBaseOperationIndex));
         jsValueResult(resultTag.gpr(), resultPayload.gpr(), m_compileIndex);
         break;
     }
@@ -4323,18 +4333,18 @@ void SpeculativeJIT::compile(Node& node)
         GPRReg resultPayloadGPR = resultPayload.gpr();
 
         ResolveGlobalData& data = m_jit.graph().m_resolveGlobalData[node.resolveGlobalDataIndex()];
-        GlobalResolveInfo* resolveInfoAddress = &(m_jit.codeBlock()->globalResolveInfo(data.resolveInfoIndex));
+        ResolveOperation* resolveOperationAddress = &(m_jit.codeBlock()->resolveOperations(data.resolveOperationsIndex)->data()[data.resolvePropertyIndex]);
 
         // Check Structure of global object
         m_jit.move(JITCompiler::TrustedImmPtr(m_jit.globalObjectFor(node.codeOrigin)), globalObjectGPR);
-        m_jit.move(JITCompiler::TrustedImmPtr(resolveInfoAddress), resolveInfoGPR);
-        m_jit.loadPtr(JITCompiler::Address(resolveInfoGPR, OBJECT_OFFSETOF(GlobalResolveInfo, structure)), resultPayloadGPR);
+        m_jit.move(JITCompiler::TrustedImmPtr(resolveOperationAddress), resolveInfoGPR);
+        m_jit.loadPtr(JITCompiler::Address(resolveInfoGPR, OBJECT_OFFSETOF(ResolveOperation, m_structure)), resultPayloadGPR);
 
         JITCompiler::Jump structuresNotMatch = m_jit.branchPtr(JITCompiler::NotEqual, resultPayloadGPR, JITCompiler::Address(globalObjectGPR, JSCell::structureOffset()));
 
         // Fast case
         m_jit.loadPtr(JITCompiler::Address(globalObjectGPR, JSObject::butterflyOffset()), resultPayloadGPR);
-        m_jit.load32(JITCompiler::Address(resolveInfoGPR, OBJECT_OFFSETOF(GlobalResolveInfo, offset)), resolveInfoGPR);
+        m_jit.load32(JITCompiler::Address(resolveInfoGPR, OBJECT_OFFSETOF(ResolveOperation, m_offset)), resolveInfoGPR);
 #if DFG_ENABLE(JIT_ASSERT)
         JITCompiler::Jump isOutOfLine = m_jit.branch32(JITCompiler::GreaterThanOrEqual, resolveInfoGPR, TrustedImm32(firstOutOfLineOffset));
         m_jit.breakpoint();
@@ -4737,6 +4747,11 @@ void SpeculativeJIT::compile(Node& node)
         
     case NewFunctionExpression:
         compileNewFunctionExpression(node);
+        break;
+
+    case GarbageValue:
+        // We should never get to the point of code emission for a GarbageValue
+        CRASH();
         break;
 
     case ForceOSRExit: {

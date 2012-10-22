@@ -25,6 +25,7 @@
 
 #include "config.h"
 #include "Localizer.h"
+#include <wtf/DateMath.h>
 #include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
@@ -42,7 +43,12 @@ private:
 #endif
 #if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
     virtual String dateFormat() OVERRIDE;
+    virtual String monthFormat() OVERRIDE;
+    virtual const Vector<String>& shortMonthLabels() OVERRIDE;
+    virtual const Vector<String>& shortStandAloneMonthLabels() OVERRIDE;
 #endif
+
+    Vector<String> m_shortMonthLabels;
 };
 
 PassOwnPtr<Localizer> Localizer::create(const AtomicString&)
@@ -79,6 +85,26 @@ bool LocaleNone::isRTL()
 String LocaleNone::dateFormat()
 {
     return ASCIILiteral("dd/MM/yyyyy");
+}
+
+String LocaleNone::monthFormat()
+{
+    return ASCIILiteral("yyyy-MM");
+}
+
+const Vector<String>& LocaleNone::shortMonthLabels()
+{
+    if (!m_shortMonthLabels.isEmpty())
+        return m_shortMonthLabels;
+    m_shortMonthLabels.reserveCapacity(WTF_ARRAY_LENGTH(WTF::monthName));
+    for (unsigned i = 0; i < WTF_ARRAY_LENGTH(WTF::monthName); ++i)
+        m_shortMonthLabels.append(WTF::monthName[i]);
+    return m_shortMonthLabels;
+}
+
+const Vector<String>& LocaleNone::shortStandAloneMonthLabels()
+{
+    return shortMonthLabels();
 }
 #endif
 

@@ -101,7 +101,7 @@ public:
 
     class QueueClient {
     public:
-        virtual void didReceiveMessageOnConnectionWorkQueue(Connection*, MessageID, ArgumentDecoder*, bool& didHandleMessage) = 0;
+        virtual void didReceiveMessageOnConnectionWorkQueue(Connection*, MessageID, MessageDecoder&, bool& didHandleMessage) = 0;
 
     protected:
         virtual ~QueueClient() { }
@@ -174,9 +174,9 @@ public:
     void addQueueClient(QueueClient*);
     void removeQueueClient(QueueClient*);
 
-    void addMessageReceiver(MessageClass messageClass, MessageReceiver* messageReceiver)
+    void deprecatedAddMessageReceiver(MessageClass messageClass, MessageReceiver* messageReceiver)
     {
-        m_messageReceiverMap.addMessageReceiver(messageClass, messageReceiver);
+        m_messageReceiverMap.deprecatedAddMessageReceiver(messageClass, messageReceiver);
     }
 
     bool open();
@@ -276,8 +276,8 @@ private:
     void dispatchConnectionDidClose();
     void dispatchOneMessage();
     void dispatchMessage(IncomingMessage&);
-    void dispatchMessage(MessageID, MessageDecoder*);
-    void dispatchSyncMessage(MessageID, MessageDecoder*);
+    void dispatchMessage(MessageID, MessageDecoder&);
+    void dispatchSyncMessage(MessageID, MessageDecoder&);
     void didFailToSendSyncMessage();
 
     // Can be called on any thread.
@@ -410,7 +410,7 @@ private:
 
 template<typename T> bool Connection::send(const T& message, uint64_t destinationID, unsigned messageSendFlags)
 {
-    OwnPtr<MessageEncoder> encoder = MessageEncoder::create("", "", destinationID);
+    OwnPtr<MessageEncoder> encoder = MessageEncoder::create(T::receiverName(), T::name(), destinationID);
     encoder->encode(message);
     
     return sendMessage(MessageID(T::messageID), encoder.release(), messageSendFlags);
@@ -419,7 +419,7 @@ template<typename T> bool Connection::send(const T& message, uint64_t destinatio
 template<typename T> bool Connection::sendSync(const T& message, const typename T::Reply& reply, uint64_t destinationID, double timeout, unsigned syncSendFlags)
 {
     uint64_t syncRequestID = 0;
-    OwnPtr<MessageEncoder> encoder = createSyncMessageEncoder("", "", destinationID, syncRequestID);
+    OwnPtr<MessageEncoder> encoder = createSyncMessageEncoder(T::receiverName(), T::name(), destinationID, syncRequestID);
     
     // Encode the rest of the input arguments.
     encoder->encode(message);
@@ -440,7 +440,7 @@ template<typename T> bool Connection::waitForAndDispatchImmediately(uint64_t des
         return false;
 
     ASSERT(decoder->destinationID() == destinationID);
-    m_client->didReceiveMessage(this, MessageID(T::messageID), decoder.get());
+    m_client->didReceiveMessage(this, MessageID(T::messageID), *decoder);
     return true;
 }
 

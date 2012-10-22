@@ -55,6 +55,7 @@
 #endif
 #include "EditorClientBlackBerry.h"
 #include "FocusController.h"
+#include "Frame.h"
 #include "FrameLoaderClientBlackBerry.h"
 #if !defined(PUBLIC_BUILD) || !PUBLIC_BUILD
 #include "GeolocationClientMock.h"
@@ -1159,8 +1160,6 @@ void WebPagePrivate::setLoadState(LoadState state)
             // can end up blitting artifacts instead. See: RIM Bug #401.
             if (m_backingStore->d->renderVisibleContents() && !m_backingStore->d->isSuspended() && !m_backingStore->d->shouldDirectRenderingToWindow())
                 m_backingStore->d->blitVisibleContents();
-
-            zoomToInitialScaleOnLoad();
 
             // Update cursor status.
             updateCursor();
@@ -3201,12 +3200,21 @@ void WebPagePrivate::setPageVisibilityState()
 
 void WebPagePrivate::setVisible(bool visible)
 {
-    m_visible = visible;
+    if (visible != m_visible) {
+        if (visible) {
+            if (m_mainFrame)
+                m_mainFrame->animation()->resumeAnimations();
+            if (m_page->scriptedAnimationsSuspended())
+                m_page->resumeScriptedAnimations();
+        } else {
+            if (m_mainFrame)
+                m_mainFrame->animation()->suspendAnimations();
+            if (!m_page->scriptedAnimationsSuspended())
+                m_page->suspendScriptedAnimations();
+        }
 
-    if (visible && m_page->scriptedAnimationsSuspended())
-        m_page->resumeScriptedAnimations();
-    if (!visible && !m_page->scriptedAnimationsSuspended())
-        m_page->suspendScriptedAnimations();
+        m_visible = visible;
+    }
 
 #if ENABLE(PAGE_VISIBILITY_API)
     setPageVisibilityState();
@@ -5454,6 +5462,10 @@ void WebPagePrivate::setCompositorDrawsRootLayer(bool compositorDrawsRootLayer)
     // When the BlackBerry port forces compositing mode, the root layer stops
     // painting to window and starts painting to layer instead.
     m_page->settings()->setForceCompositingMode(compositorDrawsRootLayer);
+
+    if (!m_mainFrame)
+        return;
+
     if (FrameView* view = m_mainFrame->view())
         view->updateCompositingLayers();
 #endif

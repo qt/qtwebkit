@@ -163,10 +163,7 @@ public:
     bool hasParentNode() const { return m_parentNode; }
 
     void resetAuthorStyle();
-    void appendAuthorStylesheets(unsigned firstNew, const Vector<RefPtr<StyleSheet> >&);
-    
-    // Find the ids or classes the selectors on a stylesheet are scoped to. The selectors only apply to elements in subtrees where the root element matches the scope.
-    static bool determineStylesheetSelectorScopes(StyleSheetContents*, HashSet<AtomicStringImpl*>& idScopes, HashSet<AtomicStringImpl*>& classScopes);
+    void appendAuthorStyleSheets(unsigned firstNew, const Vector<RefPtr<CSSStyleSheet> >&);
 
 private:
     void initForStyleResolve(Element*, RenderStyle* parentStyle = 0, PseudoId = NOPSEUDO);

@@ -1,3 +1,32 @@
+2012-10-22  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] Fix "ASSERTION FAILED: !document->inPageCache()" when loading a page
+        https://bugs.webkit.org/show_bug.cgi?id=98514
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * WebCoreSupport/WebFrameLoaderClient.cpp:
+        (WebFrameLoaderClient::transitionToCommittedForNewPage):
+
+2012-10-21  Andreas Kling  <kling@webkit.org>
+
+        Remove Page::javaScriptURLsAreAllowed setting.
+        <http://webkit.org/b/99944>
+
+        Reviewed by Anders Carlsson.
+
+        Have WebView::setJavaScriptURLsAreAllowed() do nothing and return E_NOTIMPL
+        to prevent COM ABI breakage.
+
+        * WebView.cpp:
+        (WebView::setJavaScriptURLsAreAllowed):
+
+2012-10-18  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. Build fix after r131701 and r131777.
+
+        * WebKit.vcproj/WebKit.sln:
+
 2012-10-14  Sam Weinig  <sam@webkit.org>
 
         Fix the windows build.

@@ -287,6 +287,7 @@ void DumpRenderTreeChrome::resetDefaultsToConsistentValues()
     ewk_view_setting_web_audio_set(mainView(), EINA_FALSE);
     ewk_view_setting_allow_universal_access_from_file_urls_set(mainView(), EINA_TRUE);
     ewk_view_setting_allow_file_access_from_file_urls_set(mainView(), EINA_TRUE);
+    ewk_view_setting_resizable_textareas_set(mainView(), EINA_TRUE);
 
     ewk_view_zoom_set(mainView(), 1.0, 0, 0);
     ewk_view_scale_set(mainView(), 1.0, 0, 0);
@@ -319,6 +320,7 @@ void DumpRenderTreeChrome::resetDefaultsToConsistentValues()
     DumpRenderTreeSupportEfl::setMinimumLogicalFontSize(mainView(), 9);
     DumpRenderTreeSupportEfl::setCSSRegionsEnabled(mainView(), true);
     DumpRenderTreeSupportEfl::setShouldTrackVisitedLinks(false);
+    DumpRenderTreeSupportEfl::setTracksRepaints(mainFrame(), false);
 
     // Reset capacities for the memory cache for dead objects.
     static const unsigned cacheTotalCapacity =  8192 * 1024;

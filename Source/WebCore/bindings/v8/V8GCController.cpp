@@ -66,77 +66,38 @@
 
 namespace WebCore {
 
-typedef HashMap<Node*, v8::Object*> DOMNodeMap;
-typedef HashMap<void*, v8::Object*> DOMObjectMap;
-
 #ifndef NDEBUG
-
-class DOMObjectVisitor : public DOMWrapperMap<void>::Visitor {
-public:
-    void visitDOMWrapper(DOMDataStore* store, void* object, v8::Persistent<v8::Object> wrapper)
-    {
-        WrapperTypeInfo* type = V8DOMWrapper::domWrapperType(wrapper);
-        UNUSED_PARAM(type);
-        UNUSED_PARAM(object);
-    }
-};
 
 class EnsureWeakDOMNodeVisitor : public DOMWrapperMap<Node>::Visitor {
 public:
-    void visitDOMWrapper(DOMDataStore* store, Node* object, v8::Persistent<v8::Object> wrapper)
+    void visitDOMWrapper(DOMDataStore*, Node*, v8::Persistent<v8::Object> wrapper)
     {
-        UNUSED_PARAM(object);
         ASSERT(wrapper.IsWeak());
     }
 };
 
 #endif // NDEBUG
 
-class SpecialCasePrologueObjectHandler {
+template<typename T>
+class ActiveDOMObjectPrologueVisitor : public DOMWrapperMap<T>::Visitor {
 public:
-    static bool process(void* object, v8::Persistent<v8::Object> wrapper, WrapperTypeInfo* typeInfo)
-    {
-        // Additional handling of message port ensuring that entangled ports also
-        // have their wrappers entangled. This should ideally be handled when the
-        // ports are actually entangled in MessagePort::entangle, but to avoid
-        // forking MessagePort.* this is postponed to GC time. Having this postponed
-        // has the drawback that the wrappers are "entangled/unentangled" for each
-        // GC even though their entaglement most likely is still the same.
-        if (V8MessagePort::info.equals(typeInfo)) {
-            // Mark each port as in-use if it's entangled. For simplicity's sake, we assume all ports are remotely entangled,
-            // since the Chromium port implementation can't tell the difference.
-            MessagePort* port1 = static_cast<MessagePort*>(object);
-            if (port1->isEntangled() || port1->hasPendingActivity())
-                wrapper.ClearWeak();
-            return true;
-        }
-        return false;
-    }
-};
-
-class SpecialCasePrologueNodeHandler {
-public:
-    static bool process(Node* object, v8::Persistent<v8::Object> wrapper, WrapperTypeInfo* typeInfo)
-    {
-        UNUSED_PARAM(object);
-        UNUSED_PARAM(wrapper);
-        UNUSED_PARAM(typeInfo);
-        return false;
-    }
-};
-
-template<typename T, typename S>
-class GCPrologueVisitor : public DOMWrapperMap<T>::Visitor {
-public:
-    void visitDOMWrapper(DOMDataStore* store, T* object, v8::Persistent<v8::Object> wrapper)
+    void visitDOMWrapper(DOMDataStore*, T* object, v8::Persistent<v8::Object> wrapper)
     {
         WrapperTypeInfo* typeInfo = V8DOMWrapper::domWrapperType(wrapper);  
 
-        if (!S::process(object, wrapper, typeInfo)) {
-            ActiveDOMObject* activeDOMObject = typeInfo->toActiveDOMObject(wrapper);
-            if (activeDOMObject && activeDOMObject->hasPendingActivity())
+        if (V8MessagePort::info.equals(typeInfo)) {
+            // Mark each port as in-use if it's entangled. For simplicity's sake,
+            // we assume all ports are remotely entangled, since the Chromium port
+            // implementation can't tell the difference.
+            MessagePort* port = reinterpret_cast<MessagePort*>(object);
+            if (port->isEntangled() || port->hasPendingActivity())
                 wrapper.ClearWeak();
+            return;
         }
+
+        ActiveDOMObject* activeDOMObject = typeInfo->toActiveDOMObject(wrapper);
+        if (activeDOMObject && activeDOMObject->hasPendingActivity())
+            wrapper.ClearWeak();
     }
 };
 
@@ -257,9 +218,17 @@ static GroupId calculateGroupId(Node* node)
     return GroupId(root);
 }
 
-class GrouperVisitor : public DOMWrapperMap<Node>::Visitor, public DOMWrapperMap<void>::Visitor {
+class ObjectVisitor : public DOMWrapperMap<void>::Visitor {
 public:
-    void visitDOMWrapper(DOMDataStore* store, Node* node, v8::Persistent<v8::Object> wrapper)
+    void visitDOMWrapper(DOMDataStore* store, void* object, v8::Persistent<v8::Object> wrapper)
+    {
+        V8DOMWrapper::domWrapperType(wrapper)->visitDOMWrapper(store, object, wrapper);
+    }
+};
+
+class NodeVisitor : public DOMWrapperMap<Node>::Visitor {
+public:
+    void visitDOMWrapper(DOMDataStore*, Node* node, v8::Persistent<v8::Object> wrapper)
     {
         if (node->hasEventListeners()) {
             Vector<v8::Persistent<v8::Value> > listeners;
@@ -280,12 +249,6 @@ public:
         if (!groupId)
             return;
         m_grouper.append(GrouperItem(groupId, wrapper));
-    }
-
-    void visitDOMWrapper(DOMDataStore* store, void* object, v8::Persistent<v8::Object> wrapper)
-    {
-        WrapperTypeInfo* info = V8DOMWrapper::domWrapperType(wrapper);
-        info->visitDOMWrapper(store, object, wrapper);
     }
 
     void applyGrouping()
@@ -336,32 +299,23 @@ private:
 // Create object groups for DOM tree nodes.
 void V8GCController::gcPrologue()
 {
+    TRACE_EVENT_BEGIN0("v8", "GC");
+
     v8::HandleScope scope;
 
-#if PLATFORM(CHROMIUM)
-    TRACE_EVENT_BEGIN0("v8", "GC");
-#endif
+    ActiveDOMObjectPrologueVisitor<void> activeObjectVisitor;
+    visitActiveDOMObjects(&activeObjectVisitor);
+    ActiveDOMObjectPrologueVisitor<Node> activeNodeVisitor;
+    visitActiveDOMNodes(&activeNodeVisitor);
 
-#ifndef NDEBUG
-    DOMObjectVisitor domObjectVisitor;
-    visitDOMObjects(&domObjectVisitor);
-#endif
+    NodeVisitor nodeVisitor;
+    visitDOMNodes(&nodeVisitor);
+    visitActiveDOMNodes(&nodeVisitor);
+    nodeVisitor.applyGrouping();
 
-    // Run through all objects with possible pending activity making their
-    // wrappers non weak if there is pending activity.
-    GCPrologueVisitor<void, SpecialCasePrologueObjectHandler> prologueObjectVisitor;
-    visitActiveDOMObjects(&prologueObjectVisitor);
-    GCPrologueVisitor<Node, SpecialCasePrologueNodeHandler> prologueNodeVisitor;
-    visitActiveDOMNodes(&prologueNodeVisitor);
+    ObjectVisitor objectVisitor;
+    visitDOMObjects(&objectVisitor);
 
-    // Create object groups.
-    GrouperVisitor grouperVisitor;
-    visitDOMNodes(&grouperVisitor);
-    visitActiveDOMNodes(&grouperVisitor);
-    visitDOMObjects(&grouperVisitor);
-    grouperVisitor.applyGrouping();
-
-    // Clean single element cache for string conversions.
     V8PerIsolateData* data = V8PerIsolateData::current();
     data->stringCache()->clearOnGC();
 }
@@ -445,17 +399,11 @@ void V8GCController::gcEpilogue()
 #endif
 
 #ifndef NDEBUG
-    // Check all survivals are weak.
-    DOMObjectVisitor domObjectVisitor;
-    visitDOMObjects(&domObjectVisitor);
-
     EnsureWeakDOMNodeVisitor weakDOMNodeVisitor;
     visitDOMNodes(&weakDOMNodeVisitor);
 #endif
 
-#if PLATFORM(CHROMIUM)
     TRACE_EVENT_END0("v8", "GC");
-#endif
 }
 
 void V8GCController::checkMemoryUsage()
