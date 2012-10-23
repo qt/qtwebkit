@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2010 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,32 +29,51 @@
  */
 
 #include "config.h"
-#include "V8IDBCursorWithValue.h"
+#include "Task.h"
 
-#if ENABLE(INDEXED_DATABASE)
+#include "WebKit.h"
+#include "WebTask.h"
+#include "platform/WebKitPlatformSupport.h"
+#include "webkit/support/webkit_support.h"
+#include <wtf/OwnPtr.h>
+#include <wtf/PassOwnPtr.h>
 
-#include "V8IDBAny.h"
+using namespace WebKit;
+using namespace WebTestRunner;
 
-namespace WebCore {
+namespace {
 
-v8::Handle<v8::Value> V8IDBCursorWithValue::valueAccessorGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+void invokeTask(void* context)
 {
-    INC_STATS("DOM.IDBCursorWithValue.value._get");
+    WebTask* task = static_cast<WebTask*>(context);
+    task->run();
+    delete task;
+}
 
-    IDBCursorWithValue* imp = V8IDBCursorWithValue::toNative(info.Holder());
-    v8::Handle<v8::String> propertyName = v8::String::NewSymbol("value");
-    if (!imp->valueIsDirty()) {
-        v8::Handle<v8::Value> value = info.Holder()->GetHiddenValue(propertyName);
-        if (!value.IsEmpty())
-            return value;
+class TaskWrapper : public webkit_support::TaskAdaptor {
+public:
+    explicit TaskWrapper(WebTask* task)
+        : m_task(adoptPtr(task))
+    {
+    }
+    virtual ~TaskWrapper() { }
+    virtual void Run()
+    {
+        m_task->run();
     }
 
-    RefPtr<IDBAny> result = imp->value();
-    v8::Handle<v8::Value> wrapper = toV8(result.get(), info.Holder(), info.GetIsolate());
-    info.Holder()->SetHiddenValue(propertyName, wrapper);
-    return wrapper;
-}
+private:
+    OwnPtr<WebTask> m_task;
+};
 
 }
 
-#endif
+void postTask(WebTask* task)
+{
+    webKitPlatformSupport()->callOnMainThread(invokeTask, static_cast<void*>(task));
+}
+
+void postDelayedTask(WebTask* task, long long ms)
+{
+    webkit_support::PostDelayedTask(new TaskWrapper(task), ms);
+}

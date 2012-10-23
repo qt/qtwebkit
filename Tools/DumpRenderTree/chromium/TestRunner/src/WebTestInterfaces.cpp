@@ -63,6 +63,10 @@ public:
     virtual void setEditCommand(const std::string& name, const std::string& value);
     virtual WebContextMenuData* lastContextMenuData() const;
     virtual void setGamepadData(const WebGamepads&);
+    virtual void printMessage(const std::string& message) const;
+    virtual void postTask(WebTask*);
+    virtual void postDelayedTask(WebTask*, long long ms);
+    virtual WebString registerIsolatedFileSystem(const WebVector<WebString>& absoluteFilenames);
 
 private:
     TestInterfaces m_interfaces;
@@ -121,6 +125,26 @@ WebContextMenuData* WebTestInterfaces::Internal::lastContextMenuData() const
 void WebTestInterfaces::Internal::setGamepadData(const WebGamepads& pads)
 {
     m_delegate->setGamepadData(pads);
+}
+
+void WebTestInterfaces::Internal::printMessage(const std::string& message) const
+{
+    m_delegate->printMessage(message);
+}
+
+void WebTestInterfaces::Internal::postTask(WebTask* task)
+{
+    m_delegate->postTask(task);
+}
+
+void WebTestInterfaces::Internal::postDelayedTask(WebTask* task, long long ms)
+{
+    m_delegate->postDelayedTask(task, ms);
+}
+
+WebString WebTestInterfaces::Internal::registerIsolatedFileSystem(const WebVector<WebString>& absoluteFilenames)
+{
+    return m_delegate->registerIsolatedFileSystem(absoluteFilenames);
 }
 
 WebTestInterfaces::WebTestInterfaces()

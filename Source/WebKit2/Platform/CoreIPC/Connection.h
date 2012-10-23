@@ -32,7 +32,6 @@
 #include "MessageDecoder.h"
 #include "MessageEncoder.h"
 #include "MessageReceiver.h"
-#include "MessageReceiverMap.h"
 #include "WorkQueue.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/OwnPtr.h>
@@ -174,11 +173,6 @@ public:
     void addQueueClient(QueueClient*);
     void removeQueueClient(QueueClient*);
 
-    void deprecatedAddMessageReceiver(MessageClass messageClass, MessageReceiver* messageReceiver)
-    {
-        m_messageReceiverMap.deprecatedAddMessageReceiver(messageClass, messageReceiver);
-    }
-
     bool open();
     void invalidate();
     void markCurrentlyDispatchedMessageAsInvalid();
@@ -191,8 +185,9 @@ public:
     template<typename T> bool sendSync(const T& message, const typename T::Reply& reply, uint64_t destinationID, double timeout = NoTimeout, unsigned syncSendFlags = 0);
     template<typename T> bool waitForAndDispatchImmediately(uint64_t destinationID, double timeout);
 
-    PassOwnPtr<MessageEncoder> createSyncMessageEncoder(const CString& messageReceiverName, const CString& messageName, uint64_t destinationID, uint64_t& syncRequestID);
+    PassOwnPtr<MessageEncoder> createSyncMessageEncoder(StringReference messageReceiverName, StringReference messageName, uint64_t destinationID, uint64_t& syncRequestID);
     bool sendMessage(MessageID, PassOwnPtr<MessageEncoder>, unsigned messageSendFlags = 0);
+    PassOwnPtr<MessageDecoder> sendSyncMessage(MessageID, uint64_t syncRequestID, PassOwnPtr<MessageEncoder>, double timeout, unsigned syncSendFlags = 0);
     bool sendSyncReply(PassOwnPtr<MessageEncoder>);
 
     // FIXME: These variants of send, sendSync and waitFor are all deprecated.
@@ -254,7 +249,6 @@ private:
     
     PassOwnPtr<MessageDecoder> waitForMessage(MessageID, uint64_t destinationID, double timeout);
     
-    PassOwnPtr<MessageDecoder> sendSyncMessage(MessageID, uint64_t syncRequestID, PassOwnPtr<MessageEncoder>, double timeout, unsigned syncSendFlags = 0);
     PassOwnPtr<MessageDecoder> waitForSyncReply(uint64_t syncRequestID, double timeout, unsigned syncSendFlags);
 
     // Called on the connection work queue.
@@ -304,8 +298,6 @@ private:
     // Incoming messages.
     Mutex m_incomingMessagesLock;
     Deque<IncomingMessage> m_incomingMessages;
-
-    MessageReceiverMap m_messageReceiverMap;
 
     // Outgoing messages.
     Mutex m_outgoingMessagesLock;
@@ -450,7 +442,7 @@ template<typename E, typename T, typename U>
 inline bool Connection::deprecatedSendSync(E messageID, uint64_t destinationID, const T& arguments, const U& reply, double timeout)
 {
     uint64_t syncRequestID = 0;
-    OwnPtr<MessageEncoder> encoder = createSyncMessageEncoder("", "", destinationID, syncRequestID);
+    OwnPtr<MessageEncoder> encoder = createSyncMessageEncoder(CoreIPC::MessageKindTraits<E>::messageReceiverName(), "", destinationID, syncRequestID);
 
     // Encode the input arguments.
     encoder->encode(arguments);
@@ -467,7 +459,7 @@ inline bool Connection::deprecatedSendSync(E messageID, uint64_t destinationID, 
 template<typename E, typename T>
 bool Connection::deprecatedSend(E messageID, uint64_t destinationID, const T& arguments)
 {
-    OwnPtr<MessageEncoder> encoder = MessageEncoder::create("", "", destinationID);
+    OwnPtr<MessageEncoder> encoder = MessageEncoder::create(CoreIPC::MessageKindTraits<E>::messageReceiverName(), "", destinationID);
     encoder->encode(arguments);
 
     return sendMessage(MessageID(messageID), encoder.release());

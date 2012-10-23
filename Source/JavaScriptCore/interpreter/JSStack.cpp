@@ -28,6 +28,7 @@
 
 #include "config.h"
 #include "JSStack.h"
+#include "JSStackInlines.h"
 
 #include "ConservativeRoots.h"
 #include "Interpreter.h"
@@ -41,7 +42,22 @@ static Mutex& stackStatisticsMutex()
     DEFINE_STATIC_LOCAL(Mutex, staticMutex, ());
     return staticMutex;
 }    
-    
+
+JSStack::JSStack(JSGlobalData& globalData, size_t capacity)
+    : m_end(0)
+    , m_topCallFrame(globalData.topCallFrame)
+{
+    ASSERT(capacity && isPageAligned(capacity));
+
+    m_reservation = PageReservation::reserve(roundUpAllocationSize(capacity * sizeof(Register), commitSize), OSAllocator::JSVMStackPages);
+    m_end = static_cast<Register*>(m_reservation.base());
+    m_commitEnd = static_cast<Register*>(m_reservation.base());
+
+    disableErrorStackReserve();
+
+    m_topCallFrame = 0;
+}
+
 JSStack::~JSStack()
 {
     void* base = m_reservation.base();
@@ -52,15 +68,22 @@ JSStack::~JSStack()
 
 bool JSStack::growSlowCase(Register* newEnd)
 {
+    // If we have already committed enough memory to satisfy this request,
+    // just update the end pointer and return.
     if (newEnd <= m_commitEnd) {
         m_end = newEnd;
         return true;
     }
 
+    // Compute the chunk size of additional memory to commit, and see if we
+    // have it is still within our budget. If not, we'll fail to grow and
+    // return false.
     long delta = roundUpAllocationSize(reinterpret_cast<char*>(newEnd) - reinterpret_cast<char*>(m_commitEnd), commitSize);
-    if (reinterpret_cast<char*>(m_commitEnd) + delta > static_cast<char*>(m_reservation.base()) + m_reservation.size())
+    if (reinterpret_cast<char*>(m_commitEnd) + delta > reinterpret_cast<char*>(m_useableEnd))
         return false;
 
+    // Otherwise, the growth is still within our budget. Go ahead and commit
+    // it and return true.
     m_reservation.commit(m_commitEnd, delta);
     addToCommittedByteCount(delta);
     m_commitEnd = reinterpret_cast_ptr<Register*>(reinterpret_cast<char*>(m_commitEnd) + delta);
@@ -70,12 +93,12 @@ bool JSStack::growSlowCase(Register* newEnd)
 
 void JSStack::gatherConservativeRoots(ConservativeRoots& conservativeRoots)
 {
-    conservativeRoots.add(begin(), end());
+    conservativeRoots.add(begin(), getTopOfStack());
 }
 
 void JSStack::gatherConservativeRoots(ConservativeRoots& conservativeRoots, JITStubRoutineSet& jitStubRoutines, DFGCodeBlocks& dfgCodeBlocks)
 {
-    conservativeRoots.add(begin(), end(), jitStubRoutines, dfgCodeBlocks);
+    conservativeRoots.add(begin(), getTopOfStack(), jitStubRoutines, dfgCodeBlocks);
 }
 
 void JSStack::releaseExcessCapacity()
@@ -102,6 +125,27 @@ void JSStack::addToCommittedByteCount(long byteCount)
     MutexLocker locker(stackStatisticsMutex());
     ASSERT(static_cast<long>(committedBytesCount) + byteCount > -1);
     committedBytesCount += byteCount;
+}
+
+void JSStack::enableErrorStackReserve()
+{
+    m_useableEnd = reservationEnd();
+}
+
+void JSStack::disableErrorStackReserve()
+{
+    char* useableEnd = reinterpret_cast<char*>(reservationEnd()) - commitSize;
+    m_useableEnd = reinterpret_cast<Register*>(useableEnd);
+
+    // By the time we get here, we are guaranteed to be destructing the last
+    // Interpreter::ErrorHandlingMode that enabled this reserve in the first
+    // place. That means the stack space beyond m_useableEnd before we
+    // enabled the reserve was not previously in use. Hence, it is safe to
+    // shrink back to that m_useableEnd.
+    if (m_end > m_useableEnd) {
+        ASSERT(m_topCallFrame->frameExtent() <= m_useableEnd);
+        shrink(m_useableEnd);
+    }
 }
 
 } // namespace JSC

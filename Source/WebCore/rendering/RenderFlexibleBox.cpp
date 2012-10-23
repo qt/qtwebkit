@@ -235,18 +235,22 @@ void RenderFlexibleBox::computePreferredLogicalWidths()
     setPreferredLogicalWidthsDirty(false);
 }
 
-LayoutUnit RenderFlexibleBox::baselinePosition(FontBaseline baselineType, bool firstLine, LineDirectionMode direction, LinePositionMode linePositionMode) const
+static int synthesizedBaselineFromContentBox(const RenderBox* box, LineDirectionMode direction)
 {
-    LayoutUnit baseline = firstLineBoxBaseline();
-    if (baseline != -1) {
-        LayoutUnit marginAscent = direction == HorizontalLine ? marginTop() : marginRight();
-        return baseline + marginAscent;
-    }
-
-    return RenderBox::baselinePosition(baselineType, firstLine, direction, linePositionMode);
+    return direction == HorizontalLine ? box->borderTop() + box->paddingTop() + box->contentHeight() : box->borderRight() + box->paddingRight() + box->contentWidth();
 }
 
-LayoutUnit RenderFlexibleBox::firstLineBoxBaseline() const
+int RenderFlexibleBox::baselinePosition(FontBaseline, bool, LineDirectionMode direction, LinePositionMode) const
+{
+    int baseline = firstLineBoxBaseline();
+    if (baseline == -1)
+        baseline = synthesizedBaselineFromContentBox(this, direction);
+
+    int marginAscent = direction == HorizontalLine ? marginTop() : marginRight();
+    return baseline + marginAscent;
+}
+
+int RenderFlexibleBox::firstLineBoxBaseline() const
 {
     ASSERT(m_orderIterator);
 
@@ -273,11 +277,25 @@ LayoutUnit RenderFlexibleBox::firstLineBoxBaseline() const
     if (isColumnFlow() && !hasOrthogonalFlow(baselineChild))
         return mainAxisExtentForChild(baselineChild) + baselineChild->logicalTop();
 
-    LayoutUnit baseline = baselineChild->firstLineBoxBaseline();
-    if (baseline == -1)
-        return -1;
+    int baseline = baselineChild->firstLineBoxBaseline();
+    if (baseline == -1) {
+        // FIXME: We should pass |direction| into firstLineBoxBaseline and stop bailing out if we're a writing mode root.
+        // This would also fix some cases where the flexbox is orthogonal to its container.
+        LineDirectionMode direction = isHorizontalWritingMode() ? HorizontalLine : VerticalLine;
+        return synthesizedBaselineFromContentBox(baselineChild, direction) + baselineChild->logicalTop();
+    }
 
     return baseline + baselineChild->logicalTop();
+}
+
+int RenderFlexibleBox::inlineBlockBaseline(LineDirectionMode direction) const
+{
+    int baseline = firstLineBoxBaseline();
+    if (baseline != -1)
+        return baseline;
+
+    int marginAscent = direction == HorizontalLine ? marginTop() : marginRight();
+    return synthesizedBaselineFromContentBox(this, direction) + marginAscent;
 }
 
 void RenderFlexibleBox::layoutBlock(bool relayoutChildren, LayoutUnit)
@@ -407,7 +425,7 @@ bool RenderFlexibleBox::isLeftToRightFlow() const
 
 bool RenderFlexibleBox::isMultiline() const
 {
-    return style()->flexWrap() != FlexWrapNone;
+    return style()->flexWrap() != FlexNoWrap;
 }
 
 Length RenderFlexibleBox::flexBasisForChild(RenderBox* child) const

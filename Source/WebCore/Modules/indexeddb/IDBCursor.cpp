@@ -39,6 +39,7 @@
 #include "IDBTransaction.h"
 #include "ScriptCallStack.h"
 #include "ScriptExecutionContext.h"
+#include <limits>
 
 namespace WebCore {
 
@@ -80,7 +81,6 @@ IDBCursor::IDBCursor(PassRefPtr<IDBCursorBackendInterface> backend, Direction di
     , m_transaction(transaction)
     , m_transactionNotifier(transaction, this)
     , m_gotValue(false)
-    , m_valueIsDirty(true)
 {
     ASSERT(m_backend);
     ASSERT(m_request);
@@ -113,10 +113,9 @@ PassRefPtr<IDBKey> IDBCursor::primaryKey() const
     return m_currentPrimaryKey;
 }
 
-PassRefPtr<IDBAny> IDBCursor::value()
+const ScriptValue& IDBCursor::value() const
 {
     IDB_TRACE("IDBCursor::value");
-    m_valueIsDirty = false;
     return m_currentValue;
 }
 
@@ -156,7 +155,7 @@ PassRefPtr<IDBRequest> IDBCursor::update(ScriptExecutionContext* context, Script
     return objectStore->put(IDBObjectStoreBackendInterface::CursorUpdate, IDBAny::create(this), context, value, m_currentPrimaryKey, ec);
 }
 
-void IDBCursor::advance(long count, ExceptionCode& ec)
+void IDBCursor::advance(long long count, ExceptionCode& ec)
 {
     IDB_TRACE("IDBCursor::advance");
     if (!m_gotValue) {
@@ -170,8 +169,7 @@ void IDBCursor::advance(long count, ExceptionCode& ec)
     }
 
     // FIXME: This should only need to check for 0 once webkit.org/b/96798 lands.
-    const int64_t maxECMAScriptInteger = 0x20000000000000LL - 1;
-    if (count < 1 || count > maxECMAScriptInteger) {
+    if (count < 1 || count > UINT_MAX) {
         ec = NATIVE_TYPE_ERR;
         return;
     }
@@ -277,10 +275,9 @@ void IDBCursor::setValueReady(PassRefPtr<IDBKey> key, PassRefPtr<IDBKey> primary
             ASSERT_UNUSED(injected, injected);
         }
     }
-    m_currentValue = IDBAny::create(value);
+    m_currentValue = value;
 
     m_gotValue = true;
-    m_valueIsDirty = true;
 }
 
 PassRefPtr<IDBObjectStore> IDBCursor::effectiveObjectStore()

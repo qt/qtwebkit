@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Intel Corporation. All rights reserved.
+ * Copyright (C) 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,12 +23,36 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ewk_view_resource_load_client_private_h
-#define ewk_view_resource_load_client_private_h
+#include "config.h"
+#include "StringReference.h"
 
-#include <Evas.h>
-#include <WebKit2/WKBase.h>
+#include "ArgumentDecoder.h"
+#include "ArgumentEncoder.h"
+#include "DataReference.h"
+#include <wtf/StringHasher.h>
 
-void ewk_view_resource_load_client_attach(WKPageRef pageRef, Evas_Object* ewkView);
+namespace CoreIPC {
 
-#endif // ewk_view_resource_load_client_private_h
+void StringReference::encode(ArgumentEncoder* encoder) const
+{
+    encoder->encodeVariableLengthByteArray(DataReference(reinterpret_cast<const uint8_t*>(m_data), m_size));
+}
+
+bool StringReference::decode(ArgumentDecoder* decoder, StringReference& result)
+{
+    DataReference dataReference;
+    if (!decoder->decodeVariableLengthByteArray(dataReference))
+        return false;
+
+    result.m_data = reinterpret_cast<const char*>(dataReference.data());
+    result.m_size = dataReference.size();
+
+    return true;
+}
+
+unsigned StringReference::Hash::hash(const StringReference& a)
+{
+    return StringHasher::computeHash(reinterpret_cast<const unsigned char*>(a.data()), a.size());
+}
+
+} // namespace CoreIPC

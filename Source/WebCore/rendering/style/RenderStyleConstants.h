@@ -171,7 +171,7 @@ enum EBoxDirection { BNORMAL, BREVERSE };
 enum EAlignContent { AlignContentFlexStart, AlignContentFlexEnd, AlignContentCenter, AlignContentSpaceBetween, AlignContentSpaceAround, AlignContentStretch };
 enum EAlignItems { AlignAuto, AlignFlexStart, AlignFlexEnd, AlignCenter, AlignStretch, AlignBaseline };
 enum EFlexDirection { FlowRow, FlowRowReverse, FlowColumn, FlowColumnReverse };
-enum EFlexWrap { FlexWrapNone, FlexWrap, FlexWrapReverse };
+enum EFlexWrap { FlexNoWrap, FlexWrap, FlexWrapReverse };
 enum EJustifyContent { JustifyFlexStart, JustifyFlexEnd, JustifyCenter, JustifySpaceBetween, JustifySpaceAround };
 
 enum ETextSecurity {
@@ -336,15 +336,15 @@ enum ETextDecoration {
 inline ETextDecoration operator|(ETextDecoration a, ETextDecoration b) { return ETextDecoration(int(a) | int(b)); }
 inline ETextDecoration& operator|=(ETextDecoration& a, ETextDecoration b) { return a = a | b; }
 
-#if ENABLE(CSS3_TEXT)
 enum TextDecorationStyle {
     TextDecorationStyleSolid,
+#if ENABLE(CSS3_TEXT)
     TextDecorationStyleDouble,
     TextDecorationStyleDotted,
     TextDecorationStyleDashed,
     TextDecorationStyleWavy
-};
 #endif // CSS3_TEXT
+};
 
 enum EPageBreak {
     PBAUTO, PBALWAYS, PBAVOID

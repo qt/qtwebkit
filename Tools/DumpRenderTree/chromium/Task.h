@@ -28,52 +28,14 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
-#include "Task.h"
+#ifndef Task_h
+#define Task_h
 
-#include "WebKit.h"
-#include "platform/WebKitPlatformSupport.h"
-
-WebTask::WebTask(TaskList* list)
-    : m_taskList(list)
-{
-    m_taskList->registerTask(this);
+namespace WebTestRunner {
+class WebTask;
 }
 
-WebTask::~WebTask()
-{
-    if (m_taskList)
-        m_taskList->unregisterTask(this);
-}
+void postTask(WebTestRunner::WebTask*);
+void postDelayedTask(WebTestRunner::WebTask*, long long ms);
 
-void TaskList::unregisterTask(WebTask* task)
-{
-    size_t index = m_tasks.find(task);
-    if (index != notFound)
-        m_tasks.remove(index);
-}
-
-void TaskList::revokeAll()
-{
-    while (!m_tasks.isEmpty())
-        m_tasks[0]->cancel();
-}
-
-static void invokeTask(void* context)
-{
-    WebTask* task = static_cast<WebTask*>(context);
-    task->run();
-    delete task;
-}
-
-void postTask(WebTask* task)
-{
-    WebKit::webKitPlatformSupport()->callOnMainThread(invokeTask, static_cast<void*>(task));
-}
-
-void postDelayedTask(WebTask* task, int64_t ms)
-{
-    webkit_support::PostDelayedTask(task, ms);
-}
-
-
+#endif // Task_h

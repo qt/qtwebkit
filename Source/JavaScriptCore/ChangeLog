@@ -1,3 +1,186 @@
+2012-10-23  Mark Lam  <mark.lam@apple.com>
+
+        Make topCallFrame reliable.
+        https://bugs.webkit.org/show_bug.cgi?id=98928.
+
+        Reviewed by Geoffrey Garen.
+
+        - VM entry points and the GC now uses topCallFrame.
+        - The callerFrame value in CallFrames are now always the previous
+          frame on the stack, except for the first frame which has a
+          callerFrame of 0 (not counting the HostCallFrameFlag).
+          Hence, we can now traverse every frame on the stack all the way
+          back to the first frame.
+        - GlobalExec's will no longer be used as the callerFrame values in
+          call frames.
+        - Added fences and traps for debugging the JSStack in debug builds.
+
+        * bytecode/SamplingTool.h:
+        (SamplingTool):
+        (JSC::SamplingTool::CallRecord::CallRecord):
+        * dfg/DFGOperations.cpp:
+        - Fixed 2 DFG helper functions to flush topCallFrame as expected.
+        * dfg/DFGSpeculativeJIT.h:
+        (JSC::DFG::SpeculativeJIT::prepareForExternalCall):
+        * interpreter/CallFrame.h:
+        (JSC::ExecState::callerFrameNoFlags):
+        (ExecState):
+        (JSC::ExecState::argIndexForRegister):
+        (JSC::ExecState::getArgumentUnsafe):
+        * interpreter/CallFrameClosure.h:
+        (CallFrameClosure):
+        * interpreter/Interpreter.cpp:
+        (JSC):
+        (JSC::eval):
+        (JSC::Interpreter::Interpreter):
+        (JSC::Interpreter::throwException):
+        (JSC::Interpreter::execute):
+        (JSC::Interpreter::executeCall):
+        (JSC::Interpreter::executeConstruct):
+        (JSC::Interpreter::prepareForRepeatCall):
+        (JSC::Interpreter::endRepeatCall):
+        * interpreter/Interpreter.h:
+        (JSC):
+        (Interpreter):
+        * interpreter/JSStack.cpp:
+        (JSC::JSStack::JSStack):
+        (JSC::JSStack::gatherConservativeRoots):
+        (JSC::JSStack::disableErrorStackReserve):
+        * interpreter/JSStack.h:
+        (JSC):
+        (JSStack):
+        (JSC::JSStack::installFence):
+        (JSC::JSStack::validateFence):
+        (JSC::JSStack::installTrapsAfterFrame):
+        * interpreter/JSStackInlines.h: Added.
+        (JSC):
+        (JSC::JSStack::getTopOfFrame):
+        (JSC::JSStack::getTopOfStack):
+        (JSC::JSStack::getStartOfFrame):
+        (JSC::JSStack::pushFrame):
+        (JSC::JSStack::popFrame):
+        (JSC::JSStack::generateFenceValue):
+        (JSC::JSStack::installFence):
+        (JSC::JSStack::validateFence):
+        (JSC::JSStack::installTrapsAfterFrame):
+        * jit/JITStubs.cpp:
+        (JSC::jitCompileFor):
+        (JSC::lazyLinkFor):
+        - Set frame->codeBlock to 0 for both the above because they are called
+          with partially intitialized frames (cb uninitialized), but may
+          trigger a GC.
+        (JSC::DEFINE_STUB_FUNCTION):
+        * runtime/JSGlobalData.cpp:
+        (JSC::JSGlobalData::JSGlobalData):
+
+2012-10-22  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG::Array::Undecided should be called DFG::Array::SelectUsingPredictions
+        https://bugs.webkit.org/show_bug.cgi?id=100052
+
+        Reviewed by Oliver Hunt.
+
+        No functional change, just renaming. It's a clearer name that more accurately
+        reflects the meaning, and it eliminates the namespace confusion that will happen
+        with the Undecided indexing type in https://bugs.webkit.org/show_bug.cgi?id=98606
+
+        * dfg/DFGAbstractState.cpp:
+        (JSC::DFG::AbstractState::execute):
+        * dfg/DFGArrayMode.cpp:
+        (JSC::DFG::fromObserved):
+        (JSC::DFG::refineArrayMode):
+        (JSC::DFG::modeAlreadyChecked):
+        (JSC::DFG::modeToString):
+        * dfg/DFGArrayMode.h:
+        (JSC::DFG::canCSEStorage):
+        (JSC::DFG::modeIsSpecific):
+        (JSC::DFG::modeSupportsLength):
+        (JSC::DFG::benefitsFromStructureCheck):
+        * dfg/DFGFixupPhase.cpp:
+        (JSC::DFG::FixupPhase::fixupNode):
+        (JSC::DFG::FixupPhase::blessArrayOperation):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::arrayify):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::compile):
+
+2012-10-22  Mark Lam  <mark.lam@apple.com>
+
+        Change stack recursion checks to be based on stack availability.
+        https://bugs.webkit.org/show_bug.cgi?id=99872.
+
+        Reviewed by Filip Pizlo and Geoffrey Garen.
+
+        - Remove m_reentryDepth, ThreadStackType which are now obsolete.
+        - Replaced the reentryDepth checks with a StackBounds check.
+        - Added the Interpreter::StackPolicy class to compute a reasonable
+          stack capacity requirement given the native stack that the
+          interpreter is executing on at that time.
+        - Reserved an amount of JSStack space for the use of error handling
+          and enable its use (using Interpreter::ErrorHandlingMode) when
+          we're about to throw or report an exception.
+        - Interpreter::StackPolicy also allows more native stack space
+          to be used when in ErrorHandlingMode. This is needed in the case
+          of native stack overflows.
+        - Fixed the parser so that it throws a StackOverflowError instead of
+          a SyntaxError when it encounters a stack overflow.
+
+        * API/JSContextRef.cpp:
+        (JSContextGroupCreate):
+        (JSGlobalContextCreateInGroup):
+        * JavaScriptCore.order:
+        * JavaScriptCore.vcproj/JavaScriptCore/JavaScriptCore.def:
+        * interpreter/Interpreter.cpp:
+        (JSC::Interpreter::ErrorHandlingMode::ErrorHandlingMode):
+        (JSC):
+        (JSC::Interpreter::ErrorHandlingMode::~ErrorHandlingMode):
+        (JSC::Interpreter::StackPolicy::StackPolicy):
+        (JSC::Interpreter::Interpreter):
+        (JSC::Interpreter::execute):
+        (JSC::Interpreter::executeCall):
+        (JSC::Interpreter::executeConstruct):
+        (JSC::Interpreter::prepareForRepeatCall):
+        * interpreter/Interpreter.h:
+        (JSC):
+        (Interpreter):
+        (ErrorHandlingMode):
+        (StackPolicy):
+        (JSC::Interpreter::StackPolicy::requiredCapacity):
+        * interpreter/JSStack.cpp:
+        (JSC):
+        (JSC::JSStack::JSStack):
+        (JSC::JSStack::growSlowCase):
+        (JSC::JSStack::enableErrorStackReserve):
+        (JSC::JSStack::disableErrorStackReserve):
+        * interpreter/JSStack.h:
+        (JSStack):
+        (JSC::JSStack::reservationEnd):
+        (JSC):
+        * jsc.cpp:
+        (jscmain):
+        * parser/Parser.cpp:
+        (JSC::::Parser):
+        * parser/Parser.h:
+        (Parser):
+        (JSC::::parse):
+        * runtime/ExceptionHelpers.cpp:
+        (JSC::throwStackOverflowError):
+        * runtime/JSGlobalData.cpp:
+        (JSC::JSGlobalData::JSGlobalData):
+        (JSC::JSGlobalData::createContextGroup):
+        (JSC::JSGlobalData::create):
+        (JSC::JSGlobalData::createLeaked):
+        (JSC::JSGlobalData::sharedInstance):
+        * runtime/JSGlobalData.h:
+        (JSC):
+        (JSGlobalData):
+        * runtime/StringRecursionChecker.h:
+        (JSC::StringRecursionChecker::performCheck):
+        * testRegExp.cpp:
+        (realMain):
+
 2012-10-20  Martin Robinson  <mrobinson@igalia.com>
 
         Fix 'make dist' for the GTK+ port

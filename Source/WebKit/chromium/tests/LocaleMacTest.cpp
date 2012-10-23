@@ -144,6 +144,12 @@ protected:
         return locale->shortMonthLabels()[index];
     }
 
+    String standAloneMonthLabel(const String& localeString, unsigned index)
+    {
+        OwnPtr<LocaleMac> locale = LocaleMac::create(localeString);
+        return locale->standAloneMonthLabels()[index];
+    }
+
     String shortStandAloneMonthLabel(const String& localeString, unsigned index)
     {
         OwnPtr<LocaleMac> locale = LocaleMac::create(localeString);
@@ -256,7 +262,7 @@ TEST_F(LocaleMacTest, isRTL)
 #if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
 TEST_F(LocaleMacTest, monthFormat)
 {
-    EXPECT_STREQ("MMM yyyy", monthFormat("en_US").utf8().data());
+    EXPECT_STREQ("MMMM yyyy", monthFormat("en_US").utf8().data());
     EXPECT_STREQ("yyyy\xE5\xB9\xB4M\xE6\x9C\x88", monthFormat("ja_JP").utf8().data());
 
     // fr_FR and ru return different results on OS versions.
@@ -276,6 +282,21 @@ TEST_F(LocaleMacTest, shortTimeFormat)
     EXPECT_STREQ("h:mm a", shortTimeFormat("en_US").utf8().data());
     EXPECT_STREQ("HH:mm", shortTimeFormat("fr_FR").utf8().data());
     EXPECT_STREQ("H:mm", shortTimeFormat("ja_JP").utf8().data());
+}
+
+TEST_F(LocaleMacTest, standAloneMonthLabels)
+{
+    EXPECT_STREQ("January", standAloneMonthLabel("en_US", January).utf8().data());
+    EXPECT_STREQ("June", standAloneMonthLabel("en_US", June).utf8().data());
+    EXPECT_STREQ("December", standAloneMonthLabel("en_US", December).utf8().data());
+
+    EXPECT_STREQ("janvier", standAloneMonthLabel("fr_FR", January).utf8().data());
+    EXPECT_STREQ("juin", standAloneMonthLabel("fr_FR", June).utf8().data());
+    EXPECT_STREQ("d\xC3\xA9" "cembre", standAloneMonthLabel("fr_FR", December).utf8().data());
+
+    EXPECT_STREQ("1\xE6\x9C\x88", standAloneMonthLabel("ja_JP", January).utf8().data());
+    EXPECT_STREQ("6\xE6\x9C\x88", standAloneMonthLabel("ja_JP", June).utf8().data());
+    EXPECT_STREQ("12\xE6\x9C\x88", standAloneMonthLabel("ja_JP", December).utf8().data());
 }
 
 TEST_F(LocaleMacTest, shortMonthLabels)

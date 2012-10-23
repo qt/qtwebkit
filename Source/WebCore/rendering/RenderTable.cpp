@@ -378,20 +378,15 @@ void RenderTable::layout()
 
     bool collapsing = collapseBorders();
 
-    for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
-        if (child->isTableSection()) {
-            RenderTableSection* section = toRenderTableSection(child);
-            if (m_columnLogicalWidthChanged)
-                section->setChildNeedsLayout(true, MarkOnlyThis);
-            section->layoutIfNeeded();
-            totalSectionLogicalHeight += section->calcRowLogicalHeight();
-            if (collapsing)
-                section->recalcOuterBorder();
-            ASSERT(!section->needsLayout());
-        } else if (child->isRenderTableCol()) {
-            child->layoutIfNeeded();
-            ASSERT(!child->needsLayout());
-        }
+    // We ignore table col / colgroup in this iteration as they are only used to size the cell's widths during auto / fixed table layout.
+    for (RenderTableSection* section = topSection(); section; section = sectionBelow(section)) {
+        if (m_columnLogicalWidthChanged)
+            section->setChildNeedsLayout(true, MarkOnlyThis);
+        section->layoutIfNeeded();
+        totalSectionLogicalHeight += section->calcRowLogicalHeight();
+        if (collapsing)
+            section->recalcOuterBorder();
+        ASSERT(!section->needsLayout());
     }
 
     // If any table section moved vertically, we will just repaint everything from that
@@ -1220,7 +1215,7 @@ void RenderTable::updateFirstLetter()
 {
 }
 
-LayoutUnit RenderTable::baselinePosition(FontBaseline baselineType, bool firstLine, LineDirectionMode direction, LinePositionMode linePositionMode) const
+int RenderTable::baselinePosition(FontBaseline baselineType, bool firstLine, LineDirectionMode direction, LinePositionMode linePositionMode) const
 {
     LayoutUnit baseline = firstLineBoxBaseline();
     if (baseline != -1)
@@ -1229,13 +1224,13 @@ LayoutUnit RenderTable::baselinePosition(FontBaseline baselineType, bool firstLi
     return RenderBox::baselinePosition(baselineType, firstLine, direction, linePositionMode);
 }
 
-LayoutUnit RenderTable::lastLineBoxBaseline() const
+int RenderTable::inlineBlockBaseline(LineDirectionMode) const
 {
-    // Tables don't contribute their baseline towards the computation of an inline-block's baseline.
+    // Tables are skipped when computing an inline-block's baseline.
     return -1;
 }
 
-LayoutUnit RenderTable::firstLineBoxBaseline() const
+int RenderTable::firstLineBoxBaseline() const
 {
     // The baseline of a 'table' is the same as the 'inline-table' baseline per CSS 3 Flexbox (CSS 2.1
     // doesn't define the baseline of a 'table' only an 'inline-table').
@@ -1250,7 +1245,7 @@ LayoutUnit RenderTable::firstLineBoxBaseline() const
     if (!topNonEmptySection)
         return -1;
 
-    LayoutUnit baseline = topNonEmptySection->firstLineBoxBaseline();
+    int baseline = topNonEmptySection->firstLineBoxBaseline();
     if (baseline > 0)
         return topNonEmptySection->logicalTop() + baseline;
 

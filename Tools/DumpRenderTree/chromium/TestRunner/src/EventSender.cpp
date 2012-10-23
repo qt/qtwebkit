@@ -51,6 +51,7 @@
 #include "platform/WebDragData.h"
 #include "platform/WebPoint.h"
 #include "platform/WebString.h"
+#include "platform/WebVector.h"
 #include "webkit/support/webkit_support.h"
 #include <wtf/Deque.h>
 #include <wtf/StringExtras.h>
@@ -369,7 +370,7 @@ void EventSender::dumpFilenameBeingDragged(const CppArgumentList&, CppVariant*)
             break;
         }
     }
-    printf("Filename being dragged: %s\n", filename.utf8().data());
+    m_delegate->printMessage(std::string("Filename being dragged: ") + filename.utf8().data() + "\n");
 }
 
 WebMouseEvent::Button EventSender::getButtonTypeFromButtonNumber(int buttonCode)
@@ -854,20 +855,20 @@ void EventSender::contextClick(const CppArgumentList& arguments, CppVariant* res
     result->set(WebBindings::makeStringArray(makeMenuItemStringsFor(lastContextMenu, m_delegate)));
 }
 
-class MouseDownTask: public MethodTask<EventSender> {
+class MouseDownTask: public WebMethodTask<EventSender> {
 public:
     MouseDownTask(EventSender* obj, const CppArgumentList& arg)
-        : MethodTask<EventSender>(obj), m_arguments(arg) { }
+        : WebMethodTask<EventSender>(obj), m_arguments(arg) { }
     virtual void runIfValid() { m_object->mouseDown(m_arguments, 0); }
 
 private:
     CppArgumentList m_arguments;
 };
 
-class MouseUpTask: public MethodTask<EventSender> {
+class MouseUpTask: public WebMethodTask<EventSender> {
 public:
     MouseUpTask(EventSender* obj, const CppArgumentList& arg)
-        : MethodTask<EventSender>(obj), m_arguments(arg) { }
+        : WebMethodTask<EventSender>(obj), m_arguments(arg) { }
     virtual void runIfValid() { m_object->mouseUp(m_arguments, 0); }
 
 private:
@@ -877,14 +878,14 @@ private:
 void EventSender::scheduleAsynchronousClick(const CppArgumentList& arguments, CppVariant* result)
 {
     result->setNull();
-    postTask(new MouseDownTask(this, arguments));
-    postTask(new MouseUpTask(this, arguments));
+    m_delegate->postTask(new MouseDownTask(this, arguments));
+    m_delegate->postTask(new MouseUpTask(this, arguments));
 }
 
-class KeyDownTask : public MethodTask<EventSender> {
+class KeyDownTask : public WebMethodTask<EventSender> {
 public:
     KeyDownTask(EventSender* obj, const CppArgumentList& arg)
-        : MethodTask<EventSender>(obj), m_arguments(arg) { }
+        : WebMethodTask<EventSender>(obj), m_arguments(arg) { }
     virtual void runIfValid() { m_object->keyDown(m_arguments, 0); }
 
 private:
@@ -894,22 +895,22 @@ private:
 void EventSender::scheduleAsynchronousKeyDown(const CppArgumentList& arguments, CppVariant* result)
 {
     result->setNull();
-    postTask(new KeyDownTask(this, arguments));
+    m_delegate->postTask(new KeyDownTask(this, arguments));
 }
 
 void EventSender::beginDragWithFiles(const CppArgumentList& arguments, CppVariant* result)
 {
     currentDragData.initialize();
     Vector<string> files = arguments[0].toStringVector();
-    Vector<WebString> absoluteFilenames;
+    WebVector<WebString> absoluteFilenames(files.size());
     for (size_t i = 0; i < files.size(); ++i) {
         WebDragData::Item item;
         item.storageType = WebDragData::Item::StorageTypeFilename;
         item.filenameData = webkit_support::GetAbsoluteWebStringFromUTF8Path(files[i]);
         currentDragData.addItem(item);
-        absoluteFilenames.append(item.filenameData);
+        absoluteFilenames[i] = item.filenameData;
     }
-    currentDragData.setFilesystemId(webkit_support::RegisterIsolatedFileSystem(absoluteFilenames));
+    currentDragData.setFilesystemId(m_delegate->registerIsolatedFileSystem(absoluteFilenames));
     currentDragEffectsAllowed = WebKit::WebDragOperationCopy;
 
     // Provide a drag source.

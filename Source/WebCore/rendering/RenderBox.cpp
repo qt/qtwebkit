@@ -1786,7 +1786,7 @@ static bool isStretchingColumnFlexItem(const RenderObject* flexitem)
         return true;
 
     // We don't stretch multiline flexboxes because they need to apply line spacing (align-content) first.
-    if (parent->isFlexibleBox() && parent->style()->flexWrap() == FlexWrapNone && parent->style()->isColumnFlexDirection() && flexItemHasStretchAlignment(flexitem))
+    if (parent->isFlexibleBox() && parent->style()->flexWrap() == FlexNoWrap && parent->style()->isColumnFlexDirection() && flexItemHasStretchAlignment(flexitem))
         return true;
     return false;
 }
@@ -1820,7 +1820,7 @@ bool RenderBox::sizesLogicalWidthToFitContent(SizeType widthType) const
     // stretched size to avoid an extra layout when applying alignment.
     if (parent()->isFlexibleBox()) {
         // For multiline columns, we need to apply align-content first, so we can't stretch now.
-        if (!parent()->style()->isColumnFlexDirection() || parent()->style()->flexWrap() != FlexWrapNone)
+        if (!parent()->style()->isColumnFlexDirection() || parent()->style()->flexWrap() != FlexNoWrap)
             return true;
         if (!flexItemHasStretchAlignment(this))
             return true;
@@ -3831,10 +3831,10 @@ LayoutUnit RenderBox::lineHeight(bool /*firstLine*/, LineDirectionMode direction
     return 0;
 }
 
-LayoutUnit RenderBox::baselinePosition(FontBaseline baselineType, bool /*firstLine*/, LineDirectionMode direction, LinePositionMode /*linePositionMode*/) const
+int RenderBox::baselinePosition(FontBaseline baselineType, bool /*firstLine*/, LineDirectionMode direction, LinePositionMode /*linePositionMode*/) const
 {
     if (isReplaced()) {
-        LayoutUnit result = direction == HorizontalLine ? m_marginBox.top() + height() + m_marginBox.bottom() : m_marginBox.right() + width() + m_marginBox.left();
+        int result = direction == HorizontalLine ? m_marginBox.top() + height() + m_marginBox.bottom() : m_marginBox.right() + width() + m_marginBox.left();
         if (baselineType == AlphabeticBaseline)
             return result;
         return result - result / 2;

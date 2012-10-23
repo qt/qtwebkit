@@ -1,3 +1,495 @@
+2012-10-23  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Make page load client a C++ class
+        https://bugs.webkit.org/show_bug.cgi?id=100081
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Make page load client a C++ class and move it
+        up to UIProcess/efl since it is not really part
+        of the public API.
+
+        * PlatformEfl.cmake:
+        * UIProcess/API/efl/ewk_view.cpp:
+        (Ewk_View_Private_Data):
+        (_ewk_view_initialize):
+        * UIProcess/API/efl/ewk_view_loader_client_private.h: Removed.
+        * UIProcess/efl/PageLoadClientEfl.cpp: Renamed from Source/WebKit2/UIProcess/API/efl/ewk_view_loader_client.cpp.
+        (WebKit):
+        (WebKit::toPageLoadClientEfl):
+        (WebKit::PageLoadClientEfl::didReceiveTitleForFrame):
+        (WebKit::PageLoadClientEfl::didReceiveIntentForFrame):
+        (WebKit::PageLoadClientEfl::registerIntentServiceForFrame):
+        (WebKit::PageLoadClientEfl::didChangeProgress):
+        (WebKit::PageLoadClientEfl::didFinishLoadForFrame):
+        (WebKit::PageLoadClientEfl::didFailLoadWithErrorForFrame):
+        (WebKit::PageLoadClientEfl::didStartProvisionalLoadForFrame):
+        (WebKit::PageLoadClientEfl::didReceiveServerRedirectForProvisionalLoadForFrame):
+        (WebKit::PageLoadClientEfl::didFailProvisionalLoadWithErrorForFrame):
+        (WebKit::PageLoadClientEfl::didChangeBackForwardList):
+        (WebKit::PageLoadClientEfl::didSameDocumentNavigationForFrame):
+        (WebKit::PageLoadClientEfl::PageLoadClientEfl):
+        * UIProcess/efl/PageLoadClientEfl.h: Added.
+        (WebKit):
+        (PageLoadClientEfl):
+        (WebKit::PageLoadClientEfl::create):
+        (WebKit::PageLoadClientEfl::view):
+
+2012-10-22  Anders Carlsson  <andersca@apple.com>
+
+        Handle ArgumentCoder template specializations that take the ArgumentEncoder as a reference
+        https://bugs.webkit.org/show_bug.cgi?id=100056
+
+        Reviewed by Andreas Kling.
+
+        Use template magic to make it possible to have ArgumentCoder specializations where the encode
+        function takes the ArgumentEncoder object as a reference instead of as a pointer. Also, add an
+        operator<< to ArgumentEncoder and change the string related ArgumentCoder specializations over to taking
+        the encoder as a reference and using stream operators.
+
+        * Platform/CoreIPC/ArgumentCoders.cpp:
+        (CoreIPC::::encode):
+        * Platform/CoreIPC/ArgumentCoders.h:
+        * Platform/CoreIPC/ArgumentEncoder.h:
+        (ArgumentEncoder):
+        (UsesDeprecatedEncodeFunction):
+        (NoType):
+        (CoreIPC::ArgumentEncoder::encode):
+        (CoreIPC::ArgumentEncoder::operator<<):
+
+2012-10-22  Anders Carlsson  <andersca@apple.com>
+
+        More Argument coder cleanup
+        https://bugs.webkit.org/show_bug.cgi?id=100022
+
+        Reviewed by Andreas Kling.
+
+        Remove the ArgumentDecoder::decode overload that takes a const reference - if the call to decode ends up creating a temporary
+        we'll encode into it and then destroy it. Since this decode overload was mostly used with the CoreIPC::Out functions, remove them
+        (and CoreIPC::In) as well. Clean up a couple of ArgumentCoders as well.
+
+        * Platform/CoreIPC/ArgumentCoders.h:
+        * Platform/CoreIPC/ArgumentDecoder.h:
+        * Platform/CoreIPC/Arguments.h:
+        * Platform/CoreIPC/Connection.h:
+        (Connection):
+        * Platform/mac/SharedMemoryMac.cpp:
+        (WebKit::SharedMemory::Handle::decode):
+        * Shared/PrintInfo.cpp:
+        (WebKit::PrintInfo::encode):
+        (WebKit::PrintInfo::decode):
+        * Shared/WebContextMenuItemData.cpp:
+        (WebKit::WebContextMenuItemData::encode):
+        (WebKit::WebContextMenuItemData::decode):
+        * Shared/WebEvent.cpp:
+        (WebKit::WebEvent::encode):
+        (WebKit::WebEvent::decode):
+        * Shared/WebGeolocationPosition.cpp:
+        (WebKit::WebGeolocationPosition::Data::encode):
+        (WebKit::WebGeolocationPosition::Data::decode):
+        * Shared/WebMouseEvent.cpp:
+        (WebKit::WebMouseEvent::encode):
+        (WebKit::WebMouseEvent::decode):
+        * Shared/WebPopupItem.cpp:
+        (WebKit::WebPopupItem::encode):
+        (WebKit::WebPopupItem::decode):
+        * UIProcess/WebConnectionToWebProcess.cpp:
+        (WebKit::WebConnectionToWebProcess::decodeMessageBody):
+        * UIProcess/WebContext.cpp:
+        (WebKit::WebContext::didReceiveMessage):
+        (WebKit::WebContext::didReceiveSyncMessage):
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::postMessage):
+        (WebKit::InjectedBundle::postSynchronousMessage):
+        * WebProcess/WebConnectionToUIProcess.cpp:
+        (WebKit::WebConnectionToUIProcess::decodeMessageBody):
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::postInjectedBundleMessage):
+        * WebProcess/WebProcess.cpp:
+        (WebKit::WebProcess::postInjectedBundleMessage):
+
+2012-10-22  Anders Carlsson  <andersca@apple.com>
+
+        Remove MessageReceiverMap::deprecatedAddMessageReceiver
+        https://bugs.webkit.org/show_bug.cgi?id=100012
+
+        Reviewed by Andreas Kling.
+
+        Get rid of MessageReceiverMap::deprecatedAddMessageReceiver and make callers use addMessageReceiver instead.
+        Also, remove the message receiver map inside Connection and add a message receiver map to WebProcess instead.
+
+        * Platform/CoreIPC/Connection.cpp:
+        (CoreIPC::Connection::dispatchMessage):
+        * Platform/CoreIPC/Connection.h:
+        (Connection):
+        * Platform/CoreIPC/MessageReceiverMap.cpp:
+        (CoreIPC::MessageReceiverMap::invalidate):
+        (CoreIPC::MessageReceiverMap::dispatchMessage):
+        (CoreIPC::MessageReceiverMap::dispatchSyncMessage):
+        * Platform/CoreIPC/MessageReceiverMap.h:
+        (MessageReceiverMap):
+        * UIProcess/Notifications/WebNotificationManagerProxy.cpp:
+        (WebKit::WebNotificationManagerProxy::WebNotificationManagerProxy):
+        * UIProcess/WebApplicationCacheManagerProxy.cpp:
+        (WebKit::WebApplicationCacheManagerProxy::WebApplicationCacheManagerProxy):
+        * UIProcess/WebContext.cpp:
+        * UIProcess/WebContext.h:
+        (WebContext):
+        * UIProcess/WebCookieManagerProxy.cpp:
+        (WebKit::WebCookieManagerProxy::WebCookieManagerProxy):
+        * UIProcess/WebDatabaseManagerProxy.cpp:
+        (WebKit::WebDatabaseManagerProxy::WebDatabaseManagerProxy):
+        * UIProcess/WebGeolocationManagerProxy.cpp:
+        (WebKit::WebGeolocationManagerProxy::WebGeolocationManagerProxy):
+        * UIProcess/WebIconDatabase.cpp:
+        (WebKit::WebIconDatabase::WebIconDatabase):
+        * UIProcess/WebKeyValueStorageManagerProxy.cpp:
+        (WebKit::WebKeyValueStorageManagerProxy::WebKeyValueStorageManagerProxy):
+        * UIProcess/WebMediaCacheManagerProxy.cpp:
+        (WebKit::WebMediaCacheManagerProxy::WebMediaCacheManagerProxy):
+        * UIProcess/WebResourceCacheManagerProxy.cpp:
+        (WebKit::WebResourceCacheManagerProxy::WebResourceCacheManagerProxy):
+        * WebProcess/Authentication/AuthenticationManager.cpp:
+        (WebKit::AuthenticationManager::AuthenticationManager):
+        * WebProcess/Geolocation/WebGeolocationManager.cpp:
+        (WebKit::WebGeolocationManager::WebGeolocationManager):
+        (WebKit::WebGeolocationManager::registerWebPage):
+        * WebProcess/Geolocation/WebGeolocationManager.h:
+        (WebGeolocationManager):
+        * WebProcess/WebProcess.cpp:
+        (WebKit::WebProcess::addMessageReceiver):
+        (WebKit):
+        (WebKit::WebProcess::didReceiveSyncMessage):
+        (WebKit::WebProcess::didReceiveMessage):
+        * WebProcess/WebProcess.h:
+        (WebProcess):
+
+2012-10-22  Sudarsana Nagineni  <sudarsana.nagineni@intel.com>
+
+        [EFL][WK2] ewk_view_color_picker_color_set() is leaking
+        https://bugs.webkit.org/show_bug.cgi?id=100007
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Fix a leak in ewk_view_color_picker_color_set() by adopting WKStringRef
+        returned by WKStringCreateWithUTF8CString().
+
+        * UIProcess/API/efl/ewk_view.cpp:
+        (ewk_view_color_picker_color_set):
+
+2012-10-22  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Make the resource load client a C++ class
+        https://bugs.webkit.org/show_bug.cgi?id=99982
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Create a C++ class for the resource load client and
+        move the id <-> resource mapping from the Ewk_View
+        to ResourceLoadClientEfl for better a cleaner
+        separation.
+
+        The resource load client code was also moved out of
+        UIProcess/API/efl to UIProcess/efl since this is not
+        part of the WK2 EFL API.
+
+        * PlatformEfl.cmake:
+        * UIProcess/API/efl/ewk_view.cpp:
+        (Ewk_View_Private_Data):
+        (_ewk_view_initialize):
+        (ewk_view_wkpage_get):
+        (ewk_view_resource_load_initiated):
+        (ewk_view_resource_load_response):
+        (ewk_view_resource_load_failed):
+        (ewk_view_resource_load_finished):
+        (ewk_view_resource_request_sent):
+        (ewk_view_load_provisional_started):
+        * UIProcess/API/efl/ewk_view_private.h:
+        * UIProcess/API/efl/ewk_view_resource_load_client.cpp: Removed.
+        * UIProcess/API/efl/ewk_view_resource_load_client_private.h: Removed.
+        * UIProcess/efl/ResourceLoadClientEfl.cpp: Added.
+        (WebKit):
+        (WebKit::toResourceLoadClientEfl):
+        (WebKit::ResourceLoadClientEfl::didInitiateLoadForResource):
+        (WebKit::ResourceLoadClientEfl::didSendRequestForResource):
+        (WebKit::ResourceLoadClientEfl::didReceiveResponseForResource):
+        (WebKit::ResourceLoadClientEfl::didFinishLoadForResource):
+        (WebKit::ResourceLoadClientEfl::didFailLoadForResource):
+        (WebKit::ResourceLoadClientEfl::onViewProvisionalLoadStarted):
+        (WebKit::ResourceLoadClientEfl::ResourceLoadClientEfl):
+        (WebKit::ResourceLoadClientEfl::~ResourceLoadClientEfl):
+        * UIProcess/efl/ResourceLoadClientEfl.h: Added.
+        (WebKit):
+        (ResourceLoadClientEfl):
+        (WebKit::ResourceLoadClientEfl::create):
+
+2012-10-22  Anders Carlsson  <andersca@apple.com>
+
+        [WK2] Regression(r131990): plugins/npruntime/remove-property.html started failing
+        https://bugs.webkit.org/show_bug.cgi?id=99977
+
+        Reviewed by Alexey Proskuryakov.
+
+        Remove int32_t casts - the ArgumentDecoder::decode overload that takes a const int would cause
+        a temporary to be created which the number was then decoded into.
+
+        * Shared/Plugins/NPIdentifierData.cpp:
+        (WebKit::NPIdentifierData::encode):
+        (WebKit::NPIdentifierData::decode):
+
+2012-10-22  Anders Carlsson  <andersca@apple.com>
+
+        Don't use CStrings for message receiver names and message names
+        https://bugs.webkit.org/show_bug.cgi?id=99853
+
+        Reviewed by Andreas Kling.
+
+        Re-land this with a fix to MessageReceiverMap::dispatchSyncMessage to look in the new global message receivers map.
+
+        Introduce StringReference which is similar to DataReference except it holds a pointer to + length of a char *
+        and can be created from a string literal. Use this in place of CString in MessageEncoder/MessageDecoder and
+        make MessageReceiverMap use a HashMap from StringReferences to MessageReceivers for global message receivers.
+
+        * CMakeLists.txt:
+        * GNUmakefile.list.am:
+        * Platform/CoreIPC/Connection.cpp:
+        (CoreIPC::Connection::createSyncMessageEncoder):
+        (CoreIPC::Connection::dispatchSyncMessage):
+        * Platform/CoreIPC/Connection.h:
+        (Connection):
+        (CoreIPC::Connection::deprecatedSendSync):
+        (CoreIPC::Connection::deprecatedSend):
+        * Platform/CoreIPC/MessageDecoder.cpp:
+        (CoreIPC::MessageDecoder::MessageDecoder):
+        * Platform/CoreIPC/MessageDecoder.h:
+        (CoreIPC::MessageDecoder::messageReceiverName):
+        (CoreIPC::MessageDecoder::messageName):
+        (MessageDecoder):
+        * Platform/CoreIPC/MessageEncoder.cpp:
+        (CoreIPC::MessageEncoder::create):
+        (CoreIPC::MessageEncoder::MessageEncoder):
+        * Platform/CoreIPC/MessageEncoder.h:
+        (CoreIPC):
+        (MessageEncoder):
+        * Platform/CoreIPC/MessageReceiverMap.cpp:
+        (CoreIPC::MessageReceiverMap::addMessageReceiver):
+        (CoreIPC):
+        (CoreIPC::MessageReceiverMap::dispatchMessage):
+        * Platform/CoreIPC/MessageReceiverMap.h:
+        (MessageReceiverMap):
+        * Platform/CoreIPC/StringReference.cpp: Added.
+        (CoreIPC):
+        (CoreIPC::StringReference::encode):
+        (CoreIPC::StringReference::decode):
+        (CoreIPC::StringReference::Hash::hash):
+        * Platform/CoreIPC/StringReference.h: Added.
+        (CoreIPC):
+        (StringReference):
+        (CoreIPC::StringReference::StringReference):
+        (CoreIPC::StringReference::isEmpty):
+        (CoreIPC::StringReference::size):
+        (CoreIPC::StringReference::data):
+        (CoreIPC::StringReference::operator==):
+        (Hash):
+        (CoreIPC::StringReference::Hash::equal):
+        (WTF):
+        * Platform/CoreIPC/mac/ConnectionMac.cpp:
+        (CoreIPC::Connection::open):
+        * Scripts/webkit2/messages.py:
+        (message_to_struct_declaration):
+        (forward_declarations_and_headers):
+        (generate_messages_header):
+        * Scripts/webkit2/messages_unittest.py:
+        * Shared/CoreIPCSupport/WebContextMessageKinds.h:
+        * Target.pri:
+        * UIProcess/WebContext.cpp:
+        (WebKit::WebContext::WebContext):
+        (WebKit::WebContext::addMessageReceiver):
+        (WebKit):
+        * UIProcess/WebContext.h:
+        (WebContext):
+        * UIProcess/WebProcessProxy.h:
+        (WebKit::WebProcessProxy::deprecatedSend):
+        (WebKit::WebProcessProxy::send):
+        * WebKit2.xcodeproj/project.pbxproj:
+        * win/WebKit2.vcproj:
+
+2012-10-22  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r132072.
+        http://trac.webkit.org/changeset/132072
+        https://bugs.webkit.org/show_bug.cgi?id=100011
+
+        Made most of the tests crash on the WK2 bot. (Requested by
+        rakuco on #webkit).
+
+        * UIProcess/API/efl/PageClientImpl.cpp:
+        (WebKit::PageClientImpl::handleDownloadRequest):
+        * UIProcess/API/efl/ewk_context.cpp:
+        (Ewk_Context):
+        (Ewk_Context::Ewk_Context):
+        (ewk_context_ref):
+        (ewk_context_unref):
+        (ewk_context_cookie_manager_get):
+        (ewk_context_favicon_database_get):
+        (ewk_context_WKContext_get):
+        (ewk_context_new_from_WKContext):
+        (ewk_context_download_job_add):
+        (ewk_context_download_job_get):
+        (ewk_context_download_job_remove):
+        (ewk_context_request_manager_get):
+        (ewk_context_url_scheme_request_received):
+        (ewk_context_default_get):
+        (ewk_context_new):
+        (ewk_context_new_with_injected_bundle_path):
+        (ewk_context_url_scheme_register):
+        (ewk_context_vibration_client_callbacks_set):
+        (ewk_context_history_callbacks_set):
+        (ewk_context_history_client_get):
+        (ewk_context_visited_link_add):
+        (ewk_context_cache_model_set):
+        (ewk_context_cache_model_get):
+        * UIProcess/API/efl/ewk_context_download_client.cpp:
+        (decideDestinationWithSuggestedFilename):
+        (didReceiveResponse):
+        (didCreateDestination):
+        (didReceiveData):
+        (didFail):
+        (didCancel):
+        (didFinish):
+        (ewk_context_download_client_attach):
+        * UIProcess/API/efl/ewk_context_history_client.cpp:
+        (getEwkHistoryDelegate):
+        (didNavigateWithNavigationData):
+        (didPerformClientRedirect):
+        (didPerformServerRedirect):
+        (didUpdateHistoryTitle):
+        (populateVisitedLinks):
+        (ewk_context_history_client_attach):
+        * UIProcess/API/efl/ewk_context_private.h:
+        * UIProcess/API/efl/ewk_context_request_manager_client.cpp:
+        (didReceiveURIRequest):
+        (ewk_context_request_manager_client_attach):
+        * UIProcess/API/efl/ewk_view.cpp:
+        (Ewk_View_Private_Data):
+        (Ewk_View_Private_Data::Ewk_View_Private_Data):
+        (Ewk_View_Private_Data::~Ewk_View_Private_Data):
+        (_ewk_view_priv_del):
+        (_ewk_view_initialize):
+        (ewk_view_base_add):
+        (ewk_view_add_with_context):
+        (ewk_view_context_get):
+        (ewk_view_update_icon):
+
+2012-10-22  Darin Adler  <darin@apple.com>
+
+        * UIProcess/API/mac/WKView.mm:
+        (-[WKView view:stringForToolTip:point:userData:]): Fix build. Forgot to save file
+        before committing.
+
+2012-10-22  Darin Adler  <darin@apple.com>
+
+        REGRESSION (r131686): Crash in NSToolTipManager mouseEnteredToolTip
+        <rdar://problem/12527528> and https://bugs.webkit.org/show_bug.cgi?id=99792
+
+        Roll out the tool tip part of r131686 since it still seems to be causing trouble.
+
+        * UIProcess/API/mac/WKView.mm:
+        (-[WKView view:stringForToolTip:point:userData:]): Added this method back.
+        (-[WKView _wk_toolTipChangedFrom:to:]): Use self as owner again, eliminating the
+        separate WKToolTipDelegate object.
+
+2012-10-22  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Memory leak in Ewk_Form_Submission_Request::fieldValue()
+        https://bugs.webkit.org/show_bug.cgi?id=99993
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Adopt the WKStringRef returned by toCopiedAPI() in
+        Ewk_Form_Submission_Request::fieldValue() to avoid
+        a memory leak.
+
+        * UIProcess/API/efl/ewk_form_submission_request.cpp:
+        (Ewk_Form_Submission_Request::fieldValue):
+
+2012-10-22  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL][WK2] Refactor Ewk_Context
+        https://bugs.webkit.org/show_bug.cgi?id=99594
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Ewk_Context is now encapsulated to a C++ class inherited from WTF::RefCounted.
+
+        * UIProcess/API/efl/PageClientImpl.cpp:
+        (WebKit::PageClientImpl::handleDownloadRequest):
+        * UIProcess/API/efl/ewk_context.cpp:
+        (Ewk_Context::Ewk_Context):
+        (Ewk_Context::~Ewk_Context):
+        (Ewk_Context::create):
+        (Ewk_Context::defaultContext):
+        (Ewk_Context::cookieManager):
+        (Ewk_Context::faviconDatabase):
+        (Ewk_Context::registerURLScheme):
+        (Ewk_Context::vibrationProvider):
+        (Ewk_Context::addVisitedLink):
+        (Ewk_Context::setCacheModel):
+        (Ewk_Context::cacheModel):
+        (ewk_context_ref):
+        (ewk_context_unref):
+        (ewk_context_cookie_manager_get):
+        (ewk_context_favicon_database_get):
+        (Ewk_Context::wkContext):
+        (Ewk_Context::addDownloadJob):
+        (Ewk_Context::downloadJob):
+        (Ewk_Context::removeDownloadJob):
+        (Ewk_Context::requestManager):
+        (Ewk_Context::urlSchemeRequestReceived):
+        (ewk_context_default_get):
+        (ewk_context_new):
+        (ewk_context_new_with_injected_bundle_path):
+        (ewk_context_url_scheme_register):
+        (ewk_context_vibration_client_callbacks_set):
+        (ewk_context_history_callbacks_set):
+        (ewk_context_visited_link_add):
+        (ewk_context_cache_model_set):
+        (ewk_context_cache_model_get):
+        * UIProcess/API/efl/ewk_context_download_client.cpp:
+        (decideDestinationWithSuggestedFilename):
+        (didReceiveResponse):
+        (didCreateDestination):
+        (didReceiveData):
+        (didFail):
+        (didCancel):
+        (didFinish):
+        (ewk_context_download_client_attach):
+        * UIProcess/API/efl/ewk_context_history_client.cpp:
+        (getEwkHistoryClient):
+        (didNavigateWithNavigationData):
+        (didPerformClientRedirect):
+        (didPerformServerRedirect):
+        (didUpdateHistoryTitle):
+        (populateVisitedLinks):
+        (ewk_context_history_client_attach):
+        * UIProcess/API/efl/ewk_context_private.h:
+        (Ewk_Context):
+        (Ewk_Context::create):
+        (Ewk_Context::historyClient):
+        * UIProcess/API/efl/ewk_context_request_manager_client.cpp:
+        (didReceiveURIRequest):
+        (ewk_context_request_manager_client_attach):
+        * UIProcess/API/efl/ewk_view.cpp:
+        (Ewk_View_Private_Data):
+        (Ewk_View_Private_Data::Ewk_View_Private_Data):
+        (Ewk_View_Private_Data::~Ewk_View_Private_Data):
+        (_ewk_view_priv_del):
+        (_ewk_view_initialize):
+        (ewk_view_base_add):
+        (ewk_view_add_with_context):
+        (ewk_view_context_get):
+        (ewk_view_update_icon):
+
 2012-10-22  Simon Hausmann  <simon.hausmann@digia.com>
 
         [Qt] Fix build without QtWidgets

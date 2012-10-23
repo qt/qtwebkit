@@ -619,6 +619,8 @@ public:
     ETextDecoration textDecoration() const { return static_cast<ETextDecoration>(visual->textDecoration); }
 #if ENABLE(CSS3_TEXT)
     TextDecorationStyle textDecorationStyle() const { return static_cast<TextDecorationStyle>(rareNonInheritedData->m_textDecorationStyle); }
+#else
+    TextDecorationStyle textDecorationStyle() const { return TextDecorationStyleSolid; }
 #endif // CSS3_TEXT
     int wordSpacing() const;
     int letterSpacing() const;
@@ -1632,7 +1634,7 @@ public:
     static EAlignItems initialAlignItems() { return AlignStretch; }
     static EAlignItems initialAlignSelf() { return AlignAuto; }
     static EFlexDirection initialFlexDirection() { return FlowRow; }
-    static EFlexWrap initialFlexWrap() { return FlexWrapNone; }
+    static EFlexWrap initialFlexWrap() { return FlexNoWrap; }
     static EJustifyContent initialJustifyContent() { return JustifyFlexStart; }
     static int initialMarqueeLoopCount() { return -1; }
     static int initialMarqueeSpeed() { return 85; }

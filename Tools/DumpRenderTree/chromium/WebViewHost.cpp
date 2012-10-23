@@ -35,6 +35,7 @@
 #include "MockGrammarCheck.h"
 #include "MockWebSpeechInputController.h"
 #include "MockWebSpeechRecognizer.h"
+#include "Task.h"
 #include "TestNavigationController.h"
 #include "TestShell.h"
 #include "TestWebPlugin.h"
@@ -88,6 +89,7 @@
 
 using namespace WebCore;
 using namespace WebKit;
+using namespace WebTestRunner;
 using namespace std;
 
 static const int screenWidth = 1920;
@@ -579,16 +581,6 @@ void WebViewHost::showContextMenu(WebFrame*, const WebContextMenuData& contextMe
     m_lastContextMenuData = adoptPtr(new WebContextMenuData(contextMenuData));
 }
 
-void WebViewHost::clearContextMenuData()
-{
-    m_lastContextMenuData.clear();
-}
-
-WebContextMenuData* WebViewHost::lastContextMenuData() const
-{
-    return m_lastContextMenuData.get();
-}
-
 void WebViewHost::setStatusText(const WebString& text)
 {
     if (!testRunner()->shouldDumpStatusCallbacks())
@@ -772,11 +764,6 @@ WebDeviceOrientationClientMock* WebViewHost::deviceOrientationClientMock()
 MockSpellCheck* WebViewHost::mockSpellCheck()
 {
     return &m_spellcheck;
-}
-
-void WebViewHost::fillSpellingSuggestionList(const WebKit::WebString& word, WebKit::WebVector<WebKit::WebString>* suggestions)
-{
-    mockSpellCheck()->fillSuggestionList(word, suggestions);
 }
 
 WebDeviceOrientationClient* WebViewHost::deviceOrientationClient()
@@ -1459,6 +1446,60 @@ void WebViewHost::deliveredIntentFailure(WebFrame* frame, int id, const WebSeria
     printf("Web intent failure for id %d\n", id);
 }
 
+// WebTestDelegate ------------------------------------------------------------
+
+WebContextMenuData* WebViewHost::lastContextMenuData() const
+{
+    return m_lastContextMenuData.get();
+}
+
+void WebViewHost::clearContextMenuData()
+{
+    m_lastContextMenuData.clear();
+}
+
+void WebViewHost::setEditCommand(const string& name, const string& value)
+{
+    m_editCommandName = name;
+    m_editCommandValue = value;
+}
+
+void WebViewHost::clearEditCommand()
+{
+    m_editCommandName.clear();
+    m_editCommandValue.clear();
+}
+
+void WebViewHost::fillSpellingSuggestionList(const WebKit::WebString& word, WebKit::WebVector<WebKit::WebString>* suggestions)
+{
+    mockSpellCheck()->fillSuggestionList(word, suggestions);
+}
+
+void WebViewHost::setGamepadData(const WebGamepads& pads)
+{
+    webkit_support::SetGamepadData(pads);
+}
+
+void WebViewHost::printMessage(const std::string& message) const
+{
+    printf("%s", message.c_str());
+}
+
+void WebViewHost::postTask(WebTask* task)
+{
+    ::postTask(task);
+}
+
+void WebViewHost::postDelayedTask(WebTask* task, long long ms)
+{
+    ::postDelayedTask(task, ms);
+}
+
+WebString WebViewHost::registerIsolatedFileSystem(const WebVector<WebString>& absoluteFilenames)
+{
+    return webkit_support::RegisterIsolatedFileSystem(absoluteFilenames);
+}
+
 // Public functions -----------------------------------------------------------
 
 WebViewHost::WebViewHost(TestShell* shell)
@@ -1592,18 +1633,6 @@ void WebViewHost::waitForPolicyDelegate()
 {
     m_policyDelegateEnabled = true;
     m_policyDelegateShouldNotifyDone = true;
-}
-
-void WebViewHost::setEditCommand(const string& name, const string& value)
-{
-    m_editCommandName = name;
-    m_editCommandValue = value;
-}
-
-void WebViewHost::clearEditCommand()
-{
-    m_editCommandName.clear();
-    m_editCommandValue.clear();
 }
 
 void WebViewHost::loadURLForFrame(const WebURL& url, const WebString& frameName)
@@ -1788,11 +1817,6 @@ void WebViewHost::setDeviceScaleFactor(float deviceScaleFactor)
 {
     webView()->setDeviceScaleFactor(deviceScaleFactor);
     discardBackingStore();
-}
-
-void WebViewHost::setGamepadData(const WebGamepads& pads)
-{
-    webkit_support::SetGamepadData(pads);
 }
 
 void WebViewHost::setPageTitle(const WebString&)

@@ -26,6 +26,7 @@
 #include "config.h"
 #include "MessageReceiverMap.h"
 
+#include "MessageDecoder.h"
 #include "MessageReceiver.h"
 
 namespace CoreIPC {
@@ -38,20 +39,20 @@ MessageReceiverMap::~MessageReceiverMap()
 {
 }
 
-void MessageReceiverMap::deprecatedAddMessageReceiver(MessageClass messageClass, MessageReceiver* messageReceiver)
+void MessageReceiverMap::addMessageReceiver(StringReference messageReceiverName, MessageReceiver* messageReceiver)
 {
-    ASSERT(!m_deprecatedGlobalMessageReceivers.contains(messageClass));
-    m_deprecatedGlobalMessageReceivers.set(messageClass, messageReceiver);
+    ASSERT(!m_globalMessageReceivers.contains(messageReceiverName));
+    m_globalMessageReceivers.set(messageReceiverName, messageReceiver);
 }
 
 void MessageReceiverMap::invalidate()
 {
-    m_deprecatedGlobalMessageReceivers.clear();
+    m_globalMessageReceivers.clear();
 }
 
 bool MessageReceiverMap::dispatchMessage(Connection* connection, MessageID messageID, MessageDecoder& decoder)
 {
-    if (MessageReceiver* messageReceiver = m_deprecatedGlobalMessageReceivers.get(messageID.messageClass())) {
+    if (MessageReceiver* messageReceiver = m_globalMessageReceivers.get(decoder.messageReceiverName())) {
         messageReceiver->didReceiveMessage(connection, messageID, decoder);
         return true;
     }
@@ -61,7 +62,7 @@ bool MessageReceiverMap::dispatchMessage(Connection* connection, MessageID messa
 
 bool MessageReceiverMap::dispatchSyncMessage(Connection* connection, MessageID messageID, MessageDecoder& decoder, OwnPtr<MessageEncoder>& replyEncoder)
 {
-    if (MessageReceiver* messageReceiver = m_deprecatedGlobalMessageReceivers.get(messageID.messageClass())) {
+    if (MessageReceiver* messageReceiver = m_globalMessageReceivers.get(decoder.messageReceiverName())) {
         messageReceiver->didReceiveSyncMessage(connection, messageID, decoder, replyEncoder);
         return true;
     }
