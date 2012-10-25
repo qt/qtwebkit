@@ -1,3 +1,15 @@
+2012-10-25  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Fix the LLInt build on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=97648
+
+        Reviewed by NOBODY (OOPS!).
+
+        Added EXEEXT variable - similar to automake - that expands to .exe as suffix for
+        executable programs on Windows. Empty otherwise.
+
+        * qmake/mkspecs/features/default_pre.prf:
+
 2012-10-23  Simon Hausmann  <simon.hausmann@digia.com>
 
         Unreviewed trivial Qt build fix: Fix build without USE_3D_GRAPHICS

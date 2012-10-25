@@ -30,6 +30,9 @@ include(yarr/yarr.pri)
 
 INSTALLDEPS += all
 
+CONFIG(debug, debug|release): INCLUDEPATH += $$JAVASCRIPTCORE_GENERATED_SOURCES_DIR\debug
+CONFIG(release, debug|release): INCLUDEPATH += $$JAVASCRIPTCORE_GENERATED_SOURCES_DIR\release
+
 SOURCES += \
     API/JSBase.cpp \
     API/JSCallbackConstructor.cpp \

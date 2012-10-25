@@ -7,7 +7,11 @@
 
 TEMPLATE = app
 TARGET = LLIntOffsetsExtractor
-DESTDIR = $$OUT_PWD
+
+debug_and_release {
+    CONFIG += force_build_all
+    CONFIG += build_all
+}
 
 QT = core # Needed for qglobal.h
 
@@ -20,6 +24,10 @@ defineTest(addIncludePaths) {
 }
 
 addIncludePaths()
+
+# To make sure we include JavaScriptCore/config.h and not
+# the WTF one.
+INCLUDEPATH = $$PWD $$INCLUDEPATH
 
 LLINT_DEPENDENCY = \
     $$PWD/llint/LowLevelInterpreter.asm \
