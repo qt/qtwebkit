@@ -662,7 +662,7 @@ _llint_op_resolve_global_property:
     loadp CodeBlock[cfr], t1
     loadp CodeBlock::m_globalObject[t1], t1
     loadp ResolveOperation::m_structure[t0], t2
-    bpneq JSCell::m_structure[t1], t2, _llint_op_resolve
+    bpneq JSCell::m_structure[t1], t2, ._llint_op_resolve
     loadis ResolveOperation::m_offset[t0], t0
     if JSVALUE64
         loadPropertyAtVariableOffsetKnownNotInline(t0, t1, t2)
@@ -746,6 +746,7 @@ _llint_op_resolve_scoped_var_with_top_scope_check:
     moveJSValue(t1, t2, cfr, t3, 4, t0)
     dispatch(5)
 
+._llint_op_resolve:
 _llint_op_resolve:
     traceExecution()
     getResolveOperation(3, t0, t1)
@@ -780,7 +781,7 @@ _llint_op_resolve_base_to_global:
     dispatch(7)
 
 _llint_op_resolve_base_to_global_dynamic:
-    jmp _llint_op_resolve_base
+    jmp ._llint_resolve_base
 
 _llint_op_resolve_base_to_scope:
     traceExecution()
@@ -827,6 +828,7 @@ _llint_op_resolve_base_to_scope_with_top_scope_check:
     end
     dispatch(7)
 
+._llint_resolve_base:
 _llint_op_resolve_base:
     traceExecution()
     callSlowPath(_llint_slow_path_resolve_base)
