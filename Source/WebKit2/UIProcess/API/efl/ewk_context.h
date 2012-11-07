@@ -38,8 +38,10 @@
 #define ewk_context_h
 
 #include "ewk_cookie_manager.h"
+#include "ewk_database_manager.h"
 #include "ewk_favicon_database.h"
 #include "ewk_navigation_data.h"
+#include "ewk_storage_manager.h"
 #include "ewk_url_scheme_request.h"
 #include <Evas.h>
 
@@ -47,8 +49,12 @@
 extern "C" {
 #endif
 
-/** Creates a type name for @a Ewk_Context. */
-typedef struct Ewk_Context Ewk_Context;
+/**
+ * Declare Ewk_Context as Ewk_Object.
+ *
+ * @see Ewk_Object
+ */
+typedef struct Ewk_Object Ewk_Context;
 
 /**
  * \enum    Ewk_Cache_Model
@@ -120,24 +126,6 @@ typedef void (*Ewk_History_Title_Update_Cb)(const Evas_Object *view, const char 
 typedef void (*Ewk_History_Populate_Visited_Links_Cb)(void *user_data);
 
 /**
- * Increases the reference count of the given object.
- *
- * @param context context object to increase the reference count
- *
- * @return Ewk_Context object on success or @c NULL on failure
- */
-EAPI Ewk_Context *ewk_context_ref(Ewk_Context *context);
-
-/**
- * Decreases the reference count of the given object, possibly freeing it.
- *
- * When the reference count it's reached 0, the Ewk_Context is freed.
- *
- * @param context context object to decrease the reference count
- */
-EAPI void ewk_context_unref(Ewk_Context *context);
-
-/**
  * Gets default Ewk_Context instance.
  *
  * The returned Ewk_Context object @b should not be unref'ed if application
@@ -183,6 +171,34 @@ EAPI Ewk_Context *ewk_context_new_with_injected_bundle_path(const char *path);
 EAPI Ewk_Cookie_Manager *ewk_context_cookie_manager_get(const Ewk_Context *context);
 
 /**
+ * Gets the database manager instance for this @a context.
+ *
+ * @param context context object to query
+ *
+ * @return Ewk_Database_Manager object instance or @c NULL in case of failure
+ */
+EAPI Ewk_Database_Manager *ewk_context_database_manager_get(const Ewk_Context *context);
+
+/**
+ * Sets the favicon database directory for this @a context.
+ *
+ * Sets the directory path to be used to store the favicons database
+ * for @a context on disk. Passing @c NULL as @a directory_path will
+ * result in using the default directory for the platform.
+ *
+ * Calling this method also means enabling the favicons database for
+ * its use from the applications, it is therefore expected to be
+ * called only once. Further calls for the same instance of
+ * @a context will not have any effect.
+ *
+ * @param context context object to update
+ * @param directory_path database directory path to set
+ *
+ * @return @c EINA_TRUE if successful, @c EINA_FALSE otherwise
+ */
+EAPI Eina_Bool ewk_context_favicon_database_directory_set(Ewk_Context *context, const char *directory_path);
+
+/**
  * Gets the favicon database instance for this @a context.
  *
  * @param context context object to query.
@@ -190,6 +206,15 @@ EAPI Ewk_Cookie_Manager *ewk_context_cookie_manager_get(const Ewk_Context *conte
  * @return Ewk_Favicon_Database object instance or @c NULL in case of failure.
  */
 EAPI Ewk_Favicon_Database *ewk_context_favicon_database_get(const Ewk_Context *context);
+
+/**
+ * Gets the storage manager instance for this @a context.
+ *
+ * @param context context object to query.
+ *
+ * @return Ewk_Storage_Manager object instance or @c NULL in case of failure.
+ */
+EAPI Ewk_Storage_Manager *ewk_context_storage_manager_get(const Ewk_Context *context);
 
 /**
  * Register @a scheme in @a context.

@@ -170,9 +170,11 @@ private:
     bool m_mediaIsBuffering;
 #endif
 
+    void conditionallyGoFullscreenAfterPlay();
     void userDrivenSeekTimerFired(Timer<MediaPlayerPrivate>*);
     Timer<MediaPlayerPrivate> m_userDrivenSeekTimer;
     float m_lastSeekTime;
+    mutable float m_lastLoadingTime;
     bool m_lastSeekTimePending;
     bool m_isAuthenticationChallenging;
     void waitMetadataTimerFired(Timer<MediaPlayerPrivate>*);

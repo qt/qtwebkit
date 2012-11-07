@@ -31,7 +31,6 @@
 
 #include "CachedImage.h"
 #include "CheckedInt.h"
-#include "Console.h"
 #include "DOMWindow.h"
 #include "EXTTextureFilterAnisotropic.h"
 #include "ExceptionCode.h"
@@ -532,6 +531,7 @@ void WebGLRenderingContext::initializeNewContext()
 
     m_context->reshape(canvasSize.width(), canvasSize.height());
     m_context->viewport(0, 0, canvasSize.width(), canvasSize.height());
+    m_context->scissor(0, 0, canvasSize.width(), canvasSize.height());
 
     m_context->setContextLostCallback(adoptPtr(new WebGLRenderingContextLostCallback(this)));
     m_context->setErrorMessageCallback(adoptPtr(new WebGLRenderingContextErrorMessageCallback(this)));
@@ -1918,7 +1918,7 @@ void WebGLRenderingContext::drawArrays(GC3Denum mode, GC3Dint first, GC3Dsizei c
         CheckedInt<GC3Dint> checkedFirst(first);
         CheckedInt<GC3Dint> checkedCount(count);
         CheckedInt<GC3Dint> checkedSum = checkedFirst + checkedCount;
-        if (!checkedSum.valid() || !validateRenderingState(checkedSum.value())) {
+        if (!checkedSum.isValid() || !validateRenderingState(checkedSum.value())) {
             synthesizeGLError(GraphicsContext3D::INVALID_OPERATION, "drawArrays", "attempt to access out of bounds arrays");
             return;
         }
@@ -3699,7 +3699,11 @@ void WebGLRenderingContext::texImage2D(GC3Denum target, GC3Dint level, GC3Denum 
     WebGLTexture* texture = validateTextureBinding("texImage2D", target, true);
     // If possible, copy from the canvas element directly to the texture
     // via the GPU, without a read-back to system memory.
-    if (GraphicsContext3D::TEXTURE_2D == target && texture && type == texture->getType(target, level)) {
+    //
+    // FIXME: restriction of (RGB || RGBA)/UNSIGNED_BYTE should be lifted when
+    // ImageBuffer::copyToPlatformTexture implementations are fully functional.
+    if (GraphicsContext3D::TEXTURE_2D == target && texture && type == texture->getType(target, level)
+        && (format == GraphicsContext3D::RGB || format == GraphicsContext3D::RGBA) && type == GraphicsContext3D::UNSIGNED_BYTE) {
         ImageBuffer* buffer = canvas->buffer();
         if (buffer && buffer->copyToPlatformTexture(*m_context.get(), texture->object(), internalformat, m_unpackPremultiplyAlpha, m_unpackFlipY)) {
             texture->setLevelInfo(target, level, internalformat, canvas->width(), canvas->height(), type);
@@ -5202,20 +5206,10 @@ void WebGLRenderingContext::printWarningToConsole(const String& message)
 {
     if (!canvas())
         return;
-    // FIXME: This giant cascade of null checks seems a bit paranoid.
     Document* document = canvas()->document();
     if (!document)
         return;
-    Frame* frame = document->frame();
-    if (!frame)
-        return;
-    DOMWindow* window = document->domWindow();
-    if (!window)
-        return;
-    Console* console = window->console();
-    if (!console)
-        return;
-    console->addMessage(HTMLMessageSource, LogMessageType, WarningMessageLevel, message, document->url().string());
+    document->addConsoleMessage(HTMLMessageSource, LogMessageType, WarningMessageLevel, message, document->url().string());
 }
 
 bool WebGLRenderingContext::validateFramebufferFuncParameters(const char* functionName, GC3Denum target, GC3Denum attachment)

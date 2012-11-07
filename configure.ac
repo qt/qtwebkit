@@ -2,14 +2,14 @@ AC_PREREQ(2.60)
 
 m4_define([webkit_major_version], [1])
 m4_define([webkit_minor_version], [11])
-m4_define([webkit_micro_version], [0])
+m4_define([webkit_micro_version], [1])
 
 # This is the version we'll be using as part of our User-Agent string
 # e.g., AppleWebKit/$(webkit_user_agent_version) ...
 #
 # Sourced from Source/WebCore/Configurations/Version.xcconfig
 m4_define([webkit_user_agent_major_version], [537])
-m4_define([webkit_user_agent_minor_version], [4])
+m4_define([webkit_user_agent_minor_version], [16])
 
 AC_INIT([WebKitGTK],[webkit_major_version.webkit_minor_version.webkit_micro_version],[http://bugs.webkit.org/])
 
@@ -35,13 +35,13 @@ AC_CONFIG_SRCDIR([Source/WebCore/config.h])
 
 dnl # Libtool library version, not to confuse with API version
 dnl # see http://www.gnu.org/software/libtool/manual/html_node/Libtool-versioning.html
-LIBWEBKITGTK_VERSION=16:0:16
+LIBWEBKITGTK_VERSION=17:0:17
 AC_SUBST([LIBWEBKITGTK_VERSION])
 
-LIBJAVASCRIPTCOREGTK_VERSION=13:5:13
+LIBJAVASCRIPTCOREGTK_VERSION=13:6:13
 AC_SUBST([LIBJAVASCRIPTCOREGTK_VERSION])
 
-LIBWEBKIT2GTK_VERSION=17:0:17
+LIBWEBKIT2GTK_VERSION=18:0:18
 AC_SUBST([LIBWEBKIT2GTK_VERSION])
 
 AM_INIT_AUTOMAKE([foreign subdir-objects dist-xz no-dist-gzip tar-ustar])
@@ -725,6 +725,14 @@ AC_ARG_ENABLE(media_stream,
               [],[enable_media_stream=$enable_unstable_features])
 AC_MSG_RESULT([$enable_media_stream])
 
+# check whether to enable XHR timeout support
+AC_MSG_CHECKING([whether to enable XHR timeout support])
+AC_ARG_ENABLE(xhr_timeout,
+              AC_HELP_STRING([--enable-xhr-timeout],
+                             [enable support for XHR timeout [default=yes]]),
+              [],[enable_xhr_timeout="yes"])
+AC_MSG_RESULT([$enable_xhr_timeout])
+
 # check whether to enable XSLT support
 AC_MSG_CHECKING([whether to enable XSLT support])
 AC_ARG_ENABLE(xslt,
@@ -819,9 +827,15 @@ AC_MSG_RESULT([$enable_fast_malloc])
 # check whether to enable debug symbols
 AC_MSG_CHECKING([whether to enable debug symbols])
 AC_ARG_ENABLE(debug_symbols,
-              AC_HELP_STRING([--enable-debug-symbols],
+              AC_HELP_STRING([--enable-debug-symbols=yes|no|min|full],
                              [enable debug symbols default=no, default=yes for debug builds]),
               [],[if test "$enable_debug" = "yes"; then enable_debug_symbols="yes"; else enable_debug_symbols="no"; fi])
+
+case "$enable_debug_symbols" in
+  yes) enable_debug_symbols="full" ;;
+  no|min|full) ;;
+  *) AC_MSG_ERROR([Invalid debug symbols option: must be yes, no, min or full.]) ;;
+esac
 AC_MSG_RESULT([$enable_debug_symbols])
 
 # check whether to enable debug features
@@ -865,15 +879,23 @@ AC_ARG_ENABLE([introspection],
   [],[enable_introspection=no])
 AC_MSG_RESULT([$enable_introspection])
 
-# Enable css shaders if unstable_features, css_filters and
-# accelerated_compositing are turned on.
-AC_MSG_CHECKING([whether to enable CSS Shaders])
+# Enable CSS Filters and Shaders if unstable_features and accelerated_compositing are turned on.
+enable_css_filters=no;
+enable_css_shaders=no;
+AC_MSG_CHECKING([whether to enable CSS Filters and Shaders])
 if test "$enable_unstable_features" = "yes" && test "$enable_accelerated_compositing" = "yes" && test "$with_acceleration_backend" = "opengl"; then
-    enable_css_shaders=yes;
     enable_css_filters=yes;
+    enable_css_shaders=yes;
 fi
 AC_MSG_RESULT([$enable_css_filters])
-AC_MSG_RESULT([$enable_css_shaders])
+
+# CSS Device Adaptation
+AC_MSG_CHECKING([whether to enable CSS Device Adaptation])
+AC_ARG_ENABLE(css_device_adaptation,
+              AC_HELP_STRING([--enable-css-device-adaptation],
+                             [enable support for CSS Device Adaptation [default=no]]),
+              [],[enable_css_device_adaptation="no"])
+AC_MSG_RESULT([$enable_css_device_adaptation])
 
 G_IR_SCANNER=
 G_IR_COMPILER=
@@ -914,7 +936,10 @@ if test "$host_cpu" = "sh4"; then
 fi
 
 # Add '-g' flag to gcc to build with debug symbols
-if test "$enable_debug_symbols" = "yes"; then
+if test "$enable_debug_symbols" = "min"; then
+   CXXFLAGS="$CXXFLAGS -g1"
+   CFLAGS="$CFLAGS -g1"
+elif test "$enable_debug_symbols" != "no"; then
    CXXFLAGS="$CXXFLAGS -g"
    CFLAGS="$CFLAGS -g"
 fi
@@ -936,6 +961,10 @@ PKG_CHECK_MODULES([LIBSOUP],
                   [libsoup-2.4 >= $LIBSOUP_REQUIRED_VERSION])
 AC_SUBST([LIBSOUP_CFLAGS])
 AC_SUBST([LIBSOUP_LIBS])
+
+PKG_CHECK_MODULES([LIBSECRET], [libsecret-1])
+AC_SUBST([LIBSECRET_CFLAGS])
+AC_SUBST([LIBSECRET_LIBS])
 
 # check if FreeType/FontConfig are available
 if test "$with_font_backend" = "freetype"; then
@@ -1044,16 +1073,6 @@ if test "$with_acceleration_backend" = "opengl"; then
 fi
 AC_SUBST([OPENGL_LIBS])
 
-# check if atspi2 is available (only needed for Webkit2 unit tests)
-if test "$enable_webkit2" = "yes"; then
-   PKG_CHECK_MODULES([ATSPI2],
-                     [atspi-2 >= $ATSPI2_REQUIRED_VERSION],
-                     [have_atspi2=yes], [have_atspi2=no])
-
-   AC_SUBST([ATSPI2_CFLAGS])
-   AC_SUBST([ATSPI2_LIBS])
-fi
-
 if test "$enable_gamepad" = "yes"; then
    PKG_CHECK_MODULES([GAMEPAD], [gio-unix-2.0 gudev-1.0])
 
@@ -1114,6 +1133,16 @@ AC_SUBST(GTK2_LIBS)
 
 GTK_DOC_CHECK([1.10])
 
+# We need atspi2 for Webkit2 unit tests
+if test "$enable_webkit2" = "yes"; then
+   PKG_CHECK_MODULES([ATSPI2],
+                     [atspi-2 >= $ATSPI2_REQUIRED_VERSION],
+                     [have_atspi2=yes], [have_atspi2=no])
+
+   AC_SUBST([ATSPI2_CFLAGS])
+   AC_SUBST([ATSPI2_LIBS])
+fi
+
 # OS conditionals
 AM_CONDITIONAL([OS_WIN32],[test "$os_win32" = "yes"])
 AM_CONDITIONAL([OS_UNIX],[test "$os_win32" = "no"])
@@ -1166,6 +1195,7 @@ AM_CONDITIONAL([ENABLE_DEBUG],[test "$enable_debug_features" = "yes"])
 AM_CONDITIONAL([ENABLE_UNSTABLE_FEATURES],[test "$enable_unstable_features" = "yes"])
 AM_CONDITIONAL([ENABLE_WEBGL],[test "$enable_webgl" = "yes"])
 AM_CONDITIONAL([ENABLE_GAMEPAD],[test "$enable_gamepad" = "yes"])
+AM_CONDITIONAL([ENABLE_XHR_TIMEOUT],[test "$enable_xhr_timeout" = "yes"])
 AM_CONDITIONAL([ENABLE_XSLT],[test "$enable_xslt" = "yes"])
 AM_CONDITIONAL([ENABLE_FILTERS],[test "$enable_filters" = "yes"])
 AM_CONDITIONAL([ENABLE_GEOLOCATION], [test "$enable_geolocation" = "yes"])
@@ -1181,6 +1211,7 @@ AM_CONDITIONAL([ENABLE_OPCODE_STATS],[test "$enable_opcode_stats" = "yes"])
 AM_CONDITIONAL([ENABLE_WEBKIT2],[test "$enable_webkit2" = "yes"])
 AM_CONDITIONAL([ENABLE_PLUGIN_PROCESS],[test "$enable_plugin_process" = "yes"])
 AM_CONDITIONAL([ENABLE_SPELLCHECK],[test "$enable_spellcheck" = "yes"])
+AM_CONDITIONAL([ENABLE_CSS_DEVICE_ADAPTATION],[test "$enable_css_device_adaptation" = "yes"])
 AM_CONDITIONAL([ENABLE_CSS_FILTERS],[test "$enable_css_filters" = "yes"])
 AM_CONDITIONAL([ENABLE_CSS_SHADERS],[test "$enable_css_shaders" = "yes"])
 
@@ -1194,6 +1225,7 @@ GNUmakefile
 
 AC_CONFIG_FILES([
 Source/WebKit/gtk/webkit/webkitversion.h
+Source/WebKit/gtk/po/POTFILES
 DerivedSources/WebCore/UserAgentGtk.h:Source/WebCore/platform/gtk/UserAgentGtk.h.in
 ])
 
@@ -1250,6 +1282,7 @@ Features:
  Spellcheck support                                       : $enable_spellcheck
  Web Audio support                                        : $enable_web_audio
  WebGL                                                    : $enable_webgl
+ XHR timeout support                                      : $enable_xhr_timeout
  XSLT support                                             : $enable_xslt
 
 WebKit2 support:

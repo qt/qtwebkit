@@ -131,9 +131,9 @@ WebInspector.TimelinePanel = function()
 
     this._headerLineCount = 1;
 
-    this._mainThreadTasks = [];
+    this._mainThreadTasks = /** @type {!Array.<{startTime: number, endTime: number}>} */ ([]);
     this._mainThreadMonitoringEnabled = false;
-    if (WebInspector.experimentsSettings.mainThreadMonitoring.isEnabled())
+    if (WebInspector.settings.showCpuOnTimelineRuler.get() && Capabilities.timelineCanMonitorMainThread)
         this._enableMainThreadMonitoring();
 
     this._createFileSelector();
@@ -334,11 +334,11 @@ WebInspector.TimelinePanel.prototype = {
 
     _contextMenu: function(event)
     {
-        var contextMenu = new WebInspector.ContextMenu();
+        var contextMenu = new WebInspector.ContextMenu(event);
         if (InspectorFrontendHost.canSave())
             contextMenu.appendItem(WebInspector.UIString("Save Timeline data\u2026"), this._saveToFile.bind(this), this._operationInProgress);
         contextMenu.appendItem(WebInspector.UIString("Load Timeline data\u2026"), this._fileSelectorElement.click.bind(this._fileSelectorElement), this._operationInProgress);
-        contextMenu.show(event);
+        contextMenu.show();
     },
 
     _saveToFile: function()
@@ -553,17 +553,17 @@ WebInspector.TimelinePanel.prototype = {
         this._automaticallySizeWindow = false;
         var records = this._model.records;
         for (var i = 0; i < records.length; ++i)
-            this._innerAddRecordToTimeline(records[i], this._rootRecord());
+            this._innerAddRecordToTimeline(records[i]);
         this._invalidateAndScheduleRefresh(false);
     },
 
     _onTimelineEventRecorded: function(event)
     {
-        if (this._innerAddRecordToTimeline(event.data, this._rootRecord()))
+        if (this._innerAddRecordToTimeline(event.data))
             this._invalidateAndScheduleRefresh(false);
     },
 
-    _innerAddRecordToTimeline: function(record, parentRecord)
+    _innerAddRecordToTimeline: function(record)
     {
         if (record.type === WebInspector.TimelineModel.RecordType.Program) {
             this._mainThreadTasks.push({
@@ -572,7 +572,7 @@ WebInspector.TimelinePanel.prototype = {
             });
         }
 
-        var records = this._presentationModel.addRecord(record, parentRecord);
+        var records = this._presentationModel.addRecord(record);
         this._allRecordsCount += records.length;
         var timeStampRecords = this._timeStampRecords;
         var hasVisibleRecords = false;
@@ -875,7 +875,7 @@ WebInspector.TimelinePanel.prototype = {
         var taskIndex = insertionIndexForObjectInListSortedByFunction(startTime, tasks, compareEndTime);
 
         var container = this._cpuBarsElement;
-        var element = container.firstChild.nextSibling;
+        var element = container.firstChild;
         var lastElement;
         var lastLeft;
         var lastRight;
@@ -893,6 +893,7 @@ WebInspector.TimelinePanel.prototype = {
                 var gap = Math.floor(left) - Math.ceil(lastRight);
                 if (gap < minGap) {
                     lastRight = right;
+                    lastElement._tasksInfo.lastTaskIndex = taskIndex;
                     continue;
                 }
                 lastElement.style.width = (lastRight - lastLeft) + "px";
@@ -902,6 +903,7 @@ WebInspector.TimelinePanel.prototype = {
                 element = container.createChild("div", "timeline-graph-bar");
 
             element.style.left = left + "px";
+            element._tasksInfo = {tasks: tasks, firstTaskIndex: taskIndex, lastTaskIndex: taskIndex};
             lastLeft = left;
             lastRight = right;
 
@@ -914,6 +916,7 @@ WebInspector.TimelinePanel.prototype = {
 
         while (element) {
             var nextElement = element.nextSibling;
+            element._tasksInfo = null;
             container.removeChild(element);
             element = nextElement;
         }
@@ -921,12 +924,8 @@ WebInspector.TimelinePanel.prototype = {
 
     _enableMainThreadMonitoring: function()
     {
-        ++this._headerLineCount;
-
         var container = this._timelineGrid.gridHeaderElement;
-        this._cpuBarsElement = container.createChild("div", "timeline-cpu-bars timeline-category-program");
-        var cpuBarsLabel = this._cpuBarsElement.createChild("span", "timeline-cpu-bars-label");
-        cpuBarsLabel.textContent = WebInspector.UIString("CPU");
+        this._cpuBarsElement = container.createChild("div", "timeline-cpu-bars");
 
         const headerBorderWidth = 1;
         const headerMargin = 2;
@@ -997,6 +996,8 @@ WebInspector.TimelinePanel.prototype = {
         } else {
             if (anchor.row && anchor.row._record)
                 anchor.row._record.generatePopupContent(showCallback);
+            else if (anchor._tasksInfo)
+                popover.show(this._presentationModel.generateMainThreadBarPopupContent(anchor._tasksInfo), anchor);
         }
 
         function showCallback(popupContent)

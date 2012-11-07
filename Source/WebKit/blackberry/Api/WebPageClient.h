@@ -113,6 +113,9 @@ public:
     virtual void addMessageToConsole(const unsigned short* message, unsigned messageLength, const unsigned short* source, unsigned sourceLength, unsigned lineNumber) = 0;
     virtual int showAlertDialog(AlertType) = 0;
 
+    virtual BlackBerry::Platform::String serializePageCacheState() const = 0;
+    virtual void deserializePageCacheState(const BlackBerry::Platform::String& state) = 0;
+
     virtual void runJavaScriptAlert(const unsigned short* message, unsigned messageLength, const char* origin, unsigned originLength) = 0;
     virtual bool runJavaScriptConfirm(const unsigned short* message, unsigned messageLength, const char* origin, unsigned originLength) = 0;
     virtual bool runJavaScriptPrompt(const unsigned short* message, unsigned messageLength, const unsigned short* defaultValue, unsigned defaultValueLength, const char* origin, unsigned originLength, BlackBerry::Platform::String& result) = 0;
@@ -129,6 +132,7 @@ public:
     virtual void contentsSizeChanged(const Platform::IntSize&) const = 0;
     virtual void scrollChanged(const Platform::IntPoint&) const = 0;
     virtual void zoomChanged(bool isMinZoomed, bool isMaxZoomed, bool isAtInitialZoom, double newZoom) const = 0;
+    virtual void updateInteractionViews() = 0;
 
     virtual void requestUpdateViewport(int width, int height) = 0;
 
@@ -157,8 +161,10 @@ public:
 
     virtual void cursorChanged(Platform::CursorType, const char* url, int x, int y) = 0;
 
-    virtual void requestGeolocationPermission(Platform::GeoTrackerListener*, void* context, const char* origin, unsigned originLength) = 0;
-    virtual void cancelGeolocationPermission(Platform::GeoTrackerListener*, void* context) = 0;
+    virtual void requestGlobalLocalServicePermission(Platform::GeoTrackerListener*, const BlackBerry::Platform::String& origin) = 0;
+
+    virtual void requestGeolocationPermission(Platform::GeoTrackerListener*, const BlackBerry::Platform::String& origin) = 0;
+    virtual void cancelGeolocationPermission() = 0;
     virtual Platform::NetworkStreamFactory* networkStreamFactory() = 0;
 
     virtual void handleStringPattern(const unsigned short* pattern, unsigned length) = 0;
@@ -255,6 +261,9 @@ public:
     virtual bool hasKeyboardFocus() = 0;
     virtual bool createPopupWebView(const Platform::IntRect&) = 0;
     virtual void closePopupWebView() = 0;
+
+    virtual void addSearchProvider(const Platform::String&) = 0;
+    virtual int  isSearchProviderInstalled(const Platform::String&) = 0;
 
     // Match with ChromeClient::CustomHandlersState.
     enum ProtocolHandlersState {

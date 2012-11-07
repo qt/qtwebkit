@@ -286,8 +286,6 @@ GraphicsLayerCA::GraphicsLayerCA(GraphicsLayerClient* client)
     }
 
     m_layer = PlatformCALayer::create(layerType, this);
-
-    updateDebugIndicators();
     noteLayerPropertyChanged(ContentsScaleChanged);
 }
 
@@ -520,7 +518,7 @@ void GraphicsLayerCA::setMasksToBounds(bool masksToBounds)
         return;
 
     GraphicsLayer::setMasksToBounds(masksToBounds);
-    noteLayerPropertyChanged(MasksToBoundsChanged);
+    noteLayerPropertyChanged(MasksToBoundsChanged | DebugIndicatorsChanged);
 }
 
 void GraphicsLayerCA::setDrawsContent(bool drawsContent)
@@ -529,7 +527,7 @@ void GraphicsLayerCA::setDrawsContent(bool drawsContent)
         return;
 
     GraphicsLayer::setDrawsContent(drawsContent);
-    noteLayerPropertyChanged(DrawsContentChanged);
+    noteLayerPropertyChanged(DrawsContentChanged | DebugIndicatorsChanged);
 }
 
 void GraphicsLayerCA::setContentsVisible(bool contentsVisible)
@@ -670,6 +668,8 @@ void GraphicsLayerCA::setNeedsDisplayInRect(const FloatRect& r)
         m_dirtyRects[0].unite(rect);
 
     noteLayerPropertyChanged(DirtyRectsChanged);
+
+    addRepaintRect(rect);
 }
 
 void GraphicsLayerCA::setContentsNeedsDisplay()
@@ -910,7 +910,7 @@ void GraphicsLayerCA::flushCompositingStateForThisLayerOnly()
     commitLayerChangesAfterSublayers();
 }
 
-TiledBacking* GraphicsLayerCA::tiledBacking()
+TiledBacking* GraphicsLayerCA::tiledBacking() const
 {
     return m_layer->tiledBacking();
 }
@@ -943,11 +943,14 @@ FloatRect GraphicsLayerCA::computeVisibleRect(TransformState& state) const
         }
     }
 
-    state.applyTransform(layerTransform, accumulation);
+    bool applyWasClamped;
+    state.applyTransform(layerTransform, accumulation, &applyWasClamped);
     
-    FloatRect clipRectForChildren = state.mappedQuad().boundingBox();
+    bool mapWasClamped;
+    FloatRect clipRectForChildren = state.mappedQuad(&mapWasClamped).boundingBox();
     FloatRect clipRectForSelf(0, 0, m_size.width(), m_size.height());
-    clipRectForSelf.intersect(clipRectForChildren);
+    if (!applyWasClamped && !mapWasClamped)
+        clipRectForSelf.intersect(clipRectForChildren);
     
     if (masksToBounds()) {
         ASSERT(accumulation == TransformState::FlattenTransform);
@@ -1039,7 +1042,7 @@ bool GraphicsLayerCA::platformCALayerShowRepaintCounter(PlatformCALayer* platfor
     if (m_isPageTileCacheLayer && platformLayer)
         return false;
     
-    return showRepaintCounter();
+    return isShowingRepaintCounter();
 }
 
 void GraphicsLayerCA::platformCALayerPaintContents(GraphicsContext& context, const IntRect& clip)
@@ -1146,6 +1149,9 @@ void GraphicsLayerCA::commitLayerChangesBeforeSublayers(float pageScaleFactor, c
     if (m_uncommittedChanges & AcceleratesDrawingChanged)
         updateAcceleratesDrawing();
 
+    if (m_uncommittedChanges & DebugIndicatorsChanged)
+        updateDebugBorder();
+
     if (m_uncommittedChanges & ChildrenChanged) {
         updateSublayerList();
         // Sublayers may set this flag again, so clear it to avoid always updating sublayers in commitLayerChangesAfterSublayers().
@@ -1184,54 +1190,47 @@ void GraphicsLayerCA::updateLayerNames()
 
 void GraphicsLayerCA::updateSublayerList()
 {
-    PlatformCALayerList newSublayers;
-    const Vector<GraphicsLayer*>& childLayers = children();
+    const PlatformCALayerList* customSublayers = m_layer->customSublayers();
 
-    if (const PlatformCALayerList* customSublayers = m_layer->customSublayers())
-        newSublayers.appendRange(customSublayers->begin(), customSublayers->end());
-    
-    if (m_structuralLayer || m_contentsLayer || childLayers.size() > 0) {
-        if (m_structuralLayer) {
-            // Add the replica layer first.
-            if (m_replicaLayer)
-                newSublayers.append(static_cast<GraphicsLayerCA*>(m_replicaLayer)->primaryLayer());
-            // Add the primary layer. Even if we have negative z-order children, the primary layer always comes behind.
-            newSublayers.append(m_layer);
-        } else if (m_contentsLayer && m_contentsVisible) {
-            // FIXME: add the contents layer in the correct order with negative z-order children.
-            // This does not cause visible rendering issues because currently contents layers are only used
-            // for replaced elements that don't have children.
-            newSublayers.append(m_contentsLayer);
-        }
-        
-        size_t numChildren = childLayers.size();
-        for (size_t i = 0; i < numChildren; ++i) {
-            GraphicsLayerCA* curChild = static_cast<GraphicsLayerCA*>(childLayers[i]);
-            PlatformCALayer* childLayer = curChild->layerForSuperlayer();
-            newSublayers.append(childLayer);
-        }
+    PlatformCALayerList structuralLayerChildren;
+    PlatformCALayerList primaryLayerChildren;
 
-        for (size_t i = 0; i < newSublayers.size(); --i)
-            newSublayers[i]->removeFromSuperlayer();
-    }
-    
-#ifdef VISIBLE_TILE_WASH
-    if (m_visibleTileWashLayer)
-        newSublayers.append(m_visibleTileWashLayer);
-#endif
+    PlatformCALayerList& childListForSublayers = m_structuralLayer ? structuralLayerChildren : primaryLayerChildren;
+
+    if (customSublayers)
+        primaryLayerChildren.append(*customSublayers);
 
     if (m_structuralLayer) {
-        m_structuralLayer->setSublayers(newSublayers);
+        if (m_replicaLayer)
+            structuralLayerChildren.append(static_cast<GraphicsLayerCA*>(m_replicaLayer)->primaryLayer());
+    
+        structuralLayerChildren.append(m_layer);
+    }
 
-        if (m_contentsLayer) {
-            // If we have a transform layer, then the contents layer is parented in the 
-            // primary layer (which is itself a child of the transform layer).
-            m_layer->removeAllSublayers();
-            if (m_contentsVisible)
-                m_layer->appendSublayer(m_contentsLayer.get());
-        }
-    } else
-        m_layer->setSublayers(newSublayers);
+    if (m_contentsLayer && m_contentsVisible) {
+        // FIXME: add the contents layer in the correct order with negative z-order children.
+        // This does not cause visible rendering issues because currently contents layers are only used
+        // for replaced elements that don't have children.
+        primaryLayerChildren.append(m_contentsLayer);
+    }
+    
+    const Vector<GraphicsLayer*>& childLayers = children();
+    size_t numChildren = childLayers.size();
+    for (size_t i = 0; i < numChildren; ++i) {
+        GraphicsLayerCA* curChild = static_cast<GraphicsLayerCA*>(childLayers[i]);
+        PlatformCALayer* childLayer = curChild->layerForSuperlayer();
+        childListForSublayers.append(childLayer);
+    }
+
+#ifdef VISIBLE_TILE_WASH
+    if (m_visibleTileWashLayer)
+        childListForSublayers.append(m_visibleTileWashLayer);
+#endif
+
+    if (m_structuralLayer)
+        m_structuralLayer->setSublayers(structuralLayerChildren);
+    
+    m_layer->setSublayers(primaryLayerChildren);
 }
 
 void GraphicsLayerCA::updateGeometry(float pageScaleFactor, const FloatPoint& positionRelativeToBase)
@@ -1345,8 +1344,6 @@ void GraphicsLayerCA::updateMasksToBounds()
         for (LayerMap::const_iterator it = layerCloneMap->begin(); it != end; ++it)
             it->value->setMasksToBounds(m_masksToBounds);
     }
-
-    updateDebugIndicators();
 }
 
 void GraphicsLayerCA::updateContentsVisibility()
@@ -1356,7 +1353,7 @@ void GraphicsLayerCA::updateContentsVisibility()
         if (m_drawsContent)
             m_layer->setNeedsDisplay();
     } else {
-        m_layer.get()->setContents(0);
+        m_layer->setContents(0);
 
         if (LayerMap* layerCloneMap = m_layerClones.get()) {
             LayerMap::const_iterator end = layerCloneMap->end();
@@ -1368,7 +1365,7 @@ void GraphicsLayerCA::updateContentsVisibility()
 
 void GraphicsLayerCA::updateContentsOpaque()
 {
-    m_layer.get()->setOpaque(m_contentsOpaque);
+    m_layer->setOpaque(m_contentsOpaque);
 
     if (LayerMap* layerCloneMap = m_layerClones.get()) {
         LayerMap::const_iterator end = layerCloneMap->end();
@@ -1401,9 +1398,9 @@ void GraphicsLayerCA::updateBackfaceVisibility()
 #if ENABLE(CSS_FILTERS)
 void GraphicsLayerCA::updateFilters()
 {
-    primaryLayer()->setFilters(m_filters);
+    m_layer->setFilters(m_filters);
 
-    if (LayerMap* layerCloneMap = primaryLayerClones()) {
+    if (LayerMap* layerCloneMap = m_layerClones.get()) {
         LayerMap::const_iterator end = layerCloneMap->end();
         for (LayerMap::const_iterator it = layerCloneMap->begin(); it != end; ++it) {
             if (m_replicaLayer && isReplicatedRootClone(it->key))
@@ -1530,12 +1527,19 @@ void GraphicsLayerCA::updateLayerDrawsContent(float pageScaleFactor, const Float
                 it->value->setContents(0);
         }
     }
-    updateDebugIndicators();
 }
 
 void GraphicsLayerCA::updateAcceleratesDrawing()
 {
     m_layer->setAcceleratesDrawing(m_acceleratesDrawing);
+}
+
+void GraphicsLayerCA::updateDebugBorder()
+{
+    if (isShowingDebugBorder())
+        updateDebugIndicators();
+    else
+        m_layer->setBorderWidth(0);
 }
 
 FloatRect GraphicsLayerCA::adjustTiledLayerVisibleRect(TiledBacking* tiledBacking, const FloatRect& oldVisibleRect, const FloatSize& oldSize) const
@@ -1600,10 +1604,13 @@ FloatRect GraphicsLayerCA::adjustTiledLayerVisibleRect(TiledBacking* tiledBackin
 
 void GraphicsLayerCA::updateVisibleRect(const FloatRect& oldVisibleRect)
 {
-    if (m_layer->layerType() != PlatformCALayer::LayerTypeTileCacheLayer)
+    if (!m_layer->usesTileCacheLayer())
         return;
 
-    FloatRect tileArea = adjustTiledLayerVisibleRect(tiledBacking(), oldVisibleRect, m_sizeAtLastVisibleRectUpdate);
+    FloatRect tileArea = m_visibleRect;
+    if (m_layer->layerType() == PlatformCALayer::LayerTypeTileCacheLayer)
+        tileArea = adjustTiledLayerVisibleRect(tiledBacking(), oldVisibleRect, m_sizeAtLastVisibleRectUpdate);
+
     tiledBacking()->setVisibleRect(enclosingIntRect(tileArea));
 
     m_sizeAtLastVisibleRectUpdate = m_size;
@@ -2497,6 +2504,24 @@ void GraphicsLayerCA::updateContentsScale(float pageScaleFactor, const FloatPoin
         m_layer->setNeedsDisplay();
 }
 
+void GraphicsLayerCA::setShowDebugBorder(bool showBorder)
+{
+    if (showBorder == m_showDebugBorder)
+        return;
+
+    GraphicsLayer::setShowDebugBorder(showBorder);
+    noteLayerPropertyChanged(DebugIndicatorsChanged);
+}
+
+void GraphicsLayerCA::setShowRepaintCounter(bool showCounter)
+{
+    if (showCounter == m_showRepaintCounter)
+        return;
+
+    GraphicsLayer::setShowRepaintCounter(showCounter);
+    noteLayerPropertyChanged(DebugIndicatorsChanged);
+}
+
 void GraphicsLayerCA::setDebugBackgroundColor(const Color& color)
 {    
     if (color.isValid())
@@ -2521,6 +2546,16 @@ void GraphicsLayerCA::dumpAdditionalProperties(TextStream& textStream, int inden
     if (behavior & LayerTreeAsTextIncludeVisibleRects) {
         writeIndent(textStream, indent + 1);
         textStream << "(visible rect " << m_visibleRect.x() << ", " << m_visibleRect.y() << " " << m_visibleRect.width() << " x " << m_visibleRect.height() << ")\n";
+    }
+
+    if (tiledBacking() && (behavior & LayerTreeAsTextIncludeTileCaches)) {
+        IntRect tileCoverageRect = tiledBacking()->tileCoverageRect();
+        writeIndent(textStream, indent + 1);
+        textStream << "(tile cache coverage " << tileCoverageRect.x() << ", " << tileCoverageRect.y() << " " << tileCoverageRect.width() << " x " << tileCoverageRect.height() << ")\n";
+
+        IntSize tileSize = tiledBacking()->tileSize();
+        writeIndent(textStream, indent + 1);
+        textStream << "(tile size " << tileSize.width() << " x " << tileSize.height() << ")\n";
     }
 }
 
@@ -2600,10 +2635,9 @@ void GraphicsLayerCA::swapFromOrToTiledLayer(bool useTiledLayer, float /*pageSca
         | BackgroundColorChanged
         | ContentsScaleChanged
         | AcceleratesDrawingChanged
-#if ENABLE(CSS_FILTERS)
         | FiltersChanged
-#endif
-        | OpacityChanged;
+        | OpacityChanged
+        | DebugIndicatorsChanged;
     
 #ifndef NDEBUG
     String name = String::format("%sCALayer(%p) GraphicsLayer(%p) ", (m_layer->layerType() == PlatformCALayer::LayerTypeWebTiledLayer) ? "Tiled " : "", m_layer->platformLayer(), this) + m_name;
@@ -2615,8 +2649,6 @@ void GraphicsLayerCA::swapFromOrToTiledLayer(bool useTiledLayer, float /*pageSca
     
     // need to tell new layer to draw itself
     setNeedsDisplay();
-    
-    updateDebugIndicators();
 }
 
 GraphicsLayer::CompositingCoordinatesOrientation GraphicsLayerCA::defaultContentsOrientation() const
@@ -2640,7 +2672,7 @@ void GraphicsLayerCA::setupContentsLayer(PlatformCALayer* contentsLayer)
     } else
         contentsLayer->setAnchorPoint(FloatPoint3D());
 
-    if (showDebugBorders()) {
+    if (isShowingDebugBorder()) {
         contentsLayer->setBorderColor(Color(0, 0, 128, 180));
         contentsLayer->setBorderWidth(1.0f);
     }
@@ -2828,13 +2860,14 @@ PassRefPtr<PlatformCALayer> GraphicsLayerCA::cloneLayer(PlatformCALayer *layer, 
     newLayer->setOpaque(layer->isOpaque());
     newLayer->setBackgroundColor(layer->backgroundColor());
     newLayer->setContentsScale(layer->contentsScale());
+    newLayer->copyFiltersFrom(layer);
 
     if (cloneLevel == IntermediateCloneLevel) {
         newLayer->setOpacity(layer->opacity());
         moveOrCopyAnimations(Copy, layer, newLayer.get());
     }
     
-    if (showDebugBorders()) {
+    if (isShowingDebugBorder()) {
         newLayer->setBorderColor(Color(255, 122, 251));
         newLayer->setBorderWidth(2);
     }

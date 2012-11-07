@@ -107,8 +107,8 @@
 #include "InspectorCounters.h"
 #include "InspectorInstrumentation.h"
 #include "Language.h"
-#include "Localizer.h"
 #include "Logging.h"
+#include "MainResourceLoader.h"
 #include "MediaCanStartListener.h"
 #include "MediaQueryList.h"
 #include "MediaQueryMatcher.h"
@@ -125,6 +125,7 @@
 #include "PageGroup.h"
 #include "PageTransitionEvent.h"
 #include "PlatformKeyboardEvent.h"
+#include "PlatformLocale.h"
 #include "PluginDocument.h"
 #include "PointerLockController.h"
 #include "PopStateEvent.h"
@@ -159,7 +160,6 @@
 #include "Timer.h"
 #include "TransformSource.h"
 #include "TreeWalker.h"
-#include "UndoManager.h"
 #include "UserContentURLPattern.h"
 #include "WebCoreMemoryInstrumentation.h"
 #include "WebKitNamedFlow.h"
@@ -446,7 +446,7 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
 #if ENABLE(MUTATION_OBSERVERS)
     , m_mutationObserverTypes(0)
 #endif
-    , m_styleSheetCollection(adoptPtr(new DocumentStyleSheetCollection(this)))
+    , m_styleSheetCollection(DocumentStyleSheetCollection::create(this))
     , m_readyState(Complete)
     , m_styleRecalcTimer(this, &Document::styleRecalcTimerFired)
     , m_pendingStyleRecalcShouldForce(false)
@@ -478,7 +478,7 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     , m_isViewSource(false)
     , m_sawElementsInKnownNamespaces(false)
     , m_isSrcdocDocument(false)
-    , m_documentRareData(0)
+    , m_renderer(0)
     , m_eventQueue(DocumentEventQueue::create(this))
     , m_weakReference(DocumentWeakReference::create(this))
     , m_idAttributeName(idAttr)
@@ -498,9 +498,6 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     , m_wheelEventHandlerCount(0)
 #if ENABLE(TOUCH_EVENTS)
     , m_touchEventHandlerCount(0)
-#endif
-#if ENABLE(UNDO_MANAGER)
-    , m_undoManager(0)
 #endif
     , m_pendingTasksTimer(this, &Document::pendingTasksTimerFired)
     , m_scheduledTasksAreSuspended(false)
@@ -1500,19 +1497,20 @@ PassRefPtr<Range> Document::caretRangeFromPoint(int x, int y)
  *  2. Trim leading and trailing spaces
  *  3. Collapse internal whitespace.
  */
+template <typename CharacterType>
 static inline StringWithDirection canonicalizedTitle(Document* document, const StringWithDirection& titleWithDirection)
 {
     const String& title = titleWithDirection.string();
-    const UChar* characters = title.characters();
+    const CharacterType* characters = title.getCharacters<CharacterType>();
     unsigned length = title.length();
     unsigned i;
 
-    StringBuffer<UChar> buffer(length);
+    StringBuffer<CharacterType> buffer(length);
     unsigned builderIndex = 0;
 
     // Skip leading spaces and leading characters that would convert to spaces
     for (i = 0; i < length; ++i) {
-        UChar c = characters[i];
+        CharacterType c = characters[i];
         if (!(c <= 0x20 || c == 0x7F))
             break;
     }
@@ -1523,7 +1521,7 @@ static inline StringWithDirection canonicalizedTitle(Document* document, const S
     // Replace control characters with spaces, and backslashes with currency symbols, and collapse whitespace.
     bool previousCharWasWS = false;
     for (; i < length; ++i) {
-        UChar c = characters[i];
+        CharacterType c = characters[i];
         if (c <= 0x20 || c == 0x7F || (WTF::Unicode::category(c) & (WTF::Unicode::Separator_Line | WTF::Unicode::Separator_Paragraph))) {
             if (previousCharWasWS)
                 continue;
@@ -1559,7 +1557,15 @@ void Document::updateTitle(const StringWithDirection& title)
         return;
 
     m_rawTitle = title;
-    m_title = canonicalizedTitle(this, m_rawTitle);
+
+    if (m_rawTitle.string().isEmpty())
+        m_title = StringWithDirection();
+    else {
+        if (m_rawTitle.string().is8Bit())
+            m_title = canonicalizedTitle<LChar>(this, m_rawTitle);
+        else
+            m_title = canonicalizedTitle<UChar>(this, m_rawTitle);
+    }
     if (Frame* f = frame())
         f->loader()->setTitle(m_title);
 }
@@ -1856,14 +1862,10 @@ void Document::recalcStyle(StyleChange change)
                 element->recalcStyle(change);
         }
 
-    #if USE(ACCELERATED_COMPOSITING)
-        if (view()) {
-            bool layoutPending = view()->layoutPending() || renderer()->needsLayout();
-            // If we didn't update compositing layers because of layout(), we need to do so here.
-            if (!layoutPending)
-                view()->updateCompositingLayersAfterStyleChange();
-        }
-    #endif
+#if USE(ACCELERATED_COMPOSITING)
+        if (view())
+            view()->updateCompositingLayersAfterStyleChange();
+#endif
 
     bailOut:
         clearNeedsStyleRecalc();
@@ -2027,11 +2029,6 @@ void Document::pageSizeAndMarginsInPixels(int pageIndex, IntSize& pageSize, int&
     marginRight = style->marginRight().isAuto() ? marginRight : intValueForLength(style->marginRight(), width, view);
     marginBottom = style->marginBottom().isAuto() ? marginBottom : intValueForLength(style->marginBottom(), width, view);
     marginLeft = style->marginLeft().isAuto() ? marginLeft : intValueForLength(style->marginLeft(), width, view);
-}
-
-void Document::setDocumentRareData(NodeRareData* rareData)
-{
-    m_documentRareData = rareData;
 }
 
 void Document::setIsViewSource(bool isViewSource)
@@ -2200,11 +2197,6 @@ void Document::resumeActiveDOMObjects()
     if (DeviceOrientationController* controller = DeviceOrientationController::from(page()))
         controller->resumeEventsForAllListeners(domWindow());
 #endif
-}
-
-RenderView* Document::renderView() const
-{
-    return toRenderView(renderer());
 }
 
 void Document::clearAXObjectCache()
@@ -2955,17 +2947,24 @@ void Document::processHttpEquiv(const String& equiv, const String& content)
         if (frame) {
             FrameLoader* frameLoader = frame->loader();
             if (frameLoader->shouldInterruptLoadForXFrameOptions(content, url())) {
+                unsigned long requestIdentifier = 0;
+                if (frameLoader->activeDocumentLoader() && frameLoader->activeDocumentLoader()->mainResourceLoader())
+                    requestIdentifier = frameLoader->activeDocumentLoader()->mainResourceLoader()->identifier();
+                String message = "Refused to display '" + url().string() + "' in a frame because it set 'X-Frame-Options' to '" + content + "'.";
+
                 frameLoader->stopAllLoaders();
                 frame->navigationScheduler()->scheduleLocationChange(securityOrigin(), blankURL(), String());
-
-                DEFINE_STATIC_LOCAL(String, consoleMessage, (ASCIILiteral("Refused to display document because display forbidden by X-Frame-Options.\n")));
-                addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, consoleMessage);
+                addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message, url().string(), 0, 0, requestIdentifier);
             }
         }
-    } else if (equalIgnoringCase(equiv, "x-webkit-csp"))
-        contentSecurityPolicy()->didReceiveHeader(content, ContentSecurityPolicy::EnforcePolicy);
+    } else if (equalIgnoringCase(equiv, "content-security-policy"))
+        contentSecurityPolicy()->didReceiveHeader(content, ContentSecurityPolicy::EnforceStableDirectives);
+    else if (equalIgnoringCase(equiv, "content-security-policy-report-only"))
+        contentSecurityPolicy()->didReceiveHeader(content, ContentSecurityPolicy::ReportStableDirectives);
+    else if (equalIgnoringCase(equiv, "x-webkit-csp"))
+        contentSecurityPolicy()->didReceiveHeader(content, ContentSecurityPolicy::EnforceAllDirectives);
     else if (equalIgnoringCase(equiv, "x-webkit-csp-report-only"))
-        contentSecurityPolicy()->didReceiveHeader(content, ContentSecurityPolicy::ReportOnly);
+        contentSecurityPolicy()->didReceiveHeader(content, ContentSecurityPolicy::ReportAllDirectives);
 }
 
 // Though isspace() considers \t and \v to be whitespace, Win IE doesn't.
@@ -4862,15 +4861,17 @@ void Document::parseDNSPrefetchControlHeader(const String& dnsPrefetchControl)
     m_haveExplicitlyDisabledDNSPrefetch = true;
 }
 
-void Document::addMessage(MessageSource source, MessageType type, MessageLevel level, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack> callStack)
+void Document::addMessage(MessageSource source, MessageType type, MessageLevel level, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack> callStack, unsigned long requestIdentifier)
 {
     if (!isContextThread()) {
         postTask(AddConsoleMessageTask::create(source, type, level, message));
         return;
     }
 
-    if (DOMWindow* window = domWindow())
-        window->console()->addMessage(source, type, level, message, sourceURL, lineNumber, callStack);
+    if (DOMWindow* window = domWindow()) {
+        if (Console* console = window->console())
+            console->addMessage(source, type, level, message, sourceURL, lineNumber, callStack, requestIdentifier);
+    }
 }
 
 struct PerformTaskContext {
@@ -4975,8 +4976,10 @@ void Document::windowScreenDidChange(PlatformDisplayID displayID)
 #endif
 
 #if USE(ACCELERATED_COMPOSITING)
-    if (renderView()->usesCompositing())
-        renderView()->compositor()->windowScreenDidChange(displayID);
+    if (RenderView* view = renderView()) {
+        if (view->usesCompositing())
+            view->compositor()->windowScreenDidChange(displayID);
+    }
 #endif
 }
 
@@ -4994,11 +4997,16 @@ PassRefPtr<StringImpl> Document::displayStringModifiedByEncoding(PassRefPtr<Stri
     return str;
 }
 
-void Document::displayBufferModifiedByEncoding(UChar* buffer, unsigned len) const
+template <typename CharacterType>
+void Document::displayBufferModifiedByEncodingInternal(CharacterType* buffer, unsigned len) const
 {
     if (m_decoder)
         m_decoder->encoding().displayBuffer(buffer, len);
 }
+
+// Generate definitions for both character types
+template void Document::displayBufferModifiedByEncodingInternal<LChar>(LChar*, unsigned) const;
+template void Document::displayBufferModifiedByEncodingInternal<UChar>(UChar*, unsigned) const;
 
 void Document::enqueuePageshowEvent(PageshowEventPersistence persisted)
 {
@@ -5013,6 +5021,9 @@ void Document::enqueueHashchangeEvent(const String& oldURL, const String& newURL
 
 void Document::enqueuePopstateEvent(PassRefPtr<SerializedScriptValue> stateObject)
 {
+    if (!ContextFeatures::pushStateEnabled(this))
+        return;
+
     // FIXME: https://bugs.webkit.org/show_bug.cgi?id=36202 Popstate event needs to fire asynchronously
     dispatchWindowEvent(PopStateEvent::create(stateObject, domWindow() ? domWindow()->history() : 0));
 }
@@ -5950,15 +5961,6 @@ void Document::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addMember(m_pendingTasks);
 }
 
-#if ENABLE(UNDO_MANAGER)
-PassRefPtr<UndoManager> Document::undoManager()
-{
-    if (!m_undoManager)
-        m_undoManager = UndoManager::create(this);
-    return m_undoManager;
-}
-#endif
-
 class ImmutableAttributeDataCacheKey {
 public:
     ImmutableAttributeDataCacheKey(const QualifiedName& tagName, const Attribute* attributes, unsigned attributeCount)
@@ -6028,14 +6030,14 @@ bool Document::haveStylesheetsLoaded() const
     return !m_styleSheetCollection->hasPendingSheets() || m_ignorePendingStylesheets;
 }
 
-Localizer& Document::getCachedLocalizer(const AtomicString& locale)
+Locale& Document::getCachedLocale(const AtomicString& locale)
 {
     AtomicString localeKey = locale;
     if (locale.isEmpty() || !RuntimeEnabledFeatures::langAttributeAwareFormControlUIEnabled())
         localeKey = defaultLanguage();
-    LocaleToLocalizerMap::AddResult result = m_localizerCache.add(localeKey, nullptr);
+    LocaleIdentifierToLocaleMap::AddResult result = m_localeCache.add(localeKey, nullptr);
     if (result.isNewEntry)
-        result.iterator->value = Localizer::create(localeKey);
+        result.iterator->value = Locale::create(localeKey);
     return *(result.iterator->value);
 }
 

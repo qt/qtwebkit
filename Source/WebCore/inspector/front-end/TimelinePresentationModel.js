@@ -274,7 +274,7 @@ WebInspector.TimelinePresentationModel.prototype = {
         this._frames.push(frame);
     },
 
-    addRecord: function(record, parentRecord)
+    addRecord: function(record)
     {
         if (this._minimumRecordTime === -1 || record.startTime < this._minimumRecordTime)
             this._minimumRecordTime = WebInspector.TimelineModel.startTimeInSeconds(record);
@@ -288,7 +288,7 @@ WebInspector.TimelinePresentationModel.prototype = {
         var formattedRecords = [];
         var recordsCount = records.length;
         for (var i = 0; i < recordsCount; ++i)
-            formattedRecords.push(this._innerAddRecord(records[i], parentRecord));
+            formattedRecords.push(this._innerAddRecord(records[i], this._rootRecord));
         return formattedRecords;
     },
 
@@ -440,6 +440,36 @@ WebInspector.TimelinePresentationModel.prototype = {
                 return false;
         }
         return true;
+    },
+
+    /**
+     * @param {{tasks: !Array.<{startTime: number, endTime: number}>, firstTaskIndex: number, lastTaskIndex: number}} info
+     * @return {!Element}
+     */
+    generateMainThreadBarPopupContent: function(info)
+    {
+        var firstTaskIndex = info.firstTaskIndex;
+        var lastTaskIndex = info.lastTaskIndex;
+        var tasks = info.tasks;
+        var messageCount = lastTaskIndex - firstTaskIndex + 1;
+        var cpuTime = 0;
+
+        for (var i = firstTaskIndex; i <= lastTaskIndex; ++i) {
+            var task = tasks[i];
+            cpuTime += task.endTime - task.startTime;
+        }
+        var startTime = tasks[firstTaskIndex].startTime;
+        var endTime = tasks[lastTaskIndex].endTime;
+        var duration = endTime - startTime;
+        var offset = this._minimumRecordTime;
+
+        var contentHelper = new WebInspector.TimelinePresentationModel.PopupContentHelper(WebInspector.UIString("CPU"));
+        var durationText = WebInspector.UIString("%s (at %s)", Number.secondsToString(duration, true),
+            Number.secondsToString(startTime - offset, true));
+        contentHelper._appendTextRow(WebInspector.UIString("Duration"), durationText);
+        contentHelper._appendTextRow(WebInspector.UIString("CPU time"), Number.secondsToString(cpuTime, true));
+        contentHelper._appendTextRow(WebInspector.UIString("Message Count"), messageCount);
+        return contentHelper._contentTable;
     },
 
     __proto__: WebInspector.Object.prototype

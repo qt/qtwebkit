@@ -29,6 +29,7 @@
 #if ENABLE(CSS_FILTERS)
 
 #include "Color.h"
+#include "FilterEffect.h"
 #include "LayoutTypes.h"
 #include "Length.h"
 #include <wtf/OwnPtr.h>
@@ -69,6 +70,7 @@ public:
         DROP_SHADOW,
 #if ENABLE(CSS_SHADERS)
         CUSTOM,
+        VALIDATED_CUSTOM,
 #endif
         PASSTHROUGH,
         NONE
@@ -161,14 +163,21 @@ public:
         return adoptRef(new ReferenceFilterOperation(url, fragment, type));
     }
 
+    class Data {
+    public:
+        virtual ~Data() { }
+    };
+
     virtual bool affectsOpacity() const { return true; }
     virtual bool movesPixels() const { return true; }
 
     const String& url() const { return m_url; }
     const String& fragment() const { return m_fragment; }
 
-    void* data() const { return m_data; }
-    void setData(void* data) { m_data = data; }
+    Data* data() const { return m_data.get(); }
+    void setData(PassOwnPtr<Data> data) { m_data = data; }
+    FilterEffect* filterEffect() const { return m_filterEffect.get(); }
+    void setFilterEffect(PassRefPtr<FilterEffect> filterEffect) { m_filterEffect = filterEffect; }
 
 private:
 
@@ -184,13 +193,13 @@ private:
         : FilterOperation(type)
         , m_url(url)
         , m_fragment(fragment)
-        , m_data(0)
     {
     }
 
     String m_url;
     String m_fragment;
-    void* m_data;
+    OwnPtr<Data> m_data;
+    RefPtr<FilterEffect> m_filterEffect;
 };
 
 // GRAYSCALE, SEPIA, SATURATE and HUE_ROTATE are variations on a basic color matrix effect.

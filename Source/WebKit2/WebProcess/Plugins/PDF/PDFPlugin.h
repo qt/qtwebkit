@@ -38,15 +38,18 @@ typedef const struct OpaqueJSContext* JSContextRef;
 typedef struct OpaqueJSValue* JSObjectRef;
 typedef const struct OpaqueJSValue* JSValueRef;
 
+OBJC_CLASS PDFAnnotation;
 OBJC_CLASS PDFLayerController;
 OBJC_CLASS WKPDFLayerControllerDelegate;
 
 namespace WebCore {
+class Element;
 struct PluginInfo;
 }
 
 namespace WebKit {
 
+class PDFPluginAnnotation;
 class PluginView;
 class WebFrame;
 
@@ -56,6 +59,7 @@ public:
     ~PDFPlugin();
 
     void paintControlForLayerInContext(CALayer *, CGContextRef);
+    void setActiveAnnotation(PDFAnnotation *);
     
     using ScrollableArea::notifyScrollPositionChanged;
 
@@ -77,12 +81,14 @@ private:
     virtual bool handleKeyboardEvent(const WebKeyboardEvent&) OVERRIDE;
     virtual bool handleEditingCommand(const String& commandName, const String& argument) OVERRIDE;
     virtual bool isEditingCommandEnabled(const String&) OVERRIDE;
-    virtual bool handlesPageScaleFactor() OVERRIDE { return true; }
+    virtual bool handlesPageScaleFactor() OVERRIDE;
 
     // ScrollableArea functions.
     virtual void setScrollOffset(const WebCore::IntPoint&) OVERRIDE;
     virtual void invalidateScrollbarRect(WebCore::Scrollbar*, const WebCore::IntRect&) OVERRIDE;
     virtual void invalidateScrollCornerRect(const WebCore::IntRect&) OVERRIDE;
+
+    bool supportsForms();
 
     RetainPtr<CALayer> m_containerLayer;
     RetainPtr<CALayer> m_contentLayer;
@@ -91,6 +97,9 @@ private:
     RetainPtr<CALayer> m_scrollCornerLayer;
     RetainPtr<PDFLayerController> m_pdfLayerController;
     
+    RefPtr<PDFPluginAnnotation> m_activeAnnotation;
+    RefPtr<WebCore::Element> m_annotationContainer;
+
     WebCore::AffineTransform m_rootViewToPluginTransform;
     WebCore::IntPoint m_lastMousePoint;
     

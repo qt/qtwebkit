@@ -59,6 +59,7 @@ RenderTable::RenderTable(Node* node)
     , m_hasColElements(false)
     , m_needsSectionRecalc(false)
     , m_columnLogicalWidthChanged(false)
+    , m_columnRenderersValid(false)
     , m_hSpacing(0)
     , m_vSpacing(0)
     , m_borderStart(0)
@@ -211,6 +212,26 @@ void RenderTable::removeCaption(const RenderTableCaption* oldCaption)
         return;
 
     m_captions.remove(index);
+}
+
+void RenderTable::invalidateCachedColumns()
+{
+    m_columnRenderersValid = false;
+    m_columnRenderers.resize(0);
+}
+
+void RenderTable::addColumn(const RenderTableCol*)
+{
+    invalidateCachedColumns();
+}
+
+void RenderTable::removeColumn(const RenderTableCol*)
+{
+    invalidateCachedColumns();
+    // We don't really need to recompute our sections, but we need to update our
+    // column count and whether we have a column. Currently, we only have one
+    // size-fit-all flag but we may have to consider splitting it.
+    setNeedsSectionRecalc();
 }
 
 void RenderTable::updateLogicalWidth()
@@ -378,15 +399,20 @@ void RenderTable::layout()
 
     bool collapsing = collapseBorders();
 
-    // We ignore table col / colgroup in this iteration as they are only used to size the cell's widths during auto / fixed table layout.
-    for (RenderTableSection* section = topSection(); section; section = sectionBelow(section)) {
-        if (m_columnLogicalWidthChanged)
-            section->setChildNeedsLayout(true, MarkOnlyThis);
-        section->layoutIfNeeded();
-        totalSectionLogicalHeight += section->calcRowLogicalHeight();
-        if (collapsing)
-            section->recalcOuterBorder();
-        ASSERT(!section->needsLayout());
+    for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
+        if (child->isTableSection()) {
+            RenderTableSection* section = toRenderTableSection(child);
+            if (m_columnLogicalWidthChanged)
+                section->setChildNeedsLayout(true, MarkOnlyThis);
+            section->layoutIfNeeded();
+            totalSectionLogicalHeight += section->calcRowLogicalHeight();
+            if (collapsing)
+                section->recalcOuterBorder();
+            ASSERT(!section->needsLayout());
+        } else if (child->isRenderTableCol()) {
+            child->layoutIfNeeded();
+            ASSERT(!child->needsLayout());
+        }
     }
 
     // If any table section moved vertically, we will just repaint everything from that
@@ -690,14 +716,10 @@ RenderTableSection* RenderTable::topNonEmptySection() const
 
 void RenderTable::splitColumn(unsigned position, unsigned firstSpan)
 {
-    // we need to add a new columnStruct
-    unsigned oldSize = m_columns.size();
-    m_columns.grow(oldSize + 1);
-    unsigned oldSpan = m_columns[position].span;
-    ASSERT(oldSpan > firstSpan);
-    m_columns[position].span = firstSpan;
-    memmove(m_columns.data() + position + 1, m_columns.data() + position, (oldSize - position) * sizeof(ColumnStruct));
-    m_columns[position + 1].span = oldSpan - firstSpan;
+    // We split the column at "position", taking "firstSpan" cells from the span.
+    ASSERT(m_columns[position].span > firstSpan);
+    m_columns.insert(position, ColumnStruct(firstSpan));
+    m_columns[position + 1].span -= firstSpan;
 
     // Propagate the change in our columns representation to the sections that don't need
     // cell recalc. If they do, they will be synced up directly with m_columns later.
@@ -718,10 +740,8 @@ void RenderTable::splitColumn(unsigned position, unsigned firstSpan)
 
 void RenderTable::appendColumn(unsigned span)
 {
-    unsigned pos = m_columns.size();
-    unsigned newSize = pos + 1;
-    m_columns.grow(newSize);
-    m_columns[pos].span = span;
+    unsigned newColumnIndex = m_columns.size();
+    m_columns.append(ColumnStruct(span));
 
     // Propagate the change in our columns representation to the sections that don't need
     // cell recalc. If they do, they will be synced up directly with m_columns later.
@@ -733,7 +753,7 @@ void RenderTable::appendColumn(unsigned span)
         if (section->needsCellRecalc())
             continue;
 
-        section->appendColumn(pos);
+        section->appendColumn(newColumnIndex);
     }
 
     m_columnPos.grow(numEffCols() + 1);
@@ -754,15 +774,30 @@ RenderTableCol* RenderTable::firstColumn() const
     return 0;
 }
 
+void RenderTable::updateColumnCache() const
+{
+    ASSERT(m_hasColElements);
+    ASSERT(m_columnRenderers.isEmpty());
+    ASSERT(!m_columnRenderersValid);
+
+    for (RenderTableCol* columnRenderer = firstColumn(); columnRenderer; columnRenderer = columnRenderer->nextColumn()) {
+        if (columnRenderer->isTableColumnGroupWithColumnChildren())
+            continue;
+        m_columnRenderers.append(columnRenderer);
+    }
+    m_columnRenderersValid = true;
+}
+
 RenderTableCol* RenderTable::slowColElement(unsigned col, bool* startEdge, bool* endEdge) const
 {
     ASSERT(m_hasColElements);
 
-    unsigned columnCount = 0;
-    for (RenderTableCol* columnRenderer = firstColumn(); columnRenderer; columnRenderer = columnRenderer->nextColumn()) {
-        if (columnRenderer->isTableColumnGroupWithColumnChildren())
-            continue;
+    if (!m_columnRenderersValid)
+        updateColumnCache();
 
+    unsigned columnCount = 0;
+    for (unsigned i = 0; i < m_columnRenderers.size(); i++) {
+        RenderTableCol* columnRenderer = m_columnRenderers[i];
         unsigned span = columnRenderer->span();
         unsigned startCol = columnCount;
         ASSERT(span >= 1);
@@ -776,7 +811,6 @@ RenderTableCol* RenderTable::slowColElement(unsigned col, bool* startEdge, bool*
             return columnRenderer;
         }
     }
-
     return 0;
 }
 
@@ -1315,7 +1349,7 @@ RenderTable* RenderTable::createAnonymousWithParentRenderer(const RenderObject* 
 const BorderValue& RenderTable::tableStartBorderAdjoiningCell(const RenderTableCell* cell) const
 {
     ASSERT(cell->isFirstOrLastCellInRow());
-    if (hasSameDirectionAs(cell->section()))
+    if (hasSameDirectionAs(cell->row()))
         return style()->borderStart();
 
     return style()->borderEnd();
@@ -1324,7 +1358,7 @@ const BorderValue& RenderTable::tableStartBorderAdjoiningCell(const RenderTableC
 const BorderValue& RenderTable::tableEndBorderAdjoiningCell(const RenderTableCell* cell) const
 {
     ASSERT(cell->isFirstOrLastCellInRow());
-    if (hasSameDirectionAs(cell->section()))
+    if (hasSameDirectionAs(cell->row()))
         return style()->borderEnd();
 
     return style()->borderStart();

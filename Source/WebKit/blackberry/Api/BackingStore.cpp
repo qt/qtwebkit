@@ -359,6 +359,10 @@ void BackingStorePrivate::resumeScreenAndBackingStoreUpdates(BackingStore::Resum
     if (op == BackingStore::None)
         return;
 #if USE(ACCELERATED_COMPOSITING)
+    // It needs layout and render before committing root layer if we set OSDS
+    if (m_webPage->d->needsOneShotDrawingSynchronization())
+        m_webPage->d->requestLayoutIfNeeded();
+
     // This will also blit since we set the OSDS flag above.
     m_webPage->d->commitRootLayerIfNeeded();
 #else
@@ -514,8 +518,7 @@ bool BackingStorePrivate::shouldPerformRegularRenderJobs() const
 }
 
 static const BlackBerry::Platform::Message::Type RenderJobMessageType = BlackBerry::Platform::Message::generateUniqueMessageType();
-class RenderJobMessage : public BlackBerry::Platform::ExecutableMessage
-{
+class RenderJobMessage : public BlackBerry::Platform::ExecutableMessage {
 public:
     RenderJobMessage(BlackBerry::Platform::MessageDelegate* delegate)
         : BlackBerry::Platform::ExecutableMessage(delegate, BlackBerry::Platform::ExecutableMessage::UniqueCoalescing, RenderJobMessageType)
@@ -1200,7 +1203,7 @@ void BackingStorePrivate::paintDefaultBackground(const Platform::IntRect& dstRec
     // make sure it is invalidated.
     const Platform::IntRect pixelContentsRect = viewportAccessor->pixelContentsRect();
     Platform::IntRectRegion overScrollRegion = Platform::IntRectRegion::subtractRegions(
-        dstRect, viewportAccessor->pixelViewportFromContents(pixelContentsRect));
+        clippedDstRect, viewportAccessor->pixelViewportFromContents(pixelContentsRect));
 
     IntRectList overScrollRects = overScrollRegion.rects();
     for (size_t i = 0; i < overScrollRects.size(); ++i) {
@@ -2327,8 +2330,10 @@ void BackingStorePrivate::blitToWindow(const Platform::IntRect& dstRect,
     BlackBerry::Platform::Graphics::Buffer* dstBuffer = buffer();
     ASSERT(dstBuffer);
     ASSERT(srcBuffer);
-    if (!dstBuffer)
-        BBLOG(BlackBerry::Platform::LogLevelWarn, "Empty window buffer, couldn't blitToWindow");
+    if (!dstBuffer) {
+        BBLOG(BlackBerry::Platform::LogLevelWarn,
+            "Empty window buffer, couldn't blitToWindow");
+    }
 
     BlackBerry::Platform::Graphics::BlendMode blendMode = blend
         ? BlackBerry::Platform::Graphics::SourceOver
@@ -2356,8 +2361,10 @@ void BackingStorePrivate::fillWindow(Platform::Graphics::FillPattern pattern,
 
     BlackBerry::Platform::Graphics::Buffer* dstBuffer = buffer();
     ASSERT(dstBuffer);
-    if (!dstBuffer)
-        BBLOG(BlackBerry::Platform::LogLevelWarn, "Empty window buffer, couldn't fillWindow");
+    if (!dstBuffer) {
+        BBLOG(BlackBerry::Platform::LogLevelWarn,
+            "Empty window buffer, couldn't fillWindow");
+    }
 
     BlackBerry::Platform::Graphics::fillBuffer(dstBuffer, pattern, dstRect, contentsOrigin, contentsScale);
 }
@@ -2441,8 +2448,10 @@ void BackingStorePrivate::clearWindow(const Platform::IntRect& rect,
 
     BlackBerry::Platform::Graphics::Buffer* dstBuffer = buffer();
     ASSERT(dstBuffer);
-    if (!dstBuffer)
-        BBLOG(BlackBerry::Platform::LogLevelWarn, "Empty window buffer, couldn't clearWindow");
+    if (!dstBuffer) {
+        BBLOG(BlackBerry::Platform::LogLevelWarn,
+            "Empty window buffer, couldn't clearWindow");
+    }
 
     windowFrontBufferState()->clearBlittedRegion(rect);
     windowBackBufferState()->addBlittedRegion(rect);

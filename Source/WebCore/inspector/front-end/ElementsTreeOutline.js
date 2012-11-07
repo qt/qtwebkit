@@ -359,6 +359,11 @@ WebInspector.ElementsTreeOutline.prototype = {
 
     _ondragstart: function(event)
     {
+        if (!window.getSelection().isCollapsed)
+            return false;
+        if (event.target.nodeName === "A")
+            return false;
+
         var treeElement = this._treeElementFromEvent(event);
         if (!treeElement)
             return false;
@@ -484,9 +489,9 @@ WebInspector.ElementsTreeOutline.prototype = {
         {
             WebInspector.domAgent.inspectElement(treeElement.representedObject.id);
         }
-        var contextMenu = new WebInspector.ContextMenu();
+        var contextMenu = new WebInspector.ContextMenu(event);
         contextMenu.appendItem(WebInspector.UIString("Reveal in Elements Panel"), focusElement.bind(this));
-        contextMenu.show(event);
+        contextMenu.show();
     },
 
     populateContextMenu: function(contextMenu, event)
@@ -1721,7 +1726,7 @@ WebInspector.ElementsTreeElement.prototype = {
      */
     _buildTagDOM: function(parentElement, tagName, isClosingTag, isDistinctTreeElement, linkify)
     {
-        var node = /** @type WebInspector.DOMNode */ this.representedObject;
+        var node = /** @type WebInspector.DOMNode */ (this.representedObject);
         var classes = [ "webkit-html-tag" ];
         if (isClosingTag && isDistinctTreeElement)
             classes.push("close");
@@ -2003,7 +2008,7 @@ WebInspector.ElementsTreeElement.prototype = {
                 object.callFunction(scrollIntoView);
         }
         
-        var node = /** @type {WebInspector.DOMNode} */ this.representedObject;
+        var node = /** @type {WebInspector.DOMNode} */ (this.representedObject);
         WebInspector.RemoteObject.resolveNode(node, "", scrollIntoViewCallback);
     },
 
@@ -2039,7 +2044,7 @@ WebInspector.ElementsTreeUpdater.prototype = {
         if (this._treeOutline._visible)
             this._updateModifiedNodesSoon();
 
-        var entry = /** @type {WebInspector.ElementsTreeUpdater.UpdateEntry} */ this._recentlyModifiedNodes.get(node);
+        var entry = /** @type {WebInspector.ElementsTreeUpdater.UpdateEntry} */ (this._recentlyModifiedNodes.get(node));
         if (!entry) {
             entry = new WebInspector.ElementsTreeUpdater.UpdateEntry(isUpdated, parentNode);
             this._recentlyModifiedNodes.put(node, entry);

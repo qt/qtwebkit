@@ -253,6 +253,7 @@ void InjectedBundle::beginTesting(WKDictionaryRef settings)
     WKBundleSetPopupBlockingEnabled(m_bundle, m_pageGroup, false);
     WKBundleSetAlwaysAcceptCookies(m_bundle, false);
     WKBundleSetSerialLoadingEnabled(m_bundle, false);
+    WKBundleSetShadowDOMEnabled(m_bundle, true);
 
     WKBundleRemoveAllUserContent(m_bundle, m_pageGroup);
 
@@ -479,7 +480,16 @@ void InjectedBundle::queueBackNavigation(unsigned howFarBackward)
 
     WKRetainPtr<WKStringRef> messageName(AdoptWK, WKStringCreateWithUTF8CString("QueueBackNavigation"));
     WKRetainPtr<WKUInt64Ref> messageBody(AdoptWK, WKUInt64Create(howFarBackward));
-    WKBundlePostMessage(m_bundle, messageName.get(),  messageBody.get());
+    WKBundlePostMessage(m_bundle, messageName.get(), messageBody.get());
+}
+
+void InjectedBundle::queueForwardNavigation(unsigned howFarForward)
+{
+    m_useWorkQueue = true;
+
+    WKRetainPtr<WKStringRef> messageName(AdoptWK, WKStringCreateWithUTF8CString("QueueForwardNavigation"));
+    WKRetainPtr<WKUInt64Ref> messageBody(AdoptWK, WKUInt64Create(howFarForward));
+    WKBundlePostMessage(m_bundle, messageName.get(), messageBody.get());
 }
 
 void InjectedBundle::queueLoad(WKStringRef url, WKStringRef target)
@@ -495,6 +505,30 @@ void InjectedBundle::queueLoad(WKStringRef url, WKStringRef target)
 
     WKRetainPtr<WKStringRef> targetKey(AdoptWK, WKStringCreateWithUTF8CString("target"));
     WKDictionaryAddItem(loadData.get(), targetKey.get(), target);
+
+    WKBundlePostMessage(m_bundle, messageName.get(), loadData.get());
+}
+
+void InjectedBundle::queueLoadHTMLString(WKStringRef content, WKStringRef baseURL, WKStringRef unreachableURL)
+{
+    m_useWorkQueue = true;
+
+    WKRetainPtr<WKStringRef> messageName(AdoptWK, WKStringCreateWithUTF8CString("QueueLoadHTMLString"));
+
+    WKRetainPtr<WKMutableDictionaryRef> loadData(AdoptWK, WKMutableDictionaryCreate());
+
+    WKRetainPtr<WKStringRef> contentKey(AdoptWK, WKStringCreateWithUTF8CString("content"));
+    WKDictionaryAddItem(loadData.get(), contentKey.get(), content);
+
+    if (baseURL) {
+        WKRetainPtr<WKStringRef> baseURLKey(AdoptWK, WKStringCreateWithUTF8CString("baseURL"));
+        WKDictionaryAddItem(loadData.get(), baseURLKey.get(), baseURL);
+    }
+
+    if (unreachableURL) {
+        WKRetainPtr<WKStringRef> unreachableURLKey(AdoptWK, WKStringCreateWithUTF8CString("unreachableURL"));
+        WKDictionaryAddItem(loadData.get(), unreachableURLKey.get(), unreachableURL);
+    }
 
     WKBundlePostMessage(m_bundle, messageName.get(), loadData.get());
 }

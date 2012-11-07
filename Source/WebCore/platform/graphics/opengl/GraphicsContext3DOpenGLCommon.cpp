@@ -222,7 +222,7 @@ void GraphicsContext3D::reshape(int width, int height)
     if (width == m_currentWidth && height == m_currentHeight)
         return;
 
-#if PLATFORM(QT) && USE(GRAPHICS_SURFACE)
+#if (PLATFORM(QT) || PLATFORM(EFL)) && USE(GRAPHICS_SURFACE)
     ::glFlush(); // Make sure all GL calls have been committed before resizing.
     createGraphicsSurfaces(IntSize(width, height));
 #endif
@@ -1406,6 +1406,8 @@ void GraphicsContext3D::deleteShader(Platform3DObject shader)
 void GraphicsContext3D::deleteTexture(Platform3DObject texture)
 {
     makeContextCurrent();
+    if (m_boundTexture0 == texture)
+        m_boundTexture0 = 0;
     glDeleteTextures(1, &texture);
 }
 

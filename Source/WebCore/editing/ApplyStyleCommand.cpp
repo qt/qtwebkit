@@ -28,7 +28,6 @@
 
 #include "CSSComputedStyleDeclaration.h"
 #include "CSSParser.h"
-#include "CSSProperty.h"
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
 #include "CSSValuePool.h"
@@ -826,7 +825,7 @@ bool ApplyStyleCommand::removeInlineStyleFromElement(EditingStyle* style, PassRe
 {
     ASSERT(element);
 
-    if (!element->parentNode() || !element->parentNode()->isContentEditable())
+    if (!element->parentNode() || !element->parentNode()->isContentEditable(Node::UserSelectAllIsAlwaysNonEditable))
         return false;
 
     if (isStyledInlineElementToRemove(element.get())) {
@@ -1289,7 +1288,7 @@ void ApplyStyleCommand::surroundNodeRangeWithElement(PassRefPtr<Node> passedStar
     RefPtr<Node> node = startNode;
     while (node) {
         RefPtr<Node> next = node->nextSibling();
-        if (node->isContentEditable()) {
+        if (node->isContentEditable(Node::UserSelectAllIsAlwaysNonEditable)) {
             removeNode(node);
             appendNode(node, element);
         }

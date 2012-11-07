@@ -313,9 +313,6 @@ protected:
     typedef HashSet<RenderWidget*> RenderWidgetSet;
     RenderWidgetSet m_widgets;
 
-    typedef HashSet<RenderBox*> RenderBoxSet;
-    OwnPtr<RenderBoxSet> m_fixedPositionedElements;
-
 private:
     bool shouldUsePrintingLayout() const;
 
@@ -352,10 +349,9 @@ inline const RenderView* toRenderView(const RenderObject* object)
 // This will catch anyone doing an unnecessary cast.
 void toRenderView(const RenderView*);
 
-
-ALWAYS_INLINE RenderView* RenderObject::view() const
+ALWAYS_INLINE RenderView* Document::renderView() const
 {
-    return toRenderView(document()->renderer());
+    return toRenderView(renderer());
 }
 
 // Stack-based class to assist with LayoutState push/pop

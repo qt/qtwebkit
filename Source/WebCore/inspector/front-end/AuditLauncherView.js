@@ -71,7 +71,7 @@ WebInspector.AuditLauncherView.prototype = {
 
     _onRequestStarted: function(event)
     {
-        var request = /** @type {WebInspector.NetworkRequest} */ event.data;
+        var request = /** @type {WebInspector.NetworkRequest} */ (event.data);
         // Ignore long-living WebSockets for the sake of progress indicator, as we won't be waiting them anyway.
         if (request.type === WebInspector.resourceTypes.WebSocket)
             return;
@@ -81,7 +81,7 @@ WebInspector.AuditLauncherView.prototype = {
 
     _onRequestFinished: function(event)
     {
-        var request = /** @type {WebInspector.NetworkRequest} */ event.data;
+        var request = /** @type {WebInspector.NetworkRequest} */ (event.data);
         // See resorceStarted for details.
         if (request.type === WebInspector.resourceTypes.WebSocket)
             return;
@@ -89,6 +89,9 @@ WebInspector.AuditLauncherView.prototype = {
         this._updateResourceProgress();
     },
 
+    /**
+     * @param {!WebInspector.AuditCategory} category
+     */
     addCategory: function(category)
     {
         if (!this._sortedCategories.length)
@@ -113,6 +116,9 @@ WebInspector.AuditLauncherView.prototype = {
         this._updateButton();
     },
 
+    /**
+     * @param {boolean} auditRunning
+     */
     _setAuditRunning: function(auditRunning)
     {
         if (this._auditRunning === auditRunning)
@@ -158,6 +164,9 @@ WebInspector.AuditLauncherView.prototype = {
         this._setAuditRunning(!this._auditRunning);
     },
 
+    /**
+     * @param {boolean} checkCategories
+     */
     _selectAllClicked: function(checkCategories)
     {
         var childNodes = this._categoriesElement.childNodes;
@@ -174,6 +183,10 @@ WebInspector.AuditLauncherView.prototype = {
         this._updateButton();
     },
 
+    /**
+     * @param {string} title
+     * @param {string} id
+     */
     _createCategoryElement: function(title, id)
     {
         var labelElement = document.createElement("label");

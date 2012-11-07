@@ -22,17 +22,13 @@ LIBS =
 
 defineTest(addIncludePaths) {
     # Just needed for include paths
-    include(../WTF/WTF.pri)
     include(JavaScriptCore.pri)
+    include(../WTF/WTF.pri)
 
     export(INCLUDEPATH)
 }
 
 addIncludePaths()
-
-# To make sure we include JavaScriptCore/config.h and not
-# the WTF one.
-INCLUDEPATH = $$PWD $$INCLUDEPATH
 
 LLINT_DEPENDENCY = \
     $$PWD/llint/LowLevelInterpreter.asm \

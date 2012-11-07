@@ -38,8 +38,53 @@
 
 namespace WebCore {
 
-struct IDBObjectStoreMetadata;
-struct IDBIndexMetadata;
+struct IDBIndexMetadata {
+    IDBIndexMetadata() { }
+    IDBIndexMetadata(const String& name, int64_t id, const IDBKeyPath& keyPath, bool unique, bool multiEntry)
+        : name(name)
+        , id(id)
+        , keyPath(keyPath)
+        , unique(unique)
+        , multiEntry(multiEntry) { }
+    String name;
+    int64_t id;
+    IDBKeyPath keyPath;
+    bool unique;
+    bool multiEntry;
+
+    static const int64_t InvalidId = -1;
+};
+
+struct IDBObjectStoreMetadata {
+    IDBObjectStoreMetadata() { }
+    IDBObjectStoreMetadata(const String& name, int64_t id, const IDBKeyPath& keyPath, bool autoIncrement, int64_t maxIndexId)
+        : name(name)
+        , id(id)
+        , keyPath(keyPath)
+        , autoIncrement(autoIncrement)
+        , maxIndexId(maxIndexId)
+    {
+    }
+    String name;
+    int64_t id;
+    IDBKeyPath keyPath;
+    bool autoIncrement;
+    int64_t maxIndexId;
+
+    static const int64_t InvalidId = -1;
+
+    typedef HashMap<int64_t, IDBIndexMetadata> IndexMap;
+    IndexMap indexes;
+
+    bool containsIndex(const String& name) const
+    {
+        for (IndexMap::const_iterator it = indexes.begin(); it != indexes.end(); ++it) {
+            if (it->value.name == name)
+                return true;
+        }
+        return false;
+    }
+};
 
 struct IDBDatabaseMetadata {
     // FIXME: These can probably be collapsed into 0.
@@ -47,6 +92,8 @@ struct IDBDatabaseMetadata {
         NoIntVersion = -1,
         DefaultIntVersion = 0
     };
+
+    typedef HashMap<int64_t, IDBObjectStoreMetadata> ObjectStoreMap;
 
     IDBDatabaseMetadata()
         : intVersion(NoIntVersion)
@@ -61,48 +108,29 @@ struct IDBDatabaseMetadata {
     {
     }
 
+    int64_t findObjectStore(const String& name) const
+    {
+        for (ObjectStoreMap::const_iterator it = objectStores.begin(); it != objectStores.end(); ++it) {
+            if (it->value.name == name) {
+                ASSERT(it->key != IDBObjectStoreMetadata::InvalidId);
+                return it->key;
+            }
+        }
+        return IDBObjectStoreMetadata::InvalidId;
+    }
+
+    bool containsObjectStore(const String& name) const
+    {
+        return findObjectStore(name) != IDBObjectStoreMetadata::InvalidId;
+    }
+
     String name;
     int64_t id;
     String version;
     int64_t intVersion;
     int64_t maxObjectStoreId;
 
-    typedef HashMap<String, IDBObjectStoreMetadata> ObjectStoreMap;
     ObjectStoreMap objectStores;
-};
-
-struct IDBObjectStoreMetadata {
-    IDBObjectStoreMetadata() { }
-    IDBObjectStoreMetadata(const String& name, int64_t id, const IDBKeyPath& keyPath, bool autoIncrement, int64_t maxIndexId)
-        : name(name)
-        , keyPath(keyPath)
-        , autoIncrement(autoIncrement)
-        , maxIndexId(maxIndexId)
-    {
-    }
-    String name;
-    int64_t id;
-    IDBKeyPath keyPath;
-    bool autoIncrement;
-    int64_t maxIndexId;
-
-    typedef HashMap<String, IDBIndexMetadata> IndexMap;
-    IndexMap indexes;
-};
-
-struct IDBIndexMetadata {
-    IDBIndexMetadata() { }
-    IDBIndexMetadata(const String& name, int64_t id, const IDBKeyPath& keyPath, bool unique, bool multiEntry)
-        : name(name)
-        , id(id)
-        , keyPath(keyPath)
-        , unique(unique)
-        , multiEntry(multiEntry) { }
-    String name;
-    int64_t id;
-    IDBKeyPath keyPath;
-    bool unique;
-    bool multiEntry;
 };
 
 }

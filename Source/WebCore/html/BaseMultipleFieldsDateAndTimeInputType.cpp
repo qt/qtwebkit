@@ -41,9 +41,9 @@
 #include "HTMLInputElement.h"
 #include "HTMLOptionElement.h"
 #include "KeyboardEvent.h"
-#include "Localizer.h"
 #include "Page.h"
 #include "PickerIndicatorElement.h"
+#include "PlatformLocale.h"
 #include "RenderTheme.h"
 #include "ShadowRoot.h"
 #include <wtf/DateMath.h>
@@ -93,9 +93,40 @@ bool BaseMultipleFieldsDateAndTimeInputType::isEditControlOwnerReadOnly() const
     return element()->disabled();
 }
 
+void BaseMultipleFieldsDateAndTimeInputType::focusAndSelectSpinButtonOwner()
+{
+    if (m_dateTimeEditElement)
+        m_dateTimeEditElement->focusIfNoFocus();
+}
+
+bool BaseMultipleFieldsDateAndTimeInputType::shouldSpinButtonRespondToMouseEvents()
+{
+    return !element()->disabled() && !element()->readOnly();
+}
+
+bool BaseMultipleFieldsDateAndTimeInputType::shouldSpinButtonRespondToWheelEvents()
+{
+    if (!shouldSpinButtonRespondToMouseEvents())
+        return false;
+    return m_dateTimeEditElement && m_dateTimeEditElement->hasFocusedField();
+}
+
+void BaseMultipleFieldsDateAndTimeInputType::spinButtonStepDown()
+{
+    if (m_dateTimeEditElement)
+        m_dateTimeEditElement->stepDown();
+}
+
+void BaseMultipleFieldsDateAndTimeInputType::spinButtonStepUp()
+{
+    if (m_dateTimeEditElement)
+        m_dateTimeEditElement->stepUp();
+}
+
 BaseMultipleFieldsDateAndTimeInputType::BaseMultipleFieldsDateAndTimeInputType(HTMLInputElement* element)
     : BaseDateAndTimeInputType(element)
     , m_dateTimeEditElement(0)
+    , m_spinButtonElement(0)
     , m_pickerIndicatorElement(0)
     , m_pickerIndicatorIsVisible(false)
     , m_pickerIndicatorIsAlwaysVisible(false)
@@ -104,6 +135,8 @@ BaseMultipleFieldsDateAndTimeInputType::BaseMultipleFieldsDateAndTimeInputType(H
 
 BaseMultipleFieldsDateAndTimeInputType::~BaseMultipleFieldsDateAndTimeInputType()
 {
+    if (m_spinButtonElement)
+        m_spinButtonElement->removeSpinButtonOwner();
     if (m_dateTimeEditElement)
         m_dateTimeEditElement->removeEditControlOwner();
 }
@@ -135,19 +168,20 @@ void BaseMultipleFieldsDateAndTimeInputType::createShadowSubtree()
     container->appendChild(m_dateTimeEditElement);
     updateInnerTextValue();
 
-#if ENABLE(DATALIST_ELEMENT) || ENABLE(CALENDAR_PICKER)
+    RefPtr<SpinButtonElement> spinButton = SpinButtonElement::create(document, *this);
+    m_spinButtonElement = spinButton.get();
+    container->appendChild(spinButton);
+
     bool shouldAddPickerIndicator = false;
 #if ENABLE(DATALIST_ELEMENT)
     if (InputType::themeSupportsDataListUI(this))
         shouldAddPickerIndicator = true;
 #endif
-#if ENABLE(CALENDAR_PICKER)
     RefPtr<RenderTheme> theme = document->page() ? document->page()->theme() : RenderTheme::defaultTheme();
     if (theme->supportsCalendarPicker(formControlType())) {
         shouldAddPickerIndicator = true;
         m_pickerIndicatorIsAlwaysVisible = true;
     }
-#endif
     if (shouldAddPickerIndicator) {
         RefPtr<PickerIndicatorElement> pickerElement = PickerIndicatorElement::create(document);
         m_pickerIndicatorElement = pickerElement.get();
@@ -155,11 +189,14 @@ void BaseMultipleFieldsDateAndTimeInputType::createShadowSubtree()
         m_pickerIndicatorIsVisible = true;
         updatePickerIndicatorVisibility();
     }
-#endif // ENABLE(DATALIST_ELEMENT) || ENABLE(CALENDAR_PICKER)
 }
 
 void BaseMultipleFieldsDateAndTimeInputType::destroyShadowSubtree()
 {
+    if (m_spinButtonElement) {
+        m_spinButtonElement->removeSpinButtonOwner();
+        m_spinButtonElement = 0;
+    }
     if (m_dateTimeEditElement) {
         m_dateTimeEditElement->removeEditControlOwner();
         m_dateTimeEditElement = 0;
@@ -175,12 +212,19 @@ void BaseMultipleFieldsDateAndTimeInputType::focus(bool)
 
 void BaseMultipleFieldsDateAndTimeInputType::forwardEvent(Event* event)
 {
+    if (m_spinButtonElement) {
+        m_spinButtonElement->forwardEvent(event);
+        if (event->defaultHandled())
+            return;
+    }
+        
     if (m_dateTimeEditElement)
         m_dateTimeEditElement->defaultEventHandler(event);
 }
 
 void BaseMultipleFieldsDateAndTimeInputType::disabledAttributeChanged()
 {
+    m_spinButtonElement->releaseCapture();
     if (m_dateTimeEditElement)
         m_dateTimeEditElement->disabledStateChanged();
 }
@@ -189,11 +233,8 @@ void BaseMultipleFieldsDateAndTimeInputType::handleKeydownEvent(KeyboardEvent* e
 {
     Document* document = element()->document();
     RefPtr<RenderTheme> theme = document->page() ? document->page()->theme() : RenderTheme::defaultTheme();
-    if (theme->shouldOpenPickerWithF4Key() && event->keyIdentifier() == "F4") {
-        if (m_pickerIndicatorElement)
-            m_pickerIndicatorElement->openPopup();
-        event->setDefaultHandled();
-    } else if (m_pickerIndicatorIsVisible && event->keyIdentifier() == "Down" && event->getModifierState("Alt")) {
+    if (m_pickerIndicatorIsVisible
+        && ((event->keyIdentifier() == "Down" && event->getModifierState("Alt")) || (theme->shouldOpenPickerWithF4Key() && event->keyIdentifier() == "F4"))) {
         if (m_pickerIndicatorElement)
             m_pickerIndicatorElement->openPopup();
         event->setDefaultHandled();
@@ -223,6 +264,7 @@ void BaseMultipleFieldsDateAndTimeInputType::minOrMaxAttributeChanged()
 
 void BaseMultipleFieldsDateAndTimeInputType::readonlyAttributeChanged()
 {
+    m_spinButtonElement->releaseCapture();
     if (m_dateTimeEditElement)
         m_dateTimeEditElement->readOnlyStateChanged();
 }
@@ -273,11 +315,11 @@ void BaseMultipleFieldsDateAndTimeInputType::updateInnerTextValue()
     if (!m_dateTimeEditElement)
         return;
 
-    AtomicString direction = element()->localizer().isRTL() ? AtomicString("rtl", AtomicString::ConstructFromLiteral) : AtomicString("ltr", AtomicString::ConstructFromLiteral);
+    AtomicString direction = element()->locale().isRTL() ? AtomicString("rtl", AtomicString::ConstructFromLiteral) : AtomicString("ltr", AtomicString::ConstructFromLiteral);
     if (Element* container = firstElementChild(element()->userAgentShadowRoot()))
         container->setAttribute(HTMLNames::dirAttr, direction);
 
-    DateTimeEditElement::LayoutParameters layoutParameters(element()->localizer(), createStepRange(AnyIsDefaultStep));
+    DateTimeEditElement::LayoutParameters layoutParameters(element()->locale(), createStepRange(AnyIsDefaultStep));
 
     DateComponents date;
     const bool hasValue = parseToDateComponents(element()->value(), &date);
@@ -299,15 +341,12 @@ void BaseMultipleFieldsDateAndTimeInputType::listAttributeTargetChanged()
 }
 #endif
 
-#if ENABLE(DATALIST_ELEMENT) || ENABLE(CALENDAR_PICKER)
 void BaseMultipleFieldsDateAndTimeInputType::updatePickerIndicatorVisibility()
 {
-#if ENABLE(CALENDAR_PICKER)
     if (m_pickerIndicatorIsAlwaysVisible) {
         showPickerIndicator();
         return;
     }
-#endif
 #if ENABLE(DATALIST_ELEMENT)
     if (HTMLDataListElement* dataList = element()->dataList()) {
         RefPtr<HTMLCollection> options = dataList->options();
@@ -339,7 +378,6 @@ void BaseMultipleFieldsDateAndTimeInputType::showPickerIndicator()
     ASSERT(m_pickerIndicatorElement);
     m_pickerIndicatorElement->removeInlineStyleProperty(CSSPropertyDisplay);
 }
-#endif // ENABLE(DATALIST_ELEMENT) || ENABLE(CALENDAR_PICKER)
 
 int BaseMultipleFieldsDateAndTimeInputType::fullYear(const String& source) const
 {

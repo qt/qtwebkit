@@ -2111,107 +2111,6 @@ void SpeculativeJIT::emitBranch(Node& node)
     }
 }
 
-MacroAssembler::JumpList SpeculativeJIT::compileContiguousGetByVal(Node&, GPRReg, GPRReg propertyReg, GPRReg storageReg, GPRReg resultReg)
-{
-    MacroAssembler::JumpList slowCases;
-    slowCases.append(m_jit.branch32(MacroAssembler::AboveOrEqual, propertyReg, MacroAssembler::Address(storageReg, Butterfly::offsetOfPublicLength())));
-    
-    m_jit.load64(MacroAssembler::BaseIndex(storageReg, propertyReg, MacroAssembler::TimesEight), resultReg);
-    slowCases.append(m_jit.branchTest64(MacroAssembler::Zero, resultReg));
-    
-    return slowCases;
-}
-
-MacroAssembler::JumpList SpeculativeJIT::compileArrayStorageGetByVal(Node&, GPRReg, GPRReg propertyReg, GPRReg storageReg, GPRReg resultReg)
-{
-    MacroAssembler::Jump outOfBounds = m_jit.branch32(MacroAssembler::AboveOrEqual, propertyReg, MacroAssembler::Address(storageReg, ArrayStorage::vectorLengthOffset()));
-    
-    m_jit.load64(MacroAssembler::BaseIndex(storageReg, propertyReg, MacroAssembler::TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0])), resultReg);
-    MacroAssembler::Jump hole = m_jit.branchTest64(MacroAssembler::Zero, resultReg);
-    
-    MacroAssembler::JumpList slowCases;
-    slowCases.append(outOfBounds);
-    slowCases.append(hole);
-    return slowCases;
-}
-
-MacroAssembler::JumpList SpeculativeJIT::compileContiguousPutByVal(Node& node, GPRReg, GPRReg propertyReg, GPRReg storageReg, GPRReg valueReg, GPRReg tempReg)
-{
-    Array::Mode arrayMode = node.arrayMode();
-    
-    MacroAssembler::JumpList slowCases;
-    
-    if (!mayStoreToTail(arrayMode)) {
-        speculationCheck(
-            Uncountable, JSValueRegs(), NoNode,
-            m_jit.branch32(MacroAssembler::AboveOrEqual, propertyReg, MacroAssembler::Address(storageReg, Butterfly::offsetOfPublicLength())));
-    } else {
-        MacroAssembler::Jump inBounds = m_jit.branch32(MacroAssembler::Below, propertyReg, MacroAssembler::Address(storageReg, Butterfly::offsetOfPublicLength()));
-
-        slowCases.append(m_jit.branch32(MacroAssembler::AboveOrEqual, propertyReg, MacroAssembler::Address(storageReg, Butterfly::offsetOfVectorLength())));
-        
-        if (isInBoundsAccess(arrayMode))
-            speculationCheck(Uncountable, JSValueRegs(), NoNode, slowCases);
-        
-        m_jit.add32(TrustedImm32(1), propertyReg, tempReg);
-        m_jit.store32(tempReg, MacroAssembler::Address(storageReg, Butterfly::offsetOfPublicLength()));
-
-        inBounds.link(&m_jit);
-    }
-
-    m_jit.store64(valueReg, MacroAssembler::BaseIndex(storageReg, propertyReg, MacroAssembler::TimesEight));
-    
-    if (isInBoundsAccess(arrayMode))
-        return MacroAssembler::JumpList();
-    return slowCases;
-}
-
-MacroAssembler::JumpList SpeculativeJIT::compileArrayStoragePutByVal(Node& node, GPRReg, GPRReg propertyReg, GPRReg storageReg, GPRReg valueReg, GPRReg tempReg)
-{
-    Array::Mode arrayMode = node.arrayMode();
-    
-    MacroAssembler::JumpList slowCases;
-    
-    MacroAssembler::Jump beyondArrayBounds = m_jit.branch32(MacroAssembler::AboveOrEqual, propertyReg, MacroAssembler::Address(storageReg, ArrayStorage::vectorLengthOffset()));
-    if (isInBoundsAccess(arrayMode))
-        speculationCheck(OutOfBounds, JSValueRegs(), NoNode, beyondArrayBounds);
-    else
-        slowCases.append(beyondArrayBounds);
-
-    // Check if we're writing to a hole; if so increment m_numValuesInVector.
-    if (!mayStoreToHole(arrayMode)) {
-        // This is uncountable because if we take this exit, then the baseline JIT
-        // will immediately count the hole store. So there is no need for exit
-        // profiling.
-        speculationCheck(
-            Uncountable, JSValueRegs(), NoNode,
-            m_jit.branchTest64(MacroAssembler::Zero, MacroAssembler::BaseIndex(storageReg, propertyReg, MacroAssembler::TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0]))));
-    } else {
-        MacroAssembler::Jump notHoleValue = m_jit.branchTest64(MacroAssembler::NonZero, MacroAssembler::BaseIndex(storageReg, propertyReg, MacroAssembler::TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0])));
-        if (isSlowPutAccess(arrayMode)) {
-            // This is sort of strange. If we wanted to optimize this code path, we would invert
-            // the above branch. But it's simply not worth it since this only happens if we're
-            // already having a bad time.
-            slowCases.append(m_jit.jump());
-        } else {
-            m_jit.add32(TrustedImm32(1), MacroAssembler::Address(storageReg, ArrayStorage::numValuesInVectorOffset()));
-                
-            // If we're writing to a hole we might be growing the array; 
-            MacroAssembler::Jump lengthDoesNotNeedUpdate = m_jit.branch32(MacroAssembler::Below, propertyReg, MacroAssembler::Address(storageReg, ArrayStorage::lengthOffset()));
-            m_jit.add32(TrustedImm32(1), propertyReg, tempReg);
-            m_jit.store32(tempReg, MacroAssembler::Address(storageReg, ArrayStorage::lengthOffset()));
-                
-            lengthDoesNotNeedUpdate.link(&m_jit);
-        }
-        notHoleValue.link(&m_jit);
-    }
-    
-    // Store the value to the array.
-    m_jit.store64(valueReg, MacroAssembler::BaseIndex(storageReg, propertyReg, MacroAssembler::TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0])));
-    
-    return slowCases;
-}
-
 void SpeculativeJIT::compile(Node& node)
 {
     NodeType op = node.op();
@@ -2673,13 +2572,14 @@ void SpeculativeJIT::compile(Node& node)
         break;
     }
         
-    case Arrayify: {
+    case Arrayify:
+    case ArrayifyToStructure: {
         arrayify(node);
         break;
     }
 
     case GetByVal: {
-        switch (node.arrayMode()) {
+        switch (node.arrayMode().type()) {
         case Array::SelectUsingPredictions:
         case Array::ForceExit:
             ASSERT_NOT_REACHED();
@@ -2698,27 +2598,26 @@ void SpeculativeJIT::compile(Node& node)
             jsValueResult(result.gpr(), m_compileIndex);
             break;
         }
-        case IN_BOUNDS_CONTIGUOUS_MODES: {
-            SpeculateStrictInt32Operand property(this, node.child2());
-            StorageOperand storage(this, node.child3());
+        case Array::Contiguous: {
+            if (node.arrayMode().isInBounds()) {
+                SpeculateStrictInt32Operand property(this, node.child2());
+                StorageOperand storage(this, node.child3());
+                
+                GPRReg propertyReg = property.gpr();
+                GPRReg storageReg = storage.gpr();
+                
+                if (!m_compileOkay)
+                    return;
+                
+                speculationCheck(OutOfBounds, JSValueRegs(), NoNode, m_jit.branch32(MacroAssembler::AboveOrEqual, propertyReg, MacroAssembler::Address(storageReg, Butterfly::offsetOfPublicLength())));
+                
+                GPRTemporary result(this);
+                m_jit.load64(MacroAssembler::BaseIndex(storageReg, propertyReg, MacroAssembler::TimesEight), result.gpr());
+                speculationCheck(OutOfBounds, JSValueRegs(), NoNode, m_jit.branchTest64(MacroAssembler::Zero, result.gpr()));
+                jsValueResult(result.gpr(), m_compileIndex);
+                break;
+            }
             
-            GPRReg propertyReg = property.gpr();
-            GPRReg storageReg = storage.gpr();
-            
-            if (!m_compileOkay)
-                return;
-            
-            speculationCheck(OutOfBounds, JSValueRegs(), NoNode, m_jit.branch32(MacroAssembler::AboveOrEqual, propertyReg, MacroAssembler::Address(storageReg, Butterfly::offsetOfPublicLength())));
-            
-            GPRTemporary result(this);
-            m_jit.load64(MacroAssembler::BaseIndex(storageReg, propertyReg, MacroAssembler::TimesEight), result.gpr());
-            speculationCheck(OutOfBounds, JSValueRegs(), NoNode, m_jit.branchTest64(MacroAssembler::Zero, result.gpr()));
-            jsValueResult(result.gpr(), m_compileIndex);
-            break;
-        }
-        case CONTIGUOUS_TO_TAIL_MODES:
-        case OUT_OF_BOUNDS_CONTIGUOUS_MODES:
-        case ALL_EFFECTFUL_CONTIGUOUS_MODES: {
             SpeculateCellOperand base(this, node.child1());
             SpeculateStrictInt32Operand property(this, node.child2());
             StorageOperand storage(this, node.child3());
@@ -2733,8 +2632,13 @@ void SpeculativeJIT::compile(Node& node)
             GPRTemporary result(this);
             GPRReg resultReg = result.gpr();
             
-            MacroAssembler::JumpList slowCases =
-                compileContiguousGetByVal(node, baseReg, propertyReg, storageReg, resultReg);
+            MacroAssembler::JumpList slowCases;
+            
+            slowCases.append(m_jit.branch32(MacroAssembler::AboveOrEqual, propertyReg, MacroAssembler::Address(storageReg, Butterfly::offsetOfPublicLength())));
+            
+            m_jit.load64(MacroAssembler::BaseIndex(storageReg, propertyReg, MacroAssembler::TimesEight), resultReg);
+            slowCases.append(m_jit.branchTest64(MacroAssembler::Zero, resultReg));
+            
             addSlowPathGenerator(
                 slowPathCall(
                     slowCases, this, operationGetByValArrayInt,
@@ -2743,28 +2647,28 @@ void SpeculativeJIT::compile(Node& node)
             jsValueResult(resultReg, m_compileIndex);
             break;
         }
-        case IN_BOUNDS_ARRAY_STORAGE_MODES: {
-            SpeculateStrictInt32Operand property(this, node.child2());
-            StorageOperand storage(this, node.child3());
+        case Array::ArrayStorage:
+        case Array::SlowPutArrayStorage: {
+            if (node.arrayMode().isInBounds()) {
+                SpeculateStrictInt32Operand property(this, node.child2());
+                StorageOperand storage(this, node.child3());
             
-            GPRReg propertyReg = property.gpr();
-            GPRReg storageReg = storage.gpr();
+                GPRReg propertyReg = property.gpr();
+                GPRReg storageReg = storage.gpr();
             
-            if (!m_compileOkay)
-                return;
+                if (!m_compileOkay)
+                    return;
             
-            speculationCheck(OutOfBounds, JSValueRegs(), NoNode, m_jit.branch32(MacroAssembler::AboveOrEqual, propertyReg, MacroAssembler::Address(storageReg, ArrayStorage::vectorLengthOffset())));
+                speculationCheck(OutOfBounds, JSValueRegs(), NoNode, m_jit.branch32(MacroAssembler::AboveOrEqual, propertyReg, MacroAssembler::Address(storageReg, ArrayStorage::vectorLengthOffset())));
             
-            GPRTemporary result(this);
-            m_jit.load64(MacroAssembler::BaseIndex(storageReg, propertyReg, MacroAssembler::TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0])), result.gpr());
-            speculationCheck(OutOfBounds, JSValueRegs(), NoNode, m_jit.branchTest64(MacroAssembler::Zero, result.gpr()));
+                GPRTemporary result(this);
+                m_jit.load64(MacroAssembler::BaseIndex(storageReg, propertyReg, MacroAssembler::TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0])), result.gpr());
+                speculationCheck(OutOfBounds, JSValueRegs(), NoNode, m_jit.branchTest64(MacroAssembler::Zero, result.gpr()));
             
-            jsValueResult(result.gpr(), m_compileIndex);
-            break;
-        }
-        case OUT_OF_BOUNDS_ARRAY_STORAGE_MODES:
-        case SLOW_PUT_ARRAY_STORAGE_MODES:
-        case ALL_EFFECTFUL_ARRAY_STORAGE_MODES: {
+                jsValueResult(result.gpr(), m_compileIndex);
+                break;
+            }
+
             SpeculateCellOperand base(this, node.child1());
             SpeculateStrictInt32Operand property(this, node.child2());
             StorageOperand storage(this, node.child3());
@@ -2779,8 +2683,13 @@ void SpeculativeJIT::compile(Node& node)
             GPRTemporary result(this);
             GPRReg resultReg = result.gpr();
             
-            MacroAssembler::JumpList slowCases =
-                compileArrayStorageGetByVal(node, baseReg, propertyReg, storageReg, resultReg);
+            MacroAssembler::JumpList slowCases;
+            
+            slowCases.append(m_jit.branch32(MacroAssembler::AboveOrEqual, propertyReg, MacroAssembler::Address(storageReg, ArrayStorage::vectorLengthOffset())));
+    
+            m_jit.load64(MacroAssembler::BaseIndex(storageReg, propertyReg, MacroAssembler::TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0])), resultReg);
+            slowCases.append(m_jit.branchTest64(MacroAssembler::Zero, resultReg));
+    
             addSlowPathGenerator(
                 slowPathCall(
                     slowCases, this, operationGetByValArrayInt,
@@ -2836,10 +2745,10 @@ void SpeculativeJIT::compile(Node& node)
         Edge child3 = m_jit.graph().varArgChild(node, 2);
         Edge child4 = m_jit.graph().varArgChild(node, 3);
         
-        Array::Mode arrayMode = modeForPut(node.arrayMode());
+        ArrayMode arrayMode = node.arrayMode().modeForPut();
         bool alreadyHandled = false;
         
-        switch (arrayMode) {
+        switch (arrayMode.type()) {
         case Array::SelectUsingPredictions:
         case Array::ForceExit:
             ASSERT_NOT_REACHED();
@@ -2879,9 +2788,8 @@ void SpeculativeJIT::compile(Node& node)
         GPRReg baseReg = base.gpr();
         GPRReg propertyReg = property.gpr();
 
-        switch (arrayMode) {
-        case ALL_CONTIGUOUS_MODES:
-        case ALL_EFFECTFUL_CONTIGUOUS_MODES: {
+        switch (arrayMode.type()) {
+        case Array::Contiguous: {
             JSValueOperand value(this, child3);
 
             GPRReg valueReg = value.gpr();
@@ -2910,16 +2818,34 @@ void SpeculativeJIT::compile(Node& node)
             GPRTemporary temporary;
             GPRReg temporaryReg = temporaryRegisterForPutByVal(temporary, node);
 
-            MacroAssembler::JumpList slowCases =
-                compileContiguousPutByVal(
-                    node, baseReg, propertyReg, storageReg, valueReg, temporaryReg);
+            MacroAssembler::JumpList slowCases;
+            
+            if (arrayMode.isInBounds()) {
+                speculationCheck(
+                    Uncountable, JSValueRegs(), NoNode,
+                    m_jit.branch32(MacroAssembler::AboveOrEqual, propertyReg, MacroAssembler::Address(storageReg, Butterfly::offsetOfPublicLength())));
+            } else {
+                MacroAssembler::Jump inBounds = m_jit.branch32(MacroAssembler::Below, propertyReg, MacroAssembler::Address(storageReg, Butterfly::offsetOfPublicLength()));
+                
+                slowCases.append(m_jit.branch32(MacroAssembler::AboveOrEqual, propertyReg, MacroAssembler::Address(storageReg, Butterfly::offsetOfVectorLength())));
+                
+                if (!arrayMode.isOutOfBounds())
+                    speculationCheck(Uncountable, JSValueRegs(), NoNode, slowCases);
+                
+                m_jit.add32(TrustedImm32(1), propertyReg, temporaryReg);
+                m_jit.store32(temporaryReg, MacroAssembler::Address(storageReg, Butterfly::offsetOfPublicLength()));
+                
+                inBounds.link(&m_jit);
+            }
+            
+            m_jit.store64(valueReg, MacroAssembler::BaseIndex(storageReg, propertyReg, MacroAssembler::TimesEight));
 
             base.use();
             property.use();
             value.use();
             storage.use();
             
-            if (!slowCases.empty()) {
+            if (arrayMode.isOutOfBounds()) {
                 addSlowPathGenerator(
                     slowPathCall(
                         slowCases, this,
@@ -2931,8 +2857,8 @@ void SpeculativeJIT::compile(Node& node)
             break;
         }
             
-        case ALL_ARRAY_STORAGE_MODES:
-        case ALL_EFFECTFUL_ARRAY_STORAGE_MODES: {
+        case Array::ArrayStorage:
+        case Array::SlowPutArrayStorage: {
             JSValueOperand value(this, child3);
 
             GPRReg valueReg = value.gpr();
@@ -2961,9 +2887,44 @@ void SpeculativeJIT::compile(Node& node)
             GPRTemporary temporary;
             GPRReg temporaryReg = temporaryRegisterForPutByVal(temporary, node);
 
-            MacroAssembler::JumpList slowCases =
-                compileArrayStoragePutByVal(
-                    node, baseReg, propertyReg, storageReg, valueReg, temporaryReg);
+            MacroAssembler::JumpList slowCases;
+
+            MacroAssembler::Jump beyondArrayBounds = m_jit.branch32(MacroAssembler::AboveOrEqual, propertyReg, MacroAssembler::Address(storageReg, ArrayStorage::vectorLengthOffset()));
+            if (!arrayMode.isOutOfBounds())
+                speculationCheck(OutOfBounds, JSValueRegs(), NoNode, beyondArrayBounds);
+            else
+                slowCases.append(beyondArrayBounds);
+
+            // Check if we're writing to a hole; if so increment m_numValuesInVector.
+            if (arrayMode.isInBounds()) {
+                // This is uncountable because if we take this exit, then the baseline JIT
+                // will immediately count the hole store. So there is no need for exit
+                // profiling.
+                speculationCheck(
+                    Uncountable, JSValueRegs(), NoNode,
+                    m_jit.branchTest64(MacroAssembler::Zero, MacroAssembler::BaseIndex(storageReg, propertyReg, MacroAssembler::TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0]))));
+            } else {
+                MacroAssembler::Jump notHoleValue = m_jit.branchTest64(MacroAssembler::NonZero, MacroAssembler::BaseIndex(storageReg, propertyReg, MacroAssembler::TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0])));
+                if (arrayMode.isSlowPut()) {
+                    // This is sort of strange. If we wanted to optimize this code path, we would invert
+                    // the above branch. But it's simply not worth it since this only happens if we're
+                    // already having a bad time.
+                    slowCases.append(m_jit.jump());
+                } else {
+                    m_jit.add32(TrustedImm32(1), MacroAssembler::Address(storageReg, ArrayStorage::numValuesInVectorOffset()));
+                
+                    // If we're writing to a hole we might be growing the array; 
+                    MacroAssembler::Jump lengthDoesNotNeedUpdate = m_jit.branch32(MacroAssembler::Below, propertyReg, MacroAssembler::Address(storageReg, ArrayStorage::lengthOffset()));
+                    m_jit.add32(TrustedImm32(1), propertyReg, temporaryReg);
+                    m_jit.store32(temporaryReg, MacroAssembler::Address(storageReg, ArrayStorage::lengthOffset()));
+                
+                    lengthDoesNotNeedUpdate.link(&m_jit);
+                }
+                notHoleValue.link(&m_jit);
+            }
+    
+            // Store the value to the array.
+            m_jit.store64(valueReg, MacroAssembler::BaseIndex(storageReg, propertyReg, MacroAssembler::TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0])));
 
             base.use();
             property.use();
@@ -3117,7 +3078,7 @@ void SpeculativeJIT::compile(Node& node)
     }
         
     case ArrayPush: {
-        ASSERT(modeIsJSArray(node.arrayMode()));
+        ASSERT(node.arrayMode().isJSArray());
         
         SpeculateCellOperand base(this, node.child1());
         JSValueOperand value(this, node.child2());
@@ -3135,9 +3096,8 @@ void SpeculativeJIT::compile(Node& node)
         StorageOperand storage(this, node.child3());
         GPRReg storageGPR = storage.gpr();
 
-        switch (node.arrayMode()) {
-        case Array::ArrayWithContiguous:
-        case Array::ArrayWithContiguousOutOfBounds: {
+        switch (node.arrayMode().type()) {
+        case Array::Contiguous: {
             m_jit.load32(MacroAssembler::Address(storageGPR, Butterfly::offsetOfPublicLength()), storageLengthGPR);
             MacroAssembler::Jump slowPath = m_jit.branch32(MacroAssembler::AboveOrEqual, storageLengthGPR, MacroAssembler::Address(storageGPR, Butterfly::offsetOfVectorLength()));
             m_jit.store64(valueGPR, MacroAssembler::BaseIndex(storageGPR, storageLengthGPR, MacroAssembler::TimesEight));
@@ -3154,8 +3114,7 @@ void SpeculativeJIT::compile(Node& node)
             break;
         }
             
-        case Array::ArrayWithArrayStorage:
-        case Array::ArrayWithArrayStorageOutOfBounds: {
+        case Array::ArrayStorage: {
             m_jit.load32(MacroAssembler::Address(storageGPR, ArrayStorage::lengthOffset()), storageLengthGPR);
         
             // Refuse to handle bizarre lengths.
@@ -3187,7 +3146,7 @@ void SpeculativeJIT::compile(Node& node)
     }
         
     case ArrayPop: {
-        ASSERT(modeIsJSArray(node.arrayMode()));
+        ASSERT(node.arrayMode().isJSArray());
 
         SpeculateCellOperand base(this, node.child1());
         StorageOperand storage(this, node.child2());
@@ -3199,9 +3158,8 @@ void SpeculativeJIT::compile(Node& node)
         GPRReg valueGPR = value.gpr();
         GPRReg storageLengthGPR = storageLength.gpr();
         
-        switch (node.arrayMode()) {
-        case Array::ArrayWithContiguous:
-        case Array::ArrayWithContiguousOutOfBounds: {
+        switch (node.arrayMode().type()) {
+        case Array::Contiguous: {
             m_jit.load32(
                 MacroAssembler::Address(storageGPR, Butterfly::offsetOfPublicLength()), storageLengthGPR);
             MacroAssembler::Jump undefinedCase =
@@ -3230,8 +3188,7 @@ void SpeculativeJIT::compile(Node& node)
             break;
         }
             
-        case Array::ArrayWithArrayStorage:
-        case Array::ArrayWithArrayStorageOutOfBounds: {
+        case Array::ArrayStorage: {
             m_jit.load32(MacroAssembler::Address(storageGPR, ArrayStorage::lengthOffset()), storageLengthGPR);
         
             JITCompiler::Jump undefinedCase =
@@ -3873,9 +3830,15 @@ void SpeculativeJIT::compile(Node& node)
         
         ASSERT(node.structureSet().size());
         
+        ExitKind exitKind;
+        if (m_jit.graph()[node.child1()].op() == WeakJSConstant)
+            exitKind = BadWeakConstantCache;
+        else
+            exitKind = BadCache;
+        
         if (node.structureSet().size() == 1) {
             speculationCheckWithConditionalDirection(
-                BadCache, JSValueRegs(base.gpr()), NoNode,
+                exitKind, JSValueRegs(base.gpr()), NoNode,
                 m_jit.branchWeakPtr(
                     JITCompiler::NotEqual,
                     JITCompiler::Address(base.gpr(), JSCell::structureOffset()),
@@ -3892,7 +3855,7 @@ void SpeculativeJIT::compile(Node& node)
                 done.append(m_jit.branchWeakPtr(JITCompiler::Equal, structure.gpr(), node.structureSet()[i]));
             
             speculationCheckWithConditionalDirection(
-                BadCache, JSValueRegs(base.gpr()), NoNode,
+                exitKind, JSValueRegs(base.gpr()), NoNode,
                 m_jit.branchWeakPtr(
                     JITCompiler::NotEqual, structure.gpr(), node.structureSet().last()),
                 node.op() == ForwardCheckStructure);
@@ -3916,7 +3879,8 @@ void SpeculativeJIT::compile(Node& node)
         m_jit.addWeakReference(node.structure());
         node.structure()->addTransitionWatchpoint(
             speculationWatchpointWithConditionalDirection(
-                BadCache, node.op() == ForwardStructureTransitionWatchpoint));
+                m_jit.graph()[node.child1()].op() == WeakJSConstant ? BadWeakConstantCache : BadCache,
+                node.op() == ForwardStructureTransitionWatchpoint));
 
 #if !ASSERT_DISABLED
         SpeculateCellOperand op1(this, node.child1());

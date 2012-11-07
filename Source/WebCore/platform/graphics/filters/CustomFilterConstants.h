@@ -45,6 +45,18 @@ enum CustomFilterMeshConstants {
     TriangleAttribOffset = MeshAttribOffset + MeshAttribSize * sizeof(float)
 };
 
+enum CustomFilterMeshType {
+    MeshTypeAttached,
+    MeshTypeDetached
+};
+
+enum CustomFilterMeshBoxType {
+    MeshBoxTypeFilter,
+    MeshBoxTypeBorder,
+    MeshBoxTypePadding,
+    MeshBoxTypeContent
+};
+
 } // namespace WebCore
 
 #endif // CustomFilterConstants_h

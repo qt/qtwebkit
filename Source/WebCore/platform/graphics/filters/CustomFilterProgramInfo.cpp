@@ -64,11 +64,12 @@ bool CustomFilterProgramInfo::isHashTableDeletedValue() const
         && m_fragmentShaderString.isHashTableDeletedValue();
 }
 
-CustomFilterProgramInfo::CustomFilterProgramInfo(const String& vertexShader, const String& fragmentShader, CustomFilterProgramType programType, const CustomFilterProgramMixSettings& mixSettings)
+CustomFilterProgramInfo::CustomFilterProgramInfo(const String& vertexShader, const String& fragmentShader, CustomFilterProgramType programType, const CustomFilterProgramMixSettings& mixSettings, CustomFilterMeshType meshType)
     : m_vertexShaderString(vertexShader)
     , m_fragmentShaderString(fragmentShader)
     , m_programType(programType)
     , m_mixSettings(mixSettings)
+    , m_meshType(meshType)
 {
     // At least one of the shaders needs to be non-null.
     ASSERT(!m_vertexShaderString.isNull() || !m_fragmentShaderString.isNull());
@@ -78,12 +79,15 @@ unsigned CustomFilterProgramInfo::hash() const
 {
     // At least one of the shaders needs to be non-null.
     ASSERT(!m_vertexShaderString.isNull() || !m_fragmentShaderString.isNull());
-    uintptr_t hashCodes[5] = {
+
+    bool blendsElementTexture = (m_programType == PROGRAM_TYPE_BLENDS_ELEMENT_TEXTURE);
+    uintptr_t hashCodes[6] = {
         hashPossiblyNullString(m_vertexShaderString),
         hashPossiblyNullString(m_fragmentShaderString),
-        m_programType == PROGRAM_TYPE_BLENDS_ELEMENT_TEXTURE,
-        m_programType == PROGRAM_TYPE_BLENDS_ELEMENT_TEXTURE ? m_mixSettings.blendMode : 0,
-        m_programType == PROGRAM_TYPE_BLENDS_ELEMENT_TEXTURE ? m_mixSettings.compositeOperator : 0
+        blendsElementTexture,
+        static_cast<uintptr_t>(blendsElementTexture ? m_mixSettings.blendMode : 0),
+        static_cast<uintptr_t>(blendsElementTexture ? m_mixSettings.compositeOperator : 0),
+        m_meshType
     };
     return StringHasher::hashMemory<sizeof(hashCodes)>(&hashCodes);
 }
@@ -93,15 +97,11 @@ bool CustomFilterProgramInfo::operator==(const CustomFilterProgramInfo& o) const
     ASSERT(!isHashTableDeletedValue());
     ASSERT(!o.isHashTableDeletedValue());
 
-    if (m_programType == PROGRAM_TYPE_BLENDS_ELEMENT_TEXTURE)
-        return m_vertexShaderString == o.m_vertexShaderString
-            && m_fragmentShaderString == o.m_fragmentShaderString
-            && m_programType == o.m_programType
-            && m_mixSettings == o.m_mixSettings;
-
-    return m_vertexShaderString == o.m_vertexShaderString
-        && m_fragmentShaderString == o.m_fragmentShaderString
-        && m_programType == o.m_programType;
+    return m_programType == o.m_programType
+        && (m_programType != PROGRAM_TYPE_BLENDS_ELEMENT_TEXTURE || m_mixSettings == o.m_mixSettings)
+        && m_meshType == o.m_meshType
+        && m_vertexShaderString == o.m_vertexShaderString
+        && m_fragmentShaderString == o.m_fragmentShaderString;
 }
 
 } // namespace WebCore

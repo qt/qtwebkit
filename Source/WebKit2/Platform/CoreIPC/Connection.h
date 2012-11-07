@@ -88,7 +88,7 @@ public:
     class Client : public MessageReceiver {
     public:
         virtual void didClose(Connection*) = 0;
-        virtual void didReceiveInvalidMessage(Connection*, MessageID) = 0;
+        virtual void didReceiveInvalidMessage(Connection*, StringReference messageReceiverName, StringReference messageName) = 0;
 
 #if PLATFORM(WIN)
         virtual Vector<HWND> windowsToReceiveSentMessagesWhileWaitingForSyncReply() = 0;
@@ -190,11 +190,6 @@ public:
     PassOwnPtr<MessageDecoder> sendSyncMessage(MessageID, uint64_t syncRequestID, PassOwnPtr<MessageEncoder>, double timeout, unsigned syncSendFlags = 0);
     bool sendSyncReply(PassOwnPtr<MessageEncoder>);
 
-    // FIXME: These variants of send, sendSync and waitFor are all deprecated.
-    // All clients should move to the overloads that take a message type.
-    template<typename E, typename T> bool deprecatedSend(E messageID, uint64_t destinationID, const T& arguments);
-    template<typename E, typename T, typename U> bool deprecatedSendSync(E messageID, uint64_t destinationID, const T& arguments, const U& reply, double timeout = NoTimeout);
-    
     void wakeUpRunLoop();
 
     void incrementDispatchMessageMarkedDispatchWhenWaitingForSyncReplyCount() { ++m_inDispatchMessageMarkedDispatchWhenWaitingForSyncReplyCount; }
@@ -402,6 +397,8 @@ private:
 
 template<typename T> bool Connection::send(const T& message, uint64_t destinationID, unsigned messageSendFlags)
 {
+    COMPILE_ASSERT(!T::isSync, AsyncMessageExpected);
+
     OwnPtr<MessageEncoder> encoder = MessageEncoder::create(T::receiverName(), T::name(), destinationID);
     encoder->encode(message);
     
@@ -410,6 +407,8 @@ template<typename T> bool Connection::send(const T& message, uint64_t destinatio
 
 template<typename T> bool Connection::sendSync(const T& message, const typename T::Reply& reply, uint64_t destinationID, double timeout, unsigned syncSendFlags)
 {
+    COMPILE_ASSERT(T::isSync, SyncMessageExpected);
+
     uint64_t syncRequestID = 0;
     OwnPtr<MessageEncoder> encoder = createSyncMessageEncoder(T::receiverName(), T::name(), destinationID, syncRequestID);
     
@@ -434,35 +433,6 @@ template<typename T> bool Connection::waitForAndDispatchImmediately(uint64_t des
     ASSERT(decoder->destinationID() == destinationID);
     m_client->didReceiveMessage(this, MessageID(T::messageID), *decoder);
     return true;
-}
-
-// These three member functions are all deprecated.
-
-template<typename E, typename T, typename U>
-inline bool Connection::deprecatedSendSync(E messageID, uint64_t destinationID, const T& arguments, const U& reply, double timeout)
-{
-    uint64_t syncRequestID = 0;
-    OwnPtr<MessageEncoder> encoder = createSyncMessageEncoder(CoreIPC::MessageKindTraits<E>::messageReceiverName(), "", destinationID, syncRequestID);
-
-    // Encode the input arguments.
-    encoder->encode(arguments);
-    
-    // Now send the message and wait for a reply.
-    OwnPtr<MessageDecoder> replyDecoder = sendSyncMessage(MessageID(messageID), syncRequestID, encoder.release(), timeout);
-    if (!replyDecoder)
-        return false;
-    
-    // Decode the reply.
-    return replyDecoder->decode(const_cast<U&>(reply));
-}
-
-template<typename E, typename T>
-bool Connection::deprecatedSend(E messageID, uint64_t destinationID, const T& arguments)
-{
-    OwnPtr<MessageEncoder> encoder = MessageEncoder::create(CoreIPC::MessageKindTraits<E>::messageReceiverName(), "", destinationID);
-    encoder->encode(arguments);
-
-    return sendMessage(MessageID(messageID), encoder.release());
 }
 
 } // namespace CoreIPC

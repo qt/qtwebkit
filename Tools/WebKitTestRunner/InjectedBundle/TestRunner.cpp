@@ -839,6 +839,11 @@ void TestRunner::queueBackNavigation(unsigned howFarBackward)
     InjectedBundle::shared().queueBackNavigation(howFarBackward);
 }
 
+void TestRunner::queueForwardNavigation(unsigned howFarForward)
+{
+    InjectedBundle::shared().queueForwardNavigation(howFarForward);
+}
+
 void TestRunner::queueLoad(JSStringRef url, JSStringRef target)
 {
     WKRetainPtr<WKURLRef> baseURLWK(AdoptWK, WKBundleFrameCopyURL(WKBundlePageGetMainFrame(InjectedBundle::shared().page()->page())));
@@ -846,6 +851,15 @@ void TestRunner::queueLoad(JSStringRef url, JSStringRef target)
     WKRetainPtr<WKStringRef> urlStringWK(AdoptWK, WKURLCopyString(urlWK.get()));
 
     InjectedBundle::shared().queueLoad(urlStringWK.get(), toWK(target).get());
+}
+
+void TestRunner::queueLoadHTMLString(JSStringRef content, JSStringRef baseURL, JSStringRef unreachableURL)
+{
+    WKRetainPtr<WKStringRef> contentWK = toWK(content);
+    WKRetainPtr<WKStringRef> baseURLWK = baseURL ? toWK(baseURL) : WKRetainPtr<WKStringRef>();
+    WKRetainPtr<WKStringRef> unreachableURLWK = unreachableURL ? toWK(unreachableURL) : WKRetainPtr<WKStringRef>();
+
+    InjectedBundle::shared().queueLoadHTMLString(contentWK.get(), baseURLWK.get(), unreachableURLWK.get());
 }
 
 void TestRunner::queueReload()

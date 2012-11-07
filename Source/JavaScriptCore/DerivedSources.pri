@@ -40,6 +40,13 @@ LLINT_DEPENDENCY = \
     $$PWD/llint/LowLevelInterpreter64.asm \
     $$LLINT_ASSEMBLER
 
+DISASSEMBLER_FILES = \
+    disassembler/udis86/optable.xml
+
+DISASSEMBLER_DEPENDENCY = \
+    $$PWD/disassembler/udis86/ud_opcode.py \
+    $$PWD/disassembler/udis86/ud_optable.py
+
 # GENERATOR 1-A: LUT creator
 lut.output = ${QMAKE_FILE_BASE}.lut.h
 lut.input = LUT_FILES
@@ -88,7 +95,7 @@ klgen.input = KEYWORDLUT_FILES
 klgen.commands = python $$klgen.script ${QMAKE_FILE_NAME} > ${QMAKE_FILE_OUT}
 GENERATORS += klgen
 
-EXTRACTOR_BINARY = LLIntOffsetsExtractor$$EXEEXT
+EXTRACTOR_BINARY = LLIntOffsetsExtractor$$BIN_EXTENSION
 DIRS = $$OUT_PWD $$OUT_PWD/debug $$OUT_PWD/release
 for(dir, DIRS) {
     file = $$dir/$$EXTRACTOR_BINARY
@@ -103,4 +110,15 @@ if(linux-*|win32):!equals(QT_ARCH, "arm") {
     llint.depends = $$LLINT_DEPENDENCY
     llint.commands = ruby $$llint.script $$LLINT_ASSEMBLER ${QMAKE_FILE_IN} ${QMAKE_FILE_OUT}
     GENERATORS += llint
+}
+
+linux-*:if(isEqual(QT_ARCH, "i386")|isEqual(QT_ARCH, "x86_64")) {
+    # GENERATOR: disassembler
+    disassembler.output = udis86_itab.c
+    disassembler.input = DISASSEMBLER_FILES
+    disassembler.script = $$PWD/disassembler/udis86/itab.py
+    disassembler.depends = $$DISASSEMBLER_DEPENDENCY
+    disassembler.commands = python $$disassembler.script ${QMAKE_FILE_NAME} --outputDir ${QMAKE_FUNC_FILE_OUT_PATH}
+    disassembler.CONFIG += no_link
+    GENERATORS += disassembler
 }

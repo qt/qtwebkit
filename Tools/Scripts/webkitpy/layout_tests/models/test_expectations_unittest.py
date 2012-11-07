@@ -80,7 +80,8 @@ Bug(test) failures/expected/image.html [ WontFix Mac ]
         if overrides:
             expectations_dict['overrides'] = overrides
         self._port.expectations_dict = lambda: expectations_dict
-        self._exp = TestExpectations(self._port, self.get_basic_tests(), is_lint_mode)
+        expectations_to_lint = expectations_dict if is_lint_mode else None
+        self._exp = TestExpectations(self._port, self.get_basic_tests(), expectations_to_lint=expectations_to_lint)
 
     def assert_exp(self, test, result):
         self.assertEquals(self._exp.get_expectations(self.get_test(test)),
@@ -183,6 +184,15 @@ class MiscTests(Base):
                         "expectations:2 Path does not exist. non-existent-test.html")
             self.assertEqual(str(e), warnings)
 
+    def test_parse_warnings_are_logged_if_not_in_lint_mode(self):
+        oc = OutputCapture()
+        try:
+            oc.capture_output()
+            self.parse_exp('-- this should be a syntax error', is_lint_mode=False)
+        finally:
+            _, _, logs = oc.restore_output()
+            self.assertNotEquals(logs, '')
+
     def test_error_on_different_platform(self):
         # parse_exp uses a Windows port. Assert errors on Mac show up in lint mode.
         self.assertRaises(ParseError, self.parse_exp,
@@ -247,7 +257,8 @@ class SkippedTests(Base):
             expectations_dict['overrides'] = overrides
         port.expectations_dict = lambda: expectations_dict
         port.skipped_layout_tests = lambda tests: set(skips)
-        exp = TestExpectations(port, ['failures/expected/text.html'], lint)
+        expectations_to_lint = expectations_dict if lint else None
+        exp = TestExpectations(port, ['failures/expected/text.html'], expectations_to_lint=expectations_to_lint)
 
         # Check that the expectation is for BUG_DUMMY SKIP : ... [ Pass ]
         self.assertEquals(exp.get_modifiers('failures/expected/text.html'),

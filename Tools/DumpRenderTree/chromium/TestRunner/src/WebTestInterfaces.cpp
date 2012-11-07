@@ -63,10 +63,12 @@ public:
     virtual void setEditCommand(const std::string& name, const std::string& value);
     virtual WebContextMenuData* lastContextMenuData() const;
     virtual void setGamepadData(const WebGamepads&);
-    virtual void printMessage(const std::string& message) const;
+    virtual void printMessage(const std::string& message);
     virtual void postTask(WebTask*);
     virtual void postDelayedTask(WebTask*, long long ms);
     virtual WebString registerIsolatedFileSystem(const WebVector<WebString>& absoluteFilenames);
+    virtual long long getCurrentTimeInMillisecond();
+    virtual WebKit::WebString getAbsoluteWebStringFromUTF8Path(const std::string& path);
 
 private:
     TestInterfaces m_interfaces;
@@ -127,7 +129,7 @@ void WebTestInterfaces::Internal::setGamepadData(const WebGamepads& pads)
     m_delegate->setGamepadData(pads);
 }
 
-void WebTestInterfaces::Internal::printMessage(const std::string& message) const
+void WebTestInterfaces::Internal::printMessage(const std::string& message)
 {
     m_delegate->printMessage(message);
 }
@@ -145,6 +147,16 @@ void WebTestInterfaces::Internal::postDelayedTask(WebTask* task, long long ms)
 WebString WebTestInterfaces::Internal::registerIsolatedFileSystem(const WebVector<WebString>& absoluteFilenames)
 {
     return m_delegate->registerIsolatedFileSystem(absoluteFilenames);
+}
+
+long long WebTestInterfaces::Internal::getCurrentTimeInMillisecond()
+{
+    return m_delegate->getCurrentTimeInMillisecond();
+}
+
+WebKit::WebString WebTestInterfaces::Internal::getAbsoluteWebStringFromUTF8Path(const std::string& path)
+{
+    return m_delegate->getAbsoluteWebStringFromUTF8Path(path);
 }
 
 WebTestInterfaces::WebTestInterfaces()

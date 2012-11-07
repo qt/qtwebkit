@@ -67,7 +67,7 @@ public:
 
     // From IDBFactor.deleteDatabase(), IDBObjectStore/IDBIndex.get(), IDBObjectStore.delete(), IDBObjectStore.clear()
     virtual void onSuccess() = 0;
-    
+
     // From IDBCursor.advance()/continue()
     virtual void onSuccess(PassRefPtr<IDBKey>, PassRefPtr<IDBKey> primaryKey, PassRefPtr<SerializedScriptValue>) = 0;
     // From IDBCursor.advance()/continue()

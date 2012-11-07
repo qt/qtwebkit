@@ -20,14 +20,18 @@
 #ifndef ewk_context_private_h
 #define ewk_context_private_h
 
+#include "DownloadManagerEfl.h"
 #include "WKAPICast.h"
 #include "WKRetainPtr.h"
-#include "ewk_context_history_client_private.h"
+#include "ewk_context.h"
+#include "ewk_object_private.h"
 
-class Ewk_Download_Job;
-class Ewk_Url_Scheme_Request;
 class Ewk_Cookie_Manager;
 class Ewk_Favicon_Database;
+
+namespace WebKit {
+class ContextHistoryClientEfl;
+class RequestManagerClientEfl;
 #if ENABLE(BATTERY_STATUS)
 class BatteryProvider;
 #endif
@@ -37,25 +41,33 @@ class NetworkInfoProvider;
 #if ENABLE(VIBRATION)
 class VibrationProvider;
 #endif
+}
 
-class Ewk_Context : public RefCounted<Ewk_Context> {
+class EwkContext : public Ewk_Object {
 public:
-    static PassRefPtr<Ewk_Context> create(WKContextRef context);
-    static PassRefPtr<Ewk_Context> create();
-    static PassRefPtr<Ewk_Context> create(const String& injectedBundlePath);
+    EWK_OBJECT_DECLARE(EwkContext)
 
-    static PassRefPtr<Ewk_Context> defaultContext();
+    static PassRefPtr<EwkContext> create(WKContextRef context);
+    static PassRefPtr<EwkContext> create();
+    static PassRefPtr<EwkContext> create(const String& injectedBundlePath);
 
-    ~Ewk_Context();
+    static PassRefPtr<EwkContext> defaultContext();
+
+    ~EwkContext();
 
     Ewk_Cookie_Manager* cookieManager();
 
+    Ewk_Database_Manager* databaseManager();
+
+    bool setFaviconDatabaseDirectoryPath(const String& databaseDirectory);
     Ewk_Favicon_Database* faviconDatabase();
 
-    bool registerURLScheme(const String& scheme, Ewk_Url_Scheme_Request_Cb callback, void* userData);
+    Ewk_Storage_Manager* storageManager() const;
+
+    WebKit::RequestManagerClientEfl* requestManager();
 
 #if ENABLE(VIBRATION)
-    PassRefPtr<VibrationProvider> vibrationProvider();
+    PassRefPtr<WebKit::VibrationProvider> vibrationProvider();
 #endif
 
     void addVisitedLink(const String& visitedURL);
@@ -66,41 +78,34 @@ public:
 
     WKContextRef wkContext();
 
-    WKSoupRequestManagerRef requestManager();
+    WebKit::DownloadManagerEfl* downloadManager() const;
 
-    void urlSchemeRequestReceived(Ewk_Url_Scheme_Request*);
-
-    void addDownloadJob(Ewk_Download_Job*);
-    Ewk_Download_Job* downloadJob(uint64_t downloadId);
-    void removeDownloadJob(uint64_t downloadId);
-
-    const Ewk_Context_History_Client& historyClient() const  { return m_historyClient; }
-    Ewk_Context_History_Client& historyClient() { return m_historyClient; }
+    WebKit::ContextHistoryClientEfl* historyClient();
 
 private:
-    explicit Ewk_Context(WKContextRef);
+    explicit EwkContext(WKContextRef);
+
+    void ensureFaviconDatabase();
 
     WKRetainPtr<WKContextRef> m_context;
 
     OwnPtr<Ewk_Cookie_Manager> m_cookieManager;
+    OwnPtr<Ewk_Database_Manager> m_databaseManager;
     OwnPtr<Ewk_Favicon_Database> m_faviconDatabase;
+    OwnPtr<Ewk_Storage_Manager> m_storageManager;
 #if ENABLE(BATTERY_STATUS)
-    RefPtr<BatteryProvider> m_batteryProvider;
+    RefPtr<WebKit::BatteryProvider> m_batteryProvider;
 #endif
 #if ENABLE(NETWORK_INFO)
-    RefPtr<NetworkInfoProvider> m_networkInfoProvider;
+    RefPtr<WebKit::NetworkInfoProvider> m_networkInfoProvider;
 #endif
 #if ENABLE(VIBRATION)
-    RefPtr<VibrationProvider> m_vibrationProvider;
+    RefPtr<WebKit::VibrationProvider> m_vibrationProvider;
 #endif
-    HashMap<uint64_t, RefPtr<Ewk_Download_Job> > m_downloadJobs;
+    OwnPtr<WebKit::DownloadManagerEfl> m_downloadManager;
+    OwnPtr<WebKit::RequestManagerClientEfl> m_requestManagerClient;
 
-    WKRetainPtr<WKSoupRequestManagerRef> m_requestManager;
-
-    typedef HashMap<String, class Ewk_Url_Scheme_Handler> URLSchemeHandlerMap;
-    URLSchemeHandlerMap m_urlSchemeHandlers;
-
-    Ewk_Context_History_Client m_historyClient;
+    OwnPtr<WebKit::ContextHistoryClientEfl> m_historyClient;
 };
 
 #endif // ewk_context_private_h

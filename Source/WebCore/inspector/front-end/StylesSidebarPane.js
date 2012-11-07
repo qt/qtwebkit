@@ -93,7 +93,8 @@ WebInspector.StylesSidebarPane = function(computedStylePane, setPseudoClassCallb
     this._sectionsContainer = document.createElement("div");
     this.bodyElement.appendChild(this._sectionsContainer);
 
-    this._spectrum = new WebInspector.Spectrum();
+    this._spectrumHelper = new WebInspector.SpectrumPopupHelper();
+    this._linkifier = new WebInspector.Linkifier(new WebInspector.Linkifier.DefaultCSSFormatter());
 
     WebInspector.cssModel.addEventListener(WebInspector.CSSStyleModel.Events.StyleSheetChanged, this._styleSheetOrMediaQueryResultChanged, this);
     WebInspector.cssModel.addEventListener(WebInspector.CSSStyleModel.Events.MediaQueryResultChanged, this._styleSheetOrMediaQueryResultChanged, this);
@@ -130,14 +131,22 @@ WebInspector.StylesSidebarPane.canonicalPropertyName = function(name)
     return match[1];
 }
 
+WebInspector.StylesSidebarPane.createExclamationMark = function(propertyName)
+{
+    var exclamationElement = document.createElement("img");
+    exclamationElement.className = "exclamation-mark";
+    exclamationElement.title = WebInspector.CSSCompletions.cssPropertiesMetainfo.keySet()[propertyName.toLowerCase()] ? WebInspector.UIString("Invalid property value.") : WebInspector.UIString("Unknown property name.");
+    return exclamationElement;
+}
+
 WebInspector.StylesSidebarPane.prototype = {
     _contextMenuEventFired: function(event)
     {
         // We start editing upon click -> default navigation to resources panel is not available
         // Hence we add a soft context menu for hrefs.
-        var contextMenu = new WebInspector.ContextMenu();
+        var contextMenu = new WebInspector.ContextMenu(event);
         contextMenu.appendApplicableItems(event.target);
-        contextMenu.show(event);
+        contextMenu.show();
     },
 
     get _forcedPseudoClasses()
@@ -161,8 +170,7 @@ WebInspector.StylesSidebarPane.prototype = {
 
     update: function(node, forceUpdate)
     {
-        if (this._spectrum.visible)
-            this._spectrum.hide(false);
+        this._spectrumHelper.hide();
 
         var refresh = false;
 
@@ -353,6 +361,7 @@ WebInspector.StylesSidebarPane.prototype = {
     {
         this._sectionsContainer.removeChildren();
         this._computedStylePane.bodyElement.removeChildren();
+        this._linkifier.reset();
 
         var styleRules = this._rebuildStyleRules(node, styles);
         var usedProperties = {};
@@ -785,8 +794,7 @@ WebInspector.StylesSidebarPane.prototype = {
 
     willHide: function()
     {
-        if (this._spectrum.visible)
-            this._spectrum.hide(false);
+        this._spectrumHelper.hide();
     },
 
     __proto__: WebInspector.SidebarPane.prototype
@@ -1191,13 +1199,8 @@ WebInspector.StylePropertiesSection.prototype = {
             return link;
         }
 
-        if (this.styleRule.sourceURL) {
-            var uiLocation = this.rule.uiLocation();
-            if (uiLocation)
-                return linkifyUncopyable(uiLocation.url(), uiLocation.lineNumber);
-            else
-                return linkifyUncopyable(this.styleRule.sourceURL, this.rule.sourceLine);
-        }
+        if (this.styleRule.sourceURL)
+            return this._parentPane._linkifier.linkifyCSSRuleLocation(this.rule) || linkifyUncopyable(this.styleRule.sourceURL, this.rule.sourceLine);
 
         if (!this.rule)
             return document.createTextNode("");
@@ -1232,6 +1235,9 @@ WebInspector.StylePropertiesSection.prototype = {
     _handleEmptySpaceClick: function(event)
     {
         if (!this.editable)
+            return;
+
+        if (!window.getSelection().isCollapsed)
             return;
 
         if (this._checkWillCancelEditing())
@@ -1456,8 +1462,10 @@ WebInspector.ComputedStylePropertiesSection.prototype = {
                     treeElement.appendChild(childElement);
                     if (property.inactive || section.isPropertyOverloaded(property.name))
                         childElement.listItemElement.addStyleClass("overloaded");
-                    if (!property.parsedOk)
+                    if (!property.parsedOk) {
                         childElement.listItemElement.addStyleClass("not-parsed-ok");
+                        childElement.listItemElement.insertBefore(WebInspector.StylesSidebarPane.createExclamationMark(property.name), childElement.listItemElement.firstChild);
+                    }
                 }
             }
         }
@@ -1759,32 +1767,21 @@ WebInspector.StylePropertyTreeElement.prototype = {
 
                 var format = getFormat();
                 var hasSpectrum = self._parentPane;
-                var spectrum = hasSpectrum ? self._parentPane._spectrum : null;
+                var spectrumHelper = hasSpectrum ? self._parentPane._spectrumHelper : null;
+                var spectrum = spectrumHelper ? spectrumHelper.spectrum() : null;
 
-                var swatchElement = document.createElement("span");
-                var swatchInnerElement = swatchElement.createChild("span", "swatch-inner");
-                swatchElement.title = WebInspector.UIString("Click to open a colorpicker. Shift-click to change color format");
-
-                swatchElement.className = "swatch";
-
-                swatchElement.addEventListener("mousedown", consumeEvent, false);
-                swatchElement.addEventListener("click", swatchClick, false);
-                swatchElement.addEventListener("dblclick", consumeEvent, false);
-
-                swatchInnerElement.style.backgroundColor = text;
+                var colorSwatch = new WebInspector.ColorSwatch();
+                colorSwatch.setColorString(text);
+                colorSwatch.element.addEventListener("click", swatchClick, false);
 
                 var scrollerElement = hasSpectrum ? self._parentPane._computedStylePane.element.parentElement : null;
 
                 function spectrumChanged(e)
                 {
                     color = e.data;
-
                     var colorString = color.toString();
-
                     colorValueElement.textContent = colorString;
-                    spectrum.displayText = colorString;
-                    swatchInnerElement.style.backgroundColor = colorString;
-
+                    colorSwatch.setColorString(colorString);
                     self.applyStyleText(nameElement.textContent + ": " + valueElement.textContent, false, false, false);
                 }
 
@@ -1795,7 +1792,7 @@ WebInspector.StylePropertyTreeElement.prototype = {
                     var propertyText = !commitEdit && self.originalPropertyText ? self.originalPropertyText : (nameElement.textContent + ": " + valueElement.textContent);
                     self.applyStyleText(propertyText, true, true, false);
                     spectrum.removeEventListener(WebInspector.Spectrum.Events.ColorChanged, spectrumChanged);
-                    spectrum.removeEventListener(WebInspector.Spectrum.Events.Hidden, spectrumHidden);
+                    spectrumHelper.removeEventListener(WebInspector.SpectrumPopupHelper.Events.Hidden, spectrumHidden);
 
                     delete self._parentPane._isEditingStyle;
                     delete self.originalPropertyText;
@@ -1803,24 +1800,24 @@ WebInspector.StylePropertyTreeElement.prototype = {
 
                 function repositionSpectrum()
                 {
-                    spectrum.reposition(swatchElement);
+                    spectrumHelper.reposition(colorSwatch.element);
                 }
 
                 function swatchClick(e)
                 {
                     // Shift + click toggles color formats.
                     // Click opens colorpicker, only if the element is not in computed styles section.
-                    if (!spectrum || e.shiftKey)
+                    if (!spectrumHelper || e.shiftKey)
                         changeColorDisplay(e);
                     else {
-                        var visible = spectrum.toggle(swatchElement, color, format);
+                        var visible = spectrumHelper.toggle(colorSwatch.element, color, format);
 
                         if (visible) {
                             spectrum.displayText = color.toString(format);
                             self.originalPropertyText = self.property.propertyText;
                             self._parentPane._isEditingStyle = true;
                             spectrum.addEventListener(WebInspector.Spectrum.Events.ColorChanged, spectrumChanged);
-                            spectrum.addEventListener(WebInspector.Spectrum.Events.Hidden, spectrumHidden);
+                            spectrumHelper.addEventListener(WebInspector.SpectrumPopupHelper.Events.Hidden, spectrumHidden);
 
                             scrollerElement.addEventListener("scroll", repositionSpectrum, false);
                         }
@@ -1907,7 +1904,7 @@ WebInspector.StylePropertyTreeElement.prototype = {
                 }
 
                 var container = document.createElement("nobr");
-                container.appendChild(swatchElement);
+                container.appendChild(colorSwatch.element);
                 container.appendChild(colorValueElement);
                 return container;
             }
@@ -1940,10 +1937,7 @@ WebInspector.StylePropertyTreeElement.prototype = {
             this.listItemElement.addStyleClass("not-parsed-ok");
 
             // Add a separate exclamation mark IMG element with a tooltip.
-            var exclamationElement = document.createElement("img");
-            exclamationElement.className = "exclamation-mark";
-            exclamationElement.title = WebInspector.CSSCompletions.cssPropertiesMetainfo.keySet()[this.property.name.toLowerCase()] ? WebInspector.UIString("Invalid property value.") : WebInspector.UIString("Unknown property name.");
-            this.listItemElement.insertBefore(exclamationElement, this.listItemElement.firstChild);
+            this.listItemElement.insertBefore(WebInspector.StylesSidebarPane.createExclamationMark(this.property.name), this.listItemElement.firstChild);
         }
         if (this.property.inactive)
             this.listItemElement.addStyleClass("inactive");
@@ -2048,6 +2042,9 @@ WebInspector.StylePropertyTreeElement.prototype = {
 
     _mouseClick: function(event)
     {
+        if (!window.getSelection().isCollapsed)
+            return;
+
         event.consume(true);
 
         if (event.target === this.listItemElement) {

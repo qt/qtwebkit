@@ -326,9 +326,8 @@ void GraphicsContext::drawNativeImage(NativeImagePtr imagePtr, const FloatSize& 
 
     setPlatformCompositeOperation(op);
 
-    // Flip the coords.
-    CGContextTranslateCTM(context, adjustedDestRect.x(), adjustedDestRect.maxY());
-    CGContextScaleCTM(context, 1, -1);
+    // ImageOrientation expects the origin to be at (0, 0)
+    CGContextTranslateCTM(context, adjustedDestRect.x(), adjustedDestRect.y());
     adjustedDestRect.setLocation(FloatPoint());
 
     if (orientation != DefaultImageOrientation) {
@@ -340,6 +339,10 @@ void GraphicsContext::drawNativeImage(NativeImagePtr imagePtr, const FloatSize& 
         }
     }
     
+    // Flip the coords.
+    CGContextTranslateCTM(context, 0, adjustedDestRect.height());
+    CGContextScaleCTM(context, 1, -1);
+
     // Adjust the color space.
     image = Image::imageWithColorSpace(image.get(), styleColorSpace);
 
@@ -485,7 +488,7 @@ void GraphicsContext::drawLine(const IntPoint& point1, const IntPoint& point2)
             }
         }
 
-        const CGFloat dottedLine[2] = { patWidth, patWidth };
+        const CGFloat dottedLine[2] = { static_cast<CGFloat>(patWidth), static_cast<CGFloat>(patWidth) };
         CGContextSetLineDash(context, patternOffset, dottedLine, 2);
     }
 
@@ -593,7 +596,7 @@ void GraphicsContext::strokeArc(const IntRect& rect, int startAngle, int angleSp
             }
         }
 
-        const CGFloat dottedLine[2] = { patWidth, patWidth };
+        const CGFloat dottedLine[2] = { static_cast<CGFloat>(patWidth), static_cast<CGFloat>(patWidth) };
         CGContextSetLineDash(context, patternOffset, dottedLine, 2);
     }
 
@@ -1057,7 +1060,12 @@ void GraphicsContext::clipOut(const IntRect& rect)
     if (paintingDisabled())
         return;
 
-    CGRect rects[2] = { CGContextGetClipBoundingBox(platformContext()), rect };
+    // FIXME: Using CGRectInfinite is much faster than getting the clip bounding box. However, due
+    // to <rdar://problem/12584492>, CGRectInfinite can't be used with an accelerated context that
+    // has certain transforms that aren't just a translation or a scale.
+    const AffineTransform& ctm = getCTM();
+    bool canUseCGRectInfinite = !isAcceleratedContext() || (!ctm.b() && !ctm.c());
+    CGRect rects[2] = { canUseCGRectInfinite ? CGRectInfinite : CGContextGetClipBoundingBox(platformContext()), rect };
     CGContextBeginPath(platformContext());
     CGContextAddRects(platformContext(), rects, 2);
     CGContextEOClip(platformContext());

@@ -25,8 +25,6 @@
 #include <Elementary.h>
 #include <Evas.h>
 
-static const int DEFAULT_WIDTH = 800;
-static const int DEFAULT_HEIGHT = 600;
 static const char DEFAULT_URL[] = "http://www.google.com/";
 static const char APP_NAME[] = "EFL MiniBrowser";
 static const int TOOL_BAR_ICON_SIZE = 24;
@@ -42,6 +40,8 @@ static int verbose = 1;
 static Eina_List *windows = NULL;
 static char *evas_engine_name = NULL;
 static Eina_Bool frame_flattening_enabled = EINA_FALSE;
+static int window_width = 800;
+static int window_height = 600;
 
 static Ewk_View_Smart_Class* miniBrowserViewSmartClass()
 {
@@ -67,6 +67,8 @@ static const Ecore_Getopt options = {
     EINA_TRUE, {
         ECORE_GETOPT_STORE_STR
             ('e', "engine", "ecore-evas engine to use."),
+        ECORE_GETOPT_STORE_STR
+            ('s', "window-size", "window size in following format (width)x(height)."),
         ECORE_GETOPT_CALLBACK_NOARGS
             ('E', "list-engines", "list ecore-evas engines.",
              ecore_getopt_callback_ecore_evas_list_engines, NULL),
@@ -163,6 +165,13 @@ on_key_down(void *data, Evas *e, Evas_Object *obj, void *event_info)
     } else if (!strcmp(ev->key, "F6")) {
         info("Stop (F6) was pressed, stop loading.\n");
         ewk_view_stop(obj);
+    } else if  (!strcmp(ev->key, "F7")) {
+        Ewk_Pagination_Mode mode =  ewk_view_pagination_mode_get(obj);
+        mode = (++mode) % (EWK_PAGINATION_MODE_BOTTOM_TO_TOP + 1);
+        if (ewk_view_pagination_mode_set(obj, mode))
+            info("Change Pagination Mode (F7) was pressed, changed to: %d\n", mode);
+        else
+            info("Change Pagination Mode (F7) was pressed, but NOT changed!");
     } else if (!strcmp(ev->key, "n") && ctrlPressed) {
         info("Create new window (Ctrl+n) was pressed.\n");
         Browser_Window *window = window_create(DEFAULT_URL);
@@ -231,7 +240,11 @@ static void
 on_url_changed(void *user_data, Evas_Object *webview, void *event_info)
 {
     Browser_Window *window = (Browser_Window *)user_data;
-    elm_entry_entry_set(window->url_bar, ewk_view_url_get(window->webview));
+
+    char *url = elm_entry_utf8_to_markup(ewk_view_url_get(window->webview));
+    elm_entry_entry_set(window->url_bar, url);
+
+    free(url);
 }
 
 static void
@@ -308,6 +321,79 @@ on_download_request(void *user_data, Evas_Object *webview, void *event_info)
     eina_strbuf_free(destination_path);
 }
 
+typedef struct {
+    Evas_Object *parent;
+    Evas_Object *window;
+    Ewk_File_Chooser_Request *request;
+} FileSelectorData;
+
+static void on_filepicker_parent_deletion(void *user_data, Evas *evas, Evas_Object *window, void *event);
+
+static void close_file_picker(FileSelectorData* fs_data)
+{
+    evas_object_event_callback_del(fs_data->parent, EVAS_CALLBACK_DEL, on_filepicker_parent_deletion);
+    evas_object_del(fs_data->window);
+    ewk_file_chooser_request_unref(fs_data->request);
+    free(fs_data);
+}
+
+static void
+on_filepicker_parent_deletion(void *user_data, Evas *evas, Evas_Object *window, void *event)
+{
+    close_file_picker((FileSelectorData *)user_data);
+}
+
+static void
+on_filepicker_deletion(void *user_data, Evas_Object *window, void *event_info)
+{
+    close_file_picker((FileSelectorData *)user_data);
+}
+
+static void
+on_fileselector_done(void *user_data, Evas_Object *file_selector, void *event_info)
+{
+    FileSelectorData *fs_data = (FileSelectorData *)user_data;
+
+    const char *selected = (const char *)event_info;
+    if (selected && *selected)
+        ewk_file_chooser_request_file_choose(fs_data->request, selected);
+
+    close_file_picker(fs_data);
+}
+
+static void
+on_file_chooser_request(void *user_data, Evas_Object *webview, void *event_info)
+{
+    Browser_Window *app_data = (Browser_Window *)user_data;
+    Ewk_File_Chooser_Request *request = (Ewk_File_Chooser_Request *)event_info;
+
+    // Show basic file picker which does not currently support multiple files
+    // or MIME type filtering.
+    Evas_Object *window = elm_win_add(app_data->window, "file-picker-window", ELM_WIN_DIALOG_BASIC);
+    elm_win_title_set(window, "File picker");
+    elm_win_modal_set(window, EINA_TRUE);
+
+    FileSelectorData* fs_data = (FileSelectorData*)malloc(sizeof(FileSelectorData));
+    fs_data->parent = app_data->window;
+    fs_data->window = window;
+    fs_data->request = ewk_file_chooser_request_ref(request);
+    evas_object_smart_callback_add(window, "delete,request", on_filepicker_deletion, fs_data);
+    evas_object_event_callback_add(app_data->window, EVAS_CALLBACK_DEL, on_filepicker_parent_deletion, fs_data);
+
+    Evas_Object *file_selector = elm_fileselector_add(window);
+    const char *home_path = getenv("HOME");
+    elm_fileselector_path_set(file_selector, home_path ? home_path : "/home");
+    evas_object_size_hint_weight_set(file_selector, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
+    elm_win_resize_object_add(window, file_selector);
+    evas_object_show(file_selector);
+
+    evas_object_smart_callback_add(file_selector, "done", on_fileselector_done, fs_data);
+
+    evas_object_resize(window, 400, 400);
+    elm_win_center(window, EINA_TRUE, EINA_TRUE);
+    evas_object_show(window);
+}
+
 static void
 on_download_finished(void *user_data, Evas_Object *webview, void *event_info)
 {
@@ -380,9 +466,12 @@ on_url_bar_activated(void *user_data, Evas_Object *url_bar, void *event_info)
 {
     Browser_Window *app_data = (Browser_Window *)user_data;
 
-    const char *user_url = elm_entry_entry_get(url_bar);
+    const char *markup_url = elm_entry_entry_get(url_bar);
+    char *user_url = elm_entry_markup_to_utf8(markup_url);
     char *url = url_from_user_input(user_url);
     ewk_view_url_set(app_data->webview, url);
+
+    free(user_url);
     free(url);
 
     /* Give focus back to the view */
@@ -465,6 +554,7 @@ on_javascript_alert(Ewk_View_Smart_Data *smartData, const char *message)
     elm_object_text_set(button, "OK");
     elm_object_part_content_set(alert_popup, "button1", button);
     evas_object_smart_callback_add(button, "clicked", quit_event_loop, NULL);
+    elm_object_focus_set(button, EINA_TRUE);
     evas_object_show(alert_popup);
 
     /* Make modal */
@@ -494,6 +584,7 @@ on_javascript_confirm(Ewk_View_Smart_Data *smartData, const char *message)
     elm_object_text_set(ok_button, "OK");
     elm_object_part_content_set(confirm_popup, "button2", ok_button);
     evas_object_smart_callback_add(ok_button, "clicked", on_ok_clicked, &ok);
+    elm_object_focus_set(ok_button, EINA_TRUE);
     evas_object_show(confirm_popup);
 
     /* Make modal */
@@ -534,9 +625,11 @@ on_javascript_prompt(Ewk_View_Smart_Data *smartData, const char *message, const 
     elm_entry_single_line_set(entry, EINA_TRUE);
     elm_entry_text_style_user_push(entry, "DEFAULT='font_size=18'");
     elm_entry_entry_set(entry, default_value ? default_value : "");
+    elm_entry_select_all(entry);
     evas_object_size_hint_weight_set(entry, EVAS_HINT_EXPAND, 0.0);
     evas_object_size_hint_align_set(entry, EVAS_HINT_FILL, 0.5);
     elm_box_pack_end(box, entry);
+    elm_object_focus_set(entry, EINA_TRUE);
     evas_object_show(entry);
 
     elm_object_content_set(prompt_popup, box);
@@ -560,6 +653,158 @@ on_javascript_prompt(Ewk_View_Smart_Data *smartData, const char *message, const 
     evas_object_del(prompt_popup);
 
     return prompt_text;
+}
+
+typedef struct {
+    Evas_Object *popup;
+    Ewk_Auth_Request *request;
+    Evas_Object *username_entry;
+    Evas_Object *password_entry;
+} AuthData;
+
+static void
+auth_popup_close(AuthData *auth_data)
+{
+    ewk_object_unref(auth_data->request);
+    evas_object_del(auth_data->popup);
+    free(auth_data);
+}
+
+static void
+on_auth_cancel(void *user_data, Evas_Object *obj, void *event_info)
+{
+    AuthData *auth_data = (AuthData *)user_data;
+
+    ewk_auth_request_cancel(auth_data->request);
+
+    auth_popup_close(auth_data);
+}
+
+static void
+on_auth_ok(void *user_data, Evas_Object *obj, void *event_info)
+{
+    AuthData *auth_data = (AuthData *)user_data;
+
+    const char *username = elm_entry_entry_get(auth_data->username_entry);
+    const char *password = elm_entry_entry_get(auth_data->password_entry);
+    ewk_auth_request_authenticate(auth_data->request, username, password);
+
+    auth_popup_close(auth_data);
+}
+
+static void
+on_authentication_request(void *user_data, Evas_Object *obj, void *event_info)
+{
+    Browser_Window *window = (Browser_Window *)user_data;
+    Ewk_Auth_Request *request = ewk_object_ref((Ewk_Auth_Request *)event_info);
+
+    AuthData *auth_data = (AuthData *)malloc(sizeof(AuthData));
+    auth_data->request = request;
+
+    Evas_Object *auth_popup = elm_popup_add(window->window);
+    auth_data->popup = auth_popup;
+    evas_object_size_hint_weight_set(auth_popup, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
+    elm_object_part_text_set(auth_popup, "title,text", "Authentication Required");
+
+    /* Popup Content */
+    Evas_Object *vbox = elm_box_add(auth_popup);
+    elm_box_padding_set(vbox, 0, 4);
+    evas_object_size_hint_weight_set(vbox, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
+    evas_object_size_hint_align_set(vbox, EVAS_HINT_FILL, EVAS_HINT_FILL);
+    elm_object_content_set(auth_popup, vbox);
+    evas_object_show(vbox);
+
+    /* Authentication message */
+    Evas_Object *label = elm_label_add(auth_popup);
+    elm_label_line_wrap_set(label, ELM_WRAP_WORD);
+    Eina_Strbuf *auth_text = eina_strbuf_new();
+    const char* host = ewk_auth_request_host_get(request);
+    const char* realm = ewk_auth_request_realm_get(request);
+    eina_strbuf_append_printf(auth_text, "A username and password are being requested by %s. The site says: \"%s\"", host, realm ? realm : "");
+    elm_object_text_set(label, eina_strbuf_string_get(auth_text));
+    eina_strbuf_free(auth_text);
+    evas_object_size_hint_weight_set(label, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
+    evas_object_size_hint_align_set(label, EVAS_HINT_FILL, EVAS_HINT_FILL);
+    elm_box_pack_end(vbox, label);
+    evas_object_show(label);
+
+    /* Credential table */
+    Evas_Object *table = elm_table_add(auth_popup);
+    elm_table_padding_set(table, 2, 2);
+    elm_table_homogeneous_set(table, EINA_TRUE);
+    evas_object_size_hint_weight_set(table, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
+    evas_object_size_hint_align_set(table, EVAS_HINT_FILL, EVAS_HINT_FILL);
+    elm_box_pack_end(vbox, table);
+    evas_object_show(table);
+
+    /* Username row */
+    Evas_Object *username_label = elm_label_add(auth_popup);
+    elm_object_text_set(username_label, "Username:");
+    evas_object_size_hint_weight_set(username_label, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
+    evas_object_size_hint_align_set(username_label, 1, EVAS_HINT_FILL);
+    elm_table_pack(table, username_label, 0, 0, 1, 1);
+    evas_object_show(username_label);
+
+    Evas_Object *username_entry = elm_entry_add(auth_popup);
+    auth_data->username_entry = username_entry;
+    elm_entry_scrollable_set(username_entry, EINA_TRUE);
+    elm_entry_single_line_set(username_entry, EINA_TRUE);
+    elm_entry_text_style_user_push(username_entry, "DEFAULT='font_size=18'");
+    const char *suggested_username = ewk_auth_request_suggested_username_get(request);
+    elm_entry_entry_set(username_entry, suggested_username ? suggested_username : "");
+    evas_object_size_hint_weight_set(username_entry, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
+    evas_object_size_hint_align_set(username_entry, EVAS_HINT_FILL, EVAS_HINT_FILL);
+    elm_table_pack(table, username_entry, 1, 0, 2, 1);
+    elm_object_focus_set(username_entry, EINA_TRUE);
+    evas_object_show(username_entry);
+
+    /* Password row */
+    Evas_Object *password_label = elm_label_add(auth_popup);
+    elm_object_text_set(password_label, "Password:");
+    evas_object_size_hint_weight_set(password_label, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
+    evas_object_size_hint_align_set(password_label, 1, EVAS_HINT_FILL);
+    elm_table_pack(table, password_label, 0, 1, 1, 1);
+    evas_object_show(password_label);
+
+    Evas_Object *password_entry = elm_entry_add(auth_popup);
+    auth_data->password_entry = password_entry;
+    elm_entry_scrollable_set(password_entry, EINA_TRUE);
+    elm_entry_single_line_set(password_entry, EINA_TRUE);
+    elm_entry_password_set(password_entry, EINA_TRUE);
+    elm_entry_text_style_user_push(password_entry, "DEFAULT='font_size=18'");
+    evas_object_size_hint_weight_set(password_entry, EVAS_HINT_EXPAND, EVAS_HINT_EXPAND);
+    evas_object_size_hint_align_set(password_entry, EVAS_HINT_FILL, EVAS_HINT_FILL);
+    elm_table_pack(table, password_entry, 1, 1, 2, 1);
+    evas_object_show(password_entry);
+
+    /* Popup buttons */
+    Evas_Object *cancel_button = elm_button_add(auth_popup);
+    elm_object_text_set(cancel_button, "Cancel");
+    elm_object_part_content_set(auth_popup, "button1", cancel_button);
+    evas_object_smart_callback_add(cancel_button, "clicked", on_auth_cancel, auth_data);
+    Evas_Object *ok_button = elm_button_add(auth_popup);
+    elm_object_text_set(ok_button, "OK");
+    elm_object_part_content_set(auth_popup, "button2", ok_button);
+    evas_object_smart_callback_add(ok_button, "clicked", on_auth_ok, auth_data);
+    evas_object_show(auth_popup);
+}
+
+static void
+on_tooltip_text_set(void *user_data, Evas_Object *obj, void *event_info)
+{
+    Browser_Window *window = (Browser_Window *)user_data;
+    const char* message = (const char*)event_info;
+
+    elm_object_tooltip_text_set(window->webview, message);
+    elm_object_tooltip_show(window->webview);
+}
+
+static void
+on_tooltip_text_unset(void *user_data, Evas_Object *obj, void *event_info)
+{
+    Browser_Window *window = (Browser_Window *)user_data;
+
+    elm_object_tooltip_unset(window->webview);
 }
 
 static void
@@ -691,17 +936,21 @@ static Browser_Window *window_create(const char *url)
     ewk_settings_frame_flattening_enabled_set(settings, frame_flattening_enabled);
     ewk_settings_developer_extras_enabled_set(settings, EINA_TRUE);
 
+    evas_object_smart_callback_add(app_data->webview, "authentication,request", on_authentication_request, app_data);
     evas_object_smart_callback_add(app_data->webview, "close,window", on_close_window, app_data);
     evas_object_smart_callback_add(app_data->webview, "create,window", on_new_window, app_data);
     evas_object_smart_callback_add(app_data->webview, "download,failed", on_download_failed, app_data);
     evas_object_smart_callback_add(app_data->webview, "download,finished", on_download_finished, app_data);
     evas_object_smart_callback_add(app_data->webview, "download,request", on_download_request, app_data);
+    evas_object_smart_callback_add(app_data->webview, "file,chooser,request", on_file_chooser_request, app_data);
     evas_object_smart_callback_add(app_data->webview, "icon,changed", on_view_icon_changed, app_data);
     evas_object_smart_callback_add(app_data->webview, "load,error", on_error, app_data);
     evas_object_smart_callback_add(app_data->webview, "load,progress", on_progress, app_data);
     evas_object_smart_callback_add(app_data->webview, "title,changed", on_title_changed, app_data);
     evas_object_smart_callback_add(app_data->webview, "url,changed", on_url_changed, app_data);
     evas_object_smart_callback_add(app_data->webview, "back,forward,list,changed", on_back_forward_list_changed, app_data);
+    evas_object_smart_callback_add(app_data->webview, "tooltip,text,set", on_tooltip_text_set, app_data);
+    evas_object_smart_callback_add(app_data->webview, "tooltip,text,unset", on_tooltip_text_unset, app_data);
 
     evas_object_event_callback_add(app_data->webview, EVAS_CALLBACK_KEY_DOWN, on_key_down, app_data);
     evas_object_event_callback_add(app_data->webview, EVAS_CALLBACK_MOUSE_DOWN, on_mouse_down, app_data);
@@ -714,12 +963,37 @@ static Browser_Window *window_create(const char *url)
     if (url)
         ewk_view_url_set(app_data->webview, url);
 
-    evas_object_resize(app_data->window, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+    evas_object_resize(app_data->window, window_width, window_height);
     evas_object_show(app_data->window);
 
     view_focus_set(app_data, EINA_TRUE);
 
     return app_data;
+}
+
+static void
+parse_window_size(const char *input_string, int *width, int *height)
+{
+    static const unsigned max_length = 4;
+    int parsed_width;
+    int parsed_height;
+    char **arr;
+    unsigned elements;
+
+    arr = eina_str_split_full(input_string, "x", 0, &elements);
+
+    if (elements == 2 && (strlen(arr[0]) <= max_length) && (strlen(arr[1]) <= max_length)) {
+        parsed_width = atoi(arr[0]);
+        if (width && parsed_width)
+            *width = parsed_width;
+
+        parsed_height = atoi(arr[1]);
+        if (height && parsed_height)
+            *height = parsed_height;
+    }
+
+    free(arr[0]);
+    free(arr);
 }
 
 EAPI_MAIN int
@@ -728,9 +1002,11 @@ elm_main(int argc, char *argv[])
     int args = 1;
     unsigned char quitOption = 0;
     Browser_Window *window;
+    char *window_size_string = NULL;
 
     Ecore_Getopt_Value values[] = {
         ECORE_GETOPT_VALUE_STR(evas_engine_name),
+        ECORE_GETOPT_VALUE_STR(window_size_string),
         ECORE_GETOPT_VALUE_BOOL(quitOption),
         ECORE_GETOPT_VALUE_BOOL(frame_flattening_enabled),
         ECORE_GETOPT_VALUE_BOOL(quitOption),
@@ -755,6 +1031,19 @@ elm_main(int argc, char *argv[])
 
     if (evas_engine_name)
         elm_config_preferred_engine_set(evas_engine_name);
+#if defined(WTF_USE_ACCELERATED_COMPOSITING) && defined(HAVE_ECORE_X)
+    else {
+        evas_engine_name = "opengl_x11";
+        elm_config_preferred_engine_set(evas_engine_name);
+    }
+#endif
+
+    // Enable favicon database.
+    Ewk_Context *context = ewk_context_default_get();
+    ewk_context_favicon_database_directory_set(context, NULL);
+
+    if (window_size_string)
+        parse_window_size(window_size_string, &window_width, &window_height);
 
     if (args < argc) {
         char *url = url_from_user_input(argv[args]);

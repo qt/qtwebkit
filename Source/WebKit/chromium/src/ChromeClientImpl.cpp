@@ -42,6 +42,7 @@
 #include "Console.h"
 #include "Cursor.h"
 #include "DatabaseTracker.h"
+#include "DateTimeChooser.h"
 #include "DateTimeChooserImpl.h"
 #include "Document.h"
 #include "DocumentLoader.h"
@@ -265,17 +266,13 @@ Page* ChromeClientImpl::createWindow(
     return newView->page();
 }
 
-static inline bool currentEventShouldCauseBackgroundTab(const WebInputEvent* inputEvent)
+static inline void updatePolicyForEvent(const WebInputEvent* inputEvent, WebNavigationPolicy* policy)
 {
-    if (!inputEvent)
-        return false;
-
-    if (inputEvent->type != WebInputEvent::MouseUp)
-        return false;
+    if (!inputEvent || inputEvent->type != WebInputEvent::MouseUp)
+        return;
 
     const WebMouseEvent* mouseEvent = static_cast<const WebMouseEvent*>(inputEvent);
 
-    WebNavigationPolicy policy;
     unsigned short buttonNumber;
     switch (mouseEvent->button) {
     case WebMouseEvent::ButtonLeft:
@@ -288,17 +285,14 @@ static inline bool currentEventShouldCauseBackgroundTab(const WebInputEvent* inp
         buttonNumber = 2;
         break;
     default:
-        return false;
+        return;
     }
     bool ctrl = mouseEvent->modifiers & WebMouseEvent::ControlKey;
     bool shift = mouseEvent->modifiers & WebMouseEvent::ShiftKey;
     bool alt = mouseEvent->modifiers & WebMouseEvent::AltKey;
     bool meta = mouseEvent->modifiers & WebMouseEvent::MetaKey;
 
-    if (!WebViewImpl::navigationPolicyFromMouseEvent(buttonNumber, ctrl, shift, alt, meta, &policy))
-        return false;
-
-    return policy == WebNavigationPolicyNewBackgroundTab;
+    WebViewImpl::navigationPolicyFromMouseEvent(buttonNumber, ctrl, shift, alt, meta, policy);
 }
 
 WebNavigationPolicy ChromeClientImpl::getNavigationPolicy()
@@ -315,8 +309,8 @@ WebNavigationPolicy ChromeClientImpl::getNavigationPolicy()
     WebNavigationPolicy policy = WebNavigationPolicyNewForegroundTab;
     if (asPopup)
         policy = WebNavigationPolicyNewPopup;
-    if (currentEventShouldCauseBackgroundTab(WebViewImpl::currentInputEvent()))
-        policy = WebNavigationPolicyNewBackgroundTab;
+    updatePolicyForEvent(WebViewImpl::currentInputEvent(), &policy);
+
     return policy;
 }
 
@@ -502,15 +496,7 @@ void ChromeClientImpl::invalidateContentsAndRootView(const IntRect& updateRect, 
 {
     if (updateRect.isEmpty())
         return;
-#if USE(ACCELERATED_COMPOSITING)
-    if (!m_webView->isAcceleratedCompositingActive()) {
-#endif
-        if (m_webView->client())
-            m_webView->client()->didInvalidateRect(updateRect);
-#if USE(ACCELERATED_COMPOSITING)
-    } else
-        m_webView->invalidateRootLayerRect(updateRect);
-#endif
+    m_webView->invalidateRect(updateRect);
 }
 
 void ChromeClientImpl::invalidateContentsForSlowScroll(const IntRect& updateRect, bool immediate)
@@ -629,13 +615,6 @@ void ChromeClientImpl::dispatchViewportPropertiesDidChange(const ViewportArgumen
     if (!m_webView->settings()->viewportEnabled() || !m_webView->isFixedLayoutModeEnabled() || !m_webView->client() || !m_webView->page())
         return;
 
-    ViewportArguments args;
-    if (arguments == args) {
-        // Default viewport arguments passed in. This is a signal to reset the viewport.
-        args.width = ViewportArguments::ValueDesktopWidth;
-    } else
-        args = arguments;
-
     FrameView* frameView = m_webView->mainFrameImpl()->frameView();
     int dpi = screenHorizontalDPI(frameView);
     ASSERT(dpi > 0);
@@ -650,7 +629,7 @@ void ChromeClientImpl::dispatchViewportPropertiesDidChange(const ViewportArgumen
     float devicePixelRatio = dpi / ViewportArguments::deprecatedTargetDPI;
     // Call the common viewport computing logic in ViewportArguments.cpp.
     ViewportAttributes computed = computeViewportAttributes(
-        args, settings->layoutFallbackWidth(), deviceRect.width, deviceRect.height,
+        arguments, settings->layoutFallbackWidth(), deviceRect.width, deviceRect.height,
         devicePixelRatio, IntSize(deviceRect.width, deviceRect.height));
 
     restrictScaleFactorToInitialScaleIfNotUserScalable(computed);
@@ -707,10 +686,15 @@ PassOwnPtr<WebColorChooser> ChromeClientImpl::createWebColorChooser(WebColorChoo
 }
 #endif
 
-#if ENABLE(CALENDAR_PICKER)
-PassOwnPtr<WebCore::DateTimeChooser> ChromeClientImpl::openDateTimeChooser(WebCore::DateTimeChooserClient* pickerClient, const WebCore::DateTimeChooserParameters& parameters)
+#if ENABLE(DATE_AND_TIME_INPUT_TYPES)
+PassRefPtr<DateTimeChooser> ChromeClientImpl::openDateTimeChooser(DateTimeChooserClient* pickerClient, const DateTimeChooserParameters& parameters)
 {
-    return adoptPtr(new DateTimeChooserImpl(this, pickerClient, parameters));
+#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+    return DateTimeChooserImpl::create(this, pickerClient, parameters);
+#else
+    notImplemented();
+    return PassRefPtr<DateTimeChooser>();
+#endif
 }
 #endif
 
@@ -901,6 +885,11 @@ void ChromeClientImpl::postAccessibilityNotification(AccessibilityObject* obj, A
     // Alert assistive technology about the accessibility object notification.
     if (obj)
         m_webView->client()->postAccessibilityNotification(WebAccessibilityObject(obj), toWebAccessibilityNotification(notification));
+}
+
+WebKit::WebScreenInfo ChromeClientImpl::screenInfo()
+{
+    return m_webView->client()->screenInfo();
 }
 
 bool ChromeClientImpl::paintCustomOverhangArea(GraphicsContext* context, const IntRect& horizontalOverhangArea, const IntRect& verticalOverhangArea, const IntRect& dirtyRect)

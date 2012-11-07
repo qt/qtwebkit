@@ -73,10 +73,12 @@ BitmapImage::BitmapImage(NativeImageCairo* nativeImage, ImageObserver* observer)
 
 void BitmapImage::draw(GraphicsContext* context, const FloatRect& dst, const FloatRect& src, ColorSpace styleColorSpace, CompositeOperator op)
 {
-    FloatRect srcRect(src);
-    FloatRect dstRect(dst);
+    draw(context, dst, src, styleColorSpace, op, DoNotRespectImageOrientation);
+}
 
-    if (!dstRect.width() || !dstRect.height() || !srcRect.width() || !srcRect.height())
+void BitmapImage::draw(GraphicsContext* context, const FloatRect& dst, const FloatRect& src, ColorSpace styleColorSpace, CompositeOperator op, RespectImageOrientationEnum shouldRespectImageOrientation)
+{
+    if (!dst.width() || !dst.height() || !src.width() || !src.height())
         return;
 
     startAnimation();
@@ -86,7 +88,7 @@ void BitmapImage::draw(GraphicsContext* context, const FloatRect& dst, const Flo
         return;
 
     if (mayFillWithSolidColor()) {
-        fillWithSolidColor(context, dstRect, solidColor(), styleColorSpace, op);
+        fillWithSolidColor(context, dst, solidColor(), styleColorSpace, op);
         return;
     }
 
@@ -101,10 +103,28 @@ void BitmapImage::draw(GraphicsContext* context, const FloatRect& dst, const Flo
 #if ENABLE(IMAGE_DECODER_DOWN_SAMPLING)
     cairo_surface_t* surface = nativeImage->surface();
     IntSize scaledSize(cairo_image_surface_get_width(surface), cairo_image_surface_get_height(surface));
-    FloatRect adjustedSrcRect = adjustSourceRectForDownSampling(srcRect, scaledSize);
+    FloatRect adjustedSrcRect = adjustSourceRectForDownSampling(src, scaledSize);
 #else
-    FloatRect adjustedSrcRect(srcRect);
+    FloatRect adjustedSrcRect(src);
 #endif
+
+    ImageOrientation orientation = DefaultImageOrientation;
+    if (shouldRespectImageOrientation == RespectImageOrientation)
+        orientation = frameOrientationAtIndex(m_currentFrame);
+
+    FloatRect dstRect = dst;
+
+    if (orientation != DefaultImageOrientation) {
+        // ImageOrientation expects the origin to be at (0, 0).
+        context->translate(dstRect.x(), dstRect.y());
+        dstRect.setLocation(FloatPoint());
+        context->concatCTM(orientation.transformFromDefault(dstRect.size()));
+        if (orientation.usesWidthAsHeight()) {
+            // The destination rectangle will have it's width and height already reversed for the orientation of
+            // the image, as it was needed for page layout, so we need to reverse it back here.
+            dstRect = FloatRect(dstRect.x(), dstRect.y(), dstRect.height(), dstRect.width());
+        }
+    }
 
     context->platformContext()->drawSurfaceToContext(nativeImage->surface(), dstRect, adjustedSrcRect, context);
 

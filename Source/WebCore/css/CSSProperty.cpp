@@ -41,29 +41,6 @@ struct SameSizeAsCSSProperty {
 
 COMPILE_ASSERT(sizeof(CSSProperty) == sizeof(SameSizeAsCSSProperty), CSSProperty_should_stay_small);
 
-String CSSProperty::cssName() const
-{
-#if ENABLE(CSS_VARIABLES)
-    if (id() == CSSPropertyVariable) {
-        ASSERT(value()->isVariableValue());
-        return "-webkit-var-" + static_cast<CSSVariableValue*>(value())->name();
-    }
-#endif
-    return getPropertyNameString(id());
-}
-
-String CSSProperty::cssText() const
-{
-    StringBuilder result;
-    result.append(cssName());
-    result.appendLiteral(": ");
-    result.append(m_value->cssText());
-    if (isImportant())
-        result.appendLiteral(" !important");
-    result.append(';');
-    return result.toString();
-}
-
 void CSSProperty::wrapValueInCommaSeparatedList()
 {
     RefPtr<CSSValue> value = m_value.release();
@@ -703,6 +680,12 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
 #endif
 #if ENABLE(DRAGGABLE_REGION)
     case CSSPropertyWebkitAppRegion:
+#endif
+#if ENABLE(CSS_DEVICE_ADAPTATION)
+    case CSSPropertyMaxZoom:
+    case CSSPropertyMinZoom:
+    case CSSPropertyOrientation:
+    case CSSPropertyUserZoom:
 #endif
         return false;
     case CSSPropertyInvalid:

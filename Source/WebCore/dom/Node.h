@@ -111,6 +111,17 @@ enum StyleChangeType {
     SyntheticStyleChange = 3 << nodeStyleChangeShift
 };
 
+class NodeRareDataBase {
+public:
+    RenderObject* renderer() const { return m_renderer; }
+    void setRenderer(RenderObject* renderer) { m_renderer = renderer; }
+    virtual ~NodeRareDataBase() { }
+protected:
+    NodeRareDataBase() { }
+private:
+    RenderObject* m_renderer;
+};
+
 class Node : public EventTarget, public ScriptWrappable, public TreeShared<Node, ContainerNode> {
     friend class Document;
     friend class TreeScope;
@@ -226,8 +237,10 @@ public:
     bool isDocumentNode() const;
     bool isShadowRoot() const { return getFlag(IsShadowRootFlag); }
     bool inNamedFlow() const { return getFlag(InNamedFlowFlag); }
-    bool hasAttrList() const { return getFlag(HasAttrListFlag); }
     bool hasCustomCallbacks() const { return getFlag(HasCustomCallbacksFlag); }
+
+    bool hasSyntheticAttrChildNodes() const { return getFlag(HasSyntheticAttrChildNodesFlag); }
+    void setHasSyntheticAttrChildNodes(bool flag) { setFlag(flag, HasSyntheticAttrChildNodesFlag); }
 
     // If this node is in a shadow tree, returns its shadow host. Otherwise, returns 0.
     Element* shadowHost() const;
@@ -258,8 +271,7 @@ public:
     Node* enclosingLinkEventParentOrSelf();
 
     bool isBlockFlow() const;
-    bool isBlockFlowOrBlockTable() const;
-    
+
     // These low-level calls give the caller responsibility for maintaining the integrity of the tree.
     void setPreviousSibling(Node* previous) { m_previous = previous; }
     void setNextSibling(Node* next) { m_next = next; }
@@ -345,9 +357,6 @@ public:
     void setInNamedFlow() { setFlag(InNamedFlowFlag); }
     void clearInNamedFlow() { clearFlag(InNamedFlowFlag); }
 
-    void setHasAttrList() { setFlag(HasAttrListFlag); }
-    void clearHasAttrList() { clearFlag(HasAttrListFlag); }
-
     bool hasScopedHTMLStyleChild() const { return getFlag(HasScopedHTMLStyleChildFlag); }
     void setHasScopedHTMLStyleChild(bool flag) { setFlag(flag, HasScopedHTMLStyleChildFlag); }
 
@@ -376,16 +385,20 @@ public:
     virtual bool isMouseFocusable() const;
     virtual Node* focusDelegate();
 
-    bool isContentEditable();
+    enum UserSelectAllTreatment {
+        UserSelectAllDoesNotAffectEditability,
+        UserSelectAllIsAlwaysNonEditable
+    };
+    bool isContentEditable(UserSelectAllTreatment = UserSelectAllDoesNotAffectEditability);
     bool isContentRichlyEditable();
 
     void inspect();
 
-    bool rendererIsEditable(EditableType editableType = ContentIsEditable) const
+    bool rendererIsEditable(EditableType editableType = ContentIsEditable, UserSelectAllTreatment treatment = UserSelectAllIsAlwaysNonEditable) const
     {
         switch (editableType) {
         case ContentIsEditable:
-            return rendererIsEditable(Editable);
+            return rendererIsEditable(Editable, treatment);
         case HasEditableAXRole:
             return isEditableToAccessibility(Editable);
         }
@@ -397,7 +410,7 @@ public:
     {
         switch (editableType) {
         case ContentIsEditable:
-            return rendererIsEditable(RichlyEditable);
+            return rendererIsEditable(RichlyEditable, UserSelectAllIsAlwaysNonEditable);
         case HasEditableAXRole:
             return isEditableToAccessibility(RichlyEditable);
         }
@@ -500,9 +513,16 @@ public:
     // -----------------------------------------------------------------------------
     // Integration with rendering tree
 
-    RenderObject* renderer() const { return m_renderer; }
-    void setRenderer(RenderObject* renderer) { m_renderer = renderer; }
-    
+    // As renderer() includes a branch you should avoid calling it repeatedly in hot code paths.
+    RenderObject* renderer() const { return hasRareData() ? m_data.m_rareData->renderer() : m_data.m_renderer; };
+    void setRenderer(RenderObject* renderer)
+    {
+        if (hasRareData())
+            m_data.m_rareData->setRenderer(renderer);
+        else
+            m_data.m_renderer = renderer;
+    }
+
     // Use these two methods with caution.
     RenderBox* renderBox() const;
     RenderBoxModelObject* renderBoxModelObject() const;
@@ -530,7 +550,6 @@ public:
     
     // Wrapper for nodes that don't have a renderer, but still cache the style (like HTMLOptionElement).
     RenderStyle* renderStyle() const;
-    virtual void setRenderStyle(PassRefPtr<RenderStyle>);
 
     RenderStyle* computedStyle(PseudoId pseudoElementSpecifier = NOPSEUDO) { return virtualComputedStyle(pseudoElementSpecifier); }
 
@@ -663,11 +682,13 @@ public:
     void notifyMutationObserversNodeWillDetach();
 #endif // ENABLE(MUTATION_OBSERVERS)
 
-    void registerScopedHTMLStyleChild();
-    void unregisterScopedHTMLStyleChild();
+    virtual void registerScopedHTMLStyleChild();
+    virtual void unregisterScopedHTMLStyleChild();
     size_t numberOfScopedHTMLStyleChildren() const;
 
     virtual void reportMemoryUsage(MemoryObjectInfo*) const;
+
+    void textRects(Vector<IntRect>&) const;
 
 private:
     enum NodeFlags {
@@ -711,7 +732,7 @@ private:
         DefaultNodeFlags = IsParsingChildrenFinishedFlag | IsStyleAttributeValidFlag,
 #endif
         InNamedFlowFlag = 1 << 26,
-        HasAttrListFlag = 1 << 27,
+        HasSyntheticAttrChildNodesFlag = 1 << 27,
         HasCustomCallbacksFlag = 1 << 28,
         HasScopedHTMLStyleChildFlag = 1 << 29,
         HasEventTargetDataFlag = 1 << 30,
@@ -768,7 +789,7 @@ private:
     void setDocument(Document*);
 
     enum EditableLevel { Editable, RichlyEditable };
-    bool rendererIsEditable(EditableLevel) const;
+    bool rendererIsEditable(EditableLevel, UserSelectAllTreatment = UserSelectAllIsAlwaysNonEditable) const;
     bool isEditableToAccessibility(EditableLevel) const;
 
     void setStyleChange(StyleChangeType);
@@ -782,7 +803,7 @@ private:
     virtual OwnPtr<NodeRareData> createRareData();
     bool rareDataFocused() const;
 
-    virtual RenderStyle* nonRendererRenderStyle() const;
+    virtual RenderStyle* nonRendererStyle() const { return 0; }
 
     virtual const AtomicString& virtualPrefix() const;
     virtual const AtomicString& virtualLocalName() const;
@@ -811,7 +832,12 @@ private:
     Document* m_document;
     Node* m_previous;
     Node* m_next;
-    RenderObject* m_renderer;
+    // When a node has rare data we move the renderer into the rare data.
+    union DataUnion {
+        DataUnion() : m_renderer(0) { }
+        RenderObject* m_renderer;
+        NodeRareDataBase* m_rareData;
+    } m_data;
 
 public:
     bool isStyleAttributeValid() const { return getFlag(IsStyleAttributeValidFlag); }

@@ -128,6 +128,7 @@ public:
     void setAllowExternalPages(bool allowExternalPages) { m_allowExternalPages = allowExternalPages; }
 
     void setAcceleratedCompositingForVideoEnabled(bool enabled) { m_acceleratedCompositingForVideoEnabled = enabled; }
+    void setAcceleratedCompositingForFixedPositionEnabled(bool enabled) { m_acceleratedCompositingForFixedPositionEnabled = enabled; }
     bool softwareCompositingEnabled() { return m_softwareCompositingEnabled; }
     void setSoftwareCompositingEnabled(bool enabled) { m_softwareCompositingEnabled = enabled; }
     void setThreadedCompositingEnabled(bool enabled) { m_threadedCompositingEnabled = enabled; }
@@ -136,6 +137,7 @@ public:
     void setDeferred2dCanvasEnabled(bool enabled) { m_deferred2dCanvasEnabled = enabled; }
     void setAcceleratedPaintingEnabled(bool enabled) { m_acceleratedPaintingEnabled = enabled; }
     void setPerTilePaintingEnabled(bool);
+    void setAcceleratedAnimationEnabled(bool);
     void setDeferredImageDecodingEnabled(bool enabled) { m_deferredImageDecodingEnabled = enabled; }
 #if defined(OS_WIN)
     // Access to the finished event. Used by the static WatchDog thread.
@@ -227,6 +229,7 @@ private:
     int m_timeout; // timeout value in millisecond
     bool m_allowExternalPages;
     bool m_acceleratedCompositingForVideoEnabled;
+    bool m_acceleratedCompositingForFixedPositionEnabled;
     bool m_softwareCompositingEnabled;
     bool m_threadedCompositingEnabled;
     bool m_forceCompositingMode;

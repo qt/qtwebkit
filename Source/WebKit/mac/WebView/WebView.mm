@@ -466,6 +466,8 @@ NSString *_WebMainFrameDocumentKey =    @"mainFrameDocument";
 
 NSString *_WebViewDidStartAcceleratedCompositingNotification = @"_WebViewDidStartAcceleratedCompositing";
 
+NSString *WebKitKerningAndLigaturesEnabledByDefaultDefaultsKey = @"WebKitKerningAndLigaturesEnabledByDefault";
+
 @interface WebProgressItem : NSObject
 {
 @public
@@ -1998,11 +2000,9 @@ static inline IMP getMethod(id o, SEL s)
     NSMutableURLRequest *request = [[NSMutableURLRequest alloc] initWithURL:URL];
     [request _web_setHTTPUserAgent:[self userAgentForURL:URL]];
     NSCachedURLResponse *cachedResponse;
-#if USE(CFURLSTORAGESESSIONS)
     if (CFURLStorageSessionRef storageSession = ResourceHandle::currentStorageSession())
         cachedResponse = WKCachedResponseForRequest(storageSession, request);
     else
-#endif
         cachedResponse = [[NSURLCache sharedURLCache] cachedResponseForRequest:request];
     [request release];
     return cachedResponse;
@@ -3027,6 +3027,7 @@ static Vector<String> toStringVector(NSArray* patterns)
 
 + (void)_setLoadResourcesSerially:(BOOL)serialize 
 {
+    WebPlatformStrategies::initialize();
     resourceLoadScheduler()->setSerialLoadingEnabled(serialize);
 }
 
@@ -3118,23 +3119,29 @@ static Vector<String> toStringVector(NSArray* patterns)
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_cacheModelChangedNotification:) name:WebPreferencesCacheModelChangedInternalNotification object:nil];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_preferencesRemovedNotification:) name:WebPreferencesRemovedNotification object:nil];    
 
-    continuousSpellCheckingEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:WebContinuousSpellCheckingEnabled];
-    grammarCheckingEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:WebGrammarCheckingEnabled];
+    NSUserDefaults *defaults = [NSUserDefaults standardUserDefaults];
 
-    Font::setDefaultTypesettingFeatures([[NSUserDefaults standardUserDefaults] boolForKey:@"WebKitKerningAndLigaturesEnabledByDefault"] ? Kerning | Ligatures : 0);
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+    [defaults registerDefaults:[NSDictionary dictionaryWithObject:[NSNumber numberWithBool:YES] forKey:WebKitKerningAndLigaturesEnabledByDefaultDefaultsKey]];
+#endif
+
+    continuousSpellCheckingEnabled = [defaults boolForKey:WebContinuousSpellCheckingEnabled];
+    grammarCheckingEnabled = [defaults boolForKey:WebGrammarCheckingEnabled];
+
+    Font::setDefaultTypesettingFeatures([defaults boolForKey:WebKitKerningAndLigaturesEnabledByDefaultDefaultsKey] ? Kerning | Ligatures : 0);
 
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
-    automaticQuoteSubstitutionEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:WebAutomaticQuoteSubstitutionEnabled];
-    automaticLinkDetectionEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:WebAutomaticLinkDetectionEnabled];
-    automaticDashSubstitutionEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:WebAutomaticDashSubstitutionEnabled];
-    automaticTextReplacementEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:WebAutomaticTextReplacementEnabled];
-    automaticSpellingCorrectionEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:WebAutomaticSpellingCorrectionEnabled];
+    automaticQuoteSubstitutionEnabled = [defaults boolForKey:WebAutomaticQuoteSubstitutionEnabled];
+    automaticLinkDetectionEnabled = [defaults boolForKey:WebAutomaticLinkDetectionEnabled];
+    automaticDashSubstitutionEnabled = [defaults boolForKey:WebAutomaticDashSubstitutionEnabled];
+    automaticTextReplacementEnabled = [defaults boolForKey:WebAutomaticTextReplacementEnabled];
+    automaticSpellingCorrectionEnabled = [defaults boolForKey:WebAutomaticSpellingCorrectionEnabled];
 #endif
 
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
-    if (![[NSUserDefaults standardUserDefaults] objectForKey:WebAutomaticTextReplacementEnabled])
+    if (![defaults objectForKey:WebAutomaticTextReplacementEnabled])
         automaticTextReplacementEnabled = [NSSpellChecker isAutomaticTextReplacementEnabled];
-    if (![[NSUserDefaults standardUserDefaults] objectForKey:WebAutomaticSpellingCorrectionEnabled])
+    if (![defaults objectForKey:WebAutomaticSpellingCorrectionEnabled])
         automaticSpellingCorrectionEnabled = [NSSpellChecker isAutomaticSpellingCorrectionEnabled];
 #endif
 }

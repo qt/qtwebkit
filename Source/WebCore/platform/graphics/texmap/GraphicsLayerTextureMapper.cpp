@@ -20,6 +20,7 @@
 #include "config.h"
 #include "GraphicsLayerTextureMapper.h"
 
+#include "GraphicsLayerAnimation.h"
 #include "GraphicsLayerFactory.h"
 #include "TextureMapperLayer.h"
 
@@ -87,6 +88,7 @@ void GraphicsLayerTextureMapper::setNeedsDisplay()
 {
     m_needsDisplay = true;
     notifyChange(TextureMapperLayer::DisplayChange);
+    addRepaintRect(FloatRect(FloatPoint(), m_size));
 }
 
 /* \reimp (GraphicsLayer.h)
@@ -94,6 +96,7 @@ void GraphicsLayerTextureMapper::setNeedsDisplay()
 void GraphicsLayerTextureMapper::setContentsNeedsDisplay()
 {
     notifyChange(TextureMapperLayer::DisplayChange);
+    addRepaintRect(contentsRect());
 }
 
 /* \reimp (GraphicsLayer.h)
@@ -104,6 +107,7 @@ void GraphicsLayerTextureMapper::setNeedsDisplayInRect(const FloatRect& rect)
         return;
     m_needsDisplayRect.unite(rect);
     notifyChange(TextureMapperLayer::DisplayChange);
+    addRepaintRect(rect);
 }
 
 /* \reimp (GraphicsLayer.h)
@@ -392,11 +396,18 @@ bool GraphicsLayerTextureMapper::addAnimation(const KeyframeValueList& valueList
     if (valueList.property() == AnimatedPropertyWebkitTransform)
         listsMatch = validateTransformOperations(valueList, hasBigRotation) >= 0;
 
-    m_animations.add(GraphicsLayerAnimation(keyframesName, valueList, boxSize, anim, timeOffset, listsMatch));
+    m_animations.add(GraphicsLayerAnimation(keyframesName, valueList, boxSize, anim, WTF::currentTime() - timeOffset, listsMatch));
     notifyChange(TextureMapperLayer::AnimationChange);
     m_animationStartedTimer.startOneShot(0);
     return true;
 }
+
+void GraphicsLayerTextureMapper::setAnimations(const GraphicsLayerAnimations& animations)
+{
+    m_animations = animations;
+    notifyChange(TextureMapperLayer::AnimationChange);
+}
+
 
 void GraphicsLayerTextureMapper::pauseAnimation(const String& animationName, double timeOffset)
 {

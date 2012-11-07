@@ -20,17 +20,11 @@
 #include "NetworkManager.h"
 
 #include "Chrome.h"
-#if ENABLE(BLACKBERRY_CREDENTIAL_PERSIST)
-#include "CredentialBackingStore.h"
-#endif
 #include "CredentialStorage.h"
 #include "Frame.h"
 #include "FrameLoaderClientBlackBerry.h"
 #include "NetworkJob.h"
 #include "Page.h"
-#if ENABLE(BLACKBERRY_CREDENTIAL_PERSIST)
-#include "ResourceHandleClient.h"
-#endif
 #include "ResourceHandleInternal.h"
 #include "ResourceRequest.h"
 #include "SecurityOrigin.h"
@@ -42,15 +36,7 @@
 
 namespace WebCore {
 
-NetworkManager* NetworkManager::instance()
-{
-    static NetworkManager* sInstance;
-    if (!sInstance) {
-        sInstance = new NetworkManager;
-        ASSERT(sInstance);
-    }
-    return sInstance;
-}
+SINGLETON_INITIALIZER_THREADUNSAFE(NetworkManager)
 
 bool NetworkManager::startJob(int playerId, PassRefPtr<ResourceHandle> job, const Frame& frame, bool defersLoading)
 {
@@ -128,20 +114,6 @@ bool NetworkManager::startJob(int playerId, const String& pageGroupName, PassRef
 
         if (authType != BlackBerry::Platform::NetworkRequest::AuthNone)
             platformRequest.setCredentials(username.utf8().data(), password.utf8().data(), authType);
-    } else if (url.protocolIsInHTTPFamily()) {
-        // For URLs that match the paths of those previously challenged for HTTP Basic authentication,
-        // try and reuse the credential preemptively, as allowed by RFC 2617.
-        Credential credential = CredentialStorage::get(url);
-#if ENABLE(BLACKBERRY_CREDENTIAL_PERSIST)
-        // FIXME: needs to refactor the credentialBackingStore to get credential and protection space at one time.
-        if (credential.isEmpty() && guardJob->client()->shouldUseCredentialStorage(guardJob.get())) {
-            credential = credentialBackingStore().getLogin(url);
-            if (!credential.isEmpty())
-                CredentialStorage::set(credential, credentialBackingStore().getProtectionSpace(url), url);
-        }
-#endif
-        if (!credential.isEmpty())
-            platformRequest.setCredentials(credential.user().utf8().data(), credential.password().utf8().data(), BlackBerry::Platform::NetworkRequest::AuthHTTPBasic);
     }
 
     if (!request.overrideContentType().isEmpty())

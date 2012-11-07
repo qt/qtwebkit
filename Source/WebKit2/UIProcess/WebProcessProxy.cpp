@@ -359,21 +359,20 @@ void WebProcessProxy::getPlugins(CoreIPC::Connection*, uint64_t requestID, bool 
     pluginWorkQueue().dispatch(bind(&WebProcessProxy::handleGetPlugins, this, requestID, refresh));
 }
 
-void WebProcessProxy::getPluginPath(const String& mimeType, const String& urlString, String& pluginPath, bool& blocked)
+void WebProcessProxy::getPluginPath(const String& mimeType, const String& urlString, String& pluginPath, uint32_t& pluginLoadPolicy)
 {
     MESSAGE_CHECK_URL(urlString);
 
     String newMimeType = mimeType.lower();
 
-    blocked = false;
+    pluginLoadPolicy = PluginModuleLoadNormally;
     PluginModuleInfo plugin = m_context->pluginInfoStore().findPlugin(newMimeType, KURL(KURL(), urlString));
     if (!plugin.path)
         return;
 
-    if (m_context->pluginInfoStore().shouldBlockPlugin(plugin)) {
-        blocked = true;
+    pluginLoadPolicy = PluginInfoStore::policyForPlugin(plugin);
+    if (pluginLoadPolicy != PluginModuleLoadNormally)
         return;
-    }
 
     pluginPath = plugin.path;
 }
@@ -477,9 +476,9 @@ void WebProcessProxy::didClose(CoreIPC::Connection*)
         pages[i]->processDidCrash();
 }
 
-void WebProcessProxy::didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::MessageID messageID)
+void WebProcessProxy::didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference messageReceiverName, CoreIPC::StringReference messageName)
 {
-    WTFLogAlways("Received an invalid message from the web process with message ID %x\n", messageID.toInt());
+    WTFLogAlways("Received an invalid message \"%s.%s\" from the web process.\n", messageReceiverName.toString().data(), messageName.toString().data());
 
     // Terminate the WebProcesses.
     terminate();
@@ -532,6 +531,11 @@ void WebProcessProxy::didFinishLaunching(CoreIPC::Connection::Identifier connect
 
     // Tell the context that we finished launching.
     m_context->processDidFinishLaunching(this);
+
+#if PLATFORM(MAC)
+    if (WebContext::applicationIsOccluded())
+        connection()->send(Messages::WebProcess::SetApplicationIsOccluded(true), 0);
+#endif
 }
 
 WebFrameProxy* WebProcessProxy::webFrame(uint64_t frameID) const

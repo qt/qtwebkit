@@ -114,10 +114,6 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/bytecode/LazyOperandValueProfile.cpp \
 	Source/JavaScriptCore/bytecode/LazyOperandValueProfile.h \
 	Source/JavaScriptCore/bytecode/LineInfo.h \
-	Source/JavaScriptCore/bytecode/MethodCallLinkInfo.cpp \
-	Source/JavaScriptCore/bytecode/MethodCallLinkInfo.h \
-	Source/JavaScriptCore/bytecode/MethodCallLinkStatus.cpp \
-	Source/JavaScriptCore/bytecode/MethodCallLinkStatus.h \
 	Source/JavaScriptCore/bytecode/MethodOfGettingAValueProfile.cpp \
 	Source/JavaScriptCore/bytecode/MethodOfGettingAValueProfile.h \
 	Source/JavaScriptCore/bytecode/Opcode.cpp \
@@ -142,6 +138,8 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/bytecode/StructureStubInfo.h \
 	Source/JavaScriptCore/bytecode/StructureStubClearingWatchpoint.cpp \
 	Source/JavaScriptCore/bytecode/StructureStubClearingWatchpoint.h \
+	Source/JavaScriptCore/bytecode/UnlinkedCodeBlock.cpp \
+	Source/JavaScriptCore/bytecode/UnlinkedCodeBlock.h \
 	Source/JavaScriptCore/bytecode/ValueProfile.h \
 	Source/JavaScriptCore/bytecode/ValueRecovery.h \
 	Source/JavaScriptCore/bytecode/VirtualRegister.h \
@@ -377,6 +375,7 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/interpreter/Interpreter.h \
 	Source/JavaScriptCore/interpreter/JSStack.cpp \
 	Source/JavaScriptCore/interpreter/JSStack.h \
+	Source/JavaScriptCore/interpreter/JSStackInlines.h \
 	Source/JavaScriptCore/interpreter/Register.h \
 	Source/JavaScriptCore/interpreter/VMInspector.cpp \
 	Source/JavaScriptCore/interpreter/VMInspector.h \
@@ -447,6 +446,7 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/parser/ParserTokens.h \
 	Source/JavaScriptCore/parser/Parser.cpp \
 	Source/JavaScriptCore/parser/Parser.h \
+	Source/JavaScriptCore/parser/ParserModes.h \
 	Source/JavaScriptCore/parser/ResultType.h \
 	Source/JavaScriptCore/parser/SourceCode.h \
 	Source/JavaScriptCore/parser/SourceProvider.h \
@@ -487,6 +487,8 @@ javascriptcore_sources += \
 	Source/JavaScriptCore/runtime/CallData.cpp \
 	Source/JavaScriptCore/runtime/CallData.h \
 	Source/JavaScriptCore/runtime/ClassInfo.h \
+	Source/JavaScriptCore/runtime/CodeCache.cpp \
+	Source/JavaScriptCore/runtime/CodeCache.h \
 	Source/JavaScriptCore/runtime/CodeSpecializationKind.h \
 	Source/JavaScriptCore/runtime/CommonIdentifiers.cpp \
 	Source/JavaScriptCore/runtime/CommonIdentifiers.h \

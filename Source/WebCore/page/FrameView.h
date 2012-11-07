@@ -338,8 +338,9 @@ public:
     
     void setTracksRepaints(bool);
     bool isTrackingRepaints() const { return m_isTrackingRepaints; }
-    void resetTrackedRepaints() { m_trackedRepaintRects.clear(); }
+    void resetTrackedRepaints();
     const Vector<IntRect>& trackedRepaintRects() const { return m_trackedRepaintRects; }
+    String trackedRepaintRectsAsText() const;
 
     typedef HashSet<ScrollableArea*> ScrollableAreaSet;
     void addScrollableArea(ScrollableArea*);
@@ -388,6 +389,8 @@ private:
     bool useSlowRepaintsIfNotOverlapped() const;
     void updateCanBlitOnScrollRecursively();
     bool contentsInCompositedLayer() const;
+
+    bool shouldUpdateFixedElementsAfterScrolling();
 
     void applyOverflowToViewport(RenderObject*, ScrollbarMode& hMode, ScrollbarMode& vMode);
     void applyPaginationToViewport();
@@ -484,6 +487,7 @@ private:
     
     bool m_layoutSchedulingEnabled;
     bool m_inLayout;
+    bool m_doingPreLayoutStyleUpdate;
     bool m_inSynchronousPostLayout;
     int m_layoutCount;
     unsigned m_nestedLayoutCount;

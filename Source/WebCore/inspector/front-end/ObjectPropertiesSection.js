@@ -58,9 +58,9 @@ WebInspector.ObjectPropertiesSection.prototype = {
 
     _contextMenuEventFired: function(event)
     {
-        var contextMenu = new WebInspector.ContextMenu();
+        var contextMenu = new WebInspector.ContextMenu(event);
         contextMenu.appendApplicableItems(this.object);
-        contextMenu.show(event);
+        contextMenu.show();
     },
 
     onpopulate: function()
@@ -253,10 +253,10 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
 
     _contextMenuFired: function(value, event)
     {
-        var contextMenu = new WebInspector.ContextMenu();
+        var contextMenu = new WebInspector.ContextMenu(event);
         this.populateContextMenu(contextMenu);
         contextMenu.appendApplicableItems(value);
-        contextMenu.show(event);
+        contextMenu.show();
     },
 
     /**
@@ -317,6 +317,14 @@ WebInspector.ObjectPropertyTreeElement.prototype = {
         var proxyElement = this._prompt.attachAndStartEditing(elementToEdit, blurListener.bind(this));
         window.getSelection().setBaseAndExtent(elementToEdit, 0, elementToEdit, 1);
         proxyElement.addEventListener("keydown", this._promptKeyDown.bind(this, context), false);
+    },
+
+    /**
+     * @return {boolean}
+     */
+    isEditing: function()
+    {
+        return !!this._prompt;
     },
 
     editingEnded: function(context)
@@ -595,8 +603,7 @@ WebInspector.ArrayGroupingTreeElement._populateRanges = function(treeElement, ob
     {
         var count = 0;
         for (var i = fromIndex; i <= toIndex; ++i) {
-            var value = this[i];
-            if (typeof value !== "undefined")
+            if (i in this)
                 ++count;
         }
 
@@ -604,15 +611,14 @@ WebInspector.ArrayGroupingTreeElement._populateRanges = function(treeElement, ob
         if (count <= bucketThreshold)
             bucketSize = count;
         else
-            bucketSize = Math.pow(bucketThreshold, Math.floor(Math.log(count) / Math.log(bucketThreshold)));
+            bucketSize = Math.pow(bucketThreshold, Math.ceil(Math.log(count) / Math.log(bucketThreshold)) - 1);
 
         var ranges = [];
         count = 0;
         var groupStart = -1;
         var groupEnd = 0;
         for (var i = fromIndex; i <= toIndex; ++i) {
-            var value = this[i];
-            if (typeof value === "undefined")
+            if (!(i in this))
                 continue;
 
             if (groupStart === -1)
@@ -670,9 +676,8 @@ WebInspector.ArrayGroupingTreeElement._populateAsFragment = function(treeElement
     {
         var result = Object.create(null);
         for (var i = fromIndex; i <= toIndex; ++i) {
-            var value = this[i];
-            if (typeof value !== "undefined")
-                result[i] = value;
+            if (i in this)
+                result[i] = this[i];
         }
         return result;
     }

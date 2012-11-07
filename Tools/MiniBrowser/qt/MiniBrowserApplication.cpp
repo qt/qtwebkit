@@ -29,7 +29,7 @@
 #include "MiniBrowserApplication.h"
 
 #include "BrowserWindow.h"
-#include "QtInitializeTestFonts.h"
+#include "QtTestSupport.h"
 #include "private/qquickwebview_p.h"
 #include "utils.h"
 #include <QRegExp>
@@ -140,7 +140,6 @@ bool MiniBrowserApplication::notify(QObject* target, QEvent* event)
 
         switch (mouseEvent->type()) {
         case QEvent::MouseButtonPress:
-        case QEvent::MouseButtonDblClick:
             touchPoint.setId(mouseEvent->button());
             if (m_touchPoints.contains(touchPoint.id())) {
                 touchPoint.setState(Qt::TouchPointMoved);
@@ -176,6 +175,10 @@ bool MiniBrowserApplication::notify(QObject* target, QEvent* event)
             touchPoint.setId(mouseEvent->button());
             touchPoint.setState(Qt::TouchPointReleased);
             break;
+        case QEvent::MouseButtonDblClick:
+            // Eat double-clicks, their accompanying press event is all we need.
+            event->accept();
+            return true;
         default:
             Q_ASSERT_X(false, "multi-touch mocking", "unhandled event type");
         }
@@ -332,7 +335,7 @@ void MiniBrowserApplication::handleUserOptions()
     }
 
     if (takeOptionFlag(&args, QStringLiteral("--use-test-fonts")))
-        WebKit::initializeTestFonts();
+        WebKit::QtTestSupport::initializeTestFonts();
 
     if (args.contains("-r")) {
         QString listFile = takeOptionValue(&args, "-r");

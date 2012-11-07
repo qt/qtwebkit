@@ -26,22 +26,25 @@
 #ifndef PageLoadClientEfl_h
 #define PageLoadClientEfl_h
 
-#include "ewk_view_private.h"
+#include "WKPageLoadTypes.h"
+#include <WebKit2/WKBase.h>
 #include <wtf/PassOwnPtr.h>
+
+class EwkViewImpl;
 
 namespace WebKit {
 
 class PageLoadClientEfl {
 public:
-    static PassOwnPtr<PageLoadClientEfl> create(Evas_Object* view)
+    static PassOwnPtr<PageLoadClientEfl> create(EwkViewImpl* viewImpl)
     {
-        return adoptPtr(new PageLoadClientEfl(view));
+        return adoptPtr(new PageLoadClientEfl(viewImpl));
     }
 
 private:
-    explicit PageLoadClientEfl(Evas_Object* view);
+    explicit PageLoadClientEfl(EwkViewImpl*);
 
-    inline Evas_Object* view() const { return m_view; }
+    inline EwkViewImpl* viewImpl() const { return m_viewImpl; }
 
     static void didReceiveTitleForFrame(WKPageRef, WKStringRef title, WKFrameRef, WKTypeRef, const void* clientInfo);
 #if ENABLE(WEB_INTENTS)
@@ -56,10 +59,14 @@ private:
     static void didStartProvisionalLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef userData, const void* clientInfo);
     static void didReceiveServerRedirectForProvisionalLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef userData, const void* clientInfo);
     static void didFailProvisionalLoadWithErrorForFrame(WKPageRef, WKFrameRef, WKErrorRef, WKTypeRef userData, const void* clientInfo);
+#if USE(TILED_BACKING_STORE)
+    static void didCommitLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef userData, const void* clientInfo);
+#endif
     static void didChangeBackForwardList(WKPageRef, WKBackForwardListItemRef addedItem, WKArrayRef removedItems, const void* clientInfo);
     static void didSameDocumentNavigationForFrame(WKPageRef, WKFrameRef, WKSameDocumentNavigationType, WKTypeRef, const void* clientInfo);
+    static void didReceiveAuthenticationChallengeInFrame(WKPageRef, WKFrameRef, WKAuthenticationChallengeRef, const void* clientInfo);
 
-    Evas_Object* m_view;
+    EwkViewImpl* m_viewImpl;
 };
 
 } // namespace WebKit

@@ -32,9 +32,9 @@
 
 namespace WebKit {
 
-void AttributedString::encode(CoreIPC::ArgumentEncoder* encoder) const
+void AttributedString::encode(CoreIPC::ArgumentEncoder& encoder) const
 {
-    encoder->encode(!string);
+    encoder << static_cast<bool>(!string);
     if (!string)
         return;
     CoreIPC::encode(encoder, string.get());

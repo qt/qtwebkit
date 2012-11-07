@@ -86,7 +86,6 @@ void (*wkQTClearMediaDownloadCacheForSite)(NSString *site);
 void (*wkQTClearMediaDownloadCache)();
 
 void (*wkSetCGFontRenderingMode)(CGContextRef, NSFont*);
-void (*wkSetCookieStoragePrivateBrowsingEnabled)(BOOL);
 void (*wkSetDragImage)(NSImage*, NSPoint offset);
 void (*wkSetBaseCTM)(CGContextRef, CGAffineTransform);
 void (*wkSetPatternPhaseInUserSpace)(CGContextRef, CGPoint point);
@@ -175,8 +174,10 @@ NSURLRequest* (*wkCopyRequestWithStorageSession)(CFURLStorageSessionRef, NSURLRe
 CFHTTPCookieStorageRef (*wkCopyHTTPCookieStorage)(CFURLStorageSessionRef);
 unsigned (*wkGetHTTPCookieAcceptPolicy)(CFHTTPCookieStorageRef);
 void (*wkSetHTTPCookieAcceptPolicy)(CFHTTPCookieStorageRef, unsigned);
+NSArray *(*wkHTTPCookies)(CFHTTPCookieStorageRef);
 NSArray *(*wkHTTPCookiesForURL)(CFHTTPCookieStorageRef, NSURL *);
 void (*wkSetHTTPCookiesForURL)(CFHTTPCookieStorageRef, NSArray *, NSURL *, NSURL *);
+void (*wkDeleteAllHTTPCookies)(CFHTTPCookieStorageRef);
 void (*wkDeleteHTTPCookie)(CFHTTPCookieStorageRef, NSHTTPCookie *);
 
 CFStringRef (*wkGetCFURLResponseMIMEType)(CFURLResponseRef);
@@ -216,3 +217,15 @@ CGFloat (*wkNSElasticDeltaForReboundDelta)(CGFloat delta);
 CGFloat (*wkNSReboundDeltaForElasticDelta)(CGFloat delta);
 #endif
 
+bool (*wkCaptionAppearanceHasUserPreferences)(void);
+bool (*wkCaptionAppearanceShowCaptionsWhenAvailable)(void);
+CGColorRef(*wkCaptionAppearanceCopyForegroundColor)(void);
+CGColorRef(*wkCaptionAppearanceCopyBackgroundColor)(void);
+CGColorRef(*wkCaptionAppearanceCopyWindowColor)(void);
+bool(*wkCaptionAppearanceGetForegroundOpacity)(CGFloat*);
+bool(*wkCaptionAppearanceGetBackgroundOpacity)(CGFloat*);
+bool(*wkCaptionAppearanceGetWindowOpacity)(CGFloat*);
+CGFontRef(*wkCaptionAppearanceCopyFontForStyle)(int);
+bool(*wkCaptionAppearanceGetRelativeCharacterSize)(CGFloat*);
+int(*wkCaptionAppearanceGetTextEdgeStyle)(void);
+CFStringRef(*wkCaptionAppearanceGetSettingsChangedNotification)(void);

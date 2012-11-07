@@ -110,6 +110,13 @@
 #include "SVGNames.h"
 #endif
 
+#if ENABLE(CSS_SHADERS) && USE(3D_GRAPHICS)
+#include "CustomFilterGlobalContext.h"
+#include "CustomFilterOperation.h"
+#include "CustomFilterValidatedProgram.h"
+#include "ValidatedCustomFilterOperation.h"
+#endif
+
 #if PLATFORM(BLACKBERRY)
 #define DISABLE_ROUNDED_CORNER_CLIPPING
 #endif
@@ -1878,10 +1885,27 @@ void RenderLayer::scrollRectToVisible(const LayoutRect& rect, const ScrollAlignm
         frameView->resumeScheduledEvents();
 }
 
+#if USE(ACCELERATED_COMPOSITING)
+static FrameView* frameViewFromLayer(const RenderLayer* layer)
+{
+    Frame* frame = layer->renderer()->frame();
+    if (!frame)
+        return 0;
+
+    return frame->view();
+}
+#endif
+
 void RenderLayer::updateCompositingLayersAfterScroll()
 {
 #if USE(ACCELERATED_COMPOSITING)
     if (compositor()->inCompositingMode()) {
+        // If we're in the middle of layout, we'll just update compositiong once layout has finished.
+        if (FrameView* frameView = frameViewFromLayer(this)) {
+            if (frameView->isInLayout())
+                return;
+        }
+
         // Our stacking context is guaranteed to contain all of our descendants that may need
         // repositioning, so update compositing layers from there.
         if (RenderLayer* compositingAncestor = stackingContext()->enclosingCompositingLayer()) {
@@ -3173,9 +3197,9 @@ void RenderLayer::paintLayerContents(RenderLayer* rootLayer, GraphicsContext* co
             ReferenceClipPathOperation* referenceClipPathOperation = static_cast<ReferenceClipPathOperation*>(style->clipPath());
             Document* document = renderer()->document();
             // FIXME: It doesn't work with forward or external SVG references (https://bugs.webkit.org/show_bug.cgi?id=90405)
-            Element* clipPath = document ? document->getElementById(referenceClipPathOperation->fragment()) : 0;
-            if (clipPath && clipPath->renderer() && clipPath->renderer()->isSVGResourceContainer())
-                static_cast<RenderSVGResourceClipper*>(clipPath->renderer())->applyClippingToContext(renderer(), calculateLayerBounds(this, rootLayer, 0), paintDirtyRect, context);
+            Element* element = document ? document->getElementById(referenceClipPathOperation->fragment()) : 0;
+            if (element && element->hasTagName(SVGNames::clipPathTag) && element->renderer())
+                static_cast<RenderSVGResourceClipper*>(element->renderer())->applyClippingToContext(renderer(), calculateLayerBounds(this, rootLayer, 0), paintDirtyRect, context);
         }
 #endif
     }
@@ -4501,7 +4525,7 @@ RenderLayerBacking* RenderLayer::ensureBacking()
         compositor()->layerBecameComposited(this);
 
 #if ENABLE(CSS_FILTERS)
-        updateOrRemoveFilterEffect();
+        updateOrRemoveFilterEffectRenderer();
 #endif
 #if ENABLE(CSS_COMPOSITING)
         backing()->setBlendMode(m_blendMode);
@@ -4518,7 +4542,7 @@ void RenderLayer::clearBacking(bool layerBeingDestroyed)
 
 #if ENABLE(CSS_FILTERS)
     if (!layerBeingDestroyed)
-        updateOrRemoveFilterEffect();
+        updateOrRemoveFilterEffectRenderer();
 #else
     UNUSED_PARAM(layerBeingDestroyed);
 #endif
@@ -4937,6 +4961,9 @@ void RenderLayer::styleChanged(StyleDifference, const RenderStyle* oldStyle)
 #if ENABLE(CSS_COMPOSITING)
     updateBlendMode();
 #endif
+#if ENABLE(CSS_FILTERS)
+    updateOrRemoveFilterClients();
+#endif
 
 #if USE(ACCELERATED_COMPOSITING)
     if (compositor()->updateLayerCompositingState(this))
@@ -4952,7 +4979,7 @@ void RenderLayer::styleChanged(StyleDifference, const RenderStyle* oldStyle)
 #endif
 
 #if ENABLE(CSS_FILTERS)
-    updateOrRemoveFilterEffect();
+    updateOrRemoveFilterEffectRenderer();
 #if USE(ACCELERATED_COMPOSITING)
     bool backingDidCompositeLayers = isComposited() && backing()->canCompositeFilters();
     if (isComposited() && backingDidCompositeLayers && !backing()->canCompositeFilters()) {
@@ -5075,8 +5102,60 @@ void RenderLayer::updateReflectionStyle()
     m_reflection->setStyle(newStyle.release());
 }
 
+#if ENABLE(CSS_SHADERS)
+bool RenderLayer::isCSSCustomFilterEnabled() const
+{
+    // We only want to enable shaders if WebGL is also enabled on this platform.
+    const Settings* settings = renderer()->document()->settings();
+    return settings && settings->isCSSCustomFilterEnabled() && settings->webGLEnabled();
+}
+#endif
+
 #if ENABLE(CSS_FILTERS)
-void RenderLayer::updateOrRemoveFilterEffect()
+FilterOperations RenderLayer::computeFilterOperations(const RenderStyle* style)
+{
+#if !ENABLE(CSS_SHADERS)
+    return style->filter();
+#else
+    const FilterOperations& filters = style->filter();
+    if (!filters.hasCustomFilter())
+        return filters;
+
+    if (!isCSSCustomFilterEnabled()) {
+        // CSS Custom filters should not parse at all in this case, but there might be
+        // remaining styles that were parsed when the flag was enabled. Reproduces in DumpRenderTree
+        // because it resets the flag while the previous test is still loaded.
+        return FilterOperations();
+    }
+
+    FilterOperations outputFilters;
+    for (size_t i = 0; i < filters.size(); ++i) {
+        RefPtr<FilterOperation> filterOperation = filters.operations().at(i);
+        if (filterOperation->getOperationType() == FilterOperation::CUSTOM) {
+            // We have to wait until the program of CSS Shaders is loaded before setting it on the layer.
+            // Note that we will handle the loading of the shaders and repainting of the layer in updateOrRemoveFilterClients.
+            const CustomFilterOperation* customOperation = static_cast<const CustomFilterOperation*>(filterOperation.get());
+            RefPtr<CustomFilterProgram> program = customOperation->program();
+            if (!program->isLoaded())
+                continue;
+            
+            CustomFilterGlobalContext* globalContext = renderer()->view()->customFilterGlobalContext();
+            RefPtr<CustomFilterValidatedProgram> validatedProgram = globalContext->getValidatedProgram(program->programInfo());
+            if (!validatedProgram->isInitialized())
+                continue;
+
+            RefPtr<ValidatedCustomFilterOperation> validatedOperation = ValidatedCustomFilterOperation::create(validatedProgram.release(), 
+                customOperation->parameters(), customOperation->meshRows(), customOperation->meshColumns(), customOperation->meshType());
+            outputFilters.operations().append(validatedOperation.release());
+            continue;
+        }
+        outputFilters.operations().append(filterOperation.release());
+    }
+    return outputFilters;
+#endif
+}
+
+void RenderLayer::updateOrRemoveFilterClients()
 {
     if (!hasFilter()) {
         removeFilterInfoIfNeeded();
@@ -5096,13 +5175,24 @@ void RenderLayer::updateOrRemoveFilterEffect()
     else if (hasFilterInfo())
         filterInfo()->removeReferenceFilterClients();
 #endif
+}
 
+void RenderLayer::updateOrRemoveFilterEffectRenderer()
+{
+    // FilterEffectRenderer is only used to render the filters in software mode,
+    // so we always need to run updateOrRemoveFilterEffectRenderer after the composited
+    // mode might have changed for this layer.
     if (!paintsWithFilters()) {
         // Don't delete the whole filter info here, because we might use it
         // for loading CSS shader files.
         if (RenderLayerFilterInfo* filterInfo = this->filterInfo())
             filterInfo->setRenderer(0);
-        return;
+
+        // Early-return only if we *don't* have reference filters.
+        // For reference filters, we still want the FilterEffect graph built
+        // for us, even if we're composited.
+        if (!renderer()->style()->filter().hasReferenceFilter())
+            return;
     }
     
     RenderLayerFilterInfo* filterInfo = ensureFilterInfo();
@@ -5115,7 +5205,7 @@ void RenderLayer::updateOrRemoveFilterEffect()
 
     // If the filter fails to build, remove it from the layer. It will still attempt to
     // go through regular processing (e.g. compositing), but never apply anything.
-    if (!filterInfo->renderer()->build(renderer()->document(), renderer()->style()->filter()))
+    if (!filterInfo->renderer()->build(renderer()->document(), computeFilterOperations(renderer()->style())))
         filterInfo->setRenderer(0);
 }
 

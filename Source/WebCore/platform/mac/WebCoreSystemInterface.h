@@ -193,7 +193,6 @@ extern NSArray *(*wkQTGetSitesInMediaDownloadCache)();
 extern void (*wkQTClearMediaDownloadCacheForSite)(NSString *site);
 extern void (*wkQTClearMediaDownloadCache)();
 extern void (*wkSetCGFontRenderingMode)(CGContextRef, NSFont*);
-extern void (*wkSetCookieStoragePrivateBrowsingEnabled)(BOOL);
 extern void (*wkSetDragImage)(NSImage*, NSPoint offset);
 extern void (*wkSetNSURLConnectionDefersCallbacks)(NSURLConnection *, BOOL);
 extern void (*wkSetNSURLRequestShouldContentSniff)(NSMutableURLRequest *, BOOL);
@@ -291,9 +290,11 @@ typedef struct OpaqueCFHTTPCookieStorage* CFHTTPCookieStorageRef;
 extern CFHTTPCookieStorageRef (*wkCopyHTTPCookieStorage)(CFURLStorageSessionRef);
 extern unsigned (*wkGetHTTPCookieAcceptPolicy)(CFHTTPCookieStorageRef);
 extern void (*wkSetHTTPCookieAcceptPolicy)(CFHTTPCookieStorageRef, unsigned);
+extern NSArray *(*wkHTTPCookies)(CFHTTPCookieStorageRef);
 extern NSArray *(*wkHTTPCookiesForURL)(CFHTTPCookieStorageRef, NSURL *);
 extern void (*wkSetHTTPCookiesForURL)(CFHTTPCookieStorageRef, NSArray *, NSURL *, NSURL *);
 extern void (*wkDeleteHTTPCookie)(CFHTTPCookieStorageRef, NSHTTPCookie *);
+extern void (*wkDeleteAllHTTPCookies)(CFHTTPCookieStorageRef);
 
 extern CFStringRef (*wkGetCFURLResponseMIMEType)(CFURLResponseRef);
 extern CFURLRef (*wkGetCFURLResponseURL)(CFURLResponseRef);
@@ -344,6 +345,40 @@ extern CGFloat (*wkNSElasticDeltaForReboundDelta)(CGFloat delta);
 extern CGFloat (*wkNSReboundDeltaForElasticDelta)(CGFloat delta);
 #endif
 
+typedef enum {
+    wkCaptionFontStyleDefault = 0,
+    wkCaptionFontStyleMonospacedWithSerif,
+    wkCaptionFontStyleProportionalWithSerif,
+    wkCaptionFontStyleMonospacedWithoutSerif,
+    wkCaptionFontStyleProportionalWithoutSerif,
+    wkCaptionFontStyleCasual,
+    wkCaptionFontStyleCursive,
+    wkCaptionFontStyleSmallCapital,
+    wkCaptionFontStyleMax
+} wkCaptionFontStyle;
+
+typedef enum {
+    wkCaptionTextEdgeStyleUndefined = 0,
+    wkCaptionTextEdgeStyleNone,
+    wkCaptionTextEdgeStyleRaised,
+    wkCaptionTextEdgeStyleDepressed,
+    wkCaptionTextEdgeStyleUniform,
+    wkCaptionTextEdgeStyleDropShadow,
+    wkCaptionTextEdgeStyleMax
+} wkCaptionTextEdgeStyle;
+
+extern bool (*wkCaptionAppearanceHasUserPreferences)(void);
+extern bool (*wkCaptionAppearanceShowCaptionsWhenAvailable)(void);
+extern CGColorRef(*wkCaptionAppearanceCopyForegroundColor)(void);
+extern CGColorRef(*wkCaptionAppearanceCopyBackgroundColor)(void);
+extern CGColorRef(*wkCaptionAppearanceCopyWindowColor)(void);
+extern bool(*wkCaptionAppearanceGetForegroundOpacity)(CGFloat*);
+extern bool(*wkCaptionAppearanceGetBackgroundOpacity)(CGFloat*);
+extern bool(*wkCaptionAppearanceGetWindowOpacity)(CGFloat*);
+extern CGFontRef(*wkCaptionAppearanceCopyFontForStyle)(int);
+extern bool(*wkCaptionAppearanceGetRelativeCharacterSize)(CGFloat*);
+extern int(*wkCaptionAppearanceGetTextEdgeStyle)(void);
+extern CFStringRef(*wkCaptionAppearanceGetSettingsChangedNotification)(void);
 }
 
 #endif

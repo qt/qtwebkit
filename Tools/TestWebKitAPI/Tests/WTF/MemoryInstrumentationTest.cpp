@@ -36,11 +36,13 @@
 #include <wtf/HashCountedSet.h>
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
+#include <wtf/ListHashSet.h>
 #include <wtf/MemoryInstrumentation.h>
 #include <wtf/MemoryInstrumentationArrayBufferView.h>
 #include <wtf/MemoryInstrumentationHashCountedSet.h>
 #include <wtf/MemoryInstrumentationHashMap.h>
 #include <wtf/MemoryInstrumentationHashSet.h>
+#include <wtf/MemoryInstrumentationListHashSet.h>
 #include <wtf/MemoryInstrumentationString.h>
 #include <wtf/MemoryInstrumentationVector.h>
 #include <wtf/RefCounted.h>
@@ -79,57 +81,65 @@ using WTF::MemoryObjectType;
 
 MemoryObjectType TestType = "TestType";
 
-class InstrumentationTestHelper : public WTF::MemoryInstrumentation {
+class MemoryInstrumentationTestClient : public WTF::MemoryInstrumentationClient {
 public:
-    InstrumentationTestHelper()
-        : MemoryInstrumentation(&m_client)
-    { }
+    virtual void countObjectSize(const void*, MemoryObjectType objectType, size_t size)
+    {
+        TypeToSizeMap::AddResult result = m_totalSizes.add(objectType, size);
+        if (!result.isNewEntry)
+            result.iterator->value += size;
+    }
+    virtual bool visited(const void* object) { return !m_visitedObjects.add(object).isNewEntry; }
+    virtual void checkCountedObject(const void*) { }
+
+    size_t visitedObjects() const { return m_visitedObjects.size(); }
+    size_t totalSize(const MemoryObjectType objectType) const
+    {
+        TypeToSizeMap::const_iterator i = m_totalSizes.find(objectType);
+        return i == m_totalSizes.end() ? 0 : i->value;
+    }
+
+    size_t reportedSizeForAllTypes() const
+    {
+        size_t size = 0;
+        for (TypeToSizeMap::const_iterator i = m_totalSizes.begin(); i != m_totalSizes.end(); ++i)
+            size += i->value;
+        return size;
+    }
+
+private:
+    typedef HashMap<MemoryObjectType, size_t> TypeToSizeMap;
+    TypeToSizeMap m_totalSizes;
+    WTF::HashSet<const void*> m_visitedObjects;
+};
+
+class InstrumentationTestImpl : public WTF::MemoryInstrumentation {
+public:
+    explicit InstrumentationTestImpl(MemoryInstrumentationTestClient* client)
+        : MemoryInstrumentation(client)
+        , m_client(client) { }
 
     virtual void processDeferredInstrumentedPointers();
     virtual void deferInstrumentedPointer(PassOwnPtr<InstrumentedPointerBase>);
 
-    size_t visitedObjects() const { return m_client.visitedObjects(); }
-    size_t reportedSizeForAllTypes() const { return m_client.reportedSizeForAllTypes(); }
-    size_t totalSize(const MemoryObjectType objectType) const { return m_client.totalSize(objectType); }
+    size_t visitedObjects() const { return m_client->visitedObjects(); }
+    size_t reportedSizeForAllTypes() const { return m_client->reportedSizeForAllTypes(); }
+    size_t totalSize(const MemoryObjectType objectType) const { return m_client->totalSize(objectType); }
 
 private:
-    class Client : public WTF::MemoryInstrumentationClient {
-    public:
-        virtual void countObjectSize(const void*, MemoryObjectType objectType, size_t size)
-        {
-            TypeToSizeMap::AddResult result = m_totalSizes.add(objectType, size);
-            if (!result.isNewEntry)
-                result.iterator->value += size;
-        }
-        virtual bool visited(const void* object) { return !m_visitedObjects.add(object).isNewEntry; }
-        virtual void checkCountedObject(const void*) { }
-
-        size_t visitedObjects() const { return m_visitedObjects.size(); }
-        size_t totalSize(const MemoryObjectType objectType) const
-        {
-            TypeToSizeMap::const_iterator i = m_totalSizes.find(objectType);
-            return i == m_totalSizes.end() ? 0 : i->value;
-        }
-
-        size_t reportedSizeForAllTypes() const
-        {
-            size_t size = 0;
-            for (TypeToSizeMap::const_iterator i = m_totalSizes.begin(); i != m_totalSizes.end(); ++i)
-                size += i->value;
-            return size;
-        }
-
-    private:
-        typedef HashMap<MemoryObjectType, size_t> TypeToSizeMap;
-        TypeToSizeMap m_totalSizes;
-        WTF::HashSet<const void*> m_visitedObjects;
-    };
-
-    Client m_client;
+    MemoryInstrumentationTestClient* m_client;
     Vector<OwnPtr<InstrumentedPointerBase> > m_deferredInstrumentedPointers;
 };
 
-void InstrumentationTestHelper::processDeferredInstrumentedPointers()
+class InstrumentationTestHelper : public InstrumentationTestImpl {
+public:
+    InstrumentationTestHelper() : InstrumentationTestImpl(&m_client) { }
+
+private:
+    MemoryInstrumentationTestClient m_client;
+};
+
+void InstrumentationTestImpl::processDeferredInstrumentedPointers()
 {
     while (!m_deferredInstrumentedPointers.isEmpty()) {
         OwnPtr<InstrumentedPointerBase> pointer = m_deferredInstrumentedPointers.last().release();
@@ -138,7 +148,7 @@ void InstrumentationTestHelper::processDeferredInstrumentedPointers()
     }
 }
 
-void InstrumentationTestHelper::deferInstrumentedPointer(PassOwnPtr<InstrumentedPointerBase> pointer)
+void InstrumentationTestImpl::deferInstrumentedPointer(PassOwnPtr<InstrumentedPointerBase> pointer)
 {
     m_deferredInstrumentedPointers.append(pointer);
 }
@@ -648,6 +658,43 @@ TEST(MemoryInstrumentationTest, hashMapWithInstrumentedPointerKeysAndPointerValu
     EXPECT_EQ(2u * 2u * count + 1, helper.visitedObjects());
 }
 
+TEST(MemoryInstrumentationTest, listHashSetWithInstrumentedType)
+{
+    InstrumentationTestHelper helper;
+
+    typedef ListHashSet<String, 8> TestSet;
+    OwnPtr<TestSet> value = adoptPtr(new TestSet());
+    size_t count = 10;
+    for (size_t i = 0; i < count; ++i)
+        value->add(String::number(i));
+    InstrumentedOwner<TestSet* > root(value.get());
+    helper.addRootObject(root);
+    EXPECT_EQ(sizeof(TestSet) + sizeof(String) * value->capacity() + (sizeof(StringImpl) + 1 * sizeof(LChar)) * count +
+        sizeof(WTF::ListHashSetNodeAllocator<String, 8>) + sizeof(WTF::ListHashSetNode<String, 8>) * (count - 8),
+        helper.reportedSizeForAllTypes());
+    EXPECT_EQ(1 + count, helper.visitedObjects());
+}
+
+TEST(MemoryInstrumentationTest, listHashSetWithInstrumentedTypeAfterValuesRemoval)
+{
+    InstrumentationTestHelper helper;
+
+    typedef ListHashSet<String, 8> TestSet;
+    OwnPtr<TestSet> value = adoptPtr(new TestSet());
+    size_t count = 20;
+    for (size_t i = 0; i < count; ++i)
+        value->add(String::number(i));
+    // Remove 10 values, 8 of which were allocated in the internal buffer.
+    for (size_t i = 0; i < 10; ++i)
+        value->remove(String::number(i));
+    InstrumentedOwner<TestSet* > root(value.get());
+    helper.addRootObject(root);
+    EXPECT_EQ(sizeof(TestSet) + sizeof(String) * value->capacity() + (sizeof(StringImpl) + 2 * sizeof(LChar)) * (count - 10) +
+        sizeof(WTF::ListHashSetNodeAllocator<String, 8>) + sizeof(WTF::ListHashSetNode<String, 8>) * (count - 10),
+        helper.reportedSizeForAllTypes());
+    EXPECT_EQ(1 + (count - 10), helper.visitedObjects());
+}
+
 class InstrumentedConvertibleToInt {
 public:
     InstrumentedConvertibleToInt() : m_notInstrumented(0) { }
@@ -750,7 +797,6 @@ public:
     }
 };
 
-
 TEST(MemoryInstrumentationTest, instrumentedWithMultipleAncestors)
 {
     InstrumentationTestHelper helper;
@@ -760,10 +806,42 @@ TEST(MemoryInstrumentationTest, instrumentedWithMultipleAncestors)
     Instrumented* ancestorPointer = descendantPointer;
     InstrumentedOwner<Instrumented*> ancestorPointerOwner(ancestorPointer);
     EXPECT_NE(static_cast<void*>(ancestorPointer), static_cast<void*>(descendantPointer));
+
     helper.addRootObject(descendantPointerOwner);
     helper.addRootObject(ancestorPointerOwner);
     EXPECT_EQ(sizeof(ClassWithTwoAncestors), helper.reportedSizeForAllTypes());
     EXPECT_EQ(2u, helper.visitedObjects());
+}
+
+class CheckCountedObjectsClient : public MemoryInstrumentationTestClient {
+public:
+    CheckCountedObjectsClient(const void* expectedPointer) : m_expectedPointer(expectedPointer), m_expectedPointerFound(false) { }
+    virtual void checkCountedObject(const void* pointer)
+    {
+        EXPECT_EQ(pointer, m_expectedPointer);
+        m_expectedPointerFound = true;
+    }
+    bool expectedPointerFound() { return m_expectedPointerFound; }
+
+private:
+    const void* m_expectedPointer;
+    bool m_expectedPointerFound;
+};
+
+TEST(MemoryInstrumentationTest, checkCountedObjectWithMultipleAncestors)
+{
+    OwnPtr<ClassWithTwoAncestors> instance = adoptPtr(new ClassWithTwoAncestors());
+    ClassWithTwoAncestors* descendantPointer = instance.get();
+    InstrumentedOwner<ClassWithTwoAncestors*> descendantPointerOwner(descendantPointer);
+    Instrumented* ancestorPointer = descendantPointer;
+    InstrumentedOwner<Instrumented*> ancestorPointerOwner(ancestorPointer);
+    EXPECT_NE(static_cast<void*>(ancestorPointer), static_cast<void*>(descendantPointer));
+
+    CheckCountedObjectsClient client(instance.get());
+    InstrumentationTestImpl instrumentation(&client);
+    instrumentation.addRootObject(descendantPointerOwner);
+    instrumentation.addRootObject(ancestorPointerOwner);
+    EXPECT_TRUE(client.expectedPointerFound());
 }
 
 } // namespace

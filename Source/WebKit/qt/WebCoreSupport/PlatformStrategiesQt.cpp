@@ -63,12 +63,7 @@ CookiesStrategy* PlatformStrategiesQt::createCookiesStrategy()
     return this;
 }
 
-PluginStrategy* PlatformStrategiesQt::createPluginStrategy()
-{
-    return this;
-}
-
-VisitedLinkStrategy* PlatformStrategiesQt::createVisitedLinkStrategy()
+LoaderStrategy* PlatformStrategiesQt::createLoaderStrategy()
 {
     return this;
 }
@@ -76,6 +71,21 @@ VisitedLinkStrategy* PlatformStrategiesQt::createVisitedLinkStrategy()
 PasteboardStrategy* PlatformStrategiesQt::createPasteboardStrategy()
 {
     return 0;
+}
+
+PluginStrategy* PlatformStrategiesQt::createPluginStrategy()
+{
+    return this;
+}
+
+SharedWorkerStrategy* PlatformStrategiesQt::createSharedWorkerStrategy()
+{
+    return this;
+}
+
+VisitedLinkStrategy* PlatformStrategiesQt::createVisitedLinkStrategy()
+{
+    return this;
 }
 
 void PlatformStrategiesQt::notifyCookiesChanged()

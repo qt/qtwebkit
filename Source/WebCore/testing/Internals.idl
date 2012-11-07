@@ -47,7 +47,10 @@
     Node oldestShadowRoot(in Element host) raises (DOMException);
     Node youngerShadowRoot(in Node root) raises (DOMException);
 #endif
+    DOMString shadowRootType(in Node root) raises (DOMException);
     boolean hasShadowInsertionPoint(in Node root) raises (DOMException);
+    boolean hasContentElement(in Node root) raises (DOMException);
+    unsigned long countElementShadow(in Node Root) raises (DOMException);
     Element includerFor(in Node node) raises (DOMException);
     DOMString shadowPseudoId(in Element element) raises (DOMException);
     void setShadowPseudoId(in Element element, in DOMString id) raises (DOMException);
@@ -125,11 +128,6 @@
     long lastSpellCheckRequestSequence(in Document document) raises (DOMException);
     long lastSpellCheckProcessedSequence(in Document document) raises (DOMException);
 
-#if defined(ENABLE_VIDEO_TRACK) && ENABLE_VIDEO_TRACK
-    void setShouldDisplayTrackKind(in Document document, in DOMString kind, in boolean enabled) raises (DOMException);
-    boolean shouldDisplayTrackKind(in Document document, in DOMString trackKind) raises (DOMException);
-#endif
-
     sequence<String> userPreferredLanguages();
     void setUserPreferredLanguages(in sequence<String> languages);
 
@@ -158,7 +156,13 @@
 
     // Flags for layerTreeAsText.
     const unsigned short LAYER_TREE_INCLUDES_VISIBLE_RECTS = 1;
+    const unsigned short LAYER_TREE_INCLUDES_TILE_CACHES = 2;
+    const unsigned short LAYER_TREE_INCLUDES_REPAINT_RECTS = 4;
     DOMString layerTreeAsText(in Document document, in [Optional] unsigned short flags) raises (DOMException);
+
+    DOMString scrollingStateTreeAsText(in Document document) raises (DOMException);
+
+    DOMString repaintRectsAsText(in Document document) raises (DOMException);
 
     void garbageCollectDocumentResources(in Document document) raises (DOMException);
 
@@ -177,6 +181,8 @@
     [Conditional=INSPECTOR] sequence<String> consoleMessageArgumentCounts(in Document document);
     [Conditional=INSPECTOR] DOMWindow openDummyInspectorFrontend(in DOMString url);
     [Conditional=INSPECTOR] void closeDummyInspectorFrontend();
+    [Conditional=INSPECTOR] void setInspectorResourcesDataSizeLimits(in long maximumResourcesContentSize, in long maximumSingleResourceContentSize) raises(DOMException);
+    [Conditional=INSPECTOR] void setJavaScriptProfilingEnabled(in boolean creates) raises(DOMException);
 
     DOMString counterValue(in Element element);
     long pageNumber(in Element element, in [Optional] float pageWidth, in [Optional] float pageHeight);
@@ -199,4 +205,9 @@
     MallocStatistics mallocStatistics();
 
     DOMString[] getReferencedFilePaths();
+
+    // These functions both reset the tracked repaint rects. They are inteded to be used in the following order:
+    //  startTrackingRepaints, repaintRectsAsText, stopTrackingRepaints.
+    void startTrackingRepaints(in Document document) raises (DOMException);
+    void stopTrackingRepaints(in Document document) raises (DOMException);
 };

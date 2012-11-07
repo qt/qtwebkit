@@ -46,7 +46,7 @@ public:
     {
     }
 
-    void encode(CoreIPC::ArgumentEncoder* encoder) const 
+    void encode(CoreIPC::ArgumentEncoder& encoder) const
     {
         APIObject::Type type = APIObject::TypeNull;
         if (baseEncode(encoder, type))
@@ -55,17 +55,17 @@ public:
         switch (type) {
         case APIObject::TypePage: {
             WebPageProxy* page = static_cast<WebPageProxy*>(m_root);
-            encoder->encode(page->pageID());
+            encoder << page->pageID();
             break;
         }
         case APIObject::TypeFrame: {
             WebFrameProxy* frame = static_cast<WebFrameProxy*>(m_root);
-            encoder->encode(frame->frameID());
+            encoder << frame->frameID();
             break;
         }
         case APIObject::TypePageGroup: {
             WebPageGroup* pageGroup = static_cast<WebPageGroup*>(m_root);
-            encoder->encode(pageGroup->data());
+            encoder << pageGroup->data();
             break;
         }
         default:

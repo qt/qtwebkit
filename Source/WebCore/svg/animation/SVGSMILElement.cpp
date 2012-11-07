@@ -421,9 +421,6 @@ bool SVGSMILElement::isSupportedAttribute(const QualifiedName& attrName)
         supportedAttributes.add(SVGNames::minAttr);
         supportedAttributes.add(SVGNames::maxAttr);
         supportedAttributes.add(SVGNames::attributeNameAttr);
-        supportedAttributes.add(SVGNames::fromAttr);
-        supportedAttributes.add(SVGNames::toAttr);
-        supportedAttributes.add(SVGNames::byAttr);
         supportedAttributes.add(XLinkNames::hrefAttr);
     }
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
@@ -713,6 +710,7 @@ SMILTime SVGSMILElement::simpleDuration() const
 
 void SVGSMILElement::addBeginTime(SMILTime eventTime, SMILTime beginTime, SMILTimeWithOrigin::Origin origin)
 {
+    ASSERT(!isnan(beginTime.value()));
     m_beginTimes.append(SMILTimeWithOrigin(beginTime, origin));
     sortTimeList(m_beginTimes);
     beginListChanged(eventTime);
@@ -720,6 +718,7 @@ void SVGSMILElement::addBeginTime(SMILTime eventTime, SMILTime beginTime, SMILTi
 
 void SVGSMILElement::addEndTime(SMILTime eventTime, SMILTime endTime, SMILTimeWithOrigin::Origin origin)
 {
+    ASSERT(!isnan(endTime.value()));
     m_endTimes.append(SMILTimeWithOrigin(endTime, origin));
     sortTimeList(m_endTimes);
     endListChanged(eventTime);
@@ -1002,9 +1001,7 @@ float SVGSMILElement::calculateAnimationPercentAndRepeat(SMILTime elapsed, unsig
     SMILTime activeTime = elapsed - m_intervalBegin;
     SMILTime repeatingDuration = this->repeatingDuration();
     if (elapsed >= m_intervalEnd || activeTime > repeatingDuration) {
-        repeat = static_cast<unsigned>(repeatingDuration.value() / simpleDuration.value());
-        if (fmod(repeatingDuration.value(), !simpleDuration.value()))
-            repeat--;
+        repeat = static_cast<unsigned>(repeatingDuration.value() / simpleDuration.value()) - 1;
 
         double percent = (m_intervalEnd.value() - m_intervalBegin.value()) / simpleDuration.value();
         percent = percent - floor(percent);

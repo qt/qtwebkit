@@ -145,6 +145,7 @@ static HistoryDelegate *historyDelegate;
 PolicyDelegate *policyDelegate;
 StorageTrackerDelegate *storageDelegate;
 
+static int dumpPixelsForAllTests = NO;
 static bool dumpPixelsForCurrentTest;
 static int threaded;
 static int dumpTree = YES;
@@ -328,6 +329,7 @@ static NSSet *allowedFontFamilySet()
         @"STFangsong",
         @"STHeiti",
         @"STIXGeneral",
+        @"STIXSizeOneSym",
         @"STKaiti",
         @"STSong",
         @"Symbol",
@@ -614,6 +616,8 @@ static void resetDefaultsToConsistentValues()
     [defaults setObject:[path stringByAppendingPathComponent:@"LocalStorage"] forKey:WebStorageDirectoryDefaultsKey];
     [defaults setObject:[path stringByAppendingPathComponent:@"LocalCache"] forKey:WebKitLocalCacheDefaultsKey];
 
+    [defaults setBool:NO forKey:@"WebKitKerningAndLigaturesEnabledByDefault"];
+
     WebPreferences *preferences = [WebPreferences standardPreferences];
 
     [preferences setAllowUniversalAccessFromFileURLs:YES];
@@ -789,6 +793,7 @@ static void initializeGlobalsFromCommandLineOptions(int argc, const char *argv[]
 {
     struct option options[] = {
         {"notree", no_argument, &dumpTree, NO},
+        {"pixel-tests", no_argument, &dumpPixelsForAllTests, YES},
         {"tree", no_argument, &dumpTree, YES},
         {"threaded", no_argument, &threaded, YES},
         {"complex-text", no_argument, &forceComplexText, YES},
@@ -1297,7 +1302,7 @@ static void runTest(const string& inputLine)
 
     TestCommand command = parseInputLine(inputLine);
     const string& pathOrURL = command.pathOrURL;
-    dumpPixelsForCurrentTest = command.shouldDumpPixels;
+    dumpPixelsForCurrentTest = command.shouldDumpPixels || dumpPixelsForAllTests;
 
     NSString *pathOrURLString = [NSString stringWithUTF8String:pathOrURL.c_str()];
     if (!pathOrURLString) {

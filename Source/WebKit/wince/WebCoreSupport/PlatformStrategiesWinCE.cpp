@@ -48,12 +48,7 @@ CookiesStrategy* PlatformStrategiesWinCE::createCookiesStrategy()
     return this;
 }
 
-PluginStrategy* PlatformStrategiesWinCE::createPluginStrategy()
-{
-    return this;
-}
-
-VisitedLinkStrategy* PlatformStrategiesWinCE::createVisitedLinkStrategy()
+LoaderStrategy* PlatformStrategiesWinCE::createLoaderStrategy()
 {
     return this;
 }
@@ -61,6 +56,21 @@ VisitedLinkStrategy* PlatformStrategiesWinCE::createVisitedLinkStrategy()
 PasteboardStrategy* PlatformStrategiesWinCE::createPasteboardStrategy()
 {
     return 0;
+}
+
+PluginStrategy* PlatformStrategiesWinCE::createPluginStrategy()
+{
+    return this;
+}
+
+SharedWorkerStrategy* PlatformStrategiesWinCE::createSharedWorkerStrategy()
+{
+    return this;
+}
+
+VisitedLinkStrategy* PlatformStrategiesWinCE::createVisitedLinkStrategy()
+{
+    return this;
 }
 
 void PlatformStrategiesWinCE::notifyCookiesChanged()

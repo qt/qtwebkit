@@ -258,6 +258,7 @@ QPointF QQuickWebViewPrivate::FlickableAxisLocker::adjust(const QPointF& positio
 
 QQuickWebViewPrivate::QQuickWebViewPrivate(QQuickWebView* viewport)
     : q_ptr(viewport)
+    , experimental(new QQuickWebViewExperimental(viewport, this))
     , alertDialog(0)
     , confirmDialog(0)
     , promptDialog(0)
@@ -321,6 +322,9 @@ void QQuickWebViewPrivate::initialize(WKContextRef contextRef, WKPageGroupRef pa
 
     pageClient.initialize(q_ptr, pageViewPrivate->eventHandler.data(), &undoController);
     webPageProxy->initializeWebPage();
+
+    q_ptr->setAcceptedMouseButtons(Qt::MouseButtonMask);
+    q_ptr->setAcceptHoverEvents(true);
 }
 
 void QQuickWebViewPrivate::loadDidStop()
@@ -419,9 +423,6 @@ void QQuickWebViewPrivate::handleMouseEvent(QMouseEvent* event)
 {
     switch (event->type()) {
     case QEvent::MouseButtonPress:
-    case QEvent::MouseButtonDblClick:
-        // If a MouseButtonDblClick was received then we got a MouseButtonPress before
-        // handleMousePressEvent will take care of double clicks.
         pageView->eventHandler()->handleMousePressEvent(event);
         break;
     case QEvent::MouseMove:
@@ -429,6 +430,11 @@ void QQuickWebViewPrivate::handleMouseEvent(QMouseEvent* event)
         break;
     case QEvent::MouseButtonRelease:
         pageView->eventHandler()->handleMouseReleaseEvent(event);
+        break;
+    case QEvent::MouseButtonDblClick:
+        // If a MouseButtonDblClick was received then we got a MouseButtonPress before.
+        // WebCore will build double-clicks out of press events.
+        event->accept();
         break;
     default:
         ASSERT_NOT_REACHED();
@@ -503,7 +509,7 @@ void QQuickWebViewPrivate::handleDownloadRequest(DownloadProxy* download)
     downloadItem->d->downloadProxy = download;
 
     q->connect(downloadItem->d, SIGNAL(receivedResponse(QWebDownloadItem*)), q, SLOT(_q_onReceivedResponseFromDownload(QWebDownloadItem*)));
-    context->downloadManager()->addDownload(download, downloadItem);
+    QtWebContext::downloadManager()->addDownload(download, downloadItem);
 }
 
 void QQuickWebViewPrivate::_q_onVisibleChanged()
@@ -805,11 +811,7 @@ QQuickWebViewLegacyPrivate::QQuickWebViewLegacyPrivate(QQuickWebView* viewport)
 
 void QQuickWebViewLegacyPrivate::initialize(WKContextRef contextRef, WKPageGroupRef pageGroupRef)
 {
-    Q_Q(QQuickWebView);
     QQuickWebViewPrivate::initialize(contextRef, pageGroupRef);
-
-    q->setAcceptedMouseButtons(Qt::MouseButtonMask);
-    q->setAcceptHoverEvents(true);
 
     // Trigger setting of correct visibility flags after everything was allocated and initialized.
     _q_onVisibleChanged();
@@ -847,7 +849,6 @@ void QQuickWebViewLegacyPrivate::setZoomFactor(qreal factor)
 QQuickWebViewFlickablePrivate::QQuickWebViewFlickablePrivate(QQuickWebView* viewport)
     : QQuickWebViewPrivate(viewport)
 {
-    viewport->setAcceptHoverEvents(false);
 }
 
 void QQuickWebViewFlickablePrivate::initialize(WKContextRef contextRef, WKPageGroupRef pageGroupRef)
@@ -897,12 +898,12 @@ void QQuickWebViewFlickablePrivate::handleMouseEvent(QMouseEvent* event)
     pageView->eventHandler()->handleInputEvent(event);
 }
 
-QQuickWebViewExperimental::QQuickWebViewExperimental(QQuickWebView *webView)
+QQuickWebViewExperimental::QQuickWebViewExperimental(QQuickWebView *webView, QQuickWebViewPrivate* webViewPrivate)
     : QObject(webView)
     , q_ptr(webView)
-    , d_ptr(webView->d_ptr.data())
+    , d_ptr(webViewPrivate)
     , schemeParent(new QObject(this))
-    , m_test(new QWebKitTest(webView->d_ptr.data(), this))
+    , m_test(new QWebKitTest(webViewPrivate, this))
 {
 }
 
@@ -1473,7 +1474,6 @@ QQuickWebPage* QQuickWebViewExperimental::page()
 QQuickWebView::QQuickWebView(QQuickItem* parent)
     : QQuickFlickable(parent)
     , d_ptr(createPrivateObject(this))
-    , m_experimental(new QQuickWebViewExperimental(this))
 {
     Q_D(QQuickWebView);
     d->initialize();
@@ -1482,7 +1482,6 @@ QQuickWebView::QQuickWebView(QQuickItem* parent)
 QQuickWebView::QQuickWebView(WKContextRef contextRef, WKPageGroupRef pageGroupRef, QQuickItem* parent)
     : QQuickFlickable(parent)
     , d_ptr(createPrivateObject(this))
-    , m_experimental(new QQuickWebViewExperimental(this))
 {
     Q_D(QQuickWebView);
     d->initialize(contextRef, pageGroupRef);
@@ -1762,7 +1761,8 @@ QVariant QQuickWebView::inputMethodQuery(Qt::InputMethodQuery property) const
 */
 QQuickWebViewExperimental* QQuickWebView::experimental() const
 {
-    return m_experimental;
+    Q_D(const QQuickWebView);
+    return d->experimental;
 }
 
 /*!

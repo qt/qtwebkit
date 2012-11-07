@@ -42,7 +42,7 @@
 #if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
 #include "DateTimeFieldsState.h"
 #include "LocalizedStrings.h"
-#include "Localizer.h"
+#include "PlatformLocale.h"
 #include <wtf/text/StringBuilder.h>
 #include <wtf/text/WTFString.h>
 #endif
@@ -152,10 +152,10 @@ String DateTimeLocalInputType::formatDateTimeFieldsState(const DateTimeFieldsSta
 void DateTimeLocalInputType::setupLayoutParameters(DateTimeEditElement::LayoutParameters& layoutParameters, const DateComponents& date) const
 {
     if (shouldHaveSecondField(date)) {
-        layoutParameters.dateTimeFormat = layoutParameters.localizer.dateTimeFormatWithSeconds();
+        layoutParameters.dateTimeFormat = layoutParameters.locale.dateTimeFormatWithSeconds();
         layoutParameters.fallbackDateTimeFormat = "dd/MM/yyyy HH:mm:ss";
     } else {
-        layoutParameters.dateTimeFormat = layoutParameters.localizer.dateTimeFormatWithoutSeconds();
+        layoutParameters.dateTimeFormat = layoutParameters.locale.dateTimeFormatWithoutSeconds();
         layoutParameters.fallbackDateTimeFormat = "dd/MM/yyyy HH:mm";
     }
     layoutParameters.minimumYear = fullYear(element()->fastGetAttribute(minAttr));

@@ -36,13 +36,13 @@ SharedWorkerProcessCreationParameters::SharedWorkerProcessCreationParameters()
 {
 }
 
-void SharedWorkerProcessCreationParameters::encode(CoreIPC::ArgumentEncoder* encoder) const
+void SharedWorkerProcessCreationParameters::encode(CoreIPC::ArgumentEncoder& encoder) const
 {
-    encoder->encode(minimumLifetime);
-    encoder->encode(terminationTimeout);
+    encoder << minimumLifetime;
+    encoder << terminationTimeout;
 
 #if PLATFORM(MAC)
-    encoder->encode(parentProcessName);
+    encoder << parentProcessName;
 #endif
 }
 

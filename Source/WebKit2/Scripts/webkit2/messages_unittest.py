@@ -382,6 +382,7 @@ struct LoadURL : CoreIPC::Arguments1<const WTF::String&> {
     static const Kind messageID = LoadURLID;
     static CoreIPC::StringReference receiverName() { return messageReceiverName(); }
     static CoreIPC::StringReference name() { return CoreIPC::StringReference("LoadURL"); }
+    static const bool isSync = false;
 
     typedef CoreIPC::Arguments1<const WTF::String&> DecodeType;
     explicit LoadURL(const WTF::String& url)
@@ -395,6 +396,7 @@ struct TouchEvent : CoreIPC::Arguments1<const WebKit::WebTouchEvent&> {
     static const Kind messageID = TouchEventID;
     static CoreIPC::StringReference receiverName() { return messageReceiverName(); }
     static CoreIPC::StringReference name() { return CoreIPC::StringReference("TouchEvent"); }
+    static const bool isSync = false;
 
     typedef CoreIPC::Arguments1<const WebKit::WebTouchEvent&> DecodeType;
     explicit TouchEvent(const WebKit::WebTouchEvent& event)
@@ -408,6 +410,7 @@ struct DidReceivePolicyDecision : CoreIPC::Arguments3<uint64_t, uint64_t, uint32
     static const Kind messageID = DidReceivePolicyDecisionID;
     static CoreIPC::StringReference receiverName() { return messageReceiverName(); }
     static CoreIPC::StringReference name() { return CoreIPC::StringReference("DidReceivePolicyDecision"); }
+    static const bool isSync = false;
 
     typedef CoreIPC::Arguments3<uint64_t, uint64_t, uint32_t> DecodeType;
     DidReceivePolicyDecision(uint64_t frameID, uint64_t listenerID, uint32_t policyAction)
@@ -420,6 +423,7 @@ struct Close : CoreIPC::Arguments0 {
     static const Kind messageID = CloseID;
     static CoreIPC::StringReference receiverName() { return messageReceiverName(); }
     static CoreIPC::StringReference name() { return CoreIPC::StringReference("Close"); }
+    static const bool isSync = false;
 
     typedef CoreIPC::Arguments0 DecodeType;
 };
@@ -428,6 +432,7 @@ struct PreferencesDidChange : CoreIPC::Arguments1<const WebKit::WebPreferencesSt
     static const Kind messageID = PreferencesDidChangeID;
     static CoreIPC::StringReference receiverName() { return messageReceiverName(); }
     static CoreIPC::StringReference name() { return CoreIPC::StringReference("PreferencesDidChange"); }
+    static const bool isSync = false;
 
     typedef CoreIPC::Arguments1<const WebKit::WebPreferencesStore&> DecodeType;
     explicit PreferencesDidChange(const WebKit::WebPreferencesStore& store)
@@ -440,6 +445,7 @@ struct SendDoubleAndFloat : CoreIPC::Arguments2<double, float> {
     static const Kind messageID = SendDoubleAndFloatID;
     static CoreIPC::StringReference receiverName() { return messageReceiverName(); }
     static CoreIPC::StringReference name() { return CoreIPC::StringReference("SendDoubleAndFloat"); }
+    static const bool isSync = false;
 
     typedef CoreIPC::Arguments2<double, float> DecodeType;
     SendDoubleAndFloat(double d, float f)
@@ -452,6 +458,7 @@ struct SendInts : CoreIPC::Arguments2<const Vector<uint64_t>&, const Vector<Vect
     static const Kind messageID = SendIntsID;
     static CoreIPC::StringReference receiverName() { return messageReceiverName(); }
     static CoreIPC::StringReference name() { return CoreIPC::StringReference("SendInts"); }
+    static const bool isSync = false;
 
     typedef CoreIPC::Arguments2<const Vector<uint64_t>&, const Vector<Vector<uint64_t> >&> DecodeType;
     SendInts(const Vector<uint64_t>& ints, const Vector<Vector<uint64_t> >& intVectors)
@@ -464,6 +471,7 @@ struct CreatePlugin : CoreIPC::Arguments2<uint64_t, const WebKit::Plugin::Parame
     static const Kind messageID = CreatePluginID;
     static CoreIPC::StringReference receiverName() { return messageReceiverName(); }
     static CoreIPC::StringReference name() { return CoreIPC::StringReference("CreatePlugin"); }
+    static const bool isSync = true;
 
     typedef CoreIPC::Arguments1<bool&> Reply;
     typedef CoreIPC::Arguments2<uint64_t, const WebKit::Plugin::Parameters&> DecodeType;
@@ -477,6 +485,7 @@ struct RunJavaScriptAlert : CoreIPC::Arguments2<uint64_t, const WTF::String&> {
     static const Kind messageID = RunJavaScriptAlertID;
     static CoreIPC::StringReference receiverName() { return messageReceiverName(); }
     static CoreIPC::StringReference name() { return CoreIPC::StringReference("RunJavaScriptAlert"); }
+    static const bool isSync = true;
 
     typedef CoreIPC::Arguments0 Reply;
     typedef CoreIPC::Arguments2<uint64_t, const WTF::String&> DecodeType;
@@ -490,6 +499,7 @@ struct GetPlugins : CoreIPC::Arguments1<bool> {
     static const Kind messageID = GetPluginsID;
     static CoreIPC::StringReference receiverName() { return messageReceiverName(); }
     static CoreIPC::StringReference name() { return CoreIPC::StringReference("GetPlugins"); }
+    static const bool isSync = true;
 
     typedef CoreIPC::Arguments1<Vector<WebCore::PluginInfo>&> Reply;
     typedef CoreIPC::Arguments1<bool> DecodeType;
@@ -503,6 +513,7 @@ struct GetPluginProcessConnection : CoreIPC::Arguments1<const WTF::String&> {
     static const Kind messageID = GetPluginProcessConnectionID;
     static CoreIPC::StringReference receiverName() { return messageReceiverName(); }
     static CoreIPC::StringReference name() { return CoreIPC::StringReference("GetPluginProcessConnection"); }
+    static const bool isSync = true;
 
     struct DelayedReply : public ThreadSafeRefCounted<DelayedReply> {
         DelayedReply(PassRefPtr<CoreIPC::Connection>, PassOwnPtr<CoreIPC::MessageEncoder>);
@@ -527,6 +538,7 @@ struct TestMultipleAttributes : CoreIPC::Arguments0 {
     static const Kind messageID = TestMultipleAttributesID;
     static CoreIPC::StringReference receiverName() { return messageReceiverName(); }
     static CoreIPC::StringReference name() { return CoreIPC::StringReference("TestMultipleAttributes"); }
+    static const bool isSync = true;
 
     struct DelayedReply : public ThreadSafeRefCounted<DelayedReply> {
         DelayedReply(PassRefPtr<CoreIPC::Connection>, PassOwnPtr<CoreIPC::MessageEncoder>);
@@ -547,6 +559,7 @@ struct TestConnectionQueue : CoreIPC::Arguments1<uint64_t> {
     static const Kind messageID = TestConnectionQueueID;
     static CoreIPC::StringReference receiverName() { return messageReceiverName(); }
     static CoreIPC::StringReference name() { return CoreIPC::StringReference("TestConnectionQueue"); }
+    static const bool isSync = false;
 
     typedef CoreIPC::Arguments1<uint64_t> DecodeType;
     explicit TestConnectionQueue(uint64_t pluginID)
@@ -559,6 +572,7 @@ struct TestParameterAttributes : CoreIPC::Arguments3<uint64_t, double, double> {
     static const Kind messageID = TestParameterAttributesID;
     static CoreIPC::StringReference receiverName() { return messageReceiverName(); }
     static CoreIPC::StringReference name() { return CoreIPC::StringReference("TestParameterAttributes"); }
+    static const bool isSync = false;
 
     typedef CoreIPC::Arguments3<uint64_t, double, double> DecodeType;
     TestParameterAttributes(uint64_t foo, double bar, double baz)
@@ -572,6 +586,7 @@ struct DidCreateWebProcessConnection : CoreIPC::Arguments1<const CoreIPC::MachPo
     static const Kind messageID = DidCreateWebProcessConnectionID;
     static CoreIPC::StringReference receiverName() { return messageReceiverName(); }
     static CoreIPC::StringReference name() { return CoreIPC::StringReference("DidCreateWebProcessConnection"); }
+    static const bool isSync = false;
 
     typedef CoreIPC::Arguments1<const CoreIPC::MachPort&> DecodeType;
     explicit DidCreateWebProcessConnection(const CoreIPC::MachPort& connectionIdentifier)
@@ -586,6 +601,7 @@ struct InterpretKeyEvent : CoreIPC::Arguments1<uint32_t> {
     static const Kind messageID = InterpretKeyEventID;
     static CoreIPC::StringReference receiverName() { return messageReceiverName(); }
     static CoreIPC::StringReference name() { return CoreIPC::StringReference("InterpretKeyEvent"); }
+    static const bool isSync = true;
 
     typedef CoreIPC::Arguments1<Vector<WebCore::KeypressCommand>&> Reply;
     typedef CoreIPC::Arguments1<uint32_t> DecodeType;
@@ -601,6 +617,7 @@ struct DeprecatedOperation : CoreIPC::Arguments1<const CoreIPC::DummyType&> {
     static const Kind messageID = DeprecatedOperationID;
     static CoreIPC::StringReference receiverName() { return messageReceiverName(); }
     static CoreIPC::StringReference name() { return CoreIPC::StringReference("DeprecatedOperation"); }
+    static const bool isSync = false;
 
     typedef CoreIPC::Arguments1<const CoreIPC::DummyType&> DecodeType;
     explicit DeprecatedOperation(const CoreIPC::DummyType& dummy)
@@ -615,6 +632,7 @@ struct ExperimentalOperation : CoreIPC::Arguments1<const CoreIPC::DummyType&> {
     static const Kind messageID = ExperimentalOperationID;
     static CoreIPC::StringReference receiverName() { return messageReceiverName(); }
     static CoreIPC::StringReference name() { return CoreIPC::StringReference("ExperimentalOperation"); }
+    static const bool isSync = false;
 
     typedef CoreIPC::Arguments1<const CoreIPC::DummyType&> DecodeType;
     explicit ExperimentalOperation(const CoreIPC::DummyType& dummy)
@@ -743,18 +761,15 @@ bool TestMultipleAttributes::DelayedReply::send()
 
 namespace WebKit {
 
-void WebPage::didReceiveWebPageMessageOnConnectionWorkQueue(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder, bool& didHandleMessage)
+void WebPage::didReceiveWebPageMessageOnConnectionWorkQueue(CoreIPC::Connection* connection, CoreIPC::MessageID, CoreIPC::MessageDecoder& decoder, bool& didHandleMessage)
 {
 #if COMPILER(MSVC)
 #pragma warning(push)
 #pragma warning(disable: 4065)
 #endif
-    switch (messageID.get<Messages::WebPage::Kind>()) {
-    case Messages::WebPage::TestConnectionQueueID:
+    if (decoder.messageName() == Messages::WebPage::TestConnectionQueue::name()) {
         CoreIPC::handleMessageOnConnectionQueue<Messages::WebPage::TestConnectionQueue>(connection, decoder, this, &WebPage::testConnectionQueue);
         didHandleMessage = true;
-        return;
-    default:
         return;
     }
 #if COMPILER(MSVC)
@@ -762,78 +777,83 @@ void WebPage::didReceiveWebPageMessageOnConnectionWorkQueue(CoreIPC::Connection*
 #endif
 }
 
-void WebPage::didReceiveWebPageMessage(CoreIPC::Connection*, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
+void WebPage::didReceiveWebPageMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder& decoder)
 {
-    switch (messageID.get<Messages::WebPage::Kind>()) {
-    case Messages::WebPage::LoadURLID:
+    if (decoder.messageName() == Messages::WebPage::LoadURL::name()) {
         CoreIPC::handleMessage<Messages::WebPage::LoadURL>(decoder, this, &WebPage::loadURL);
         return;
+    }
 #if ENABLE(TOUCH_EVENTS)
-    case Messages::WebPage::TouchEventID:
+    if (decoder.messageName() == Messages::WebPage::TouchEvent::name()) {
         CoreIPC::handleMessage<Messages::WebPage::TouchEvent>(decoder, this, &WebPage::touchEvent);
         return;
+    }
 #endif
-    case Messages::WebPage::DidReceivePolicyDecisionID:
+    if (decoder.messageName() == Messages::WebPage::DidReceivePolicyDecision::name()) {
         CoreIPC::handleMessage<Messages::WebPage::DidReceivePolicyDecision>(decoder, this, &WebPage::didReceivePolicyDecision);
         return;
-    case Messages::WebPage::CloseID:
+    }
+    if (decoder.messageName() == Messages::WebPage::Close::name()) {
         CoreIPC::handleMessage<Messages::WebPage::Close>(decoder, this, &WebPage::close);
         return;
-    case Messages::WebPage::PreferencesDidChangeID:
+    }
+    if (decoder.messageName() == Messages::WebPage::PreferencesDidChange::name()) {
         CoreIPC::handleMessage<Messages::WebPage::PreferencesDidChange>(decoder, this, &WebPage::preferencesDidChange);
         return;
-    case Messages::WebPage::SendDoubleAndFloatID:
+    }
+    if (decoder.messageName() == Messages::WebPage::SendDoubleAndFloat::name()) {
         CoreIPC::handleMessage<Messages::WebPage::SendDoubleAndFloat>(decoder, this, &WebPage::sendDoubleAndFloat);
         return;
-    case Messages::WebPage::SendIntsID:
+    }
+    if (decoder.messageName() == Messages::WebPage::SendInts::name()) {
         CoreIPC::handleMessage<Messages::WebPage::SendInts>(decoder, this, &WebPage::sendInts);
         return;
-    case Messages::WebPage::TestParameterAttributesID:
+    }
+    if (decoder.messageName() == Messages::WebPage::TestParameterAttributes::name()) {
         CoreIPC::handleMessage<Messages::WebPage::TestParameterAttributes>(decoder, this, &WebPage::testParameterAttributes);
         return;
+    }
 #if PLATFORM(MAC)
-    case Messages::WebPage::DidCreateWebProcessConnectionID:
+    if (decoder.messageName() == Messages::WebPage::DidCreateWebProcessConnection::name()) {
         CoreIPC::handleMessage<Messages::WebPage::DidCreateWebProcessConnection>(decoder, this, &WebPage::didCreateWebProcessConnection);
         return;
+    }
 #endif
 #if ENABLE(DEPRECATED_FEATURE)
-    case Messages::WebPage::DeprecatedOperationID:
+    if (decoder.messageName() == Messages::WebPage::DeprecatedOperation::name()) {
         CoreIPC::handleMessage<Messages::WebPage::DeprecatedOperation>(decoder, this, &WebPage::deprecatedOperation);
         return;
+    }
 #endif
 #if ENABLE(EXPERIMENTAL_FEATURE)
-    case Messages::WebPage::ExperimentalOperationID:
+    if (decoder.messageName() == Messages::WebPage::ExperimentalOperation::name()) {
         CoreIPC::handleMessage<Messages::WebPage::ExperimentalOperation>(decoder, this, &WebPage::experimentalOperation);
         return;
-#endif
-    default:
-        break;
     }
-
+#endif
     ASSERT_NOT_REACHED();
 }
 
-void WebPage::didReceiveSyncWebPageMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder, OwnPtr<CoreIPC::MessageEncoder>& replyEncoder)
+void WebPage::didReceiveSyncWebPageMessage(CoreIPC::Connection* connection, CoreIPC::MessageID, CoreIPC::MessageDecoder& decoder, OwnPtr<CoreIPC::MessageEncoder>& replyEncoder)
 {
-    switch (messageID.get<Messages::WebPage::Kind>()) {
-    case Messages::WebPage::CreatePluginID:
+    if (decoder.messageName() == Messages::WebPage::CreatePlugin::name()) {
         CoreIPC::handleMessage<Messages::WebPage::CreatePlugin>(decoder, *replyEncoder, this, &WebPage::createPlugin);
         return;
-    case Messages::WebPage::RunJavaScriptAlertID:
+    }
+    if (decoder.messageName() == Messages::WebPage::RunJavaScriptAlert::name()) {
         CoreIPC::handleMessage<Messages::WebPage::RunJavaScriptAlert>(decoder, *replyEncoder, this, &WebPage::runJavaScriptAlert);
         return;
-    case Messages::WebPage::GetPluginProcessConnectionID:
+    }
+    if (decoder.messageName() == Messages::WebPage::GetPluginProcessConnection::name()) {
         CoreIPC::handleMessageDelayed<Messages::WebPage::GetPluginProcessConnection>(connection, decoder, replyEncoder, this, &WebPage::getPluginProcessConnection);
         return;
+    }
 #if PLATFORM(MAC)
-    case Messages::WebPage::InterpretKeyEventID:
+    if (decoder.messageName() == Messages::WebPage::InterpretKeyEvent::name()) {
         CoreIPC::handleMessage<Messages::WebPage::InterpretKeyEvent>(decoder, *replyEncoder, this, &WebPage::interpretKeyEvent);
         return;
-#endif
-    default:
-        break;
     }
-
+#endif
     ASSERT_NOT_REACHED();
 }
 

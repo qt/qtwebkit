@@ -20,6 +20,7 @@
 #define WebPage_p_h
 
 #include "ChromeClient.h"
+#include "HitTestResult.h"
 #include "InRegionScroller.h"
 #include "InspectorClientBlackBerry.h"
 #include "InspectorOverlay.h"
@@ -33,6 +34,7 @@
 #include "PageClientBlackBerry.h"
 #include "PlatformMouseEvent.h"
 #include "ScriptSourceCode.h"
+#include "SelectionOverlay.h"
 #include "Timer.h"
 #include "ViewportArguments.h"
 #include "WebPage.h"
@@ -51,9 +53,8 @@ class DOMWrapperWorld;
 class Document;
 class Element;
 class Frame;
-class GeolocationControllerClientBlackBerry;
+class GeolocationClientBlackBerry;
 class GraphicsLayerBlackBerry;
-class JavaScriptDebuggerBlackBerry;
 class LayerWebKitThread;
 class Node;
 class Page;
@@ -400,8 +401,6 @@ public:
     virtual void notifyAnimationStarted(const WebCore::GraphicsLayer*, double time) { }
     virtual void notifyFlushRequired(const WebCore::GraphicsLayer*);
     virtual void paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext&, WebCore::GraphicsLayerPaintingPhase, const WebCore::IntRect& inClip) { }
-    virtual bool showDebugBorders(const WebCore::GraphicsLayer*) const;
-    virtual bool showRepaintCounter(const WebCore::GraphicsLayer*) const;
 
     // WebKit thread, plumbed through from ChromeClientBlackBerry.
     void setRootLayerWebKitThread(WebCore::Frame*, WebCore::LayerWebKitThread*);
@@ -459,7 +458,16 @@ public:
     void applySizeOverride(int overrideWidth, int overrideHeight);
     void setTextZoomFactor(float);
 
+    void postponeDocumentStyleRecalc();
+    void resumeDocumentStyleRecalc();
+
+    const WebCore::HitTestResult& hitTestResult(const WebCore::IntPoint& contentPos);
+    void clearCachedHitTestResult();
+
     WebCore::IntSize screenSize() const;
+
+    void willComposite();
+    void didComposite();
 
     WebPage* m_webPage;
     WebPageClient* m_client;
@@ -470,11 +478,7 @@ public:
     WebSettings* m_webSettings;
     WebCookieJar* m_cookieJar;
     OwnPtr<WebTapHighlight> m_tapHighlight;
-    WebSelectionOverlay* m_selectionOverlay;
-
-#if ENABLE(JAVASCRIPT_DEBUGGER)
-    OwnPtr<WebCore::JavaScriptDebuggerBlackBerry> m_scriptDebugger;
-#endif
+    OwnPtr<SelectionOverlay> m_selectionOverlay;
 
     bool m_visible;
     ActivationStateType m_activationState;
@@ -522,9 +526,8 @@ public:
 #if ENABLE(FULLSCREEN_API)
 #if ENABLE(VIDEO)
     double m_scaleBeforeFullScreen;
-    WebCore::IntPoint m_scrollOffsetBeforeFullScreen;
+    int m_xScrollOffsetBeforeFullScreen;
 #endif
-    bool m_isTogglingFullScreenState;
 #endif
 
     Platform::BlackBerryCursor m_currentCursor;
@@ -636,6 +639,12 @@ public:
     WebCore::PagePopupBlackBerry* m_selectPopup;
 
     RefPtr<WebCore::AutofillManager> m_autofillManager;
+
+    bool m_documentStyleRecalcPostponed;
+    bool m_documentChildNeedsStyleRecalc;
+
+    WebCore::IntPoint m_cachedHitTestContentPos;
+    WebCore::HitTestResult m_cachedHitTestResult;
 protected:
     virtual ~WebPagePrivate();
 };

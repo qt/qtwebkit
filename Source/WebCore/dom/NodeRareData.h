@@ -158,6 +158,8 @@ public:
         }
     }
 
+    void reportMemoryUsage(MemoryObjectInfo*) const;
+
 private:
     NodeListsNodeData() { }
 
@@ -176,7 +178,7 @@ private:
     TagNodeListCacheNS m_tagNodeListCacheNS;
 };
 
-class NodeRareData {
+class NodeRareData : public NodeRareDataBase {
     WTF_MAKE_NONCOPYABLE(NodeRareData); WTF_MAKE_FAST_ALLOCATED;
 public:    
     NodeRareData()
@@ -196,19 +198,6 @@ public:
 
     virtual ~NodeRareData()
     {
-    }
-
-    typedef HashMap<const Node*, NodeRareData*> NodeRareDataMap;
-    
-    static NodeRareDataMap& rareDataMap()
-    {
-        static NodeRareDataMap* dataMap = new NodeRareDataMap;
-        return *dataMap;
-    }
-    
-    static NodeRareData* rareDataFromMap(const Node* node)
-    {
-        return rareDataMap().get(node);
     }
 
     TreeScope* treeScope() const { return m_treeScope; }
@@ -307,6 +296,8 @@ public:
 
     bool isFocused() const { return m_isFocused; }
     void setFocused(bool focused) { m_isFocused = focused; }
+
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
 
 protected:
     // for ElementRareData

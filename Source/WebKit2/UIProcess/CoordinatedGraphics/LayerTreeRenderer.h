@@ -28,6 +28,7 @@
 #include "WebLayerTreeInfo.h"
 #include <WebCore/GraphicsContext.h>
 #include <WebCore/GraphicsLayer.h>
+#include <WebCore/GraphicsLayerAnimation.h>
 #include <WebCore/GraphicsSurface.h>
 #include <WebCore/IntRect.h>
 #include <WebCore/IntSize.h>
@@ -59,7 +60,7 @@ public:
         {
         }
     };
-    LayerTreeRenderer(LayerTreeCoordinatorProxy*);
+    explicit LayerTreeRenderer(LayerTreeCoordinatorProxy*);
     virtual ~LayerTreeRenderer();
     void purgeGLResources();
     void paintToCurrentGLContext(const WebCore::TransformationMatrix&, float, const WebCore::FloatRect&, WebCore::TextureMapper::PaintFlags = 0);
@@ -74,7 +75,6 @@ public:
 
     void detach();
     void appendUpdate(const Function<void()>&);
-    void updateViewport();
     void setActive(bool);
 
     void deleteLayer(WebLayerID);
@@ -91,8 +91,13 @@ public:
     void flushLayerChanges();
     void createImage(int64_t, PassRefPtr<ShareableBitmap>);
     void destroyImage(int64_t);
-    void setAnimatedOpacity(uint32_t, float);
-    void setAnimatedTransform(uint32_t, const WebCore::TransformationMatrix&);
+    void setLayerAnimations(WebLayerID, const WebCore::GraphicsLayerAnimations&);
+    void setAnimationsLocked(bool);
+
+#if ENABLE(REQUEST_ANIMATION_FRAME)
+    void requestAnimationFrame();
+    void animationFrameReady();
+#endif
 
 private:
     PassOwnPtr<WebCore::GraphicsLayer> createLayer(WebLayerID);
@@ -103,11 +108,17 @@ private:
     // Reimplementations from WebCore::GraphicsLayerClient.
     virtual void notifyAnimationStarted(const WebCore::GraphicsLayer*, double) { }
     virtual void notifyFlushRequired(const WebCore::GraphicsLayer*) { }
-    virtual bool showDebugBorders(const WebCore::GraphicsLayer*) const { return false; }
-    virtual bool showRepaintCounter(const WebCore::GraphicsLayer*) const { return false; }
     void paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext&, WebCore::GraphicsLayerPaintingPhase, const WebCore::IntRect&) { }
+    void updateViewport();
     void dispatchOnMainThread(const Function<void()>&);
     void adjustPositionForFixedLayers();
+
+    void assignImageToLayer(WebCore::GraphicsLayer*, int64_t imageID);
+    void ensureRootLayer();
+    void ensureLayer(WebLayerID);
+    void commitTileOperations();
+    void renderNextFrame();
+    void purgeBackingStores();
 
     typedef HashMap<WebLayerID, WebCore::GraphicsLayer*> LayerMap;
     WebCore::FloatSize m_contentsSize;
@@ -115,6 +126,7 @@ private:
 
     // Render queue can be accessed ony from main thread or updatePaintNode call stack!
     Vector<Function<void()> > m_renderQueue;
+    Mutex m_renderQueueMutex;
 
 #if USE(TEXTURE_MAPPER)
     OwnPtr<WebCore::TextureMapper> m_textureMapper;
@@ -127,19 +139,8 @@ private:
     SurfaceBackingStoreMap m_surfaceBackingStores;
 #endif
 
-    void scheduleWebViewUpdate();
-    void synchronizeViewport();
-    void assignImageToLayer(WebCore::GraphicsLayer*, int64_t imageID);
-    void ensureRootLayer();
-    void ensureLayer(WebLayerID);
-    void commitTileOperations();
-    void syncAnimations();
-    void renderNextFrame();
-    void purgeBackingStores();
-
     LayerTreeCoordinatorProxy* m_layerTreeCoordinatorProxy;
     OwnPtr<WebCore::GraphicsLayer> m_rootLayer;
-    Vector<WebLayerID> m_layersToDelete;
 
     LayerMap m_layers;
     LayerMap m_fixedLayers;
@@ -147,6 +148,10 @@ private:
     WebCore::IntPoint m_renderedContentsScrollPosition;
     WebCore::IntPoint m_pendingRenderedContentsScrollPosition;
     bool m_isActive;
+    bool m_animationsLocked;
+#if ENABLE(REQUEST_ANIMATION_FRAME)
+    bool m_animationFrameRequested;
+#endif
 };
 
 };

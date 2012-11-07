@@ -212,10 +212,6 @@
     CSSStyleDeclaration createCSSStyleDeclaration();
 #endif
 
-#if defined(LANGUAGE_JAVASCRIPT) && LANGUAGE_JAVASCRIPT
-    [Conditional=UNDO_MANAGER] readonly attribute UndoManager undoManager;
-#endif
-
 #if defined(LANGUAGE_OBJECTIVE_C) && LANGUAGE_OBJECTIVE_C
     // DOM Level 2 Style Interface
     [ObjCLegacyUnnamedParameters, ObjCUseDefaultView] CSSStyleDeclaration getComputedStyle(in Element element,
@@ -370,7 +366,7 @@
     [Conditional=PAGE_VISIBILITY_API] readonly attribute boolean webkitHidden;
 
     // Security Policy API: http://dvcs.w3.org/hg/content-security-policy/raw-file/tip/csp-specification.dev.html#script-interfaces
-    [Conditional=CSP_NEXT] readonly attribute DOMSecurityPolicy SecurityPolicy;
+    [Conditional=CSP_NEXT] readonly attribute DOMSecurityPolicy securityPolicy;
 
 };
 

@@ -115,5 +115,5 @@ isEmpty(SQLITE3SRCDIR) {
 FLEX = flex
 win32: FLEX = win_flex
 
-EXEEXT =
-win32: EXEEXT = .exe
+BIN_EXTENSION =
+win32: BIN_EXTENSION = .exe

@@ -1,3 +1,145 @@
+2012-11-01  Seonae Kim  <sunaeluv.kim@samsung.com>
+
+        [EFL][DRT] Support Geolocation
+        https://bugs.webkit.org/show_bug.cgi?id=97427
+
+        Reviewed by Gyuyoung Kim. 
+
+        Implement methods to use GeolocationClientMock in DumpRenderTree.
+        This client attaches to the page whenever a view is created.
+
+        * WebCoreSupport/DumpRenderTreeSupportEfl.cpp:
+        (DumpRenderTreeSupportEfl::attachClientToPage):
+        (DumpRenderTreeSupportEfl::resetGeolocationClientMock):
+        (DumpRenderTreeSupportEfl::setMockGeolocationPermission):
+        (DumpRenderTreeSupportEfl::setMockGeolocationPosition):
+        (DumpRenderTreeSupportEfl::setMockGeolocationPositionUnavailableError):
+        (DumpRenderTreeSupportEfl::numberOfPendingGeolocationPermissionRequests):
+        * WebCoreSupport/DumpRenderTreeSupportEfl.h:
+
+2012-10-31  Michał Pakuła vel Rutka  <m.pakula@samsung.com>
+
+        [EFL][DRT] EventSender requires contextClick implementation
+        https://bugs.webkit.org/show_bug.cgi?id=86091
+
+        Reviewed by Gyuyoung Kim.
+
+        Add a pointer to parent menu in Ewk_Context_Menu_Item and a getter
+        function to allow selecting a context menu item without having
+        parent menu pointer in DumpRenderTree EventSender.
+        Three unit tests added due ewk API changes.
+
+        * ewk/ewk_contextmenu.cpp:
+        (_Ewk_Context_Menu_Item):
+        (ewk_context_menu_item_new):
+        (ewk_context_menu_item_parent_get):
+        (ewk_context_menu_item_append):
+        * ewk/ewk_contextmenu.h:
+        * ewk/ewk_view.cpp:
+        (ewk_view_context_menu_get):
+        * ewk/ewk_view.h:
+        * tests/test_ewk_contextmenu.cpp: Added.
+        (TEST_F):
+        * tests/test_ewk_view.cpp:
+        (TEST_F):
+
+2012-10-30  Seokju Kwon  <seokju.kwon@samsung.com>
+
+        [EFL] Fix failure to highlight nodes on web inspector
+        https://bugs.webkit.org/show_bug.cgi?id=100303
+
+        Reviewed by Gyuyoung Kim.
+
+        It is not working to highlight nodes on web inspector
+        when using 'Single Backing Store'.
+        Add code for drawing it if there is the highlighted node.
+
+        * ewk/ewk_view_single.cpp:
+        (_ewk_view_single_smart_repaints_process):
+
+2012-10-30  Jinwoo Song  <jinwoo7.song@samsung.com>
+
+        [EFL] Refactor tooltip callback signal in WebKit1
+        https://bugs.webkit.org/show_bug.cgi?id=100571
+
+        Reviewed by Gyuyoung Kim.
+
+        Separate tooltip callback signal into 'tooltip,text,set'
+        and 'tooltip,text,unset' to be consistent with WebKit2.
+
+        * ewk/ewk_view.cpp:
+        (ewk_view_tooltip_text_set):
+        * ewk/ewk_view.h:
+
+2012-10-26  Hyowon Kim  <hw1008.kim@samsung.com>
+
+        [Texmap][EFL] Implementation of AC related functions in ChromeClientEfl and ewkView.
+        https://bugs.webkit.org/show_bug.cgi?id=82315
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        This patch implements accelerated-compositing-related functions
+        to enter accelerated-compositing mode and sync layers 
+        in ChromeClientEfl and ewkView.
+
+        * WebCoreSupport/ChromeClientEfl.cpp:
+        (WebCore::ChromeClientEfl::attachRootGraphicsLayer):
+        (WebCore::ChromeClientEfl::setNeedsOneShotDrawingSynchronization):
+        (WebCore::ChromeClientEfl::scheduleCompositingLayerFlush):
+        (WebCore::ChromeClientEfl::allowedCompositingTriggers):
+        * ewk/ewk_view.cpp:
+        (_Ewk_View_Private_Data):
+        (_ewk_view_priv_new):
+        (_ewk_view_priv_del):
+        (_ewk_view_accelerated_compositing_cb):
+        Sync and render layers.
+        (_ewk_view_accelerated_compositing_context_create_if_needed):
+        Create a new AcceleratedCompositingContext.
+        (ewk_view_accelerated_compositing_object_create):
+        Create a new evas_image_object act as render target surface.
+        (ewk_view_accelerated_compositing_context_get):
+        Return the GraphicsContext3D for accelerated compositing. 
+        (ewk_view_root_graphics_layer_set):
+        Set the root layer to AcceleratedCompositingContext.
+        (ewk_view_mark_for_sync):
+        Mark the evas_image_object for accelerated compositing as dirty to make it update.
+        * ewk/ewk_view_private.h:
+        (WebCore):
+
+2012-10-24  Brady Eidson  <beidson@apple.com>
+
+        Add a strategy for loader customization.
+        https://bugs.webkit.org/show_bug.cgi?id=100278
+
+        Reviewed by Alexey Proskuryakov.
+
+        * WebCoreSupport/PlatformStrategiesEfl.cpp:
+        (PlatformStrategiesEfl::createLoaderStrategy):
+        * WebCoreSupport/PlatformStrategiesEfl.h:
+        (PlatformStrategiesEfl):
+
+2012-10-23  Alexey Proskuryakov  <ap@apple.com>
+
+        Add a strategy for shared workers
+        https://bugs.webkit.org/show_bug.cgi?id=100165
+
+        Reviewed by Brady Eidson.
+
+        * WebCoreSupport/PlatformStrategiesEfl.cpp:
+        (PlatformStrategiesEfl::createPasteboardStrategy):
+        (PlatformStrategiesEfl::createSharedWorkerStrategy):
+        (PlatformStrategiesEfl::createVisitedLinkStrategy):
+        * WebCoreSupport/PlatformStrategiesEfl.h:
+
+2012-10-23  Hyowon Kim  <hw1008.kim@samsung.com>
+
+        [Texmap][EFL] Add AcceleratedCompositingContextEfl to the build system.
+        https://bugs.webkit.org/show_bug.cgi?id=88630
+
+        Reviewed by Gyuyoung Kim.
+
+        * WebCoreSupport/AcceleratedCompositingContextEfl.cpp: Modify the #include file.
+
 2012-10-23  Andras Becsi  <andras.becsi@digia.com>
 
         Remove devicePixelRatio from ViewportAttributes

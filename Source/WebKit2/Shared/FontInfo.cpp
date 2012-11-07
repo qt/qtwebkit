@@ -34,10 +34,10 @@
 
 namespace WebKit {
 
-void FontInfo::encode(CoreIPC::ArgumentEncoder* encoder) const
+void FontInfo::encode(CoreIPC::ArgumentEncoder& encoder) const
 {
 #if PLATFORM(MAC)
-    encoder->encode(static_cast<bool>(fontAttributeDictionary));
+    encoder << static_cast<bool>(fontAttributeDictionary);
     if (fontAttributeDictionary)
         CoreIPC::encode(encoder, fontAttributeDictionary.get());
 #else

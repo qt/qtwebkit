@@ -53,12 +53,28 @@ TEST_F(EWK2UnitTestBase, ewk_context_cookie_manager_get)
     ASSERT_EQ(cookieManager, ewk_context_cookie_manager_get(context));
 }
 
+TEST_F(EWK2UnitTestBase, ewk_context_database_manager_get)
+{
+    Ewk_Context* context = ewk_view_context_get(webView());
+    Ewk_Database_Manager* databaseManager = ewk_context_database_manager_get(context);
+    ASSERT_TRUE(databaseManager);
+    ASSERT_EQ(databaseManager, ewk_context_database_manager_get(context));
+}
+
 TEST_F(EWK2UnitTestBase, ewk_context_favicon_database_get)
 {
     Ewk_Context* context = ewk_view_context_get(webView());
     Ewk_Favicon_Database* faviconDatabase = ewk_context_favicon_database_get(context);
     ASSERT_TRUE(faviconDatabase);
     ASSERT_EQ(faviconDatabase, ewk_context_favicon_database_get(context));
+}
+
+TEST_F(EWK2UnitTestBase, ewk_context_storage_manager_get)
+{
+    Ewk_Context* context = ewk_view_context_get(webView());
+    Ewk_Storage_Manager* storageManager = ewk_context_storage_manager_get(context);
+    ASSERT_TRUE(storageManager);
+    ASSERT_EQ(storageManager, ewk_context_storage_manager_get(context));
 }
 
 static void schemeRequestCallback(Ewk_Url_Scheme_Request* request, void* userData)
@@ -121,7 +137,7 @@ static void loadVibrationHTMLString(Evas_Object* webView, const char* vibrationP
         ecore_main_loop_iterate();
 }
 
-TEST_F(EWK2UnitTestBase, ewk_context_vibration_client_callbacks_set)
+TEST_F(EWK2UnitTestBase, DISABLED_ewk_context_vibration_client_callbacks_set)
 {
     VibrationCbData data = { false, false, 0, 5000 };
     ewk_context_vibration_client_callbacks_set(ewk_view_context_get(webView()), vibrateCallback, cancelVibrationCallback, &data);
@@ -179,21 +195,12 @@ TEST_F(EWK2UnitTestBase, ewk_context_new)
 {
     Ewk_Context* context = ewk_context_new();
     ASSERT_TRUE(context);
-    ewk_context_unref(context);
+    ewk_object_unref(context);
 }
 
 TEST_F(EWK2UnitTestBase, ewk_context_new_with_injected_bundle_path)
 {
     Ewk_Context* context = ewk_context_new_with_injected_bundle_path(environment->injectedBundleSample());
     ASSERT_TRUE(context);
-    ewk_context_unref(context);
+    ewk_object_unref(context);
 }
-
-TEST_F(EWK2UnitTestBase, ewk_context_ref)
-{
-    Ewk_Context* context = ewk_context_new();
-    ASSERT_EQ(context, ewk_context_ref(context));
-    ewk_context_unref(context);
-    ewk_context_unref(context);
-}
-

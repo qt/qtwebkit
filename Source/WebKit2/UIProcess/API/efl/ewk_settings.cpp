@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012 Samsung Electronics
+ * Copyright (C) 2012 Intel Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,19 +27,31 @@
 #include "config.h"
 #include "ewk_settings.h"
 
+#include "EwkViewImpl.h"
 #include "ewk_settings_private.h"
-#include <WebKit2/WKPreferences.h>
-#include <WebKit2/WKPreferencesPrivate.h>
+#include <WebKit2/WebPageGroup.h>
+#include <WebKit2/WebPageProxy.h>
+#include <WebKit2/WebPreferences.h>
 
 #if ENABLE(SPELLCHECK)
 #include "WKTextChecker.h"
-#include "WebKitTextChecker.h"
+#include "ewk_text_checker_private.h"
 #include <Ecore.h>
 #include <wtf/Vector.h>
 #include <wtf/text/CString.h>
 #endif
 
 using namespace WebKit;
+
+const WebKit::WebPreferences* Ewk_Settings::preferences() const
+{
+    return m_viewImpl->page()->pageGroup()->preferences();
+}
+
+WebKit::WebPreferences* Ewk_Settings::preferences()
+{
+    return m_viewImpl->page()->pageGroup()->preferences();
+}
 
 #if ENABLE(SPELLCHECK)
 static struct {
@@ -58,7 +71,7 @@ static Eina_Bool onContinuousSpellCheckingIdler(void*)
 static Eina_Bool spellCheckingLanguagesSetUpdate(void*)
 {
     // FIXME: Consider to delegate calling of this method in WebProcess to do not delay/block UIProcess.
-    updateSpellCheckingLanguages(ewkTextCheckerSettings.spellCheckingLanguages);
+    Ewk_Text_Checker::updateSpellCheckingLanguages(ewkTextCheckerSettings.spellCheckingLanguages);
     return ECORE_CALLBACK_CANCEL;
 }
 
@@ -73,7 +86,7 @@ Eina_Bool ewk_settings_fullscreen_enabled_set(Ewk_Settings* settings, Eina_Bool 
 {
 #if ENABLE(FULLSCREEN_API)
     EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
-    WKPreferencesSetFullScreenEnabled(settings->preferences.get(), enable);
+    settings->preferences()->setFullScreenEnabled(enable);
     return true;
 #else
     return false;
@@ -84,7 +97,7 @@ Eina_Bool ewk_settings_fullscreen_enabled_get(const Ewk_Settings* settings)
 {
 #if ENABLE(FULLSCREEN_API)
     EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
-    return WKPreferencesGetFullScreenEnabled(settings->preferences.get());
+    return settings->preferences()->fullScreenEnabled();
 #else
     return false;
 #endif
@@ -94,7 +107,7 @@ Eina_Bool ewk_settings_javascript_enabled_set(Ewk_Settings* settings, Eina_Bool 
 {
     EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
 
-    WKPreferencesSetJavaScriptEnabled(settings->preferences.get(), enable);
+    settings->preferences()->setJavaScriptEnabled(enable);
 
     return true;
 }
@@ -103,14 +116,14 @@ Eina_Bool ewk_settings_javascript_enabled_get(const Ewk_Settings* settings)
 {
     EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
 
-    return WKPreferencesGetJavaScriptEnabled(settings->preferences.get());
+    return settings->preferences()->javaScriptEnabled();
 }
 
 Eina_Bool ewk_settings_loads_images_automatically_set(Ewk_Settings* settings, Eina_Bool automatic)
 {
     EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
 
-    WKPreferencesSetLoadsImagesAutomatically(settings->preferences.get(), automatic);
+    settings->preferences()->setLoadsImagesAutomatically(automatic);
 
     return true;
 }
@@ -119,14 +132,14 @@ Eina_Bool ewk_settings_loads_images_automatically_get(const Ewk_Settings* settin
 {
     EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
 
-    return WKPreferencesGetLoadsImagesAutomatically(settings->preferences.get());
+    return settings->preferences()->loadsImagesAutomatically();
 }
 
 Eina_Bool ewk_settings_developer_extras_enabled_set(Ewk_Settings* settings, Eina_Bool enable)
 {
     EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
 
-    WKPreferencesSetDeveloperExtrasEnabled(settings->preferences.get(), enable);
+    settings->preferences()->setDeveloperExtrasEnabled(enable);
 
     return true;
 }
@@ -135,14 +148,14 @@ Eina_Bool ewk_settings_developer_extras_enabled_get(const Ewk_Settings* settings
 {
     EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
 
-    return WKPreferencesGetDeveloperExtrasEnabled(settings->preferences.get());
+    return settings->preferences()->developerExtrasEnabled();
 }
 
 Eina_Bool ewk_settings_file_access_from_file_urls_allowed_set(Ewk_Settings* settings, Eina_Bool enable)
 {
     EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
 
-    WKPreferencesSetFileAccessFromFileURLsAllowed(settings->preferences.get(), enable);
+    settings->preferences()->setAllowFileAccessFromFileURLs(enable);
 
     return true;
 }
@@ -151,14 +164,14 @@ Eina_Bool ewk_settings_file_access_from_file_urls_allowed_get(const Ewk_Settings
 {
     EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
 
-    return WKPreferencesGetFileAccessFromFileURLsAllowed(settings->preferences.get());
+    return settings->preferences()->allowFileAccessFromFileURLs();
 }
 
 Eina_Bool ewk_settings_frame_flattening_enabled_set(Ewk_Settings* settings, Eina_Bool enable)
 {
     EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
 
-    WKPreferencesSetFrameFlatteningEnabled(settings->preferences.get(), enable);
+    settings->preferences()->setFrameFlatteningEnabled(enable);
 
     return true;
 }
@@ -167,14 +180,14 @@ Eina_Bool ewk_settings_frame_flattening_enabled_get(const Ewk_Settings* settings
 {
     EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
 
-    return WKPreferencesGetFrameFlatteningEnabled(settings->preferences.get());
+    return settings->preferences()->frameFlatteningEnabled();
 }
 
 Eina_Bool ewk_settings_dns_prefetching_enabled_set(Ewk_Settings* settings, Eina_Bool enable)
 {
     EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
 
-    WKPreferencesSetDNSPrefetchingEnabled(settings->preferences.get(), enable);
+    settings->preferences()->setDNSPrefetchingEnabled(enable);
 
     return true;
 }
@@ -183,7 +196,7 @@ Eina_Bool ewk_settings_dns_prefetching_enabled_get(const Ewk_Settings* settings)
 {
     EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
 
-    return WKPreferencesGetDNSPrefetchingEnabled(settings->preferences.get());
+    return settings->preferences()->dnsPrefetchingEnabled();
 }
 
 void ewk_settings_continuous_spell_checking_change_cb_set(Ewk_Settings_Continuous_Spell_Checking_Change_Cb callback)
@@ -212,7 +225,7 @@ void ewk_settings_continuous_spell_checking_enabled_set(Eina_Bool enable)
         WKTextCheckerContinuousSpellCheckingEnabledStateChanged(enable);
 
         // Sets the default language if user didn't specify any.
-        if (enable && loadedSpellCheckingLanguages().isEmpty())
+        if (enable && Ewk_Text_Checker::loadedSpellCheckingLanguages().isEmpty())
             spellCheckingLanguagesSet(Vector<String>());
 
         if (ewkTextCheckerSettings.onContinuousSpellChecking)
@@ -225,7 +238,7 @@ Eina_List* ewk_settings_spell_checking_available_languages_get()
 {
     Eina_List* listOflanguages = 0;
 #if ENABLE(SPELLCHECK)
-    Vector<String> languages = availableSpellCheckingLanguages();
+    const Vector<String>& languages = Ewk_Text_Checker::availableSpellCheckingLanguages();
     size_t numberOfLanuages = languages.size();
 
     for (size_t i = 0; i < numberOfLanuages; ++i)
@@ -248,7 +261,7 @@ Eina_List* ewk_settings_spell_checking_languages_get()
 {
     Eina_List* listOflanguages = 0;
 #if ENABLE(SPELLCHECK)
-    Vector<String> languages = loadedSpellCheckingLanguages();
+    Vector<String> languages = Ewk_Text_Checker::loadedSpellCheckingLanguages();
     size_t numberOfLanuages = languages.size();
 
     for (size_t i = 0; i < numberOfLanuages; ++i)
@@ -256,4 +269,20 @@ Eina_List* ewk_settings_spell_checking_languages_get()
 
 #endif
     return listOflanguages;
+}
+
+Eina_Bool ewk_setting_encoding_detector_enabled_set(Ewk_Settings* settings, Eina_Bool enable)
+{
+    EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
+
+    settings->preferences()->setUsesEncodingDetector(enable);
+
+    return true;
+}
+
+Eina_Bool ewk_setting_encoding_detector_enabled_get(const Ewk_Settings* settings)
+{
+    EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
+
+    return settings->preferences()->usesEncodingDetector();
 }

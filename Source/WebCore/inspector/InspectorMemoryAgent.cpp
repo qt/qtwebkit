@@ -276,7 +276,7 @@ private:
     CharacterDataStatistics& m_characterDataStatistics;
 };
 
-class CounterVisitor : public NodeWrapperVisitor, public ExternalStringVisitor {
+class CounterVisitor : public WrappedNodeVisitor, public ExternalStringVisitor {
 public:
     CounterVisitor(Page* page)
         : m_page(page)
@@ -450,7 +450,7 @@ static void reportRenderTreeInfo(WTF::MemoryInstrumentationClient& memoryInstrum
 
 namespace {
 
-class DOMTreesIterator : public NodeWrapperVisitor {
+class DOMTreesIterator : public WrappedNodeVisitor {
 public:
     DOMTreesIterator(MemoryInstrumentationImpl& memoryInstrumentation, Page* page)
         : m_page(page)
@@ -559,7 +559,7 @@ void InspectorMemoryAgent::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo)
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Inspector);
     InspectorBaseAgent<InspectorMemoryAgent>::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_inspectorClient);
+    info.addWeakPointer(m_inspectorClient);
     info.addMember(m_page);
 }
 

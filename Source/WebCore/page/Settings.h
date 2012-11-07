@@ -29,6 +29,7 @@
 
 #include "EditingBehaviorTypes.h"
 #include "FontRenderingMode.h"
+#include "IntSize.h"
 #include "KURL.h"
 #include "SecurityOrigin.h"
 #include "Timer.h"
@@ -36,10 +37,6 @@
 #include <wtf/text/AtomicString.h>
 #include <wtf/text/AtomicStringHash.h>
 #include <wtf/unicode/Unicode.h>
-
-#if ENABLE(TEXT_AUTOSIZING)
-#include "IntSize.h"
-#endif
 
 namespace WebCore {
 
@@ -123,6 +120,14 @@ namespace WebCore {
         const IntSize& textAutosizingWindowSizeOverride() const { return m_textAutosizingWindowSizeOverride; }
 #endif
 
+        // Only set by Layout Tests.
+        void setResolutionOverride(const IntSize&);
+        const IntSize& resolutionOverride() const { return m_resolutionDensityPerInchOverride; }
+
+        // Only set by Layout Tests.
+        void setMediaTypeOverride(const String&);
+        const String& mediaTypeOverride() const { return m_mediaTypeOverride; }
+
         // Unlike areImagesEnabled, this only suppresses the network load of
         // the image URL.  A cached image will still be rendered if requested.
         void setLoadsImagesAutomatically(bool);
@@ -150,6 +155,9 @@ namespace WebCore {
 
         void setJavaScriptCanOpenWindowsAutomatically(bool);
         bool javaScriptCanOpenWindowsAutomatically() const { return m_javaScriptCanOpenWindowsAutomatically; }
+
+        void setSupportsMultipleWindows(bool);
+        bool supportsMultipleWindows() const { return m_supportsMultipleWindows; }
 
         void setJavaScriptCanAccessClipboard(bool);
         bool javaScriptCanAccessClipboard() const { return m_javaScriptCanAccessClipboard; }
@@ -655,6 +663,7 @@ namespace WebCore {
         String m_defaultTextEncodingName;
         String m_ftpDirectoryTemplatePath;
         String m_localStorageDatabasePath;
+        String m_mediaTypeOverride;
         KURL m_userStyleSheetLocation;
         ScriptFontFamilyMap m_standardFontFamilyMap;
         ScriptFontFamilyMap m_serifFontFamilyMap;
@@ -686,6 +695,7 @@ namespace WebCore {
         IntSize m_textAutosizingWindowSizeOverride;
         bool m_textAutosizingEnabled : 1;
 #endif
+        IntSize m_resolutionDensityPerInchOverride;
         bool m_isSpatialNavigationEnabled : 1;
         bool m_isJavaEnabled : 1;
         bool m_isJavaEnabledForLocalFiles : 1;
@@ -702,6 +712,7 @@ namespace WebCore {
         bool m_allowUniversalAccessFromFileURLs: 1;
         bool m_allowFileAccessFromFileURLs: 1;
         bool m_javaScriptCanOpenWindowsAutomatically : 1;
+        bool m_supportsMultipleWindows : 1;
         bool m_javaScriptCanAccessClipboard : 1;
         bool m_shouldPrintBackgrounds : 1;
         bool m_textAreasAreResizable : 1;
@@ -837,6 +848,9 @@ namespace WebCore {
         void imageLoadingSettingsTimerFired(Timer<Settings>*);
 
         double m_incrementalRenderingSuppressionTimeoutInSeconds;
+
+        static double gDefaultMinDOMTimerInterval;
+        static double gDefaultDOMTimerAlignmentInterval;
 
 #if USE(AVFOUNDATION)
         static bool gAVFoundationEnabled;

@@ -118,7 +118,8 @@ namespace JSC {
         macro(op_put_to_base, 5) \
         macro(op_put_to_base_variable, 5) \
         \
-        macro(op_init_global_const, 3) \
+        macro(op_init_global_const_nop, 5) \
+        macro(op_init_global_const, 5) \
         macro(op_init_global_const_check, 5) \
         macro(op_get_by_id, 9) /* has value profiling */ \
         macro(op_get_by_id_out_of_line, 9) /* has value profiling */ \
@@ -190,7 +191,6 @@ namespace JSC {
         macro(op_ret, 2) \
         macro(op_call_put_result, 3) /* has value profiling */ \
         macro(op_ret_object_or_this, 3) \
-        macro(op_method_check, 1) \
         \
         macro(op_construct, 6) \
         macro(op_strcat, 4) \
@@ -205,7 +205,7 @@ namespace JSC {
         \
         macro(op_catch, 2) \
         macro(op_throw, 2) \
-        macro(op_throw_reference_error, 2) \
+        macro(op_throw_static_error, 3) \
         \
         macro(op_debug, 5) \
         macro(op_profile_will_call, 2) \

@@ -723,7 +723,7 @@ sub builtDylibPathForName
     }
     if (isQt()) {
         my $isSearchingForWebCore = $libraryName =~ "WebCore";
-        $libraryName = "QtWebKit";
+        $libraryName = "QtWebKitWidgets";
         my $result;
         if (isDarwin() and -d "$configurationProductDir/lib/$libraryName.framework") {
             $result = "$configurationProductDir/lib/$libraryName.framework/$libraryName";
@@ -2429,7 +2429,17 @@ sub buildChromiumNinja($$@)
     }
     my $command = "";
 
-    $command .= "ninja -C out/$config $target $makeArgs";
+    # Find ninja.
+    my $ninjaPath;
+    if (commandExists('ninja')) {
+        $ninjaPath = 'ninja';
+    } elsif (-e 'Source/WebKit/chromium/depot_tools/ninja') {
+        $ninjaPath = 'Source/WebKit/chromium/depot_tools/ninja';
+    } else {
+        die "ninja not found. Install chromium's depot_tools by running update-webkit first\n";
+    }
+
+    $command .= "$ninjaPath -C out/$config $target $makeArgs";
 
     print "$command\n";
     return system $command;

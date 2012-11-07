@@ -37,6 +37,7 @@
 #include "WebProcessProxyMessages.h"
 #include <WebCore/Color.h>
 #include <WebCore/KURL.h>
+#include <WebCore/LoaderStrategy.h>
 #include <WebCore/Page.h>
 #include <WebCore/PlatformPasteboard.h>
 #include <wtf/Atomics.h>
@@ -68,17 +69,27 @@ CookiesStrategy* WebPlatformStrategies::createCookiesStrategy()
     return this;
 }
 
-PluginStrategy* WebPlatformStrategies::createPluginStrategy()
-{
-    return this;
-}
-
-VisitedLinkStrategy* WebPlatformStrategies::createVisitedLinkStrategy()
+LoaderStrategy* WebPlatformStrategies::createLoaderStrategy()
 {
     return this;
 }
 
 PasteboardStrategy* WebPlatformStrategies::createPasteboardStrategy()
+{
+    return this;
+}
+
+PluginStrategy* WebPlatformStrategies::createPluginStrategy()
+{
+    return this;
+}
+
+SharedWorkerStrategy* WebPlatformStrategies::createSharedWorkerStrategy()
+{
+    return this;
+}
+
+VisitedLinkStrategy* WebPlatformStrategies::createVisitedLinkStrategy()
 {
     return this;
 }
@@ -89,6 +100,23 @@ void WebPlatformStrategies::notifyCookiesChanged()
 {
     WebCookieManager::shared().dispatchCookiesDidChange();
 }
+
+// LoaderStrategy
+
+#if ENABLE(NETWORK_PROCESS)
+ResourceLoadScheduler* WebPlatformStrategies::resourceLoadScheduler()
+{
+    static ResourceLoadScheduler* scheduler;
+    if (!scheduler) {
+        if (WebProcess::shared().usesNetworkProcess())
+            scheduler = &WebProcess::shared().webResourceLoadScheduler();
+        else
+            scheduler = WebCore::resourceLoadScheduler();
+    }
+    
+    return scheduler;
+}
+#endif
 
 // PluginStrategy
 

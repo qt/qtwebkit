@@ -47,15 +47,6 @@ static HashMap<WebLayerID, CoordinatedGraphicsLayer*>& layerByIDMap()
     return globalMap;
 }
 
-CoordinatedGraphicsLayer* CoordinatedGraphicsLayer::layerByID(WebKit::WebLayerID id)
-{
-    HashMap<WebLayerID, CoordinatedGraphicsLayer*>& table = layerByIDMap();
-    HashMap<WebLayerID, CoordinatedGraphicsLayer*>::iterator it = table.find(id);
-    if (it == table.end())
-        return 0;
-    return it->value;
-}
-
 static WebLayerID toWebLayerID(GraphicsLayer* layer)
 {
     return layer ? toCoordinatedGraphicsLayer(layer)->id() : 0;
@@ -68,9 +59,9 @@ void CoordinatedGraphicsLayer::didChangeLayerState()
         client()->notifyFlushRequired(this);
 }
 
-void CoordinatedGraphicsLayer::didChangeAnimatedProperties()
+void CoordinatedGraphicsLayer::didChangeAnimations()
 {
-    m_shouldSyncAnimatedProperties = true;
+    m_shouldSyncAnimations = true;
     if (client())
         client()->notifyFlushRequired(this);
 }
@@ -93,9 +84,6 @@ void CoordinatedGraphicsLayer::didChangeFilters()
 
 void CoordinatedGraphicsLayer::setShouldUpdateVisibleRect()
 {
-    if (!transform().isAffine())
-        return;
-
     m_shouldUpdateVisibleRect = true;
     for (size_t i = 0; i < children().size(); ++i)
         toCoordinatedGraphicsLayer(children()[i])->setShouldUpdateVisibleRect();
@@ -117,7 +105,7 @@ CoordinatedGraphicsLayer::CoordinatedGraphicsLayer(GraphicsLayerClient* client)
     , m_shouldSyncLayerState(true)
     , m_shouldSyncChildren(true)
     , m_shouldSyncFilters(true)
-    , m_shouldSyncAnimatedProperties(true)
+    , m_shouldSyncAnimations(true)
     , m_fixedToViewport(false)
     , m_canvasNeedsDisplay(false)
     , m_CoordinatedGraphicsLayerClient(0)
@@ -139,11 +127,6 @@ CoordinatedGraphicsLayer::~CoordinatedGraphicsLayer()
         m_CoordinatedGraphicsLayerClient->detachLayer(this);
     }
     willBeDestroyed();
-}
-
-void CoordinatedGraphicsLayer::willBeDestroyed()
-{
-    GraphicsLayer::willBeDestroyed();
 }
 
 bool CoordinatedGraphicsLayer::setChildren(const Vector<GraphicsLayer*>& children)
@@ -493,32 +476,23 @@ void CoordinatedGraphicsLayer::syncLayerState()
     m_layerInfo.mask = toWebLayerID(maskLayer());
     m_layerInfo.masksToBounds = masksToBounds();
     m_layerInfo.opacity = opacity();
-    m_layerInfo.parent = toWebLayerID(parent());
     m_layerInfo.pos = position();
     m_layerInfo.preserves3D = preserves3D();
     m_layerInfo.replica = toWebLayerID(replicaLayer());
     m_layerInfo.size = size();
     m_layerInfo.transform = transform();
-    if (!m_animations.hasActiveAnimationsOfType(AnimatedPropertyWebkitTransform))
-        m_effectiveTransform = transform();
-    if (!m_animations.hasActiveAnimationsOfType(AnimatedPropertyOpacity))
-        m_effectiveOpacity = opacity();
     m_CoordinatedGraphicsLayerClient->syncLayerState(m_id, m_layerInfo);
 }
 
-void CoordinatedGraphicsLayer::syncAnimatedProperties()
+void CoordinatedGraphicsLayer::syncAnimations()
 {
-    m_animations.apply(this);
-    if (!m_shouldSyncAnimatedProperties)
+    if (!m_shouldSyncAnimations)
         return;
 
-    m_shouldSyncAnimatedProperties = false;
-    if (m_effectiveOpacity != opacity())
-        m_CoordinatedGraphicsLayerClient->setLayerAnimatedOpacity(id(), m_effectiveOpacity);
-    if (m_effectiveTransform != transform())
-        m_CoordinatedGraphicsLayerClient->setLayerAnimatedTransform(id(), m_effectiveTransform);
-}
+    m_shouldSyncAnimations = false;
 
+    m_CoordinatedGraphicsLayerClient->setLayerAnimations(m_id, m_animations);
+}
 
 void CoordinatedGraphicsLayer::syncCanvas()
 {
@@ -550,7 +524,7 @@ void CoordinatedGraphicsLayer::flushCompositingStateForThisLayerOnly()
     // The remote image might have been released by purgeBackingStores.
     ensureImageBackingStore();
     syncLayerState();
-    syncAnimatedProperties();
+    syncAnimations();
     computeTransformedVisibleRect();
     syncChildren();
 #if ENABLE(CSS_FILTERS)
@@ -662,9 +636,9 @@ Color CoordinatedGraphicsLayer::tiledBackingStoreBackgroundColor() const
     return contentsOpaque() ? Color::white : Color::transparent;
 }
 
-PassOwnPtr<WebCore::GraphicsContext> CoordinatedGraphicsLayer::beginContentUpdate(const WebCore::IntSize& size, ShareableSurface::Handle& handle, WebCore::IntPoint& offset)
+PassOwnPtr<WebCore::GraphicsContext> CoordinatedGraphicsLayer::beginContentUpdate(const WebCore::IntSize& size, int& atlas, WebCore::IntPoint& offset)
 {
-    return m_CoordinatedGraphicsLayerClient->beginContentUpdate(size, contentsOpaque() ? 0 : ShareableBitmap::SupportsAlpha, handle, offset);
+    return m_CoordinatedGraphicsLayerClient->beginContentUpdate(size, contentsOpaque() ? 0 : ShareableBitmap::SupportsAlpha, atlas, offset);
 }
 
 void CoordinatedGraphicsLayer::createTile(int tileID, const SurfaceUpdateInfo& updateInfo, const IntRect& targetRect)
@@ -749,12 +723,30 @@ void CoordinatedGraphicsLayer::adjustVisibleRect()
         m_mainBackingStore->coverWithTilesIfNeeded();
 }
 
+bool CoordinatedGraphicsLayer::hasPendingVisibleChanges()
+{
+    if (opacity() < 0.01 && !m_animations.hasActiveAnimationsOfType(AnimatedPropertyOpacity))
+        return false;
+
+    for (size_t i = 0; i < children().size(); ++i) {
+        if (toCoordinatedGraphicsLayer(children()[i])->hasPendingVisibleChanges())
+            return true;
+    }
+
+    if (!m_shouldSyncLayerState && !m_shouldSyncChildren && !m_shouldSyncFilters && !m_shouldSyncAnimations && !m_canvasNeedsDisplay)
+        return false;
+
+    return selfOrAncestorHaveNonAffineTransforms() || !tiledBackingStoreVisibleRect().isEmpty();
+
+}
+
 void CoordinatedGraphicsLayer::computeTransformedVisibleRect()
 {
     if (!m_shouldUpdateVisibleRect)
         return;
+
     m_shouldUpdateVisibleRect = false;
-    m_layerTransform.setLocalTransform(m_effectiveTransform);
+    m_layerTransform.setLocalTransform(transform());
     m_layerTransform.setPosition(position());
     m_layerTransform.setAnchorPoint(anchorPoint());
     m_layerTransform.setSize(size());
@@ -779,13 +771,16 @@ void CoordinatedGraphicsLayer::initFactory()
 
 bool CoordinatedGraphicsLayer::selfOrAncestorHaveNonAffineTransforms()
 {
+    if (m_animations.hasActiveAnimationsOfType(AnimatedPropertyWebkitTransform))
+        return true;
+
     if (!m_layerTransform.combined().isAffine())
         return true;
 
     return false;
 }
 
-bool CoordinatedGraphicsLayer::addAnimation(const KeyframeValueList& valueList, const IntSize& boxSize, const Animation* anim, const String& keyframesName, double timeOffset)
+bool CoordinatedGraphicsLayer::addAnimation(const KeyframeValueList& valueList, const IntSize& boxSize, const Animation* anim, const String& keyframesName, double delayAsNegativeTimeOffset)
 {
     ASSERT(!keyframesName.isEmpty());
 
@@ -798,39 +793,28 @@ bool CoordinatedGraphicsLayer::addAnimation(const KeyframeValueList& valueList, 
     if (valueList.property() == AnimatedPropertyWebkitTransform)
         listsMatch = validateTransformOperations(valueList, ignoredHasBigRotation) >= 0;
 
-    m_animations.add(GraphicsLayerAnimation(keyframesName, valueList, boxSize, anim, timeOffset, listsMatch));
+    m_lastAnimationStartTime = WTF::currentTime() - delayAsNegativeTimeOffset;
+    m_animations.add(GraphicsLayerAnimation(keyframesName, valueList, boxSize, anim, m_lastAnimationStartTime, listsMatch));
     m_animationStartedTimer.startOneShot(0);
-    didChangeLayerState();
+    didChangeAnimations();
     return true;
 }
 
-void CoordinatedGraphicsLayer::pauseAnimation(const String& animationName, double timeOffset)
+void CoordinatedGraphicsLayer::pauseAnimation(const String& animationName, double time)
 {
-    m_animations.pause(animationName, timeOffset);
+    m_animations.pause(animationName, time);
+    didChangeAnimations();
 }
 
 void CoordinatedGraphicsLayer::removeAnimation(const String& animationName)
 {
     m_animations.remove(animationName);
+    didChangeAnimations();
 }
 
 void CoordinatedGraphicsLayer::animationStartedTimerFired(Timer<CoordinatedGraphicsLayer>*)
 {
-    client()->notifyAnimationStarted(this, /* DOM time */ WTF::currentTime());
+    client()->notifyAnimationStarted(this, m_lastAnimationStartTime);
 }
-
-void CoordinatedGraphicsLayer::setAnimatedTransform(const TransformationMatrix& transform)
-{
-    m_effectiveTransform = transform;
-    didChangeAnimatedProperties();
-    m_shouldUpdateVisibleRect = true;
-}
-
-void CoordinatedGraphicsLayer::setAnimatedOpacity(float opacity)
-{
-    m_effectiveOpacity = opacity;
-    didChangeAnimatedProperties();
-}
-
 }
 #endif

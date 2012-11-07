@@ -26,6 +26,7 @@
 #include "config.h"
 #include "ArrayProfile.h"
 
+#include "CodeBlock.h"
 #include <wtf/StringExtras.h>
 
 namespace JSC {
@@ -38,14 +39,14 @@ const char* arrayModesToString(ArrayModes arrayModes)
     if (arrayModes == ALL_ARRAY_MODES)
         return "TOP";
 
-    bool isNonArray = !!(arrayModes & NonArray);
-    bool isNonArrayWithContiguous = !!(arrayModes & NonArrayWithContiguous);
-    bool isNonArrayWithArrayStorage = !!(arrayModes & NonArrayWithArrayStorage);
-    bool isNonArrayWithSlowPutArrayStorage = !!(arrayModes & NonArrayWithSlowPutArrayStorage);
-    bool isArray = !!(arrayModes & ArrayClass);
-    bool isArrayWithContiguous = !!(arrayModes & ArrayWithContiguous);
-    bool isArrayWithArrayStorage = !!(arrayModes & ArrayWithArrayStorage);
-    bool isArrayWithSlowPutArrayStorage = !!(arrayModes & ArrayWithSlowPutArrayStorage);
+    bool isNonArray = !!(arrayModes & asArrayModes(NonArray));
+    bool isNonArrayWithContiguous = !!(arrayModes & asArrayModes(NonArrayWithContiguous));
+    bool isNonArrayWithArrayStorage = !!(arrayModes & asArrayModes(NonArrayWithArrayStorage));
+    bool isNonArrayWithSlowPutArrayStorage = !!(arrayModes & asArrayModes(NonArrayWithSlowPutArrayStorage));
+    bool isArray = !!(arrayModes & asArrayModes(ArrayClass));
+    bool isArrayWithContiguous = !!(arrayModes & asArrayModes(ArrayWithContiguous));
+    bool isArrayWithArrayStorage = !!(arrayModes & asArrayModes(ArrayWithArrayStorage));
+    bool isArrayWithSlowPutArrayStorage = !!(arrayModes & asArrayModes(ArrayWithSlowPutArrayStorage));
     
     static char result[256];
     snprintf(
@@ -64,12 +65,14 @@ const char* arrayModesToString(ArrayModes arrayModes)
     return result;
 }
 
-void ArrayProfile::computeUpdatedPrediction(OperationInProgress operation)
+void ArrayProfile::computeUpdatedPrediction(CodeBlock* codeBlock, OperationInProgress operation)
 {
     if (m_lastSeenStructure) {
         m_observedArrayModes |= arrayModeFromStructure(m_lastSeenStructure);
         m_mayInterceptIndexedAccesses |=
             m_lastSeenStructure->typeInfo().interceptsGetOwnPropertySlotByIndexEvenWhenLengthIsNotZero();
+        if (!codeBlock->globalObject()->isOriginalArrayStructure(m_lastSeenStructure))
+            m_usesOriginalArrayStructures = false;
         if (!m_structureIsPolymorphic) {
             if (!m_expectedStructure)
                 m_expectedStructure = m_lastSeenStructure;

@@ -33,10 +33,6 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
-#if USE(GRAPHICS_SURFACE)
-#include "GraphicsSurface.h"
-#endif
-
 #if PLATFORM(QT)
 #include "NativeImageQt.h"
 #endif
@@ -381,7 +377,7 @@ void TextureMapperGL::drawTextureRectangleARB(uint32_t texture, Flags flags, con
     m_context3D->uniform1i(program->samplerLocation(), 0);
 
     m_context3D->uniform1f(program->flipLocation(), !!(flags & ShouldFlipTexture));
-    m_context3D->uniform2f(program->textureSizeLocation(), textureSize.width(), textureSize.height());
+    m_context3D->uniform2f(program->samplerSizeLocation(), textureSize.width(), textureSize.height());
     m_context3D->uniform1f(program->opacityLocation(), opacity);
 
     if (maskTexture && maskTexture->isValid()) {
@@ -644,6 +640,7 @@ void BitmapTextureGL::updateContents(const void* srcData, const IntRect& targetR
     const unsigned bytesPerPixel = 4;
     char* data = reinterpret_cast<char*>(const_cast<void*>(srcData));
     Vector<char> temporaryData;
+    IntPoint adjustedSourceOffset = sourceOffset;
 
     // prepare temporaryData if necessary
     if ((!driverSupportsBGRASwizzling() && updateContentsFlag == UpdateCannotModifyOriginalImageData)
@@ -659,14 +656,17 @@ void BitmapTextureGL::updateContents(const void* srcData, const IntRect& targetR
             src += bytesPerLine;
             dst += targetBytesPerLine;
         }
+
+        bytesPerLine = targetBytesPerLine;
+        adjustedSourceOffset = IntPoint(0, 0);
     }
 
     if (driverSupportsBGRASwizzling())
         glFormat = GraphicsContext3D::BGRA;
     else
-        swizzleBGRAToRGBA(reinterpret_cast<uint32_t*>(data), IntRect(sourceOffset, targetRect.size()), bytesPerLine / bytesPerPixel);
+        swizzleBGRAToRGBA(reinterpret_cast<uint32_t*>(data), IntRect(adjustedSourceOffset, targetRect.size()), bytesPerLine / bytesPerPixel);
 
-    if (bytesPerLine == targetRect.width() * bytesPerPixel && sourceOffset == IntPoint::zero()) {
+    if (bytesPerLine == static_cast<int>(targetRect.width() * bytesPerPixel) && adjustedSourceOffset == IntPoint::zero()) {
         m_context3D->texSubImage2D(GraphicsContext3D::TEXTURE_2D, 0, targetRect.x(), targetRect.y(), targetRect.width(), targetRect.height(), glFormat, DEFAULT_TEXTURE_PIXEL_TRANSFER_TYPE, data);
         return;
     }
@@ -680,8 +680,8 @@ void BitmapTextureGL::updateContents(const void* srcData, const IntRect& targetR
 #if !defined(TEXMAP_OPENGL_ES_2)
     // Use the OpenGL sub-image extension, now that we know it's available.
     m_context3D->pixelStorei(GL_UNPACK_ROW_LENGTH, bytesPerLine / bytesPerPixel);
-    m_context3D->pixelStorei(GL_UNPACK_SKIP_ROWS, sourceOffset.y());
-    m_context3D->pixelStorei(GL_UNPACK_SKIP_PIXELS, sourceOffset.x());
+    m_context3D->pixelStorei(GL_UNPACK_SKIP_ROWS, adjustedSourceOffset.y());
+    m_context3D->pixelStorei(GL_UNPACK_SKIP_PIXELS, adjustedSourceOffset.x());
     m_context3D->texSubImage2D(GraphicsContext3D::TEXTURE_2D, 0, targetRect.x(), targetRect.y(), targetRect.width(), targetRect.height(), glFormat, DEFAULT_TEXTURE_PIXEL_TRANSFER_TYPE, data);
     m_context3D->pixelStorei(GL_UNPACK_ROW_LENGTH, 0);
     m_context3D->pixelStorei(GL_UNPACK_SKIP_ROWS, 0);

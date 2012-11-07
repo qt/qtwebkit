@@ -41,7 +41,7 @@ from webkitpy.common.host import Host
 from webkitpy.common.system import stack_utils
 from webkitpy.layout_tests.controllers.manager import Manager, WorkerException, TestRunInterruptedException
 from webkitpy.layout_tests.models import test_expectations
-from webkitpy.layout_tests.port import port_options
+from webkitpy.layout_tests.port import configuration_options, platform_options
 from webkitpy.layout_tests.views import printing
 
 
@@ -67,19 +67,20 @@ def lint(port, options):
     lint_failed = False
 
     for port_to_lint in ports_to_lint:
-        expectations_file = port_to_lint.path_to_test_expectations_file()
-        if expectations_file in files_linted:
-            continue
+        expectations_dict = port_to_lint.expectations_dict()
+        for expectations_file in expectations_dict.keys():
+            if expectations_file in files_linted:
+                continue
 
-        try:
-            test_expectations.TestExpectations(port_to_lint, is_lint_mode=True)
-        except test_expectations.ParseError, e:
-            lint_failed = True
-            _log.error('')
-            for warning in e.warnings:
-                _log.error(warning)
-            _log.error('')
-        files_linted.add(expectations_file)
+            try:
+                test_expectations.TestExpectations(port_to_lint, expectations_to_lint={expectations_file: expectations_dict[expectations_file]})
+            except test_expectations.ParseError, e:
+                lint_failed = True
+                _log.error('')
+                for warning in e.warnings:
+                    _log.error(warning)
+                _log.error('')
+            files_linted.add(expectations_file)
 
     if lint_failed:
         _log.error('Lint failed.')
@@ -200,7 +201,8 @@ def parse_args(args=None):
 
     option_group_definitions = []
 
-    option_group_definitions.append(("Configuration options", port_options()))
+    option_group_definitions.append(("Platform options", platform_options()))
+    option_group_definitions.append(("Configuration options", configuration_options()))
     option_group_definitions.append(("Printing Options", printing.print_options()))
 
     # FIXME: These options should move onto the ChromiumPort.

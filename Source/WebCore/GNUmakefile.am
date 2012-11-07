@@ -73,6 +73,7 @@ webcore_cppflags += \
 	-I$(srcdir)/Source/WebCore/platform/mediastream/gstreamer \
 	-I$(srcdir)/Source/WebCore/platform/mock \
 	-I$(srcdir)/Source/WebCore/platform/network \
+	-I$(srcdir)/Source/WebCore/platform/network/gtk \
 	-I$(srcdir)/Source/WebCore/platform/sql \
 	-I$(srcdir)/Source/WebCore/platform/text \
 	-I$(srcdir)/Source/WebCore/platform/text/transcoder \
@@ -206,6 +207,15 @@ $(GENSOURCES_WEBCORE)/XPathGrammar.cpp: $(WebCore)/xml/XPathGrammar.y
 	$(AM_V_at)perl $(WebCore)/css/makegrammar.pl --outputDir $(GENSOURCES_WEBCORE) --bison "$(BISON)" --symbolsPrefix xpathyy $<
 
 # ----
+# XHR timeout Support
+# ----
+if ENABLE_XHR_TIMEOUT
+feature_defines_overrides += ENABLE_XHR_TIMEOUT=1
+else
+feature_defines_overrides += ENABLE_XHR_TIMEOUT=0
+endif # END ENABLE_XHR_TIMEOUT
+
+# ----
 # XSLT Support
 # ----
 if ENABLE_XSLT
@@ -222,6 +232,15 @@ feature_defines_overrides += ENABLE_FILTERS=1
 else
 feature_defines_overrides += ENABLE_FILTERS=0
 endif # END ENABLE_FILTERS
+
+# ----
+# CSS Device Adaptation
+# ----
+if ENABLE_CSS_DEVICE_ADAPTATION
+feature_defines_overrides += ENABLE_CSS_DEVICE_ADAPTATION=1
+else
+feature_defines_overrides += ENABLE_CSS_DEVICE_ADAPTATION=0
+endif # END ENABLE_CSS_DEVICE_ADAPTATION
 
 # ----
 # Shaders
@@ -623,6 +642,7 @@ libWebCore_la_CPPFLAGS = \
 	$(GEOCLUE_CFLAGS) \
 	$(GLIB_CFLAGS) \
 	$(GSTREAMER_CFLAGS) \
+	$(LIBSECRET_CFLAGS) \
 	$(LIBSOUP_CFLAGS) \
 	$(LIBXML_CFLAGS) \
 	$(LIBXSLT_CFLAGS) \
@@ -686,6 +706,7 @@ libWebCoreGtk_la_CPPFLAGS = \
 	$(GSTREAMER_CFLAGS) \
 	$(GTK_CFLAGS) \
 	$(HILDON_CFLAGS) \
+	$(LIBSECRET_CFLAGS) \
 	$(LIBSOUP_CFLAGS) \
 	$(LIBXML_CFLAGS) \
 	$(LIBXSLT_CFLAGS) \

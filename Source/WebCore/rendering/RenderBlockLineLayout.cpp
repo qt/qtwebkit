@@ -94,13 +94,8 @@ public:
 #endif
         updateAvailableWidth();
     }
-#if ENABLE(SUBPIXEL_LAYOUT)
     bool fitsOnLine() const { return currentWidth() <= m_availableWidth; }
     bool fitsOnLine(float extra) const { return currentWidth() + extra <= m_availableWidth; }
-#else
-    bool fitsOnLine() const { return currentWidth() <= m_availableWidth; }
-    bool fitsOnLine(float extra) const { return currentWidth() + extra <= m_availableWidth; }
-#endif
     float currentWidth() const { return m_committedWidth + m_uncommittedWidth; }
 
     // FIXME: We should eventually replace these three functions by ones that work on a higher abstraction.
@@ -177,12 +172,12 @@ inline void LineWidth::shrinkAvailableWidthForNewFloatIfNeeded(RenderBlock::Floa
         return;
 
     if (newFloat->type() == RenderBlock::FloatingObject::FloatLeft) {
-        float newLeft = m_block->pixelSnappedLogicalRightForFloat(newFloat);
+        float newLeft = m_block->logicalRightForFloat(newFloat);
         if (m_isFirstLine && m_block->style()->isLeftToRightDirection())
             newLeft += floorToInt(m_block->textIndentOffset());
         m_left = max<float>(m_left, newLeft);
     } else {
-        float newRight = m_block->pixelSnappedLogicalLeftForFloat(newFloat);
+        float newRight = m_block->logicalLeftForFloat(newFloat);
         if (m_isFirstLine && !m_block->style()->isLeftToRightDirection())
             newRight -= floorToInt(m_block->textIndentOffset());
         m_right = min<float>(m_right, newRight);
@@ -1403,9 +1398,9 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
     ExclusionShapeInsideInfo* exclusionShapeInsideInfo = layoutExclusionShapeInsideInfo(this);
     if (exclusionShapeInsideInfo) {
         if (exclusionShapeInsideInfo != this->exclusionShapeInsideInfo()) {
-            // FIXME: If layout state is disabled, the offset will be incorrect.
-            LayoutSize layoutOffset = view()->layoutState()->layoutOffset();
-            absoluteLogicalTop = logicalTop() + (isHorizontalWritingMode() ? layoutOffset.height() : layoutOffset.width());
+            // FIXME Bug 100284: If subsequent LayoutStates are pushed, we will have to add
+            // their offsets from the original shape-inside container.
+            absoluteLogicalTop = logicalTop();
         }
         // Begin layout at the logical top of our shape inside.
         if (logicalHeight() + absoluteLogicalTop < exclusionShapeInsideInfo->shapeLogicalTop())
@@ -2815,7 +2810,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
         } else
             ASSERT_NOT_REACHED();
 
-        bool checkForBreak = autoWrap;
+        bool checkForBreak = autoWrap || blockStyle->autoWrap();
         if (width.committedWidth() && !width.fitsOnLine() && lBreak.m_obj && currWS == NOWRAP)
             checkForBreak = true;
         else if (next && current.m_obj->isText() && next->isText() && !next->isBR() && (autoWrap || (next->style()->autoWrap()))) {

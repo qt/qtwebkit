@@ -176,7 +176,8 @@ def get_tests_run(extra_args=None, tests_included=False, flatten_batches=False,
 
 # Update this magic number if you add an unexpected test to webkitpy.layout_tests.port.test
 # FIXME: It's nice to have a routine in port/test.py that returns this number.
-unexpected_tests_count = 14
+unexpected_failures = 12
+unexpected_tests_count = unexpected_failures + 4
 
 
 class StreamTestingMixin(object):
@@ -198,9 +199,6 @@ class LintTest(unittest.TestCase, StreamTestingMixin):
                 self.host = host
                 self.name = name
                 self.path = path
-
-            def path_to_test_expectations_file(self):
-                return self.path
 
             def test_configuration(self):
                 return None
@@ -244,7 +242,7 @@ class LintTest(unittest.TestCase, StreamTestingMixin):
                                                FakePort(host, 'b-win', 'path-to-b')))
 
         self.assertEquals(run_webkit_tests.lint(host.port_factory.ports['a'], MockOptions(platform=None)), 0)
-        self.assertEquals(host.ports_parsed, ['a', 'b'])
+        self.assertEquals(host.ports_parsed, ['a', 'b', 'b-win'])
 
         host.ports_parsed = []
         self.assertEquals(run_webkit_tests.lint(host.port_factory.ports['a'], MockOptions(platform='a')), 0)
@@ -266,6 +264,15 @@ class LintTest(unittest.TestCase, StreamTestingMixin):
         self.assertEqual(res, -1)
         self.assertEmpty(out)
         self.assertTrue(any(['Lint failed' in msg for msg in err.buflist]))
+
+        # ensure we lint *all* of the files in the cascade.
+        port_obj.expectations_dict = lambda: {'foo': '-- syntax error1', 'bar': '-- syntax error2'}
+        res, out, err = run_and_capture(port_obj, options, parsed_args)
+
+        self.assertEqual(res, -1)
+        self.assertEmpty(out)
+        self.assertTrue(any(['foo:1' in msg for msg in err.buflist]))
+        self.assertTrue(any(['bar:1' in msg for msg in err.buflist]))
 
 
 class MainTest(unittest.TestCase, StreamTestingMixin):
@@ -496,7 +503,7 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
 
     def test_run_singly_actually_runs_tests(self):
         res, _, _, _ = logging_run(['--run-singly', 'failures/unexpected'])
-        self.assertEquals(res, 10)
+        self.assertEquals(res, unexpected_failures)
 
     def test_single_file(self):
         # FIXME: We should consider replacing more of the get_tests_run()-style tests
@@ -561,7 +568,7 @@ class MainTest(unittest.TestCase, StreamTestingMixin):
         file_list = host.filesystem.written_files.keys()
         file_list.remove('/tmp/layout-test-results/tests_run0.txt')
         self.assertEquals(res, 1)
-        expected_token = '"unexpected":{"text-image-checksum.html":{"expected":"PASS","actual":"TEXT"},"missing_text.html":{"expected":"PASS","is_missing_text":true,"actual":"MISSING"}'
+        expected_token = '"unexpected":{"text-image-checksum.html":{"expected":"PASS","actual":"IMAGE+TEXT","image_diff_percent":1},"missing_text.html":{"expected":"PASS","is_missing_text":true,"actual":"MISSING"}'
         json_string = host.filesystem.read_text_file('/tmp/layout-test-results/full_results.json')
         self.assertTrue(json_string.find(expected_token) != -1)
         self.assertTrue(json_string.find('"num_regressions":1') != -1)

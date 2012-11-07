@@ -204,6 +204,15 @@ Internals::~Internals()
 {
 }
 
+void Internals::resetToConsistentState(Page* page)
+{
+    ASSERT(page);
+#if ENABLE(INSPECTOR) && ENABLE(JAVASCRIPT_DEBUGGER)
+    if (page->inspectorController())
+        page->inspectorController()->setProfilerEnabled(false);
+#endif
+}
+
 Internals::Internals(Document* document)
     : ContextDestructionObserver(document)
 {
@@ -304,6 +313,25 @@ bool Internals::hasShadowInsertionPoint(const Node* root, ExceptionCode& ec) con
 
     ec = INVALID_ACCESS_ERR;
     return 0;
+}
+
+bool Internals::hasContentElement(const Node* root, ExceptionCode& ec) const
+{
+    if (root && root->isShadowRoot())
+        return toShadowRoot(root)->hasContentElement();
+
+    ec = INVALID_ACCESS_ERR;
+    return 0;
+}
+
+size_t Internals::countElementShadow(const Node* root, ExceptionCode& ec) const
+{
+    if (!root || !root->isShadowRoot()) {
+        ec = INVALID_ACCESS_ERR;
+        return 0;
+    }
+
+    return toShadowRoot(root)->countElementShadow();
 }
 
 bool Internals::attached(Node* node, ExceptionCode& ec)
@@ -462,6 +490,24 @@ Internals::ShadowRootIfShadowDOMEnabledOrNode* Internals::olderShadowRoot(Node* 
     }
 
     return toShadowRoot(shadow)->olderShadowRoot();
+}
+
+String Internals::shadowRootType(const Node* root, ExceptionCode& ec) const
+{
+    if (!root || !root->isShadowRoot()) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+
+    switch (toShadowRoot(root)->type()) {
+    case ShadowRoot::UserAgentShadowRoot:
+        return String("UserAgentShadowRoot");
+    case ShadowRoot::AuthorShadowRoot:
+        return String("AuthorShadowRoot");
+    default:
+        ASSERT_NOT_REACHED();
+        return String("Unknown");
+    }
 }
 
 Element* Internals::includerFor(Node* node, ExceptionCode& ec)
@@ -994,16 +1040,6 @@ void Internals::setUserPreferredLanguages(const Vector<String>& languages)
     settings()->setUserPreferredLanguages(languages);
 }
 
-void Internals::setShouldDisplayTrackKind(Document*, const String& kind, bool enabled, ExceptionCode& ec)
-{
-    settings()->setShouldDisplayTrackKind(kind, enabled, ec);
-}
-
-bool Internals::shouldDisplayTrackKind(Document*, const String& kind, ExceptionCode& ec)
-{
-    return settings()->shouldDisplayTrackKind(kind, ec);
-}
-
 unsigned Internals::wheelEventHandlerCount(Document* document, ExceptionCode& ec)
 {
     if (!document) {
@@ -1159,6 +1195,27 @@ void Internals::closeDummyInspectorFrontend()
     m_frontendWindow->close(m_frontendWindow->scriptExecutionContext());
     m_frontendWindow.release();
 }
+
+void Internals::setInspectorResourcesDataSizeLimits(int maximumResourcesContentSize, int maximumSingleResourceContentSize, ExceptionCode& ec)
+{
+    Page* page = contextDocument()->frame()->page();
+    if (!page || !page->inspectorController()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+    page->inspectorController()->setResourcesDataSizeLimitsFromInternals(maximumResourcesContentSize, maximumSingleResourceContentSize);
+}
+
+void Internals::setJavaScriptProfilingEnabled(bool enabled, ExceptionCode& ec)
+{
+    Page* page = contextDocument()->frame()->page();
+    if (!page || !page->inspectorController()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    page->inspectorController()->setProfilerEnabled(enabled);
+}
 #endif // ENABLE(INSPECTOR)
 
 bool Internals::hasGrammarMarker(Document* document, int from, int length, ExceptionCode&)
@@ -1237,8 +1294,36 @@ String Internals::layerTreeAsText(Document* document, unsigned flags, ExceptionC
     LayerTreeFlags layerTreeFlags = 0;
     if (flags & LAYER_TREE_INCLUDES_VISIBLE_RECTS)
         layerTreeFlags |= LayerTreeFlagsIncludeVisibleRects;
+    if (flags & LAYER_TREE_INCLUDES_TILE_CACHES)
+        layerTreeFlags |= LayerTreeFlagsIncludeTileCaches;
+    if (flags & LAYER_TREE_INCLUDES_REPAINT_RECTS)
+        layerTreeFlags |= LayerTreeFlagsIncludeRepaintRects;
 
     return document->frame()->layerTreeAsText(layerTreeFlags);
+}
+
+String Internals::repaintRectsAsText(Document* document, ExceptionCode& ec) const
+{
+    if (!document || !document->frame()) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+
+    return document->frame()->trackedRepaintRectsAsText();
+}
+
+String Internals::scrollingStateTreeAsText(Document* document, ExceptionCode& ec) const
+{
+    if (!document || !document->frame()) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+
+    Page* page = document->page();
+    if (!page)
+        return String();
+
+    return page->scrollingStateTreeAsText();
 }
 
 void Internals::garbageCollectDocumentResources(Document* document, ExceptionCode& ec) const
@@ -1368,6 +1453,28 @@ PassRefPtr<DOMStringList> Internals::getReferencedFilePaths() const
     for (size_t i = 0; i < filePaths.size(); ++i)
         stringList->append(filePaths[i]);
     return stringList.release();
+}
+
+void Internals::startTrackingRepaints(Document* document, ExceptionCode& ec)
+{
+    if (!document || !document->view()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    FrameView* frameView = document->view();
+    frameView->setTracksRepaints(true);
+}
+
+void Internals::stopTrackingRepaints(Document* document, ExceptionCode& ec)
+{
+    if (!document || !document->view()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    FrameView* frameView = document->view();
+    frameView->setTracksRepaints(false);
 }
 
 }

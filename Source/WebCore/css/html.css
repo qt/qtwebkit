@@ -482,7 +482,8 @@ input[type="date"] {
     -webkit-align-items: stretch;
     display: -webkit-inline-flex;
     font-family: monospace;
-    padding: 0 0 0 1px;
+    padding: 0;
+    -webkit-padding-start: 1px;
 }
 #endif
 #if defined(ENABLE_INPUT_TYPE_DATETIME) && ENABLE_INPUT_TYPE_DATETIME
@@ -490,7 +491,8 @@ input[type="datetime"] {
     -webkit-align-items: stretch;
     display: -webkit-inline-flex;
     font-family: monospace;
-    padding: 0 0 0 1px;
+    padding: 0;
+    -webkit-padding-start: 1px;
 }
 #endif
 #if defined(ENABLE_INPUT_TYPE_DATETIMELOCAL) && ENABLE_INPUT_TYPE_DATETIMELOCAL
@@ -498,7 +500,8 @@ input[type="datetime-local"] {
     -webkit-align-items: stretch;
     display: -webkit-inline-flex;
     font-family: monospace;
-    padding: 0 0 0 1px;
+    padding: 0;
+    -webkit-padding-start: 1px;
 }
 #endif
 #if defined(ENABLE_INPUT_TYPE_MONTH) && ENABLE_INPUT_TYPE_MONTH
@@ -506,7 +509,8 @@ input[type="month"] {
     -webkit-align-items: stretch;
     display: -webkit-inline-flex;
     font-family: monospace;
-    padding: 0 0 0 1px;
+    padding: 0;
+    -webkit-padding-start: 1px;
 }
 #endif
 #if defined(ENABLE_INPUT_TYPE_TIME) && ENABLE_INPUT_TYPE_TIME
@@ -514,7 +518,8 @@ input[type="time"] {
     -webkit-align-items: stretch;
     display: -webkit-inline-flex;
     font-family: monospace;
-    padding: 0 0 0 1px;
+    padding: 0;
+    -webkit-padding-start: 1px;
 }
 #endif
 #if defined(ENABLE_INPUT_TYPE_WEEK) && ENABLE_INPUT_TYPE_WEEK
@@ -522,110 +527,32 @@ input[type="week"] {
     -webkit-align-items: stretch;
     display: -webkit-inline-flex;
     font-family: monospace;
-    padding: 0 0 0 1px;
+    padding: 0;
+    -webkit-padding-start: 1px;
 }
 #endif
 
 input::-webkit-datetime-edit {
-    -webkit-align-items: center;
     -webkit-flex: 1;
     -webkit-user-modify: read-only !important;
-    display: -webkit-flex;
+    display: inline-block;
     white-space: pre;
 }
 
-input::-webkit-datetime-edit-ampm-field {
-    -webkit-user-modify: read-only !important;
-    border: none;
-    padding: 0.15em;
-    display: inline-block;
-    text-align: center;
-}
-
-input::-webkit-datetime-edit-day-field {
-    -webkit-user-modify: read-only !important;
-    display: inline-block;
-    border: none;
-    text-align: center;
-    padding: 0.15em;
-}
-
-input::-webkit-datetime-edit-hour-field {
-    -webkit-user-modify: read-only !important;
-    display: inline-block;
-    border: none;
-    text-align: center;
-    padding: 0.15em;
-}
-
-input::-webkit-datetime-edit-millisecond-field {
-    -webkit-user-modify: read-only !important;
-    display: inline-block;
-    border: none;
-    text-align: center;
-    padding: 0.15em;
-}
-
-input::-webkit-datetime-edit-minute-field {
-    -webkit-user-modify: read-only !important;
-    display: inline-block;
-    border: none;
-    text-align: center;
-    padding: 0.15em;
-}
-
-input::-webkit-datetime-edit-month-field {
-    -webkit-user-modify: read-only !important;
-    display: inline-block;
-    border: none;
-    text-align: center;
-    padding: 0.15em;
-}
-
-/* This selector is used when step >= 3600 second but format contains minute field. */
-input::-webkit-datetime-edit-minute-field[readonly] {
-    color: GrayText;
-}
-
-input::-webkit-datetime-edit-second-field {
-    -webkit-user-modify: read-only !important;
-    display: inline-block;
-    border: none;
-    text-align: center;
-    padding: 0.15em;
-}
-
-input::-webkit-datetime-edit-week-field {
-    -webkit-user-modify: read-only !important;
-    display: inline-block;
-    border: none;
-    text-align: center;
-    padding: 0.15em;
-}
-
+input::-webkit-datetime-edit-ampm-field,
+input::-webkit-datetime-edit-day-field,
+input::-webkit-datetime-edit-hour-field,
+input::-webkit-datetime-edit-millisecond-field,
+input::-webkit-datetime-edit-minute-field,
+input::-webkit-datetime-edit-month-field,
+input::-webkit-datetime-edit-second-field,
+input::-webkit-datetime-edit-week-field,
 input::-webkit-datetime-edit-year-field {
     -webkit-user-modify: read-only !important;
-    display: inline-block;
     border: none;
+    display: inline-block;
+    margin: 1px;
     text-align: center;
-    padding: 0.15em;
-}
-
-input::-webkit-datetime-edit-text {
-    -webkit-user-modify: read-only !important;
-    display: inline-block;
-}
-
-input::-webkit-datetime-edit-gap {
-    -webkit-flex: 1;
-    -webkit-user-modify: read-only !important;
-    display: inline-block;
-}
-
-input::-webkit-date-and-time-container {
-    -webkit-align-items: center;
-    -webkit-flex: 1;
-    display: -webkit-flex;
 }
 
 /* Remove focus ring from fields and use highlight color */
@@ -638,14 +565,30 @@ input::-webkit-datetime-edit-month-field:focus,
 input::-webkit-datetime-edit-second-field:focus,
 input::-webkit-datetime-edit-week-field:focus,
 input::-webkit-datetime-edit-year-field:focus {
-  background-color: highlight;
-  color: highlighttext;
-  outline: none;
+    background-color: highlight;
+    color: highlighttext;
+    outline: none;
+}
+
+/* This selector is used when step >= 3600 second but format contains minute field. */
+input::-webkit-datetime-edit-minute-field[readonly] {
+    color: GrayText;
 }
 
 /* This selector is used when step >= 60 second but format contains second field. */
 input::-webkit-datetime-edit-second-field[readonly] {
     color: GrayText;
+}
+
+input::-webkit-datetime-edit-text {
+    -webkit-user-modify: read-only !important;
+    display: inline-block;
+}
+
+input::-webkit-date-and-time-container {
+    -webkit-align-items: center;
+    -webkit-flex: 1;
+    display: -webkit-inline-flex;
 }
 
 input[type="date"]::-webkit-inner-spin-button,
@@ -655,8 +598,8 @@ input[type="month"]::-webkit-inner-spin-button,
 input[type="time"]::-webkit-inner-spin-button,
 input[type="week"]::-webkit-inner-spin-button {
     display: inline-block;
-    margin-left: 0.2em;
     position: static;
+    -webkit-margin-start: 2px;
 }
 #endif
 

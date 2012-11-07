@@ -27,6 +27,7 @@
 #define ScrollingCoordinator_h
 
 #include "IntRect.h"
+#include "LayoutTypes.h"
 #include "PlatformWheelEvent.h"
 #include "ScrollTypes.h"
 #include "Timer.h"
@@ -47,15 +48,15 @@ namespace WebCore {
 typedef unsigned MainThreadScrollingReasons;
 typedef uint64_t ScrollingNodeID;
 
+enum ScrollingNodeType { ScrollingNode, FixedNode };
+
 class Frame;
 class FrameView;
 class GraphicsLayer;
 class Page;
 class Region;
 class ScrollableArea;
-class ScrollingStateNode;
-class ScrollingStateScrollingNode;
-class ScrollingStateTree;
+class ViewportConstraints;
 
 #if ENABLE(THREADED_SCROLLING)
 class ScrollingTree;
@@ -109,9 +110,12 @@ public:
     virtual bool requestScrollPositionUpdate(FrameView*, const IntPoint&) { return false; }
     virtual bool handleWheelEvent(FrameView*, const PlatformWheelEvent&) { return true; }
     virtual void updateMainFrameScrollPositionAndScrollLayerPosition() { }
-    virtual ScrollingNodeID attachToStateTree(ScrollingNodeID newNodeID, ScrollingNodeID /*parentID*/) { return newNodeID; }
+    virtual ScrollingNodeID attachToStateTree(ScrollingNodeType, ScrollingNodeID newNodeID, ScrollingNodeID /*parentID*/) { return newNodeID; }
     virtual void detachFromStateTree(ScrollingNodeID) { }
     virtual void clearStateTree() { }
+    virtual void updateViewportConstrainedNode(ScrollingNodeID, const ViewportConstraints&, GraphicsLayer*) { }
+    virtual void syncChildPositions(const LayoutRect&) { }
+    virtual String scrollingStateTreeAsText() const;
 
     // Generated a unique id for scroll layers.
     ScrollingNodeID uniqueScrollLayerID();

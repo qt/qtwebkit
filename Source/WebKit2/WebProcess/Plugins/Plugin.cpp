@@ -32,16 +32,16 @@ using namespace WebCore;
 
 namespace WebKit {
 
-void Plugin::Parameters::encode(CoreIPC::ArgumentEncoder* encoder) const
+void Plugin::Parameters::encode(CoreIPC::ArgumentEncoder& encoder) const
 {
-    encoder->encode(url.string());
-    encoder->encode(names);
-    encoder->encode(values);
-    encoder->encode(mimeType);
-    encoder->encode(isFullFramePlugin);
-    encoder->encode(shouldUseManualLoader);
+    encoder << url.string();
+    encoder << names;
+    encoder << values;
+    encoder << mimeType;
+    encoder << isFullFramePlugin;
+    encoder << shouldUseManualLoader;
 #if PLATFORM(MAC)
-    encoder->encodeEnum(layerHostingMode);
+    encoder.encodeEnum(layerHostingMode);
 #endif
 }
 

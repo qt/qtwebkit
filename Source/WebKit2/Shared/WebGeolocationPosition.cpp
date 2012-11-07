@@ -51,7 +51,7 @@ WebGeolocationPosition::~WebGeolocationPosition()
 {
 }
 
-void WebGeolocationPosition::Data::encode(CoreIPC::ArgumentEncoder* encoder) const
+void WebGeolocationPosition::Data::encode(CoreIPC::ArgumentEncoder& encoder) const
 {
     CoreIPC::SimpleArgumentCoder<WebGeolocationPosition::Data>::encode(encoder, *this);
 }

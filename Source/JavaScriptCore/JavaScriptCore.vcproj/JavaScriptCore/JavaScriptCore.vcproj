@@ -638,6 +638,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\runtime\CodeCache.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\runtime\CodeCache.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\runtime\CommonIdentifiers.cpp"
 				>
 			</File>
@@ -1678,22 +1686,6 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\bytecode\MethodCallLinkInfo.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\bytecode\MethodCallLinkInfo.h"
-				>
-			</File>
-			<File
-				RelativePath="..\..\bytecode\MethodCallLinkStatus.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\bytecode\MethodCallLinkStatus.h"
-				>
-			</File>
-			<File
 				RelativePath="..\..\bytecode\MethodOfGettingAValueProfile.cpp"
 				>
 			</File>
@@ -1759,6 +1751,14 @@
 			</File>
 			<File
 				RelativePath="..\..\bytecode\StructureStubInfo.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\bytecode\UnlinkedCodeBlock.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\bytecode\UnlinkedCodeBlock.h"
 				>
 			</File>
 			<File
@@ -2243,6 +2243,10 @@
 			</File>
 			<File
 				RelativePath="..\..\parser\Parser.h"
+				>
+			</File>
+			<File
+				RelativePath="..\..\parser\ParserModes.h"
 				>
 			</File>
 			<File

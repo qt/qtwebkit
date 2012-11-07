@@ -38,6 +38,14 @@ using namespace EWK2UnitTest;
 extern EWK2UnitTestEnvironment* environment;
 bool fullScreenCallbackCalled;
 
+TEST_F(EWK2UnitTestBase, ewk_view_type_check)
+{
+    ASSERT_FALSE(ewk_view_context_get(0));
+
+    Evas_Object* rectangle = evas_object_rectangle_add(canvas());
+    ASSERT_FALSE(ewk_view_url_set(rectangle, 0));
+}
+
 static void onLoadFinishedForRedirection(void* userData, Evas_Object*, void*)
 {
     int* countLoadFinished = static_cast<int*>(userData);
@@ -191,76 +199,6 @@ TEST_F(EWK2UnitTestBase, ewk_view_form_submission_request)
         ecore_main_loop_iterate();
     ASSERT_TRUE(handled);
     evas_object_smart_callback_del(webView(), "form,submission,request", onFormAboutToBeSubmitted);
-}
-
-static inline void checkBasicPopupMenuItem(Ewk_Popup_Menu_Item* item, const char* title, bool enabled)
-{
-    EXPECT_EQ(EWK_POPUP_MENU_ITEM, ewk_popup_menu_item_type_get(item));
-    EXPECT_STREQ(title, ewk_popup_menu_item_text_get(item));
-    EXPECT_EQ(enabled, ewk_popup_menu_item_enabled_get(item));
-}
-
-static Eina_Bool selectItemAfterDelayed(void* data)
-{
-    EXPECT_TRUE(ewk_view_popup_menu_select(static_cast<Evas_Object*>(data), 0));
-    return ECORE_CALLBACK_CANCEL;
-}
-
-static Eina_Bool showPopupMenu(Ewk_View_Smart_Data* smartData, Eina_Rectangle, Ewk_Text_Direction, double, Eina_List* list, int selectedIndex)
-{
-    EXPECT_EQ(2, selectedIndex);
-
-    Ewk_Popup_Menu_Item* item = static_cast<Ewk_Popup_Menu_Item*>(eina_list_nth(list, 0));
-    checkBasicPopupMenuItem(item, "first", true);
-    EXPECT_EQ(EWK_TEXT_DIRECTION_LEFT_TO_RIGHT, ewk_popup_menu_item_text_direction_get(item));
-    EXPECT_STREQ("", ewk_popup_menu_item_tooltip_get(item));
-    EXPECT_STREQ("", ewk_popup_menu_item_accessibility_text_get(item));
-    EXPECT_FALSE(ewk_popup_menu_item_is_label_get(item));
-    EXPECT_FALSE(ewk_popup_menu_item_selected_get(item));
-
-    item = static_cast<Ewk_Popup_Menu_Item*>(eina_list_nth(list, 1));
-    checkBasicPopupMenuItem(item, "second", false);
-    EXPECT_FALSE(ewk_popup_menu_item_enabled_get(item));
-
-    item = static_cast<Ewk_Popup_Menu_Item*>(eina_list_nth(list, 2));
-    checkBasicPopupMenuItem(item, "third", true);
-    EXPECT_EQ(EWK_TEXT_DIRECTION_RIGHT_TO_LEFT, ewk_popup_menu_item_text_direction_get(item));
-    EXPECT_STREQ("tooltip", ewk_popup_menu_item_tooltip_get(item));
-    EXPECT_STREQ("aria", ewk_popup_menu_item_accessibility_text_get(item));
-    EXPECT_TRUE(ewk_popup_menu_item_selected_get(item));
-
-    item = static_cast<Ewk_Popup_Menu_Item*>(eina_list_nth(list, 3));
-    checkBasicPopupMenuItem(item, "label", false);
-    EXPECT_TRUE(ewk_popup_menu_item_is_label_get(item));
-
-    item = static_cast<Ewk_Popup_Menu_Item*>(eina_list_nth(list, 4));
-    checkBasicPopupMenuItem(item, "    forth", true);
-
-    item = static_cast<Ewk_Popup_Menu_Item*>(eina_list_nth(list, 5));
-    EXPECT_EQ(EWK_POPUP_MENU_UNKNOWN, ewk_popup_menu_item_type_get(item));
-    EXPECT_STREQ(0, ewk_popup_menu_item_text_get(item));
-
-    ecore_timer_add(0, selectItemAfterDelayed, smartData->self);
-    return true;
-}
-
-TEST_F(EWK2UnitTestBase, ewk_view_popup_menu_select)
-{
-    const char* selectHTML =
-        "<!doctype html><body><select onchange=\"document.title=this.value;\">"
-        "<option>first</option><option disabled>second</option><option selected dir=\"rtl\" title=\"tooltip\" aria-label=\"aria\">third</option>"
-        "<optgroup label=\"label\"><option>forth</option></optgroup>"
-        "</select></body>";
-
-    ewkViewClass()->popup_menu_show = showPopupMenu;
-
-    ewk_view_html_string_load(webView(), selectHTML, "file:///", 0);
-    ASSERT_TRUE(waitUntilLoadFinished());
-    mouseClick(30, 20);
-    ASSERT_TRUE(waitUntilTitleChangedTo("first"));
-
-    EXPECT_TRUE(ewk_view_popup_menu_close(webView()));
-    EXPECT_FALSE(ewk_view_popup_menu_select(webView(), 0));
 }
 
 TEST_F(EWK2UnitTestBase, ewk_view_settings_get)
@@ -612,135 +550,6 @@ TEST_F(EWK2UnitTestBase, ewk_view_run_javascript_prompt)
     EXPECT_FALSE(promptCallbackData.called);
 }
 
-#if ENABLE(INPUT_TYPE_COLOR)
-static const int initialRed = 0x12;
-static const int initialGreen = 0x34;
-static const int initialBlue = 0x56;
-static const int initialAlpha = 0xff;
-static const int changedRed = 0x98;
-static const int changedGreen = 0x76;
-static const int changedBlue = 0x54;
-static const int changedAlpha = 0xff;
-
-static bool isColorPickerShown = false;
-
-static void onColorPickerDone(void* userData, Evas_Object*, void*)
-{
-    bool* handled = static_cast<bool*>(userData);
-
-    *handled = true;
-}
-
-static unsigned char setColorPickerColor(void* data)
-{
-    Ewk_View_Smart_Data* smartData = static_cast<Ewk_View_Smart_Data*>(data);
-
-    // 4. Change color to changed color.
-    EXPECT_TRUE(ewk_view_color_picker_color_set(smartData->self, changedRed, changedGreen, changedBlue, changedAlpha));
-
-    evas_object_smart_callback_call(smartData->self, "input,type,color,request", 0);
-
-    return 0;
-}
-
-static Eina_Bool showColorPicker(Ewk_View_Smart_Data* smartData, int r, int g, int b, int a)
-{
-    static bool isFirstRun = true;
-
-    isColorPickerShown = true;
-
-    if (isFirstRun) {
-        // 2. Check initial value from html file.
-        EXPECT_EQ(initialRed, r);
-        EXPECT_EQ(initialGreen, g);
-        EXPECT_EQ(initialBlue, b);
-        EXPECT_EQ(initialAlpha, a);
-
-        isFirstRun = false;
-    } else {
-        // 7. Input values should be same as changed color.
-        EXPECT_EQ(changedRed, r);
-        EXPECT_EQ(changedGreen, g);
-        EXPECT_EQ(changedBlue, b);
-        EXPECT_EQ(changedAlpha, a);
-
-        evas_object_smart_callback_call(smartData->self, "input,type,color,request", 0);
-        return true;
-    }
-
-    // 3. Return after making a color picker.
-    ecore_timer_add(0.0, setColorPickerColor, smartData);
-    return true;
-}
-
-static Eina_Bool hideColorPicker(Ewk_View_Smart_Data*)
-{
-    // 5. Test color picker is shown.
-    EXPECT_TRUE(isColorPickerShown);
-    isColorPickerShown = false;
-}
-
-static Eina_Bool hideColorPickerByRemovingElement(Ewk_View_Smart_Data* smartData)
-{
-    // 9. input_picker_color_dismiss() is called if the element is removed.
-    EXPECT_TRUE(isColorPickerShown);
-    isColorPickerShown = false;
-    evas_object_smart_callback_call(smartData->self, "input,type,color,request", 0);
-}
-
-TEST_F(EWK2UnitTestBase, ewk_view_color_picker_color_set)
-{
-    Ewk_View_Smart_Class* api = ewkViewClass();
-    api->input_picker_color_request = showColorPicker;
-    api->input_picker_color_dismiss = hideColorPicker;
-
-    const char colorPickerHTML[] =
-        "<!DOCTYPE html>"
-        "<html>"
-        "<head>"
-        "<script>function removeInputElement(){"
-        "var parentElement = document.getElementById('parent');"
-        "var inputElement = document.getElementById('color');"
-        "parentElement.removeChild(inputElement);"
-        "}</script>"
-        "</head>"
-        "<body>"
-        "<div id='parent'>"
-        "<input type='color' value='#123456' id='color'>"
-        "<button onclick='removeInputElement();'>Remove Element</button>"
-        "</div>"
-        "</body>"
-        "</html>";
-
-    ewk_view_html_string_load(webView(), colorPickerHTML, 0, 0);
-    waitUntilLoadFinished();
-
-    // 1. Click input element to show color picker.
-    mouseClick(30, 20);
-
-    bool handled = false;
-    evas_object_smart_callback_add(webView(), "input,type,color,request", onColorPickerDone, &handled);
-    while (!handled)
-        ecore_main_loop_iterate();
-
-    // 6. Click input element to show color picker again.
-    mouseClick(30, 20);
-
-    handled = false;
-    while (!handled)
-        ecore_main_loop_iterate();
-
-    // 8. Click button to remove input element durlng color picker is shown.
-    api->input_picker_color_dismiss = hideColorPickerByRemovingElement;
-    mouseClick(80, 20);
-
-    handled = false;
-    while (!handled)
-        ecore_main_loop_iterate();
-    evas_object_smart_callback_del(webView(), "input,type,color,request", onColorPickerDone);
-}
-#endif // ENABLE(INPUT_TYPE_COLOR)
-
 TEST_F(EWK2UnitTestBase, ewk_view_context_get)
 {
     Ewk_Context* context = ewk_view_context_get(webView());
@@ -958,4 +767,33 @@ TEST_F(EWK2UnitTestBase, ewk_view_scale)
     ASSERT_TRUE(ewk_view_scale_set(webView(), 1, 0, 0));
     ASSERT_TRUE(loadUrlSync(environment->defaultTestPageUrl()));
     ASSERT_FLOAT_EQ(1, ewk_view_scale_get(webView()));
+}
+
+TEST_F(EWK2UnitTestBase, ewk_view_pagination)
+{
+    ASSERT_TRUE(loadUrlSync(environment->defaultTestPageUrl()));
+
+    // Default pagination value is EWK_PAGINATION_MODE_UNPAGINATED
+    ASSERT_EQ(EWK_PAGINATION_MODE_UNPAGINATED, ewk_view_pagination_mode_get(webView()));
+
+    ASSERT_TRUE(ewk_view_pagination_mode_set(webView(), EWK_PAGINATION_MODE_LEFT_TO_RIGHT));
+    // Reload page to check the pagination mode.
+    ASSERT_TRUE(loadUrlSync(environment->defaultTestPageUrl()));
+    ASSERT_EQ(EWK_PAGINATION_MODE_LEFT_TO_RIGHT, ewk_view_pagination_mode_get(webView()));
+
+    ASSERT_TRUE(ewk_view_pagination_mode_set(webView(), EWK_PAGINATION_MODE_RIGHT_TO_LEFT));
+    ASSERT_TRUE(loadUrlSync(environment->defaultTestPageUrl()));
+    ASSERT_EQ(EWK_PAGINATION_MODE_RIGHT_TO_LEFT, ewk_view_pagination_mode_get(webView()));
+
+    ASSERT_TRUE(ewk_view_pagination_mode_set(webView(), EWK_PAGINATION_MODE_TOP_TO_BOTTOM));
+    ASSERT_TRUE(loadUrlSync(environment->defaultTestPageUrl()));
+    ASSERT_EQ(EWK_PAGINATION_MODE_TOP_TO_BOTTOM, ewk_view_pagination_mode_get(webView()));
+
+    ASSERT_TRUE(ewk_view_pagination_mode_set(webView(),  EWK_PAGINATION_MODE_BOTTOM_TO_TOP));
+    ASSERT_TRUE(loadUrlSync(environment->defaultTestPageUrl()));
+    ASSERT_EQ(EWK_PAGINATION_MODE_BOTTOM_TO_TOP, ewk_view_pagination_mode_get(webView()));
+
+    ASSERT_TRUE(ewk_view_pagination_mode_set(webView(), EWK_PAGINATION_MODE_UNPAGINATED));
+    ASSERT_TRUE(loadUrlSync(environment->defaultTestPageUrl()));
+    ASSERT_EQ(EWK_PAGINATION_MODE_UNPAGINATED, ewk_view_pagination_mode_get(webView()));
 }

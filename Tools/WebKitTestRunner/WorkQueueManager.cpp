@@ -87,6 +87,18 @@ public:
     WKRetainPtr<WKStringRef> m_script;
 };
 
+class NavigationItem : public WorkQueueItem {
+public:
+    explicit NavigationItem(int index) : m_index(index) { }
+
+    WorkQueueItem::Type invoke() const
+    {
+        return goToItemAtIndex(m_index) ? WorkQueueItem::Loading : WorkQueueItem::NonLoading;
+    }
+
+    unsigned m_index;
+};
+
 WorkQueueManager::WorkQueueManager()
     : m_processing(false)
 {
@@ -141,18 +153,39 @@ void WorkQueueManager::queueLoad(const String& url, const String& target)
     enqueue(new LoadItem(url, target));
 }
 
-void WorkQueueManager::queueBackNavigation(unsigned howFarBackward)
+void WorkQueueManager::queueLoadHTMLString(const String& content, const String& baseURL, const String& unreachableURL)
 {
-    class BackNavigationItem : public WorkQueueItem {
+    class LoadHTMLStringItem : public WorkQueueItem {
     public:
-        explicit BackNavigationItem(unsigned howFarBackward) : m_howFarBackward(howFarBackward) { }
+        LoadHTMLStringItem(const String& content, const String& baseURL, const String& unreachableURL)
+            : m_content(AdoptWK, WKStringCreateWithUTF8CString(content.utf8().data()))
+            , m_baseURL(AdoptWK, WKURLCreateWithUTF8CString(baseURL.utf8().data()))
+            , m_unreachableURL(AdoptWK, WKURLCreateWithUTF8CString(unreachableURL.utf8().data()))
+        {
+        }
 
-        WorkQueueItem::Type invoke() const { return goToItemAtIndex(-m_howFarBackward) ? WorkQueueItem::Loading : WorkQueueItem::NonLoading; }
+        WorkQueueItem::Type invoke() const
+        {
+            WKPageLoadAlternateHTMLString(mainPage(), m_content.get(), m_baseURL.get(), m_unreachableURL.get());
+            return WorkQueueItem::Loading;
+        }
 
-        unsigned m_howFarBackward;
+        WKRetainPtr<WKStringRef> m_content;
+        WKRetainPtr<WKURLRef> m_baseURL;
+        WKRetainPtr<WKURLRef> m_unreachableURL;
     };
 
-    enqueue(new BackNavigationItem(howFarBackward));
+    enqueue(new LoadHTMLStringItem(content, baseURL, unreachableURL));
+}
+
+void WorkQueueManager::queueBackNavigation(unsigned howFarBackward)
+{
+    enqueue(new NavigationItem(-howFarBackward));
+}
+
+void WorkQueueManager::queueForwardNavigation(unsigned howFarForward)
+{
+    enqueue(new NavigationItem(howFarForward));
 }
 
 void WorkQueueManager::queueReload()

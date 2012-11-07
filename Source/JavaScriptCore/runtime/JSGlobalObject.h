@@ -43,6 +43,10 @@ namespace JSC {
     class Debugger;
     class ErrorConstructor;
     class ErrorPrototype;
+    class EvalCodeBlock;
+    class EvalExecutable;
+    class FunctionCodeBlock;
+    class FunctionExecutable;
     class FunctionPrototype;
     class GetterSetter;
     class GlobalCodeBlock;
@@ -50,9 +54,10 @@ namespace JSC {
     class LLIntOffsetsExtractor;
     class NativeErrorConstructor;
     class ProgramCodeBlock;
+    class ProgramExecutable;
     class RegExpConstructor;
     class RegExpPrototype;
-
+    class SourceCode;
     struct ActivationStackNode;
     struct HashTable;
 
@@ -185,6 +190,9 @@ namespace JSC {
 
         static JS_EXPORTDATA const ClassInfo s_info;
 
+        bool hasDebugger() const { return m_debugger; }
+        bool hasProfiler() const { return globalObjectMethodTable()->supportsProfiling(this); }
+
     protected:
         JS_EXPORT_PRIVATE explicit JSGlobalObject(JSGlobalData&, Structure*, const GlobalObjectMethodTable* = 0);
 
@@ -271,6 +279,10 @@ namespace JSC {
         Structure* arrayStructureWithArrayStorage() const { return m_arrayStructureWithArrayStorage.get(); }
         void* addressOfArrayStructure() { return &m_arrayStructure; }
         void* addressOfArrayStructureWithArrayStorage() { return &m_arrayStructureWithArrayStorage; }
+        bool isOriginalArrayStructure(Structure* structure)
+        {
+            return structure == m_arrayStructure.get() || structure == m_arrayStructureWithArrayStorage.get();
+        }
         Structure* booleanObjectStructure() const { return m_booleanObjectStructure.get(); }
         Structure* callbackConstructorStructure() const { return m_callbackConstructorStructure.get(); }
         Structure* callbackFunctionStructure() const { return m_callbackFunctionStructure.get(); }
@@ -362,6 +374,11 @@ namespace JSC {
 
         double weakRandomNumber() { return m_weakRandom.get(); }
         unsigned weakRandomInteger() { return m_weakRandom.getUint32(); }
+
+        UnlinkedProgramCodeBlock* createProgramCodeBlock(CallFrame*, ProgramExecutable*, JSObject** exception);
+        UnlinkedEvalCodeBlock* createEvalCodeBlock(CallFrame*, EvalExecutable*, JSObject** exception);
+        UnlinkedFunctionExecutable* createFunctionExecutableFromGlobalCode(CallFrame*, const Identifier&, const SourceCode&, JSObject** exception);
+
     protected:
 
         static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesVisitChildren | OverridesGetPropertyNames | Base::StructureFlags;

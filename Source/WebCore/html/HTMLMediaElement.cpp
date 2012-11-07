@@ -69,6 +69,7 @@
 #include "MIMETypeRegistry.h"
 #include "NodeRenderingContext.h"
 #include "Page.h"
+#include "PageGroup.h"
 #include "RenderVideo.h"
 #include "RenderView.h"
 #include "ScriptController.h"
@@ -281,6 +282,14 @@ HTMLMediaElement::HTMLMediaElement(const QualifiedName& tagName, Document* docum
 
     setHasCustomCallbacks();
     addElementToDocumentMap(this, document);
+
+#if ENABLE(VIDEO_TRACK)
+    if (document->page()) {
+        PageGroup& group = document->page()->group();
+        if (group.userHasCaptionPreferences())
+            m_disableCaptions = !group.userPrefersCaptions();
+    }
+#endif
 }
 
 HTMLMediaElement::~HTMLMediaElement()
@@ -354,8 +363,10 @@ void HTMLMediaElement::parseAttribute(const Attribute& attribute)
 {
     if (attribute.name() == srcAttr) {
         // Trigger a reload, as long as the 'src' attribute is present.
-        if (fastHasAttribute(srcAttr))
+        if (fastHasAttribute(srcAttr)) {
+            clearMediaPlayer(MediaResource);
             scheduleLoad(MediaResource);
+        }
     } else if (attribute.name() == controlsAttr)
         configureMediaControls();
 #if PLATFORM(MAC)
@@ -541,6 +552,20 @@ void HTMLMediaElement::attach()
             frame->loader()->client()->hideMediaPlayerProxyPlugin(m_proxyWidget.get());
     }
 #endif
+
+#if ENABLE(VIDEO_TRACK)
+    if (document()->page())
+        document()->page()->group().registerForCaptionPreferencesChangedCallbacks(this);
+#endif
+}
+
+void HTMLMediaElement::detach()
+{
+#if ENABLE(VIDEO_TRACK)
+    if (document()->page())
+        document()->page()->group().unregisterForCaptionPreferencesChangedCallbacks(this);
+#endif
+    HTMLElement::detach();
 }
 
 void HTMLMediaElement::didRecalcStyle(StyleChange)
@@ -893,8 +918,7 @@ static KURL createFileURLForApplicationCacheResource(const String& path)
     // app cache media files are always created with encodeForFileName(createCanonicalUUIDString()).
 
 #if USE(CF) && PLATFORM(WIN)
-    RetainPtr<CFStringRef> cfPath(AdoptCF, path.createCFString());
-    RetainPtr<CFURLRef> cfURL(AdoptCF, CFURLCreateWithFileSystemPath(0, cfPath.get(), kCFURLWindowsPathStyle, false));
+    RetainPtr<CFURLRef> cfURL(AdoptCF, CFURLCreateWithFileSystemPath(0, path.createCFString().get(), kCFURLWindowsPathStyle, false));
     KURL url(cfURL.get());
 #else
     KURL url;
@@ -925,10 +949,9 @@ void HTMLMediaElement::loadResource(const KURL& initialURL, ContentType& content
     }
     
 #if ENABLE(MEDIA_SOURCE)
-    if (url.protocolIs(mediaSourceBlobProtocol)) {
-        if (m_mediaSource)
-            m_mediaSource->setReadyState(MediaSource::closedKeyword());
+    ASSERT(!m_mediaSource);
 
+    if (url.protocolIs(mediaSourceBlobProtocol)) {
         m_mediaSource = MediaSourceRegistry::registry().lookupMediaSource(url.string());
 
         if (m_mediaSource) {
@@ -2396,6 +2419,8 @@ void HTMLMediaElement::setSourceState(const String& state)
          return;
 
     m_mediaSource->setReadyState(state);
+    if (state == MediaSource::closedKeyword())
+        m_mediaSource = 0;
 }
 #endif
 
@@ -2806,33 +2831,43 @@ void HTMLMediaElement::willRemoveTrack(HTMLTrackElement* trackElement)
     // then the user agent must remove the track element's corresponding text track from the 
     // media element's list of text tracks.
     m_textTracks->remove(textTrack.get());
+    if (textTrack->cues()) {
+        TextTrackCueList* cues = textTrack->cues();
+        beginIgnoringTrackDisplayUpdateRequests();
+        for (size_t i = 0; i < cues->length(); ++i)
+            textTrackRemoveCue(cues->item(i)->track(), cues->item(i));
+        endIgnoringTrackDisplayUpdateRequests();
+    }
+
     size_t index = m_textTracksWhenResourceSelectionBegan.find(textTrack.get());
     if (index != notFound)
         m_textTracksWhenResourceSelectionBegan.remove(index);
 }
 
-bool HTMLMediaElement::userIsInterestedInThisLanguage(const String&) const
+bool HTMLMediaElement::userPrefersCaptions() const
 {
-    // FIXME: check the user's language preference - bugs.webkit.org/show_bug.cgi?id=74121
-    return true;
+    Page* page = document()->page();
+    if (!page)
+        return false;
+
+    PageGroup& group = page->group();
+    return group.userHasCaptionPreferences() && group.userPrefersCaptions();
 }
 
 bool HTMLMediaElement::userIsInterestedInThisTrackKind(String kind) const
 {
-    // If ... the user has indicated an interest in having a track with this text track kind, text track language, ... 
     if (m_disableCaptions)
         return false;
 
     Settings* settings = document()->settings();
-    if (!settings)
-        return false;
+    bool userPrefersCaptionsOrSubtitles = m_closedCaptionsVisible || userPrefersCaptions();
 
     if (kind == TextTrack::subtitlesKeyword())
-        return settings->shouldDisplaySubtitles() || m_closedCaptionsVisible;
+        return (settings && settings->shouldDisplaySubtitles()) || userPrefersCaptionsOrSubtitles;
     if (kind == TextTrack::captionsKeyword())
-        return settings->shouldDisplayCaptions() || m_closedCaptionsVisible;
+        return (settings && settings->shouldDisplayCaptions()) || userPrefersCaptionsOrSubtitles;
     if (kind == TextTrack::descriptionsKeyword())
-        return settings->shouldDisplayTextDescriptions() || m_closedCaptionsVisible;
+        return settings && settings->shouldDisplayTextDescriptions();
 
     return false;
 }
@@ -3644,13 +3679,7 @@ void HTMLMediaElement::userCancelledLoad()
     // If the media data fetching process is aborted by the user:
 
     // 1 - The user agent should cancel the fetching process.
-#if !ENABLE(PLUGIN_PROXY_FOR_VIDEO)
-    m_player.clear();
-#endif
-    stopPeriodicTimers();
-    m_loadTimer.stop();
-    m_loadState = WaitingForSource;
-    m_pendingLoadFlags = 0;
+    clearMediaPlayer(-1);
 
     // 2 - Set the error attribute to a new MediaError object whose code attribute is set to MEDIA_ERR_ABORTED.
     m_error = MediaError::create(MediaError::MEDIA_ERR_ABORTED);
@@ -3686,6 +3715,18 @@ void HTMLMediaElement::userCancelledLoad()
     if (RuntimeEnabledFeatures::webkitVideoTrackEnabled())
         updateActiveTextTrackCues(0);
 #endif
+}
+
+void HTMLMediaElement::clearMediaPlayer(signed flags)
+{
+#if !ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+    m_player.clear();
+#endif
+    stopPeriodicTimers();
+    m_loadTimer.stop();
+
+    m_pendingLoadFlags &= ~flags;
+    m_loadState = WaitingForSource;
 }
 
 bool HTMLMediaElement::canSuspend() const
@@ -3997,22 +4038,8 @@ void HTMLMediaElement::setClosedCaptionsVisible(bool closedCaptionVisible)
 #if ENABLE(VIDEO_TRACK)
     if (RuntimeEnabledFeatures::webkitVideoTrackEnabled()) {
         m_disableCaptions = !m_closedCaptionsVisible;
-        
-        // Mark all track elements as not "configured" so that configureTextTracks()
-        // will reconsider which tracks to display in light of new user preferences
-        // (e.g. default tracks should not be displayed if the user has turned off
-        // captions and non-default tracks should be displayed based on language
-        // preferences if the user has turned captions on).
-        for (Node* node = firstChild(); node; node = node->nextSibling()) {
-            if (!node->hasTagName(trackTag))
-                continue;
-            HTMLTrackElement* trackElement = static_cast<HTMLTrackElement*>(node);
-            if (trackElement->kind() == TextTrack::captionsKeyword()
-                || trackElement->kind() == TextTrack::subtitlesKeyword())
-                trackElement->setHasBeenConfigured(false);
-        }
 
-        configureTextTracks();
+        markCaptionAndSubtitleTracksAsUnconfigured();
     }
 #else
     if (hasMediaControls())
@@ -4160,6 +4187,9 @@ void HTMLMediaElement::configureMediaControls()
 
     mediaControls()->show();
 #else
+    if (!hasMediaControls())
+        createMediaControls();
+
     if (m_player)
         m_player->setControls(controls());
 #endif
@@ -4200,6 +4230,39 @@ void HTMLMediaElement::updateClosedCaptionsControls()
             mediaControls()->updateTextTrackDisplay();
     }
 }
+
+void HTMLMediaElement::captionPreferencesChanged()
+{
+    if (!isVideo())
+        return;
+
+    markCaptionAndSubtitleTracksAsUnconfigured();
+}
+
+void HTMLMediaElement::markCaptionAndSubtitleTracksAsUnconfigured()
+{
+    // Mark all track elements as not "configured" so that configureTextTracks()
+    // will reconsider which tracks to display in light of new user preferences
+    // (e.g. default tracks should not be displayed if the user has turned off
+    // captions and non-default tracks should be displayed based on language
+    // preferences if the user has turned captions on).
+    for (RefPtr<Node> node = firstChild(); node; node = node->nextSibling()) {
+        if (!node->hasTagName(trackTag))
+            continue;
+        
+        HTMLTrackElement* trackElement = static_cast<HTMLTrackElement*>(node.get());
+        RefPtr<TextTrack> textTrack = trackElement->track();
+        if (!textTrack)
+            continue;
+        
+        String kind = textTrack->kind();
+
+        if (kind == TextTrack::subtitlesKeyword() || kind == TextTrack::captionsKeyword())
+            trackElement->setHasBeenConfigured(false);
+    }
+    configureTextTracks();
+}
+
 #endif
 
 void* HTMLMediaElement::preDispatchEventHandler(Event* event)
@@ -4216,7 +4279,7 @@ void HTMLMediaElement::createMediaPlayer()
     if (m_audioSourceNode)
         m_audioSourceNode->lock();
 #endif
-        
+
     m_player = MediaPlayer::create(this);
 
 #if ENABLE(MEDIA_SOURCE)
@@ -4468,9 +4531,24 @@ String HTMLMediaElement::mediaPlayerDocumentHost() const
     return document()->url().host();
 }
 
+void HTMLMediaElement::mediaPlayerEnterFullscreen()
+{
+    enterFullscreen();
+}
+
 void HTMLMediaElement::mediaPlayerExitFullscreen()
 {
     exitFullscreen();
+}
+
+bool HTMLMediaElement::mediaPlayerIsFullscreen() const
+{
+    return isFullscreen();
+}
+
+bool HTMLMediaElement::mediaPlayerIsFullscreenPermitted() const
+{
+    return !userGestureRequiredForFullscreen() || ScriptController::processingUserGesture();
 }
 
 bool HTMLMediaElement::mediaPlayerIsVideo() const

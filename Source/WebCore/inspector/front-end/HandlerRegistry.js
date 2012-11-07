@@ -94,8 +94,11 @@ WebInspector.HandlerRegistry.prototype = {
      * @param {WebInspector.ContextMenu} contextMenu
      * @param {Object} target
      */
-    appendApplicableItems: function(contextMenu, target)
+    appendApplicableItems: function(event, contextMenu, target)
     {
+        if (event.hasBeenHandledByHandlerRegistry)
+            return;
+        event.hasBeenHandledByHandlerRegistry = true;
         this._appendContentProviderItems(contextMenu, target);
         this._appendHrefItems(contextMenu, target);
     },
@@ -108,7 +111,7 @@ WebInspector.HandlerRegistry.prototype = {
     {
         if (!(target instanceof WebInspector.UISourceCode || target instanceof WebInspector.Resource || target instanceof WebInspector.NetworkRequest))
             return;
-        var contentProvider = /** @type {WebInspector.ContentProvider} */ target;
+        var contentProvider = /** @type {WebInspector.ContentProvider} */ (target);
         if (!contentProvider.contentURL())
             return;
 
@@ -140,7 +143,7 @@ WebInspector.HandlerRegistry.prototype = {
         function save(forceSaveAs)
         {
             if (contentProvider instanceof WebInspector.UISourceCode) {
-                var uiSourceCode = /** @type {WebInspector.UISourceCode} */ contentProvider;
+                var uiSourceCode = /** @type {WebInspector.UISourceCode} */ (contentProvider);
                 if (uiSourceCode.isDirty()) {
                     doSave(forceSaveAs, uiSourceCode.workingCopy());
                     uiSourceCode.commitWorkingCopy(function() { });
@@ -163,7 +166,7 @@ WebInspector.HandlerRegistry.prototype = {
     {
         if (!(target instanceof Node))
             return;
-        var targetNode = /** @type {Node} */ target;
+        var targetNode = /** @type {Node} */ (target);
 
         var anchorElement = targetNode.enclosingNodeOrSelfWithClass("webkit-html-resource-link") || targetNode.enclosingNodeOrSelfWithClass("webkit-html-external-link");
         if (!anchorElement)

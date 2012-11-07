@@ -33,6 +33,9 @@
  */
 (function (InjectedScriptHost, inspectedWindow, injectedScriptId) {
 
+// Protect against Object overwritten by the user code.
+var Object = {}.constructor;
+
 /**
  * @param {Arguments} array
  * @param {number=} index
@@ -48,7 +51,7 @@ function slice(array, index)
 
 /**
  * Please use this bind, not the one from Function.prototype
- * @param {function()} func
+ * @param {function(...)} func
  * @param {Object} thisObject
  * @param {...number} var_args
  */
@@ -364,7 +367,10 @@ InjectedScript.prototype = {
                     if (!descriptor) {
                         // Not all bindings provide proper descriptors. Fall back to the writable, configurable property.
                         try {
-                            descriptors.push({ name: name, value: object[name], writable: false, configurable: false, enumerable: false});
+                            descriptor = { name: name, value: object[name], writable: false, configurable: false, enumerable: false};
+                            if (o === object) 
+                                descriptor.isOwn = true;
+                            descriptors.push(descriptor);
                         } catch (e) {
                             // Silent catch.
                         }
@@ -377,11 +383,13 @@ InjectedScript.prototype = {
                 }
 
                 descriptor.name = name;
-                descriptors.push(descriptor); 
+                if (o === object) 
+                    descriptor.isOwn = true;
+                descriptors.push(descriptor);
             }
             if (ownProperties) {
                 if (object.__proto__)
-                    descriptors.push({ name: "__proto__", value: object.__proto__, writable: true, configurable: true, enumerable: false});
+                    descriptors.push({ name: "__proto__", value: object.__proto__, writable: true, configurable: true, enumerable: false, isOwn: true});
                 break;
             }
         }
@@ -393,11 +401,12 @@ InjectedScript.prototype = {
      * @param {string} objectGroup
      * @param {boolean} injectCommandLineAPI
      * @param {boolean} returnByValue
+     * @param {boolean} generatePreview
      * @return {*}
      */
-    evaluate: function(expression, objectGroup, injectCommandLineAPI, returnByValue)
+    evaluate: function(expression, objectGroup, injectCommandLineAPI, returnByValue, generatePreview)
     {
-        return this._evaluateAndWrap(InjectedScriptHost.evaluate, InjectedScriptHost, expression, objectGroup, false, injectCommandLineAPI, returnByValue);
+        return this._evaluateAndWrap(InjectedScriptHost.evaluate, InjectedScriptHost, expression, objectGroup, false, injectCommandLineAPI, returnByValue, generatePreview);
     },
 
     /**
@@ -455,13 +464,14 @@ InjectedScript.prototype = {
      * @param {boolean} isEvalOnCallFrame
      * @param {boolean} injectCommandLineAPI
      * @param {boolean} returnByValue
+     * @param {boolean} generatePreview
      * @return {*}
      */
-    _evaluateAndWrap: function(evalFunction, object, expression, objectGroup, isEvalOnCallFrame, injectCommandLineAPI, returnByValue)
+    _evaluateAndWrap: function(evalFunction, object, expression, objectGroup, isEvalOnCallFrame, injectCommandLineAPI, returnByValue, generatePreview)
     {
         try {
             return { wasThrown: false,
-                     result: this._wrapObject(this._evaluateOn(evalFunction, object, objectGroup, expression, isEvalOnCallFrame, injectCommandLineAPI), objectGroup, returnByValue, false) };
+                     result: this._wrapObject(this._evaluateOn(evalFunction, object, objectGroup, expression, isEvalOnCallFrame, injectCommandLineAPI), objectGroup, returnByValue, generatePreview) };
         } catch (e) {
             return this._createThrownValue(e, objectGroup);
         }
@@ -537,14 +547,15 @@ InjectedScript.prototype = {
      * @param {string} objectGroup
      * @param {boolean} injectCommandLineAPI
      * @param {boolean} returnByValue
+     * @param {boolean} generatePreview
      * @return {*}
      */
-    evaluateOnCallFrame: function(topCallFrame, callFrameId, expression, objectGroup, injectCommandLineAPI, returnByValue)
+    evaluateOnCallFrame: function(topCallFrame, callFrameId, expression, objectGroup, injectCommandLineAPI, returnByValue, generatePreview)
     {
         var callFrame = this._callFrameForId(topCallFrame, callFrameId);
         if (!callFrame)
             return "Could not find call frame with given id";
-        return this._evaluateAndWrap(callFrame.evaluate, callFrame, expression, objectGroup, true, injectCommandLineAPI, returnByValue);
+        return this._evaluateAndWrap(callFrame.evaluate, callFrame, expression, objectGroup, true, injectCommandLineAPI, returnByValue, generatePreview);
     },
 
     /**
@@ -606,7 +617,7 @@ InjectedScript.prototype = {
         var object = this.findObjectById(objectId);
         if (!object || this._subtype(object) !== "node")
             return null;
-        return /** @type {Node} */ object;
+        return /** @type {Node} */ (object);
     },
 
     /**
@@ -697,7 +708,7 @@ InjectedScript.prototype = {
         if (this.isPrimitiveValue(obj))
             return null;
 
-        obj = /** @type {Object} */ obj;
+        obj = /** @type {Object} */ (obj);
 
         // Type is object, get subtype.
         var subtype = this._subtype(obj);
@@ -784,7 +795,7 @@ InjectedScript.RemoteObject = function(object, objectGroupName, forceValueType, 
         return;
     }
 
-    object = /** @type {Object} */ object;
+    object = /** @type {Object} */ (object);
 
     this.objectId = injectedScript._bind(object, objectGroupName);
     var subtype = injectedScript._subtype(object);

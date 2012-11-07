@@ -135,7 +135,7 @@ struct UCharBufferTranslator {
 
     static void translate(StringImpl*& location, const UCharBuffer& buf, unsigned hash)
     {
-        location = StringImpl::create(buf.s, buf.length).leakRef();
+        location = StringImpl::create8BitIfPossible(buf.s, buf.length).leakRef();
         location->setHash(hash);
         location->setIsAtomic(true);
     }
@@ -260,7 +260,7 @@ PassRefPtr<StringImpl> AtomicString::add(const UChar* s)
     if (!s)
         return 0;
 
-    int length = 0;
+    unsigned length = 0;
     while (s[length] != UChar(0))
         length++;
 

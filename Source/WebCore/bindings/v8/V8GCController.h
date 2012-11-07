@@ -35,14 +35,22 @@
 
 namespace WebCore {
 
+class Node;
+
 class V8GCController {
 public:
-    static void gcPrologue();
-    static void gcEpilogue();
+    static void gcPrologue(v8::GCType, v8::GCCallbackFlags);
+    static void gcEpilogue(v8::GCType, v8::GCCallbackFlags);
+    static void minorGCPrologue();
+    static void minorGCEpilogue();
+    static void majorGCPrologue();
+    static void majorGCEpilogue();
 
     static void checkMemoryUsage();
     static void hintForCollectGarbage();
     static void collectGarbage();
+
+    static void* opaqueRootForGC(Node*);
 };
 
 }

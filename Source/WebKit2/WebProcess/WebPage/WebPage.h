@@ -43,6 +43,7 @@
 #include "InjectedBundlePagePolicyClient.h"
 #include "InjectedBundlePageResourceLoadClient.h"
 #include "InjectedBundlePageUIClient.h"
+#include "MessageReceiver.h"
 #include "MessageSender.h"
 #include "TapHighlightController.h"
 #include "Plugin.h"
@@ -162,7 +163,7 @@ class WebGestureEvent;
 class WebTouchEvent;
 #endif
 
-class WebPage : public APIObject, public CoreIPC::MessageSender<WebPage> {
+class WebPage : public APIObject, public CoreIPC::MessageReceiver, public CoreIPC::MessageSender<WebPage> {
 public:
     static const Type APIType = TypeBundlePage;
 
@@ -238,9 +239,8 @@ public:
     WebOpenPanelResultListener* activeOpenPanelResultListener() const { return m_activeOpenPanelResultListener.get(); }
     void setActiveOpenPanelResultListener(PassRefPtr<WebOpenPanelResultListener>);
 
-    // -- Called from WebProcess.
-    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
-    void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&);
+    void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&) OVERRIDE;
+    void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&) OVERRIDE;
 
     // -- InjectedBundle methods
 #if ENABLE(CONTEXT_MENUS)
@@ -378,7 +378,6 @@ public:
 #if USE(TILED_BACKING_STORE)
     void pageDidRequestScroll(const WebCore::IntPoint&);
     void setFixedVisibleContentRect(const WebCore::IntRect&);
-    void setResizesToContentsUsingLayoutSize(const WebCore::IntSize&);
     void resizeToContentsIfNeeded();
     void sendViewportAttributesChanged();
     void setViewportSize(const WebCore::IntSize&);
@@ -465,7 +464,10 @@ public:
     void gestureWillBegin(const WebCore::IntPoint&, bool& canBeginPanning);
     void gestureDidScroll(const WebCore::IntSize&);
     void gestureDidEnd();
-
+#elif PLATFORM(EFL)
+    void confirmComposition(const String& compositionString);
+    void setComposition(const WTF::String& compositionString, const WTF::Vector<WebCore::CompositionUnderline>& underlines, uint64_t cursorPosition);
+    void cancelComposition();
 #elif PLATFORM(GTK)
     void updateAccessibilityTree();
 #if USE(TEXTURE_MAPPER_GL)

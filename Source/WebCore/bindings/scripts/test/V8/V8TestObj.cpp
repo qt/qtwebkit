@@ -101,7 +101,7 @@ static v8::Handle<v8::Value> readOnlyTestObjAttrAttrGetter(v8::Local<v8::String>
     INC_STATS("DOM.TestObj.readOnlyTestObjAttr._get");
     TestObj* imp = V8TestObj::toNative(info.Holder());
     RefPtr<TestObj> result = imp->readOnlyTestObjAttr();
-    v8::Handle<v8::Value> wrapper = result.get() ? getDOMObjectMap(info.GetIsolate()).get(result.get()) : v8Undefined();
+    v8::Handle<v8::Value> wrapper = result.get() ? v8::Handle<v8::Value>(DOMDataStore::current(info.GetIsolate())->get(result.get())) : v8Undefined();
     if (wrapper.IsEmpty()) {
         wrapper = toV8(result.get(), info.Holder(), info.GetIsolate());
         if (!wrapper.IsEmpty())
@@ -1173,10 +1173,6 @@ static v8::Handle<v8::Value> optionsObjectCallback(const v8::Arguments& args)
     EXCEPTION_BLOCK(Dictionary, oo, Dictionary(MAYBE_MISSING_PARAMETER(args, 0, DefaultIsUndefined), args.GetIsolate()));
     if (!oo.isUndefinedOrNull() && !oo.isObject())
         return throwTypeError("Not an object.", args.GetIsolate());
-    if (args.Length() <= 1) {
-        imp->optionsObject(oo);
-        return v8Undefined();
-    }
     EXCEPTION_BLOCK(Dictionary, ooo, Dictionary(MAYBE_MISSING_PARAMETER(args, 1, DefaultIsUndefined), args.GetIsolate()));
     if (!ooo.isUndefinedOrNull() && !ooo.isObject())
         return throwTypeError("Not an object.", args.GetIsolate());
@@ -2073,7 +2069,7 @@ static const V8DOMConfiguration::BatchedAttribute V8TestObjAttrs[] = {
     {"id", TestObjV8Internal::idAttrGetter, TestObjV8Internal::idAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     // Attribute 'hash' (Type: 'readonly attribute' ExtAttr: '')
     {"hash", TestObjV8Internal::hashAttrGetter, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    // Attribute 'replaceableAttribute' (Type: 'attribute' ExtAttr: 'Replaceable')
+    // Attribute 'replaceableAttribute' (Type: 'readonly attribute' ExtAttr: 'Replaceable')
     {"replaceableAttribute", TestObjV8Internal::replaceableAttributeAttrGetter, TestObjV8Internal::TestObjReplaceableAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
 };
 
@@ -2326,16 +2322,15 @@ bool V8TestObj::HasInstance(v8::Handle<v8::Value> value)
 void V8TestObj::installPerContextProperties(v8::Handle<v8::Object> instance, TestObj* impl)
 {
     v8::Local<v8::Object> proto = v8::Local<v8::Object>::Cast(instance->GetPrototype());
-    ScriptExecutionContext* context = toScriptExecutionContext(proto->CreationContext());
     // When building QtWebkit with V8 this variable is unused when none of the features are enabled.
-    UNUSED_PARAM(context);
-    if (context && context->isDocument() && ContextFeatures::enabledPerContextAttr1Enabled(static_cast<Document*>(context))) {
+    UNUSED_PARAM(proto);
+    if (ContextFeatures::enabledPerContextAttr1Enabled(impl->document())) {
         static const V8DOMConfiguration::BatchedAttribute attrData =\
         // Attribute 'enabledPerContextAttr1' (Type: 'attribute' ExtAttr: 'V8EnabledPerContext')
         {"enabledPerContextAttr1", TestObjV8Internal::enabledPerContextAttr1AttrGetter, TestObjV8Internal::enabledPerContextAttr1AttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */};
         V8DOMConfiguration::configureAttribute(instance, proto, attrData);
     }
-    if (context && context->isDocument() && ContextFeatures::featureNameEnabled(static_cast<Document*>(context))) {
+    if (ContextFeatures::featureNameEnabled(impl->document())) {
         static const V8DOMConfiguration::BatchedAttribute attrData =\
         // Attribute 'enabledPerContextAttr2' (Type: 'attribute' ExtAttr: 'V8EnabledPerContext')
         {"enabledPerContextAttr2", TestObjV8Internal::enabledPerContextAttr2AttrGetter, TestObjV8Internal::enabledPerContextAttr2AttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */};

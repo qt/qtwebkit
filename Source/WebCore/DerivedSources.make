@@ -266,8 +266,6 @@ BINDING_IDLS = \
     $(WebCore)/dom/WebKitNamedFlow.idl \
     $(WebCore)/dom/WebKitTransitionEvent.idl \
     $(WebCore)/dom/WheelEvent.idl \
-    $(WebCore)/editing/DOMTransaction.idl \
-    $(WebCore)/editing/UndoManager.idl \
     $(WebCore)/fileapi/Blob.idl \
     $(WebCore)/fileapi/File.idl \
     $(WebCore)/fileapi/FileError.idl \
@@ -670,12 +668,7 @@ ifeq ($(OS),MACOS)
 
 FRAMEWORK_FLAGS = $(shell echo $(BUILT_PRODUCTS_DIR) $(FRAMEWORK_SEARCH_PATHS) | perl -e 'print "-F " . join(" -F ", split(" ", <>));')
 HEADER_FLAGS = $(shell echo $(BUILT_PRODUCTS_DIR) $(HEADER_SEARCH_PATHS) | perl -e 'print "-I" . join(" -I", split(" ", <>));')
-
-ifeq ($(TARGET_GCC_VERSION),LLVM_COMPILER)
-	TEXT_PREPROCESSOR_FLAGS=-E -P -x c -traditional
-else
-	TEXT_PREPROCESSOR_FLAGS=-E -P -x c -std=c89
-endif
+TEXT_PREPROCESSOR_FLAGS=-E -P -x c -traditional
 
 ifneq ($(SDKROOT),)
 	SDK_FLAGS=-isysroot $(SDKROOT)

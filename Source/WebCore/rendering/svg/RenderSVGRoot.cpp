@@ -297,17 +297,21 @@ void RenderSVGRoot::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paint
     // Convert from container offsets (html renderers) to a relative transform (svg renderers).
     // Transform from our paint container's coordinate system to our local coords.
     IntPoint adjustedPaintOffset = roundedIntPoint(paintOffset);
-    childPaintInfo.applyTransform(AffineTransform::translation(adjustedPaintOffset.x() - x(), adjustedPaintOffset.y() - y()) * localToParentTransform());
+    childPaintInfo.applyTransform(AffineTransform::translation(adjustedPaintOffset.x(), adjustedPaintOffset.y()) * localToBorderBoxTransform());
 
-    SVGRenderingContext renderingContext;
-    bool continueRendering = true;
-    if (childPaintInfo.phase == PaintPhaseForeground) {
-        renderingContext.prepareToRenderSVGContent(this, childPaintInfo);
-        continueRendering = renderingContext.isRenderingPrepared();
+    // SVGRenderingContext must be destroyed before we restore the childPaintInfo.context, because a filter may have
+    // changed the context and it is only reverted when the SVGRenderingContext destructor finishes applying the filter.
+    {
+        SVGRenderingContext renderingContext;
+        bool continueRendering = true;
+        if (childPaintInfo.phase == PaintPhaseForeground) {
+            renderingContext.prepareToRenderSVGContent(this, childPaintInfo);
+            continueRendering = renderingContext.isRenderingPrepared();
+        }
+
+        if (continueRendering)
+            RenderBox::paint(childPaintInfo, LayoutPoint());
     }
-
-    if (continueRendering)
-        RenderBox::paint(childPaintInfo, LayoutPoint());
 
     childPaintInfo.context->restore();
 }

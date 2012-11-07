@@ -181,6 +181,7 @@ enum AccessibilityRole {
     SplitterRole,
     StaticTextRole,
     SystemWideRole,
+    SVGRootRole,
     TabGroupRole,
     TabListRole,
     TabPanelRole,            
@@ -362,7 +363,8 @@ public:
     virtual bool isAccessibilityRenderObject() const { return false; }
     virtual bool isAccessibilityScrollbar() const { return false; }
     virtual bool isAccessibilityScrollView() const { return false; }
-    
+    virtual bool isAccessibilitySVGRoot() const { return false; }
+
     bool accessibilityObjectContainsText(String *) const;
     
     virtual bool isAnchor() const { return false; }
@@ -610,7 +612,7 @@ public:
     virtual void decrement() { }
 
     virtual void childrenChanged() { }
-    virtual void contentChanged() { }
+    virtual void textChanged() { }
     virtual void updateAccessibilityRole() { }
     const AccessibilityChildrenVector& children();
     virtual void addChildren() { }
@@ -729,6 +731,12 @@ public:
     // Scroll this object to a given point in global coordinates of the top-level window.
     virtual void scrollToGlobalPoint(const IntPoint&) const;
 
+    bool cachedIsIgnoredValue();
+    void setCachedIsIgnoredValue(bool);
+
+    // Fires a children changed notification on the parent if the isIgnored value changed.
+    void notifyIfIgnoredValueChanged();
+
 #if HAVE(ACCESSIBILITY)
 #if PLATFORM(GTK)
     AccessibilityObjectWrapper* wrapper() const;
@@ -767,6 +775,7 @@ protected:
     AccessibilityChildrenVector m_children;
     mutable bool m_haveChildren;
     AccessibilityRole m_role;
+    AccessibilityObjectInclusion m_cachedIsIgnoredValue;
     
     // If this object itself scrolls, return its ScrollableArea.
     virtual ScrollableArea* getScrollableAreaIfScrollable() const { return 0; }

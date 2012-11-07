@@ -33,6 +33,7 @@
 #include "CredentialManager.h"
 #include "CredentialTransformData.h"
 #include "DumpRenderTreeClient.h"
+#include "ExternalExtension.h"
 #include "FrameNetworkingContextBlackBerry.h"
 #include "FrameView.h"
 #include "HTMLFormElement.h"
@@ -708,33 +709,44 @@ void FrameLoaderClientBlackBerry::dispatchDidFailProvisionalLoad(const ResourceE
     if (!isMainFrame())
         return;
 
-    String errorPage = m_webPagePrivate->m_client->getErrorPage(error.errorCode(), error.localizedDescription(), error.failingURL());
+    if (error.domain() == ResourceError::platformErrorDomain
+        && (error.errorCode() == BlackBerry::Platform::FilterStream::StatusDeniedByApplication)) {
+        // Do not display error page for loading DENYed by application.
+        return;
+    }
 
     // Make sure we're still in the provisionalLoad state - getErrorPage runs a
     // nested event loop while it's waiting for client resources to load so
     // there's a small window for the user to hit stop.
-    if (m_frame->loader()->provisionalDocumentLoader()) {
-        SubstituteData errorData(utf8Buffer(errorPage), "text/html", "utf-8", KURL(KURL(), error.failingURL()));
+    if (!m_frame->loader()->provisionalDocumentLoader())
+        return;
 
-        ResourceRequest originalRequest = m_frame->loader()->provisionalDocumentLoader()->originalRequest();
+    ResourceRequest originalRequest = m_frame->loader()->provisionalDocumentLoader()->originalRequest();
 
-        // Loading using SubstituteData will replace the original request with our
-        // error data. This must be done within dispatchDidFailProvisionalLoad,
-        // and do NOT call stopAllLoaders first, because the loader checks the
-        // provisionalDocumentLoader to decide the load type; if called any other
-        // way, the error page is added to the end of the history instead of
-        // replacing the failed load.
-        //
-        // If this comes from a back/forward navigation, we need to save the current viewstate
-        // to original historyitem, and prevent the restore of view state to the error page.
-        if (isBackForwardLoadType(m_frame->loader()->loadType())) {
-            m_frame->loader()->history()->saveScrollPositionAndViewStateToItem(m_frame->loader()->history()->currentItem());
-            ASSERT(m_frame->loader()->history()->provisionalItem());
-            m_frame->loader()->history()->provisionalItem()->viewState().shouldSaveViewState = false;
-        }
-        m_loadingErrorPage = true;
-        m_frame->loader()->load(originalRequest, errorData, false);
+    // Do not show error page for a failed download.
+    if (originalRequest.forceDownload())
+        return;
+
+    String errorPage = m_webPagePrivate->m_client->getErrorPage(error.errorCode(), error.localizedDescription(), error.failingURL());
+    SubstituteData errorData(utf8Buffer(errorPage), "text/html", "utf-8", KURL(KURL(), error.failingURL()));
+
+    // Loading using SubstituteData will replace the original request with our
+    // error data. This must be done within dispatchDidFailProvisionalLoad,
+    // and do NOT call stopAllLoaders first, because the loader checks the
+    // provisionalDocumentLoader to decide the load type; if called any other
+    // way, the error page is added to the end of the history instead of
+    // replacing the failed load.
+    //
+    // If this comes from a back/forward navigation, we need to save the current viewstate
+    // to original historyitem, and prevent the restore of view state to the error page.
+    if (isBackForwardLoadType(m_frame->loader()->loadType())) {
+        m_frame->loader()->history()->saveScrollPositionAndViewStateToItem(m_frame->loader()->history()->currentItem());
+        ASSERT(m_frame->loader()->history()->provisionalItem());
+        m_frame->loader()->history()->provisionalItem()->viewState().shouldSaveViewState = false;
     }
+
+    m_loadingErrorPage = true;
+    m_frame->loader()->load(originalRequest, errorData, false);
 }
 
 void FrameLoaderClientBlackBerry::dispatchWillSubmitForm(FramePolicyFunction function, PassRefPtr<FormState>)
@@ -906,6 +918,8 @@ void FrameLoaderClientBlackBerry::dispatchDidClearWindowObjectInWorld(DOMWrapper
     if (m_webPagePrivate->m_enableQnxJavaScriptObject)
         attachExtensionObjectToFrame(m_frame, m_webPagePrivate->m_client);
 
+    attachExternalExtensionObjectToFrame(m_frame);
+
     m_webPagePrivate->m_client->notifyWindowObjectCleared();
 
     if (m_webPagePrivate->m_dumpRenderTree) {
@@ -1040,6 +1054,7 @@ void FrameLoaderClientBlackBerry::saveViewStateToItem(HistoryItem* item)
         viewState.minimumScale = m_webPagePrivate->m_minimumScale;
         viewState.maximumScale = m_webPagePrivate->m_maximumScale;
         viewState.isUserScalable = m_webPagePrivate->m_userScalable;
+        viewState.webPageClientState = m_webPagePrivate->m_client->serializePageCacheState();
     }
 }
 
@@ -1057,6 +1072,9 @@ void FrameLoaderClientBlackBerry::restoreViewState()
     HistoryItemViewState& viewState = currentItem->viewState();
     if (!viewState.shouldSaveViewState)
         return;
+
+    m_webPagePrivate->m_client->deserializePageCacheState(viewState.webPageClientState);
+
     // WebPagePrivate is messing up FrameView::wasScrolledByUser() by sending
     // scroll events that look like they were user generated all the time.
     //

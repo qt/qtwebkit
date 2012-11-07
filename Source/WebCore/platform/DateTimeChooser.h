@@ -31,7 +31,9 @@
 #ifndef DateTimeChooser_h
 #define DateTimeChooser_h
 
+#if ENABLE(DATE_AND_TIME_INPUT_TYPES)
 #include "IntRect.h"
+#include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
 
 namespace WebCore {
@@ -52,7 +54,7 @@ struct DateTimeChooserParameters {
 };
 
 // For pickers like color pickers and date pickers.
-class DateTimeChooser {
+class DateTimeChooser : public RefCounted<DateTimeChooser> {
 public:
     virtual ~DateTimeChooser() { }
 
@@ -60,5 +62,5 @@ public:
 };
 
 } // namespace WebCore
-
+#endif
 #endif // DateTimeChooser_h

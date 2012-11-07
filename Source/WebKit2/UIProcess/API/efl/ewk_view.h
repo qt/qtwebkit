@@ -26,6 +26,8 @@
  *
  * The following signals (see evas_object_smart_callback_add()) are emitted:
  *
+ * - "authentication,request", Ewk_Auth_Request*: reports that user authentication was requested. Call
+ *   ewk_auth_request_ref() on the request object to process the authentication asynchronously.
  * - "back,forward,list,changed", void: reports that the view's back / forward list had changed.
  * - "close,window", void: window is closed.
  * - "create,window", Evas_Object**: a new window is created.
@@ -34,6 +36,9 @@
  * - "download,finished", Ewk_Download_Job*: reports that a download completed successfully.
  * - "download,request", Ewk_Download_Job*: reports that a new download has been requested. The client should set the
  *   destination path by calling ewk_download_job_destination_set() or the download will fail.
+ * - "file,chooser,request", Ewk_File_Chooser_Request*: reports that a request has been made for the user to choose
+ *   a file (or several) on the file system. Call ewk_file_chooser_request_ref() on the request object to process it
+ *   asynchronously.
  * - "form,submission,request", Ewk_Form_Submission_Request*: Reports that a form request is about to be submitted.
  *   The Ewk_Form_Submission_Request passed contains information about the text fields of the form. This
  *   is typically used to store login information that can be used later to pre-fill the form.
@@ -75,10 +80,12 @@
 #define ewk_view_h
 
 #include "ewk_back_forward_list.h"
+#include "ewk_color_picker.h"
 #include "ewk_context.h"
 #include "ewk_download_job.h"
 #include "ewk_error.h"
 #include "ewk_intent.h"
+#include "ewk_popup_menu.h"
 #include "ewk_resource.h"
 #include "ewk_settings.h"
 #include "ewk_touch.h"
@@ -104,7 +111,7 @@ struct Ewk_View_Smart_Class {
     Evas_Smart_Class sc; /**< all but 'data' is free to be changed. */
     unsigned long version;
 
-    Eina_Bool (*popup_menu_show)(Ewk_View_Smart_Data *sd, Eina_Rectangle rect, Ewk_Text_Direction text_direction, double page_scale_factor, Eina_List *items, int selected_index);
+    Eina_Bool (*popup_menu_show)(Ewk_View_Smart_Data *sd, Eina_Rectangle rect, Ewk_Text_Direction text_direction, double page_scale_factor, Ewk_Popup_Menu *menu);
     Eina_Bool (*popup_menu_hide)(Ewk_View_Smart_Data *sd);
 
     // event handling:
@@ -129,7 +136,7 @@ struct Ewk_View_Smart_Class {
 
     // color picker:
     //   - Shows and hides color picker.
-    Eina_Bool (*input_picker_color_request)(Ewk_View_Smart_Data *sd, int r, int g, int b, int a);
+    Eina_Bool (*input_picker_color_request)(Ewk_View_Smart_Data *sd, Ewk_Color_Picker *color_picker);
     Eina_Bool (*input_picker_color_dismiss)(Ewk_View_Smart_Data *sd);
 
     // storage:
@@ -182,7 +189,7 @@ struct Ewk_View_Smart_Class {
  */
 #define EWK_VIEW_SMART_CLASS_INIT_NAME_VERSION(name) EWK_VIEW_SMART_CLASS_INIT(EVAS_SMART_CLASS_INIT_NAME_VERSION(name))
 
-typedef struct Ewk_View_Private_Data Ewk_View_Private_Data;
+typedef struct EwkViewImpl EwkViewImpl;
 /**
  * @brief Contains an internal View data.
  *
@@ -194,7 +201,7 @@ struct Ewk_View_Smart_Data {
     const Ewk_View_Smart_Class* api; /**< reference to casted class instance */
     Evas_Object* self; /**< reference to owner object */
     Evas_Object* image; /**< reference to evas_object_image for drawing web contents */
-    Ewk_View_Private_Data* priv; /**< should never be accessed, c++ stuff */
+    EwkViewImpl* priv; /**< should never be accessed, c++ stuff */
     struct {
         Evas_Coord x, y, w, h; /**< last used viewport */
     } view;
@@ -269,6 +276,18 @@ enum Ewk_Find_Options {
     EWK_FIND_OPTIONS_SHOW_HIGHLIGHT = 1 << 7 /**< show highlight */
 };
 typedef enum Ewk_Find_Options Ewk_Find_Options;
+
+/**
+ * Enum values used to set pagination mode.
+ */
+typedef enum {
+    EWK_PAGINATION_MODE_INVALID = -1, /**< invalid pagination mode that will be returned when error occured. */
+    EWK_PAGINATION_MODE_UNPAGINATED, /**< default mode for pagination. not paginated  */
+    EWK_PAGINATION_MODE_LEFT_TO_RIGHT, /**< go to the next page with scrolling left to right horizontally. */
+    EWK_PAGINATION_MODE_RIGHT_TO_LEFT, /**< go to the next page with scrolling right to left horizontally. */
+    EWK_PAGINATION_MODE_TOP_TO_BOTTOM, /**< go to the next page with scrolling top to bottom vertically. */
+    EWK_PAGINATION_MODE_BOTTOM_TO_TOP /**< go to the next page with scrolling bottom to top vertically. */
+} Ewk_Pagination_Mode;
 
 /**
  * Sets the smart class APIs, enabling view to be inherited.
@@ -677,27 +696,6 @@ EAPI Eina_Bool ewk_view_text_find_highlight_clear(Evas_Object *o);
 EAPI Eina_Bool ewk_view_text_matches_count(Evas_Object *o, const char *text, Ewk_Find_Options options, unsigned max_match_count);
 
 /**
- * Selects index of current popup menu.
- *
- * @param o view object contains popup menu.
- * @param index index of item to select
- *
- * @return @c EINA_TRUE on success, @c EINA_FALSE on failure (probably
- *         popup menu is not selected or index is out of range)
- */
-EAPI Eina_Bool ewk_view_popup_menu_select(Evas_Object *o, unsigned int index);
-
-/**
- * Closes current popup menu.
- *
- * @param o view object contains popup menu.
- *
- * @return @c EINA_TRUE on success, @c EINA_FALSE on failure (probably
- *         popup menu is not selected)
- */
-EAPI Eina_Bool ewk_view_popup_menu_close(Evas_Object *o);
-
-/**
  * Sets whether the ewk_view supports the mouse events or not.
  *
  * The ewk_view will support the mouse events if EINA_TRUE or not support the
@@ -718,23 +716,6 @@ EAPI Eina_Bool ewk_view_mouse_events_enabled_set(Evas_Object *o, Eina_Bool enabl
  * @return @c EINA_TRUE if the mouse events are enabled or @c EINA_FALSE otherwise
  */
 EAPI Eina_Bool ewk_view_mouse_events_enabled_get(const Evas_Object *o);
-
-/*
- * Sets the user chosen color. To be used when implementing a color picker.
- *
- * The function should only be called when a color has been requested by the document.
- * If called when this is not the case or when the input picker has been dismissed, this
- * function will fail and return EINA_FALSE.
- *
- * @param o view object contains color picker
- * @param r red channel value to be set
- * @param g green channel value to be set
- * @param b blue channel value to be set
- * @param a alpha channel value to be set
- *
- * @return @c EINA_TRUE on success @c EINA_FALSE otherwise
- */
-EAPI Eina_Bool ewk_view_color_picker_color_set(Evas_Object *o, int r, int g, int b, int a);
 
 /**
  * Feeds the touch event to the view.
@@ -792,6 +773,28 @@ EAPI Eina_Bool ewk_view_inspector_show(Evas_Object *o);
  * @return @c EINA_TRUE on success or @c EINA_FALSE on failure
  */
 EAPI Eina_Bool ewk_view_inspector_close(Evas_Object *o);
+
+/**
+ * Set pagination mode to the current web page.
+ *
+ * @param o view object to set the pagenation mode
+ * @param mode The Ewk_Pagination_Mode to set
+ *
+ * @return @c EINA_TRUE on success or @c EINA_FALSE on failure
+ */
+EAPI Eina_Bool ewk_view_pagination_mode_set(Evas_Object *o, Ewk_Pagination_Mode mode);
+
+/**
+ * Get pagination mode of the current web page. 
+ * 
+ * The default value is EWK_PAGINATION_MODE_UNPAGINATED.
+ * When error occured, EWK_PAGINATION_MODE_INVALID is returned. 
+ *
+ * @param o view object to get the pagination mode
+ *
+ * @return The pagination mode of the current web page
+ */
+EAPI Ewk_Pagination_Mode ewk_view_pagination_mode_get(const Evas_Object *o);
 
 #ifdef __cplusplus
 }

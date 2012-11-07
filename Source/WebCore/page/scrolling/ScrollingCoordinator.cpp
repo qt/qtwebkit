@@ -237,8 +237,14 @@ void ScrollingCoordinator::updateMainFrameScrollPosition(const IntPoint& scrollP
     frameView->setInProgrammaticScroll(oldProgrammaticScroll);
 
 #if USE(ACCELERATED_COMPOSITING)
-    if (GraphicsLayer* scrollLayer = scrollLayerForFrameView(frameView))
-        scrollLayer->syncPosition(-frameView->scrollPosition());
+    if (GraphicsLayer* scrollLayer = scrollLayerForFrameView(frameView)) {
+        if (programmaticScroll)
+            scrollLayer->setPosition(-frameView->scrollPosition());
+        else {
+            scrollLayer->syncPosition(-frameView->scrollPosition());
+            syncChildPositions(frameView->visibleContentRect());
+        }
+    }
 #endif
 }
 
@@ -317,6 +323,11 @@ ScrollingNodeID ScrollingCoordinator::uniqueScrollLayerID()
 {
     static ScrollingNodeID uniqueScrollLayerID = 1;
     return uniqueScrollLayerID++;
+}
+
+String ScrollingCoordinator::scrollingStateTreeAsText() const
+{
+    return String();
 }
 
 } // namespace WebCore

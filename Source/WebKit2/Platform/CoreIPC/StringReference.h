@@ -26,6 +26,7 @@
 #ifndef StringReference_h
 #define StringReference_h
 
+#include <wtf/Forward.h>
 #include <wtf/HashTraits.h>
 
 namespace CoreIPC {
@@ -59,12 +60,14 @@ public:
     size_t size() const { return m_size; }
     const char* data() const { return m_data; }
 
+    CString toString() const;
+
     friend bool operator==(const StringReference& a, const StringReference& b)
     {
         return a.m_size == b.m_size && !memcmp(a.m_data, b.m_data, a.m_size);
     }
 
-    void encode(ArgumentEncoder*) const;
+    void encode(ArgumentEncoder&) const;
     static bool decode(ArgumentDecoder*, StringReference&);
 
     struct Hash {

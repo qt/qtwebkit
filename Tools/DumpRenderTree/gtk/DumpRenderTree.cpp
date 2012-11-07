@@ -73,6 +73,7 @@ extern gchar* webkit_web_frame_get_response_mime_type(WebKitWebFrame* frame);
 
 volatile bool done;
 static bool printSeparators;
+static int dumpPixelsForAllTests = false;
 static bool dumpPixelsForCurrentTest;
 static int dumpTree = 1;
 static int useTimeoutWatchdog = 1;
@@ -548,6 +549,7 @@ static void initializeGlobalsFromCommandLineOptions(int argc, char *argv[])
 {
     struct option options[] = {
         {"notree", no_argument, &dumpTree, false},
+        {"pixel-tests", no_argument, &dumpPixelsForAllTests, true},
         {"tree", no_argument, &dumpTree, true},
         {"no-timeout", no_argument, &useTimeoutWatchdog, false},
         {NULL, 0, NULL, 0}
@@ -645,10 +647,6 @@ static void setDefaultsToConsistentStateValuesForTesting()
 {
     resetDefaultsToConsistentValues();
 
-    /* Disable the default auth dialog for testing */
-    SoupSession* session = webkit_get_default_session();
-    soup_session_remove_feature_by_type(session, WEBKIT_TYPE_SOUP_AUTH_DIALOG);
-
 #if PLATFORM(X11)
     webkit_web_settings_add_extra_plugin_directory(webView, TEST_PLUGIN_DIR);
 #endif
@@ -696,7 +694,7 @@ static void runTest(const string& inputLine)
 
     TestCommand command = parseInputLine(inputLine);
     string& testURL = command.pathOrURL;
-    dumpPixelsForCurrentTest = command.shouldDumpPixels;
+    dumpPixelsForCurrentTest = command.shouldDumpPixels || dumpPixelsForAllTests;
 
     // Convert the path into a full file URL if it does not look
     // like an HTTP/S URL (doesn't start with http:// or https://).

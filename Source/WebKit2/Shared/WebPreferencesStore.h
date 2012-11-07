@@ -138,6 +138,7 @@ namespace WebKit {
     macro(CookieEnabled, cookieEnabled, Bool, bool, true) \
     macro(PlugInSnapshottingEnabled, plugInSnapshottingEnabled, Bool, bool, false) \
     macro(PDFPluginEnabled, pdfPluginEnabled, Bool, bool, false) \
+    macro(UsesEncodingDetector, usesEncodingDetector, Bool, bool, false) \
     \
 
 #define FOR_EACH_WEBKIT_DOUBLE_PREFERENCE(macro) \
@@ -233,7 +234,7 @@ FOR_EACH_WEBKIT_PREFERENCE(DECLARE_KEY_GETTERS)
 struct WebPreferencesStore {
     WebPreferencesStore();
 
-    void encode(CoreIPC::ArgumentEncoder*) const;
+    void encode(CoreIPC::ArgumentEncoder&) const;
     static bool decode(CoreIPC::ArgumentDecoder*, WebPreferencesStore&);
 
     // NOTE: The getters in this class have non-standard names to aid in the use of the preference macros.

@@ -91,72 +91,6 @@ void JIT::emit_op_del_by_id(Instruction* currentInstruction)
     stubCall.call(dst);
 }
 
-void JIT::emit_op_method_check(Instruction* currentInstruction)
-{
-    // Assert that the following instruction is a get_by_id.
-    ASSERT(m_interpreter->getOpcodeID((currentInstruction + OPCODE_LENGTH(op_method_check))->u.opcode) == op_get_by_id
-        || m_interpreter->getOpcodeID((currentInstruction + OPCODE_LENGTH(op_method_check))->u.opcode) == op_get_by_id_out_of_line);
-    
-    currentInstruction += OPCODE_LENGTH(op_method_check);
-    
-    // Do the method check - check the object & its prototype's structure inline (this is the common case).
-    m_methodCallCompilationInfo.append(MethodCallCompilationInfo(m_bytecodeOffset, m_propertyAccessCompilationInfo.size()));
-    MethodCallCompilationInfo& info = m_methodCallCompilationInfo.last();
-    
-    int dst = currentInstruction[1].u.operand;
-    int base = currentInstruction[2].u.operand;
-    
-    emitLoad(base, regT1, regT0);
-    emitJumpSlowCaseIfNotJSCell(base, regT1);
-    
-    BEGIN_UNINTERRUPTED_SEQUENCE(sequenceMethodCheck);
-    
-    Jump structureCheck = branchPtrWithPatch(NotEqual, Address(regT0, JSCell::structureOffset()), info.structureToCompare, TrustedImmPtr(reinterpret_cast<void*>(patchGetByIdDefaultStructure)));
-    DataLabelPtr protoStructureToCompare, protoObj = moveWithPatch(TrustedImmPtr(0), regT2);
-    Jump protoStructureCheck = branchPtrWithPatch(NotEqual, Address(regT2, JSCell::structureOffset()), protoStructureToCompare, TrustedImmPtr(reinterpret_cast<void*>(patchGetByIdDefaultStructure)));
-    
-    // This will be relinked to load the function without doing a load.
-    DataLabelPtr putFunction = moveWithPatch(TrustedImmPtr(0), regT0);
-    
-    END_UNINTERRUPTED_SEQUENCE(sequenceMethodCheck);
-    
-    move(TrustedImm32(JSValue::CellTag), regT1);
-    Jump match = jump();
-    
-    // Link the failure cases here.
-    structureCheck.link(this);
-    protoStructureCheck.link(this);
-    
-    // Do a regular(ish) get_by_id (the slow case will be link to
-    // cti_op_get_by_id_method_check instead of cti_op_get_by_id.
-    compileGetByIdHotPath();
-    
-    match.link(this);
-    emitValueProfilingSite(m_bytecodeOffset + OPCODE_LENGTH(op_method_check));
-    emitStore(dst, regT1, regT0);
-    map(m_bytecodeOffset + OPCODE_LENGTH(op_method_check) + OPCODE_LENGTH(op_get_by_id), dst, regT1, regT0);
-    
-    // We've already generated the following get_by_id, so make sure it's skipped over.
-    m_bytecodeOffset += OPCODE_LENGTH(op_get_by_id);
-
-    m_propertyAccessCompilationInfo.last().addMethodCheckInfo(info.structureToCompare, protoObj, protoStructureToCompare, putFunction);
-}
-
-void JIT::emitSlow_op_method_check(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
-{
-    currentInstruction += OPCODE_LENGTH(op_method_check);
-    
-    int dst = currentInstruction[1].u.operand;
-    int base = currentInstruction[2].u.operand;
-    int ident = currentInstruction[3].u.operand;
-    
-    compileGetByIdSlowCase(dst, base, &(m_codeBlock->identifier(ident)), iter, true);
-    emitValueProfilingSite(m_bytecodeOffset + OPCODE_LENGTH(op_method_check));
-    
-    // We've already generated the following get_by_id, so make sure it's skipped over.
-    m_bytecodeOffset += OPCODE_LENGTH(op_get_by_id);
-}
-
 JIT::CodeRef JIT::stringGetByValStubGenerator(JSGlobalData* globalData)
 {
     JSInterfaceJIT jit;
@@ -453,22 +387,28 @@ void JIT::emit_op_get_by_id(Instruction* currentInstruction)
 {
     int dst = currentInstruction[1].u.operand;
     int base = currentInstruction[2].u.operand;
+    Identifier* ident = &(m_codeBlock->identifier(currentInstruction[3].u.operand));
     
     emitLoad(base, regT1, regT0);
     emitJumpSlowCaseIfNotJSCell(base, regT1);
-    compileGetByIdHotPath();
+    compileGetByIdHotPath(ident);
     emitValueProfilingSite();
     emitStore(dst, regT1, regT0);
     map(m_bytecodeOffset + OPCODE_LENGTH(op_get_by_id), dst, regT1, regT0);
 }
 
-void JIT::compileGetByIdHotPath()
+void JIT::compileGetByIdHotPath(Identifier* ident)
 {
     // As for put_by_id, get_by_id requires the offset of the Structure and the offset of the access to be patched.
     // Additionally, for get_by_id we need patch the offset of the branch to the slow case (we patch this to jump
     // to array-length / prototype access tranpolines, and finally we also the the property-map access offset as a label
     // to jump back to if one of these trampolies finds a match.
     
+    if (*ident == m_globalData->propertyNames->length && canBeOptimized()) {
+        loadPtr(Address(regT0, JSCell::structureOffset()), regT2);
+        emitArrayProfilingSiteForBytecodeIndex(regT2, regT3, m_bytecodeOffset);
+    }
+
     BEGIN_UNINTERRUPTED_SEQUENCE(sequenceGetByIdHotPath);
     
     Label hotPathBegin(this);
@@ -498,7 +438,7 @@ void JIT::emitSlow_op_get_by_id(Instruction* currentInstruction, Vector<SlowCase
     emitValueProfilingSite();
 }
 
-void JIT::compileGetByIdSlowCase(int dst, int base, Identifier* ident, Vector<SlowCaseEntry>::iterator& iter, bool isMethodCheck)
+void JIT::compileGetByIdSlowCase(int dst, int base, Identifier* ident, Vector<SlowCaseEntry>::iterator& iter)
 {
     // As for the hot path of get_by_id, above, we ensure that we can use an architecture specific offset
     // so that we only need track one pointer into the slow case code - we track a pointer to the location
@@ -511,7 +451,7 @@ void JIT::compileGetByIdSlowCase(int dst, int base, Identifier* ident, Vector<Sl
     BEGIN_UNINTERRUPTED_SEQUENCE(sequenceGetByIdSlowCase);
     
     Label coldPathBegin(this);
-    JITStubCall stubCall(this, isMethodCheck ? cti_op_get_by_id_method_check : cti_op_get_by_id);
+    JITStubCall stubCall(this, cti_op_get_by_id);
     stubCall.addArgument(regT1, regT0);
     stubCall.addArgument(TrustedImmPtr(ident));
     Call call = stubCall.call(dst);
@@ -624,12 +564,12 @@ void JIT::privateCompilePutByIdTransition(StructureStubInfo* stubInfo, Structure
     JumpList failureCases;
     failureCases.append(branch32(NotEqual, regT1, TrustedImm32(JSValue::CellTag)));
     failureCases.append(branchPtr(NotEqual, Address(regT0, JSCell::structureOffset()), TrustedImmPtr(oldStructure)));
-    testPrototype(oldStructure->storedPrototype(), failureCases);
+    testPrototype(oldStructure->storedPrototype(), failureCases, stubInfo);
     
     if (!direct) {
         // Verify that nothing in the prototype chain has a setter for this property. 
         for (WriteBarrier<Structure>* it = chain->head(); *it; ++it)
-            testPrototype((*it)->storedPrototype(), failureCases);
+            testPrototype((*it)->storedPrototype(), failureCases, stubInfo);
     }
 
     // If we succeed in all of our checks, and the code was optimizable, then make sure we
@@ -751,7 +691,6 @@ void JIT::privateCompilePatchGetArrayLength(ReturnAddressPtr returnAddress)
     
     // Check for array
     loadPtr(Address(regT0, JSCell::structureOffset()), regT2);
-    emitArrayProfilingSiteForBytecodeIndex(regT2, regT3, stubInfo->bytecodeIndex);
     Jump failureCases1 = branchTest32(Zero, regT2, TrustedImm32(IsArray));
     Jump failureCases2 = branchTest32(Zero, regT2, TrustedImm32(IndexingShapeMask));
     
@@ -802,8 +741,7 @@ void JIT::privateCompileGetByIdProto(StructureStubInfo* stubInfo, Structure* str
     Jump failureCases1 = checkStructure(regT0, structure);
     
     // Check the prototype object's Structure had not changed.
-    move(TrustedImmPtr(protoObject), regT3);
-    Jump failureCases2 = branchPtr(NotEqual, Address(regT3, JSCell::structureOffset()), TrustedImmPtr(prototypeStructure));
+    Jump failureCases2 = addStructureTransitionCheck(protoObject, prototypeStructure, stubInfo, regT3);
 
     bool needsStubLink = false;
     // Checks out okay!
@@ -833,7 +771,8 @@ void JIT::privateCompileGetByIdProto(StructureStubInfo* stubInfo, Structure* str
     // Use the patch information to link the failure cases back to the original slow case routine.
     CodeLocationLabel slowCaseBegin = stubInfo->callReturnLocation.labelAtOffset(-stubInfo->patch.baseline.u.get.coldPathBegin);
     patchBuffer.link(failureCases1, slowCaseBegin);
-    patchBuffer.link(failureCases2, slowCaseBegin);
+    if (failureCases2.isSet())
+        patchBuffer.link(failureCases2, slowCaseBegin);
     
     // On success return back to the hot patch code, at a point it will perform the store to dest for us.
     patchBuffer.link(success, stubInfo->hotPathBegin.labelAtOffset(stubInfo->patch.baseline.u.get.putResult));
@@ -942,8 +881,7 @@ void JIT::privateCompileGetByIdProtoList(StructureStubInfo* stubInfo, Polymorphi
     Jump failureCases1 = checkStructure(regT0, structure);
     
     // Check the prototype object's Structure had not changed.
-    move(TrustedImmPtr(protoObject), regT3);
-    Jump failureCases2 = branchPtr(NotEqual, Address(regT3, JSCell::structureOffset()), TrustedImmPtr(prototypeStructure));
+    Jump failureCases2 = addStructureTransitionCheck(protoObject, prototypeStructure, stubInfo, regT3);
     
     bool needsStubLink = false;
     bool isDirect = false;
@@ -980,7 +918,8 @@ void JIT::privateCompileGetByIdProtoList(StructureStubInfo* stubInfo, Polymorphi
     // Use the patch information to link the failure cases back to the original slow case routine.
     CodeLocationLabel lastProtoBegin = CodeLocationLabel(JITStubRoutine::asCodePtr(prototypeStructures->list[currentIndex - 1].stubRoutine));
     patchBuffer.link(failureCases1, lastProtoBegin);
-    patchBuffer.link(failureCases2, lastProtoBegin);
+    if (failureCases2.isSet())
+        patchBuffer.link(failureCases2, lastProtoBegin);
     
     // On success return back to the hot patch code, at a point it will perform the store to dest for us.
     patchBuffer.link(success, stubInfo->hotPathBegin.labelAtOffset(stubInfo->patch.baseline.u.get.putResult));
@@ -1019,7 +958,7 @@ void JIT::privateCompileGetByIdChainList(StructureStubInfo* stubInfo, Polymorphi
     for (unsigned i = 0; i < count; ++i, ++it) {
         protoObject = asObject(currStructure->prototypeForLookup(callFrame));
         currStructure = it->get();
-        testPrototype(protoObject, bucketsOfFail);
+        testPrototype(protoObject, bucketsOfFail, stubInfo);
     }
     ASSERT(protoObject);
     
@@ -1098,7 +1037,7 @@ void JIT::privateCompileGetByIdChain(StructureStubInfo* stubInfo, Structure* str
     for (unsigned i = 0; i < count; ++i, ++it) {
         protoObject = asObject(currStructure->prototypeForLookup(callFrame));
         currStructure = it->get();
-        testPrototype(protoObject, bucketsOfFail);
+        testPrototype(protoObject, bucketsOfFail, stubInfo);
     }
     ASSERT(protoObject);
     

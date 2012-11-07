@@ -46,6 +46,14 @@ WebInspector.DefaultTextEditor = function(url, delegate)
 
     this.element.className = "text-editor monospace";
 
+    // Prevent middle-click pasting in the editor unless it is explicitly enabled for certain component.
+    this.element.addEventListener("mouseup", preventDefaultOnMouseUp.bind(this), false);
+    function preventDefaultOnMouseUp(event)
+    {
+        if (event.button === 1)
+            event.consume(true);
+    }
+
     this._textModel = new WebInspector.TextEditorModel();
     this._textModel.addEventListener(WebInspector.TextEditorModel.Events.TextChanged, this._textChanged, this);
     this._textModel.resetUndoStack();
@@ -62,6 +70,14 @@ WebInspector.DefaultTextEditor = function(url, delegate)
     this._mainPanel._container.addEventListener("focus", this._handleFocused.bind(this), false);
 
     this._gutterPanel.element.addEventListener("mousedown", this._onMouseDown.bind(this), true);
+
+    // Explicitly enable middle-click pasting in the editor main panel.
+    this._mainPanel.element.addEventListener("mouseup", consumeMouseUp.bind(this), false);
+    function consumeMouseUp(event)
+    {
+        if (event.button === 1)
+            event.consume(false);
+    }
 
     this.element.appendChild(this._mainPanel.element);
     this.element.appendChild(this._gutterPanel.element);
@@ -395,6 +411,8 @@ WebInspector.DefaultTextEditor.prototype = {
         var handleRedo = this._mainPanel.handleUndoRedo.bind(this._mainPanel, true);
         this._shortcuts[WebInspector.KeyboardShortcut.makeKey("z", modifiers.CtrlOrMeta)] = handleUndo;
         this._shortcuts[WebInspector.KeyboardShortcut.makeKey("z", modifiers.Shift | modifiers.CtrlOrMeta)] = handleRedo;
+        if (!WebInspector.isMac())
+            this._shortcuts[WebInspector.KeyboardShortcut.makeKey("y", modifiers.CtrlOrMeta)] = handleRedo;
 
         var handleTabKey = this._mainPanel.handleTabKeyPress.bind(this._mainPanel, false);
         var handleShiftTabKey = this._mainPanel.handleTabKeyPress.bind(this._mainPanel, true);
@@ -418,7 +436,7 @@ WebInspector.DefaultTextEditor.prototype = {
         var anchor = event.target.enclosingNodeOrSelfWithNodeName("a");
         if (anchor)
             return;
-        var contextMenu = new WebInspector.ContextMenu();
+        var contextMenu = new WebInspector.ContextMenu(event);
         var target = event.target.enclosingNodeOrSelfWithClass("webkit-line-number");
         if (target)
             this._delegate.populateLineGutterContextMenu(contextMenu, target.lineNumber);
@@ -426,7 +444,7 @@ WebInspector.DefaultTextEditor.prototype = {
             target = this._mainPanel._enclosingLineRowOrSelf(event.target);
             this._delegate.populateTextAreaContextMenu(contextMenu, target && target.lineNumber);
         }
-        contextMenu.show(event);
+        contextMenu.show();
     },
 
     _handleScrollChanged: function(event)

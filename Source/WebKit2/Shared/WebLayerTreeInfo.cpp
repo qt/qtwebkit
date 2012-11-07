@@ -30,7 +30,7 @@ using namespace CoreIPC;
 
 namespace WebKit {
 
-void WebLayerInfo::encode(CoreIPC::ArgumentEncoder* encoder) const
+void WebLayerInfo::encode(CoreIPC::ArgumentEncoder& encoder) const
 {
     SimpleArgumentCoder<WebLayerInfo>::encode(encoder, *this);
 }

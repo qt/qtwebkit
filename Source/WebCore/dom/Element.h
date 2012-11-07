@@ -42,7 +42,7 @@ class DOMTokenList;
 class ElementRareData;
 class ElementShadow;
 class IntSize;
-class Localizer;
+class Locale;
 class RenderRegion;
 class ShadowRoot;
 class WebKitAnimationList;
@@ -291,7 +291,7 @@ public:
     bool isInCanvasSubtree() const;
 
     AtomicString computeInheritedLanguage() const;
-    Localizer& localizer() const;
+    Locale& locale() const;
 
     virtual void accessKeyAction(bool /*sendToAnyEvent*/) { }
 
@@ -311,6 +311,9 @@ public:
     String outerText();
  
     virtual String title() const;
+
+    const AtomicString& pseudo() const;
+    void setPseudo(const AtomicString&);
 
     void updateId(const AtomicString& oldId, const AtomicString& newId);
     void updateId(TreeScope*, const AtomicString& oldId, const AtomicString& newId);
@@ -434,13 +437,7 @@ public:
     IntSize savedLayerScrollOffset() const;
     void setSavedLayerScrollOffset(const IntSize&);
 
-    virtual void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-    {
-        MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-        ContainerNode::reportMemoryUsage(memoryObjectInfo);
-        info.addMember(m_tagName);
-        info.addMember(m_attributeData);
-    }
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
 protected:
     Element(const QualifiedName& tagName, Document* document, ConstructionType type)
@@ -530,6 +527,9 @@ private:
 private:
     ElementRareData* elementRareData() const;
     ElementRareData* ensureElementRareData();
+
+    void detachAllAttrNodesFromElement();
+    void detachAttrNodeFromElementWithValue(Attr*, const AtomicString& value);
 
     RefPtr<ElementAttributeData> m_attributeData;
 };

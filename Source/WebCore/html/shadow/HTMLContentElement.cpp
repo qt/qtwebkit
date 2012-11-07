@@ -29,10 +29,10 @@
 
 #include "ContentDistributor.h"
 #include "ContentSelectorQuery.h"
+#include "ContextFeatures.h"
 #include "ElementShadow.h"
 #include "HTMLNames.h"
 #include "QualifiedName.h"
-#include "RuntimeEnabledFeatures.h"
 #include "ShadowRoot.h"
 #include <wtf/StdLibExtras.h>
 
@@ -40,13 +40,14 @@ namespace WebCore {
 
 using HTMLNames::selectAttr;
 
-const QualifiedName& HTMLContentElement::contentTagName(Document*)
+const QualifiedName& HTMLContentElement::contentTagName(Document* document)
 {
 #if ENABLE(SHADOW_DOM)
-    if (!RuntimeEnabledFeatures::shadowDOMEnabled())
+    if (!ContextFeatures::shadowDOMEnabled(document))
         return HTMLNames::webkitShadowContentTag;
     return HTMLNames::contentTag;
 #else
+    UNUSED_PARAM(document);
     return HTMLNames::webkitShadowContentTag;
 #endif
 }
@@ -63,6 +64,7 @@ PassRefPtr<HTMLContentElement> HTMLContentElement::create(const QualifiedName& t
 
 HTMLContentElement::HTMLContentElement(const QualifiedName& name, Document* document)
     : InsertionPoint(name, document)
+    , m_registeredWithShadowRoot(false)
 {
 }
 
@@ -93,6 +95,31 @@ void HTMLContentElement::parseAttribute(const Attribute& attribute)
             root->owner()->invalidateDistribution();
     } else
         InsertionPoint::parseAttribute(attribute);
+}
+
+Node::InsertionNotificationRequest HTMLContentElement::insertedInto(ContainerNode* insertionPoint)
+{
+    InsertionPoint::insertedInto(insertionPoint);
+
+    if (insertionPoint->inDocument() && isActive()) {
+        shadowRoot()->registerContentElement();
+        m_registeredWithShadowRoot = true;
+    }
+
+    return InsertionDone;
+}
+
+void HTMLContentElement::removedFrom(ContainerNode* insertionPoint)
+{
+    if (insertionPoint->inDocument() && m_registeredWithShadowRoot) {
+        ShadowRoot* root = shadowRoot();
+        if (!root)
+            root = insertionPoint->shadowRoot();
+        if (root)
+            root->unregisterContentElement();
+        m_registeredWithShadowRoot = false;
+    }
+    InsertionPoint::removedFrom(insertionPoint);
 }
 
 }

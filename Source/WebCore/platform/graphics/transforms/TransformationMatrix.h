@@ -72,7 +72,11 @@ class FloatQuad;
 class TransformationMatrix {
     WTF_MAKE_FAST_ALLOCATED;
 public:
+#if CPU(APPLE_ARMV7S)
+    typedef double Matrix4[4][4] __attribute__((aligned (16)));
+#else
     typedef double Matrix4[4][4];
+#endif
 
     TransformationMatrix() { makeIdentity(); }
     TransformationMatrix(const AffineTransform& t);
@@ -166,7 +170,7 @@ public:
     // with the destination plane.
     FloatPoint projectPoint(const FloatPoint&, bool* clamped = 0) const;
     // Projects the four corners of the quad
-    FloatQuad projectQuad(const FloatQuad&) const;
+    FloatQuad projectQuad(const FloatQuad&,  bool* clamped = 0) const;
     // Projects the four corners of the quad and takes a bounding box,
     // while sanitizing values created when the w component is negative.
     FractionalLayoutRect clampedBoundsOfProjectedQuad(const FloatQuad&) const;

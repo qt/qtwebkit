@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Samsung Electronics
+ * Copyright (C) 2012 Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,6 +28,7 @@
 #include "WebEventFactory.h"
 
 #include "EflKeyboardUtilities.h"
+#include <WebCore/AffineTransform.h>
 #include <WebCore/Scrollbar.h>
 
 using namespace WebCore;
@@ -84,49 +86,57 @@ static inline int clickCountForEvent(const Evas_Button_Flags flags)
     return 1;
 }
 
-WebMouseEvent WebEventFactory::createWebMouseEvent(const Evas_Event_Mouse_Down* event, const Evas_Point* position)
+static inline double convertMillisecondToSecond(unsigned timestamp)
 {
+    return static_cast<double>(timestamp) / 1000;
+}
+
+WebMouseEvent WebEventFactory::createWebMouseEvent(const Evas_Event_Mouse_Down* event, const AffineTransform& toWebContent, const AffineTransform& toDeviceScreen)
+{
+    IntPoint pos(event->canvas.x, event->canvas.y);
     return WebMouseEvent(WebEvent::MouseDown,
-                         buttonForEvent(event->button),
-                         IntPoint(event->canvas.x - position->x, event->canvas.y - position->y),
-                         IntPoint(event->canvas.x, event->canvas.y),
-                         0 /* deltaX */,
-                         0 /* deltaY */,
-                         0 /* deltaZ */,
-                         clickCountForEvent(event->flags),
-                         modifiersForEvent(event->modifiers),
-                         event->timestamp);
+        buttonForEvent(event->button),
+        toWebContent.mapPoint(pos),
+        toDeviceScreen.mapPoint(pos),
+        0 /* deltaX */,
+        0 /* deltaY */,
+        0 /* deltaZ */,
+        clickCountForEvent(event->flags),
+        modifiersForEvent(event->modifiers),
+        convertMillisecondToSecond(event->timestamp));
 }
 
-WebMouseEvent WebEventFactory::createWebMouseEvent(const Evas_Event_Mouse_Up* event, const Evas_Point* position)
+WebMouseEvent WebEventFactory::createWebMouseEvent(const Evas_Event_Mouse_Up* event, const AffineTransform& toWebContent, const AffineTransform& toDeviceScreen)
 {
+    IntPoint pos(event->canvas.x, event->canvas.y);
     return WebMouseEvent(WebEvent::MouseUp,
-                         buttonForEvent(event->button),
-                         IntPoint(event->canvas.x - position->x, event->canvas.y - position->y),
-                         IntPoint(event->canvas.x, event->canvas.y),
-                         0 /* deltaX */,
-                         0 /* deltaY */,
-                         0 /* deltaZ */,
-                         clickCountForEvent(event->flags),
-                         modifiersForEvent(event->modifiers),
-                         event->timestamp);
+        buttonForEvent(event->button),
+        toWebContent.mapPoint(pos),
+        toDeviceScreen.mapPoint(pos),
+        0 /* deltaX */,
+        0 /* deltaY */,
+        0 /* deltaZ */,
+        clickCountForEvent(event->flags),
+        modifiersForEvent(event->modifiers),
+        convertMillisecondToSecond(event->timestamp));
 }
 
-WebMouseEvent WebEventFactory::createWebMouseEvent(const Evas_Event_Mouse_Move* event, const Evas_Point* position)
+WebMouseEvent WebEventFactory::createWebMouseEvent(const Evas_Event_Mouse_Move* event, const AffineTransform& toWebContent, const AffineTransform& toDeviceScreen)
 {
+    IntPoint pos(event->cur.canvas.x, event->cur.canvas.y);
     return WebMouseEvent(WebEvent::MouseMove,
-                         buttonForEvent(event->buttons),
-                         IntPoint(event->cur.canvas.x - position->x, event->cur.canvas.y - position->y),
-                         IntPoint(event->cur.canvas.x, event->cur.canvas.y),
-                         0 /* deltaX */,
-                         0 /* deltaY */,
-                         0 /* deltaZ */,
-                         0 /* clickCount */,
-                         modifiersForEvent(event->modifiers),
-                         event->timestamp);
+        buttonForEvent(event->buttons),
+        toWebContent.mapPoint(pos),
+        toDeviceScreen.mapPoint(pos),
+        0 /* deltaX */,
+        0 /* deltaY */,
+        0 /* deltaZ */,
+        0 /* clickCount */,
+        modifiersForEvent(event->modifiers),
+        convertMillisecondToSecond(event->timestamp));
 }
 
-WebWheelEvent WebEventFactory::createWebWheelEvent(const Evas_Event_Mouse_Wheel* event, const Evas_Point* position)
+WebWheelEvent WebEventFactory::createWebWheelEvent(const Evas_Event_Mouse_Wheel* event, const AffineTransform& toWebContent, const AffineTransform& toDeviceScreen)
 {
     float deltaX = 0;
     float deltaY = 0;
@@ -148,48 +158,50 @@ WebWheelEvent WebEventFactory::createWebWheelEvent(const Evas_Event_Mouse_Wheel*
     deltaX *= static_cast<float>(Scrollbar::pixelsPerLineStep());
     deltaY *= static_cast<float>(Scrollbar::pixelsPerLineStep());
 
+    IntPoint pos(event->canvas.x, event->canvas.y);
+
     return WebWheelEvent(WebEvent::Wheel,
-                         IntPoint(event->canvas.x - position->x, event->canvas.y - position->y),
-                         IntPoint(event->canvas.x, event->canvas.y),
-                         FloatSize(deltaX, deltaY),
-                         FloatSize(wheelTicksX, wheelTicksY),
-                         WebWheelEvent::ScrollByPixelWheelEvent,
-                         modifiersForEvent(event->modifiers),
-                         event->timestamp);
+        toWebContent.mapPoint(pos),
+        toDeviceScreen.mapPoint(pos),
+        FloatSize(deltaX, deltaY),
+        FloatSize(wheelTicksX, wheelTicksY),
+        WebWheelEvent::ScrollByPixelWheelEvent,
+        modifiersForEvent(event->modifiers),
+        convertMillisecondToSecond(event->timestamp));
 }
 
 WebKeyboardEvent WebEventFactory::createWebKeyboardEvent(const Evas_Event_Key_Down* event)
 {
     const String keyName(event->key);
     return WebKeyboardEvent(WebEvent::KeyDown,
-                            String::fromUTF8(event->string),
-                            String::fromUTF8(event->string),
-                            keyIdentifierForEvasKeyName(keyName),
-                            windowsKeyCodeForEvasKeyName(keyName),
-                            0 /* FIXME: nativeVirtualKeyCode */,
-                            0 /* macCharCode */,
-                            false /* FIXME: isAutoRepeat */,
-                            keyName.startsWith(keyPadPrefix),
-                            false /* isSystemKey */,
-                            modifiersForEvent(event->modifiers),
-                            event->timestamp);
+        String::fromUTF8(event->string),
+        String::fromUTF8(event->string),
+        keyIdentifierForEvasKeyName(keyName),
+        windowsKeyCodeForEvasKeyName(keyName),
+        0 /* FIXME: nativeVirtualKeyCode */,
+        0 /* macCharCode */,
+        false /* FIXME: isAutoRepeat */,
+        keyName.startsWith(keyPadPrefix),
+        false /* isSystemKey */,
+        modifiersForEvent(event->modifiers),
+        convertMillisecondToSecond(event->timestamp));
 }
 
 WebKeyboardEvent WebEventFactory::createWebKeyboardEvent(const Evas_Event_Key_Up* event)
 {
     const String keyName(event->key);
     return WebKeyboardEvent(WebEvent::KeyUp,
-                            String::fromUTF8(event->string),
-                            String::fromUTF8(event->string),
-                            keyIdentifierForEvasKeyName(keyName),
-                            windowsKeyCodeForEvasKeyName(keyName),
-                            0 /* FIXME: nativeVirtualKeyCode */,
-                            0 /* macCharCode */,
-                            false /* FIXME: isAutoRepeat */,
-                            keyName.startsWith(keyPadPrefix),
-                            false /* isSystemKey */,
-                            modifiersForEvent(event->modifiers),
-                            event->timestamp);
+        String::fromUTF8(event->string),
+        String::fromUTF8(event->string),
+        keyIdentifierForEvasKeyName(keyName),
+        windowsKeyCodeForEvasKeyName(keyName),
+        0 /* FIXME: nativeVirtualKeyCode */,
+        0 /* macCharCode */,
+        false /* FIXME: isAutoRepeat */,
+        keyName.startsWith(keyPadPrefix),
+        false /* isSystemKey */,
+        modifiersForEvent(event->modifiers),
+        convertMillisecondToSecond(event->timestamp));
 }
 
 #if ENABLE(TOUCH_EVENTS)
@@ -207,7 +219,7 @@ static inline WebEvent::Type typeForTouchEvent(Ewk_Touch_Event_Type type)
     return WebEvent::NoType;
 }
 
-WebTouchEvent WebEventFactory::createWebTouchEvent(Ewk_Touch_Event_Type type, const Eina_List* points, const Evas_Modifier* modifiers, const Evas_Point* position, double timestamp)
+WebTouchEvent WebEventFactory::createWebTouchEvent(Ewk_Touch_Event_Type type, const Eina_List* points, const Evas_Modifier* modifiers, const AffineTransform& toWebContent, const AffineTransform& toDeviceScreen, double timestamp)
 {
     Vector<WebPlatformTouchPoint> touchPoints;
     WebPlatformTouchPoint::TouchPointState state;
@@ -237,7 +249,8 @@ WebTouchEvent WebEventFactory::createWebTouchEvent(Ewk_Touch_Event_Type type, co
             continue;
         }
 
-        touchPoints.append(WebPlatformTouchPoint(point->id, state, IntPoint(point->x, point->y), IntPoint(point->x - position->x, point->y - position->y)));
+        IntPoint pos(point->x, point->y);
+        touchPoints.append(WebPlatformTouchPoint(point->id, state, toWebContent.mapPoint(pos), toDeviceScreen.mapPoint(pos)));
     }
 
     return WebTouchEvent(typeForTouchEvent(type), touchPoints, modifiersForEvent(modifiers), timestamp);

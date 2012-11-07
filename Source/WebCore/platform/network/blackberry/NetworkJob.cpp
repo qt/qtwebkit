@@ -23,6 +23,7 @@
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "CookieManager.h"
+#include "CredentialBackingStore.h"
 #include "CredentialStorage.h"
 #include "Frame.h"
 #include "FrameLoaderClientBlackBerry.h"
@@ -538,9 +539,7 @@ bool NetworkJob::shouldReleaseClientResource()
 
 bool NetworkJob::shouldNotifyClientFailed() const
 {
-    if (m_handle->firstRequest().targetType() == ResourceRequest::TargetIsXHR)
-        return m_extendedStatusCode < 0;
-    return isError(m_extendedStatusCode) && !m_dataReceived;
+    return m_extendedStatusCode < 0 || (isError(m_extendedStatusCode) && !m_dataReceived);
 }
 
 bool NetworkJob::retryAsFTPDirectory()
@@ -606,6 +605,11 @@ bool NetworkJob::handleRedirect()
     if (!newURL.isValid())
         return false;
 
+    if (newURL.protocolIsData()) {
+        m_extendedStatusCode = BlackBerry::Platform::FilterStream::StatusInvalidRedirectToData;
+        return false;
+    }
+
     ResourceRequest newRequest = m_handle->firstRequest();
     newRequest.setURL(newURL);
     newRequest.setMustHandleInternally(true);
@@ -618,8 +622,12 @@ bool NetworkJob::handleRedirect()
         newRequest.clearHTTPContentType();
     }
 
-    // Do not send existing credentials with the new request.
-    m_handle->getInternal()->m_currentWebChallenge.nullify();
+    if (!m_handle->getInternal()->m_currentWebChallenge.isNull()) {
+        // If this request is challenged, store the credentials now because the credential is correct (otherwise, it won't get here).
+        storeCredentials();
+        // Do not send existing credentials with the new request.
+        m_handle->getInternal()->m_currentWebChallenge.nullify();
+    }
 
     return startNewJobWithRequest(newRequest, true);
 }
@@ -768,8 +776,12 @@ bool NetworkJob::sendRequestWithCredentials(ProtectionSpaceServerType type, Prot
         // Don't overwrite any existing credentials with the empty credential
         if (m_handle->getInternal()->m_currentWebChallenge.isNull())
             m_handle->getInternal()->m_currentWebChallenge = AuthenticationChallenge(protectionSpace, credential, 0, m_response, ResourceError());
-    } else if (!(credential = CredentialStorage::get(protectionSpace)).isEmpty()) {
-        // First search the CredentialStorage.
+    } else if (!(credential = CredentialStorage::get(protectionSpace)).isEmpty()
+#if ENABLE(BLACKBERRY_CREDENTIAL_PERSIST)
+            || !(credential = CredentialStorage::getFromPersistentStorage(protectionSpace)).isEmpty()
+#endif
+            ) {
+        // First search the CredentialStorage and Persistent Credential Storage
         m_handle->getInternal()->m_currentWebChallenge = AuthenticationChallenge(protectionSpace, credential, 0, m_response, ResourceError());
         m_handle->getInternal()->m_currentWebChallenge.setStored(true);
     } else {
@@ -863,6 +875,9 @@ void NetworkJob::purgeCredentials()
 
     CredentialStorage::remove(challenge.protectionSpace());
     challenge.setStored(false);
+#if ENABLE(BLACKBERRY_CREDENTIAL_PERSIST)
+    credentialBackingStore().removeLogin(m_response.url(), challenge.protectionSpace());
+#endif
 }
 
 bool NetworkJob::shouldSendClientData() const

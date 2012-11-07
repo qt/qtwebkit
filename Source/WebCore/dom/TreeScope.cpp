@@ -28,6 +28,7 @@
 
 #include "ComposedShadowTreeWalker.h"
 #include "ContainerNode.h"
+#include "ContextFeatures.h"
 #include "DOMSelection.h"
 #include "DOMWindow.h"
 #include "Document.h"
@@ -42,7 +43,6 @@
 #include "IdTargetObserverRegistry.h"
 #include "InsertionPoint.h"
 #include "Page.h"
-#include "RuntimeEnabledFeatures.h"
 #include "ShadowRoot.h"
 #include "TreeScopeAdopter.h"
 #include <wtf/Vector.h>
@@ -189,7 +189,7 @@ DOMSelection* TreeScope::getSelection() const
     // as a container. It is now enabled only if runtime Shadow DOM feature is enabled.
     // See https://bugs.webkit.org/show_bug.cgi?id=82697
 #if ENABLE(SHADOW_DOM)
-    if (RuntimeEnabledFeatures::shadowDOMEnabled()) {
+    if (ContextFeatures::shadowDOMEnabled(rootNode()->document())) {
         m_selection = DOMSelection::create(this);
         return m_selection.get();
     }
@@ -278,6 +278,18 @@ Node* TreeScope::focusedNode()
         }
     }
     return 0;
+}
+
+void TreeScope::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
+    info.addMember(m_rootNode);
+    info.addMember(m_parentTreeScope);
+    info.addMember(m_elementsById);
+    info.addMember(m_imageMapsByName);
+    info.addMember(m_labelsByForAttribute);
+    info.addMember(m_idTargetObserverRegistry);
+    info.addMember(m_selection);
 }
 
 static void listTreeScopes(Node* node, Vector<TreeScope*, 5>& treeScopes)

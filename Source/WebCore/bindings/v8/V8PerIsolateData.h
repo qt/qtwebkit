@@ -78,13 +78,14 @@ public:
     StringCache* stringCache() { return m_stringCache.get(); }
     IntegerCache* integerCache() { return m_integerCache.get(); }
 
+    v8::Persistent<v8::Value> ensureLiveRoot();
+
 #if ENABLE(INSPECTOR)
     void visitExternalStrings(ExternalStringVisitor*);
 #endif
     DOMDataList& allStores() { return m_domDataList; }
 
     V8HiddenPropertyName* hiddenPropertyName() { return m_hiddenPropertyName.get(); }
-    v8::Handle<v8::Context> ensureAuxiliaryContext();
 
     void registerDOMDataStore(DOMDataStore* domDataStore) 
     {
@@ -138,10 +139,11 @@ private:
     OwnPtr<StringCache> m_stringCache;
     OwnPtr<IntegerCache> m_integerCache;
 
-    DOMDataList m_domDataList;
+    Vector<DOMDataStore*> m_domDataList;
     DOMDataStore* m_domDataStore;
 
     OwnPtr<V8HiddenPropertyName> m_hiddenPropertyName;
+    ScopedPersistent<v8::Value> m_liveRoot;
     ScopedPersistent<v8::Context> m_auxiliaryContext;
 
     bool m_constructorMode;

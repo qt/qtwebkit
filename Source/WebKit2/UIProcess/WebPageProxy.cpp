@@ -1283,7 +1283,7 @@ void WebPageProxy::receivedPolicyDecision(PolicyAction action, WebFrameProxy* fr
         // Create a download proxy.
         DownloadProxy* download = m_process->context()->createDownloadProxy();
         downloadID = download->downloadID();
-#if PLATFORM(QT) || PLATFORM(EFL)
+#if PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(GTK)
         // Our design does not suppport downloads without a WebPage.
         handleDownloadRequest(download);
 #endif
@@ -2592,6 +2592,19 @@ void WebPageProxy::unavailablePluginButtonClicked(uint32_t opaquePluginUnavailab
         pluginUnavailabilityReason = kWKPluginUnavailabilityReasonPluginCrashed;
         break;
 
+    case RenderEmbeddedObject::PluginInactive: {
+#if ENABLE(NETSCAPE_PLUGIN_API)
+        String newMimeType = mimeType;
+        PluginModuleInfo plugin = m_process->context()->pluginInfoStore().findPlugin(newMimeType, KURL(KURL(), url));
+
+        if (!plugin.path.isEmpty() && PluginInfoStore::reactivateInactivePlugin(plugin)) {
+            // The plug-in has been reactivated now; reload the page so it'll be instantiated.
+            reload(false);
+        }
+        return;
+#endif
+    }
+
     case RenderEmbeddedObject::PluginBlockedByContentSecurityPolicy:
         ASSERT_NOT_REACHED();
     }
@@ -2675,6 +2688,17 @@ void WebPageProxy::pageDidRequestScroll(const IntPoint& point)
 {
     m_pageClient->pageDidRequestScroll(point);
 }
+
+void WebPageProxy::pageTransitionViewportReady()
+{
+    m_pageClient->pageTransitionViewportReady();
+}
+
+void WebPageProxy::didRenderFrame(const WebCore::IntSize& contentsSize, const WebCore::IntRect& coveredRect)
+{
+    m_pageClient->didRenderFrame(contentsSize, coveredRect);
+}
+
 #endif
 
 void WebPageProxy::didChangeViewportProperties(const ViewportAttributes& attr)
@@ -2742,12 +2766,12 @@ void WebPageProxy::setMediaVolume(float volume)
     m_process->send(Messages::WebPage::SetMediaVolume(volume), m_pageID);    
 }
 
-#if PLATFORM(QT) || PLATFORM(EFL)
+#if PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(GTK)
 void WebPageProxy::handleDownloadRequest(DownloadProxy* download)
 {
     m_pageClient->handleDownloadRequest(download);
 }
-#endif // PLATFORM(QT) || PLATFORM(EFL)
+#endif // PLATFORM(QT) || PLATFORM(EFL) || PLATFORM(GTK)
 
 #if PLATFORM(QT) || PLATFORM(EFL)
 void WebPageProxy::didChangeContentsSize(const IntSize& size)
@@ -2899,7 +2923,7 @@ void WebPageProxy::editorStateChanged(const EditorState& editorState)
 
 #if PLATFORM(MAC)
     m_pageClient->updateTextInputState(couldChangeSecureInputState);
-#elif PLATFORM(QT)
+#elif PLATFORM(QT) || PLATFORM(EFL)
     m_pageClient->updateTextInputState();
 #endif
 }

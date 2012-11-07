@@ -57,6 +57,7 @@ namespace WebCore {
 
 #if ENABLE(CSS_FILTERS)
 class FilterEffectRenderer;
+class FilterOperations;
 #endif
 class HitTestRequest;
 class HitTestResult;
@@ -652,7 +653,12 @@ public:
     bool containsDirtyOverlayScrollbars() const { return m_containsDirtyOverlayScrollbars; }
     void setContainsDirtyOverlayScrollbars(bool dirtyScrollbars) { m_containsDirtyOverlayScrollbars = dirtyScrollbars; }
 
+#if ENABLE(CSS_SHADERS)
+    bool isCSSCustomFilterEnabled() const;
+#endif
+
 #if ENABLE(CSS_FILTERS)
+    FilterOperations computeFilterOperations(const RenderStyle*);
     bool paintsWithFilters() const;
     bool requiresFullLayerImageForFilters() const;
     FilterEffectRenderer* filterRenderer() const 
@@ -841,7 +847,8 @@ private:
     void setPaintingInsideReflection(bool b) { m_paintingInsideReflection = b; }
 
 #if ENABLE(CSS_FILTERS)
-    void updateOrRemoveFilterEffect();
+    void updateOrRemoveFilterClients();
+    void updateOrRemoveFilterEffectRenderer();
 #endif
 
     void parentClipRects(const RenderLayer* rootLayer, RenderRegion*, ClipRectsType, ClipRects&, OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize, ShouldRespectOverflowClip = RespectOverflowClip) const;

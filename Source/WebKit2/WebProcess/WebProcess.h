@@ -72,6 +72,10 @@ QT_END_NAMESPACE
 #include "WebNotificationManager.h"
 #endif
 
+#if ENABLE(NETWORK_PROCESS)
+#include "WebResourceLoadScheduler.h"
+#endif
+
 #if ENABLE(PLUGIN_PROCESS)
 #include "PluginProcessConnectionManager.h"
 #endif
@@ -115,6 +119,9 @@ public:
     WebCore::RunLoop* runLoop() const { return m_runLoop; }
 
     void addMessageReceiver(CoreIPC::StringReference messageReceiverName, CoreIPC::MessageReceiver*);
+    void addMessageReceiver(CoreIPC::StringReference messageReceiverName, uint64_t destinationID, CoreIPC::MessageReceiver*);
+
+    void removeMessageReceiver(CoreIPC::StringReference messageReceiverName, uint64_t destinationID);
 
     WebConnectionToUIProcess* webConnectionToUIProcess() const { return m_connection.get(); }
 
@@ -196,7 +203,10 @@ public:
 #endif
 
 #if ENABLE(NETWORK_PROCESS)
+    NetworkProcessConnection* networkConnection();
     void networkProcessConnectionClosed(NetworkProcessConnection*);
+    bool usesNetworkProcess() const { return m_usesNetworkProcess; }
+    WebResourceLoadScheduler& webResourceLoadScheduler() { return m_webResourceLoadScheduler; }
 #endif
 
 private:
@@ -278,7 +288,7 @@ private:
     virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
     virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&);
     virtual void didClose(CoreIPC::Connection*);
-    virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::MessageID);
+    virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference messageReceiverName, CoreIPC::StringReference messageName) OVERRIDE;
 #if PLATFORM(WIN)
     virtual Vector<HWND> windowsToReceiveSentMessagesWhileWaitingForSyncReply();
 #endif
@@ -354,6 +364,7 @@ private:
     void ensureNetworkProcessConnection();
     RefPtr<NetworkProcessConnection> m_networkProcessConnection;
     bool m_usesNetworkProcess;
+    WebResourceLoadScheduler m_webResourceLoadScheduler;
 #endif
 
 #if ENABLE(PLUGIN_PROCESS)

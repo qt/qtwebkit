@@ -31,105 +31,25 @@
 #include "config.h"
 #include "V8DOMMap.h"
 
-#include "DOMData.h"
 #include "DOMDataStore.h"
-#include "ScopedDOMDataStore.h"
 #include "V8Binding.h"
+#include "V8Node.h"
 #include <wtf/MainThread.h>
 
 namespace WebCore {
 
-DOMDataStoreHandle::DOMDataStoreHandle(bool initialize)
-    : m_store(adoptPtr(!initialize ? 0 : new ScopedDOMDataStore()))
+DOMWrapperMap<Node>& getDOMNodeMap(v8::Isolate* isolate)
 {
-    if (m_store)
-        V8PerIsolateData::current()->registerDOMDataStore(m_store.get());
-}
-
-DOMDataStoreHandle::~DOMDataStoreHandle()
-{
-    if (m_store)
-        V8PerIsolateData::current()->unregisterDOMDataStore(m_store.get());
-}
-
-DOMNodeMapping& getDOMNodeMap(v8::Isolate* isolate)
-{
-    return DOMData::getCurrentStore(isolate).domNodeMap();
-}
-
-DOMNodeMapping& getActiveDOMNodeMap(v8::Isolate* isolate)
-{
-    return DOMData::getCurrentStore(isolate).activeDomNodeMap();
+    if (!isolate)
+        isolate = v8::Isolate::GetCurrent();
+    return DOMDataStore::current(isolate)->domNodeMap();
 }
 
 DOMWrapperMap<void>& getDOMObjectMap(v8::Isolate* isolate)
 {
-    return DOMData::getCurrentStore(isolate).domObjectMap();
-}
-
-DOMWrapperMap<void>& getActiveDOMObjectMap(v8::Isolate* isolate)
-{
-    return DOMData::getCurrentStore(isolate).activeDomObjectMap();
-}
-
-void removeAllDOMObjects()
-{
-    DOMDataStore& store = DOMData::getCurrentStore();
-
-    v8::HandleScope scope;
-    ASSERT(!isMainThread());
-
-    // Note: We skip the Node wrapper maps because they exist only on the main thread.
-    DOMData::removeObjectsFromWrapperMap<void>(&store, store.domObjectMap());
-    DOMData::removeObjectsFromWrapperMap<void>(&store, store.activeDomObjectMap());
-}
-
-void visitDOMNodes(DOMWrapperMap<Node>::Visitor* visitor)
-{
-    v8::HandleScope scope;
-
-    DOMDataList& list = DOMDataStore::allStores();
-    for (size_t i = 0; i < list.size(); ++i) {
-        DOMDataStore* store = list[i];
-
-        store->domNodeMap().visit(store, visitor);
-    }
-}
-
-void visitActiveDOMNodes(DOMWrapperMap<Node>::Visitor* visitor)
-{
-    v8::HandleScope scope;
-
-    DOMDataList& list = DOMDataStore::allStores();
-    for (size_t i = 0; i < list.size(); ++i) {
-        DOMDataStore* store = list[i];
-
-        store->activeDomNodeMap().visit(store, visitor);
-    }
-}
-
-void visitDOMObjects(DOMWrapperMap<void>::Visitor* visitor)
-{
-    v8::HandleScope scope;
-
-    DOMDataList& list = DOMDataStore::allStores();
-    for (size_t i = 0; i < list.size(); ++i) {
-        DOMDataStore* store = list[i];
-
-        store->domObjectMap().visit(store, visitor);
-    }
-}
-
-void visitActiveDOMObjects(DOMWrapperMap<void>::Visitor* visitor)
-{
-    v8::HandleScope scope;
-
-    DOMDataList& list = DOMDataStore::allStores();
-    for (size_t i = 0; i < list.size(); ++i) {
-        DOMDataStore* store = list[i];
-
-        store->activeDomObjectMap().visit(store, visitor);
-    }
+    if (!isolate)
+        isolate = v8::Isolate::GetCurrent();
+    return DOMDataStore::current(isolate)->domObjectMap();
 }
 
 } // namespace WebCore

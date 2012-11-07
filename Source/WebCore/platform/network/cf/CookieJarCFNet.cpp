@@ -112,7 +112,7 @@ void setCookies(Document* document, const KURL& url, const String& value)
     // cookiesWithResponseHeaderFields doesn't parse cookies without a value
     String cookieString = value.contains('=') ? value : value + "=";
 
-    RetainPtr<CFStringRef> cookieStringCF(AdoptCF, cookieString.createCFString());
+    RetainPtr<CFStringRef> cookieStringCF = cookieString.createCFString();
     RetainPtr<CFDictionaryRef> headerFieldsCF(AdoptCF, CFDictionaryCreate(kCFAllocatorDefault,
         (const void**)&s_setCookieKeyCF, (const void**)&cookieStringCF, 1,
         &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks));
@@ -216,7 +216,7 @@ void deleteCookie(const Document*, const KURL& url, const String& name)
 
 void getHostnamesWithCookies(HashSet<String>& hostnames)
 {
-    RetainPtr<CFHTTPCookieStorageRef> cookieStorage = currentCFHTTPCookieStorage();
+    RetainPtr<CFHTTPCookieStorageRef> cookieStorage = defaultCFHTTPCookieStorage();
     if (!cookieStorage)
         return;
 
@@ -234,7 +234,7 @@ void getHostnamesWithCookies(HashSet<String>& hostnames)
 
 void deleteCookiesForHostname(const String& hostname)
 {
-    RetainPtr<CFHTTPCookieStorageRef> cookieStorage = currentCFHTTPCookieStorage();
+    RetainPtr<CFHTTPCookieStorageRef> cookieStorage = defaultCFHTTPCookieStorage();
     if (!cookieStorage)
         return;
 
@@ -253,7 +253,7 @@ void deleteCookiesForHostname(const String& hostname)
 
 void deleteAllCookies()
 {
-    RetainPtr<CFHTTPCookieStorageRef> cookieStorage = currentCFHTTPCookieStorage();
+    RetainPtr<CFHTTPCookieStorageRef> cookieStorage = defaultCFHTTPCookieStorage();
     if (!cookieStorage)
         return;
 

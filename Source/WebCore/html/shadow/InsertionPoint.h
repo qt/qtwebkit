@@ -32,6 +32,7 @@
 #define InsertionPoint_h
 
 #include "ContentDistributor.h"
+#include "ElementShadow.h"
 #include "HTMLElement.h"
 #include "HTMLNames.h"
 #include "ShadowRoot.h"
@@ -53,7 +54,6 @@ public:
 
     virtual const AtomicString& select() const = 0;
     virtual bool isSelectValid() const = 0;
-    virtual bool doesSelectFromHostChildren() const = 0;
 
     bool resetStyleInheritance() const;
     void setResetStyleInheritance(bool);
@@ -87,9 +87,6 @@ private:
 
 inline bool isInsertionPoint(const Node* node)
 {
-    if (!node)
-        return false;
-
     if (node->isHTMLElement() && toHTMLElement(node)->isInsertionPoint())
         return true;
 
@@ -98,13 +95,13 @@ inline bool isInsertionPoint(const Node* node)
 
 inline InsertionPoint* toInsertionPoint(Node* node)
 {
-    ASSERT(isInsertionPoint(node));
+    ASSERT(!node || isInsertionPoint(node));
     return static_cast<InsertionPoint*>(node);
 }
 
 inline const InsertionPoint* toInsertionPoint(const Node* node)
 {
-    ASSERT(isInsertionPoint(node));
+    ASSERT(!node || isInsertionPoint(node));
     return static_cast<const InsertionPoint*>(node);
 }
 
@@ -115,22 +112,72 @@ inline bool isActiveInsertionPoint(const Node* node)
 
 inline bool isLowerEncapsulationBoundary(Node* node)
 {
-    if (!isInsertionPoint(node))
+    if (!node || !isInsertionPoint(node))
         return false;
     return toInsertionPoint(node)->isShadowBoundary();
 }
 
-inline Element* parentElementForDistribution(const Node* node)
+inline Node* parentNodeForDistribution(const Node* node)
 {
     ASSERT(node);
-    if (Element* parent = node->parentElement()) {
-        if (isInsertionPoint(parent) && toInsertionPoint(parent)->shouldUseFallbackElements())
-            return parent->parentElement();
 
+    if (Node* parent = node->parentNode()) {
+        if (isInsertionPoint(parent) && toInsertionPoint(parent)->shouldUseFallbackElements())
+            return parent->parentNode();
         return parent;
     }
 
     return 0;
+}
+
+inline Element* parentElementForDistribution(const Node* node)
+{
+    if (Node* parent = parentNodeForDistribution(node)) {
+        if (parent->isElementNode())
+            return toElement(parent);
+    }
+
+    return 0;
+}
+
+inline ElementShadow* shadowOfParentForDistribution(const Node* node)
+{
+    if (!node)
+        return 0;
+
+    if (Element* parent = parentElementForDistribution(node))
+        return parent->shadow();
+
+    return 0;
+}
+
+inline InsertionPoint* resolveReprojection(const Node* projectedNode)
+{
+    InsertionPoint* insertionPoint = 0;
+    const Node* current = projectedNode;
+
+    while (true) {
+        if (ElementShadow* shadow = shadowOfParentForDistribution(current)) {
+            shadow->ensureDistribution();
+            if (InsertionPoint* insertedTo = shadow->distributor().findInsertionPointFor(projectedNode)) {
+                current = insertedTo;
+                insertionPoint = insertedTo;
+                continue;
+            }
+        }
+
+        if (Node* parent = parentNodeForDistribution(current)) {
+            if (InsertionPoint* insertedTo = parent->isShadowRoot() ? toShadowRoot(parent)->assignedTo() : 0) {
+                current = insertedTo;
+                insertionPoint = insertedTo;
+                continue;
+            }
+        }
+
+        break;
+    }
+
+    return insertionPoint;
 }
 
 } // namespace WebCore

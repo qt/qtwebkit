@@ -1,3 +1,72 @@
+2012-11-05  Simon Fraser  <simon.fraser@apple.com>
+
+        Fix layer borders to cleaning appear and disappear on switching
+        https://bugs.webkit.org/show_bug.cgi?id=101136
+
+        Reviewed by Sam Weinig.
+
+        Remove the GraphicsLayerClient methods showDebugBorders() and
+        showRepaintCounter().
+
+        * WebView.cpp:
+        * WebView.h:
+
+2012-10-29  Anders Carlsson  <andersca@apple.com>
+
+        String::createCFString should return a RetainPtr
+        https://bugs.webkit.org/show_bug.cgi?id=100419
+
+        Reviewed by Andreas Kling.
+
+        Update callers of String::createCFString.
+
+        * WebCoreSupport/WebFrameLoaderClient.cpp:
+        (WebFrameLoaderClient::dispatchDidFailToStartPlugin):
+        * WebDatabaseManager.cpp:
+        (WebDatabaseManager::dispatchDidModifyDatabase):
+        * WebHistory.cpp:
+        (WebHistory::visitedURL):
+        (WebHistory::itemForURLString):
+        * WebHistoryItem.cpp:
+        (WebHistoryItem::dictionaryRepresentation):
+        * WebIconDatabase.cpp:
+        (WebIconDatabase::iconDatabaseNotificationUserInfoURLKey):
+        (postDidAddIconNotification):
+        * WebLocalizableStrings.cpp:
+        (createWebKitBundle):
+        (copyLocalizedStringFromBundle):
+        * WebPreferences.cpp:
+        (WebPreferences::initializeDefaultSettings):
+        * WebView.cpp:
+        (WebView::setCacheModel):
+        (WebView::notifyPreferencesChanged):
+
+2012-10-24  Brady Eidson  <beidson@apple.com>
+
+        Add a strategy for loader customization.
+        https://bugs.webkit.org/show_bug.cgi?id=100278
+
+        Reviewed by Alexey Proskuryakov.
+
+        * WebCoreSupport/WebPlatformStrategies.cpp:
+        (WebPlatformStrategies::createLoaderStrategy):
+        * WebCoreSupport/WebPlatformStrategies.h:
+        (WebPlatformStrategies):
+
+2012-10-23  Alexey Proskuryakov  <ap@apple.com>
+
+        Add a strategy for shared workers
+        https://bugs.webkit.org/show_bug.cgi?id=100165
+
+        Reviewed by Brady Eidson.
+
+        * WebCoreSupport/WebPlatformStrategies.cpp:
+        (WebPlatformStrategies::createPasteboardStrategy):
+        (WebPlatformStrategies::createSharedWorkerStrategy):
+        (WebPlatformStrategies::createVisitedLinkStrategy):
+        * WebCoreSupport/WebPlatformStrategies.h:
+        (WebPlatformStrategies):
+
 2012-10-22  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
 
         [Qt] Fix "ASSERTION FAILED: !document->inPageCache()" when loading a page

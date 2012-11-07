@@ -190,8 +190,14 @@ SuggestionPicker.prototype.selectEntry = function(entry) {
     if (typeof entry.dataset.value !== "undefined") {
         this.submitValue(entry.dataset.value);
     } else if (entry.dataset.action === SuggestionPicker.ActionNames.OpenCalendarPicker) {
-        openCalendarPicker();
+        window.addEventListener("didHide", SuggestionPicker._handleWindowDidHide, false);
+        hideWindow();
     }
+};
+
+SuggestionPicker._handleWindowDidHide = function() {
+    openCalendarPicker();
+    window.removeEventListener("didHide", SuggestionPicker._handleWindowDidHide);
 };
 
 /**

@@ -1,3 +1,94 @@
+2012-11-06  Anders Carlsson  <andersca@apple.com>
+
+        Build fix.
+
+        * WebKitSystemInterface.h:
+
+2012-11-06  Anders Carlsson  <andersca@apple.com>
+
+        Update Java related WKSI function names
+        https://bugs.webkit.org/show_bug.cgi?id=101414
+
+        Reviewed by Sam Weinig.
+
+        Roll WebKitSystemInterface DEPS.
+
+        * WebKitSystemInterface.h:
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceMountainLion.a:
+
+2012-11-06  Alexey Proskuryakov  <ap@apple.com>
+
+        Clean up which storage cookie jar functions use
+        https://bugs.webkit.org/show_bug.cgi?id=101395
+
+        Reviewed by Brady Eidson.
+
+        * WebKitSystemInterface.h:
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceMountainLion.a:
+        Added WKHTTPCookies() and WKDeleteAllHTTPCookies(). Updated ifdefs for currently
+        supported OS versions.
+
+2012-11-06  Alexey Proskuryakov  <ap@apple.com>
+
+        Delete Leopard and Snow Leopard versions of WKSI. These have not been updated in ages.
+
+        Rubber-stampted by Mark Rowe.
+
+        * libWebKitSystemInterfaceLeopard.a: Removed.
+        * libWebKitSystemInterfaceSnowLeopard.a: Removed.
+
+2012-11-05  Alexey Proskuryakov  <ap@apple.com>
+
+        Get rid of setCookieStoragePrivateBrowsingEnabled.
+        https://bugs.webkit.org/show_bug.cgi?id=101247
+
+        Reviewed by Brady Eidson.
+
+        * WebKitSystemInterface.h: Removed the function.
+
+2012-11-02  Anders Carlsson  <andersca@apple.com>
+
+        Don't instantiate the Java plug-in if it's inactive
+        https://bugs.webkit.org/show_bug.cgi?id=101102
+        <rdar://problem/12595679>
+
+        Reviewed by Andreas Kling.
+
+        Update WebKitSystemInterface to a version that has WKJLReportWebComponentsUsed.
+
+        * WebKitSystemInterface.h:
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceMountainLion.a:
+        Roll WebKitSystemInterface DERPS.
+
+2012-10-25  Dominik Röttsches  <dominik.rottsches@intel.com>
+
+        Conditionalize XHR timeout support
+        https://bugs.webkit.org/show_bug.cgi?id=100356
+
+        Reviewed by Adam Barth.
+
+        Adding ENABLE_XHR_TIMEOUT feature, which is default off for Apple Win.
+        See also https://bugs.webkit.org/show_bug.cgi?id=100349 for an attempt
+        to fix timeout support for CF Network.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+        * win/tools/vsprops/FeatureDefinesCairo.vsprops:
+
+2012-10-24  Eric Carlson  <eric.carlson@apple.com>
+
+        Allow ports to override text track rendering style
+        https://bugs.webkit.org/show_bug.cgi?id=97800
+        <rdar://problem/12044964>
+
+        Reviewed by Maciej Stachowiak.
+
+        Update WKSI header with SPI for getting the user caption appearance preferences.
+
+        * WebKitSystemInterface.h:
+
 2012-10-19  Dongwoo Joshua Im  <dw.im@samsung.com>
 
         Rename ENABLE_CSS3_TEXT_DECORATION to ENABLE_CSS3_TEXT

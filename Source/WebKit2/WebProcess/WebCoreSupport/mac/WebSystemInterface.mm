@@ -100,7 +100,6 @@ void InitWebCoreSystemInterface(void)
         INIT(SetCGFontRenderingMode);
         INIT(SetCONNECTProxyAuthorizationForStream);
         INIT(SetCONNECTProxyForStream);
-        INIT(SetCookieStoragePrivateBrowsingEnabled);
         INIT(SetDragImage);
         INIT(SetHTTPPipeliningMaximumPriority);
         INIT(SetHTTPPipeliningPriority);
@@ -117,8 +116,10 @@ void InitWebCoreSystemInterface(void)
         INIT(CopyHTTPCookieStorage);
         INIT(GetHTTPCookieAcceptPolicy);
         INIT(SetHTTPCookieAcceptPolicy);
+        INIT(HTTPCookies);
         INIT(HTTPCookiesForURL);
         INIT(SetHTTPCookiesForURL);
+        INIT(DeleteAllHTTPCookies);
         INIT(DeleteHTTPCookie);
 
         INIT(SetMetadataURL);
@@ -192,5 +193,17 @@ void InitWebCoreSystemInterface(void)
         INIT(NSReboundDeltaForElasticDelta);
 #endif
 
+        INIT(CaptionAppearanceHasUserPreferences);
+        INIT(CaptionAppearanceShowCaptionsWhenAvailable);
+        INIT(CaptionAppearanceCopyForegroundColor);
+        INIT(CaptionAppearanceCopyBackgroundColor);
+        INIT(CaptionAppearanceCopyWindowColor);
+        INIT(CaptionAppearanceGetForegroundOpacity);
+        INIT(CaptionAppearanceGetBackgroundOpacity);
+        INIT(CaptionAppearanceGetWindowOpacity);
+        INIT(CaptionAppearanceCopyFontForStyle);
+        INIT(CaptionAppearanceGetRelativeCharacterSize);
+        INIT(CaptionAppearanceGetTextEdgeStyle);
+        INIT(CaptionAppearanceGetSettingsChangedNotification);
     });
 }

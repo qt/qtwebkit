@@ -57,6 +57,8 @@ public:
     PlatformWebView* mainWebView() { return m_mainWebView.get(); }
     WKContextRef context() { return m_context.get(); }
 
+    void ensureViewSupportsOptions(WKDictionaryRef options);
+    
     // Runs the run loop until `done` is true or the timeout elapses.
     enum TimeoutDuration { ShortTimeout, LongTimeout, NoTimeout };
     bool useWaitToDumpWatchdogTimer() { return m_useWaitToDumpWatchdogTimer; }
@@ -83,6 +85,7 @@ public:
 
 private:
     void initialize(int argc, const char* argv[]);
+    void createWebViewWithOptions(WKDictionaryRef);
     void run();
 
     void runTestingServerLoop();
@@ -137,6 +140,7 @@ private:
     bool m_printSeparators;
     bool m_usingServerMode;
     bool m_gcBetweenTests;
+    bool m_shouldDumpPixelsForAllTests;
     std::vector<std::string> m_paths;
     WKRetainPtr<WKStringRef> m_injectedBundlePath;
     WKRetainPtr<WKStringRef> m_testPluginDirectory;
@@ -174,7 +178,9 @@ private:
     bool m_policyDelegateEnabled;
     bool m_policyDelegatePermissive;
 
-    EventSenderProxy* m_eventSenderProxy;
+#if PLATFORM(MAC) || PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
+    OwnPtr<EventSenderProxy> m_eventSenderProxy;
+#endif
 
     WorkQueueManager m_workQueueManager;
 };

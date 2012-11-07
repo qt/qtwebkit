@@ -40,6 +40,7 @@
 #endif
 
 #if ENABLE(VIDEO_TRACK)
+#include "CaptionUserPreferences.h"
 #include "PODIntervalTree.h"
 #include "TextTrack.h"
 #include "TextTrackCue.h"
@@ -78,7 +79,7 @@ typedef Vector<CueIntervalTree::IntervalType> CueList;
 
 class HTMLMediaElement : public HTMLElement, public MediaPlayerClient, public MediaPlayerSupportsTypeClient, private MediaCanStartListener, public ActiveDOMObject, public MediaControllerInterface
 #if ENABLE(VIDEO_TRACK)
-    , private TextTrackClient
+    , private TextTrackClient, private CaptionPreferencesChangedListener
 #endif
 {
 public:
@@ -240,6 +241,7 @@ public:
     void configureTextTracks();
     void configureTextTrackGroup(const TrackGroup&) const;
 
+    bool userPrefersCaptions() const;
     bool userIsInterestedInThisTrackKind(String) const;
     bool textTracksAreReady() const;
     void configureTextTrackDisplay();
@@ -325,7 +327,8 @@ protected:
     virtual void parseAttribute(const Attribute&) OVERRIDE;
     virtual void finishParsingChildren();
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
-    virtual void attach();
+    virtual void attach() OVERRIDE;
+    virtual void detach() OVERRIDE;
 
     virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
 
@@ -425,7 +428,10 @@ private:
     virtual bool mediaPlayerNeedsSiteSpecificHacks() const OVERRIDE;
     virtual String mediaPlayerDocumentHost() const OVERRIDE;
 
+    virtual void mediaPlayerEnterFullscreen() OVERRIDE;
     virtual void mediaPlayerExitFullscreen() OVERRIDE;
+    virtual bool mediaPlayerIsFullscreen() const OVERRIDE;
+    virtual bool mediaPlayerIsFullscreenPermitted() const OVERRIDE;
     virtual bool mediaPlayerIsVideo() const OVERRIDE;
     virtual LayoutRect mediaPlayerContentBoxRect() const OVERRIDE;
     virtual void mediaPlayerSetSize(const IntSize&) OVERRIDE;
@@ -461,6 +467,7 @@ private:
     void scheduleNextSourceChild();
     void loadNextSourceChild();
     void userCancelledLoad();
+    void clearMediaPlayer(signed flags);
     bool havePotentialSourceChild();
     void noneSupported();
     void mediaEngineError(PassRefPtr<MediaError> err);
@@ -474,12 +481,14 @@ private:
 
 #if ENABLE(VIDEO_TRACK)
     void updateActiveTextTrackCues(float);
-    bool userIsInterestedInThisLanguage(const String&) const;
     HTMLTrackElement* showingTrackWithSameKind(HTMLTrackElement*) const;
 
     bool ignoreTrackDisplayUpdateRequests() const { return m_ignoreTrackDisplayUpdate > 0; }
     void beginIgnoringTrackDisplayUpdateRequests() { ++m_ignoreTrackDisplayUpdate; }
     void endIgnoringTrackDisplayUpdateRequests() { ASSERT(m_ignoreTrackDisplayUpdate); --m_ignoreTrackDisplayUpdate; }
+
+    void markCaptionAndSubtitleTracksAsUnconfigured();
+    virtual void captionPreferencesChanged() OVERRIDE;
 #endif
 
     // These "internal" functions do not check user gesture restrictions.

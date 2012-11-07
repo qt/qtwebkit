@@ -59,13 +59,13 @@ WebPreferencesStore::WebPreferencesStore()
 {
 }
 
-void WebPreferencesStore::encode(CoreIPC::ArgumentEncoder* encoder) const
+void WebPreferencesStore::encode(CoreIPC::ArgumentEncoder& encoder) const
 {
-    encoder->encode(m_stringValues);
-    encoder->encode(m_boolValues);
-    encoder->encode(m_uint32Values);
-    encoder->encode(m_doubleValues);
-    encoder->encode(m_floatValues);
+    encoder << m_stringValues;
+    encoder << m_boolValues;
+    encoder << m_uint32Values;
+    encoder << m_doubleValues;
+    encoder << m_floatValues;
 }
 
 bool WebPreferencesStore::decode(CoreIPC::ArgumentDecoder* decoder, WebPreferencesStore& result)
@@ -225,6 +225,16 @@ bool WebPreferencesStore::setDoubleValueForKey(const String& key, double value)
 double WebPreferencesStore::getDoubleValueForKey(const String& key) const
 {
     return valueForKey(m_doubleValues, key);
+}
+
+bool WebPreferencesStore::setFloatValueForKey(const String& key, float value) 
+{
+    return setValueForKey(m_floatValues, key, value);
+}
+
+float WebPreferencesStore::getFloatValueForKey(const String& key) const
+{
+    return valueForKey(m_floatValues, key);
 }
 
 } // namespace WebKit

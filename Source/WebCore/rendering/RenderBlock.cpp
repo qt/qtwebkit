@@ -24,6 +24,7 @@
 #include "config.h"
 #include "RenderBlock.h"
 
+#include "AXObjectCache.h"
 #include "ColumnInfo.h"
 #include "Document.h"
 #include "Element.h"
@@ -532,7 +533,10 @@ RenderBlock* RenderBlock::containingColumnsBlock(bool allowAnonymousColumnBlock)
         // FIXME: Table manages its own table parts, most of which are RenderBoxes.
         // Multi-column code cannot handle splitting the flow in table. Disabling it
         // to prevent crashes.
-        if (curr->isTable())
+        // Similarly, RenderButton maintains an anonymous block child and overrides
+        // addChild() to prevent itself from having additional direct children. This
+        // causes problems for split flows.
+        if (curr->isTable() || curr->isRenderButton())
             return 0;
         
         RenderBlock* currBlock = toRenderBlock(curr);
@@ -1011,6 +1015,8 @@ void RenderBlock::deleteLineBoxTree()
         }
     }
     m_lineBoxes.deleteLineBoxTree(renderArena());
+    if (UNLIKELY(AXObjectCache::accessibilityEnabled()))
+        document()->axObjectCache()->recomputeIsIgnored(this);
 }
 
 RootInlineBox* RenderBlock::createRootInlineBox() 
@@ -1022,6 +1028,10 @@ RootInlineBox* RenderBlock::createAndAppendRootInlineBox()
 {
     RootInlineBox* rootBox = createRootInlineBox();
     m_lineBoxes.appendLineBox(rootBox);
+
+    if (UNLIKELY(AXObjectCache::accessibilityEnabled()) && m_lineBoxes.firstLineBox() == rootBox)
+        document()->axObjectCache()->recomputeIsIgnored(this);
+
     return rootBox;
 }
 
@@ -4709,6 +4719,14 @@ bool RenderBlock::isPointInOverflowControl(HitTestResult& result, const LayoutPo
     return layer()->hitTestOverflowControls(result, roundedIntPoint(locationInContainer - toLayoutSize(accumulatedOffset)));
 }
 
+Node* RenderBlock::nodeForHitTest() const
+{
+    // If we are in the margins of block elements that are part of a
+    // continuation we're actually still inside the enclosing element
+    // that was split. Use the appropriate inner node.
+    return isAnonymousBlockContinuation() ? continuation()->node() : node();
+}
+
 bool RenderBlock::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction hitTestAction)
 {
     LayoutPoint adjustedLocation(accumulatedOffset + location());
@@ -4726,7 +4744,7 @@ bool RenderBlock::nodeAtPoint(const HitTestRequest& request, HitTestResult& resu
     if ((hitTestAction == HitTestBlockBackground || hitTestAction == HitTestChildBlockBackground) && isPointInOverflowControl(result, locationInContainer.point(), adjustedLocation)) {
         updateHitTestResult(result, locationInContainer.point() - localOffset);
         // FIXME: isPointInOverflowControl() doesn't handle rect-based tests yet.
-        if (!result.addNodeToRectBasedTestResult(node(), request, locationInContainer))
+        if (!result.addNodeToRectBasedTestResult(nodeForHitTest(), request, locationInContainer))
            return true;
     }
 
@@ -4759,7 +4777,7 @@ bool RenderBlock::nodeAtPoint(const HitTestRequest& request, HitTestResult& resu
         LayoutRect boundsRect(adjustedLocation, size());
         if (visibleToHitTesting() && locationInContainer.intersects(boundsRect)) {
             updateHitTestResult(result, flipForWritingMode(locationInContainer.point() - localOffset));
-            if (!result.addNodeToRectBasedTestResult(node(), request, locationInContainer, boundsRect))
+            if (!result.addNodeToRectBasedTestResult(nodeForHitTest(), request, locationInContainer, boundsRect))
                 return true;
         }
     }
@@ -5785,6 +5803,7 @@ void RenderBlock::computeInlinePreferredLogicalWidths()
     LayoutUnit textIndent = minimumValueForLength(styleToUse->textIndent(), cw, view());
     RenderObject* prevFloat = 0;
     bool isPrevChildInlineFlow = false;
+    bool shouldBreakLineAfterText = false;
     while (RenderObject* child = childIterator.next()) {
         autoWrap = child->isReplaced() ? child->parent()->style()->autoWrap() : 
             child->style()->autoWrap();
@@ -5873,7 +5892,7 @@ void RenderBlock::computeInlinePreferredLogicalWidths()
                     clearPreviousFloat = false;
 
                 bool canBreakReplacedElement = !child->isImage() || allowImagesToBreak;
-                if ((canBreakReplacedElement && (autoWrap || oldAutoWrap) && !isPrevChildInlineFlow) || clearPreviousFloat) {
+                if ((canBreakReplacedElement && (autoWrap || oldAutoWrap) && (!isPrevChildInlineFlow || shouldBreakLineAfterText)) || clearPreviousFloat) {
                     updatePreferredWidth(m_minPreferredLogicalWidth, inlineMin);
                     inlineMin = 0;
                 }
@@ -5900,7 +5919,7 @@ void RenderBlock::computeInlinePreferredLogicalWidths()
                 // Add our width to the max.
                 inlineMax += max<float>(0, childMax);
 
-                if (!autoWrap || !canBreakReplacedElement || isPrevChildInlineFlow) {
+                if (!autoWrap || !canBreakReplacedElement || (isPrevChildInlineFlow && !shouldBreakLineAfterText)) {
                     if (child->isFloating())
                         updatePreferredWidth(m_minPreferredLogicalWidth, childMin);
                     else
@@ -6004,9 +6023,11 @@ void RenderBlock::computeInlinePreferredLogicalWidths()
                         // and end our current line.
                         updatePreferredWidth(m_minPreferredLogicalWidth, inlineMin);
                         inlineMin = 0;
+                        shouldBreakLineAfterText = false;
                     } else {
                         updatePreferredWidth(m_minPreferredLogicalWidth, inlineMin);
                         inlineMin = endMin;
+                        shouldBreakLineAfterText = true;
                     }
                 }
 
@@ -6819,14 +6840,7 @@ void RenderBlock::updateHitTestResult(HitTestResult& result, const LayoutPoint& 
     if (result.innerNode())
         return;
 
-    Node* n = node();
-    if (isAnonymousBlockContinuation())
-        // We are in the margins of block elements that are part of a continuation.  In
-        // this case we're actually still inside the enclosing element that was
-        // split.  Go ahead and set our inner node accordingly.
-        n = continuation()->node();
-
-    if (n) {
+    if (Node* n = nodeForHitTest()) {
         result.setInnerNode(n);
         if (!result.innerNonSharedNode())
             result.setInnerNonSharedNode(n);
@@ -6981,6 +6995,11 @@ LayoutUnit RenderBlock::applyBeforeBreak(RenderBox* child, LayoutUnit logicalOff
     if (checkBeforeAlways && inNormalFlow(child) && hasNextPage(logicalOffset, IncludePageBoundary)) {
         if (checkColumnBreaks)
             view()->layoutState()->addForcedColumnBreak(child, logicalOffset);
+        if (checkRegionBreaks) {
+            LayoutUnit offsetBreakAdjustment = ZERO_LAYOUT_UNIT;
+            if (enclosingRenderFlowThread()->addForcedRegionBreak(offsetFromLogicalTopOfFirstPage() + logicalOffset, child, true, &offsetBreakAdjustment))
+                return logicalOffset + offsetBreakAdjustment;
+        }
         return nextPageLogicalTop(logicalOffset, IncludePageBoundary);
     }
     return logicalOffset;
@@ -6998,6 +7017,12 @@ LayoutUnit RenderBlock::applyAfterBreak(RenderBox* child, LayoutUnit logicalOffs
         marginInfo.setMarginAfterQuirk(true); // Cause margins to be discarded for any following content.
         if (checkColumnBreaks)
             view()->layoutState()->addForcedColumnBreak(child, logicalOffset);
+        if (checkRegionBreaks) {
+            LayoutUnit marginOffset = marginInfo.canCollapseWithMarginBefore() ? ZERO_LAYOUT_UNIT : marginInfo.margin();
+            LayoutUnit offsetBreakAdjustment = ZERO_LAYOUT_UNIT;
+            if (enclosingRenderFlowThread()->addForcedRegionBreak(offsetFromLogicalTopOfFirstPage() + logicalOffset + marginOffset, child, false, &offsetBreakAdjustment))
+                return logicalOffset + offsetBreakAdjustment;
+        }
         return nextPageLogicalTop(logicalOffset, IncludePageBoundary);
     }
     return logicalOffset;

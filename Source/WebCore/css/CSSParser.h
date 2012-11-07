@@ -47,7 +47,6 @@ namespace WebCore {
 
 class CSSBorderImageSliceValue;
 class CSSPrimitiveValue;
-class CSSProperty;
 class CSSSelectorList;
 class CSSValue;
 class CSSValueList;
@@ -282,6 +281,9 @@ public:
     StyleRuleBase* createPageRule(PassOwnPtr<CSSParserSelector> pageSelector);
     StyleRuleBase* createRegionRule(CSSSelectorVector* regionSelector, RuleList* rules);
     StyleRuleBase* createMarginAtRule(CSSSelector::MarginBoxType);
+#if ENABLE(SHADOW_DOM)
+    StyleRuleBase* createHostRule(RuleList* rules);
+#endif
     void startDeclarationsForMarginBox();
     void endDeclarationsForMarginBox();
 
@@ -363,6 +365,12 @@ public:
     inline int lex(void* yylval) { return (this->*m_lexFunc)(yylval); }
 
     int token() { return m_token; }
+
+#if ENABLE(CSS_DEVICE_ADAPTATION)
+    void markViewportRuleBodyStart() { m_inViewport = true; }
+    void markViewportRuleBodyEnd() { m_inViewport = false; }
+    StyleRuleBase* createViewportRule();
+#endif
 
     PassRefPtr<CSSPrimitiveValue> createPrimitiveNumericValue(CSSParserValue*);
     PassRefPtr<CSSPrimitiveValue> createPrimitiveStringValue(CSSParserValue*);
@@ -452,8 +460,12 @@ private:
 
     void recheckAtKeyword(const UChar* str, int len);
 
-    void setupParser(const char* prefix, const String&, const char* suffix);
-
+    template<unsigned prefixLength, unsigned suffixLength>
+    inline void setupParser(const char (&prefix)[prefixLength], const String& string, const char (&suffix)[suffixLength])
+    {
+        setupParser(prefix, prefixLength - 1, string, suffix, suffixLength - 1);
+    }
+    void setupParser(const char* prefix, unsigned prefixLength, const String&, const char* suffix, unsigned suffixLength);
     bool inShorthand() const { return m_inParseShorthand; }
 
     bool validWidth(CSSParserValue*);
@@ -511,6 +523,14 @@ private:
     bool m_allowImportRules;
     bool m_allowNamespaceDeclarations;
 
+#if ENABLE(CSS_DEVICE_ADAPTATION)
+    bool parseViewportProperty(CSSPropertyID propId, bool important);
+    bool parseViewportShorthand(CSSPropertyID propId, CSSPropertyID first, CSSPropertyID second, bool important);
+
+    bool inViewport() const { return m_inViewport; }
+    bool m_inViewport;
+#endif
+
     int (CSSParser::*m_lexFunc)(void*);
 
     Vector<RefPtr<StyleRuleBase> > m_parsedRules;
@@ -545,7 +565,7 @@ private:
         FFrequency = 0x0040,
         FPositiveInteger = 0x0080,
         FRelative = 0x0100,
-#if ENABLE(CSS_IMAGE_RESOLUTION)
+#if ENABLE(CSS_IMAGE_RESOLUTION) || ENABLE(RESOLUTION_MEDIA_QUERY)
         FResolution = 0x0200,
 #endif
         FNonNeg = 0x0400

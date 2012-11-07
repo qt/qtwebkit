@@ -32,10 +32,12 @@
  * @constructor
  * @implements {WebInspector.SourceMapping}
  * @param {WebInspector.Workspace} workspace
+ * @param {WebInspector.NetworkWorkspaceProvider} networkWorkspaceProvider
  */
-WebInspector.CompilerScriptMapping = function(workspace)
+WebInspector.CompilerScriptMapping = function(workspace, networkWorkspaceProvider)
 {
     this._workspace = workspace;
+    this._networkWorkspaceProvider = networkWorkspaceProvider;
     /** @type {Object.<string, WebInspector.SourceMapParser>} */
     this._sourceMapForSourceMapURL = {};
     /** @type {Object.<string, WebInspector.SourceMapParser>} */
@@ -56,7 +58,7 @@ WebInspector.CompilerScriptMapping.prototype = {
      */
     rawLocationToUILocation: function(rawLocation)
     {
-        var debuggerModelLocation = /** @type {WebInspector.DebuggerModel.Location} */ rawLocation;
+        var debuggerModelLocation = /** @type {WebInspector.DebuggerModel.Location} */ (rawLocation);
         var sourceMap = this._sourceMapForScriptId[debuggerModelLocation.scriptId];
         var lineNumber = debuggerModelLocation.lineNumber;
         var columnNumber = debuggerModelLocation.columnNumber || 0;
@@ -92,11 +94,10 @@ WebInspector.CompilerScriptMapping.prototype = {
     {
         // FIXME: We should only create temporary uiSourceCodes on demand and should set this as a mapping to 
         // relevant uiSourceCodes added by NetworkUISourceCodeProvider.
-        var originalUISourceCode = new WebInspector.UISourceCode(script.sourceURL, script, false);
+        var originalUISourceCode = this._workspace.addTemporaryUISourceCode(script.sourceURL, script, false);
+        originalUISourceCode.setSourceMapping(this);
         this._originalUISourceCodeForScriptId[script.scriptId] = originalUISourceCode;
         this._scriptForOriginalUISourceCode.put(originalUISourceCode, script);
-        originalUISourceCode.setSourceMapping(this);
-        this._workspace.project().addTemporaryUISourceCode(originalUISourceCode);
 
         var sourceMap = this.loadSourceMapForScript(script);
 
@@ -118,9 +119,8 @@ WebInspector.CompilerScriptMapping.prototype = {
                 contentProvider = new WebInspector.StaticContentProvider(WebInspector.resourceTypes.Script, sourceContent);
             else
                 contentProvider = new WebInspector.CompilerSourceMappingContentProvider(sourceURL);
-            var uiSourceCode = new WebInspector.UISourceCode(sourceURL, contentProvider, false);
-            this._workspace.project().addUISourceCode(uiSourceCode);
-
+            this._networkWorkspaceProvider.addFile(sourceURL, contentProvider, true);
+            var uiSourceCode = this._workspace.uiSourceCodeForURL(sourceURL);
             uiSourceCode.setSourceMapping(this);
             uiSourceCode.isContentScript = script.isContentScript;
         }
@@ -146,7 +146,7 @@ WebInspector.CompilerScriptMapping.prototype = {
             var response = InspectorFrontendHost.loadResourceSynchronously(sourceMapURL);
             if (response.slice(0, 3) === ")]}")
                 response = response.substring(response.indexOf('\n'));
-            var payload = /** @type {WebInspector.SourceMapPayload} */ JSON.parse(response);
+            var payload = /** @type {WebInspector.SourceMapPayload} */ (JSON.parse(response));
             sourceMap = new WebInspector.SourceMapParser(sourceMapURL, payload);
         } catch(e) {
             console.error(e.message);

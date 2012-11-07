@@ -1,3 +1,110 @@
+2012-11-05  Simon Fraser  <simon.fraser@apple.com>
+
+        Fix layer borders to cleaning appear and disappear on switching
+        https://bugs.webkit.org/show_bug.cgi?id=101136
+
+        Reviewed by Sam Weinig.
+
+        Remove the GraphicsLayerClient methods showDebugBorders() and
+        showRepaintCounter().
+
+        * WebCoreSupport/AcceleratedCompositingContext.h:
+        (AcceleratedCompositingContext):
+        * WebCoreSupport/AcceleratedCompositingContextCairo.cpp:
+        * WebCoreSupport/AcceleratedCompositingContextClutter.cpp:
+        * WebCoreSupport/AcceleratedCompositingContextGL.cpp:
+
+2012-10-25  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Move soup authentication from GtkAuthenticationDialog to WebCore
+        https://bugs.webkit.org/show_bug.cgi?id=99914
+
+        Reviewed by Carlos Garcia Campos.
+
+        The calls which actually authenticate a soup message are gone from the GtkAuthenticationDialog. Since the
+        GtkAuthenticationDialog exposed by the WebKitSoupAuthentication class in the GTK+ API work without a
+        ResourceHandle (they are more general), we add a WebKitSoupAuthDialogAuthenticationClient added to avoid
+        breaking API. This is unused by either Epiphany or internally in WebKitGTK+.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::dispatchDidReceiveAuthenticationChallenge): The authentication dialog
+        now just takes the AuthenticationChallenge instead of the libsoup objects.
+        * webkit/webkitsoupauthdialog.cpp:
+        (WebKitSoupAuthDialogAuthenticationClient): Added this helper.
+        (sessionAuthenticate): Use the new WebKitSoupAuthDialogAuthenticationClient.
+
+2012-11-02  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Remove dependency on SoupPasswordManager
+        https://bugs.webkit.org/show_bug.cgi?id=100775
+
+        Reviewed by Carlos Garcia Campos.
+
+        Add a libsecret dependency to the build. This is necessary so that we can remove
+        a dependency on SoupPasswordManager.
+
+        * GNUmakefile.am: Use libsecret libs during WebKit1 library compilation.
+
+2012-10-24  Brady Eidson  <beidson@apple.com>
+
+        Add a strategy for loader customization.
+        https://bugs.webkit.org/show_bug.cgi?id=100278
+
+        Reviewed by Alexey Proskuryakov.
+
+        * WebCoreSupport/PlatformStrategiesGtk.cpp:
+        (PlatformStrategiesGtk::createLoaderStrategy):
+        * WebCoreSupport/PlatformStrategiesGtk.h:
+        (PlatformStrategiesGtk):
+
+2012-10-23  Alexey Proskuryakov  <ap@apple.com>
+
+        Add a strategy for shared workers
+        https://bugs.webkit.org/show_bug.cgi?id=100165
+
+        Reviewed by Brady Eidson.
+
+        * WebCoreSupport/PlatformStrategiesGtk.cpp:
+        (PlatformStrategiesGtk::createPasteboardStrategy):
+        (PlatformStrategiesGtk::createSharedWorkerStrategy):
+        (PlatformStrategiesGtk::createVisitedLinkStrategy):
+        * WebCoreSupport/PlatformStrategiesGtk.h:
+
+2012-10-24  Priit Laes  <plaes@plaes.org>
+
+        [GTK] Typos in user-visible strings: "coordintate"
+        https://bugs.webkit.org/show_bug.cgi?id=100252
+
+        Reviewed by Martin Robinson.
+
+        s/coordintate/coordinate
+
+        * webkit/webkithittestresult.cpp:
+        (webkit_hit_test_result_class_init):
+
+2012-10-23  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK][Soup] Implement the default authentication dialog via WebCoreSupport
+        https://bugs.webkit.org/show_bug.cgi?id=99351
+
+        Reviewed by Carlos Garcia Campos.
+
+        Instead of using a custom SoupSessionFeature to show the authentication dialog,
+        show it using the corresponding WebCore message.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::dispatchDidReceiveAuthenticationChallenge):
+        Show the dialog when we need to authenticate. Also, so not show the dialog
+        if we are in DRT mode.
+        * webkit/webkitglobals.cpp:
+        (webkitInit): No longer install our SoupFeature.
+
+2012-10-23  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and configure.ac for 1.11.1 release
+
+        * NEWS: Added release notes for 1.11.1.
+
 2012-10-23  Andras Becsi  <andras.becsi@digia.com>
 
         Remove devicePixelRatio from ViewportAttributes

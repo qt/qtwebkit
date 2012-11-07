@@ -32,10 +32,12 @@
  * @constructor
  * @extends {WebInspector.Object}
  * @param {WebInspector.Workspace} workspace
+ * @param {WebInspector.NetworkWorkspaceProvider} networkWorkspaceProvider
  */
-WebInspector.ScriptSnippetModel = function(workspace)
+WebInspector.ScriptSnippetModel = function(workspace, networkWorkspaceProvider)
 {
     this._workspace = workspace;
+    this._networkWorkspaceProvider = networkWorkspaceProvider;
     this._uiSourceCodeForScriptId = {};
     this._scriptForUISourceCode = new Map();
     this._uiSourceCodeForSnippetId = {};
@@ -82,14 +84,13 @@ WebInspector.ScriptSnippetModel.prototype = {
      */
     _addScriptSnippet: function(snippet)
     {
-        var uiSourceCode = new WebInspector.UISourceCode(snippet.name, new WebInspector.SnippetContentProvider(snippet), true);
-        uiSourceCode.isSnippet = true;
+        this._networkWorkspaceProvider.addFile(snippet.name, new WebInspector.SnippetContentProvider(snippet), true, false, true);
+        var uiSourceCode = this._workspace.uiSourceCodeForURL(snippet.name);
         var scriptFile = new WebInspector.SnippetScriptFile(this, uiSourceCode);
         uiSourceCode.setScriptFile(scriptFile);
         this._snippetIdForUISourceCode.put(uiSourceCode, snippet.id);
         uiSourceCode.setSourceMapping(this._snippetScriptMapping);
         this._uiSourceCodeForSnippetId[snippet.id] = uiSourceCode;
-        this._workspace.project().addUISourceCode(uiSourceCode);
         return uiSourceCode;
     },
 
@@ -105,7 +106,7 @@ WebInspector.ScriptSnippetModel.prototype = {
         this._releaseSnippetScript(uiSourceCode);
         delete this._uiSourceCodeForSnippetId[snippet.id];
         this._snippetIdForUISourceCode.remove(uiSourceCode);
-        this._workspace.project().removeUISourceCode(uiSourceCode);
+        this._networkWorkspaceProvider.removeFile(snippet.name);
     },
 
     /**
@@ -321,9 +322,7 @@ WebInspector.ScriptSnippetModel.prototype = {
      */
     _createUISourceCodeForScript: function(script)
     {
-        var uiSourceCode = new WebInspector.UISourceCode(script.sourceURL, script, false);
-        uiSourceCode.isSnippet = true;
-        this._workspace.project().addTemporaryUISourceCode(uiSourceCode);
+        var uiSourceCode = this._workspace.addTemporaryUISourceCode(script.sourceURL, script, false, true);
         uiSourceCode.setSourceMapping(this._snippetScriptMapping);
         this._uiSourceCodeForScriptId[script.scriptId] = uiSourceCode;
         this._scriptForUISourceCode.put(uiSourceCode, script);

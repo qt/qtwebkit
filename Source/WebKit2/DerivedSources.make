@@ -36,6 +36,7 @@ VPATH = \
     $(WebKit2)/WebProcess/IconDatabase \
     $(WebKit2)/WebProcess/KeyValueStorage \
     $(WebKit2)/WebProcess/MediaCache \
+    $(WebKit2)/WebProcess/Network \
     $(WebKit2)/WebProcess/Notifications \
     $(WebKit2)/WebProcess/Plugins \
     $(WebKit2)/WebProcess/ResourceCache \
@@ -57,6 +58,7 @@ MESSAGE_RECEIVERS = \
     DownloadProxy \
     EventDispatcher \
     NetworkProcess \
+    NetworkProcessConnection \
     NetworkProcessProxy \
     NPObjectMessageReceiver \
     PluginControllerProxy \
@@ -129,12 +131,7 @@ ifeq ($(OS),MACOS)
 
 FRAMEWORK_FLAGS = $(shell echo $(BUILT_PRODUCTS_DIR) $(FRAMEWORK_SEARCH_PATHS) | perl -e 'print "-F " . join(" -F ", split(" ", <>));')
 HEADER_FLAGS = $(shell echo $(BUILT_PRODUCTS_DIR) $(HEADER_SEARCH_PATHS) | perl -e 'print "-I" . join(" -I", split(" ", <>));')
-
-ifeq ($(TARGET_GCC_VERSION),LLVM_COMPILER)
-	TEXT_PREPROCESSOR_FLAGS=-E -P -x c -traditional -w
-else
-	TEXT_PREPROCESSOR_FLAGS=-E -P -x c -std=c89
-endif
+TEXT_PREPROCESSOR_FLAGS=-E -P -x c -traditional -w
 
 ifneq ($(SDKROOT),)
 	SDK_FLAGS=-isysroot $(SDKROOT)

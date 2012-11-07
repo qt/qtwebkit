@@ -42,12 +42,18 @@ NetworkProcessConnection::~NetworkProcessConnection()
 {
 }
 
-void NetworkProcessConnection::didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&)
+void NetworkProcessConnection::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
 {
+    if (messageID.is<CoreIPC::MessageClassNetworkProcessConnection>()) {
+        didReceiveNetworkProcessConnectionMessage(connection, messageID, decoder);
+        return;
+    }
+    ASSERT_NOT_REACHED();
 }
 
 void NetworkProcessConnection::didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&)
 {
+    ASSERT_NOT_REACHED();
 }
 
 void NetworkProcessConnection::didClose(CoreIPC::Connection*)
@@ -56,10 +62,14 @@ void NetworkProcessConnection::didClose(CoreIPC::Connection*)
     WebProcess::shared().networkProcessConnectionClosed(this);
 }
 
-void NetworkProcessConnection::didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::MessageID)
+void NetworkProcessConnection::didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference, CoreIPC::StringReference)
 {
 }
 
+void NetworkProcessConnection::startResourceLoad(ResourceLoadIdentifier resourceLoadIdentifier)
+{
+    WebProcess::shared().webResourceLoadScheduler().startResourceLoad(resourceLoadIdentifier);
+}
     
 } // namespace WebKit
 

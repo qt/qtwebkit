@@ -87,6 +87,9 @@ public:
     static const Vector<WebContext*>& allContexts();
 
     void addMessageReceiver(CoreIPC::StringReference messageReceiverName, CoreIPC::MessageReceiver*);
+    void addMessageReceiver(CoreIPC::StringReference messageReceiverName, uint64_t destinationID, CoreIPC::MessageReceiver*);
+    void removeMessageReceiver(CoreIPC::StringReference messageReceiverName, uint64_t destinationID);
+
     bool dispatchMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
     bool dispatchSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&);
 
@@ -245,6 +248,10 @@ public:
 
     void setUsesNetworkProcess(bool);
 
+#if PLATFORM(MAC)
+    static bool applicationIsOccluded() { return s_applicationIsOccluded; }
+#endif
+
 private:
     WebContext(ProcessModel, const String& injectedBundlePath);
 
@@ -298,6 +305,13 @@ private:
 
     String cookieStorageDirectory() const;
     String platformDefaultCookieStorageDirectory() const;
+
+#if PLATFORM(MAC)
+    static void applicationBecameVisible(uint32_t, void*, uint32_t, void*, uint32_t);
+    static void applicationBecameOccluded(uint32_t, void*, uint32_t, void*, uint32_t);
+    static void initializeProcessSuppressionSupport();
+    static void registerOcclusionNotificationHandlers();
+#endif
 
     ProcessModel m_processModel;
     
@@ -393,6 +407,10 @@ private:
     HashMap<uint64_t, RefPtr<DictionaryCallback> > m_dictionaryCallbacks;
 
     CoreIPC::MessageReceiverMap m_messageReceiverMap;
+
+#if PLATFORM(MAC)
+    static bool s_applicationIsOccluded;
+#endif
 };
 
 template<typename U> inline void WebContext::sendToAllProcesses(const U& message)

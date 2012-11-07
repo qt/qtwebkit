@@ -73,7 +73,6 @@ class WebPageClient;
 class WebPageCompositor;
 class WebPageGroupLoadDeferrer;
 class WebPagePrivate;
-class WebSelectionOverlay;
 class WebSettings;
 class WebTapHighlight;
 class WebViewportArguments;
@@ -229,26 +228,8 @@ public:
     // Case sensitivity, wrapping, and highlighting all matches are also toggleable.
     bool findNextString(const char*, bool forward, bool caseSensitive, bool wrap, bool highlightAllMatches);
 
-    // JavaScriptDebugger interface.
-    bool enableScriptDebugger();
-    bool disableScriptDebugger();
-
     JSContextRef scriptContext() const;
     JSValueRef windowObject() const;
-
-    void addBreakpoint(const unsigned short* url, unsigned urlLength, int lineNumber, const unsigned short* condition, unsigned conditionLength);
-    void updateBreakpoint(const unsigned short* url, unsigned urlLength, int lineNumber, const unsigned short* condition, unsigned conditionLength);
-    void removeBreakpoint(const unsigned short* url, unsigned urlLength, int lineNumber);
-
-    bool pauseOnExceptions();
-    void setPauseOnExceptions(bool);
-
-    void pauseInDebugger();
-    void resumeDebugger();
-
-    void stepOverStatementInDebugger();
-    void stepIntoStatementInDebugger();
-    void stepOutOfFunctionInDebugger();
 
     unsigned timeoutForJavaScriptExecution() const;
     void setTimeoutForJavaScriptExecution(unsigned ms);
@@ -365,9 +346,6 @@ public:
     void resetUserViewportArguments();
 
     WebTapHighlight* tapHighlight() const;
-    void setTapHighlight(WebTapHighlight*);
-
-    WebSelectionOverlay* selectionOverlay() const;
 
     // Adds an overlay that can be modified on the WebKit thread, and
     // whose attributes can be overridden on the compositing thread.

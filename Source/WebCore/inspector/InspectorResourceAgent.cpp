@@ -71,6 +71,7 @@
 #include <wtf/CurrentTime.h>
 #include <wtf/HexNumber.h>
 #include <wtf/ListHashSet.h>
+#include <wtf/MemoryInstrumentationHashMap.h>
 #include <wtf/RefPtr.h>
 #include <wtf/text/StringBuilder.h>
 
@@ -570,6 +571,7 @@ void InspectorResourceAgent::enable()
 void InspectorResourceAgent::disable(ErrorString*)
 {
     m_state->setBoolean(ResourceAgentState::resourceAgentEnabled, false);
+    m_state->setString(ResourceAgentState::userAgentOverride, "");
     m_instrumentingAgents->setInspectorResourceAgent(0);
     m_resourcesData->clear();
 }
@@ -666,6 +668,19 @@ void InspectorResourceAgent::mainFrameNavigated(DocumentLoader* loader)
         memoryCache()->evictResources();
 
     m_resourcesData->clear(m_pageAgent->loaderId(loader));
+}
+
+void InspectorResourceAgent::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::InspectorResourceAgent);
+    InspectorBaseAgent<InspectorResourceAgent>::reportMemoryUsage(memoryObjectInfo);
+    info.addWeakPointer(m_pageAgent);
+    info.addWeakPointer(m_client);
+    info.addWeakPointer(m_frontend);
+    info.addMember(m_userAgentOverride);
+    info.addMember(m_resourcesData);
+    info.addMember(m_pendingXHRReplayData);
+    info.addMember(m_styleRecalculationInitiator);
 }
 
 InspectorResourceAgent::InspectorResourceAgent(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorClient* client, InspectorState* state)

@@ -1,3 +1,137 @@
+2012-11-06  Laszlo Gombos  <l.gombos@samsung.com>
+
+        [EFL] Simplify the build system
+        https://bugs.webkit.org/show_bug.cgi?id=101392
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Use WTF_USE_3D_GRAPHICS to guard the inclusion of surfaces and textmap 
+        directories under WebCore/graphics to be consistent with 
+        WebCore/PlatformEfl.cmake.
+
+        * PlatformEfl.cmake:
+
+2012-11-04  Halton Huo  <halton.huo@intel.com>
+
+        [EFL] Use _LIBRARIES instead of _LIBRARY
+        https://bugs.webkit.org/show_bug.cgi?id=101042
+
+        Reviewed by Gyuyoung Kim.
+
+        In CMake Find files, _LIBRARY is intended for internal use, should
+        use _LIBRARIES instead.
+
+        * PlatformEfl.cmake: s/_LIBRARY}/_LIBRARIES}
+
+2012-11-01  Seonae Kim  <sunaeluv.kim@samsung.com>
+
+        [EFL][DRT] Support Geolocation
+        https://bugs.webkit.org/show_bug.cgi?id=97427
+
+        Reviewed by Gyuyoung Kim. 
+
+        Add a mock directory to use GeolocationClientMock in DumpRenderTree.
+
+        * PlatformEfl.cmake:
+
+2012-10-31  Otto Derek Cheung  <otcheung@rim.com>
+
+        [BlackBerry] Adding window.external to our port
+        https://bugs.webkit.org/show_bug.cgi?id=100868
+
+        Reviewed by Rob Buis.
+
+        Adding ExternalExtension classes to the BB cmake file.
+
+        * PlatformBlackBerry.cmake:
+
+2012-10-31  Michał Pakuła vel Rutka  <m.pakula@samsung.com>
+
+        [EFL][DRT] EventSender requires contextClick implementation
+        https://bugs.webkit.org/show_bug.cgi?id=86091
+
+        Reviewed by Gyuyoung Kim.
+
+        Add new unit test file, needed due to ewk API changes.
+
+        * PlatformEfl.cmake:
+
+2012-10-30  Peter Wang  <peter.wang@torchmobile.com.cn>
+
+        [BlackBerry] Clean the code of "JavaScriptDebuggerBlackBerry"
+        https://bugs.webkit.org/show_bug.cgi?id=100724
+
+        Reviewed by Rob Buis.
+
+        Remove the code of JavaScriptDebuggerBlackBerry.
+
+        * PlatformBlackBerry.cmake:
+
+2012-10-28  Mark Rowe  <mrowe@apple.com>
+
+        Remove references to unsupported OS and Xcode versions.
+
+        Reviewed by Anders Carlsson.
+
+        * WebKit.xcodeproj/project.pbxproj:
+
+2012-10-26  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r132601.
+        http://trac.webkit.org/changeset/132601
+        https://bugs.webkit.org/show_bug.cgi?id=100494
+
+        It broke the Qt build (Requested by Ossy on #webkit).
+
+        * PlatformEfl.cmake:
+
+2012-10-26  Xiaobo Wang  <xbwang@torchmobile.com.cn>
+
+        [BlackBerry] Support pixel tests for BlackBerry DRT
+        https://bugs.webkit.org/show_bug.cgi?id=100210
+
+        Reviewed by Rob Buis.
+
+        Adds a step to build ImageDiff from Qt for DRT. Most of the works are
+        accomplished by Christopher Wells.
+
+        * PlatformBlackBerry.cmake:
+
+2012-10-24  Alexey Proskuryakov  <ap@apple.com>
+
+        Add a strategy for shared workers
+        https://bugs.webkit.org/show_bug.cgi?id=100165
+
+        EFL build fix by Christophe Dumez.
+
+        Reviewed by Brady Eidson.
+
+        * CMakeLists.txt: Add WebCore/workers to include paths.
+
+2012-10-24  Otto Derek Cheung  <otcheung@rim.com>
+
+        [BlackBerry] Rename GeolocationControllerClientBlackBerry to GeolocationClientBlackBerry
+        https://bugs.webkit.org/show_bug.cgi?id=100250
+
+        Reviewed by Rob Buis.
+
+        Rename GeolocationControllerClientBlackBerry to GeolocationClientBlackBerry
+        to prevent confusion.
+
+        PR 230196
+
+        * PlatformBlackBerry.cmake:
+
+2012-10-23  Hyowon Kim  <hw1008.kim@samsung.com>
+
+        [Texmap][EFL] Add AcceleratedCompositingContextEfl to the build system.
+        https://bugs.webkit.org/show_bug.cgi?id=88630
+
+        Reviewed by Gyuyoung Kim.
+
+        * PlatformEfl.cmake: Add the AcceleratedCompositingContextEfl.cpp file
+        and INCLUDE paths for TEXTURE_MAPPER_GL.
+
 2012-10-18  Kangil Han  <kangil.han@samsung.com>
 
         [EFL] Add unit test for ewk_frame_source_get.

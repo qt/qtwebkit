@@ -23,11 +23,11 @@
 
 
 #include "DumpRenderTreeClient.h"
-#include "PlatformString.h"
 #include "Timer.h"
 #include <BlackBerryPlatformLayoutTest.h>
 #include <FindOptions.h>
 #include <wtf/Vector.h>
+#include <wtf/text/WTFString.h>
 
 namespace WebCore {
 class Credential;
@@ -94,7 +94,6 @@ public:
     void didEndEditing();
     void didChange();
     void didChangeSelection();
-    bool findString(const String&, WebCore::FindOptions);
     bool shouldBeginEditingInDOMRange(WebCore::Range*);
     bool shouldEndEditingInDOMRange(WebCore::Range*);
     bool shouldDeleteDOMRange(WebCore::Range*);
@@ -109,7 +108,7 @@ public:
     // BlackBerry::Platform::BlackBerryPlatformLayoutTestClient method
     virtual void addTest(const char* testFile);
 private:
-    void runTest(const String& url);
+    void runTest(const String& url, const String& imageHash);
     void runTests();
     void runCurrentTest();
 
@@ -124,7 +123,7 @@ private:
     void doneDrt();
     bool isHTTPTest(const String& test);
     String renderTreeDump() const;
-    void resetToConsistentStateBeforeTesting();
+    void resetToConsistentStateBeforeTesting(const String& url, const String& imageHash);
     void runRemainingTests();
     void invalidateAnyPreviousWaitToDumpWatchdog();
     void waitToDumpWatchdogTimerFired(WebCore::Timer<DumpRenderTree>*);
@@ -141,7 +140,7 @@ private:
     GCController* m_gcController;
     AccessibilityController* m_accessibilityController;
     WebPage* m_page;
-    bool m_dumpPixels;
+    bool m_enablePixelTests;
     WebCore::Timer<DumpRenderTree> m_waitToDumpWatchdogTimer;
     WebCore::Timer<DumpRenderTree> m_workTimer;
 

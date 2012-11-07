@@ -66,10 +66,8 @@ private Q_SLOTS:
             setSurfaceType(OpenGLSurface);
             create();
             QQuickWindowPrivate::get(this)->setRenderWithoutShowing(true);
-        } else {
-            QQuickWebViewExperimental experimental(m_view);
-            experimental.setRenderToOffscreenBuffer(true);
-        }
+        } else
+            m_view->experimental()->setRenderToOffscreenBuffer(true);
 
         QWindowSystemInterface::handleWindowActivated(this);
         m_view->page()->setFocus(true);
@@ -79,7 +77,7 @@ private:
     QQuickWebView* m_view;
 };
 
-PlatformWebView::PlatformWebView(WKContextRef contextRef, WKPageGroupRef pageGroupRef)
+PlatformWebView::PlatformWebView(WKContextRef contextRef, WKPageGroupRef pageGroupRef, WKDictionaryRef /*options*/)
     : m_view(new QQuickWebView(contextRef, pageGroupRef))
     , m_window(new WrapperWindow(m_view))
     , m_windowIsKey(true)

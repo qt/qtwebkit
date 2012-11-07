@@ -37,8 +37,13 @@ class RenderTableCol : public RenderBox {
 public:
     explicit RenderTableCol(Node*);
 
+    RenderObject* firstChild() const { ASSERT(children() == virtualChildren()); return children()->firstChild(); }
+    RenderObject* lastChild() const { ASSERT(children() == virtualChildren()); return children()->lastChild(); }
+
     const RenderObjectChildList* children() const { return &m_children; }
     RenderObjectChildList* children() { return &m_children; }
+
+    virtual void computePreferredLogicalWidths();
 
     unsigned span() const { return m_span; }
     void setSpan(unsigned span) { m_span = span; }
@@ -75,13 +80,11 @@ private:
     virtual RenderObjectChildList* virtualChildren() { return children(); }
     virtual const RenderObjectChildList* virtualChildren() const { return children(); }
 
-    virtual void computePreferredLogicalWidths() OVERRIDE;
-    virtual void layout() OVERRIDE;
-
     virtual const char* renderName() const { return "RenderTableCol"; }
     virtual bool isRenderTableCol() const OVERRIDE { return true; }
     virtual void updateFromElement();
 
+    virtual void insertedIntoTree() OVERRIDE;
     virtual void willBeRemovedFromTree() OVERRIDE;
 
     virtual bool isChildAllowed(RenderObject*, RenderStyle*) const;
@@ -92,8 +95,6 @@ private:
     virtual void imageChanged(WrappedImagePtr, const IntRect* = 0);
 
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
-
-    void propagateLayoutCueToTable() const;
 
     RenderTable* table() const;
 

@@ -136,12 +136,14 @@ public:
     virtual void setShouldDisplaySubtitles(bool);
     virtual void setShouldDisplayTextDescriptions(bool);
     virtual void setShouldPrintBackgrounds(bool);
+    virtual void setShouldRespectImageOrientation(bool);
     virtual void setShowDebugBorders(bool);
     virtual void setShowFPSCounter(bool);
     virtual void setShowPaintRects(bool);
     virtual void setShowPlatformLayerTree(bool);
     virtual void setShrinksStandaloneImagesToFit(bool);
     virtual void setStandardFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON);
+    virtual void setSupportsMultipleWindows(bool);
     virtual void setSyncXHRInDocumentsEnabled(bool);
     virtual void setTextAreasAreResizable(bool);
     virtual void setTextAutosizingEnabled(bool);

@@ -28,14 +28,13 @@
 
 #if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
 #include "DateTimeFieldElement.h"
-#include "SpinButtonElement.h"
 #include "StepRange.h"
 
 namespace WebCore {
 
 class DateTimeFieldsState;
 class KeyboardEvent;
-class Localizer;
+class Locale;
 class MouseEvent;
 class StepRange;
 
@@ -43,7 +42,7 @@ class StepRange;
 // representing date and time, such as
 //  - Year, Month, Day Of Month
 //  - Hour, Minute, Second, Millisecond, AM/PM
-class DateTimeEditElement : public HTMLDivElement, public DateTimeFieldElement::FieldOwner, private SpinButtonElement::SpinButtonOwner {
+class DateTimeEditElement : public HTMLDivElement, public DateTimeFieldElement::FieldOwner {
     WTF_MAKE_NONCOPYABLE(DateTimeEditElement);
 
 public:
@@ -64,7 +63,7 @@ public:
     struct LayoutParameters {
         String dateTimeFormat;
         String fallbackDateTimeFormat;
-        Localizer& localizer;
+        Locale& locale;
         const StepRange stepRange;
         int minimumYear;
         int maximumYear;
@@ -72,8 +71,8 @@ public:
         String placeholderForMonth;
         String placeholderForYear;
 
-        LayoutParameters(Localizer& localizer, const StepRange& stepRange)
-            : localizer(localizer)
+        LayoutParameters(Locale& locale, const StepRange& stepRange)
+            : locale(locale)
             , stepRange(stepRange)
             , minimumYear(undefinedYear())
             , maximumYear(undefinedYear())
@@ -90,13 +89,17 @@ public:
     void blurByOwner();
     virtual void defaultEventHandler(Event*) OVERRIDE;
     void disabledStateChanged();
+    void focusIfNoFocus();
     void focusByOwner();
+    bool hasFocusedField();
     void readOnlyStateChanged();
     void removeEditControlOwner() { m_editControlOwner = 0; }
     void resetFields();
     void setEmptyValue(const LayoutParameters&, const DateComponents& dateForReadOnlyField);
     void setValueAsDate(const LayoutParameters&, const DateComponents&);
     void setValueAsDateTimeFieldsState(const DateTimeFieldsState&, const DateComponents& dateForReadOnlyField);
+    void stepDown();
+    void stepUp();
     String value() const;
     DateTimeFieldsState valueAsDateTimeFieldsState() const;
 
@@ -134,16 +137,8 @@ private:
     virtual bool isFieldOwnerDisabledOrReadOnly() const OVERRIDE FINAL;
     virtual AtomicString localeIdentifier() const OVERRIDE FINAL;
 
-    // SpinButtonElement::SpinButtonOwner functions.
-    virtual void focusAndSelectSpinButtonOwner() OVERRIDE FINAL;
-    virtual bool shouldSpinButtonRespondToMouseEvents() OVERRIDE FINAL;
-    virtual bool shouldSpinButtonRespondToWheelEvents() OVERRIDE FINAL;
-    virtual void spinButtonStepDown() OVERRIDE FINAL;
-    virtual void spinButtonStepUp() OVERRIDE FINAL;
-
     Vector<DateTimeFieldElement*, maximumNumberOfFields> m_fields;
     EditControlOwner* m_editControlOwner;
-    SpinButtonElement* m_spinButton;
 };
 
 } // namespace WebCore

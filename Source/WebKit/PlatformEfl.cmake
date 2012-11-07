@@ -7,6 +7,7 @@ LIST(APPEND WebKit_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/efl"
     "${WEBCORE_DIR}/platform/graphics/cairo"
     "${WEBCORE_DIR}/platform/graphics/efl"
+    "${WEBCORE_DIR}/platform/mock"
     "${WEBCORE_DIR}/platform/network/soup"
     ${CAIRO_INCLUDE_DIRS}
     ${ECORE_INCLUDE_DIRS}
@@ -78,7 +79,22 @@ IF (ENABLE_NAVIGATOR_CONTENT_UTILS)
   )
 ENDIF ()
 
+IF (WTF_USE_3D_GRAPHICS)
+  LIST(APPEND WebKit_INCLUDE_DIRECTORIES
+    "${WEBCORE_DIR}/platform/graphics/surfaces"
+    "${WEBCORE_DIR}/platform/graphics/texmap"
+    "${THIRDPARTY_DIR}/ANGLE/include/GLSLANG"
+  )
+ENDIF ()
+
+IF (ENABLE_GEOLOCATION)
+  LIST(APPEND WebKit_INCLUDE_DIRECTORIES
+    "${WEBCORE_DIR}/Modules/geolocation"
+  )
+ENDIF ()
+
 LIST(APPEND WebKit_SOURCES
+    efl/WebCoreSupport/AcceleratedCompositingContextEfl.cpp
     efl/WebCoreSupport/AssertMatchingEnums.cpp
     efl/WebCoreSupport/BatteryClientEfl.cpp
     efl/WebCoreSupport/ChromeClientEfl.cpp
@@ -144,8 +160,8 @@ LIST(APPEND WebKit_LIBRARIES
     ${LIBXML2_LIBRARIES}
     ${SQLITE_LIBRARIES}
     ${FONTCONFIG_LIBRARIES}
-    ${PNG_LIBRARY}
-    ${JPEG_LIBRARY}
+    ${PNG_LIBRARIES}
+    ${JPEG_LIBRARIES}
     ${CMAKE_DL_LIBS}
     ${GLIB_LIBRARIES}
     ${GLIB_GOBJECT_LIBRARIES}
@@ -242,6 +258,7 @@ TARGET_LINK_LIBRARIES(ewkTestUtils ${EWKUnitTests_LIBRARIES})
 SET(WEBKIT_EFL_TEST_DIR "${WEBKIT_DIR}/efl/tests/")
 
 SET(EWKUnitTests_BINARIES
+    test_ewk_contextmenu
     test_ewk_frame
     test_ewk_view
 )

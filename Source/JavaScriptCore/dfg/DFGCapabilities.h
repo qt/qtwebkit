@@ -157,7 +157,6 @@ inline CapabilityLevel canCompileOpcode(OpcodeID opcodeID, CodeBlock*, Instructi
     case op_nstricteq:
     case op_get_by_val:
     case op_put_by_val:
-    case op_method_check:
     case op_get_by_id:
     case op_get_by_id_out_of_line:
     case op_get_array_length:
@@ -167,6 +166,7 @@ inline CapabilityLevel canCompileOpcode(OpcodeID opcodeID, CodeBlock*, Instructi
     case op_put_by_id_transition_direct_out_of_line:
     case op_put_by_id_transition_normal:
     case op_put_by_id_transition_normal_out_of_line:
+    case op_init_global_const_nop:
     case op_init_global_const:
     case op_init_global_const_check:
     case op_jmp:
@@ -200,7 +200,7 @@ inline CapabilityLevel canCompileOpcode(OpcodeID opcodeID, CodeBlock*, Instructi
     case op_strcat:
     case op_to_primitive:
     case op_throw:
-    case op_throw_reference_error:
+    case op_throw_static_error:
     case op_call:
     case op_construct:
     case op_new_regexp: 

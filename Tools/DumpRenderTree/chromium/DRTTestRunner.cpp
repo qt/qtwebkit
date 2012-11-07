@@ -157,6 +157,7 @@ DRTTestRunner::DRTTestRunner(TestShell* shell)
     bindMethod("evaluateScriptInIsolatedWorld", &DRTTestRunner::evaluateScriptInIsolatedWorld);
     bindMethod("evaluateScriptInIsolatedWorldAndReturnValue", &DRTTestRunner::evaluateScriptInIsolatedWorldAndReturnValue);
     bindMethod("setIsolatedWorldSecurityOrigin", &DRTTestRunner::setIsolatedWorldSecurityOrigin);
+    bindMethod("setIsolatedWorldContentSecurityPolicy", &DRTTestRunner::setIsolatedWorldContentSecurityPolicy);
     bindMethod("execCommand", &DRTTestRunner::execCommand);
     bindMethod("forceRedSelectionColors", &DRTTestRunner::forceRedSelectionColors);
 #if ENABLE(NOTIFICATIONS)
@@ -1403,6 +1404,16 @@ void DRTTestRunner::setIsolatedWorldSecurityOrigin(const CppArgumentList& argume
     m_shell->webView()->focusedFrame()->setIsolatedWorldSecurityOrigin(arguments[0].toInt32(), origin);
 }
 
+void DRTTestRunner::setIsolatedWorldContentSecurityPolicy(const CppArgumentList& arguments, CppVariant* result)
+{
+    result->setNull();
+
+    if (arguments.size() != 2 || !arguments[0].isNumber() || !arguments[1].isString())
+        return;
+
+    m_shell->webView()->focusedFrame()->setIsolatedWorldContentSecurityPolicy(arguments[0].toInt32(), cppVariantToWebString(arguments[1]));
+}
+
 void DRTTestRunner::setAllowUniversalAccessFromFileURLs(const CppArgumentList& arguments, CppVariant* result)
 {
     if (arguments.size() > 0 && arguments[0].isBool()) {
@@ -1560,6 +1571,8 @@ void DRTTestRunner::overridePreference(const CppArgumentList& arguments, CppVari
         prefs->webSecurityEnabled = cppVariantToBool(value);
     else if (key == "WebKitJavaScriptCanOpenWindowsAutomatically")
         prefs->javaScriptCanOpenWindowsAutomatically = cppVariantToBool(value);
+    else if (key == "WebKitSupportsMultipleWindows")
+        prefs->supportsMultipleWindows = cppVariantToBool(value);
     else if (key == "WebKitDisplayImagesKey")
         prefs->loadsImagesAutomatically = cppVariantToBool(value);
     else if (key == "WebKitPluginsEnabled")
@@ -1604,6 +1617,8 @@ void DRTTestRunner::overridePreference(const CppArgumentList& arguments, CppVari
         prefs->allowRunningOfInsecureContent = cppVariantToBool(value);
     else if (key == "WebKitCSSCustomFilterEnabled")
         prefs->cssCustomFilterEnabled = cppVariantToBool(value);
+    else if (key == "WebKitShouldRespectImageOrientation")
+        prefs->shouldRespectImageOrientation = cppVariantToBool(value);
     else if (key == "WebKitWebAudioEnabled") {
         ASSERT(cppVariantToBool(value));
     } else {

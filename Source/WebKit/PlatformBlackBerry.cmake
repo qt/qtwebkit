@@ -107,12 +107,12 @@ LIST(APPEND WebKit_SOURCES
     blackberry/WebCoreSupport/DeviceOrientationClientBlackBerry.cpp
     blackberry/WebCoreSupport/DragClientBlackBerry.cpp
     blackberry/WebCoreSupport/EditorClientBlackBerry.cpp
+    blackberry/WebCoreSupport/ExternalExtension.cpp
     blackberry/WebCoreSupport/FrameLoaderClientBlackBerry.cpp
     blackberry/WebCoreSupport/FrameNetworkingContextBlackBerry.cpp
-    blackberry/WebCoreSupport/GeolocationControllerClientBlackBerry.cpp
+    blackberry/WebCoreSupport/GeolocationClientBlackBerry.cpp
     blackberry/WebCoreSupport/IconDatabaseClientBlackBerry.cpp
     blackberry/WebCoreSupport/InspectorClientBlackBerry.cpp
-    blackberry/WebCoreSupport/JavaScriptDebuggerBlackBerry.cpp
     blackberry/WebCoreSupport/NetworkInfoClientBlackBerry.cpp
     blackberry/WebCoreSupport/NotificationPresenterImpl.cpp
     blackberry/WebCoreSupport/PagePopupBlackBerry.cpp
@@ -269,6 +269,18 @@ INSTALL(FILES ${DERIVED_SOURCES_WEBCORE_DIR}/inspectorBB.html
               ${WEBKIT_DIR}/blackberry/WebCoreSupport/inspectorBB.js
               ${DERIVED_SOURCES_WEBCORE_DIR}/InspectorBackendCommands.js
         DESTINATION ../../usr/share/webkit/inspector/)
+
+IF (NOT PUBLIC_BUILD)
+    # Add the custom target to build the host-side ImageDiff binary.
+    # Reuse the Qt version.
+    ADD_CUSTOM_TARGET(
+        ImageDiff ALL
+        WORKING_DIRECTORY ${TOOLS_DIR}/DumpRenderTree/blackberry/
+        COMMAND ./build
+        DEPENDS ${TOOLS_DIR}/DumpRenderTree/qt/ImageDiff.cpp
+        COMMENT "ImageDiff building..."
+    )
+ENDIF ()
 
 ADD_CUSTOM_TARGET (
     inspector ALL

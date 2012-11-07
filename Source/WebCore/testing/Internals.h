@@ -46,6 +46,7 @@ class Frame;
 class InspectorFrontendChannelDummy;
 class InternalSettings;
 class Node;
+class Page;
 class PagePopupController;
 class Range;
 class ScriptExecutionContext;
@@ -60,6 +61,8 @@ class Internals : public RefCounted<Internals>
 public:
     static PassRefPtr<Internals> create(Document*);
     virtual ~Internals();
+
+    static void resetToConsistentState(Page*);
 
     String elementRenderTreeAsText(Element*, ExceptionCode&);
 
@@ -80,7 +83,10 @@ public:
     ShadowRootIfShadowDOMEnabledOrNode* oldestShadowRoot(Element* host, ExceptionCode&);
     ShadowRootIfShadowDOMEnabledOrNode* youngerShadowRoot(Node* shadow, ExceptionCode&);
     ShadowRootIfShadowDOMEnabledOrNode* olderShadowRoot(Node* shadow, ExceptionCode&);
+    String shadowRootType(const Node*, ExceptionCode&) const;
     bool hasShadowInsertionPoint(const Node*, ExceptionCode&) const;
+    bool hasContentElement(const Node*, ExceptionCode&) const;
+    size_t countElementShadow(const Node*, ExceptionCode&) const;
     Element* includerFor(Node*, ExceptionCode&);
     String shadowPseudoId(Element*, ExceptionCode&);
     void setShadowPseudoId(Element*, const String&, ExceptionCode&);
@@ -156,9 +162,6 @@ public:
     Vector<String> userPreferredLanguages() const;
     void setUserPreferredLanguages(const Vector<String>&);
 
-    void setShouldDisplayTrackKind(Document*, const String& kind, bool, ExceptionCode&);
-    bool shouldDisplayTrackKind(Document*, const String& kind, ExceptionCode&);
-
     unsigned wheelEventHandlerCount(Document*, ExceptionCode&);
     unsigned touchEventHandlerCount(Document*, ExceptionCode&);
 
@@ -188,10 +191,16 @@ public:
     void resumeAnimations(Document*, ExceptionCode&) const;
 
     enum {
-        LAYER_TREE_INCLUDES_VISIBLE_RECTS = 1 // Values need to kept in sync with Internals.idl.
+        // Values need to be kept in sync with Internals.idl.
+        LAYER_TREE_INCLUDES_VISIBLE_RECTS = 1,
+        LAYER_TREE_INCLUDES_TILE_CACHES = 2,
+        LAYER_TREE_INCLUDES_REPAINT_RECTS = 4
+        
     };
     String layerTreeAsText(Document*, unsigned flags, ExceptionCode&) const;
     String layerTreeAsText(Document*, ExceptionCode&) const;
+    String repaintRectsAsText(Document*, ExceptionCode&) const;
+    String scrollingStateTreeAsText(Document*, ExceptionCode&) const;
 
     void garbageCollectDocumentResources(Document*, ExceptionCode&) const;
 
@@ -203,6 +212,8 @@ public:
     Vector<String> consoleMessageArgumentCounts(Document*) const;
     PassRefPtr<DOMWindow> openDummyInspectorFrontend(const String& url);
     void closeDummyInspectorFrontend();
+    void setInspectorResourcesDataSizeLimits(int maximumResourcesContentSize, int maximumSingleResourceContentSize, ExceptionCode&);
+    void setJavaScriptProfilingEnabled(bool enabled, ExceptionCode&);
 #endif
 
     String counterValue(Element*);
@@ -227,6 +238,9 @@ public:
     PassRefPtr<MallocStatistics> mallocStatistics() const;
 
     PassRefPtr<DOMStringList> getReferencedFilePaths() const;
+
+    void startTrackingRepaints(Document*, ExceptionCode&);
+    void stopTrackingRepaints(Document*, ExceptionCode&);
 
 private:
     explicit Internals(Document*);

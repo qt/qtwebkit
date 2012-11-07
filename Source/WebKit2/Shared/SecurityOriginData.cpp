@@ -35,11 +35,11 @@ using namespace WebCore;
 
 namespace WebKit {
 
-void SecurityOriginData::encode(CoreIPC::ArgumentEncoder* encoder) const
+void SecurityOriginData::encode(CoreIPC::ArgumentEncoder& encoder) const
 {
-    encoder->encode(protocol);
-    encoder->encode(host);
-    encoder->encode(port);
+    encoder << protocol;
+    encoder << host;
+    encoder << port;
 }
 
 bool SecurityOriginData::decode(CoreIPC::ArgumentDecoder* decoder, SecurityOriginData& securityOriginData)

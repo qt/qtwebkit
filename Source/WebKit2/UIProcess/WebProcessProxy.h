@@ -118,9 +118,6 @@ public:
 
     static bool fullKeyboardAccessEnabled();
 
-    // FIXME: This variant of send is deprecated. All clients should move to an overload that take a message type.
-    template<typename E, typename T> bool deprecatedSend(E messageID, uint64_t destinationID, const T& arguments);
-
 private:
     explicit WebProcessProxy(PassRefPtr<WebContext>);
 
@@ -143,7 +140,7 @@ private:
     // Plugins
 #if ENABLE(NETSCAPE_PLUGIN_API)
     void getPlugins(CoreIPC::Connection*, uint64_t requestID, bool refresh);
-    void getPluginPath(const String& mimeType, const String& urlString, String& pluginPath, bool& blocked);
+    void getPluginPath(const String& mimeType, const String& urlString, String& pluginPath, uint32_t& pluginLoadPolicy);
     void handleGetPlugins(uint64_t requestID, bool refresh);
     void sendDidGetPlugins(uint64_t requestID, PassOwnPtr<Vector<WebCore::PluginInfo> >);
 #endif // ENABLE(NETSCAPE_PLUGIN_API)
@@ -170,7 +167,7 @@ private:
     virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
     virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&);
     virtual void didClose(CoreIPC::Connection*);
-    virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::MessageID);
+    virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference messageReceiverName, CoreIPC::StringReference messageName);
 #if PLATFORM(WIN)
     virtual Vector<HWND> windowsToReceiveSentMessagesWhileWaitingForSyncReply();
 #endif
@@ -218,19 +215,12 @@ private:
     WebBackForwardListItemMap m_backForwardListItemMap;
 };
 
-template<typename E, typename T>
-bool WebProcessProxy::deprecatedSend(E messageID, uint64_t destinationID, const T& arguments)
-{
-    OwnPtr<CoreIPC::MessageEncoder> encoder = CoreIPC::MessageEncoder::create(CoreIPC::MessageKindTraits<E>::messageReceiverName(), "", destinationID);
-    encoder->encode(arguments);
-
-    return sendMessage(CoreIPC::MessageID(messageID), encoder.release(), 0);
-}
-
 template<typename T>
 bool WebProcessProxy::send(const T& message, uint64_t destinationID, unsigned messageSendFlags)
 {
-    OwnPtr<CoreIPC::MessageEncoder> encoder = CoreIPC::MessageEncoder::create(T::receiverName(), "", destinationID);
+    COMPILE_ASSERT(!T::isSync, AsyncMessageExpected);
+
+    OwnPtr<CoreIPC::MessageEncoder> encoder = CoreIPC::MessageEncoder::create(T::receiverName(), T::name(), destinationID);
     encoder->encode(message);
 
     return sendMessage(CoreIPC::MessageID(T::messageID), encoder.release(), messageSendFlags);
@@ -239,6 +229,8 @@ bool WebProcessProxy::send(const T& message, uint64_t destinationID, unsigned me
 template<typename U> 
 bool WebProcessProxy::sendSync(const U& message, const typename U::Reply& reply, uint64_t destinationID, double timeout)
 {
+    COMPILE_ASSERT(U::isSync, SyncMessageExpected);
+
     if (!m_connection)
         return false;
 

@@ -3,6 +3,7 @@
  *  Copyright (C) 2005-2007 Alexey Proskuryakov <ap@webkit.org>
  *  Copyright (C) 2007, 2008 Julien Chaffraix <jchaffraix@webkit.org>
  *  Copyright (C) 2008, 2011 Google Inc. All rights reserved.
+ *  Copyright (C) 2012 Intel Corporation
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -175,6 +176,9 @@ XMLHttpRequest::XMLHttpRequest(ScriptExecutionContext* context, PassRefPtr<Secur
     : ActiveDOMObject(context, this)
     , m_async(true)
     , m_includeCredentials(false)
+#if ENABLE(XHR_TIMEOUT)
+    , m_timeoutMilliseconds(0)
+#endif
     , m_state(UNSENT)
     , m_createdDocument(false)
     , m_error(false)
@@ -325,6 +329,20 @@ ArrayBuffer* XMLHttpRequest::responseArrayBuffer(ExceptionCode& ec)
 
     return m_responseArrayBuffer.get();
 }
+
+#if ENABLE(XHR_TIMEOUT)
+void XMLHttpRequest::setTimeout(unsigned long timeout, ExceptionCode& ec)
+{
+    // FIXME: Need to trigger or update the timeout Timer here, if needed. http://webkit.org/b/98156
+    // XHR2 spec, 4.7.3. "This implies that the timeout attribute can be set while fetching is in progress. If that occurs it will still be measured relative to the start of fetching."
+    if (scriptExecutionContext()->isDocument() && !m_async) {
+        logConsoleError(scriptExecutionContext(), "XMLHttpRequest.timeout cannot be set for synchronous HTTP(S) requests made from the window context.");
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+    m_timeoutMilliseconds = timeout;
+}
+#endif
 
 void XMLHttpRequest::setResponseType(const String& responseType, ExceptionCode& ec)
 {
@@ -495,6 +513,15 @@ void XMLHttpRequest::open(const String& method, const KURL& url, bool async, Exc
             ec = INVALID_ACCESS_ERR;
             return;
         }
+
+#if ENABLE(XHR_TIMEOUT)
+        // Similarly, timeouts are disabled for synchronous requests as well.
+        if (m_timeoutMilliseconds > 0) {
+            logConsoleError(scriptExecutionContext(), "Synchronous XMLHttpRequests must not have a timeout value set.");
+            ec = INVALID_ACCESS_ERR;
+            return;
+        }
+#endif
     }
 
     m_method = uppercaseKnownHTTPMethod(method);
@@ -741,6 +768,11 @@ void XMLHttpRequest::createRequest(ExceptionCode& ec)
     options.allowCredentials = (m_sameOriginRequest || m_includeCredentials) ? AllowStoredCredentials : DoNotAllowStoredCredentials;
     options.crossOriginRequestPolicy = UseAccessControl;
     options.securityOrigin = securityOrigin();
+
+#if ENABLE(XHR_TIMEOUT)
+    if (m_timeoutMilliseconds)
+        request.setTimeoutInterval(m_timeoutMilliseconds / 1000.0);
+#endif
 
     m_exceptionCode = 0;
     m_error = false;
@@ -1058,6 +1090,13 @@ void XMLHttpRequest::didFail(const ResourceError& error)
         return;
     }
 
+#if ENABLE(XHR_TIMEOUT)
+    if (error.isTimeout()) {
+        didTimeout();
+        return;
+    }
+#endif
+
     // Network failures are already reported to Web Inspector by ResourceLoader.
     if (error.domain() == errorDomainWebKitInternal)
         logConsoleError(scriptExecutionContext(), "XMLHttpRequest cannot load " + error.failingURL() + ". " + error.localizedDescription());
@@ -1181,6 +1220,36 @@ void XMLHttpRequest::didReceiveData(const char* data, int len)
             callReadyStateChangeListener();
     }
 }
+
+#if ENABLE(XHR_TIMEOUT)
+void XMLHttpRequest::didTimeout()
+{
+    // internalAbort() calls dropProtection(), which may release the last reference.
+    RefPtr<XMLHttpRequest> protect(this);
+    internalAbort();
+
+    clearResponse();
+    clearRequest();
+
+    m_error = true;
+    m_exceptionCode = XMLHttpRequestException::TIMEOUT_ERR;
+
+    if (!m_async) {
+        m_state = DONE;
+        m_exceptionCode = TIMEOUT_ERR;
+        return;
+    }
+
+    changeState(DONE);
+
+    if (!m_uploadComplete) {
+        m_uploadComplete = true;
+        if (m_upload && m_uploadEventsAllowed)
+            m_upload->dispatchEventAndLoadEnd(XMLHttpRequestProgressEvent::create(eventNames().timeoutEvent));
+    }
+    m_progressEventThrottle.dispatchEventAndLoadEnd(XMLHttpRequestProgressEvent::create(eventNames().timeoutEvent));
+}
+#endif
 
 bool XMLHttpRequest::canSuspend() const
 {

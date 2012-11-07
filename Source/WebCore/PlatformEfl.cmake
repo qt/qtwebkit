@@ -45,7 +45,6 @@ LIST(APPEND WebCore_SOURCES
   platform/efl/ScrollViewEfl.cpp
   platform/efl/ScrollbarEfl.cpp
   platform/efl/ScrollbarThemeEfl.cpp
-  platform/efl/SharedBufferEfl.cpp
   platform/efl/SharedTimerEfl.cpp
   platform/efl/SoundEfl.cpp
   platform/efl/SystemTimeEfl.cpp
@@ -69,6 +68,7 @@ LIST(APPEND WebCore_SOURCES
   platform/linux/GamepadDeviceLinux.cpp
   platform/mediastream/gstreamer/MediaStreamCenterGStreamer.cpp
   platform/network/efl/NetworkStateNotifierEfl.cpp
+  platform/network/soup/AuthenticationChallengeSoup.cpp
   platform/network/soup/CookieJarSoup.cpp
   platform/network/soup/CookieStorageSoup.cpp
   platform/network/soup/CredentialStorageSoup.cpp
@@ -84,6 +84,7 @@ LIST(APPEND WebCore_SOURCES
   platform/network/soup/SoupURIUtils.cpp
   platform/PlatformStrategies.cpp
   platform/posix/FileSystemPOSIX.cpp
+  platform/posix/SharedBufferPOSIX.cpp
   platform/text/efl/TextBreakIteratorInternalICUEfl.cpp
   platform/text/enchant/TextCheckerEnchant.cpp
 )
@@ -201,10 +202,10 @@ LIST(APPEND WebCore_LIBRARIES
   ${FONTCONFIG_LIBRARIES}
   ${FREETYPE_LIBRARIES}
   ${ICU_LIBRARIES}
-  ${JPEG_LIBRARY}
+  ${JPEG_LIBRARIES}
   ${LIBXML2_LIBRARIES}
   ${LIBXSLT_LIBRARIES}
-  ${PNG_LIBRARY}
+  ${PNG_LIBRARIES}
   ${SQLITE_LIBRARIES}
   ${GLIB_LIBRARIES}
   ${GLIB_GIO_LIBRARIES}
@@ -283,6 +284,7 @@ IF (WTF_USE_3D_GRAPHICS)
   LIST(APPEND WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/platform/graphics/cairo"
     "${WEBCORE_DIR}/platform/graphics/opengl"
+    "${WEBCORE_DIR}/platform/graphics/surfaces"
     "${WEBCORE_DIR}/platform/graphics/texmap"
   )
   LIST(APPEND WebCore_SOURCES
@@ -294,6 +296,8 @@ IF (WTF_USE_3D_GRAPHICS)
     platform/graphics/opengl/Extensions3DOpenGLCommon.cpp
     platform/graphics/opengl/GraphicsContext3DOpenGL.cpp
     platform/graphics/opengl/GraphicsContext3DOpenGLCommon.cpp
+    platform/graphics/surfaces/GraphicsSurface.cpp
+    platform/graphics/surfaces/qt/GraphicsSurfaceGLX.cpp
     platform/graphics/texmap/TextureMapperGL.cpp
     platform/graphics/texmap/TextureMapperShaderManager.cpp
   )

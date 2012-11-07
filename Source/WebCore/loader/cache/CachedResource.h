@@ -61,6 +61,7 @@ class CachedResource {
     
 public:
     enum Type {
+        MainResource,
         ImageResource,
         CSSStyleSheet,
         Script,
@@ -88,7 +89,6 @@ public:
         Unknown,      // let cache decide what to do with it
         Pending,      // only partially loaded
         Cached,       // regular case
-        Canceled,
         LoadError,
         DecodeError
     };
@@ -102,6 +102,9 @@ public:
     virtual String encoding() const { return String(); }
     virtual void data(PassRefPtr<ResourceBuffer> data, bool allDataReceived);
     virtual void error(CachedResource::Status);
+
+    void setResourceError(const ResourceError& error) { m_error = error; }
+    const ResourceError& resourceError() const { return m_error; }
 
     virtual bool shouldIgnoreHTTPStatusCodeErrors() const { return false; }
 
@@ -151,7 +154,7 @@ public:
     virtual bool isImage() const { return false; }
     bool ignoreForRequestCount() const
     {
-        return false
+        return type() == MainResource
 #if ENABLE(LINK_PREFETCH)
             || type() == LinkPrefetch
             || type() == LinkSubresource
@@ -206,9 +209,9 @@ public:
     String accept() const { return m_accept; }
     void setAccept(const String& accept) { m_accept = accept; }
 
-    bool wasCanceled() const { return m_status == Canceled; }
-    bool errorOccurred() const { return (m_status == LoadError || m_status == DecodeError); }
-    bool loadFailedOrCanceled() { return m_status == Canceled || m_status == LoadError; }
+    bool wasCanceled() const { return m_error.isCancellation(); }
+    bool errorOccurred() const { return m_status == LoadError || m_status == DecodeError; }
+    bool loadFailedOrCanceled() { return !m_error.isNull(); }
 
     bool shouldSendResourceLoadCallbacks() const { return m_options.sendLoadCallbacks == SendCallbacks; }
     
@@ -254,8 +257,6 @@ public:
 
 protected:
     virtual void checkNotify();
-
-    virtual void addAdditionalRequestHeaders(CachedResourceLoader*);
 
     void setEncodedSize(unsigned);
     void setDecodedSize(unsigned);
@@ -303,9 +304,12 @@ private:
     double currentAge() const;
     double freshnessLifetime() const;
 
+    void addAdditionalRequestHeaders(CachedResourceLoader*);
     void failBeforeStarting();
 
     RefPtr<CachedMetadata> m_cachedMetadata;
+
+    ResourceError m_error;
 
     double m_lastDecodedAccessTime; // Used as a "thrash guard" in the cache
     double m_loadFinishTime;

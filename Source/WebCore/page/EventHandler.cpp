@@ -418,14 +418,21 @@ bool EventHandler::updateSelectionForMouseDownDispatchingSelectStart(Node* targe
     if (!dispatchSelectStart(targetNode))
         return false;
 
-    if (newSelection.isRange())
+    VisibleSelection selection(newSelection);
+#if ENABLE(USERSELECT_ALL)
+    if (Node* rootUserSelectAll = Position::rootUserSelectAllForNode(targetNode)) {
+        selection.setBase(positionBeforeNode(rootUserSelectAll).upstream(CanCrossEditingBoundary));
+        selection.setExtent(positionAfterNode(rootUserSelectAll).downstream(CanCrossEditingBoundary));
+    }
+#endif
+    if (selection.isRange())
         m_selectionInitiationState = ExtendedSelection;
     else {
         granularity = CharacterGranularity;
         m_selectionInitiationState = PlacedCaret;
     }
 
-    m_frame->selection()->setNonDirectionalSelectionIfNeeded(newSelection, granularity);
+    m_frame->selection()->setNonDirectionalSelectionIfNeeded(selection, granularity);
 
     return true;
 }
@@ -844,7 +851,28 @@ void EventHandler::updateSelectionForMouseDrag(const HitTestResult& hitTestResul
         newSelection = VisibleSelection(targetPosition);
     }
 
+#if ENABLE(USERSELECT_ALL)
+    Node* rootUserSelectAllForMousePressNode = Position::rootUserSelectAllForNode(m_mousePressNode.get());
+    if (rootUserSelectAllForMousePressNode && rootUserSelectAllForMousePressNode == Position::rootUserSelectAllForNode(target)) {
+        newSelection.setBase(positionBeforeNode(rootUserSelectAllForMousePressNode).upstream(CanCrossEditingBoundary));
+        newSelection.setExtent(positionAfterNode(rootUserSelectAllForMousePressNode).downstream(CanCrossEditingBoundary));
+    } else {
+        // Reset base for user select all when base is inside user-select-all area and extent < base.
+        if (rootUserSelectAllForMousePressNode && comparePositions(target->renderer()->positionForPoint(hitTestResult.localPoint()), m_mousePressNode->renderer()->positionForPoint(m_dragStartPos)) < 0)
+            newSelection.setBase(positionAfterNode(rootUserSelectAllForMousePressNode).downstream(CanCrossEditingBoundary));
+        
+        Node* rootUserSelectAllForTarget = Position::rootUserSelectAllForNode(target);
+        if (rootUserSelectAllForTarget && m_mousePressNode->renderer() && comparePositions(target->renderer()->positionForPoint(hitTestResult.localPoint()), m_mousePressNode->renderer()->positionForPoint(m_dragStartPos)) < 0)
+            newSelection.setExtent(positionBeforeNode(rootUserSelectAllForTarget).upstream(CanCrossEditingBoundary));
+        else if (rootUserSelectAllForTarget && m_mousePressNode->renderer())
+            newSelection.setExtent(positionAfterNode(rootUserSelectAllForTarget).downstream(CanCrossEditingBoundary));
+        else
+            newSelection.setExtent(targetPosition);
+    }
+#else
     newSelection.setExtent(targetPosition);
+#endif
+
     if (m_frame->selection()->granularity() != CharacterGranularity)
         newSelection.expandUsingGranularity(m_frame->selection()->granularity());
 
@@ -1315,6 +1343,41 @@ static bool nodeIsNotBeingEdited(Node* node, Frame* frame)
     return frame->selection()->rootEditableElement() != node->rootEditableElement();
 }
 
+bool EventHandler::useHandCursor(Node* node, bool isOverLink, bool shiftKey)
+{
+    if (!node)
+        return false;
+
+    bool editable = node->rendererIsEditable();
+    bool editableLinkEnabled = false;
+
+    // If the link is editable, then we need to check the settings to see whether or not the link should be followed
+    if (editable) {
+        ASSERT(m_frame->settings());
+        switch (m_frame->settings()->editableLinkBehavior()) {
+        default:
+        case EditableLinkDefaultBehavior:
+        case EditableLinkAlwaysLive:
+            editableLinkEnabled = true;
+            break;
+
+        case EditableLinkNeverLive:
+            editableLinkEnabled = false;
+            break;
+
+        case EditableLinkLiveWhenNotFocused:
+            editableLinkEnabled = nodeIsNotBeingEdited(node, m_frame) || shiftKey;
+            break;
+
+        case EditableLinkOnlyLiveWithShiftKey:
+            editableLinkEnabled = shiftKey;
+            break;
+        }
+    }
+
+    return ((isOverLink || isSubmitImage(node)) && (!editable || editableLinkEnabled));
+}
+
 OptionalCursor EventHandler::selectCursor(const MouseEventWithHitTestResults& event, Scrollbar* scrollbar)
 {
     if (m_resizeLayer && m_resizeLayer->inResizeMode())
@@ -1375,34 +1438,10 @@ OptionalCursor EventHandler::selectCursor(const MouseEventWithHitTestResults& ev
     switch (style ? style->cursor() : CURSOR_AUTO) {
     case CURSOR_AUTO: {
         bool editable = (node && node->rendererIsEditable());
-        bool editableLinkEnabled = false;
 
-        // If the link is editable, then we need to check the settings to see whether or not the link should be followed
-        if (editable) {
-            ASSERT(m_frame->settings());
-            switch (m_frame->settings()->editableLinkBehavior()) {
-            default:
-            case EditableLinkDefaultBehavior:
-            case EditableLinkAlwaysLive:
-                editableLinkEnabled = true;
-                break;
-
-            case EditableLinkNeverLive:
-                editableLinkEnabled = false;
-                break;
-
-            case EditableLinkLiveWhenNotFocused:
-                editableLinkEnabled = nodeIsNotBeingEdited(node, m_frame) || event.event().shiftKey();
-                break;
-            
-            case EditableLinkOnlyLiveWithShiftKey:
-                editableLinkEnabled = event.event().shiftKey();
-                break;
-            }
-        }
-
-        if ((event.isOverLink() || isSubmitImage(node)) && (!editable || editableLinkEnabled))
+        if (useHandCursor(node, event.isOverLink(), event.event().shiftKey()))
             return handCursor();
+
         bool inResizer = false;
         if (renderer) {
             if (RenderLayer* layer = renderer->enclosingLayer()) {
@@ -2523,6 +2562,8 @@ bool EventHandler::handleGestureEvent(const PlatformGestureEvent& gestureEvent)
         return handleGestureTapDown();
     case PlatformEvent::GestureLongPress:
         return handleGestureLongPress(gestureEvent);
+    case PlatformEvent::GestureTwoFingerTap:
+        return handleGestureTwoFingerTap(gestureEvent);
     case PlatformEvent::GestureDoubleTap:
     case PlatformEvent::GesturePinchBegin:
     case PlatformEvent::GesturePinchEnd:
@@ -2572,6 +2613,11 @@ bool EventHandler::handleGestureTap(const PlatformGestureEvent& gestureEvent)
 
 bool EventHandler::handleGestureLongPress(const PlatformGestureEvent& gestureEvent)
 {
+    return handleGestureForTextSelectionOrContextMenu(gestureEvent);
+}
+
+bool EventHandler::handleGestureForTextSelectionOrContextMenu(const PlatformGestureEvent& gestureEvent)
+{
 #if OS(ANDROID)
     IntPoint hitTestPoint = m_frame->view()->windowToContents(gestureEvent.position());
     HitTestResult result = hitTestResultAtPoint(hitTestPoint, true);
@@ -2587,6 +2633,11 @@ bool EventHandler::handleGestureLongPress(const PlatformGestureEvent& gestureEve
 #else
     return false;
 #endif
+}
+
+bool EventHandler::handleGestureTwoFingerTap(const PlatformGestureEvent& gestureEvent)
+{
+    return handleGestureForTextSelectionOrContextMenu(gestureEvent);
 }
 
 bool EventHandler::handleGestureScrollUpdate(const PlatformGestureEvent& gestureEvent)
@@ -2659,6 +2710,7 @@ bool EventHandler::adjustGesturePosition(const PlatformGestureEvent& gestureEven
         bestClickableNodeForTouchPoint(gestureEvent.position(), IntSize(gestureEvent.area().width() / 2, gestureEvent.area().height() / 2), adjustedPoint, targetNode);
         break;
     case PlatformEvent::GestureLongPress:
+    case PlatformEvent::GestureTwoFingerTap:
         bestContextMenuNodeForTouchPoint(gestureEvent.position(), IntSize(gestureEvent.area().width() / 2, gestureEvent.area().height() / 2), adjustedPoint, targetNode);
         break;
     default:
@@ -2785,7 +2837,12 @@ bool EventHandler::sendContextMenuEventForGesture(const PlatformGestureEvent& ev
         adjustGesturePosition(event, adjustedPoint);
 #endif
     PlatformMouseEvent mouseEvent(adjustedPoint, event.globalPosition(), RightButton, eventType, 1, false, false, false, false, WTF::currentTime());
+    // To simulate right-click behavior, we send a right mouse down and then
+    // context menu event.
+    handleMousePressEvent(mouseEvent);
     return sendContextMenuEvent(mouseEvent);
+    // We do not need to send a corresponding mouse release because in case of
+    // right-click, the context menu takes capture and consumes all events.
 }
 #endif // ENABLE(GESTURE_EVENTS)
 #endif // ENABLE(CONTEXT_MENUS)

@@ -29,8 +29,10 @@
 #include "MediaQueryExp.h"
 #include "RenderStyle.h"
 #include "RuleFeature.h"
+#include "RuntimeEnabledFeatures.h"
 #include "SelectorChecker.h"
 #include "StyleInheritedData.h"
+#include "StyleScopeResolver.h"
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/RefPtr.h>
@@ -59,6 +61,7 @@ class CSSValue;
 class ContainerNode;
 class CustomFilterOperation;
 class CustomFilterParameter;
+class CustomFilterParameterList;
 class Document;
 class Element;
 class Frame;
@@ -80,6 +83,7 @@ class StyleKeyframe;
 class StylePendingImage;
 class StylePropertySet;
 class StyleRule;
+class StyleRuleHost;
 class StyleRuleKeyframes;
 class StyleRulePage;
 class StyleRuleRegion;
@@ -91,10 +95,6 @@ class StyledElement;
 class WebKitCSSFilterValue;
 class WebKitCSSShaderValue;
 class WebKitCSSSVGDocumentValue;
-
-#if ENABLE(CSS_SHADERS)
-typedef Vector<RefPtr<CustomFilterParameter> > CustomFilterParameterList;
-#endif
 
 class MediaQueryResult {
     WTF_MAKE_NONCOPYABLE(MediaQueryResult); WTF_MAKE_FAST_ALLOCATED;
@@ -137,6 +137,9 @@ public:
     void popParentElement(Element*);
     void pushParentShadowRoot(const ShadowRoot*);
     void popParentShadowRoot(const ShadowRoot*);
+#if ENABLE(SHADOW_DOM)
+    void addHostRule(StyleRuleHost* rule, bool hasDocumentSecurityOrigin, const ContainerNode* scope) { ensureScopeResolver()->addHostRule(rule, hasDocumentSecurityOrigin, scope); }
+#endif
 
     PassRefPtr<RenderStyle> styleForElement(Element*, RenderStyle* parentStyle = 0, StyleSharingBehavior = AllowStyleSharing,
         RuleMatchingBehavior = MatchAllRules, RenderRegion* regionForStyling = 0);
@@ -166,11 +169,30 @@ public:
     void appendAuthorStyleSheets(unsigned firstNew, const Vector<RefPtr<CSSStyleSheet> >&);
 
 private:
+#if ENABLE(STYLE_SCOPED) || ENABLE(SHADOW_DOM)
+    StyleScopeResolver* ensureScopeResolver()
+    {
+#if ENABLE(STYLE_SCOPED)
+#if ENABLE(SHADOW_DOM)
+        ASSERT(RuntimeEnabledFeatures::shadowDOMEnabled() || RuntimeEnabledFeatures::styleScopedEnabled());
+#else
+        ASSERT(RuntimeEnabledFeatures::styleScopedEnabled());
+#endif
+#else
+        ASSERT(RuntimeEnabledFeatures::shadowDOMEnabled());
+#endif
+        if (!m_scopeResolver)
+            m_scopeResolver = adoptPtr(new StyleScopeResolver());
+        return m_scopeResolver.get();
+    }
+#endif
+
     void initForStyleResolve(Element*, RenderStyle* parentStyle = 0, PseudoId = NOPSEUDO);
     void initElement(Element*);
     void collectFeatures();
     RenderStyle* locateSharedStyle();
     bool styleSharingCandidateMatchesRuleSet(RuleSet*);
+    bool styleSharingCandidateMatchesHostRules();
     Node* locateCousinList(Element* parent, unsigned& visitedNodeCount) const;
     StyledElement* findSiblingForStyleSharing(Node*, unsigned& count) const;
     bool canShareStyleWithElement(StyledElement*) const;
@@ -218,6 +240,8 @@ public:
     static bool colorFromPrimitiveValueIsDerivedFromElement(CSSPrimitiveValue*);
     Color colorFromPrimitiveValue(CSSPrimitiveValue*, bool forVisitedLink = false) const;
 
+    bool hasSelectorForId(const AtomicString&) const;
+    bool hasSelectorForClass(const AtomicString&) const;
     bool hasSelectorForAttribute(const AtomicString&) const;
 
     CSSFontSelector* fontSelector() const { return m_fontSelector.get(); }
@@ -323,6 +347,7 @@ private:
     void matchAuthorRules(MatchResult&, bool includeEmptyRules);
     void matchUserRules(MatchResult&, bool includeEmptyRules);
     void matchScopedAuthorRules(MatchResult&, bool includeEmptyRules);
+    void matchHostRules(MatchResult&, bool includeEmptyRules);
     void collectMatchingRules(RuleSet*, int& firstRuleIndex, int& lastRuleIndex, const MatchOptions&);
     void collectMatchingRulesForRegion(RuleSet*, int& firstRuleIndex, int& lastRuleIndex, const MatchOptions&);
     void collectMatchingRulesForList(const Vector<RuleData>*, int& firstRuleIndex, int& lastRuleIndex, const MatchOptions&);
@@ -330,7 +355,7 @@ private:
     void sortMatchedRules();
     void sortAndTransferMatchedRules(MatchResult&);
 
-    bool checkSelector(const RuleData&, const ContainerNode* scope = 0);
+    bool checkSelector(const RuleData&, const ContainerNode* scope);
     bool checkRegionSelector(CSSSelector* regionSelector, Element* regionElement);
     void applyMatchedProperties(const MatchResult&, const Element*);
     enum StyleApplicationPass {
@@ -396,7 +421,6 @@ public:
 private:
     static RenderStyle* s_styleNotYetAvailable;
 
-    void addStylesheetsFromSeamlessParents();
     void addAuthorRulesAndCollectUserRulesFromSheets(const Vector<RefPtr<CSSStyleSheet> >*, RuleSet& userStyle);
 
     void cacheBorderAndBackground();
@@ -465,7 +489,6 @@ private:
     bool m_matchAuthorAndUserStyles;
     bool m_sameOriginOnly;
     bool m_distributedToInsertionPoint;
-    bool m_hasUnknownPseudoElements;
 
     RefPtr<CSSFontSelector> m_fontSelector;
     Vector<OwnPtr<MediaQueryResult> > m_viewportDependentMediaQueryResults;
@@ -494,6 +517,24 @@ private:
     friend bool operator==(const MatchRanges&, const MatchRanges&);
     friend bool operator!=(const MatchRanges&, const MatchRanges&);
 };
+
+inline bool StyleResolver::hasSelectorForAttribute(const AtomicString &attributeName) const
+{
+    ASSERT(!attributeName.isEmpty());
+    return m_features.attrsInRules.contains(attributeName.impl());
+}
+
+inline bool StyleResolver::hasSelectorForClass(const AtomicString& classValue) const
+{
+    ASSERT(!classValue.isEmpty());
+    return m_features.classesInRules.contains(classValue.impl());
+}
+
+inline bool StyleResolver::hasSelectorForId(const AtomicString& idValue) const
+{
+    ASSERT(!idValue.isEmpty());
+    return m_features.idsInRules.contains(idValue.impl());
+}
 
 } // namespace WebCore
 

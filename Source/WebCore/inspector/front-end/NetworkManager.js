@@ -42,10 +42,6 @@ WebInspector.NetworkManager = function()
     NetworkAgent.enable();
 
     WebInspector.settings.cacheDisabled.addChangeListener(this._cacheDisabledSettingChanged, this);
-
-    if (WebInspector.settings.userAgent.get())
-        this._userAgentSettingChanged();
-    WebInspector.settings.userAgent.addChangeListener(this._userAgentSettingChanged, this);
 }
 
 WebInspector.NetworkManager.EventTypes = {
@@ -62,6 +58,7 @@ WebInspector.NetworkManager._MIMETypes = {
     "application/xhtml+xml":       {"document": true},
     "text/css":                    {"stylesheet": true},
     "text/xsl":                    {"stylesheet": true},
+    "image/jpg":                   {"image": true},
     "image/jpeg":                  {"image": true},
     "image/pjpeg":                 {"image": true},
     "image/png":                   {"image": true},
@@ -107,13 +104,8 @@ WebInspector.NetworkManager.prototype = {
      */
     _cacheDisabledSettingChanged: function(event)
     {
-        var enabled = /** @type {boolean} */ event.data;
+        var enabled = /** @type {boolean} */ (event.data);
         NetworkAgent.setCacheDisabled(enabled);
-    },
-
-    _userAgentSettingChanged: function()
-    {
-        NetworkAgent.setUserAgentOverride(WebInspector.settings.userAgent.get());
     },
 
     __proto__: WebInspector.Object.prototype

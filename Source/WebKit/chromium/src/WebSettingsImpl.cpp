@@ -192,6 +192,11 @@ void WebSettingsImpl::setJavaScriptCanOpenWindowsAutomatically(bool canOpenWindo
     m_settings->setJavaScriptCanOpenWindowsAutomatically(canOpenWindows);
 }
 
+void WebSettingsImpl::setSupportsMultipleWindows(bool supportsMultipleWindows)
+{
+    m_settings->setSupportsMultipleWindows(supportsMultipleWindows);
+}
+
 void WebSettingsImpl::setLoadsImagesAutomatically(bool loadsImagesAutomatically)
 {
     m_settings->setLoadsImagesAutomatically(loadsImagesAutomatically);
@@ -634,6 +639,11 @@ void WebSettingsImpl::setShouldDisplayTextDescriptions(bool enabled)
 #else
     UNUSED_PARAM(enabled);
 #endif
+}
+
+void WebSettingsImpl::setShouldRespectImageOrientation(bool enabled)
+{
+    m_settings->setShouldRespectImageOrientation(enabled);
 }
 
 void WebSettingsImpl::setAcceleratedPaintingEnabled(bool enabled)

@@ -139,7 +139,7 @@ static bool prepareCachedResourceBuffer(CachedResource* cachedResource, bool* ha
 static bool hasTextContent(CachedResource* cachedResource)
 {
     InspectorPageAgent::ResourceType type = InspectorPageAgent::cachedResourceType(*cachedResource);
-    return type == InspectorPageAgent::StylesheetResource || type == InspectorPageAgent::ScriptResource || type == InspectorPageAgent::XHRResource;
+    return type == InspectorPageAgent::DocumentResource || type == InspectorPageAgent::StylesheetResource || type == InspectorPageAgent::ScriptResource || type == InspectorPageAgent::XHRResource;
 }
 
 static PassRefPtr<TextResourceDecoder> createXHRTextDecoder(const String& mimeType, const String& textEncodingName)
@@ -308,6 +308,8 @@ InspectorPageAgent::ResourceType InspectorPageAgent::cachedResourceType(const Ca
         return InspectorPageAgent::ScriptResource;
     case CachedResource::RawResource:
         return InspectorPageAgent::XHRResource;
+    case CachedResource::MainResource:
+        return InspectorPageAgent::DocumentResource;
     default:
         break;
     }
@@ -328,7 +330,6 @@ InspectorPageAgent::InspectorPageAgent(InstrumentingAgents* instrumentingAgents,
     , m_frontend(0)
     , m_overlay(overlay)
     , m_lastScriptIdentifier(0)
-    , m_lastPaintContext(0)
     , m_didLoadEventFire(false)
     , m_geolocationOverridden(false)
 {
@@ -354,9 +355,6 @@ void InspectorPageAgent::restore()
     if (m_state->getBoolean(PageAgentState::pageAgentEnabled)) {
         ErrorString error;
         enable(&error);
-
-        if (m_inspectorAgent->didCommitLoadFired())
-            frameNavigated(m_page->mainFrame()->loader()->documentLoader());
 #if ENABLE(TOUCH_EVENTS)
         updateTouchEventEmulationInPage(m_state->getBoolean(PageAgentState::touchEventEmulationEnabled));
 #endif
@@ -876,18 +874,9 @@ void InspectorPageAgent::applyScreenHeightOverride(long* height)
         *height = heightOverride;
 }
 
-void InspectorPageAgent::willPaint(GraphicsContext* context, const LayoutRect& rect)
+void InspectorPageAgent::didPaint(GraphicsContext* context, const LayoutRect& rect)
 {
-    if (m_state->getBoolean(PageAgentState::showPaintRects)) {
-        m_lastPaintContext = context;
-        m_lastPaintRect = rect;
-        m_lastPaintRect.inflate(-1);
-    }
-}
-
-void InspectorPageAgent::didPaint()
-{
-    if (!m_lastPaintContext || !m_state->getBoolean(PageAgentState::showPaintRects))
+    if (!m_state->getBoolean(PageAgentState::showPaintRects))
         return;
 
     static int colorSelector = 0;
@@ -897,9 +886,9 @@ void InspectorPageAgent::didPaint()
         Color(0, 0, 0xFF, 0x3F),
     };
 
-    m_overlay->drawOutline(m_lastPaintContext, m_lastPaintRect, colors[colorSelector++ % WTF_ARRAY_LENGTH(colors)]);
-
-    m_lastPaintContext = 0;
+    LayoutRect inflatedRect(rect);
+    inflatedRect.inflate(-1);
+    m_overlay->drawOutline(context, inflatedRect, colors[colorSelector++ % WTF_ARRAY_LENGTH(colors)]);
 }
 
 void InspectorPageAgent::didLayout()
@@ -958,10 +947,10 @@ PassRefPtr<TypeBuilder::Page::FrameResourceTree> InspectorPageAgent::buildObject
             .setUrl(cachedResource->url())
             .setType(cachedResourceTypeJson(*cachedResource))
             .setMimeType(cachedResource->response().mimeType());
-        if (cachedResource->status() == CachedResource::LoadError)
-            resourceObject->setFailed(true);
-        if (cachedResource->status() == CachedResource::Canceled)
+        if (cachedResource->wasCanceled())
             resourceObject->setCanceled(true);
+        else if (cachedResource->status() == CachedResource::LoadError)
+            resourceObject->setFailed(true);
         subresources->addItem(resourceObject);
     }
 

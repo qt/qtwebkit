@@ -1,12 +1,13 @@
 /*      
     WebKitSystemInterface.h
-    Copyright (C) 2005, 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
+    Copyright (C) 2005, 2006, 2007, 2008, 2009, 2010, 2011, 2012 Apple Inc. All rights reserved.
 
     Public header file.
 */
 
 #import <Cocoa/Cocoa.h>
 #import <Carbon/Carbon.h>
+#import <dispatch/dispatch.h>
 
 @class AVAsset;
 @class QTMovie;
@@ -67,8 +68,6 @@ void WKDisableCGDeferredUpdates(void);
 
 Class WKNSURLProtocolClassForRequest(NSURLRequest *request);
 void WKSetNSURLRequestShouldContentSniff(NSMutableURLRequest *request, BOOL shouldContentSniff);
-
-void WKSetCookieStoragePrivateBrowsingEnabled(BOOL enabled);
 
 unsigned WKGetNSAutoreleasePoolCount(void);
 
@@ -153,12 +152,22 @@ void WKGetGlyphsForCharacters(CGFontRef, const UniChar[], CGGlyph[], size_t);
 bool WKGetVerticalGlyphsForCharacters(CTFontRef, const UniChar[], CGGlyph[], size_t);
 
 CTLineRef WKCreateCTLineWithUniCharProvider(const UniChar* (*provide)(CFIndex stringIndex, CFIndex* charCount, CFDictionaryRef* attributes, void*), void (*dispose)(const UniChar* chars, void*), void*);
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
+
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+enum {
+    WKCTFontTransformApplyShaping = (1 << 0),
+    WKCTFontTransformApplyPositioning = (1 << 1)
+};
+
+typedef int WKCTFontTransformOptions;
+
+bool WKCTFontTransformGlyphs(CTFontRef font, CGGlyph glyphs[], CGSize advances[], CFIndex count, WKCTFontTransformOptions options);
+#endif
+
 CTTypesetterRef WKCreateCTTypesetterWithUniCharProviderAndOptions(const UniChar* (*provide)(CFIndex stringIndex, CFIndex* charCount, CFDictionaryRef* attributes, void*), void (*dispose)(const UniChar* chars, void*), void*, CFDictionaryRef options);
 
 CGContextRef WKIOSurfaceContextCreate(IOSurfaceRef, unsigned width, unsigned height, CGColorSpaceRef);
 CGImageRef WKIOSurfaceContextCreateImage(CGContextRef context);
-#endif
 
 typedef enum {
     WKPatternTilingNoDistortion,
@@ -227,11 +236,7 @@ NSURL *WKQTMovieResolvedURL(QTMovie* movie);
 
 CFStringRef WKCopyFoundationCacheDirectory(void);
 
-#if MAC_OS_X_VERSION_MIN_REQUIRED == 1060
-typedef struct __CFURLStorageSession* CFURLStorageSessionRef;
-#else
 typedef const struct __CFURLStorageSession* CFURLStorageSessionRef;
-#endif
 CFURLStorageSessionRef WKCreatePrivateStorageSession(CFStringRef);
 NSURLRequest *WKCopyRequestWithStorageSession(CFURLStorageSessionRef, NSURLRequest*);
 NSCachedURLResponse *WKCachedResponseForRequest(CFURLStorageSessionRef, NSURLRequest*);
@@ -241,8 +246,10 @@ typedef struct OpaqueCFHTTPCookieStorage* CFHTTPCookieStorageRef;
 CFHTTPCookieStorageRef WKCopyHTTPCookieStorage(CFURLStorageSessionRef);
 unsigned WKGetHTTPCookieAcceptPolicy(CFHTTPCookieStorageRef);
 void WKSetHTTPCookieAcceptPolicy(CFHTTPCookieStorageRef, unsigned policy);
+NSArray *WKHTTPCookies(CFHTTPCookieStorageRef);
 NSArray *WKHTTPCookiesForURL(CFHTTPCookieStorageRef, NSURL *);
 void WKSetHTTPCookiesForURL(CFHTTPCookieStorageRef, NSArray *, NSURL *, NSURL *);
+void WKDeleteAllHTTPCookies(CFHTTPCookieStorageRef);
 void WKDeleteHTTPCookie(CFHTTPCookieStorageRef, NSHTTPCookie *);
 
 CFHTTPCookieStorageRef WKGetDefaultHTTPCookieStorage(void);
@@ -352,9 +359,7 @@ CALayer *WKCAContextGetLayer(WKCAContextRef);
 void WKCAContextSetColorSpace(WKCAContextRef, CGColorSpaceRef);
 CGColorSpaceRef WKCAContextGetColorSpace(WKCAContextRef);
 
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
 void WKCALayerEnumerateRectsBeingDrawnWithBlock(CALayer *layer, CGContextRef context, void (^block)(CGRect rect));
-#endif
 
 @class CARenderer;
 
@@ -390,17 +395,6 @@ void WKSetCONNECTProxyForStream(CFReadStreamRef, CFStringRef proxyHost, CFNumber
 void WKSetCONNECTProxyAuthorizationForStream(CFReadStreamRef, CFStringRef proxyAuthorizationString);
 CFHTTPMessageRef WKCopyCONNECTProxyResponse(CFReadStreamRef, CFURLRef responseURL);
 
-#if MAC_OS_X_VERSION_MIN_REQUIRED == 1060
-typedef enum {
-    WKEventPhaseNone = 0,
-    WKEventPhaseBegan = 1,
-    WKEventPhaseChanged = 2,
-    WKEventPhaseEnded = 3,
-} WKEventPhase;
-
-int WKGetNSEventMomentumPhase(NSEvent *);
-#endif
-
 void WKWindowSetAlpha(NSWindow *window, float alphaValue);
 void WKWindowSetScaledFrame(NSWindow *window, NSRect scaleFrame, NSRect nonScaledFrame);
 
@@ -418,10 +412,6 @@ NSURLResponse *WKNSURLResponseFromSerializableRepresentation(CFDictionaryRef rep
 ScriptCode WKGetScriptCodeFromCurrentKeyboardInputSource(void);
 #endif
 
-#if MAC_OS_X_VERSION_MIN_REQUIRED == 1060
-CFIndex WKGetHyphenationLocationBeforeIndex(CFStringRef string, CFIndex index);
-#endif
-
 CFArrayRef WKCFURLCacheCopyAllHostNamesInPersistentStore(void);
 void WKCFURLCacheDeleteHostNamesInPersistentStore(CFArrayRef hostArray);    
 
@@ -432,8 +422,6 @@ CFStringRef WKCopyCFURLResponseSuggestedFilename(CFURLResponseRef);
 void WKSetCFURLResponseMIMEType(CFURLResponseRef, CFStringRef mimeType);
 
 CIFormat WKCIGetRGBA8Format(void);
-
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
 
 typedef enum {
     WKSandboxExtensionTypeReadOnly,
@@ -471,28 +459,16 @@ NSURL* WKAVAssetResolvedURL(AVAsset*);
 
 NSCursor *WKCursor(const char *name);
 
-#endif
-
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
-
-#import <dispatch/dispatch.h>
-
 dispatch_source_t WKCreateVMPressureDispatchOnMainQueue(void);
-
-#endif
 
 #if MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
 NSString *WKGetMacOSXVersionString(void);
 bool WKExecutableWasLinkedOnOrBeforeLion(void);
 #endif
 
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
 void WKCGPathAddRoundedRect(CGMutablePathRef path, const CGAffineTransform* matrix, CGRect rect, CGFloat cornerWidth, CGFloat cornerHeight);
-#endif
 
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
 void WKCFURLRequestAllowAllPostCaching(CFURLRequestRef);
-#endif
 
 #if MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
 @class WebFilterEvaluator;
@@ -509,9 +485,55 @@ CGFloat WKNSElasticDeltaForReboundDelta(CGFloat delta);
 CGFloat WKNSReboundDeltaForElasticDelta(CGFloat delta);
 #endif
 
-#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
-Boolean WKJLIsRuntimeAndWebComponentsInstalled(void);
+typedef enum {
+    WKCaptionFontStyleDefault = 0,
+    WKCaptionFontStyleMonospacedWithSerif,
+    WKCaptionFontStyleProportionalWithSerif,
+    WKCaptionFontStyleMonospacedWithoutSerif,
+    WKCaptionFontStyleProportionalWithoutSerif,
+    WKCaptionFontStyleCasual,
+    WKCaptionFontStyleCursive,
+    WKCaptionFontStyleSmallCapital,
+    WKCaptionFontStyleMax
+} WKCaptionFontStyle;
+
+typedef enum {
+    WKCaptionTextEdgeStyleUndefined = 0,
+    WKCaptionTextEdgeStyleNone,
+    WKCaptionTextEdgeStyleRaised,
+    WKCaptionTextEdgeStyleDepressed,
+    WKCaptionTextEdgeStyleUniform,
+    WKCaptionTextEdgeStyleDropShadow,
+    WKCaptionTextEdgeStyleMax
+} WKCaptionTextEdgeStyle;
+
+bool WKCaptionAppearanceHasUserPreferences(void);
+bool WKCaptionAppearanceShowCaptionsWhenAvailable(void);
+CGColorRef WKCaptionAppearanceCopyForegroundColor(void);
+CGColorRef WKCaptionAppearanceCopyBackgroundColor(void);
+CGColorRef WKCaptionAppearanceCopyWindowColor(void);
+bool WKCaptionAppearanceGetForegroundOpacity(CGFloat*);
+bool WKCaptionAppearanceGetBackgroundOpacity(CGFloat*);
+bool WKCaptionAppearanceGetWindowOpacity(CGFloat*);
+CGFontRef WKCaptionAppearanceCopyFontForStyle(int fontStyle);
+bool WKCaptionAppearanceGetRelativeCharacterSize(CGFloat*);
+int WKCaptionAppearanceGetTextEdgeStyle(void);
+CFStringRef WKCaptionAppearanceGetSettingsChangedNotification(void);
+
+#if MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+typedef enum {
+    WKOcclusionNotificationTypeApplicationBecameVisible,
+    WKOcclusionNotificationTypeApplicationBecameOccluded
+} WKOcclusionNotificationType;
+
+typedef void (*WKOcclusionNotificationHandler)(uint32_t, void*, uint32_t, void*, uint32_t);
+
+bool WKRegisterOcclusionNotificationHandler(WKOcclusionNotificationType, WKOcclusionNotificationHandler);
+bool WKUnregisterOcclusionNotificationHandler(WKOcclusionNotificationType, WKOcclusionNotificationHandler);
 #endif
+
+bool WKIsJavaPlugInActive(void);
+void WKActivateJavaPlugIn(void);
 
 #ifdef __cplusplus
 }

@@ -30,8 +30,7 @@ include(yarr/yarr.pri)
 
 INSTALLDEPS += all
 
-CONFIG(debug, debug|release): INCLUDEPATH += $$JAVASCRIPTCORE_GENERATED_SOURCES_DIR\debug
-CONFIG(release, debug|release): INCLUDEPATH += $$JAVASCRIPTCORE_GENERATED_SOURCES_DIR\release
+debug_and_release: INCLUDEPATH += $$JAVASCRIPTCORE_GENERATED_SOURCES_DIR/$$activeBuildConfig()
 
 SOURCES += \
     API/JSBase.cpp \
@@ -60,8 +59,6 @@ SOURCES += \
     bytecode/GetByIdStatus.cpp \
     bytecode/JumpTable.cpp \
     bytecode/LazyOperandValueProfile.cpp \
-    bytecode/MethodCallLinkInfo.cpp \
-    bytecode/MethodCallLinkStatus.cpp \
     bytecode/MethodOfGettingAValueProfile.cpp \
     bytecode/Opcode.cpp \
     bytecode/PolymorphicPutByIdList.cpp \
@@ -72,6 +69,7 @@ SOURCES += \
     bytecode/SpeculatedType.cpp \
     bytecode/StructureStubClearingWatchpoint.cpp \
     bytecode/StructureStubInfo.cpp \
+    bytecode/UnlinkedCodeBlock.cpp \
     bytecode/Watchpoint.cpp \
     bytecompiler/BytecodeGenerator.cpp \
     bytecompiler/NodesCodegen.cpp \
@@ -187,6 +185,7 @@ SOURCES += \
     runtime/BooleanObject.cpp \
     runtime/BooleanPrototype.cpp \
     runtime/CallData.cpp \
+    runtime/CodeCache.cpp \
     runtime/CommonIdentifiers.cpp \
     runtime/Completion.cpp \
     runtime/ConstructData.cpp \
@@ -275,6 +274,18 @@ SOURCES += \
     tools/CodeProfile.cpp \
     tools/CodeProfiling.cpp \
     yarr/YarrJIT.cpp \
+
+linux-*:if(isEqual(QT_ARCH, "i386")|isEqual(QT_ARCH, "x86_64")) {
+    SOURCES += \
+        disassembler/UDis86Disassembler.cpp \
+        disassembler/udis86/udis86.c \
+        disassembler/udis86/udis86_decode.c \
+        disassembler/udis86/udis86_input.c \
+        disassembler/udis86/udis86_itab_holder.c \
+        disassembler/udis86/udis86_syn-att.c \
+        disassembler/udis86/udis86_syn-intel.c \
+        disassembler/udis86/udis86_syn.c \
+}
 
 HEADERS += $$files(*.h, true)
 

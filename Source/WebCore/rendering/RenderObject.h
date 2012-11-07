@@ -29,13 +29,14 @@
 #include "CachedImageClient.h"
 #include "DocumentStyleSheetCollection.h"
 #include "Element.h"
-#include "FractionalLayoutUnit.h"
 #include "FloatQuad.h"
+#include "FractionalLayoutUnit.h"
 #include "LayoutTypes.h"
 #include "PaintPhase.h"
 #include "RenderObjectChildList.h"
 #include "RenderStyle.h"
 #include "ScrollBehavior.h"
+#include "StyleInheritedData.h"
 #include "TextAffinity.h"
 #include "TransformationMatrix.h"
 #include <wtf/HashSet.h>
@@ -177,6 +178,11 @@ public:
     RenderObject* previousSibling() const { return m_previous; }
     RenderObject* nextSibling() const { return m_next; }
 
+    // FIXME: These should be renamed slowFirstChild, slowLastChild, etc.
+    // to discourage their use. The virtualChildren() call inside these
+    // can be slow for hot code paths.
+    // Currently, some subclasses like RenderBlock, override these NON-virtual
+    // functions to make these fast when we already have a more specific pointer type.
     RenderObject* firstChild() const
     {
         if (const RenderObjectChildList* children = virtualChildren())
@@ -248,6 +254,16 @@ public:
     bool hasAXObject() const { return m_hasAXObject; }
     bool isSetNeedsLayoutForbidden() const { return m_setNeedsLayoutForbidden; }
     void setNeedsLayoutIsForbidden(bool flag) { m_setNeedsLayoutForbidden = flag; }
+
+    // Helper class forbidding calls to setNeedsLayout() during its lifetime.
+    class SetLayoutNeededForbiddenScope {
+    public:
+        explicit SetLayoutNeededForbiddenScope(RenderObject*);
+        ~SetLayoutNeededForbiddenScope();
+    private:
+        RenderObject* m_renderObject;
+        bool m_preexistingForbidden;
+    };
 #endif
 
     // Obtains the nearest enclosing block (including this block) that contributes a first-line style to our inline
@@ -599,8 +615,7 @@ public:
     
     virtual void updateDragState(bool dragOn);
 
-    // Inlined into RenderView.h for performance and to avoid a cyclic dependency.
-    RenderView* view() const;
+    RenderView* view() const { return document()->renderView(); };
 
     // Returns true if this renderer is rooted, and optionally returns the hosting view (the root of the hierarchy).
     bool isRooted(RenderView** = 0) const;
@@ -702,7 +717,7 @@ public:
 
     // Updates only the local style ptr of the object.  Does not update the state of the object,
     // and so only should be called when the style is known not to have changed (or from setStyle).
-    void setStyleInternal(PassRefPtr<RenderStyle>);
+    void setStyleInternal(PassRefPtr<RenderStyle> style) { m_style = style; }
 
     // returns the containing block level element for this element.
     RenderBlock* containingBlock() const;

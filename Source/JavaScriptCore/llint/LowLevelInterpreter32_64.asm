@@ -984,7 +984,7 @@ _llint_op_init_global_const:
     writeBarrier(t2, t3)
     storei t2, TagOffset[t0]
     storei t3, PayloadOffset[t0]
-    dispatch(3)
+    dispatch(5)
 
 
 _llint_op_init_global_const_check:
@@ -1320,8 +1320,8 @@ _llint_op_put_by_val:
         storeb 1, ArrayProfile::m_mayStoreToHole[t1]
     end
     addi 1, ArrayStorage::m_numValuesInVector[t0]
-    bib t2, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t0], .opPutByValArrayStorageStoreResult
-    addi 1, t2, t1
+    bib t3, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t0], .opPutByValArrayStorageStoreResult
+    addi 1, t3, t1
     storei t1, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t0]
     jmp .opPutByValArrayStorageStoreResult
 

@@ -28,6 +28,7 @@
 
 #if ENABLE(INSPECTOR)
 
+#include "EwkViewImpl.h"
 #include "WebProcessProxy.h"
 #include "ewk_settings.h"
 #include "ewk_view.h"
@@ -86,17 +87,23 @@ WebPageProxy* WebInspectorProxy::platformCreateInspectorPage()
 {
     ASSERT(m_page);
 
+#if USE(ACCELERATED_COMPOSITING) && defined HAVE_ECORE_X
+    const char* engine = "opengl_x11";
+    m_inspectorWindow = ecore_evas_new(engine, 0, 0, initialWindowWidth, initialWindowHeight, 0);
+#else
     m_inspectorWindow = ecore_evas_new(0, 0, 0, initialWindowWidth, initialWindowHeight, 0);
+#endif
     if (!m_inspectorWindow)
         return 0;
 
     m_inspectorView = ewk_view_base_add(ecore_evas_get(m_inspectorWindow), toAPI(page()->process()->context()), toAPI(inspectorPageGroup()));
-    ewk_view_theme_set(m_inspectorView, TEST_THEME_DIR"/default.edj");
+    EwkViewImpl* inspectorViewImpl = EwkViewImpl::fromEvasObject(m_inspectorView);
+    inspectorViewImpl->setThemePath(TEST_THEME_DIR "/default.edj");
 
-    Ewk_Settings* settings = ewk_view_settings_get(m_inspectorView);
+    Ewk_Settings* settings = inspectorViewImpl->settings();
     ewk_settings_file_access_from_file_urls_allowed_set(settings, true);
 
-    return ewk_view_page_get(m_inspectorView);
+    return inspectorViewImpl->page();
 }
 
 void WebInspectorProxy::platformOpen()

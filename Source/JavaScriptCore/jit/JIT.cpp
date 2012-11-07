@@ -301,7 +301,6 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_loop_if_true)
         DEFINE_OP(op_loop_if_false)
         DEFINE_OP(op_lshift)
-        DEFINE_OP(op_method_check)
         DEFINE_OP(op_mod)
         DEFINE_OP(op_mov)
         DEFINE_OP(op_mul)
@@ -336,6 +335,8 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_put_by_index)
         DEFINE_OP(op_put_by_val)
         DEFINE_OP(op_put_getter_setter)
+        case op_init_global_const_nop:
+            NEXT_OPCODE(op_init_global_const_nop);
         DEFINE_OP(op_init_global_const)
         DEFINE_OP(op_init_global_const_check)
 
@@ -372,7 +373,7 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_tear_off_activation)
         DEFINE_OP(op_tear_off_arguments)
         DEFINE_OP(op_throw)
-        DEFINE_OP(op_throw_reference_error)
+        DEFINE_OP(op_throw_static_error)
         DEFINE_OP(op_to_jsnumber)
         DEFINE_OP(op_to_primitive)
 
@@ -489,7 +490,6 @@ void JIT::privateCompileSlowCases()
         DEFINE_SLOWCASE_OP(op_loop_if_true)
         DEFINE_SLOWCASE_OP(op_loop_if_false)
         DEFINE_SLOWCASE_OP(op_lshift)
-        DEFINE_SLOWCASE_OP(op_method_check)
         DEFINE_SLOWCASE_OP(op_mod)
         DEFINE_SLOWCASE_OP(op_mul)
         DEFINE_SLOWCASE_OP(op_negate)
@@ -569,13 +569,6 @@ ALWAYS_INLINE void PropertyStubCompilationInfo::copyToStubInfo(StructureStubInfo
     info.hotPathBegin = linkBuffer.locationOf(hotPathBegin);
 
     switch (m_type) {
-    case MethodCheck: {
-        CodeLocationDataLabelPtr structureToCompareLocation = linkBuffer.locationOf(methodCheckStructureToCompare);
-        info.patch.baseline.methodCheckProtoObj = MacroAssembler::differenceBetweenCodePtr(structureToCompareLocation, linkBuffer.locationOf(methodCheckProtoObj));
-        info.patch.baseline.methodCheckProtoStructureToCompare = MacroAssembler::differenceBetweenCodePtr(structureToCompareLocation, linkBuffer.locationOf(methodCheckProtoStructureToCompare));
-        info.patch.baseline.methodCheckPutFunction = MacroAssembler::differenceBetweenCodePtr(structureToCompareLocation, linkBuffer.locationOf(methodCheckPutFunction));
-        // No break - fall through to GetById.
-    }
     case GetById: {
         CodeLocationLabel hotPathBeginLocation = linkBuffer.locationOf(hotPathBegin);
         info.patch.baseline.u.get.structureToCompare = MacroAssembler::differenceBetweenCodePtr(hotPathBeginLocation, linkBuffer.locationOf(getStructureToCompare));
@@ -791,14 +784,6 @@ JITCode JIT::privateCompile(CodePtr* functionEntryArityCheck, JITCompilationEffo
         info.callReturnLocation = patchBuffer.locationOfNearCall(m_callStructureStubCompilationInfo[i].callReturnLocation);
         info.hotPathBegin = patchBuffer.locationOf(m_callStructureStubCompilationInfo[i].hotPathBegin);
         info.hotPathOther = patchBuffer.locationOfNearCall(m_callStructureStubCompilationInfo[i].hotPathOther);
-    }
-    unsigned methodCallCount = m_methodCallCompilationInfo.size();
-    m_codeBlock->addMethodCallLinkInfos(methodCallCount);
-    for (unsigned i = 0; i < methodCallCount; ++i) {
-        MethodCallLinkInfo& info = m_codeBlock->methodCallLinkInfo(i);
-        info.bytecodeIndex = m_methodCallCompilationInfo[i].bytecodeIndex;
-        info.cachedStructure.setLocation(patchBuffer.locationOf(m_methodCallCompilationInfo[i].structureToCompare));
-        info.callReturnLocation = m_codeBlock->structureStubInfo(m_methodCallCompilationInfo[i].propertyAccessIndex).callReturnLocation;
     }
 
 #if ENABLE(DFG_JIT) || ENABLE(LLINT)

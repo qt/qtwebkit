@@ -276,6 +276,8 @@ WebInspector.GenericSettingsTab = function()
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show folders"), WebInspector.settings.showScriptFolders));
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Search in content scripts"), WebInspector.settings.searchInContentScripts));
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Enable source maps"), WebInspector.settings.sourceMapsEnabled));
+    if (WebInspector.experimentsSettings.isEnabled("sass"))
+        p.appendChild(this._createCSSAutoReloadControls());
     p.appendChild(this._createSelectSetting(WebInspector.UIString("Indentation"), [
             [ WebInspector.UIString("2 spaces"), WebInspector.TextEditorModel.Indent.TwoSpaces ],
             [ WebInspector.UIString("4 spaces"), WebInspector.TextEditorModel.Indent.FourSpaces ],
@@ -285,6 +287,9 @@ WebInspector.GenericSettingsTab = function()
 
     p = this._appendSection(WebInspector.UIString("Profiler"));
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show objects' hidden properties"), WebInspector.settings.showHeapSnapshotObjectsHiddenProperties));
+
+    p = this._appendSection(WebInspector.UIString("Timeline"));
+    p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show CPU activity on the ruler"), WebInspector.settings.showCpuOnTimelineRuler));
 
     p = this._appendSection(WebInspector.UIString("Console"));
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Log XMLHttpRequests"), WebInspector.settings.monitoringXHREnabled));
@@ -333,6 +338,46 @@ WebInspector.GenericSettingsTab.prototype = {
         PageAgent.setScriptExecutionDisabled(WebInspector.settings.javaScriptDisabled.get(), this._updateScriptDisabledCheckbox.bind(this));
     },
 
+    _createCSSAutoReloadControls: function()
+    {
+        var fragment = document.createDocumentFragment();
+        var labelElement = fragment.createChild("label");
+        var checkboxElement = labelElement.createChild("input");
+        checkboxElement.type = "checkbox";
+        checkboxElement.checked = WebInspector.settings.cssReloadEnabled.get();
+        checkboxElement.addEventListener("click", checkboxClicked, false);
+        labelElement.appendChild(document.createTextNode(WebInspector.UIString("Auto-reload CSS upon SASS save")));
+
+        var fieldsetElement = fragment.createChild("fieldset");
+        fieldsetElement.disabled = !checkboxElement.checked;
+        var p = fieldsetElement.createChild("p");
+        p.appendChild(document.createTextNode(WebInspector.UIString("Timeout (ms)")));
+        p.appendChild(document.createTextNode(" "));
+        var timeoutInput = p.createChild("input");
+        timeoutInput.value = WebInspector.settings.cssReloadTimeout.get();
+        timeoutInput.style.width = "60px";
+        timeoutInput.maxLength = 8;
+        timeoutInput.addEventListener("blur", blurListener, false);
+        return fragment;
+
+        function checkboxClicked()
+        {
+            var reloadEnabled = checkboxElement.checked;
+            WebInspector.settings.cssReloadEnabled.set(reloadEnabled);
+            fieldsetElement.disabled = !reloadEnabled;
+        }
+
+        function blurListener()
+        {
+            var value = timeoutInput.value;
+            if (!isFinite(value) || value <= 0) {
+                timeoutInput.value = WebInspector.settings.cssReloadTimeout.get();
+                return;
+            }
+            WebInspector.settings.cssReloadTimeout.set(Number(value));
+        }
+    },
+
     __proto__: WebInspector.SettingsTab.prototype
 }
 
@@ -348,9 +393,9 @@ WebInspector.UserAgentSettingsTab = function()
     p.appendChild(this._createUserAgentControl());
     if (Capabilities.canOverrideDeviceMetrics)
         p.appendChild(this._createDeviceMetricsControl());
-    if (Capabilities.canOverrideGeolocation && WebInspector.experimentsSettings.geolocationOverride.isEnabled())
+    if (Capabilities.canOverrideGeolocation)
         p.appendChild(this._createGeolocationOverrideControl());
-    if (Capabilities.canOverrideDeviceOrientation && WebInspector.experimentsSettings.deviceOrientationOverride.isEnabled())
+    if (Capabilities.canOverrideDeviceOrientation)
         p.appendChild(this._createDeviceOrientationOverrideControl());
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Emulate touch events"), WebInspector.settings.emulateTouchEvents));
 }
@@ -364,7 +409,7 @@ WebInspector.UserAgentSettingsTab.prototype = {
         var labelElement = p.createChild("label");
         var checkboxElement = labelElement.createChild("input");
         checkboxElement.type = "checkbox";
-        checkboxElement.checked = !!userAgent;
+        checkboxElement.checked = false;
         labelElement.appendChild(document.createTextNode(WebInspector.UIString("User Agent")));
         p.appendChild(this._createUserAgentSelectRowElement(checkboxElement));
         return p;
@@ -387,6 +432,11 @@ WebInspector.UserAgentSettingsTab.prototype = {
             ["Firefox 7 \u2014 Mac", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.6; rv:7.0.1) Gecko/20100101 Firefox/7.0.1"],
             ["Firefox 4 \u2014 Windows", "Mozilla/5.0 (Windows NT 6.1; rv:2.0.1) Gecko/20100101 Firefox/4.0.1"],
             ["Firefox 4 \u2014 Mac", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.6; rv:2.0.1) Gecko/20100101 Firefox/4.0.1"],
+            ["Firefox 14 \u2014 Android Mobile", "Mozilla/5.0 (Android; Mobile; rv:14.0) Gecko/14.0 Firefox/14.0"],
+            ["Firefox 14 \u2014 Android Tablet", "Mozilla/5.0 (Android; Tablet; rv:14.0) Gecko/14.0 Firefox/14.0"],
+
+            ["Chrome \u2014 Android Mobile", "Mozilla/5.0 (Linux; Android 4.0.4; Galaxy Nexus Build/IMM76B) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.133 Mobile Safari/535.19"],
+            ["Chrome \u2014 Android Tablet", "Mozilla/5.0 (Linux; Android 4.1.2; Nexus 7 Build/JZ054K) AppleWebKit/535.19 (KHTML, like Gecko) Chrome/18.0.1025.166 Safari/535.19"],
 
             ["iPhone \u2014 iOS 5", "Mozilla/5.0 (iPhone; CPU iPhone OS 5_0 like Mac OS X) AppleWebKit/534.46 (KHTML, like Gecko) Version/5.1 Mobile/9A334 Safari/7534.48.3", "640x960x1"],
             ["iPhone \u2014 iOS 4", "Mozilla/5.0 (iPhone; U; CPU iPhone OS 4_3_2 like Mac OS X; en-us) AppleWebKit/533.17.9 (KHTML, like Gecko) Version/5.0.2 Mobile/8H7 Safari/6533.18.5", "640x960x1"],
@@ -454,8 +504,8 @@ WebInspector.UserAgentSettingsTab.prototype = {
             } else {
                 this._selectElement.disabled = true;
                 this._otherUserAgentElement.disabled = true;
-                WebInspector.settings.userAgent.set("");
             }
+            WebInspector.userAgentSupport.toggleUserAgentOverride(checkboxElement.checked);
         }
         checkboxElement.addEventListener("click", checkboxClicked.bind(this), false);
 
@@ -750,11 +800,14 @@ WebInspector.UserAgentSettingsTab.prototype = {
         var cellElement = rowElement.createChild("td");
         cellElement.appendChild(document.createTextNode(WebInspector.UIString("Geolocation Position") + ":"));
         cellElement = rowElement.createChild("td");
+        cellElement.appendChild(document.createTextNode(WebInspector.UIString("Lat = ")));
         this._latitudeElement = this._createInput(cellElement, "geolocation-override-latitude", String(geolocation.latitude), this._applyGeolocationUserInput.bind(this));
         cellElement.appendChild(document.createTextNode(" , "));
+        cellElement.appendChild(document.createTextNode(WebInspector.UIString("Lon = ")));
         this._longitudeElement = this._createInput(cellElement, "geolocation-override-longitude", String(geolocation.longitude), this._applyGeolocationUserInput.bind(this));
         rowElement = tableElement.createChild("tr");
         cellElement = rowElement.createChild("td");
+        cellElement.colSpan = 2;
         var geolocationErrorLabelElement = document.createElement("label");
         var geolocationErrorCheckboxElement = geolocationErrorLabelElement.createChild("input");
         geolocationErrorCheckboxElement.id = "geolocation-error";

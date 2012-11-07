@@ -41,6 +41,7 @@ class Icon;
 class InputType;
 class KURL;
 class ListAttributeTargetObserver;
+struct DateTimeChooserParameters;
 
 class HTMLInputElement : public HTMLTextFormControlElement, public ImageLoaderClientBase<HTMLInputElement> {
 public:
@@ -148,6 +149,7 @@ public:
     void setType(const String&);
 
     String value() const;
+    void setValue(const String&, ExceptionCode&, TextFieldEventBehavior = DispatchNoEvent);
     void setValue(const String&, TextFieldEventBehavior = DispatchNoEvent);
     void setValueForUser(const String&);
     // Checks if the specified string would be a valid value.
@@ -290,6 +292,11 @@ public:
     virtual void setRangeText(const String& replacement, ExceptionCode&) OVERRIDE;
     virtual void setRangeText(const String& replacement, unsigned start, unsigned end, const String& selectionMode, ExceptionCode&) OVERRIDE;
 
+#if ENABLE(DATE_AND_TIME_INPUT_TYPES)
+    bool setupDateTimeChooserParameters(DateTimeChooserParameters&);
+#endif
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
+
 protected:
     HTMLInputElement(const QualifiedName&, Document*, HTMLFormElement*, bool createdByParser);
     void createShadowSubtree();
@@ -368,7 +375,6 @@ private:
     bool tooLong(const String&, NeedsToCheckDirtyFlag) const;
 
     virtual bool supportsPlaceholder() const;
-    virtual bool isPlaceholderEmpty() const OVERRIDE;
     virtual void updatePlaceholderText();
     virtual bool isEmptyValue() const OVERRIDE { return innerTextValue().isEmpty(); }
     virtual bool isEmptySuggestedValue() const { return suggestedValue().isEmpty(); }

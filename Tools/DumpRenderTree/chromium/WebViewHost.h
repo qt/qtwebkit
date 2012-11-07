@@ -135,10 +135,12 @@ class WebViewHost : public WebKit::WebViewClient, public WebKit::WebFrameClient,
     virtual void clearEditCommand() OVERRIDE;
     virtual void fillSpellingSuggestionList(const WebKit::WebString& word, WebKit::WebVector<WebKit::WebString>* suggestions) OVERRIDE;
     virtual void setGamepadData(const WebKit::WebGamepads&) OVERRIDE;
-    virtual void printMessage(const std::string& message) const OVERRIDE;
+    virtual void printMessage(const std::string& message) OVERRIDE;
     virtual void postTask(WebTestRunner::WebTask*) OVERRIDE;
     virtual void postDelayedTask(WebTestRunner::WebTask*, long long ms) OVERRIDE;
     virtual WebKit::WebString registerIsolatedFileSystem(const WebKit::WebVector<WebKit::WebString>& absoluteFilenames) OVERRIDE;
+    virtual long long getCurrentTimeInMillisecond() OVERRIDE;
+    virtual WebKit::WebString getAbsoluteWebStringFromUTF8Path(const std::string& path) OVERRIDE;
 
     // NavigationHost
     virtual bool navigate(const TestNavigationEntry&, bool reload);

@@ -27,9 +27,10 @@
 #define ResourceLoadClientEfl_h
 
 #include "ewk_resource_private.h"
-#include "ewk_view_private.h"
 #include <wtf/HashMap.h>
 #include <wtf/PassOwnPtr.h>
+
+class EwkViewImpl;
 
 namespace WebKit {
 
@@ -37,13 +38,13 @@ class ResourceLoadClientEfl {
 public:
     ~ResourceLoadClientEfl();
 
-    static PassOwnPtr<ResourceLoadClientEfl> create(Evas_Object* view)
+    static PassOwnPtr<ResourceLoadClientEfl> create(EwkViewImpl* viewImpl)
     {
-        return adoptPtr(new ResourceLoadClientEfl(view));
+        return adoptPtr(new ResourceLoadClientEfl(viewImpl));
     }
 
 private:
-    explicit ResourceLoadClientEfl(Evas_Object* view);
+    explicit ResourceLoadClientEfl(EwkViewImpl*);
 
     static void didInitiateLoadForResource(WKPageRef, WKFrameRef, uint64_t resourceIdentifier, WKURLRequestRef, bool pageIsProvisionallyLoading, const void* clientInfo);
     static void didSendRequestForResource(WKPageRef, WKFrameRef, uint64_t resourceIdentifier, WKURLRequestRef, WKURLResponseRef, const void* clientInfo);
@@ -53,7 +54,7 @@ private:
 
     static void onViewProvisionalLoadStarted(void* userData, Evas_Object* view, void* clientInfo);
 
-    Evas_Object* m_view;
+    EwkViewImpl* m_viewImpl;
     HashMap< uint64_t, RefPtr<Ewk_Resource> > m_loadingResourcesMap;
 };
 

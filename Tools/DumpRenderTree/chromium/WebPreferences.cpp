@@ -85,6 +85,7 @@ void WebPreferences::reset()
     javaEnabled = false;
     javaScriptCanAccessClipboard = true;
     javaScriptCanOpenWindowsAutomatically = true;
+    supportsMultipleWindows = true;
     javaScriptEnabled = true;
     loadsImagesAutomatically = true;
     localStorageEnabled = true;
@@ -111,6 +112,7 @@ void WebPreferences::reset()
     tabsToLinks = false;
     hyperlinkAuditingEnabled = false;
     acceleratedCompositingForVideoEnabled = false;
+    acceleratedCompositingForFixedPositionEnabled = false;
     acceleratedCompositingEnabled = false;
     accelerated2dCanvasEnabled = false;
     deferred2dCanvasEnabled = false;
@@ -120,6 +122,7 @@ void WebPreferences::reset()
     mediaPlaybackRequiresUserGesture = false;
     mockScrollbarsEnabled = false;
     cssCustomFilterEnabled = false;
+    shouldRespectImageOrientation = false;
 }
 
 static void setStandardFontFamilyWrapper(WebSettings* settings, const WebKit::WebString& font, UScriptCode script)
@@ -201,6 +204,7 @@ void WebPreferences::applyTo(WebView* webView)
     settings->setJavaEnabled(javaEnabled);
     settings->setJavaScriptCanAccessClipboard(javaScriptCanAccessClipboard);
     settings->setJavaScriptCanOpenWindowsAutomatically(javaScriptCanOpenWindowsAutomatically);
+    settings->setSupportsMultipleWindows(supportsMultipleWindows);
     settings->setJavaScriptEnabled(javaScriptEnabled);
     settings->setLoadsImagesAutomatically(loadsImagesAutomatically);
     settings->setLocalStorageEnabled(localStorageEnabled);
@@ -221,6 +225,8 @@ void WebPreferences::applyTo(WebView* webView)
     settings->setCaretBrowsingEnabled(caretBrowsingEnabled);
     settings->setAcceleratedCompositingEnabled(acceleratedCompositingEnabled);
     settings->setAcceleratedCompositingForVideoEnabled(acceleratedCompositingForVideoEnabled);
+    settings->setAcceleratedCompositingForFixedPositionEnabled(acceleratedCompositingForFixedPositionEnabled);
+    settings->setFixedPositionCreatesStackingContext(acceleratedCompositingForFixedPositionEnabled);
     settings->setForceCompositingMode(forceCompositingMode);
     settings->setAccelerated2dCanvasEnabled(accelerated2dCanvasEnabled);
     settings->setDeferred2dCanvasEnabled(deferred2dCanvasEnabled);
@@ -229,6 +235,7 @@ void WebPreferences::applyTo(WebView* webView)
     settings->setMediaPlaybackRequiresUserGesture(mediaPlaybackRequiresUserGesture);
     settings->setMockScrollbarsEnabled(mockScrollbarsEnabled);
     settings->setApplyDefaultDeviceScaleFactorInCompositor(forceCompositingMode);
+    settings->setShouldRespectImageOrientation(shouldRespectImageOrientation);
 
     // Fixed values.
     settings->setTextDirectionSubmenuInclusionBehaviorNeverIncluded();

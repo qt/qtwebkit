@@ -198,6 +198,11 @@ void InspectorTimelineAgent::setIncludeMemoryDetails(ErrorString*, bool value)
     m_state->setBoolean(TimelineAgentState::includeMemoryDetails, value);
 }
 
+void InspectorTimelineAgent::canMonitorMainThread(ErrorString*, bool* result)
+{
+    *result = m_client && m_client->canMonitorMainThread();
+}
+
 void InspectorTimelineAgent::supportsFrameInstrumentation(ErrorString*, bool* result)
 {
     *result = m_client && m_client->supportsFrameInstrumentation();
@@ -269,13 +274,16 @@ void InspectorTimelineAgent::didRecalculateStyle()
     didCompleteCurrentRecord(TimelineRecordType::RecalculateStyles);
 }
 
-void InspectorTimelineAgent::willPaint(const LayoutRect& rect, Frame* frame)
+void InspectorTimelineAgent::willPaint(Frame* frame)
 {
-    pushCurrentRecord(TimelineRecordFactory::createPaintData(rect), TimelineRecordType::Paint, true, frame, true);
+    pushCurrentRecord(InspectorObject::create(), TimelineRecordType::Paint, true, frame, true);
 }
 
-void InspectorTimelineAgent::didPaint()
+void InspectorTimelineAgent::didPaint(const LayoutRect& rect)
 {
+    TimelineRecordEntry entry = m_recordStack.last();
+    ASSERT(entry.type == TimelineRecordType::Paint);
+    TimelineRecordFactory::addRectData(entry.data.get(), rect);
     didCompleteCurrentRecord(TimelineRecordType::Paint);
 }
 

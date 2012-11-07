@@ -22,6 +22,8 @@
 #ifndef PageViewportController_h
 #define PageViewportController_h
 
+#if USE(TILED_BACKING_STORE)
+
 #include <WebCore/FloatPoint.h>
 #include <WebCore/FloatRect.h>
 #include <WebCore/FloatSize.h>
@@ -37,32 +39,6 @@ namespace WebKit {
 class WebPageProxy;
 class PageViewportController;
 class PageViewportControllerClient;
-
-// When interacting with the content, either by animating or by the hand of the user,
-// it is important to ensure smooth animations of at least 60fps in order to give a
-// good user experience.
-//
-// In order to do this we need to get rid of unknown factors. These include device
-// sensors (geolocation, orientation updates etc), CSS3 animations, JavaScript
-// exectution, sub resource loads etc.
-// We do this by sending suspend and resume notifications to the web process.
-//
-// For this purpose the ViewportUpdateDeferrer guard can be used when interacting
-// with or animating the content to scope suspend / resume and defer update
-// notifications.
-//
-// If something should only be executed when the content is suspended, it is possible
-// to check for that using ASSERT(hasSuspendedContent()).
-
-class ViewportUpdateDeferrer {
-public:
-    enum SuspendContentFlag { DeferUpdate, DeferUpdateAndSuspendContent };
-    ViewportUpdateDeferrer(PageViewportController*, SuspendContentFlag = DeferUpdate);
-    ~ViewportUpdateDeferrer();
-
-private:
-    PageViewportController* const m_controller;
-};
 
 class PageViewportController {
     WTF_MAKE_NONCOPYABLE(PageViewportController);
@@ -119,7 +95,6 @@ private:
     bool m_allowsUserScaling;
     float m_minimumScaleToFit;
 
-    int m_activeDeferrerCount;
     bool m_hasSuspendedContent;
     bool m_hadUserInteraction;
 
@@ -132,12 +107,12 @@ private:
     bool m_viewportPosIsLocked;
     bool m_effectiveScaleIsLocked;
     WebCore::FloatRect m_lastFrameCoveredRect;
-
-    friend class ViewportUpdateDeferrer;
 };
 
 bool fuzzyCompare(float, float, float epsilon);
 
 } // namespace WebKit
+
+#endif
 
 #endif // PageViewportController_h

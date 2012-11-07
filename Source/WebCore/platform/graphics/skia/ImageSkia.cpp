@@ -389,9 +389,9 @@ static void paintSkBitmap(PlatformContextSkia* platformContext, const NativeImag
     }
 
     if (resampling == RESAMPLE_NONE) {
-      // FIXME: This is to not break tests (it results in the filter bitmap flag
-      // being set to true). We need to decide if we respect RESAMPLE_NONE
-      // being returned from computeResamplingMode.
+        // FIXME: This is to not break tests (it results in the filter bitmap flag
+        // being set to true). We need to decide if we respect RESAMPLE_NONE
+        // being returned from computeResamplingMode.
         resampling = RESAMPLE_LINEAR;
     }
     resampling = limitResamplingMode(platformContext, resampling);
@@ -449,6 +449,8 @@ bool FrameData::clear(bool clearMetadata)
     if (clearMetadata)
         m_haveMetadata = false;
 
+    m_orientation = DefaultImageOrientation;
+
     if (m_frame) {
         // ImageSource::createFrameAtIndex() allocated |m_frame| and passed
         // ownership to BitmapImage; we must delete it here.
@@ -470,13 +472,14 @@ void Image::drawPattern(GraphicsContext* context,
 #if PLATFORM(CHROMIUM)
     TRACE_EVENT0("skia", "Image::drawPattern");
 #endif
-    FloatRect normSrcRect = normalizeRect(floatSrcRect);
-    if (destRect.isEmpty() || normSrcRect.isEmpty())
-        return; // nothing to draw
-
     NativeImageSkia* bitmap = nativeImageForCurrentFrame();
     if (!bitmap)
         return;
+
+    FloatRect normSrcRect = normalizeRect(floatSrcRect);
+    normSrcRect.intersect(FloatRect(0, 0, bitmap->bitmap().width(), bitmap->bitmap().height()));
+    if (destRect.isEmpty() || normSrcRect.isEmpty())
+        return; // nothing to draw
 
     SkMatrix ctm = context->platformContext()->canvas()->getTotalMatrix();
     SkMatrix totalMatrix;
@@ -582,8 +585,12 @@ void BitmapImage::checkForSolidColor()
     }
 }
 
-void BitmapImage::draw(GraphicsContext* ctxt, const FloatRect& dstRect,
-                       const FloatRect& srcRect, ColorSpace colorSpace, CompositeOperator compositeOp)
+void BitmapImage::draw(GraphicsContext* ctxt, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace colorSpace, CompositeOperator compositeOp)
+{
+    draw(ctxt, dstRect, srcRect, colorSpace, compositeOp, DoNotRespectImageOrientation);
+}
+
+void BitmapImage::draw(GraphicsContext* ctxt, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace colorSpace, CompositeOperator compositeOp, RespectImageOrientationEnum shouldRespectImageOrientation)
 {
     if (!m_source.initialized())
         return;
@@ -599,9 +606,31 @@ void BitmapImage::draw(GraphicsContext* ctxt, const FloatRect& dstRect,
 
     FloatRect normDstRect = normalizeRect(dstRect);
     FloatRect normSrcRect = normalizeRect(srcRect);
+    normSrcRect.intersect(FloatRect(0, 0, bm->bitmap().width(), bm->bitmap().height()));
 
     if (normSrcRect.isEmpty() || normDstRect.isEmpty())
         return; // Nothing to draw.
+
+    ImageOrientation orientation = DefaultImageOrientation;
+    if (shouldRespectImageOrientation == RespectImageOrientation)
+        orientation = frameOrientationAtIndex(m_currentFrame);
+
+    GraphicsContextStateSaver saveContext(*ctxt, false);
+    if (orientation != DefaultImageOrientation) {
+        saveContext.save();
+
+        // ImageOrientation expects the origin to be at (0, 0)
+        ctxt->translate(normDstRect.x(), normDstRect.y());
+        normDstRect.setLocation(FloatPoint());
+
+        ctxt->concatCTM(orientation.transformFromDefault(normDstRect.size()));
+
+        if (orientation.usesWidthAsHeight()) {
+            // The destination rect will have it's width and height already reversed for the orientation of
+            // the image, as it was needed for page layout, so we need to reverse it back here.
+            normDstRect = FloatRect(normDstRect.x(), normDstRect.y(), normDstRect.height(), normDstRect.width());
+        }
+    }
 
     paintSkBitmap(ctxt->platformContext(),
         *bm,
@@ -623,6 +652,7 @@ void BitmapImageSingleFrameSkia::draw(GraphicsContext* ctxt,
 {
     FloatRect normDstRect = normalizeRect(dstRect);
     FloatRect normSrcRect = normalizeRect(srcRect);
+    normSrcRect.intersect(FloatRect(0, 0, m_nativeImage.bitmap().width(), m_nativeImage.bitmap().height()));
 
     if (normSrcRect.isEmpty() || normDstRect.isEmpty())
         return; // Nothing to draw.

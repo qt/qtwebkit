@@ -44,7 +44,9 @@
 #include "HTMLFormElement.h"
 #include "HistoryItem.h"
 #include "InspectorInstrumentation.h"
+#include "LoaderStrategy.h"
 #include "Page.h"
+#include "PlatformStrategies.h"
 #include "ResourceError.h"
 #include "ResourceHandle.h"
 #include "ResourceLoadScheduler.h"
@@ -371,8 +373,8 @@ void MainResourceLoader::didReceiveResponse(const ResourceResponse& r)
         String content = it->value;
         if (m_frame->loader()->shouldInterruptLoadForXFrameOptions(content, r.url())) {
             InspectorInstrumentation::continueAfterXFrameOptionsDenied(m_frame.get(), documentLoader(), identifier(), r);
-            DEFINE_STATIC_LOCAL(String, consoleMessage, (ASCIILiteral("Refused to display document because display forbidden by X-Frame-Options.\n")));
-            m_frame->document()->domWindow()->console()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, consoleMessage);
+            String message = "Refused to display '" + r.url().string() + "' in a frame because it set 'X-Frame-Options' to '" + content + "'.";
+            m_frame->document()->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message, r.url().string(), 0, 0, identifier());
 
             cancel();
             return;
@@ -630,8 +632,13 @@ bool MainResourceLoader::loadNow(ResourceRequest& r)
     if (shouldLoadEmptyBeforeRedirect && !shouldLoadEmpty && defersLoading())
         return true;
 
+#if USE(PLATFORM_STRATEGIES)
+    platformStrategies()->loaderStrategy()->resourceLoadScheduler()->addMainResourceLoad(this);
+#else
     resourceLoadScheduler()->addMainResourceLoad(this);
-    if (m_substituteData.isValid()) 
+#endif
+
+    if (m_substituteData.isValid())
         handleSubstituteDataLoadSoon(r);
     else if (shouldLoadEmpty || frameLoader()->client()->representationExistsForURLScheme(url.protocol()))
         handleEmptyLoad(url, !shouldLoadEmpty);

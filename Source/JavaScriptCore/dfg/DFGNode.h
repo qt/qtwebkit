@@ -59,6 +59,11 @@ struct StructureTransitionData {
     }
 };
 
+struct NewArrayBufferData {
+    unsigned startConstant;
+    unsigned numConstants;
+};
+
 // This type used in passing an immediate argument to Node constructor;
 // distinguishes an immediate value (typically an index into a CodeBlock data structure - 
 // a constant index, argument, or identifier) from a NodeIndex.
@@ -250,9 +255,9 @@ struct Node {
     
     void convertToStructureTransitionWatchpoint(Structure* structure)
     {
-        ASSERT(m_op == CheckStructure || m_op == ForwardCheckStructure);
+        ASSERT(m_op == CheckStructure || m_op == ForwardCheckStructure || m_op == ArrayifyToStructure);
         m_opInfo = bitwise_cast<uintptr_t>(structure);
-        if (m_op == CheckStructure)
+        if (m_op == CheckStructure || m_op == ArrayifyToStructure)
             m_op = StructureTransitionWatchpoint;
         else
             m_op = ForwardStructureTransitionWatchpoint;
@@ -412,16 +417,20 @@ struct Node {
         return op() == NewArrayBuffer;
     }
     
-    unsigned startConstant()
+    NewArrayBufferData* newArrayBufferData()
     {
         ASSERT(hasConstantBuffer());
-        return m_opInfo;
+        return reinterpret_cast<NewArrayBufferData*>(m_opInfo);
+    }
+    
+    unsigned startConstant()
+    {
+        return newArrayBufferData()->startConstant;
     }
     
     unsigned numConstants()
     {
-        ASSERT(hasConstantBuffer());
-        return m_opInfo2;
+        return newArrayBufferData()->numConstants;
     }
     
     bool hasRegexpIndex()
@@ -692,6 +701,7 @@ struct Node {
         switch (op()) {
         case StructureTransitionWatchpoint:
         case ForwardStructureTransitionWatchpoint:
+        case ArrayifyToStructure:
             return true;
         default:
             return false;
@@ -750,6 +760,7 @@ struct Node {
         case StringCharCodeAt:
         case CheckArray:
         case Arrayify:
+        case ArrayifyToStructure:
         case ArrayPush:
         case ArrayPop:
             return true;
@@ -758,18 +769,20 @@ struct Node {
         }
     }
     
-    Array::Mode arrayMode()
+    ArrayMode arrayMode()
     {
         ASSERT(hasArrayMode());
-        return static_cast<Array::Mode>(m_opInfo);
+        if (op() == ArrayifyToStructure)
+            return ArrayMode::fromWord(m_opInfo2);
+        return ArrayMode::fromWord(m_opInfo);
     }
     
-    bool setArrayMode(Array::Mode arrayMode)
+    bool setArrayMode(ArrayMode arrayMode)
     {
         ASSERT(hasArrayMode());
         if (this->arrayMode() == arrayMode)
             return false;
-        m_opInfo = arrayMode;
+        m_opInfo = arrayMode.asWord();
         return true;
     }
     

@@ -29,17 +29,13 @@
  */
 
 #include "config.h"
+#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
 #include "PickerIndicatorElement.h"
-
-#if ENABLE(CALENDAR_PICKER)
 
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "Event.h"
-#include "FrameView.h"
-#include "HTMLDataListElement.h"
 #include "HTMLInputElement.h"
-#include "HTMLOptionElement.h"
 #include "Page.h"
 #include "RenderDetailsMarker.h"
 
@@ -51,7 +47,6 @@ using namespace HTMLNames;
 
 inline PickerIndicatorElement::PickerIndicatorElement(Document* document)
     : HTMLDivElement(divTag, document)
-    , m_chooser(nullptr)
 {
     setShadowPseudoId("-webkit-calendar-picker-indicator");
 }
@@ -126,38 +121,9 @@ void PickerIndicatorElement::openPopup()
     Chrome* chrome = document()->page()->chrome();
     if (!chrome)
         return;
-    if (!document()->view())
-        return;
-
-    HTMLInputElement* input = hostInput();
     DateTimeChooserParameters parameters;
-    parameters.type = input->type();
-    parameters.minimum = input->minimum();
-    parameters.maximum = input->maximum();
-    parameters.required = input->required();
-
-    StepRange stepRange = input->createStepRange(RejectAny);
-    if (stepRange.hasStep()) {
-        parameters.step = stepRange.step().toDouble();
-        parameters.stepBase = stepRange.stepBase().toDouble();
-    } else {
-        parameters.step = 1.0;
-        parameters.stepBase = 0;
-    }
-
-    parameters.anchorRectInRootView = document()->view()->contentsToRootView(hostInput()->pixelSnappedBoundingBox());
-    parameters.currentValue = input->value();
-    parameters.isAnchorElementRTL = input->computedStyle()->direction() == RTL;
-    if (HTMLDataListElement* dataList = input->dataList()) {
-        RefPtr<HTMLCollection> options = dataList->options();
-        for (unsigned i = 0; HTMLOptionElement* option = toHTMLOptionElement(options->item(i)); ++i) {
-            if (!input->isValidValue(option->value()))
-                continue;
-            parameters.suggestionValues.append(input->sanitizeValue(option->value()));
-            parameters.localizedSuggestionValues.append(input->localizeValue(option->value()));
-            parameters.suggestionLabels.append(option->value() == option->label() ? String() : option->label());
-        }
-    }
+    if (!hostInput()->setupDateTimeChooserParameters(parameters))
+        return;
     m_chooser = chrome->client()->openDateTimeChooser(this, parameters);
 }
 

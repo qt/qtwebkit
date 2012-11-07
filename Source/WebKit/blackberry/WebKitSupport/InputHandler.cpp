@@ -140,6 +140,7 @@ InputHandler::InputHandler(WebPagePrivate* page)
     , m_request(0)
     , m_processingTransactionId(-1)
     , m_focusZoomScale(0.0)
+    , m_receivedBackspaceKeyDown(false)
 {
 }
 
@@ -961,7 +962,7 @@ PassRefPtr<Range> InputHandler::getRangeForSpellCheckWithFineGranularity(Visible
 
 bool InputHandler::openDatePopup(HTMLInputElement* element, BlackBerryInputType type)
 {
-    if (!element || element->disabled() || !DOMSupport::isDateTimeInputField(element))
+    if (!element || element->disabled() || element->readOnly() || !DOMSupport::isDateTimeInputField(element))
         return false;
 
     if (isActiveTextEdit())
@@ -990,7 +991,7 @@ bool InputHandler::openDatePopup(HTMLInputElement* element, BlackBerryInputType 
 
 bool InputHandler::openColorPopup(HTMLInputElement* element)
 {
-    if (!element || element->disabled() || !DOMSupport::isColorInputField(element))
+    if (!element || element->disabled() || element->readOnly() || !DOMSupport::isColorInputField(element))
         return false;
 
     if (isActiveTextEdit())
@@ -1018,10 +1019,7 @@ void InputHandler::setInputValue(const WTF::String& value)
 
 void InputHandler::nodeTextChanged(const Node* node)
 {
-    if (processingChange() || !node)
-        return;
-
-    if (node != m_currentFocusElement)
+    if (processingChange() || !node || node != m_currentFocusElement || m_receivedBackspaceKeyDown)
         return;
 
     InputLog(LogLevelInfo, "InputHandler::nodeTextChanged");
@@ -1040,6 +1038,11 @@ WebCore::IntRect InputHandler::boundingBoxForInputField()
 
     if (!m_currentFocusElement->renderer())
         return WebCore::IntRect();
+
+    // type="search" can have a 'X', so take the inner block bounding box to not include it.
+    if (HTMLInputElement* element = m_currentFocusElement->toInputElement())
+        if (element->isSearchField())
+            return element->innerBlockElement()->renderer()->absoluteBoundingBoxRect();
 
     return m_currentFocusElement->renderer()->absoluteBoundingBoxRect();
 }
@@ -1382,6 +1385,9 @@ void InputHandler::selectionChanged()
 
     ASSERT(m_currentFocusElement->document() && m_currentFocusElement->document()->frame());
 
+    if (m_receivedBackspaceKeyDown)
+        return;
+
     int newSelectionStart = selectionStart();
     int newSelectionEnd = selectionEnd();
 
@@ -1450,6 +1456,9 @@ bool InputHandler::handleKeyboardInput(const Platform::KeyboardEvent& keyboardEv
 {
     InputLog(LogLevelInfo, "InputHandler::handleKeyboardInput received character=%lc, type=%d", keyboardEvent.character(), keyboardEvent.type());
 
+    // Clearing the m_receivedBackspaceKeyDown state on any KeyboardEvent.
+    m_receivedBackspaceKeyDown = false;
+
     // Enable input mode if we are processing a key event.
     setInputModeEnabled();
 
@@ -1475,8 +1484,14 @@ bool InputHandler::handleKeyboardInput(const Platform::KeyboardEvent& keyboardEv
         if (isKeyChar)
             type = Platform::KeyboardEvent::KeyDown;
 
+        // If we receive the KeyDown of a Backspace, set this flag to prevent sending unnecessary selection and caret changes to IMF.
+        if (keyboardEvent.character() == KEYCODE_BACKSPACE && type == Platform::KeyboardEvent::KeyDown)
+            m_receivedBackspaceKeyDown = true;
+
         Platform::KeyboardEvent adjustedKeyboardEvent(keyboardEvent.character(), type, adjustedModifiers);
         keyboardEventHandled = focusedFrame->eventHandler()->keyEvent(PlatformKeyboardEvent(adjustedKeyboardEvent));
+
+        m_receivedBackspaceKeyDown = false;
 
         if (isKeyChar) {
             type = Platform::KeyboardEvent::KeyUp;

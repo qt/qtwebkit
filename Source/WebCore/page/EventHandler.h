@@ -168,6 +168,7 @@ public:
     bool handleGestureEvent(const PlatformGestureEvent&);
     bool handleGestureTap(const PlatformGestureEvent&);
     bool handleGestureLongPress(const PlatformGestureEvent&);
+    bool handleGestureTwoFingerTap(const PlatformGestureEvent&);
     bool handleGestureScrollUpdate(const PlatformGestureEvent&);
 #endif
 
@@ -232,6 +233,8 @@ public:
 #if ENABLE(TOUCH_EVENTS)
     bool handleTouchEvent(const PlatformTouchEvent&);
 #endif
+
+    bool useHandCursor(Node*, bool isOverLink, bool shiftKey);
 
 private:
 #if ENABLE(DRAG_SUPPORT)
@@ -364,6 +367,7 @@ private:
 #if ENABLE(GESTURE_EVENTS)
     bool handleGestureScrollCore(const PlatformGestureEvent&, PlatformWheelEventGranularity, bool latchedWheel);
     bool handleGestureTapDown();
+    bool handleGestureForTextSelectionOrContextMenu(const PlatformGestureEvent&);
 #endif
 
     Frame* m_frame;

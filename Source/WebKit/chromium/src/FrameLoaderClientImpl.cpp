@@ -62,6 +62,9 @@
 #endif
 #include "Settings.h"
 #include "SocketStreamHandleInternal.h"
+#if ENABLE(REQUEST_AUTOCOMPLETE)
+#include "WebAutofillClient.h"
+#endif
 #include "WebDOMEvent.h"
 #include "WebDataSourceImpl.h"
 #include "WebDevToolsAgentPrivate.h"
@@ -893,6 +896,9 @@ Frame* FrameLoaderClientImpl::dispatchCreatePage(const NavigationAction& action)
     ChromeClientImpl* chromeClient = static_cast<ChromeClientImpl*>(m_webFrame->frame()->page()->chrome()->client());
     chromeClient->setNewWindowNavigationPolicy(policy);
 
+    if (m_webFrame->frame()->settings() && !m_webFrame->frame()->settings()->supportsMultipleWindows())
+        return m_webFrame->frame();
+
     struct WindowFeatures features;
     Page* newPage = m_webFrame->frame()->page()->chrome()->createWindow(
         m_webFrame->frame(), FrameLoadRequest(m_webFrame->frame()->document()->securityOrigin()),
@@ -1648,5 +1654,12 @@ void FrameLoaderClientImpl::dispatchWillStartUsingPeerConnectionHandler(RTCPeerC
 }
 #endif
 
+#if ENABLE(REQUEST_AUTOCOMPLETE)
+void FrameLoaderClientImpl::didRequestAutocomplete(PassRefPtr<FormState> formState)
+{
+    if (m_webFrame->viewImpl() && m_webFrame->viewImpl()->autofillClient())
+        m_webFrame->viewImpl()->autofillClient()->didRequestAutocomplete(m_webFrame, WebFormElement(formState->form()));
+}
+#endif
 
 } // namespace WebKit

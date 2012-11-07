@@ -102,7 +102,9 @@ public:
     bool shouldProcessWorkQueue() const;
     void processWorkQueue();
     void queueBackNavigation(unsigned howFarBackward);
+    void queueForwardNavigation(unsigned howFarForward);
     void queueLoad(WKStringRef url, WKStringRef target);
+    void queueLoadHTMLString(WKStringRef content, WKStringRef baseURL = 0, WKStringRef unreachableURL = 0);
     void queueReload();
     void queueLoadingScript(WKStringRef script);
     void queueNonLoadingScript(WKStringRef script);

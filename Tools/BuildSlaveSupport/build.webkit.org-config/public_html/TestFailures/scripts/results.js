@@ -27,7 +27,6 @@ var results = results || {};
 
 (function() {
 
-var kLayoutTestResultsPath = '/results/layout-test-results/';
 var kResultsName = 'full_results.json';
 
 var kBuildLinkRegexp = /a href="\d+\/"/g;
@@ -188,7 +187,9 @@ results.directoryForBuilder = function(builderName)
 
 function resultsDirectoryURL(platform, builderName)
 {
-    return layoutTestResultsURL(platform) + '/' + results.directoryForBuilder(builderName) + kLayoutTestResultsPath;
+    if (config.useLocalResults)
+        return config.kLocalServerURL + '/localresult?path=';
+    return resultsDirectoryListingURL(platform, builderName) + 'results/layout-test-results/';
 }
 
 function resultsDirectoryListingURL(platform, builderName)
@@ -626,6 +627,11 @@ results.fetchResultsForMostRecentCompletedBuildOnBuilder = function(builderName,
         var resultsCallback = function(buildResults) {
             if ($.isEmptyObject(buildResults)) {
                 ++currentIndex;
+                if (currentIndex >= buildLocations.length) {
+                    callback(null);
+                    return;
+                }
+
                 net.jsonp(buildLocations[currentIndex].url, resultsCallback);
                 return;
             }
@@ -658,7 +664,8 @@ results.fetchResultsByBuilder = function(builderNameList, callback)
                     // FIXME: use RequestTracker
                     ++requestsInFlight;
                     results.fetchResultsForMostRecentCompletedBuildOnBuilder(builderName, function(resultsTree) {
-                        resultsByBuilder[builderName] = resultsTree;
+                        if (resultsTree)
+                            resultsByBuilder[builderName] = resultsTree;
                         --requestsInFlight;
                         if (!requestsInFlight)
                             callback(resultsByBuilder);

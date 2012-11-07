@@ -132,20 +132,6 @@ void ElementShadow::detach()
     }
 }
 
-InsertionPoint* ElementShadow::insertionPointFor(const Node* node) const
-{
-    ASSERT(node && node->parentNode());
-
-    if (node->parentNode()->isShadowRoot()) {
-        if (InsertionPoint* insertionPoint = toShadowRoot(node->parentNode())->assignedTo())
-            return insertionPoint;
-
-        return 0;
-    }
-
-    return distributor().findInsertionPointFor(node);
-}
-
 bool ElementShadow::childNeedsStyleRecalc()
 {
     ASSERT(youngestShadowRoot());
@@ -215,6 +201,18 @@ void ElementShadow::invalidateDistribution(Element* host)
 
     if (needsInvalidation)
         m_distributor.finishInivalidation();
+}
+
+void ElementShadow::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
+    info.addMember(m_shadowRoots);
+    ShadowRoot* shadowRoot = m_shadowRoots.head();
+    while (shadowRoot) {
+        info.addMember(shadowRoot);
+        shadowRoot = shadowRoot->next();
+    }
+    info.addMember(m_distributor);
 }
 
 } // namespace
