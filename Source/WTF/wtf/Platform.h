@@ -892,7 +892,7 @@
 
 /* The JIT is enabled by default on all x86, x86-64, ARM & MIPS platforms. */
 #if !defined(ENABLE_JIT) \
-    && (CPU(X86) || CPU(X86_64) || CPU(ARM) || CPU(MIPS)) \
+    && (CPU(X86) || CPU(X86_64)) \
     && (OS(DARWIN) || !COMPILER(GCC) || GCC_VERSION_AT_LEAST(4, 1, 0)) \
     && !OS(WINCE) \
     && !OS(QNX)
