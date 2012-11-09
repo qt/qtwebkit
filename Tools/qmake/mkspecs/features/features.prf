@@ -121,7 +121,7 @@ defineTest(detectFeatures) {
     }
 
     # Gamepad API Support
-    packagesExist(libudev): WEBKIT_CONFIG += gamepad
+    !contains(QT_CONFIG, no-pkg-config):packagesExist(libudev): WEBKIT_CONFIG += gamepad
 
     # Support for Graphics Surface
     # GraphicsSurface requires GraphicsContext3D and hence use_3d_graphics
