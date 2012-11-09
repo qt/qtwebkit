@@ -26,7 +26,7 @@
 #include "config.h"
 #include "RegExpMatchesArray.h"
 
-#include "ButterflyInlines.h"
+#include "ButterflyInlineMethods.h"
 
 namespace JSC {
 

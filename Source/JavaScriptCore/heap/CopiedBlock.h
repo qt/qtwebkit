@@ -29,7 +29,7 @@
 #include "BlockAllocator.h"
 #include "HeapBlock.h"
 #include "JSValue.h"
-#include "JSValueInlines.h"
+#include "JSValueInlineMethods.h"
 #include "Options.h"
 #include <wtf/Atomics.h>
 

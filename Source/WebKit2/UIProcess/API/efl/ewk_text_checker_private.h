@@ -39,7 +39,6 @@ void initialize();
 Vector<String> availableSpellCheckingLanguages();
 void updateSpellCheckingLanguages(const Vector<String>& languages);
 Vector<String> loadedSpellCheckingLanguages();
-bool hasDictionary();
 
 }
 

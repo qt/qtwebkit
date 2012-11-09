@@ -21,8 +21,8 @@
 #include "config.h"
 #include "RegExpObject.h"
 
-#include "ButterflyInlines.h"
-#include "CopiedSpaceInlines.h"
+#include "ButterflyInlineMethods.h"
+#include "CopiedSpaceInlineMethods.h"
 #include "Error.h"
 #include "ExceptionHelpers.h"
 #include "JSArray.h"

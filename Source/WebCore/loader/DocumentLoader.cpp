@@ -714,7 +714,6 @@ void DocumentLoader::addResponse(const ResourceResponse& r)
 void DocumentLoader::stopRecordingResponses()
 {
     m_stopRecordingResponses = true;
-    m_responses.shrinkToFit();
 }
 
 void DocumentLoader::setTitle(const StringWithDirection& title)

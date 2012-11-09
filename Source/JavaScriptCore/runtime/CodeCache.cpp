@@ -36,6 +36,7 @@
 namespace JSC {
 
 CodeCache::CodeCache()
+    : m_randomGenerator(static_cast<uint32_t>(randomNumber() * UINT32_MAX))
 {
 }
 
@@ -66,9 +67,9 @@ UnlinkedCodeBlockType* CodeCache::getCodeBlock(JSGlobalData& globalData, Executa
     CodeBlockKey key = makeCodeBlockKey(source, CacheTypes<UnlinkedCodeBlockType>::codeType, strictness);
     bool storeInCache = false;
     if (debuggerMode == DebuggerOff && profilerMode == ProfilerOff) {
-        const Strong<UnlinkedCodeBlock>* result = m_cachedCodeBlocks.find(key);
-        if (result) {
-            UnlinkedCodeBlockType* unlinkedCode = jsCast<UnlinkedCodeBlockType*>(result->get());
+        CodeBlockIndicesMap::iterator result = m_cachedCodeBlockIndices.find(key);
+        if (result != m_cachedCodeBlockIndices.end()) {
+            UnlinkedCodeBlockType* unlinkedCode = jsCast<UnlinkedCodeBlockType*>(m_cachedCodeBlocks[result->value].second.get());
             unsigned firstLine = source.firstLine() + unlinkedCode->firstLine();
             executable->recordParse(unlinkedCode->codeFeatures(), unlinkedCode->hasCapturedVariables(), firstLine, firstLine + unlinkedCode->lineCount());
             return unlinkedCode;
@@ -90,8 +91,14 @@ UnlinkedCodeBlockType* CodeCache::getCodeBlock(JSGlobalData& globalData, Executa
     if (error.m_type != ParserError::ErrorNone)
         return 0;
 
-    if (storeInCache)
-        m_cachedCodeBlocks.add(key, Strong<UnlinkedCodeBlock>(globalData, unlinkedCode));
+    if (storeInCache) {
+        size_t index = m_randomGenerator.getUint32() % kMaxCodeBlockEntries;
+        if (m_cachedCodeBlocks[index].second)
+            m_cachedCodeBlockIndices.remove(m_cachedCodeBlocks[index].first);
+        m_cachedCodeBlockIndices.set(key, index);
+        m_cachedCodeBlocks[index].second.set(globalData, unlinkedCode);
+        m_cachedCodeBlocks[index].first = key;
+    }
 
     return unlinkedCode;
 }
@@ -126,7 +133,6 @@ UnlinkedFunctionCodeBlock* CodeCache::generateFunctionCodeBlock(JSGlobalData& gl
     body->destroyData();
     if (error.m_type != ParserError::ErrorNone)
         return 0;
-    m_cachedFunctionCode.add(result, Strong<UnlinkedFunctionCodeBlock>(globalData, result));
     return result;
 }
 
@@ -143,9 +149,9 @@ CodeCache::GlobalFunctionKey CodeCache::makeGlobalFunctionKey(const SourceCode& 
 UnlinkedFunctionExecutable* CodeCache::getFunctionExecutableFromGlobalCode(JSGlobalData& globalData, const Identifier& name, const SourceCode& source, ParserError& error)
 {
     GlobalFunctionKey key = makeGlobalFunctionKey(source, name.string());
-    const Strong<UnlinkedFunctionExecutable>* result = m_cachedGlobalFunctions.find(key);
-    if (result)
-        return result->get();
+    GlobalFunctionIndicesMap::iterator result = m_cachedGlobalFunctionIndices.find(key);
+    if (result != m_cachedGlobalFunctionIndices.end())
+        return m_cachedGlobalFunctions[result->value].second.get();
 
     RefPtr<ProgramNode> program = parse<ProgramNode>(&globalData, source, 0, Identifier(), JSParseNormal, JSParseProgramCode, error);
     if (!program) {
@@ -167,13 +173,14 @@ UnlinkedFunctionExecutable* CodeCache::getFunctionExecutableFromGlobalCode(JSGlo
     UnlinkedFunctionExecutable* functionExecutable = UnlinkedFunctionExecutable::create(&globalData, source, body);
     functionExecutable->m_nameValue.set(globalData, functionExecutable, jsString(&globalData, name.string()));
 
-    m_cachedGlobalFunctions.add(key, Strong<UnlinkedFunctionExecutable>(globalData, functionExecutable));
-    return functionExecutable;
-}
+    size_t index = m_randomGenerator.getUint32() % kMaxGlobalFunctionEntries;
+    if (m_cachedGlobalFunctions[index].second)
+        m_cachedGlobalFunctionIndices.remove(m_cachedGlobalFunctions[index].first);
+    m_cachedGlobalFunctionIndices.set(key, index);
+    m_cachedGlobalFunctions[index].second.set(globalData, functionExecutable);
+    m_cachedGlobalFunctions[index].first = key;
 
-void CodeCache::usedFunctionCode(JSGlobalData& globalData, UnlinkedFunctionCodeBlock* codeBlock)
-{
-    m_cachedFunctionCode.add(codeBlock, Strong<UnlinkedFunctionCodeBlock>(globalData, codeBlock));
+    return functionExecutable;
 }
 
 }

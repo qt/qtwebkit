@@ -67,13 +67,13 @@ PassRefPtr<SVGFEDiffuseLightingElement> SVGFEDiffuseLightingElement::create(cons
 
 const AtomicString& SVGFEDiffuseLightingElement::kernelUnitLengthXIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGKernelUnitLengthX", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGKernelUnitLengthX"));
     return s_identifier;
 }
 
 const AtomicString& SVGFEDiffuseLightingElement::kernelUnitLengthYIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGKernelUnitLengthY", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGKernelUnitLengthY"));
     return s_identifier;
 }
 

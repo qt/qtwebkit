@@ -70,7 +70,7 @@ RenderObject* ImageInnerElement::createRenderer(RenderArena* arena, RenderStyle*
 
 const AtomicString& ImageInnerElement::shadowPseudoId() const
 {
-    DEFINE_STATIC_LOCAL(AtomicString, pseudoId, ("-webkit-image-inner-element", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, pseudoId, ("-webkit-image-inner-element"));
     return pseudoId;
 }
 

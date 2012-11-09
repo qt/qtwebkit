@@ -40,7 +40,6 @@ SET(JavaScriptCore_SOURCES
     assembler/MacroAssembler.cpp
     assembler/LinkBuffer.cpp
 
-    bytecode/ArrayAllocationProfile.cpp
     bytecode/ArrayProfile.cpp
     bytecode/CallLinkInfo.cpp
     bytecode/CallLinkStatus.cpp

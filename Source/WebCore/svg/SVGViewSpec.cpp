@@ -87,19 +87,19 @@ SVGViewSpec::SVGViewSpec(SVGElement* contextElement)
 
 const AtomicString& SVGViewSpec::viewBoxIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGViewSpecViewBoxAttribute", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGViewSpecViewBoxAttribute"));
     return s_identifier;
 }
 
 const AtomicString& SVGViewSpec::preserveAspectRatioIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGViewSpecPreserveAspectRatioAttribute", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGViewSpecPreserveAspectRatioAttribute"));
     return s_identifier;
 }
 
 const AtomicString& SVGViewSpec::transformIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGViewSpecTransformAttribute", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGViewSpecTransformAttribute"));
     return s_identifier;
 }
 

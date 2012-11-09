@@ -71,13 +71,13 @@ PassRefPtr<SVGFESpecularLightingElement> SVGFESpecularLightingElement::create(co
 
 const AtomicString& SVGFESpecularLightingElement::kernelUnitLengthXIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGKernelUnitLengthX", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGKernelUnitLengthX"));
     return s_identifier;
 }
 
 const AtomicString& SVGFESpecularLightingElement::kernelUnitLengthYIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGKernelUnitLengthY", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGKernelUnitLengthY"));
     return s_identifier;
 }
 

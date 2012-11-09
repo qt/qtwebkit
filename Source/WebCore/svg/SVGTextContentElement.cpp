@@ -241,7 +241,7 @@ void SVGTextContentElement::collectStyleForAttribute(const Attribute& attribute,
     if (!isSupportedAttribute(attribute.name()))
         SVGStyledElement::collectStyleForAttribute(attribute, style);
     else if (attribute.name().matches(XMLNames::spaceAttr)) {
-        DEFINE_STATIC_LOCAL(const AtomicString, preserveString, ("preserve", AtomicString::ConstructFromLiteral));
+        DEFINE_STATIC_LOCAL(const AtomicString, preserveString, ("preserve"));
 
         if (attribute.value() == preserveString)
             addPropertyToAttributeStyle(style, CSSPropertyWhiteSpace, CSSValuePre);

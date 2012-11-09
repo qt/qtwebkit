@@ -59,6 +59,7 @@ public:
     TextTrackCue* getCue() const;
     void applyCSSProperties();
 
+    virtual const AtomicString& shadowPseudoId() const OVERRIDE;
     static const AtomicString& textTrackCueBoxShadowPseudoId();
 
 private:

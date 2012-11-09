@@ -24,8 +24,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef CharacterReferenceParserInlines_h
-#define CharacterReferenceParserInlines_h
+#ifndef CharacterReferenceParserInlineMethods_h
+#define CharacterReferenceParserInlineMethods_h
 
 #include <wtf/text/StringBuilder.h>
 
@@ -170,4 +170,4 @@ bool consumeCharacterReference(SegmentedString& source, StringBuilder& decodedCh
 
 }
 
-#endif // CharacterReferenceParserInlines_h
+#endif // CharacterReferenceParserInlineMethods_h

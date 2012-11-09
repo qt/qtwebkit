@@ -49,7 +49,7 @@ DOMWindowIndexedDatabase::~DOMWindowIndexedDatabase()
 
 DOMWindowIndexedDatabase* DOMWindowIndexedDatabase::from(DOMWindow* window)
 {
-    DEFINE_STATIC_LOCAL(AtomicString, name, ("DOMWindowIndexedDatabase", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, name, ("DOMWindowIndexedDatabase"));
     DOMWindowIndexedDatabase* supplement = static_cast<DOMWindowIndexedDatabase*>(Supplement<DOMWindow>::from(window, name));
     if (!supplement) {
         supplement = new DOMWindowIndexedDatabase(window);

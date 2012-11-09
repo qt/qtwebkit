@@ -27,12 +27,12 @@
 #include "GCThreadSharedData.h"
 
 #include "CopyVisitor.h"
-#include "CopyVisitorInlines.h"
+#include "CopyVisitorInlineMethods.h"
 #include "GCThread.h"
 #include "JSGlobalData.h"
 #include "MarkStack.h"
 #include "SlotVisitor.h"
-#include "SlotVisitorInlines.h"
+#include "SlotVisitorInlineMethods.h"
 
 namespace JSC {
 

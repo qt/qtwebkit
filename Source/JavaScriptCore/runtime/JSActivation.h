@@ -30,7 +30,7 @@
 #define JSActivation_h
 
 #include "CodeBlock.h"
-#include "CopiedSpaceInlines.h"
+#include "CopiedSpaceInlineMethods.h"
 #include "JSVariableObject.h"
 #include "Nodes.h"
 #include "SymbolTable.h"

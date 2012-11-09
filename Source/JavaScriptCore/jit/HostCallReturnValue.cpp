@@ -29,7 +29,7 @@
 #include "CallFrame.h"
 #include <wtf/InlineASM.h>
 #include "JSObject.h"
-#include "JSValueInlines.h"
+#include "JSValueInlineMethods.h"
 
 
 namespace JSC {

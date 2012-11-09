@@ -656,7 +656,7 @@ void MediaControlRootElement::updateTextTrackDisplay()
 
 const AtomicString& MediaControlRootElement::shadowPseudoId() const
 {
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls"));
     return id;
 }
 

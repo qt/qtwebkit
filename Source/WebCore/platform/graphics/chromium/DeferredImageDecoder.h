@@ -67,7 +67,6 @@ private:
 
     String m_filenameExtension;
     IntSize m_size;
-    ImageOrientation m_orientation;
 
     ImageFrame m_lazyDecodedFrame;
 };

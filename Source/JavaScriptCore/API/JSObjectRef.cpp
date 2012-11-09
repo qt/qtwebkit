@@ -29,9 +29,9 @@
 #include "JSObjectRefPrivate.h"
 
 #include "APICast.h"
-#include "ButterflyInlines.h"
+#include "ButterflyInlineMethods.h"
 #include "CodeBlock.h"
-#include "CopiedSpaceInlines.h"
+#include "CopiedSpaceInlineMethods.h"
 #include "DateConstructor.h"
 #include "ErrorConstructor.h"
 #include "FunctionConstructor.h"
@@ -144,9 +144,9 @@ JSObjectRef JSObjectMakeArray(JSContextRef ctx, size_t argumentCount, const JSVa
         for (size_t i = 0; i < argumentCount; ++i)
             argList.append(toJS(exec, arguments[i]));
 
-        result = constructArray(exec, static_cast<ArrayAllocationProfile*>(0), argList);
+        result = constructArray(exec, argList);
     } else
-        result = constructEmptyArray(exec, 0);
+        result = constructEmptyArray(exec);
 
     if (exec->hadException()) {
         if (exception)

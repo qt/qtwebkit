@@ -538,7 +538,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\runtime\ButterflyInlines.h"
+				RelativePath="..\..\runtime\ButterflyInlineMethods.h"
 				>
 			</File>
 			<File
@@ -546,7 +546,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\runtime\IndexingHeaderInlines.h"
+				RelativePath="..\..\runtime\IndexingHeaderInlineMethods.h"
 				>
 			</File>
 			<File
@@ -1010,7 +1010,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\runtime\JSValueInlines.h"
+				RelativePath="..\..\runtime\JSValueInlineMethods.h"
 				>
 			</File>
 			<File
@@ -1582,14 +1582,6 @@
 			Name="bytecode"
 			>
 			<File
-				RelativePath="..\..\bytecode\ArrayAllocationProfile.cpp"
-				>
-			</File>
-			<File
-				RelativePath="..\..\bytecode\ArrayAllocationProfile.h"
-				>
-			</File>
-			<File
 				RelativePath="..\..\bytecode\ArrayProfile.cpp"
 				>
 			</File>
@@ -1986,7 +1978,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\jit\JITInlines.h"
+				RelativePath="..\..\jit\JITInlineMethods.h"
 				>
 			</File>
 			<File
@@ -2362,7 +2354,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\heap\CopiedSpaceInlines.h"
+				RelativePath="..\..\heap\CopiedSpaceInlineMethods.h"
 				>
 			</File>
 			<File
@@ -2374,7 +2366,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\heap\CopyVisitorInlines.h"
+				RelativePath="..\..\heap\CopyVisitorInlineMethods.h"
 				>
 			</File>
 			<File
@@ -2562,7 +2554,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\heap\MarkStackInlines.h"
+				RelativePath="..\..\heap\MarkStackInlineMethods.h"
 				>
 			</File>
 			<File

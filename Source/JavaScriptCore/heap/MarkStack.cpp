@@ -25,18 +25,18 @@
 
 #include "config.h"
 #include "MarkStack.h"
-#include "MarkStackInlines.h"
+#include "MarkStackInlineMethods.h"
 
-#include "ConservativeRoots.h"
 #include "CopiedSpace.h"
-#include "CopiedSpaceInlines.h"
+#include "CopiedSpaceInlineMethods.h"
+#include "ConservativeRoots.h"
 #include "Heap.h"
 #include "Options.h"
 #include "JSArray.h"
 #include "JSCell.h"
 #include "JSObject.h"
 
-#include "SlotVisitorInlines.h"
+#include "SlotVisitorInlineMethods.h"
 #include "Structure.h"
 #include "WriteBarrier.h"
 #include <wtf/Atomics.h>

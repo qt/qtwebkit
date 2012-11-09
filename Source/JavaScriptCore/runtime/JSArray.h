@@ -22,7 +22,7 @@
 #define JSArray_h
 
 #include "ArrayConventions.h"
-#include "ButterflyInlines.h"
+#include "ButterflyInlineMethods.h"
 #include "JSObject.h"
 
 namespace JSC {
@@ -162,7 +162,7 @@ private:
     void sortNumericVector(ExecState*, JSValue compareFunction, CallType, const CallData&);
         
     template<IndexingType indexingType>
-    void sortCompactedVector(ExecState*, void* begin, unsigned relevantLength);
+    void sortCompactedVector(ExecState*, WriteBarrier<Unknown>* begin, unsigned relevantLength);
         
     template<IndexingType indexingType>
     void sortVector(ExecState*, JSValue compareFunction, CallType, const CallData&);
@@ -174,14 +174,13 @@ private:
     void compactForSorting(unsigned& numDefined, unsigned& newRelevantLength);
 };
 
-inline Butterfly* createContiguousArrayButterfly(JSGlobalData& globalData, unsigned length, unsigned& vectorLength)
+inline Butterfly* createContiguousArrayButterfly(JSGlobalData& globalData, unsigned length)
 {
     IndexingHeader header;
-    vectorLength = std::max(length, BASE_VECTOR_LEN);
-    header.setVectorLength(vectorLength);
+    header.setVectorLength(std::max(length, BASE_VECTOR_LEN));
     header.setPublicLength(length);
     Butterfly* result = Butterfly::create(
-        globalData, 0, 0, true, header, vectorLength * sizeof(EncodedJSValue));
+        globalData, 0, 0, true, header, header.vectorLength() * sizeof(EncodedJSValue));
     return result;
 }
 
@@ -201,23 +200,13 @@ Butterfly* createArrayButterflyInDictionaryIndexingMode(JSGlobalData&, unsigned 
 inline JSArray* JSArray::create(JSGlobalData& globalData, Structure* structure, unsigned initialLength)
 {
     Butterfly* butterfly;
-    if (LIKELY(!hasArrayStorage(structure->indexingType()))) {
-        ASSERT(
-            hasUndecided(structure->indexingType())
-            || hasInt32(structure->indexingType())
-            || hasDouble(structure->indexingType())
-            || hasContiguous(structure->indexingType()));
-        unsigned vectorLength;
-        butterfly = createContiguousArrayButterfly(globalData, initialLength, vectorLength);
+    if (LIKELY(structure->indexingType() == ArrayWithContiguous)) {
+        butterfly = createContiguousArrayButterfly(globalData, initialLength);
         ASSERT(initialLength < MIN_SPARSE_ARRAY_INDEX);
-        if (hasDouble(structure->indexingType())) {
-            for (unsigned i = 0; i < vectorLength; ++i)
-                butterfly->contiguousDouble()[i] = QNaN;
-        }
     } else {
         ASSERT(
             structure->indexingType() == ArrayWithSlowPutArrayStorage
-            || structure->indexingType() == ArrayWithArrayStorage);
+            || (initialLength && structure->indexingType() == ArrayWithArrayStorage));
         butterfly = createArrayButterfly(globalData, initialLength);
     }
     JSArray* array = new (NotNull, allocateCell<JSArray>(globalData.heap)) JSArray(globalData, structure, butterfly);
@@ -232,13 +221,8 @@ inline JSArray* JSArray::tryCreateUninitialized(JSGlobalData& globalData, Struct
         return 0;
         
     Butterfly* butterfly;
-    if (LIKELY(!hasArrayStorage(structure->indexingType()))) {
-        ASSERT(
-            hasUndecided(structure->indexingType())
-            || hasInt32(structure->indexingType())
-            || hasDouble(structure->indexingType())
-            || hasContiguous(structure->indexingType()));
-
+    if (LIKELY(structure->indexingType() == ArrayWithContiguous)) {
+            
         void* temp;
         if (!globalData.heap.tryAllocateStorage(Butterfly::totalSize(0, 0, true, vectorLength * sizeof(EncodedJSValue)), &temp))
             return 0;

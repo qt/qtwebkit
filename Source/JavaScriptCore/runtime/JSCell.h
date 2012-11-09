@@ -28,9 +28,9 @@
 #include "ConstructData.h"
 #include "Heap.h"
 #include "JSLock.h"
-#include "JSValueInlines.h"
+#include "JSValueInlineMethods.h"
 #include "SlotVisitor.h"
-#include "SlotVisitorInlines.h"
+#include "SlotVisitorInlineMethods.h"
 #include "TypedArrayDescriptor.h"
 #include "WriteBarrier.h"
 #include <wtf/Noncopyable.h>

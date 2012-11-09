@@ -50,25 +50,25 @@ PassRefPtr<IDBCursor> IDBCursor::create(PassRefPtr<IDBCursorBackendInterface> ba
 
 const AtomicString& IDBCursor::directionNext()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, next, ("next", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, next, ("next"));
     return next;
 }
 
 const AtomicString& IDBCursor::directionNextUnique()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, nextunique, ("nextunique", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, nextunique, ("nextunique"));
     return nextunique;
 }
 
 const AtomicString& IDBCursor::directionPrev()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, prev, ("prev", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, prev, ("prev"));
     return prev;
 }
 
 const AtomicString& IDBCursor::directionPrevUnique()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, prevunique, ("prevunique", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, prevunique, ("prevunique"));
     return prevunique;
 }
 

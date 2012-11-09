@@ -296,8 +296,6 @@ static inline WebHistoryDateKey dateKey(NSTimeInterval date)
     ASSERT(title);
     
     NSString *URLString = [url _web_originalDataAsString];
-    if (!URLString)
-        URLString = @"";
     WebHistoryItem *entry = [_entriesByURL objectForKey:URLString];
 
     if (entry) {

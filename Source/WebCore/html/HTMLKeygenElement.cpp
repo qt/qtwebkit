@@ -52,7 +52,7 @@ public:
 
     virtual const AtomicString& shadowPseudoId() const
     {
-        DEFINE_STATIC_LOCAL(AtomicString, pseudoId, ("-webkit-keygen-select", AtomicString::ConstructFromLiteral));
+        DEFINE_STATIC_LOCAL(AtomicString, pseudoId, ("-webkit-keygen-select"));
         return pseudoId;
     }
 
@@ -120,7 +120,7 @@ bool HTMLKeygenElement::appendFormData(FormDataList& encoded_values, bool)
 
 const AtomicString& HTMLKeygenElement::formControlType() const
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, keygen, ("keygen", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(const AtomicString, keygen, ("keygen"));
     return keygen;
 }
 

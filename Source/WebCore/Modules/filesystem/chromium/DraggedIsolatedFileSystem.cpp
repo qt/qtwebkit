@@ -59,7 +59,7 @@ DOMFileSystem* DraggedIsolatedFileSystem::getDOMFileSystem(ScriptExecutionContex
 const AtomicString& DraggedIsolatedFileSystem::supplementName()
 {
     ASSERT(isMainThread());
-    DEFINE_STATIC_LOCAL(AtomicString, name, ("DraggedIsolatedFileSystem", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, name, ("DraggedIsolatedFileSystem"));
     return name;
 }
 

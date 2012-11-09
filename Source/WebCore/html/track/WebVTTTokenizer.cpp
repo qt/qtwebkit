@@ -34,7 +34,7 @@
 
 #include "WebVTTTokenizer.h"
 
-#include "MarkupTokenizerInlines.h"
+#include "MarkupTokenizerInlineMethods.h"
 
 namespace WebCore {
 

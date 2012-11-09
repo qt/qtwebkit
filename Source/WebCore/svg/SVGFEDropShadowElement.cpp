@@ -66,13 +66,13 @@ PassRefPtr<SVGFEDropShadowElement> SVGFEDropShadowElement::create(const Qualifie
 
 const AtomicString& SVGFEDropShadowElement::stdDeviationXIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGStdDeviationX", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGStdDeviationX"));
     return s_identifier;
 }
 
 const AtomicString& SVGFEDropShadowElement::stdDeviationYIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGStdDeviationY", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGStdDeviationY"));
     return s_identifier;
 }
 

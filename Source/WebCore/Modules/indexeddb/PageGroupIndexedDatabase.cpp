@@ -43,7 +43,7 @@ PageGroupIndexedDatabase::~PageGroupIndexedDatabase()
 
 PageGroupIndexedDatabase* PageGroupIndexedDatabase::from(PageGroup& group)
 {
-    DEFINE_STATIC_LOCAL(AtomicString, name, ("PageGroupIndexedDatabase", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, name, ("PageGroupIndexedDatabase"));
     PageGroupIndexedDatabase* supplement = static_cast<PageGroupIndexedDatabase*>(Supplement<PageGroup>::from(&group, name));
     if (!supplement) {
         supplement = new PageGroupIndexedDatabase();

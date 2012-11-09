@@ -60,13 +60,13 @@ PassRefPtr<SVGFEMorphologyElement> SVGFEMorphologyElement::create(const Qualifie
 
 const AtomicString& SVGFEMorphologyElement::radiusXIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGRadiusX", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGRadiusX"));
     return s_identifier;
 }
 
 const AtomicString& SVGFEMorphologyElement::radiusYIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGRadiusY", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGRadiusY"));
     return s_identifier;
 }
 

@@ -44,7 +44,7 @@ PassRefPtr<MediaControlOverlayEnclosureElement> MediaControlOverlayEnclosureElem
 
 const AtomicString& MediaControlOverlayEnclosureElement::shadowPseudoId() const
 {
-    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-overlay-enclosure", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-controls-overlay-enclosure"));
     return id;
 }
 

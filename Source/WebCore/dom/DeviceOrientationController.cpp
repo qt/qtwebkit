@@ -141,7 +141,7 @@ void DeviceOrientationController::didChangeDeviceOrientation(DeviceOrientationDa
 
 const AtomicString& DeviceOrientationController::supplementName()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, name, ("DeviceOrientationController", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, name, ("DeviceOrientationController"));
     return name;
 }
 

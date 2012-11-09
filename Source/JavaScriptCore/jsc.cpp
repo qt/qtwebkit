@@ -22,10 +22,10 @@
 
 #include "config.h"
 
-#include "ButterflyInlines.h"
+#include "ButterflyInlineMethods.h"
 #include "BytecodeGenerator.h"
 #include "Completion.h"
-#include "CopiedSpaceInlines.h"
+#include "CopiedSpaceInlineMethods.h"
 #include "ExceptionHelpers.h"
 #include "HeapStatistics.h"
 #include "InitializeThreading.h"
@@ -231,7 +231,7 @@ protected:
         addConstructableFunction(globalData, "Float32Array", constructJSFloat32Array, 1);
         addConstructableFunction(globalData, "Float64Array", constructJSFloat64Array, 1);
 
-        JSArray* array = constructEmptyArray(globalExec(), 0);
+        JSArray* array = constructEmptyArray(globalExec());
         for (size_t i = 0; i < arguments.size(); ++i)
             array->putDirectIndex(globalExec(), i, jsString(globalExec(), arguments[i]));
         putDirect(globalData, Identifier(globalExec(), "arguments"), array);

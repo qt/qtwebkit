@@ -38,7 +38,7 @@ PassRefPtr<SourceGraphic> SourceGraphic::create(Filter* filter)
 
 const AtomicString& SourceGraphic::effectName()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, s_effectName, ("SourceGraphic", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(const AtomicString, s_effectName, ("SourceGraphic"));
     return s_effectName;
 }
 

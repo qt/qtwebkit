@@ -47,7 +47,6 @@
 #include <WebCore/RenderLayerCompositor.h>
 #include <WebCore/RenderView.h>
 #include <WebCore/Settings.h>
-#include <wtf/TemporaryChange.h>
 
 using namespace WebCore;
 
@@ -73,7 +72,6 @@ LayerTreeCoordinator::LayerTreeCoordinator(WebPage* webPage)
     : LayerTreeHost(webPage)
     , m_notifyAfterScheduledLayerFlush(false)
     , m_isValid(true)
-    , m_isPurging(false)
     , m_waitingForUIProcess(true)
     , m_isSuspended(false)
     , m_contentsScale(1)
@@ -451,10 +449,8 @@ void LayerTreeCoordinator::didPerformScheduledLayerFlush()
 
 void LayerTreeCoordinator::purgeReleasedImages()
 {
-    if (!m_isPurging) {
-        for (size_t i = 0; i < m_releasedDirectlyCompositedImages.size(); ++i)
-            m_webPage->send(Messages::LayerTreeCoordinatorProxy::DestroyDirectlyCompositedImage(m_releasedDirectlyCompositedImages[i]));
-    }
+    for (size_t i = 0; i < m_releasedDirectlyCompositedImages.size(); ++i)
+        m_webPage->send(Messages::LayerTreeCoordinatorProxy::DestroyDirectlyCompositedImage(m_releasedDirectlyCompositedImages[i]));
     m_releasedDirectlyCompositedImages.clear();
 }
 
@@ -608,8 +604,6 @@ void LayerTreeCoordinator::updateTile(WebLayerID layerID, int tileID, const Surf
 
 void LayerTreeCoordinator::removeTile(WebLayerID layerID, int tileID)
 {
-    if (m_isPurging)
-        return;
     m_shouldSyncFrame = true;
     m_webPage->send(Messages::LayerTreeCoordinatorProxy::RemoveTileForLayer(layerID, tileID));
 }
@@ -621,8 +615,6 @@ void LayerTreeCoordinator::createUpdateAtlas(int atlasID, const ShareableSurface
 
 void LayerTreeCoordinator::removeUpdateAtlas(int atlasID)
 {
-    if (m_isPurging)
-        return;
     m_webPage->send(Messages::LayerTreeCoordinatorProxy::RemoveUpdateAtlas(atlasID));
 }
 
@@ -698,8 +690,6 @@ bool LayerTreeCoordinator::layerTreeTileUpdatesAllowed() const
 
 void LayerTreeCoordinator::purgeBackingStores()
 {
-    TemporaryChange<bool> purgingToggle(m_isPurging, true);
-
     HashSet<WebCore::CoordinatedGraphicsLayer*>::iterator end = m_registeredLayers.end();
     for (HashSet<WebCore::CoordinatedGraphicsLayer*>::iterator it = m_registeredLayers.begin(); it != end; ++it)
         (*it)->purgeBackingStores();

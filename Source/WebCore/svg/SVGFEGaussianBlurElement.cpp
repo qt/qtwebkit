@@ -58,13 +58,13 @@ PassRefPtr<SVGFEGaussianBlurElement> SVGFEGaussianBlurElement::create(const Qual
 
 const AtomicString& SVGFEGaussianBlurElement::stdDeviationXIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGStdDeviationX", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGStdDeviationX"));
     return s_identifier;
 }
 
 const AtomicString& SVGFEGaussianBlurElement::stdDeviationYIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGStdDeviationY", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGStdDeviationY"));
     return s_identifier;
 }
 

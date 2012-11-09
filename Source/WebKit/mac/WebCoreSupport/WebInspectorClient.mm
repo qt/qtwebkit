@@ -336,13 +336,22 @@ void WebInspectorFrontendClient::updateWindowTitle() const
     if (window)
         return window;
 
-    NSUInteger styleMask = (NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask | NSTexturedBackgroundWindowMask);
+    bool useTexturedWindow = useWebKitWebInspector();
+
+    NSUInteger styleMask = (NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask);
+
+    if (useTexturedWindow)
+        styleMask |= NSTexturedBackgroundWindowMask;
+
     window = [[NSWindow alloc] initWithContentRect:NSMakeRect(60.0, 200.0, 750.0, 650.0) styleMask:styleMask backing:NSBackingStoreBuffered defer:NO];
     [window setDelegate:self];
     [window setMinSize:NSMakeSize(400.0, 400.0)];
-    [window setAutorecalculatesContentBorderThickness:NO forEdge:NSMaxYEdge];
-    [window setContentBorderThickness:55. forEdge:NSMaxYEdge];
-    WKNSWindowMakeBottomCornersSquare(window);
+
+    if (useTexturedWindow) {
+        [window setAutorecalculatesContentBorderThickness:NO forEdge:NSMaxYEdge];
+        [window setContentBorderThickness:55. forEdge:NSMaxYEdge];
+        WKNSWindowMakeBottomCornersSquare(window);
+    }
 
     [self setWindow:window];
     [window release];

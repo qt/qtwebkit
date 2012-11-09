@@ -80,6 +80,8 @@ void UnlinkedFunctionExecutable::visitChildren(JSCell* cell, SlotVisitor& visito
     COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
     ASSERT(thisObject->structure()->typeInfo().overridesVisitChildren());
     Base::visitChildren(thisObject, visitor);
+    visitor.append(&thisObject->m_codeBlockForCall);
+    visitor.append(&thisObject->m_codeBlockForConstruct);
     visitor.append(&thisObject->m_nameValue);
     visitor.append(&thisObject->m_symbolTableForCall);
     visitor.append(&thisObject->m_symbolTableForConstruct);
@@ -110,16 +112,12 @@ UnlinkedFunctionCodeBlock* UnlinkedFunctionExecutable::codeBlockFor(JSGlobalData
 {
     switch (specializationKind) {
     case CodeForCall:
-        if (UnlinkedFunctionCodeBlock* codeBlock = m_codeBlockForCall.get()) {
-            globalData.codeCache()->usedFunctionCode(globalData, codeBlock);
-            return codeBlock;
-        }
+        if (m_codeBlockForCall)
+            return m_codeBlockForCall.get();
         break;
     case CodeForConstruct:
-        if (UnlinkedFunctionCodeBlock* codeBlock = m_codeBlockForConstruct.get()) {
-            globalData.codeCache()->usedFunctionCode(globalData, codeBlock);
-            return codeBlock;
-        }
+        if (m_codeBlockForConstruct)
+            return m_codeBlockForConstruct.get();
         break;
     }
 
@@ -130,11 +128,11 @@ UnlinkedFunctionCodeBlock* UnlinkedFunctionExecutable::codeBlockFor(JSGlobalData
 
     switch (specializationKind) {
     case CodeForCall:
-        m_codeBlockForCall = PassWeak<UnlinkedFunctionCodeBlock>(result);
+        m_codeBlockForCall.set(globalData, this, result);
         m_symbolTableForCall.set(globalData, this, result->symbolTable());
         break;
     case CodeForConstruct:
-        m_codeBlockForConstruct = PassWeak<UnlinkedFunctionCodeBlock>(result);
+        m_codeBlockForConstruct.set(globalData, this, result);
         m_symbolTableForConstruct.set(globalData, this, result->symbolTable());
         break;
     }
@@ -173,7 +171,6 @@ UnlinkedCodeBlock::UnlinkedCodeBlock(JSGlobalData* globalData, Structure* struct
     , m_resolveOperationCount(0)
     , m_putToBaseOperationCount(1)
     , m_arrayProfileCount(0)
-    , m_arrayAllocationProfileCount(0)
     , m_valueProfileCount(0)
     , m_llintCallLinkInfoCount(0)
 #if ENABLE(BYTECODE_COMMENTS)

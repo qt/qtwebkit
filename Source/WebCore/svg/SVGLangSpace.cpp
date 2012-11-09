@@ -38,7 +38,7 @@ void SVGLangSpace::setXmllang(const AtomicString& xmlLang)
 const AtomicString& SVGLangSpace::xmlspace() const
 {
     if (!m_space) {
-        DEFINE_STATIC_LOCAL(const AtomicString, defaultString, ("default", AtomicString::ConstructFromLiteral));
+        DEFINE_STATIC_LOCAL(const AtomicString, defaultString, ("default"));
         return defaultString;
     }
 
@@ -71,7 +71,7 @@ bool SVGLangSpace::isKnownAttribute(const QualifiedName& attrName)
     
 void SVGLangSpace::addSupportedAttributes(HashSet<QualifiedName>& supportedAttributes)
 {
-    DEFINE_STATIC_LOCAL(AtomicString, xmlPrefix, ("xml", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, xmlPrefix, ("xml"));
 
     QualifiedName langWithPrefix = XMLNames::langAttr;
     langWithPrefix.setPrefix(xmlPrefix);

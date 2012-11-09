@@ -239,19 +239,19 @@ static void addMediaEngine(CreateMediaEnginePlayer constructor, MediaEngineSuppo
 
 static const AtomicString& applicationOctetStream()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, applicationOctetStream, ("application/octet-stream", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(const AtomicString, applicationOctetStream, ("application/octet-stream"));
     return applicationOctetStream;
 }
 
 static const AtomicString& textPlain()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, textPlain, ("text/plain", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(const AtomicString, textPlain, ("text/plain"));
     return textPlain;
 }
 
 static const AtomicString& codecs()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, codecs, ("codecs", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(const AtomicString, codecs, ("codecs"));
     return codecs;
 }
 

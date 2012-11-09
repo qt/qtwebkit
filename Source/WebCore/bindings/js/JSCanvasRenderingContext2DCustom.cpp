@@ -100,7 +100,7 @@ JSValue JSCanvasRenderingContext2D::webkitLineDash(ExecState* exec) const
     Vector<float>::const_iterator end = dash.end();
     for (Vector<float>::const_iterator it = dash.begin(); it != end; ++it)
         list.append(JSValue(*it));
-    return constructArray(exec, 0, globalObject(), list);
+    return constructArray(exec, globalObject(), list);
 }
 
 void JSCanvasRenderingContext2D::setWebkitLineDash(ExecState* exec, JSValue value)

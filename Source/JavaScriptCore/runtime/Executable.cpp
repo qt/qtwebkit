@@ -620,17 +620,18 @@ void FunctionExecutable::clearCodeIfNotCompiling()
     clearCode();
 }
 
-void FunctionExecutable::clearUnlinkedCodeForRecompilationIfNotCompiling()
+void FunctionExecutable::clearUnlinkedCodeIfNotCompiling()
 {
     if (isCompiling())
         return;
-    m_unlinkedExecutable->clearCodeForRecompilation();
+    m_unlinkedExecutable->clearCode();
 }
 
 void FunctionExecutable::clearCode()
 {
     m_codeBlockForCall.clear();
     m_codeBlockForConstruct.clear();
+    m_unlinkedExecutable->clearCode();
     Base::clearCode();
 }
 

@@ -29,9 +29,9 @@
 #include "JIT.h"
 
 #include "Arguments.h"
-#include "CopiedSpaceInlines.h"
+#include "CopiedSpaceInlineMethods.h"
 #include "Heap.h"
-#include "JITInlines.h"
+#include "JITInlineMethods.h"
 #include "JITStubCall.h"
 #include "JSArray.h"
 #include "JSCell.h"
@@ -1952,7 +1952,6 @@ void JIT::emit_op_new_array(Instruction* currentInstruction)
     JITStubCall stubCall(this, cti_op_new_array);
     stubCall.addArgument(TrustedImm32(currentInstruction[2].u.operand));
     stubCall.addArgument(TrustedImm32(currentInstruction[3].u.operand));
-    stubCall.addArgument(TrustedImmPtr(currentInstruction[4].u.arrayAllocationProfile));
     stubCall.call(currentInstruction[1].u.operand);
 }
 
@@ -1964,7 +1963,6 @@ void JIT::emit_op_new_array_with_size(Instruction* currentInstruction)
 #else
     stubCall.addArgument(currentInstruction[2].u.operand);
 #endif
-    stubCall.addArgument(TrustedImmPtr(currentInstruction[3].u.arrayAllocationProfile));
     stubCall.call(currentInstruction[1].u.operand);
 }
 
@@ -1973,7 +1971,6 @@ void JIT::emit_op_new_array_buffer(Instruction* currentInstruction)
     JITStubCall stubCall(this, cti_op_new_array_buffer);
     stubCall.addArgument(TrustedImm32(currentInstruction[2].u.operand));
     stubCall.addArgument(TrustedImm32(currentInstruction[3].u.operand));
-    stubCall.addArgument(TrustedImmPtr(currentInstruction[4].u.arrayAllocationProfile));
     stubCall.call(currentInstruction[1].u.operand);
 }
 

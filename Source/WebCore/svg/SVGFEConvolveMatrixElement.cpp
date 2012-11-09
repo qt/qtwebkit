@@ -79,25 +79,25 @@ PassRefPtr<SVGFEConvolveMatrixElement> SVGFEConvolveMatrixElement::create(const 
 
 const AtomicString& SVGFEConvolveMatrixElement::kernelUnitLengthXIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGKernelUnitLengthX", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGKernelUnitLengthX"));
     return s_identifier;
 }
 
 const AtomicString& SVGFEConvolveMatrixElement::kernelUnitLengthYIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGKernelUnitLengthY", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGKernelUnitLengthY"));
     return s_identifier;
 }
 
 const AtomicString& SVGFEConvolveMatrixElement::orderXIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGOrderX", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGOrderX"));
     return s_identifier;
 }
 
 const AtomicString& SVGFEConvolveMatrixElement::orderYIdentifier()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGOrderY", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, s_identifier, ("SVGOrderY"));
     return s_identifier;
 }
 

@@ -368,8 +368,7 @@ void MainResourceLoader::didReceiveResponse(const ResourceResponse& r)
     if (documentLoader()->applicationCacheHost()->maybeLoadFallbackForMainResponse(request(), r))
         return;
 
-    DEFINE_STATIC_LOCAL(AtomicString, xFrameOptionHeader, ("x-frame-options", AtomicString::ConstructFromLiteral));
-    HTTPHeaderMap::const_iterator it = r.httpHeaderFields().find(xFrameOptionHeader);
+    HTTPHeaderMap::const_iterator it = r.httpHeaderFields().find(AtomicString("x-frame-options"));
     if (it != r.httpHeaderFields().end()) {
         String content = it->value;
         if (m_frame->loader()->shouldInterruptLoadForXFrameOptions(content, r.url(), identifier())) {

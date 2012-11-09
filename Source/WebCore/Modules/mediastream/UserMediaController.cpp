@@ -31,7 +31,7 @@ namespace WebCore {
 
 const AtomicString& UserMediaController::supplementName()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, name, ("UserMediaController", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, name, ("UserMediaController"));
     return name;
 }
 

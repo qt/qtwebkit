@@ -139,14 +139,22 @@ void WebInspectorProxy::createInspectorWindow()
 {
     ASSERT(!m_inspectorWindow);
 
-    NSUInteger styleMask = (NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask | NSTexturedBackgroundWindowMask);
+    bool useTexturedWindow = inspectorReallyUsesWebKitUserInterface(page()->pageGroup()->preferences());
+
+    NSUInteger styleMask = (NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask);
+    if (useTexturedWindow)
+        styleMask |= NSTexturedBackgroundWindowMask;
+
     NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, initialWindowWidth, initialWindowHeight) styleMask:styleMask backing:NSBackingStoreBuffered defer:NO];
     [window setDelegate:m_inspectorProxyObjCAdapter.get()];
     [window setMinSize:NSMakeSize(minimumWindowWidth, minimumWindowHeight)];
     [window setReleasedWhenClosed:NO];
-    [window setAutorecalculatesContentBorderThickness:NO forEdge:NSMaxYEdge];
-    [window setContentBorderThickness:windowContentBorderThickness forEdge:NSMaxYEdge];
-    WKNSWindowMakeBottomCornersSquare(window);
+
+    if (useTexturedWindow) {
+        [window setAutorecalculatesContentBorderThickness:NO forEdge:NSMaxYEdge];
+        [window setContentBorderThickness:windowContentBorderThickness forEdge:NSMaxYEdge];
+        WKNSWindowMakeBottomCornersSquare(window);
+    }
 
     NSView *contentView = [window contentView];
     [m_inspectorView.get() setFrame:[contentView bounds]];

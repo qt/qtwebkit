@@ -48398,7 +48398,7 @@
 				Name="parser"
 				>
 				<File
-					RelativePath="..\xml\parser\CharacterReferenceInlines.h"
+					RelativePath="..\xml\parser\CharacterReferenceInlineMethods.h"
 					>
 				</File>
 				<File
@@ -48410,7 +48410,7 @@
 					>
 				</File>
 				<File
-					RelativePath="..\xml\parser\MarkupTokenizerInlines.h"
+					RelativePath="..\xml\parser\MarkupTokenizerInlineMethods.h"
 					>
 				</File>
 				<File

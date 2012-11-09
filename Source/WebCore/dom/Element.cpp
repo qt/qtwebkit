@@ -2166,21 +2166,21 @@ const AtomicString& Element::webkitRegionOverset() const
 {
     document()->updateLayoutIgnorePendingStylesheets();
 
-    DEFINE_STATIC_LOCAL(AtomicString, undefinedState, ("undefined", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, undefinedState, ("undefined"));
     if (!document()->cssRegionsEnabled() || !renderRegion())
         return undefinedState;
 
     switch (renderRegion()->regionState()) {
     case RenderRegion::RegionFit: {
-        DEFINE_STATIC_LOCAL(AtomicString, fitState, ("fit", AtomicString::ConstructFromLiteral));
+        DEFINE_STATIC_LOCAL(AtomicString, fitState, ("fit"));
         return fitState;
     }
     case RenderRegion::RegionEmpty: {
-        DEFINE_STATIC_LOCAL(AtomicString, emptyState, ("empty", AtomicString::ConstructFromLiteral));
+        DEFINE_STATIC_LOCAL(AtomicString, emptyState, ("empty"));
         return emptyState;
     }
     case RenderRegion::RegionOverset: {
-        DEFINE_STATIC_LOCAL(AtomicString, overflowState, ("overset", AtomicString::ConstructFromLiteral));
+        DEFINE_STATIC_LOCAL(AtomicString, overflowState, ("overset"));
         return overflowState;
     }
     case RenderRegion::RegionUndefined:

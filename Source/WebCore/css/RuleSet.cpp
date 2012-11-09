@@ -157,17 +157,38 @@ void RuleSet::RuleSetSelectorPair::reportMemoryUsage(MemoryObjectInfo* memoryObj
     info.addMember(ruleSet);
 }
 
+static inline void collectFeaturesFromSelector(RuleFeatureSet& features, const CSSSelector* selector)
+{
+    if (selector->m_match == CSSSelector::Id)
+        features.idsInRules.add(selector->value().impl());
+    else if (selector->m_match == CSSSelector::Class)
+        features.classesInRules.add(selector->value().impl());
+    else if (selector->isAttributeSelector())
+        features.attrsInRules.add(selector->attribute().localName().impl());
+    switch (selector->pseudoType()) {
+    case CSSSelector::PseudoFirstLine:
+        features.usesFirstLineRules = true;
+        break;
+    case CSSSelector::PseudoBefore:
+    case CSSSelector::PseudoAfter:
+        features.usesBeforeAfterRules = true;
+        break;
+    default:
+        break;
+    }
+}
+
 static void collectFeaturesFromRuleData(RuleFeatureSet& features, const RuleData& ruleData)
 {
     bool foundSiblingSelector = false;
     for (CSSSelector* selector = ruleData.selector(); selector; selector = selector->tagHistory()) {
-        features.collectFeaturesFromSelector(selector);
+        collectFeaturesFromSelector(features, selector);
         
         if (CSSSelectorList* selectorList = selector->selectorList()) {
             for (CSSSelector* subSelector = selectorList->first(); subSelector; subSelector = CSSSelectorList::next(subSelector)) {
                 if (!foundSiblingSelector && selector->isSiblingSelector())
                     foundSiblingSelector = true;
-                features.collectFeaturesFromSelector(subSelector);
+                collectFeaturesFromSelector(features, subSelector);
             }
         } else if (!foundSiblingSelector && selector->isSiblingSelector())
             foundSiblingSelector = true;

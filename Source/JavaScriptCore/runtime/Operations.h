@@ -26,7 +26,7 @@
 #include "Interpreter.h"
 #include "JSProxy.h"
 #include "JSString.h"
-#include "JSValueInlines.h"
+#include "JSValueInlineMethods.h"
 
 namespace JSC {
 

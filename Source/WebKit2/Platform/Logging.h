@@ -45,7 +45,6 @@ extern WTFLogChannel LogSessionState;
 extern WTFLogChannel LogTextInput;
 extern WTFLogChannel LogView;
 extern WTFLogChannel LogNetwork;
-extern WTFLogChannel LogNetworkScheduling;
 
 void initializeLogChannel(WTFLogChannel*);
 void initializeLogChannelsIfNecessary(void);

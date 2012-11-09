@@ -39,8 +39,6 @@
 namespace JSC {
 
 enum JITArrayMode {
-    JITInt32,
-    JITDouble,
     JITContiguous,
     JITArrayStorage,
     JITInt8Array,
@@ -57,8 +55,6 @@ enum JITArrayMode {
 inline bool isOptimizableIndexingType(IndexingType indexingType)
 {
     switch (indexingType) {
-    case ALL_INT32_INDEXING_TYPES:
-    case ALL_DOUBLE_INDEXING_TYPES:
     case ALL_CONTIGUOUS_INDEXING_TYPES:
     case ARRAY_WITH_ARRAY_STORAGE_INDEXING_TYPES:
         return true;
@@ -81,10 +77,6 @@ inline bool hasOptimizableIndexing(Structure* structure)
 inline JITArrayMode jitArrayModeForIndexingType(IndexingType indexingType)
 {
     switch (indexingType) {
-    case ALL_INT32_INDEXING_TYPES:
-        return JITInt32;
-    case ALL_DOUBLE_INDEXING_TYPES:
-        return JITDouble;
     case ALL_CONTIGUOUS_INDEXING_TYPES:
         return JITContiguous;
     case ARRAY_WITH_ARRAY_STORAGE_INDEXING_TYPES:

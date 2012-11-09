@@ -710,7 +710,7 @@ void CachedResource::updateResponseAfterRevalidation(const ResourceResponse& val
 {
     m_responseTimestamp = currentTime();
 
-    DEFINE_STATIC_LOCAL(const AtomicString, contentHeaderPrefix, ("content-", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(const AtomicString, contentHeaderPrefix, ("content-"));
     // RFC2616 10.3.5
     // Update cached headers from the 304 response
     const HTTPHeaderMap& newHeaders = validatingResponse.httpHeaderFields();

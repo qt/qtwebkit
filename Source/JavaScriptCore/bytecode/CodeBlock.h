@@ -755,13 +755,6 @@ namespace JSC {
         }
         ArrayProfile* getArrayProfile(unsigned bytecodeOffset);
         ArrayProfile* getOrAddArrayProfile(unsigned bytecodeOffset);
-        
-        unsigned numberOfArrayAllocationProfiles() const { return m_arrayAllocationProfiles.size(); }
-        ArrayAllocationProfile* addArrayAllocationProfile()
-        {
-            m_arrayAllocationProfiles.append(ArrayAllocationProfile());
-            return &m_arrayAllocationProfiles.last();
-        }
 #endif
 
         // Exception handling support
@@ -1152,13 +1145,9 @@ namespace JSC {
 
 #if ENABLE(VALUE_PROFILER)
         bool shouldOptimizeNow();
-        void updateAllValueProfilePredictions(OperationInProgress = NoOperation);
-        void updateAllArrayPredictions(OperationInProgress = NoOperation);
         void updateAllPredictions(OperationInProgress = NoOperation);
 #else
         bool shouldOptimizeNow() { return false; }
-        void updateAllValueProfilePredictions(OperationInProgress = NoOperation) { }
-        void updateAllArrayPredictions(OperationInProgress = NoOperation) { }
         void updateAllPredictions(OperationInProgress = NoOperation) { }
 #endif
         
@@ -1341,7 +1330,6 @@ namespace JSC {
         SegmentedVector<ValueProfile, 8> m_valueProfiles;
         SegmentedVector<RareCaseProfile, 8> m_rareCaseProfiles;
         SegmentedVector<RareCaseProfile, 8> m_specialFastCaseProfiles;
-        SegmentedVector<ArrayAllocationProfile, 8> m_arrayAllocationProfiles;
         ArrayProfileVector m_arrayProfiles;
         unsigned m_executionEntryCount;
 #endif

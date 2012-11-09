@@ -31,7 +31,6 @@
 #ifndef InsertionPoint_h
 #define InsertionPoint_h
 
-#include "CSSSelectorList.h"
 #include "ContentDistributor.h"
 #include "ElementShadow.h"
 #include "HTMLElement.h"
@@ -54,8 +53,7 @@ public:
     PassRefPtr<NodeList> getDistributedNodes() const;
 
     virtual const AtomicString& select() const = 0;
-    virtual bool isSelectValid() = 0;
-    virtual const CSSSelectorList& selectorList() = 0;
+    virtual bool isSelectValid() const = 0;
 
     bool resetStyleInheritance() const;
     void setResetStyleInheritance(bool);

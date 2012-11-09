@@ -32,7 +32,7 @@ namespace WebCore {
 
 const AtomicString& SpeechRecognitionController::supplementName()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, name, ("SpeechRecognitionController", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, name, ("SpeechRecognitionController"));
     return name;
 }
 

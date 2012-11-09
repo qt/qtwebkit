@@ -42,9 +42,8 @@ public:
 
     virtual ~HTMLShadowElement();
 
-    virtual const AtomicString& select() const;
-    virtual bool isSelectValid() OVERRIDE { return true; }
-    virtual const CSSSelectorList& selectorList() { return emptySelectorList(); }
+    const AtomicString& select() const;
+    bool isSelectValid() const OVERRIDE { return true; }
 
 protected:
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
@@ -52,8 +51,6 @@ protected:
 
 private:
     HTMLShadowElement(const QualifiedName&, Document*);
-
-    static const CSSSelectorList& emptySelectorList();
 
     bool m_registeredWithShadowRoot;
 };

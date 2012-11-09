@@ -402,7 +402,7 @@ bool MediaPlayerPrivate::hasAvailableVideoFrame() const
 
 bool MediaPlayerPrivate::hasSingleSecurityOrigin() const
 {
-    return true;
+    return false;
 }
 
 MediaPlayer::MovieLoadType MediaPlayerPrivate::movieLoadType() const

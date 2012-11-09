@@ -25,7 +25,6 @@
 #include "TextureMapper.h"
 #include "TextureMapperBackingStore.h"
 #include <wtf/HashMap.h>
-#include <wtf/HashSet.h>
 
 namespace WebKit {
 
@@ -60,7 +59,6 @@ public:
     void createTile(int, float);
     void removeTile(int);
     void updateTile(int, const WebCore::IntRect&, const WebCore::IntRect&, PassRefPtr<ShareableSurface>, const WebCore::IntPoint&);
-    bool isEmpty() const;
     static PassRefPtr<CoordinatedBackingStore> create() { return adoptRef(new CoordinatedBackingStore); }
     void commitTileOperations(WebCore::TextureMapper*);
     PassRefPtr<WebCore::BitmapTexture> texture() const;
@@ -71,7 +69,7 @@ private:
         : m_scale(1.)
     { }
     HashMap<int, CoordinatedBackingStoreTile> m_tiles;
-    HashSet<int> m_tilesToRemove;
+    Vector<int> m_tilesToRemove;
     float m_scale;
 };
 

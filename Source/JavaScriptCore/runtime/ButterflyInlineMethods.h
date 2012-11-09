@@ -23,12 +23,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef ButterflyInlines_h
-#define ButterflyInlines_h
+#ifndef ButterflyInlineMethods_h
+#define ButterflyInlineMethods_h
 
 #include "ArrayStorage.h"
 #include "Butterfly.h"
-#include "CopiedSpaceInlines.h"
+#include "CopiedSpaceInlineMethods.h"
 #include "CopyVisitor.h"
 #include "JSGlobalData.h"
 #include "Structure.h"
@@ -61,9 +61,8 @@ inline Butterfly* Butterfly::create(JSGlobalData& globalData, Structure* structu
 
 inline Butterfly* Butterfly::createUninitializedDuringCollection(CopyVisitor& visitor, size_t preCapacity, size_t propertyCapacity, bool hasIndexingHeader, size_t indexingPayloadSizeInBytes)
 {
-    size_t size = totalSize(preCapacity, propertyCapacity, hasIndexingHeader, indexingPayloadSizeInBytes);
     Butterfly* result = fromBase(
-        visitor.allocateNewSpace(size),
+        visitor.allocateNewSpace(totalSize(preCapacity, propertyCapacity, hasIndexingHeader, indexingPayloadSizeInBytes)),
         preCapacity, propertyCapacity);
     return result;
 }
@@ -176,5 +175,5 @@ inline Butterfly* Butterfly::shift(Structure* structure, size_t numberOfSlots)
 
 } // namespace JSC
 
-#endif // ButterflyInlines_h
+#endif // ButterflyInlineMethods_h
 

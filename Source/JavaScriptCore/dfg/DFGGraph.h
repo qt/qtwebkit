@@ -220,7 +220,7 @@ public:
         if (right.hasConstant())
             return addImmediateShouldSpeculateInteger(add, left, right);
         
-        return Node::shouldSpeculateIntegerExpectingDefined(left, right) && add.canSpeculateInteger();
+        return Node::shouldSpeculateInteger(left, right) && add.canSpeculateInteger();
     }
     
     bool mulShouldSpeculateInteger(Node& mul)
@@ -235,13 +235,13 @@ public:
         if (right.hasConstant())
             return mulImmediateShouldSpeculateInteger(mul, left, right);
         
-        return Node::shouldSpeculateIntegerForArithmetic(left, right) && mul.canSpeculateInteger() && !nodeMayOverflow(mul.arithNodeFlags());
+        return Node::shouldSpeculateInteger(left, right) && mul.canSpeculateInteger() && !nodeMayOverflow(mul.arithNodeFlags());
     }
     
     bool negateShouldSpeculateInteger(Node& negate)
     {
         ASSERT(negate.op() == ArithNegate);
-        return at(negate.child1()).shouldSpeculateIntegerForArithmetic() && negate.canSpeculateInteger();
+        return at(negate.child1()).shouldSpeculateInteger() && negate.canSpeculateInteger();
     }
     
     bool addShouldSpeculateInteger(NodeIndex nodeIndex)
@@ -493,8 +493,6 @@ public:
         switch (node.arrayMode().type()) {
         case Array::Generic:
             return false;
-        case Array::Int32:
-        case Array::Double:
         case Array::Contiguous:
         case Array::ArrayStorage:
             return !node.arrayMode().isOutOfBounds();
@@ -714,7 +712,7 @@ private:
         if (!immediateValue.isNumber())
             return false;
         
-        if (!variable.shouldSpeculateIntegerExpectingDefined())
+        if (!variable.shouldSpeculateInteger())
             return false;
         
         if (immediateValue.isInt32())
@@ -736,7 +734,7 @@ private:
         if (!immediateValue.isInt32())
             return false;
         
-        if (!variable.shouldSpeculateIntegerForArithmetic())
+        if (!variable.shouldSpeculateInteger())
             return false;
         
         int32_t intImmediate = immediateValue.asInt32();

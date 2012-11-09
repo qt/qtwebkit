@@ -23,8 +23,8 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef CopyVisitorInlines_h
-#define CopyVisitorInlines_h
+#ifndef CopyVisitorInlineMethods_h
+#define CopyVisitorInlineMethods_h
 
 #include "ClassInfo.h"
 #include "CopyVisitor.h"
@@ -116,5 +116,4 @@ inline void CopyVisitor::didCopy(void* ptr, size_t bytes)
 
 } // namespace JSC
 
-#endif // CopyVisitorInlines_h
-
+#endif

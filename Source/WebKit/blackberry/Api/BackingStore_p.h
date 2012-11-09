@@ -20,7 +20,6 @@
 #define BackingStore_p_h
 
 #include "BackingStore.h"
-#include "Color.h"
 #include "RenderQueue.h"
 #include "TileIndex.h"
 #include "TileIndexHash.h"
@@ -320,9 +319,6 @@ public:
     void blitToWindow(const Platform::IntRect& dstRect, const BlackBerry::Platform::Graphics::Buffer* srcBuffer, const Platform::IntRect& srcRect, bool blend, unsigned char globalAlpha);
     void fillWindow(Platform::Graphics::FillPattern, const Platform::IntRect& dstRect, const Platform::IntPoint& contentsOrigin, double contentsScale);
 
-    WebCore::Color webPageBackgroundColorUserInterfaceThread() const; // use WebSettings::backgroundColor() for the WebKit thread
-    void setWebPageBackgroundColor(const WebCore::Color&);
-
     void invalidateWindow();
     void invalidateWindow(const Platform::IntRect& dst);
     void clearWindow(const Platform::IntRect&, unsigned char red, unsigned char green, unsigned char blue, unsigned char alpha = 255);
@@ -366,8 +362,6 @@ public:
 
     bool m_defersBlit;
     bool m_hasBlitJobs;
-
-    WebCore::Color m_webPageBackgroundColor; // for user interface thread operations such as blitting
 
     mutable unsigned m_frontState;
     mutable unsigned m_backState;

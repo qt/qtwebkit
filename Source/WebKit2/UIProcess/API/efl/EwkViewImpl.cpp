@@ -47,7 +47,6 @@
 #include "ewk_popup_menu_item_private.h"
 #include "ewk_popup_menu_private.h"
 #include "ewk_private.h"
-#include "ewk_security_origin_private.h"
 #include "ewk_settings_private.h"
 #include "ewk_view.h"
 #include "ewk_view_private.h"
@@ -338,9 +337,7 @@ void EwkViewImpl::enterFullScreen()
 {
     Ewk_View_Smart_Data* sd = smartData();
 
-    RefPtr<EwkSecurityOrigin> origin = EwkSecurityOrigin::create(KURL(ParsedURLString, String::fromUTF8(m_url)));
-
-    if (!sd->api->fullscreen_enter || !sd->api->fullscreen_enter(sd, origin.get())) {
+    if (!sd->api->fullscreen_enter || !sd->api->fullscreen_enter(sd)) {
         Ecore_Evas* ecoreEvas = ecore_evas_ecore_evas_get(sd->base.evas);
         ecore_evas_fullscreen_set(ecoreEvas, true);
     }

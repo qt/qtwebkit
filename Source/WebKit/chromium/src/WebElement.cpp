@@ -66,13 +66,8 @@ bool WebElement::hasTagName(const WebString& tagName) const
 
 bool WebElement::hasHTMLTagName(const WebString& tagName) const
 {
-    // How to create                     class              nodeName localName
-    // createElement('input')            HTMLInputElement   INPUT    input
-    // createElement('INPUT')            HTMLInputElement   INPUT    input
-    // createElementNS(xhtmlNS, 'input') HTMLInputElement   INPUT    input
-    // createElementNS(xhtmlNS, 'INPUT') HTMLUnknownElement INPUT    INPUT
     const Element* element = constUnwrap<Element>();
-    return HTMLNames::xhtmlNamespaceURI == element->namespaceURI() && element->localName() == String(tagName).lower();
+    return HTMLNames::xhtmlNamespaceURI == element->namespaceURI() && equalIgnoringCase(element->tagName(), String(tagName));
 }
 
 bool WebElement::hasAttribute(const WebString& attrName) const

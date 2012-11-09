@@ -45,7 +45,6 @@ namespace JSC {
 
     struct StructureStubInfo;
 
-    class ArrayAllocationProfile;
     class CodeBlock;
     class ExecutablePool;
     class FunctionExecutable;
@@ -86,7 +85,6 @@ namespace JSC {
         ReturnAddressPtr returnAddress() { return ReturnAddressPtr(asPointer); }
         ResolveOperations* resolveOperations() { return static_cast<ResolveOperations*>(asPointer); }
         PutToBaseOperation* putToBaseOperation() { return static_cast<PutToBaseOperation*>(asPointer); }
-        ArrayAllocationProfile* arrayAllocationProfile() { return static_cast<ArrayAllocationProfile*>(asPointer); }
     };
     
     struct TrampolineStructure {

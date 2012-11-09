@@ -41,7 +41,7 @@ ContextFeaturesClient* ContextFeaturesClient::empty()
 
 const AtomicString& ContextFeatures::supplementName()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, name, ("ContextFeatures", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, name, ("ContextFeatures"));
     return name;
 }
 

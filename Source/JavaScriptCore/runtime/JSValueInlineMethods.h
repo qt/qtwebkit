@@ -23,8 +23,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef JSValueInlines_h
-#define JSValueInlines_h
+#ifndef JSValueInlineMethods_h
+#define JSValueInlineMethods_h
 
 #include "JSValue.h"
 
@@ -493,5 +493,4 @@ namespace JSC {
 
 } // namespace JSC
 
-#endif // JSValueInlines_h
-
+#endif // JSValueInlineMethods_h

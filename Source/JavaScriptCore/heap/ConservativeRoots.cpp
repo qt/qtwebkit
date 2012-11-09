@@ -26,9 +26,9 @@
 #include "config.h"
 #include "ConservativeRoots.h"
 
-#include "CodeBlock.h"
 #include "CopiedSpace.h"
-#include "CopiedSpaceInlines.h"
+#include "CopiedSpaceInlineMethods.h"
+#include "CodeBlock.h"
 #include "DFGCodeBlocks.h"
 #include "JSCell.h"
 #include "JSObject.h"

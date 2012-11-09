@@ -48,10 +48,10 @@ public:
     static PassRefPtr<ResourceBuffer> create(const char* data, int size) { return adoptRef(new ResourceBuffer(data, size)); }
     static PassRefPtr<ResourceBuffer> adoptSharedBuffer(PassRefPtr<SharedBuffer> shared) { return shared ? adoptRef(new ResourceBuffer(shared)) : 0; }
 
-    virtual ~ResourceBuffer();
+    ~ResourceBuffer();
 
-    virtual const char* data() const;
-    virtual unsigned size() const;
+    const char* data() const;
+    unsigned size() const;
     bool isEmpty() const;
 
     void append(const char*, unsigned);
@@ -79,13 +79,11 @@ public:
 
     void reportMemoryUsage(MemoryObjectInfo*) const;
 
-protected:
-    ResourceBuffer();
-
 private:
+    ResourceBuffer();
     ResourceBuffer(const char*, int);
     ResourceBuffer(PassRefPtr<SharedBuffer>);
-
+    
     RefPtr<SharedBuffer> m_sharedBuffer;
 };
 
