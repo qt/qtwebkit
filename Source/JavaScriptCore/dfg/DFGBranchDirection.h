@@ -23,39 +23,66 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef IndexingHeaderInlineMethods_h
-#define IndexingHeaderInlineMethods_h
+#ifndef DFGBranchDirection_h
+#define DFGBranchDirection_h
 
-#include "ArrayStorage.h"
-#include "IndexingHeader.h"
-#include "Structure.h"
+#include <wtf/Platform.h>
 
-namespace JSC {
+#if ENABLE(DFG_JIT)
 
-inline size_t IndexingHeader::preCapacity(Structure* structure)
-{
-    if (LIKELY(!hasArrayStorage(structure->indexingType())))
-        return 0;
+namespace JSC { namespace DFG {
+
+enum BranchDirection {
+    // This is not a branch and so there is no branch direction, or
+    // the branch direction has yet to be set.
+    InvalidBranchDirection,
+        
+    // The branch takes the true case.
+    TakeTrue,
+        
+    // The branch takes the false case.
+    TakeFalse,
+        
+    // For all we know, the branch could go either direction, so we
+    // have to assume the worst.
+    TakeBoth
+};
     
-    return arrayStorage()->m_indexBias;
-}
-
-inline size_t IndexingHeader::indexingPayloadSizeInBytes(Structure* structure)
+static inline const char* branchDirectionToString(BranchDirection branchDirection)
 {
-    switch (structure->indexingType()) {
-    case ALL_CONTIGUOUS_INDEXING_TYPES:
-        return vectorLength() * sizeof(EncodedJSValue);
-        
-    case ALL_ARRAY_STORAGE_INDEXING_TYPES:
-        return ArrayStorage::sizeFor(arrayStorage()->vectorLength());
-        
+    switch (branchDirection) {
+    case InvalidBranchDirection:
+        return "Invalid";
+    case TakeTrue:
+        return "TakeTrue";
+    case TakeFalse:
+        return "TakeFalse";
+    case TakeBoth:
+        return "TakeBoth";
+    }
+}
+    
+static inline bool isKnownDirection(BranchDirection branchDirection)
+{
+    switch (branchDirection) {
+    case TakeTrue:
+    case TakeFalse:
+        return true;
     default:
-        ASSERT(!hasIndexedProperties(structure->indexingType()));
-        return 0;
+        return false;
     }
 }
 
-} // namespace JSC
+static inline bool branchCondition(BranchDirection branchDirection)
+{
+    if (branchDirection == TakeTrue)
+        return true;
+    ASSERT(branchDirection == TakeFalse);
+    return false;
+}
 
-#endif // IndexingHeaderInlineMethods_h
+} } // namespace JSC::DFG
 
+#endif // ENABLE(DFG_JIT)
+
+#endif // DFGBranchDirection_h

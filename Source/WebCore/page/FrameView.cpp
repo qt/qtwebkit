@@ -1465,45 +1465,14 @@ void FrameView::removeViewportConstrainedObject(RenderObject* object)
     }
 }
 
-static int fixedPositionScrollOffset(int scrollPosition, int maxValue, int scrollOrigin, float dragFactor)
-{
-    if (!maxValue)
-        return 0;
-
-    if (!scrollOrigin) {
-        if (scrollPosition < 0)
-            scrollPosition = 0;
-        else if (scrollPosition > maxValue)
-            scrollPosition = maxValue;
-    } else {
-        if (scrollPosition > 0)
-            scrollPosition = 0;
-        else if (scrollPosition < -maxValue)
-            scrollPosition = -maxValue;
-    }
-    
-    return scrollPosition * dragFactor;
-}
-
 IntSize FrameView::scrollOffsetForFixedPosition() const
 {
     IntRect visibleContentRect = this->visibleContentRect();
     IntSize contentsSize = this->contentsSize();
     IntPoint scrollPosition = this->scrollPosition();
     IntPoint scrollOrigin = this->scrollOrigin();
-    
-    IntSize maxOffset(contentsSize.width() - visibleContentRect.width(), contentsSize.height() - visibleContentRect.height());
-    
     float frameScaleFactor = m_frame ? m_frame->frameScaleFactor() : 1;
-
-    FloatSize dragFactor = fixedElementsLayoutRelativeToFrame() ? FloatSize(1, 1) : FloatSize(
-        (contentsSize.width() - visibleContentRect.width() * frameScaleFactor) / maxOffset.width(),
-        (contentsSize.height() - visibleContentRect.height() * frameScaleFactor) / maxOffset.height());
-
-    int x = fixedPositionScrollOffset(scrollPosition.x(), maxOffset.width(), scrollOrigin.x(), dragFactor.width() / frameScaleFactor);
-    int y = fixedPositionScrollOffset(scrollPosition.y(), maxOffset.height(), scrollOrigin.y(), dragFactor.height() / frameScaleFactor);
-
-    return IntSize(x, y);
+    return WebCore::scrollOffsetForFixedPosition(visibleContentRect, contentsSize, scrollPosition, scrollOrigin, frameScaleFactor, fixedElementsLayoutRelativeToFrame());
 }
 
 bool FrameView::fixedElementsLayoutRelativeToFrame() const
@@ -2045,8 +2014,11 @@ void FrameView::startDeferredRepaintTimer(double delay)
     m_deferredRepaintTimer.startOneShot(delay);
 }
 
-void FrameView::checkFlushDeferredRepaintsAfterLoadComplete()
+void FrameView::handleLoadCompleted()
 {
+    // Once loading has completed, allow autoSize one last opportunity to
+    // reduce the size of the frame.
+    autoSizeIfEnabled();
     if (shouldUseLoadTimeDeferredRepaintDelay())
         return;
     m_deferredRepaintDelay = s_normalDeferredRepaintDelay;
@@ -2651,12 +2623,12 @@ void FrameView::autoSizeIfEnabled()
         if (newSize == size)
             continue;
 
-        // Avoid doing resizing to a smaller size while the frame is loading to avoid switching to a small size
-        // during an intermediate state (and then changing back to a bigger size as the load progresses).
-        if (!frame()->loader()->isComplete() && (newSize.height() < size.height() || newSize.width() < size.width()))
+        // While loading only allow the size to increase (to avoid twitching during intermediate smaller states)
+        // unless autoresize has just been turned on or the maximum size is smaller than the current size.
+        if (m_didRunAutosize && size.height() <= m_maxAutoSize.height() && size.width() <= m_maxAutoSize.width()
+            && !frame()->loader()->isComplete() && (newSize.height() < size.height() || newSize.width() < size.width()))
             break;
-        else if (document->processingLoadEvent())
-            newSize = newSize.expandedTo(size);
+
         resize(newSize.width(), newSize.height());
         // Force the scrollbar state to avoid the scrollbar code adding them and causing them to be needed. For example,
         // a vertical scrollbar may cause text to wrap and thus increase the height (which is the only reason the scollbar is needed).

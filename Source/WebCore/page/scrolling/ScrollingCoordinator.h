@@ -27,7 +27,7 @@
 #define ScrollingCoordinator_h
 
 #include "IntRect.h"
-#include "LayoutTypes.h"
+#include "LayoutRect.h"
 #include "PlatformWheelEvent.h"
 #include "ScrollTypes.h"
 #include "Timer.h"
@@ -61,6 +61,9 @@ class ViewportConstraints;
 #if ENABLE(THREADED_SCROLLING)
 class ScrollingTree;
 #endif
+
+IntSize scrollOffsetForFixedPosition(const IntRect& visibleContentRect, const IntSize& contentsSize, const IntPoint& scrollPosition,
+    const IntPoint& scrollOrigin, float frameScaleFactor, bool fixedElementsLayoutRelativeToFrame);
 
 class ScrollingCoordinator : public ThreadSafeRefCounted<ScrollingCoordinator> {
 public:
@@ -155,7 +158,7 @@ private:
     virtual void recomputeWheelEventHandlerCountForFrameView(FrameView*) { }
     virtual void setShouldUpdateScrollLayerPositionOnMainThread(MainThreadScrollingReasons) { }
 
-    bool hasNonLayerFixedObjects(FrameView*) const;
+    virtual bool hasVisibleSlowRepaintFixedObjects(FrameView*) const;
     void updateShouldUpdateScrollLayerPositionOnMainThread();
 
     bool m_forceMainThreadScrollLayerPositionUpdates;

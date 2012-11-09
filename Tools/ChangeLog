@@ -1,3 +1,385 @@
+2012-11-09  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Build with MSVC fails to use nmake instead of make
+        https://bugs.webkit.org/show_bug.cgi?id=98645
+
+        Reviewed by Tor Arne Vestbø.
+
+        Don't rely on the "default" mkspec but instead query the target
+        mkspec variable from qmake to find the right qmake.conf.
+
+        * Scripts/webkitdirs.pm:
+        (qtMakeCommand):
+
+2012-11-08  Sudarsana Nagineni  <sudarsana.nagineni@intel.com>
+
+        [EFL] about:blank should display the blank page
+        https://bugs.webkit.org/show_bug.cgi?id=101566
+
+        Reviewed by Laszlo Gombos.
+
+        Add a check to return early without prepending http:// scheme, if the
+        URL is 'about:blank'.
+
+        * EWebLauncher/url_utils.c:
+        (url_from_user_input):
+
+2012-11-08  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Add proper support for fullscreen API to MiniBrowser
+        https://bugs.webkit.org/show_bug.cgi?id=101615
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Implement fullscreen API support in MiniBrowser. When entering
+        fullscreen a popup is shown to notify the user that something
+        is displayed in fullscreen and to advertise that the Escape
+        key can be used to exit fullscreen. This behavior is according
+        to specification.
+
+        * MiniBrowser/efl/main.c:
+        (on_key_down):
+        (on_fullscreen_accept):
+        (on_fullscreen_deny):
+        (on_fullscreen_enter):
+        (on_fullscreen_exit):
+        (window_create):
+
+2012-11-08  Slavomir Kaslev  <skaslev@google.com>
+
+        [Chromium] DumpRenderTree fix for canvas in software compositing
+        https://bugs.webkit.org/show_bug.cgi?id=101509
+
+        Reviewed by Adrienne Walker.
+
+        Don't use accelerated canvas 2d when in software compositing mode.
+
+        * DumpRenderTree/chromium/TestShell.cpp:
+        (TestShell::runFileTest):
+
+2012-11-08  Jakob Petsovits  <jpetsovits@rim.com>
+
+        [BlackBerry] Rework the API to use document coordinates
+        https://bugs.webkit.org/show_bug.cgi?id=101608
+        RIM PR 173292
+
+        Reviewed by Adam Treat.
+
+        Adapt to changed WebPage API.
+        See Source/WebKit/blackberry/ChangeLog for details.
+
+        * DumpRenderTree/blackberry/DumpRenderTree.cpp:
+        (BlackBerry::WebKit::DumpRenderTree::DumpRenderTree):
+        (BlackBerry::WebKit::DumpRenderTree::resetToConsistentStateBeforeTesting):
+
+2012-11-08  Yael Aharon  <yael.aharon@intel.com>
+
+        [EFL] Turn on WTF_USE_TILED_BACKING_STORE by default
+        https://bugs.webkit.org/show_bug.cgi?id=101526
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Turn on WTF_USE_TILED_BACKING_STORE for EFL port.
+
+        * Scripts/webkitperl/FeatureList.pm:
+
+2012-11-08  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Fix build with MSVC 2012 and Angle
+        https://bugs.webkit.org/show_bug.cgi?id=101588
+
+        Reviewed by Tor Arne Vestbø.
+
+        Angle includes STL's <memory> header file, which with MSVC 2012 includes stdint.h. MSVC 2012
+        does ship stdint.h, but it's lacking other headers such as inttypes.h.
+
+        So for the rest of WebKit we have to continue to use our own versions of these files from
+        JavaScriptCore/os-win32. But for Angle we are just including a shipped STL header file (memory)
+        and so it's up to the compiler to make that work, i.e. using the stdint.h it ships.
+
+        This patch moves the addition of JavaScriptCore/os-win32 out of default_post.prf, so that it
+        doesn't apply to each and every target anymore. In particular it won't apply to Angle anymore,
+        because its presence causes a build issue where due to the addition of os-win32/ we end up
+        including our own stdint.h but are lacking WTF/ to be in the include search path (which our own
+        stdint.h requires). So out of default_post.prf and into WTF.pri, our own wrappers are now only
+        used where WTF is also needed, and since os-win32/stdint.h depends on wtf/Platform.h, it seems
+        like a logical location.
+
+        * qmake/mkspecs/features/default_post.prf:
+
+2012-11-08  Dominik Röttsches  <dominik.rottsches@intel.com>
+
+        Unreviewed, rolling out r133859.
+        http://trac.webkit.org/changeset/133859
+        https://bugs.webkit.org/show_bug.cgi?id=101526
+
+        Breaks EFL bots test execution.
+
+        * Scripts/webkitperl/FeatureList.pm:
+
+2012-11-08  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [Qt] Reduce the number of clean builds
+        https://bugs.webkit.org/show_bug.cgi?id=100844
+
+        Reviewed by Tor Arne Vestbø.
+
+        A change in any Qt project file shouldn't trigger clean
+        build always, but only if the incremental build failed.
+
+        * Scripts/webkitdirs.pm:
+        (buildQMakeProjects):
+
+2012-11-08  Kangil Han  <kangil.han@samsung.com>
+
+        [EFL][MiniBrowser] Add encoding detector option.
+        https://bugs.webkit.org/show_bug.cgi?id=100931
+
+        Reviewed by Gyuyoung Kim.
+
+        Add a runtime option to enable/disable encoding detector.
+
+        * MiniBrowser/efl/main.c:
+        (window_create):
+        (elm_main):
+
+2012-11-08  Balazs Kelemen  <kbalazs@webkit.org>
+
+        [Qt] DumpRenderTree does not honor the shouldDumpPixels boolean argument of dumpAsText
+        https://bugs.webkit.org/show_bug.cgi?id=101485
+
+        Reviewed by Csaba Osztrogonác.
+
+        [Qt] DumpRenderTree does not honor the shouldDumpPixels boolean argument of dumpAsText
+
+        Support dumpAsText(true) which means we should not dump a render tree
+        but should dump pixels. All other platforms already support it.
+
+        * DumpRenderTree/qt/DumpRenderTreeQt.cpp:
+        (WebCore::DumpRenderTree::dump):
+        * DumpRenderTree/qt/TestRunnerQt.cpp:
+        (TestRunner::reset):
+        (TestRunner::dumpAsText):
+        * DumpRenderTree/qt/TestRunnerQt.h:
+        (TestRunner::shouldDumpPixels):
+        (TestRunner):
+
+2012-11-08  Yael Aharon  <yael.aharon@intel.com>
+
+        [EFL] Turn on WTF_USE_TILED_BACKING_STORE by default
+        https://bugs.webkit.org/show_bug.cgi?id=101526
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Turn on WTF_USE_TILED_BACKING_STORE for EFL port.
+
+        * Scripts/webkitperl/FeatureList.pm:
+
+2012-11-07  Csaba Osztrogonác  <ossy@webkit.org>
+
+        Make wait-for-SVN-server.py accept empty string as revision
+        https://bugs.webkit.org/show_bug.cgi?id=98014
+
+        Reviewed by Dirk Pranke.
+
+        * BuildSlaveSupport/wait-for-SVN-server.py:
+        (waitForSVNRevision):
+
+2012-11-07  Dirk Pranke  <dpranke@chromium.org>
+
+        garden-o-matic should handle concurrent requests
+        https://bugs.webkit.org/show_bug.cgi?id=101407
+
+        Reviewed by Ojan Vafai.
+
+        Garden-o-Matic is implemented on top of the BaseHttpServer
+        python library, which implements a single-threaded (one request at
+        a time) server. This means that we can only rebaseline one test at
+        a time, and when using a local results file, even fetching the results
+        for diffs is single-threaded.
+
+        Mixing in the ThreadingMixin enables concurrent requests (subject
+        to the global python interpreter lock). Given that we're doing all
+        of the work in webkit-patch subprocesses, I think this is safe.
+
+        Of course, it may not be safe to do some of the subprocesses in
+        parallel (e.g., rollout), but I think as long as we don't issue
+        commands that touch overlapping sets of files things should be fine.
+        The file locking over modifying testexpectations should keep that
+        from being corrupted.
+
+        * Scripts/webkitpy/tool/servers/gardeningserver.py:
+        (GardeningHTTPServer):
+        (GardeningHTTPRequestHandler):
+
+2012-11-07  Andreas Kling  <akling@apple.com>
+
+        Remove build-webkit dependency on Java SDK for Apple Mac WebKit.
+        <http://webkit.org/b/101492>
+
+        Reviewed by Anders Carlsson.
+
+        Don't check for a Java SDK before building the Apple Mac port. It's no longer needed for
+        the build after the Java bridge was removed.
+
+        * Scripts/build-webkit:
+        (cMakeArgsFromFeatures):
+
+2012-11-07  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Allow client to override setWindowFrame() / getWindowFrame()
+        https://bugs.webkit.org/show_bug.cgi?id=101496
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Provide implementation for on_window_geometry_get() / on_window_geometry_set()
+        smart functions that interact with the elm_win widget.
+
+        * MiniBrowser/efl/main.c:
+        (on_window_geometry_get):
+        (on_window_geometry_set):
+        (window_create):
+
+2012-11-07  Yael Aharon  <yael.aharon@intel.com>
+
+        [EFL][WK2][AC] API tests crash
+        https://bugs.webkit.org/show_bug.cgi?id=101480
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        When AC is enabled, 8 API tests are crashing. We need to properly set the evas engine for these tests.
+
+        * TestWebKitAPI/efl/PlatformWebView.cpp:
+        (TestWebKitAPI::initEcoreEvas):
+
+2012-11-07  Peter Beverloo  <peter@chromium.org>
+
+        Don't show the Android tester in garden-o-matic yet
+        https://bugs.webkit.org/show_bug.cgi?id=101476
+
+        Reviewed by Adam Barth.
+
+        The Android tester just started running layout tests, and doesn't upload its
+        results yet. Don't show it for now. This exception will be removed once it
+        has a baseline of greenness.
+
+        * BuildSlaveSupport/build.webkit.org-config/public_html/TestFailures/scripts/config.js:
+        (.):
+
+2012-11-07  Balazs Kelemen  <kbalazs@webkit.org>
+
+        WebKitTestRunner flakily hangs when running pixel tests on Qt
+        https://bugs.webkit.org/show_bug.cgi?id=100686
+
+        Reviewed by Csaba Osztrogonác.
+
+        Make WebKitTestRunner harden against the situation when the coordinated
+        graphics rendering synchronisation fails. If we time out when waiting
+        for the forced repaint to finish it usually a symptom of the synchronisation
+        has been broken. In this case all other tests will fail with the same error.
+        The underlying problem is not yet known. Ths patch make us report this situation
+        as web process unresponsiveness, so the test harness will kill us and launch
+        a new instance. This will make our pixel test bot usable while it should not limit
+        us debugging the underlying bug.
+
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::run):
+        * WebKitTestRunner/TestInvocation.cpp:
+        (WTR::TestInvocation::TestInvocation):
+        (WTR::TestInvocation::invoke):
+        (WTR::TestInvocation::dumpWebProcessUnresponsiveness):
+        (WTR::TestInvocation::didReceiveMessageFromInjectedBundle):
+        * WebKitTestRunner/TestInvocation.h:
+        (TestInvocation): Introduce new members to hold our state
+        that was local to invoke() so far.
+        * WebKitTestRunner/qt/TestInvocationQt.cpp:
+        (WTR::TestInvocation::dumpPixelsAndCompareWithExpected):
+
+2012-11-07  Allan Sandfeld Jensen  <allan.jensen@digia.com>
+
+        [Qt] Open link in this window action
+        https://bugs.webkit.org/show_bug.cgi?id=101226
+
+        Reviewed by Simon Hausmann.
+
+        Populates the context-menu with the new action when the default action is to open in a new window.
+
+        * QtTestBrowser/webview.cpp:
+        (createContextMenu):
+
+2012-11-07  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL][WK2] Add ewk_settings_preferred_minimum_contents_width_get/set API
+        https://bugs.webkit.org/show_bug.cgi?id=101467
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Added ewk_settings_preferred_minimum_contents_width_get/set API which is used for setting/getting
+        of default minimum contents width for non viewport meta element sites.
+        Set default minimum contents width to '0' for MiniBrowser as it should behave like desktop browser.
+
+        * MiniBrowser/efl/main.c:
+        (window_create):
+
+2012-11-07  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        [EFL] Add EFL to garden-o-matic
+        https://bugs.webkit.org/show_bug.cgi?id=101444
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Added the EFL bots running layout tests to the garden-o-matic report
+        page. We are skipping here the bot that just builds WebKit EFL to make
+        the data fetching faster.
+
+        * BuildSlaveSupport/build.webkit.org-config/public_html/TestFailures/scripts/config.js:
+        (.):
+
+2012-11-07  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL][WK2] Make EWK classes Ewk_Objects
+        https://bugs.webkit.org/show_bug.cgi?id=101057
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Now all the existing EWK classes share common Ewk_Object ref/unref API.
+
+        * MiniBrowser/efl/main.c:
+        (close_file_picker):
+        (on_file_chooser_request):
+
+2012-11-07  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [Qt] Unreviewed. Add Qt EWS bots to the watchers list.
+
+        * Scripts/webkitpy/tool/commands/earlywarningsystem.py:
+        (QtEWS):
+        (QtWK2EWS):
+
+2012-11-07  Grzegorz Czajkowski  <g.czajkowski@samsung.com>
+
+        WebKitTestRunner needs to turn on 'setContinuousSpellCheckingEnabled'
+        https://bugs.webkit.org/show_bug.cgi?id=93611
+
+        Reviewed by Gyuyoung Kim.
+
+        WebKitTestRunner enables spelling feature to pass the layout tests from editing/spelling.
+
+        * WebKitTestRunner/TestController.cpp:
+        (WTR::TestController::resetStateToConsistentValues):
+        Enables spelling by WebKit2 C API.
+
+2012-11-07  Dominik Röttsches  <dominik.rottsches@intel.com>
+
+        [EFL] Switch the efl-linux-slave-2 to Wk2 Release
+        https://bugs.webkit.org/show_bug.cgi?id=101345
+
+        Reviewed by Gyuyoung Kim.
+
+        Switching efl-linux-slave-2 to Wk2 Release.
+
+        * BuildSlaveSupport/build.webkit.org-config/config.json:
+
 2012-11-07  Christophe Dumez  <christophe.dumez@intel.com>
 
         Add replaceWithLiteral() method to WTF::String

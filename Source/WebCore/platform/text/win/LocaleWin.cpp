@@ -378,7 +378,7 @@ String LocaleWin::shortTimeFormat()
     String format = getLocaleInfoString(LOCALE_SSHORTTIME);
     // Vista or older Windows doesn't support LOCALE_SSHORTTIME.
     if (format.isEmpty()) {
-        format = timeFormat();
+        format = getLocaleInfoString(LOCALE_STIMEFORMAT);
         StringBuilder builder;
         builder.append(getLocaleInfoString(LOCALE_STIME));
         builder.append("ss");

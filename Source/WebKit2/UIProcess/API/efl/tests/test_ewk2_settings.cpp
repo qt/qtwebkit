@@ -158,16 +158,27 @@ TEST_F(EWK2UnitTestBase, ewk_settings_dns_prefetching_enabled)
     ASSERT_FALSE(ewk_settings_dns_prefetching_enabled_get(settings));
 }
 
-TEST_F(EWK2UnitTestBase, ewk_setting_encoding_detector_enabled)
+TEST_F(EWK2UnitTestBase, ewk_settings_encoding_detector_enabled)
 {
     Ewk_Settings* settings = ewk_view_settings_get(webView());
 
     // The encoding detector is disabled by default.
-    ASSERT_FALSE(ewk_setting_encoding_detector_enabled_get(settings));
+    ASSERT_FALSE(ewk_settings_encoding_detector_enabled_get(settings));
 
-    ASSERT_TRUE(ewk_setting_encoding_detector_enabled_set(settings, true));
-    ASSERT_TRUE(ewk_setting_encoding_detector_enabled_get(settings));
+    ASSERT_TRUE(ewk_settings_encoding_detector_enabled_set(settings, true));
+    ASSERT_TRUE(ewk_settings_encoding_detector_enabled_get(settings));
 
-    ASSERT_TRUE(ewk_setting_encoding_detector_enabled_set(settings, false));
-    ASSERT_FALSE(ewk_setting_encoding_detector_enabled_get(settings));
+    ASSERT_TRUE(ewk_settings_encoding_detector_enabled_set(settings, false));
+    ASSERT_FALSE(ewk_settings_encoding_detector_enabled_get(settings));
+}
+
+TEST_F(EWK2UnitTestBase, ewk_settings_preferred_minimum_contents_width)
+{
+    Ewk_Settings* settings = ewk_view_settings_get(webView());
+
+    // 980 by default.
+    ASSERT_EQ(980, ewk_settings_preferred_minimum_contents_width_get(settings));
+
+    ASSERT_TRUE(ewk_settings_preferred_minimum_contents_width_set(settings, 0));
+    ASSERT_EQ(0, ewk_settings_preferred_minimum_contents_width_get(settings));
 }

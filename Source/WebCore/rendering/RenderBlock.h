@@ -149,7 +149,7 @@ public:
     // compute the region all over again when you already know it.
     LayoutUnit availableLogicalWidthForLine(LayoutUnit position, bool firstLine, RenderRegion* region, LayoutUnit offsetFromLogicalTopOfFirstPage, LayoutUnit logicalHeight = 0) const
     {
-        return max(ZERO_LAYOUT_UNIT, logicalRightOffsetForLine(position, firstLine, region, offsetFromLogicalTopOfFirstPage, logicalHeight)
+        return max<LayoutUnit>(0, logicalRightOffsetForLine(position, firstLine, region, offsetFromLogicalTopOfFirstPage, logicalHeight)
             - logicalLeftOffsetForLine(position, firstLine, region, offsetFromLogicalTopOfFirstPage, logicalHeight));
     }
     LayoutUnit logicalRightOffsetForLine(LayoutUnit position, bool firstLine, RenderRegion* region, LayoutUnit offsetFromLogicalTopOfFirstPage, LayoutUnit logicalHeight = 0) const 
@@ -221,7 +221,7 @@ public:
 
     bool containsNonZeroBidiLevel() const;
 
-    GapRects selectionGapRectsForRepaint(RenderLayerModelObject* repaintContainer);
+    GapRects selectionGapRectsForRepaint(const RenderLayerModelObject* repaintContainer);
     LayoutRect logicalLeftSelectionGap(RenderBlock* rootBlock, const LayoutPoint& rootBlockPhysicalPosition, const LayoutSize& offsetFromRootBlock,
                                        RenderObject* selObj, LayoutUnit logicalLeft, LayoutUnit logicalTop, LayoutUnit logicalHeight, const PaintInfo*);
     LayoutRect logicalRightSelectionGap(RenderBlock* rootBlock, const LayoutPoint& rootBlockPhysicalPosition, const LayoutSize& offsetFromRootBlock,
@@ -297,12 +297,12 @@ public:
     unsigned columnCount(ColumnInfo*) const;
     LayoutRect columnRectAt(ColumnInfo*, unsigned) const;
 
-    LayoutUnit paginationStrut() const { return m_rareData ? m_rareData->m_paginationStrut : ZERO_LAYOUT_UNIT; }
+    LayoutUnit paginationStrut() const { return m_rareData ? m_rareData->m_paginationStrut : LayoutUnit(); }
     void setPaginationStrut(LayoutUnit);
     
     // The page logical offset is the object's offset from the top of the page in the page progression
     // direction (so an x-offset in vertical text and a y-offset for horizontal text).
-    LayoutUnit pageLogicalOffset() const { return m_rareData ? m_rareData->m_pageLogicalOffset : ZERO_LAYOUT_UNIT; }
+    LayoutUnit pageLogicalOffset() const { return m_rareData ? m_rareData->m_pageLogicalOffset : LayoutUnit(); }
     void setPageLogicalOffset(LayoutUnit);
 
     RootInlineBox* lineGridBox() const { return m_rareData ? m_rareData->m_lineGridBox : 0; }
@@ -371,7 +371,7 @@ public:
     LayoutUnit logicalRightOffsetForContent(RenderRegion*, LayoutUnit offsetFromLogicalTopOfFirstPage) const;
     LayoutUnit availableLogicalWidthForContent(RenderRegion* region, LayoutUnit offsetFromLogicalTopOfFirstPage) const
     { 
-        return max(ZERO_LAYOUT_UNIT, logicalRightOffsetForContent(region, offsetFromLogicalTopOfFirstPage) -
+        return max<LayoutUnit>(0, logicalRightOffsetForContent(region, offsetFromLogicalTopOfFirstPage) -
             logicalLeftOffsetForContent(region, offsetFromLogicalTopOfFirstPage)); }
     LayoutUnit startOffsetForContent(RenderRegion* region, LayoutUnit offsetFromLogicalTopOfFirstPage) const
     {
@@ -833,14 +833,14 @@ private:
     // children.
     virtual RenderBlock* firstLineBlock() const;
 
-    virtual LayoutRect rectWithOutlineForRepaint(RenderLayerModelObject* repaintContainer, LayoutUnit outlineWidth) const OVERRIDE;
+    virtual LayoutRect rectWithOutlineForRepaint(const RenderLayerModelObject* repaintContainer, LayoutUnit outlineWidth) const OVERRIDE;
     virtual RenderStyle* outlineStyleForRepaint() const;
     
     virtual RenderObject* hoverAncestor() const;
     virtual void updateDragState(bool dragOn);
     virtual void childBecameNonInline(RenderObject* child);
 
-    virtual LayoutRect selectionRectForRepaint(RenderLayerModelObject* repaintContainer, bool /*clipToVisibleContent*/) OVERRIDE
+    virtual LayoutRect selectionRectForRepaint(const RenderLayerModelObject* repaintContainer, bool /*clipToVisibleContent*/) OVERRIDE
     {
         return selectionGapRectsForRepaint(repaintContainer);
     }
@@ -1144,20 +1144,20 @@ protected:
 
         static LayoutUnit positiveMarginBeforeDefault(const RenderBlock* block)
         { 
-            return std::max(block->marginBefore(), ZERO_LAYOUT_UNIT);
+            return std::max<LayoutUnit>(block->marginBefore(), 0);
         }
         
         static LayoutUnit negativeMarginBeforeDefault(const RenderBlock* block)
         { 
-            return std::max(-block->marginBefore(), ZERO_LAYOUT_UNIT);
+            return std::max<LayoutUnit>(-block->marginBefore(), 0);
         }
         static LayoutUnit positiveMarginAfterDefault(const RenderBlock* block)
         {
-            return std::max(block->marginAfter(), ZERO_LAYOUT_UNIT);
+            return std::max<LayoutUnit>(block->marginAfter(), 0);
         }
         static LayoutUnit negativeMarginAfterDefault(const RenderBlock* block)
         {
-            return std::max(-block->marginAfter(), ZERO_LAYOUT_UNIT);
+            return std::max<LayoutUnit>(-block->marginAfter(), 0);
         }
         
         MarginValues m_margins;

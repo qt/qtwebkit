@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Intel Corporation. All rights reserved.
+ * Copyright (C) 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,38 +23,30 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef VibrationProvider_h
-#define VibrationProvider_h
+#ifndef WebResourceBuffer_h
+#define WebResourceBuffer_h
 
-#if ENABLE(VIBRATION)
-
-#include "WKRetainPtr.h"
-#include "ewk_context.h"
-#include <wtf/PassRefPtr.h>
-#include <wtf/RefCounted.h>
-
-typedef struct Ewk_Vibration_Client Ewk_Vibration_Client;
+#include <WebCore/ResourceBuffer.h>
 
 namespace WebKit {
 
-class VibrationProvider : public RefCounted<VibrationProvider> {
-public:
-    static PassRefPtr<VibrationProvider> create(WKContextRef);
-    virtual ~VibrationProvider();
+class ShareableResource;
 
-    void vibrate(uint64_t vibrationTime);
-    void cancelVibration();
-    void setVibrationClientCallbacks(Ewk_Vibration_Client_Vibrate_Cb, Ewk_Vibration_Client_Vibration_Cancel_Cb, void*);
+class WebResourceBuffer : public WebCore::ResourceBuffer {
+public:
+    static PassRefPtr<WebResourceBuffer> create(PassRefPtr<ShareableResource> resource) { return adoptRef(new WebResourceBuffer(resource)); }
+
+    virtual ~WebResourceBuffer() OVERRIDE;
+
+    virtual const char* data() const OVERRIDE;
+    virtual unsigned size() const OVERRIDE;
 
 private:
-    explicit VibrationProvider(WKContextRef);
+    WebResourceBuffer(PassRefPtr<ShareableResource>);
 
-    WKRetainPtr<WKContextRef> m_wkContext;
-    OwnPtr<Ewk_Vibration_Client> m_vibrationClient;
+    RefPtr<ShareableResource> m_resource;
 };
 
 } // namespace WebKit
 
-#endif // ENABLE(VIBRATION)
-
-#endif // VibrationProvider_h
+#endif // WebResourceBuffer_h

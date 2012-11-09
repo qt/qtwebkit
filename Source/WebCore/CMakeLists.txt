@@ -826,7 +826,7 @@ SET(WebCore_SOURCES
     Modules/indexeddb/IDBKey.cpp
     Modules/indexeddb/IDBKeyRange.cpp
     Modules/indexeddb/IDBKeyPath.cpp
-    Modules/indexeddb/IDBLevelDBBackingStore.cpp
+    Modules/indexeddb/IDBBackingStore.cpp
     Modules/indexeddb/IDBLevelDBCoding.cpp
     Modules/indexeddb/IDBObjectStore.cpp
     Modules/indexeddb/IDBObjectStoreBackendImpl.cpp
@@ -1876,8 +1876,8 @@ SET(WebCore_SOURCES
     platform/graphics/FontFamily.cpp
     platform/graphics/FontFastPath.cpp
     platform/graphics/FontFeatureSettings.cpp
-    platform/graphics/FractionalLayoutBoxExtent.cpp
-    platform/graphics/FractionalLayoutRect.cpp
+    platform/graphics/LayoutBoxExtent.cpp
+    platform/graphics/LayoutRect.cpp
     platform/graphics/GeneratedImage.cpp
     platform/graphics/GeneratorGeneratedImage.cpp
     platform/graphics/GlyphPageTreeNode.cpp

@@ -649,7 +649,7 @@ IntRect Element::screenRect() const
     if (!renderer())
         return IntRect();
     // FIXME: this should probably respect transforms
-    return renderer()->view()->frameView()->contentsToScreen(renderer()->absoluteBoundingBoxRectIgnoringTransforms());
+    return document()->view()->contentsToScreen(renderer()->absoluteBoundingBoxRectIgnoringTransforms());
 }
 
 static inline bool shouldIgnoreAttributeCase(const Element* e)
@@ -776,6 +776,8 @@ void Element::attributeChanged(const QualifiedName& name, const AtomicString& ne
         }
     } else if (name == HTMLNames::nameAttr)
         setHasName(!newValue.isNull());
+    else if (name == HTMLNames::pseudoAttr)
+        shouldInvalidateStyle |= testShouldInvalidateStyle && isInShadowTree();
 
     shouldInvalidateStyle |= testShouldInvalidateStyle && styleResolver->hasSelectorForAttribute(name.localName());
 
@@ -1128,10 +1130,8 @@ void Element::attach()
 
 void Element::unregisterNamedFlowContentNode()
 {
-    if (document()->cssRegionsEnabled() && inNamedFlow()) {
-        if (document()->renderer() && document()->renderer()->view())
-            document()->renderer()->view()->flowThreadController()->unregisterNamedFlowContentNode(this);
-    }
+    if (document()->cssRegionsEnabled() && inNamedFlow() && document()->renderView())
+        document()->renderView()->flowThreadController()->unregisterNamedFlowContentNode(this);
 }
 
 void Element::detach()
@@ -1357,16 +1357,6 @@ const AtomicString& Element::shadowPseudoId() const
     return pseudo();
 }
 
-void Element::setShadowPseudoId(const AtomicString& id, ExceptionCode& ec)
-{
-    if (!CSSSelector::isCustomPseudoType(id)) {
-        ec = SYNTAX_ERR;
-        return;
-    }
-
-    setPseudo(id);
-}
-
 bool Element::childTypeAllowed(NodeType type) const
 {
     switch (type) {
@@ -1531,7 +1521,7 @@ void Element::formatForDebugger(char* buffer, unsigned length) const
 PassRefPtr<Attr> Element::setAttributeNode(Attr* attrNode, ExceptionCode& ec)
 {
     if (!attrNode) {
-        ec = TYPE_MISMATCH_ERR;
+        ec = NATIVE_TYPE_ERR;
         return 0;
     }
 
@@ -1573,7 +1563,7 @@ PassRefPtr<Attr> Element::setAttributeNodeNS(Attr* attr, ExceptionCode& ec)
 PassRefPtr<Attr> Element::removeAttributeNode(Attr* attr, ExceptionCode& ec)
 {
     if (!attr) {
-        ec = TYPE_MISMATCH_ERR;
+        ec = NATIVE_TYPE_ERR;
         return 0;
     }
     if (attr->ownerElement() != this) {
@@ -2176,21 +2166,21 @@ const AtomicString& Element::webkitRegionOverset() const
 {
     document()->updateLayoutIgnorePendingStylesheets();
 
-    DEFINE_STATIC_LOCAL(AtomicString, undefinedState, ("undefined"));
+    DEFINE_STATIC_LOCAL(AtomicString, undefinedState, ("undefined", AtomicString::ConstructFromLiteral));
     if (!document()->cssRegionsEnabled() || !renderRegion())
         return undefinedState;
 
     switch (renderRegion()->regionState()) {
     case RenderRegion::RegionFit: {
-        DEFINE_STATIC_LOCAL(AtomicString, fitState, ("fit"));
+        DEFINE_STATIC_LOCAL(AtomicString, fitState, ("fit", AtomicString::ConstructFromLiteral));
         return fitState;
     }
     case RenderRegion::RegionEmpty: {
-        DEFINE_STATIC_LOCAL(AtomicString, emptyState, ("empty"));
+        DEFINE_STATIC_LOCAL(AtomicString, emptyState, ("empty", AtomicString::ConstructFromLiteral));
         return emptyState;
     }
     case RenderRegion::RegionOverset: {
-        DEFINE_STATIC_LOCAL(AtomicString, overflowState, ("overset"));
+        DEFINE_STATIC_LOCAL(AtomicString, overflowState, ("overset", AtomicString::ConstructFromLiteral));
         return overflowState;
     }
     case RenderRegion::RegionUndefined:

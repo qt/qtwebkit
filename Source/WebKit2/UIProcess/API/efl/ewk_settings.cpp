@@ -225,7 +225,7 @@ void ewk_settings_continuous_spell_checking_enabled_set(Eina_Bool enable)
         WKTextCheckerContinuousSpellCheckingEnabledStateChanged(enable);
 
         // Sets the default language if user didn't specify any.
-        if (enable && Ewk_Text_Checker::loadedSpellCheckingLanguages().isEmpty())
+        if (enable && !Ewk_Text_Checker::hasDictionary())
             spellCheckingLanguagesSet(Vector<String>());
 
         if (ewkTextCheckerSettings.onContinuousSpellChecking)
@@ -271,7 +271,7 @@ Eina_List* ewk_settings_spell_checking_languages_get()
     return listOflanguages;
 }
 
-Eina_Bool ewk_setting_encoding_detector_enabled_set(Ewk_Settings* settings, Eina_Bool enable)
+Eina_Bool ewk_settings_encoding_detector_enabled_set(Ewk_Settings* settings, Eina_Bool enable)
 {
     EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
 
@@ -280,9 +280,25 @@ Eina_Bool ewk_setting_encoding_detector_enabled_set(Ewk_Settings* settings, Eina
     return true;
 }
 
-Eina_Bool ewk_setting_encoding_detector_enabled_get(const Ewk_Settings* settings)
+Eina_Bool ewk_settings_encoding_detector_enabled_get(const Ewk_Settings* settings)
 {
     EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
 
     return settings->preferences()->usesEncodingDetector();
+}
+
+Eina_Bool ewk_settings_preferred_minimum_contents_width_set(Ewk_Settings *settings, unsigned width)
+{
+    EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
+
+    settings->preferences()->setLayoutFallbackWidth(width);
+
+    return true;
+}
+
+unsigned ewk_settings_preferred_minimum_contents_width_get(const Ewk_Settings *settings)
+{
+    EINA_SAFETY_ON_NULL_RETURN_VAL(settings, false);
+
+    return settings->preferences()->layoutFallbackWidth();
 }

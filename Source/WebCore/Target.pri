@@ -969,8 +969,8 @@ SOURCES += \
     platform/graphics/Font.cpp \
     platform/graphics/FontCache.cpp \
     platform/graphics/FontFastPath.cpp \
-    platform/graphics/FractionalLayoutBoxExtent.cpp \
-    platform/graphics/FractionalLayoutRect.cpp \
+    platform/graphics/LayoutBoxExtent.cpp \
+    platform/graphics/LayoutRect.cpp \
     platform/graphics/GeneratedImage.cpp \
     platform/graphics/GeneratorGeneratedImage.cpp \
     platform/graphics/GlyphPageTreeNode.cpp \
@@ -2186,6 +2186,7 @@ HEADERS += \
     platform/graphics/transforms/TransformState.h \
     platform/graphics/transforms/TranslateTransformOperation.h \
     platform/graphics/WidthIterator.h \
+    platform/graphics/WidthCache.h \
     platform/image-decoders/bmp/BMPImageDecoder.h \
     platform/image-decoders/bmp/BMPImageReader.h \
     platform/image-decoders/ico/ICOImageDecoder.h \
@@ -2335,7 +2336,6 @@ HEADERS += \
     rendering/InlineFlowBox.h \
     rendering/InlineTextBox.h \
     rendering/LayoutState.h \
-    rendering/LayoutTypes.h \
     rendering/LayoutRepainter.h \
     rendering/mathml/RenderMathMLBlock.h \
     rendering/mathml/RenderMathMLFenced.h \
@@ -2736,10 +2736,10 @@ HEADERS += \
     workers/WorkerRunLoop.h \
     workers/WorkerScriptLoader.h \
     workers/WorkerThread.h \
-    xml/parser/CharacterReferenceParserInlineMethods.h \
+    xml/parser/CharacterReferenceParserInlines.h \
     xml/parser/MarkupTokenBase.h \
     xml/parser/MarkupTokenizerBase.h \
-    xml/parser/MarkupTokenizerInlineMethods.h \
+    xml/parser/MarkupTokenizerInlines.h \
     xml/parser/NewXMLDocumentParser.h \
     xml/parser/XMLCharacterReferenceParser.h \
     xml/parser/XMLDocumentParser.h \
@@ -2782,9 +2782,9 @@ SOURCES += \
     platform/graphics/qt/FloatPointQt.cpp \
     platform/graphics/qt/FloatRectQt.cpp \
     platform/graphics/qt/FloatSizeQt.cpp \
-    platform/graphics/qt/FractionalLayoutPointQt.cpp \
-    platform/graphics/qt/FractionalLayoutRectQt.cpp \
-    platform/graphics/qt/FractionalLayoutSizeQt.cpp \
+    platform/graphics/qt/LayoutPointQt.cpp \
+    platform/graphics/qt/LayoutRectQt.cpp \
+    platform/graphics/qt/LayoutSizeQt.cpp \
     platform/graphics/qt/GradientQt.cpp \
     platform/graphics/qt/GraphicsContextQt.cpp \
     platform/graphics/qt/IconQt.cpp \

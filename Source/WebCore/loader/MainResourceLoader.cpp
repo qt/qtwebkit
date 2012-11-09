@@ -368,10 +368,11 @@ void MainResourceLoader::didReceiveResponse(const ResourceResponse& r)
     if (documentLoader()->applicationCacheHost()->maybeLoadFallbackForMainResponse(request(), r))
         return;
 
-    HTTPHeaderMap::const_iterator it = r.httpHeaderFields().find(AtomicString("x-frame-options"));
+    DEFINE_STATIC_LOCAL(AtomicString, xFrameOptionHeader, ("x-frame-options", AtomicString::ConstructFromLiteral));
+    HTTPHeaderMap::const_iterator it = r.httpHeaderFields().find(xFrameOptionHeader);
     if (it != r.httpHeaderFields().end()) {
         String content = it->value;
-        if (m_frame->loader()->shouldInterruptLoadForXFrameOptions(content, r.url())) {
+        if (m_frame->loader()->shouldInterruptLoadForXFrameOptions(content, r.url(), identifier())) {
             InspectorInstrumentation::continueAfterXFrameOptionsDenied(m_frame.get(), documentLoader(), identifier(), r);
             String message = "Refused to display '" + r.url().string() + "' in a frame because it set 'X-Frame-Options' to '" + content + "'.";
             m_frame->document()->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message, r.url().string(), 0, 0, identifier());

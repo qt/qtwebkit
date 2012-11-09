@@ -23,8 +23,8 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-#ifndef JITInlineMethods_h
-#define JITInlineMethods_h
+#ifndef JITInlines_h
+#define JITInlines_h
 
 
 #if ENABLE(JIT)
@@ -528,12 +528,12 @@ inline void JIT::emitArrayProfileStoreToHoleSpecialCase(ArrayProfile* arrayProfi
 #endif
 }
 
-static inline bool arrayProfileSaw(ArrayProfile* profile, IndexingType capability)
+static inline bool arrayProfileSaw(ArrayModes arrayModes, IndexingType capability)
 {
 #if ENABLE(VALUE_PROFILER)
-    return !!(profile->observedArrayModes() & (asArrayModes(NonArray | capability) | asArrayModes(ArrayClass | capability)));
+    return arrayModesInclude(arrayModes, capability);
 #else
-    UNUSED_PARAM(profile);
+    UNUSED_PARAM(arrayModes);
     UNUSED_PARAM(capability);
     return false;
 #endif
@@ -541,9 +541,20 @@ static inline bool arrayProfileSaw(ArrayProfile* profile, IndexingType capabilit
 
 inline JITArrayMode JIT::chooseArrayMode(ArrayProfile* profile)
 {
-    if (arrayProfileSaw(profile, ArrayStorageShape))
+#if ENABLE(VALUE_PROFILER)        
+    profile->computeUpdatedPrediction(m_codeBlock);
+    ArrayModes arrayModes = profile->observedArrayModes();
+    if (arrayProfileSaw(arrayModes, DoubleShape))
+        return JITDouble;
+    if (arrayProfileSaw(arrayModes, Int32Shape))
+        return JITInt32;
+    if (arrayProfileSaw(arrayModes, ArrayStorageShape))
         return JITArrayStorage;
     return JITContiguous;
+#else
+    UNUSED_PARAM(profile);
+    return JITContiguous;
+#endif
 }
 
 #if USE(JSVALUE32_64)
@@ -998,4 +1009,5 @@ ALWAYS_INLINE void JIT::emitTagAsBoolImmediate(RegisterID reg)
 
 #endif // ENABLE(JIT)
 
-#endif
+#endif // JITInlines_h
+

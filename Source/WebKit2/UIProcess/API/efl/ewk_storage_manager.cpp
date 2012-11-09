@@ -28,7 +28,7 @@
 
 #include "WKAPICast.h"
 #include "WKArray.h"
-#include "WKKeyValueStorageManager.h"
+#include "WebKeyValueStorageManagerProxy.h"
 #include "ewk_error_private.h"
 #include "ewk_security_origin.h"
 #include "ewk_security_origin_private.h"
@@ -37,13 +37,13 @@
 
 using namespace WebKit;
 
-Ewk_Storage_Manager::Ewk_Storage_Manager(WKKeyValueStorageManagerRef wkStorageManagerRef)
-    : m_wkStorageManager(wkStorageManagerRef)
+Ewk_Storage_Manager::Ewk_Storage_Manager(WebKeyValueStorageManagerProxy* storageManagerProxy)
+    : m_storageManager(storageManagerProxy)
 { }
 
 void Ewk_Storage_Manager::getStorageOrigins(void* context, WKKeyValueStorageManagerGetKeyValueStorageOriginsFunction callback) const
 {
-    WKKeyValueStorageManagerGetKeyValueStorageOrigins(m_wkStorageManager.get(), context, callback);
+    WKKeyValueStorageManagerGetKeyValueStorageOrigins(toAPI(m_storageManager.get()), context, callback);
 }
 
 Eina_List* Ewk_Storage_Manager::createOriginList(WKArrayRef origins) const
@@ -55,7 +55,7 @@ Eina_List* Ewk_Storage_Manager::createOriginList(WKArrayRef origins) const
         WKSecurityOriginRef wkOriginRef = static_cast<WKSecurityOriginRef>(WKArrayGetItemAtIndex(origins, i));
         RefPtr<Ewk_Security_Origin> origin = m_wrapperCache.get(wkOriginRef);
         if (!origin) {
-            origin = Ewk_Security_Origin::create(wkOriginRef);
+            origin = EwkSecurityOrigin::create(wkOriginRef);
             m_wrapperCache.set(wkOriginRef, origin);
         }
         originList = eina_list_append(originList, origin.release().leakRef());

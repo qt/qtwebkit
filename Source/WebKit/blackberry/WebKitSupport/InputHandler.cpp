@@ -699,13 +699,27 @@ SpellChecker* InputHandler::getSpellChecker()
 
 bool InputHandler::shouldRequestSpellCheckingOptionsForPoint(Platform::IntPoint& point, const Element* touchedElement, imf_sp_text_t& spellCheckingOptionRequest)
 {
-    if (!isActiveTextEdit() || touchedElement != m_currentFocusElement)
+    if (!isActiveTextEdit())
+        return false;
+
+    Element* currentFocusElement = m_currentFocusElement.get();
+    if (!currentFocusElement || !currentFocusElement->isElementNode())
+        return false;
+
+    while (!currentFocusElement->isRootEditableElement()) {
+        Element* parentElement = currentFocusElement->parentElement();
+        if (!parentElement)
+            break;
+        currentFocusElement = parentElement;
+    }
+
+    if (touchedElement != currentFocusElement)
         return false;
 
     LayoutPoint contentPos(m_webPage->mapFromViewportToContents(point));
     contentPos = DOMSupport::convertPointToFrame(m_webPage->mainFrame(), m_webPage->focusedOrMainFrame(), roundedIntPoint(contentPos));
 
-    Document* document = m_currentFocusElement->document();
+    Document* document = currentFocusElement->document();
     ASSERT(document);
 
     RenderedDocumentMarker* marker = document->markers()->renderedMarkerContainingPoint(contentPos, DocumentMarker::Spelling);
@@ -723,29 +737,23 @@ bool InputHandler::shouldRequestSpellCheckingOptionsForPoint(Platform::IntPoint&
     return true;
 }
 
-void InputHandler::requestSpellingCheckingOptions(imf_sp_text_t& spellCheckingOptionRequest)
+void InputHandler::requestSpellingCheckingOptions(imf_sp_text_t& spellCheckingOptionRequest, const WebCore::IntSize& screenOffset)
 {
     // If the caret is no longer active, no message should be sent.
     if (m_webPage->focusedOrMainFrame()->selection()->selectionType() != VisibleSelection::CaretSelection)
         return;
 
     // imf_sp_text_t should be generated in pixel viewport coordinates.
-    WebCore::IntRect caretLocation = m_webPage->focusedOrMainFrame()->selection()->selection().visibleStart().absoluteCaretBounds();
-    caretLocation = m_webPage->mapToTransformed(m_webPage->focusedOrMainFrame()->view()->contentsToWindow(enclosingIntRect(caretLocation)));
-    m_webPage->clipToTransformedContentsRect(caretLocation);
+    WebCore::IntRect caretRect = m_webPage->focusedOrMainFrame()->selection()->selection().visibleStart().absoluteCaretBounds();
+    caretRect = m_webPage->focusedOrMainFrame()->view()->contentsToRootView(caretRect);
+    const WebCore::IntPoint scrollPosition = m_webPage->mainFrame()->view()->scrollPosition();
+    caretRect.move(scrollPosition.x(), scrollPosition.y());
 
-    spellCheckingOptionRequest.caret_rect.caret_top_x = caretLocation.x();
-    spellCheckingOptionRequest.caret_rect.caret_top_y = caretLocation.y();
-    spellCheckingOptionRequest.caret_rect.caret_bottom_x = caretLocation.x();
-    spellCheckingOptionRequest.caret_rect.caret_bottom_y = caretLocation.y() + caretLocation.height();
+    InputLog(LogLevelInfo, "InputHandler::requestSpellingCheckingOptions caretRect topLeft=(%d,%d), bottomRight=(%d,%d), startTextPosition=%d, endTextPosition=%d"
+                            , caretRect.minXMinYCorner().x(), caretRect.minXMinYCorner().y(), caretRect.maxXMaxYCorner().x(), caretRect.maxXMaxYCorner().y()
+                            , spellCheckingOptionRequest.startTextPosition, spellCheckingOptionRequest.endTextPosition);
 
-    SpellingLog(LogLevelInfo, "InputHandler::requestSpellingCheckingOptions Sending request:\ncaret_rect.caret_top_x = %d\ncaret_rect.caret_top_y = %d" \
-                              "\ncaret_rect.caret_bottom_x = %d\ncaret_rect.caret_bottom_y = %d\nstartTextPosition = %d\nendTextPosition = %d",
-                              spellCheckingOptionRequest.caret_rect.caret_top_x, spellCheckingOptionRequest.caret_rect.caret_top_y,
-                              spellCheckingOptionRequest.caret_rect.caret_bottom_x, spellCheckingOptionRequest.caret_rect.caret_bottom_y,
-                              spellCheckingOptionRequest.startTextPosition, spellCheckingOptionRequest.endTextPosition);
-
-    m_webPage->m_client->requestSpellingCheckingOptions(spellCheckingOptionRequest);
+    m_webPage->m_client->requestSpellingCheckingOptions(spellCheckingOptionRequest, caretRect, screenOffset);
 }
 
 void InputHandler::setElementUnfocused(bool refocusOccuring)
@@ -974,6 +982,9 @@ bool InputHandler::openDatePopup(HTMLInputElement* element, BlackBerryInputType 
     case BlackBerry::Platform::InputTypeDateTime:
     case BlackBerry::Platform::InputTypeDateTimeLocal:
     case BlackBerry::Platform::InputTypeMonth: {
+        // Date input have button appearance, we hide caret when they get clicked.
+        element->document()->frame()->selection()->setCaretVisible(false);
+
         // Check if popup already exists, close it if does.
         m_webPage->m_page->chrome()->client()->closePagePopup(0);
         WTF::String value = element->value();

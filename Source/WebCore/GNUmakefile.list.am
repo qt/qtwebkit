@@ -1872,7 +1872,7 @@ webcore_modules_sources += \
 	Source/WebCore/Modules/indexeddb/IDBKeyPath.h \
 	Source/WebCore/Modules/indexeddb/IDBKeyRange.cpp \
 	Source/WebCore/Modules/indexeddb/IDBKeyRange.h \
-	Source/WebCore/Modules/indexeddb/IDBLevelDBBackingStore.cpp \
+	Source/WebCore/Modules/indexeddb/IDBBackingStore.cpp \
 	Source/WebCore/Modules/indexeddb/IDBLevelDBBackingStore.h \
 	Source/WebCore/Modules/indexeddb/IDBLevelDBCoding.cpp \
 	Source/WebCore/Modules/indexeddb/IDBLevelDBCoding.h \
@@ -4278,7 +4278,7 @@ webcore_sources += \
 	Source/WebCore/platform/FileSystem.cpp \
 	Source/WebCore/platform/FileSystem.h \
 	Source/WebCore/platform/FloatConversion.h \
-	Source/WebCore/platform/FractionalLayoutUnit.h \
+	Source/WebCore/platform/LayoutUnit.h \
 	Source/WebCore/platform/Gamepads.h \
 	Source/WebCore/platform/HashTools.h \
 	Source/WebCore/platform/HistogramSupport.cpp \
@@ -4442,12 +4442,12 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/FontSmoothingMode.h \
 	Source/WebCore/platform/graphics/FontTraitsMask.h \
 	Source/WebCore/platform/graphics/FontWidthVariant.h \
-	Source/WebCore/platform/graphics/FractionalLayoutBoxExtent.cpp \
-	Source/WebCore/platform/graphics/FractionalLayoutBoxExtent.h \
-	Source/WebCore/platform/graphics/FractionalLayoutPoint.h \
-	Source/WebCore/platform/graphics/FractionalLayoutRect.cpp \
-	Source/WebCore/platform/graphics/FractionalLayoutRect.h \
-	Source/WebCore/platform/graphics/FractionalLayoutSize.h \
+	Source/WebCore/platform/graphics/LayoutBoxExtent.cpp \
+	Source/WebCore/platform/graphics/LayoutBoxExtent.h \
+	Source/WebCore/platform/graphics/LayoutPoint.h \
+	Source/WebCore/platform/graphics/LayoutRect.cpp \
+	Source/WebCore/platform/graphics/LayoutRect.h \
+	Source/WebCore/platform/graphics/LayoutSize.h \
 	Source/WebCore/platform/graphics/GeneratedImage.cpp \
 	Source/WebCore/platform/graphics/GeneratedImage.h \
 	Source/WebCore/platform/graphics/Generator.h \
@@ -4559,6 +4559,7 @@ webcore_sources += \
 	Source/WebCore/platform/graphics/transforms/TranslateTransformOperation.h \
 	Source/WebCore/platform/graphics/TypesettingFeatures.h \
 	Source/WebCore/platform/graphics/UnitBezier.h \
+	Source/WebCore/platform/graphics/WidthCache.h \
 	Source/WebCore/platform/graphics/WidthIterator.cpp \
 	Source/WebCore/platform/graphics/WidthIterator.h \
 	Source/WebCore/platform/graphics/WindRule.h \
@@ -4990,8 +4991,6 @@ webcore_sources += \
 	Source/WebCore/rendering/InlineTextBox.h \
 	Source/WebCore/rendering/LayoutState.cpp \
 	Source/WebCore/rendering/LayoutState.h \
-	Source/WebCore/rendering/LayoutTypes.h \
-	Source/WebCore/rendering/LayoutTypesInlineMethods.h \
 	Source/WebCore/rendering/LayoutRepainter.h \
 	Source/WebCore/rendering/LayoutRepainter.cpp \
 	Source/WebCore/rendering/OverlapTestRequestClient.h \
@@ -5825,10 +5824,10 @@ webcore_sources += \
 	Source/WebCore/workers/WorkerScriptLoader.h \
 	Source/WebCore/workers/WorkerThread.cpp \
 	Source/WebCore/workers/WorkerThread.h \
-	Source/WebCore/xml/parser/CharacterReferenceParserInlineMethods.h \
+	Source/WebCore/xml/parser/CharacterReferenceParserInlines.h \
 	Source/WebCore/xml/parser/MarkupTokenBase.h \
 	Source/WebCore/xml/parser/MarkupTokenizerBase.h \
-	Source/WebCore/xml/parser/MarkupTokenizerInlineMethods.h \
+	Source/WebCore/xml/parser/MarkupTokenizerInlines.h \
 	Source/WebCore/xml/parser/NewXMLDocumentParser.cpp \
 	Source/WebCore/xml/parser/NewXMLDocumentParser.h \
 	Source/WebCore/xml/parser/XMLCharacterReferenceParser.cpp \

@@ -37,7 +37,7 @@
 #include "FontBaseline.h"
 #include "FontDescription.h"
 #include "GraphicsTypes.h"
-#include "LayoutTypesInlineMethods.h"
+#include "LayoutBoxExtent.h"
 #include "Length.h"
 #include "LengthBox.h"
 #include "LengthFunctions.h"
@@ -981,7 +981,7 @@ public:
     ESpeak speak() const { return static_cast<ESpeak>(rareInheritedData->speak); }
 
 #if ENABLE(CSS_FILTERS)
-    FilterOperations& filter() { return rareNonInheritedData.access()->m_filter.access()->m_operations; }
+    FilterOperations& mutableFilter() { return rareNonInheritedData.access()->m_filter.access()->m_operations; }
     const FilterOperations& filter() const { return rareNonInheritedData->m_filter->m_operations; }
     bool hasFilter() const { return !rareNonInheritedData->m_filter->m_operations.operations().isEmpty(); }
 #else

@@ -187,6 +187,9 @@ struct GraphicsSurfacePrivate {
             XFreePixmap(m_display, m_xPixmap);
         m_xPixmap = 0;
 
+        if (m_fbConfigs)
+            XFree(m_fbConfigs);
+
         if (m_glContext)
             glXDestroyContext(m_display, m_glContext);
     }
@@ -207,6 +210,7 @@ struct GraphicsSurfacePrivate {
             CWBackPixel | CWBorderPixel | CWColormap, &a);
         XSetWindowBackgroundPixmap(m_display, m_surface, 0);
         XCompositeRedirectWindow(m_display, m_surface, CompositeRedirectManual);
+        XFree(visualInfo);
 
         // Make sure the XRender Extension is available.
         int eventBasep, errorBasep;
@@ -237,6 +241,11 @@ struct GraphicsSurfacePrivate {
         m_textureIsYInverted = !!inverted;
 
         XFree(configs);
+    }
+
+    bool textureIsYInverted()
+    {
+        return m_textureIsYInverted;
     }
 
     void makeCurrent()
@@ -378,7 +387,8 @@ void GraphicsSurface::platformPaintToTextureMapper(TextureMapper* textureMapper,
     TextureMapperGL* texMapGL = static_cast<TextureMapperGL*>(textureMapper);
     TransformationMatrix adjustedTransform = transform;
     adjustedTransform.multiply(TransformationMatrix::rectToRect(FloatRect(FloatPoint::zero(), m_size), targetRect));
-    texMapGL->drawTexture(platformGetTextureID(), TextureMapperGL::ShouldFlipTexture, m_size, targetRect, adjustedTransform, opacity, mask);
+    TextureMapperGL::Flags flags = m_private->textureIsYInverted() ? TextureMapperGL::ShouldFlipTexture : 0;
+    texMapGL->drawTexture(platformGetTextureID(), flags, m_size, targetRect, adjustedTransform, opacity, mask);
 }
 
 uint32_t GraphicsSurface::platformFrontBuffer() const

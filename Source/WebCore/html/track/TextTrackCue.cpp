@@ -95,7 +95,7 @@ TextTrackCueBox::TextTrackCueBox(Document* document, TextTrackCue* cue)
     : HTMLElement(divTag, document)
     , m_cue(cue)
 {
-    setShadowPseudoId(shadowPseudoId());
+    setPseudo(textTrackCueBoxShadowPseudoId());
 }
 
 TextTrackCue* TextTrackCueBox::getCue() const
@@ -170,13 +170,8 @@ void TextTrackCueBox::applyCSSProperties()
 
 const AtomicString& TextTrackCueBox::textTrackCueBoxShadowPseudoId()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, trackDisplayBoxShadowPseudoId, ("-webkit-media-text-track-display"));
+    DEFINE_STATIC_LOCAL(const AtomicString, trackDisplayBoxShadowPseudoId, ("-webkit-media-text-track-display", AtomicString::ConstructFromLiteral));
     return trackDisplayBoxShadowPseudoId;
-}
-
-const AtomicString& TextTrackCueBox::shadowPseudoId() const
-{
-    return textTrackCueBoxShadowPseudoId();
 }
 
 RenderObject* TextTrackCueBox::createRenderer(RenderArena* arena, RenderStyle*)
@@ -678,10 +673,10 @@ void TextTrackCue::updateDisplayTree(float movieTime)
 
     // Clear the contents of the two sets.
     m_futureDocumentNodes->removeChildren();
-    m_futureDocumentNodes->setShadowPseudoId(futureNodesShadowPseudoId());
+    m_futureDocumentNodes->setPseudo(futureNodesShadowPseudoId());
 
     m_pastDocumentNodes->removeChildren();
-    m_pastDocumentNodes->setShadowPseudoId(pastNodesShadowPseudoId());
+    m_pastDocumentNodes->setPseudo(pastNodesShadowPseudoId());
 
     // Update the two sets containing past and future WebVTT objects.
     RefPtr<DocumentFragment> referenceTree = getCueAsHTML();

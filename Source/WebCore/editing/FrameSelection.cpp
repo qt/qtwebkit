@@ -75,7 +75,7 @@ using namespace HTMLNames;
 
 static inline LayoutUnit NoXPosForVerticalArrowNavigation()
 {
-    return MIN_LAYOUT_UNIT;
+    return LayoutUnit::min();
 }
 
 CaretBase::CaretBase(CaretVisibility visibility)
@@ -337,7 +337,7 @@ static void clearRenderViewSelection(const Position& position)
 {
     RefPtr<Document> document = position.anchorNode()->document();
     document->updateStyleIfNeeded();
-    if (RenderView* view = toRenderView(document->renderer()))
+    if (RenderView* view = document->renderView())
         view->clearSelection();
 }
 
@@ -1263,10 +1263,15 @@ RenderObject* DragCaretController::caretRenderer() const
     return CaretBase::caretRenderer(m_position.deepEquivalent().deprecatedNode());
 }
 
+static bool isNonOrphanedCaret(const VisibleSelection& selection)
+{
+    return selection.isCaret() && !selection.start().isOrphan() && !selection.end().isOrphan();
+}
+
 LayoutRect FrameSelection::localCaretRect()
 {
     if (shouldUpdateCaretRect()) {
-        if (!isCaret() || m_selection.start().isOrphan() || m_selection.end().isOrphan())
+        if (!isNonOrphanedCaret(m_selection))
             clearCaretRect();
         else if (updateCaretRect(m_frame->document(), VisiblePosition(m_selection.start(), m_selection.affinity())))
             m_absCaretBoundsDirty = true;
@@ -1320,6 +1325,7 @@ bool FrameSelection::recomputeCaretRect()
     FrameView* v = m_frame->document()->view();
     if (!v)
         return false;
+    ASSERT(!v->needsLayout());
 
     LayoutRect oldRect = localCaretRectWithoutUpdate();
     LayoutRect newRect = localCaretRect();
@@ -1342,7 +1348,7 @@ bool FrameSelection::recomputeCaretRect()
     m_absoluteCaretRepaintBounds = caretRepaintRect(m_selection.start().deprecatedNode());
 
 #if ENABLE(TEXT_CARET)
-    if (RenderView* view = toRenderView(m_frame->document()->renderer())) {
+    if (RenderView* view = m_frame->document()->renderView()) {
         // FIXME: make caret repainting container-aware.
         view->repaintRectangleInViewAndCompositedLayers(oldAbsoluteCaretRepaintBounds, false);
         if (shouldRepaintCaret(view, isContentEditable()))
@@ -1383,9 +1389,11 @@ void CaretBase::invalidateCaretRect(Node* node, bool caretRectChanged)
     // away after clicking.
     m_caretRectNeedsUpdate = true;
 
-    if (!caretRectChanged) {
-        RenderView* view = toRenderView(node->document()->renderer());
-        if (view && shouldRepaintCaret(view, node->isContentEditable(Node::UserSelectAllIsAlwaysNonEditable)))
+    if (caretRectChanged)
+        return;
+
+    if (RenderView* view = node->document()->renderView()) {
+        if (shouldRepaintCaret(view, node->isContentEditable(Node::UserSelectAllIsAlwaysNonEditable)))
             view->repaintRectangleInViewAndCompositedLayers(caretRepaintRect(node), false);
     }
 }
@@ -1652,7 +1660,7 @@ void FrameSelection::focusedOrActiveStateChanged()
     // Because RenderObject::selectionBackgroundColor() and
     // RenderObject::selectionForegroundColor() check if the frame is active,
     // we have to update places those colors were painted.
-    if (RenderView* view = toRenderView(m_frame->document()->renderer()))
+    if (RenderView* view = m_frame->document()->renderView())
         view->repaintRectangleInViewAndCompositedLayers(enclosingIntRect(bounds()));
 
     // Caret appears in the active frame.
@@ -1719,14 +1727,19 @@ inline static bool shouldStopBlinkingDueToTypingCommand(Frame* frame)
 void FrameSelection::updateAppearance()
 {
 #if ENABLE(TEXT_CARET)
-    bool caretRectChanged = recomputeCaretRect();
+    bool caretRectChangedOrCleared = false;
+    if (isNonOrphanedCaret(m_selection)) {
+        m_frame->document()->updateLayout();
+        caretRectChangedOrCleared = recomputeCaretRect();
+    } else
+        caretRectChangedOrCleared = true;
 
     bool caretBrowsing = m_frame->settings() && m_frame->settings()->caretBrowsingEnabled();
     bool shouldBlink = caretIsVisible() && isCaret() && (isContentEditable() || caretBrowsing);
 
     // If the caret moved, stop the blink timer so we can restart with a
     // black caret in the new location.
-    if (caretRectChanged || !shouldBlink || shouldStopBlinkingDueToTypingCommand(m_frame))
+    if (caretRectChangedOrCleared || !shouldBlink || shouldStopBlinkingDueToTypingCommand(m_frame))
         m_caretBlinkTimer.stop();
 
     // Start blinking with a black caret. Be sure not to restart if we're
@@ -1784,19 +1797,17 @@ void FrameSelection::setCaretVisibility(CaretVisibility visibility)
 {
     if (caretVisibility() == visibility)
         return;
-    clearCaretRectIfNeeded();
-    CaretBase::setCaretVisibility(visibility);
-    updateAppearance();
-}
 
-void FrameSelection::clearCaretRectIfNeeded()
-{
 #if ENABLE(TEXT_CARET)
-    if (!m_caretPaint)
-        return;
-    m_caretPaint = false;
-    invalidateCaretRect();
+    m_frame->document()->updateLayoutIgnorePendingStylesheets();
+    if (m_caretPaint) {
+        m_caretPaint = false;
+        invalidateCaretRect();
+    }
+    CaretBase::setCaretVisibility(visibility);
 #endif
+
+    updateAppearance();
 }
 
 void FrameSelection::caretBlinkTimerFired(Timer<FrameSelection>*)

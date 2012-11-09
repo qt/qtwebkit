@@ -169,11 +169,15 @@ void TextureMapperLayer::paintSelf(const TextureMapperPaintOptions& options)
     float opacity = options.opacity;
     RefPtr<BitmapTexture> mask = options.mask;
 
-    if (m_backingStore)
+    if (m_backingStore) {
+        ASSERT(!layerRect().isEmpty());
         m_backingStore->paintToTextureMapper(options.textureMapper, layerRect(), transform, opacity, mask.get());
+    }
 
-    if (m_contentsLayer)
+    if (m_contentsLayer) {
+        ASSERT(!layerRect().isEmpty());
         m_contentsLayer->paintToTextureMapper(options.textureMapper, m_state.contentsRect, transform, opacity, mask.get());
+    }
 }
 
 int TextureMapperLayer::compareGraphicsLayersZValue(const void* a, const void* b)
@@ -488,7 +492,7 @@ void TextureMapperLayer::flushCompositingStateSelf(GraphicsLayerTextureMapper* g
     m_state.needsDisplay = m_state.needsDisplay || graphicsLayer->needsDisplay();
     if (!m_state.needsDisplay)
         m_state.needsDisplayRect.unite(graphicsLayer->needsDisplayRect());
-    m_contentsLayer = graphicsLayer->contentsLayer();
+    m_contentsLayer = graphicsLayer->platformLayer();
 
     m_transform.setPosition(adjustedPosition());
     m_transform.setAnchorPoint(m_state.anchorPoint);

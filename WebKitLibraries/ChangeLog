@@ -1,3 +1,21 @@
+2012-11-08  Anders Carlsson  <andersca@apple.com>
+
+        Roll WebKitSystemInterface DEPS.
+
+        Rubber-stamped by Andreas Kling.
+
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceMountainLion.a:
+
+2012-11-07  Roger Fong  <roger_fong@apple.com>
+
+        Enable Subpixel Layout on Windows. Rebaseline any failing tests that were rebaselined in r133351.
+        https://bugs.webkit.org/show_bug.cgi?id=101538
+
+        Rubberstamped by Tim Horton.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+
 2012-11-06  Anders Carlsson  <andersca@apple.com>
 
         Build fix.

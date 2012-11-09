@@ -28,15 +28,23 @@
 
 #include "WKEinaSharedString.h"
 #include "WKSecurityOrigin.h"
+#include "ewk_object_private.h"
+#include <WebCore/KURL.h>
 #include <WebKit2/WKBase.h>
 #include <wtf/PassRefPtr.h>
-#include <wtf/RefCounted.h>
 
-class Ewk_Security_Origin : public RefCounted<Ewk_Security_Origin> {
+class EwkSecurityOrigin : public Ewk_Object {
 public:
-    static PassRefPtr<Ewk_Security_Origin> create(WKSecurityOriginRef originRef)
+    EWK_OBJECT_DECLARE(EwkSecurityOrigin)
+
+    static PassRefPtr<EwkSecurityOrigin> create(WKSecurityOriginRef originRef)
     {
-        return adoptRef(new Ewk_Security_Origin(originRef));
+        return adoptRef(new EwkSecurityOrigin(originRef));
+    }
+
+    static PassRefPtr<EwkSecurityOrigin> create(const WebCore::KURL& url)
+    {
+        return adoptRef(new EwkSecurityOrigin(url));
     }
 
     const char* host() const;
@@ -44,7 +52,8 @@ public:
     uint32_t port() const;
 
 private:
-    explicit Ewk_Security_Origin(WKSecurityOriginRef originRef);
+    explicit EwkSecurityOrigin(WKSecurityOriginRef originRef);
+    explicit EwkSecurityOrigin(const WebCore::KURL& url);
 
     WKRetainPtr<WKSecurityOriginRef> m_wkOrigin;
     WKEinaSharedString m_host;

@@ -25,7 +25,6 @@
 #include "ContextHistoryClientEfl.h"
 #include "NetworkInfoProvider.h"
 #include "RequestManagerClientEfl.h"
-#include "VibrationProvider.h"
 #include "WKAPICast.h"
 #include "WKContextSoup.h"
 #include "WKNumber.h"
@@ -54,7 +53,7 @@
 using namespace WebCore;
 using namespace WebKit;
 
-typedef HashMap<WKContextRef, EwkContext*> ContextMap;
+typedef HashMap<WebContext*, EwkContext*> ContextMap;
 
 static inline ContextMap& contextMap()
 {
@@ -62,24 +61,21 @@ static inline ContextMap& contextMap()
     return map;
 }
 
-EwkContext::EwkContext(WKContextRef context)
+EwkContext::EwkContext(PassRefPtr<WebContext> context)
     : m_context(context)
-    , m_databaseManager(Ewk_Database_Manager::create(WKContextGetDatabaseManager(m_context.get())))
-    , m_storageManager(Ewk_Storage_Manager::create(WKContextGetKeyValueStorageManager(m_context.get())))
+    , m_databaseManager(Ewk_Database_Manager::create(m_context))
+    , m_storageManager(Ewk_Storage_Manager::create(m_context))
 #if ENABLE(BATTERY_STATUS)
-    , m_batteryProvider(BatteryProvider::create(context))
+    , m_batteryProvider(BatteryProvider::create(toAPI(m_context.get()))) // FIXME: All below should be initialized consistently.
 #endif
 #if ENABLE(NETWORK_INFO)
-    , m_networkInfoProvider(NetworkInfoProvider::create(context))
-#endif
-#if ENABLE(VIBRATION)
-    , m_vibrationProvider(VibrationProvider::create(context))
+    , m_networkInfoProvider(NetworkInfoProvider::create(toAPI(m_context.get())))
 #endif
     , m_downloadManager(DownloadManagerEfl::create(this))
     , m_requestManagerClient(RequestManagerClientEfl::create(this))
-    , m_historyClient(ContextHistoryClientEfl::create(context))
+    , m_historyClient(ContextHistoryClientEfl::create(toAPI(m_context.get())))
 {
-    ContextMap::AddResult result = contextMap().add(context, this);
+    ContextMap::AddResult result = contextMap().add(m_context.get(), this);
     ASSERT_UNUSED(result, result.isNewEntry);
 
 #if ENABLE(MEMORY_SAMPLER)
@@ -87,8 +83,7 @@ EwkContext::EwkContext(WKContextRef context)
     static const char environmentVariable[] = "SAMPLE_MEMORY";
 
     if (!initializeMemorySampler && getenv(environmentVariable)) {
-        WKRetainPtr<WKDoubleRef> interval(AdoptWK, WKDoubleCreate(0.0));
-        WKContextStartMemorySampler(context, interval.get());
+        m_context->startMemorySampler(0.0);
         initializeMemorySampler = true;
     }
 #endif
@@ -108,17 +103,17 @@ EwkContext::~EwkContext()
     contextMap().remove(m_context.get());
 }
 
-PassRefPtr<EwkContext> EwkContext::create(WKContextRef context)
+PassRefPtr<EwkContext> EwkContext::create(PassRefPtr<WebContext> context)
 {
-    if (contextMap().contains(context))
-        return contextMap().get(context); // Will be ref-ed automatically.
+    if (contextMap().contains(context.get()))
+        return contextMap().get(context.get()); // Will be ref-ed automatically.
 
     return adoptRef(new EwkContext(context));
 }
 
 PassRefPtr<EwkContext> EwkContext::create()
 {
-    return create(adoptWK(WKContextCreate()).get());
+    return create(WebContext::create(String()));
 }
 
 PassRefPtr<EwkContext> EwkContext::create(const String& injectedBundlePath)
@@ -126,15 +121,12 @@ PassRefPtr<EwkContext> EwkContext::create(const String& injectedBundlePath)
     if (!fileExists(injectedBundlePath))
         return 0;
 
-    WKRetainPtr<WKStringRef> injectedBundlePathWK = adoptWK(toCopiedAPI(injectedBundlePath));
-    WKRetainPtr<WKContextRef> contextWK = adoptWK(WKContextCreateWithInjectedBundlePath(injectedBundlePathWK.get()));
-
-    return create(contextWK.get());
+    return create(WebContext::create(injectedBundlePath));
 }
 
 PassRefPtr<EwkContext> EwkContext::defaultContext()
 {
-    static RefPtr<EwkContext> defaultInstance = create(adoptWK(WKContextCreate()).get());
+    static RefPtr<EwkContext> defaultInstance = create();
 
     return defaultInstance;
 }
@@ -142,7 +134,7 @@ PassRefPtr<EwkContext> EwkContext::defaultContext()
 Ewk_Cookie_Manager* EwkContext::cookieManager()
 {
     if (!m_cookieManager)
-        m_cookieManager = Ewk_Cookie_Manager::create(WKContextGetCookieManager(m_context.get()));
+        m_cookieManager = Ewk_Cookie_Manager::create(WKContextGetCookieManager(toAPI(m_context.get())));
 
     return m_cookieManager.get();
 }
@@ -157,23 +149,21 @@ void EwkContext::ensureFaviconDatabase()
     if (m_faviconDatabase)
         return;
 
-    m_faviconDatabase = Ewk_Favicon_Database::create(toImpl(m_context.get())->iconDatabase());
+    m_faviconDatabase = Ewk_Favicon_Database::create(m_context.get()->iconDatabase());
 }
 
 bool EwkContext::setFaviconDatabaseDirectoryPath(const String& databaseDirectory)
 {
     ensureFaviconDatabase();
 
-    WebContext* webContext = toImpl(m_context.get());
-
     // The database path is already open so its path was
     // already set.
-    if (webContext->iconDatabase()->isOpen())
+    if (m_context->iconDatabase()->isOpen())
         return false;
 
     // If databaseDirectory is empty, we use the default database path for the platform.
-    String databasePath = databaseDirectory.isEmpty() ? webContext->iconDatabasePath() : pathByAppendingComponent(databaseDirectory, WebCore::IconDatabase::defaultDatabaseFilename());
-    webContext->setIconDatabasePath(databasePath);
+    String databasePath = databaseDirectory.isEmpty() ? m_context->iconDatabasePath() : pathByAppendingComponent(databaseDirectory, WebCore::IconDatabase::defaultDatabaseFilename());
+    m_context->setIconDatabasePath(databasePath);
 
     return true;
 }
@@ -196,27 +186,27 @@ RequestManagerClientEfl* EwkContext::requestManager()
     return m_requestManagerClient.get();
 }
 
-#if ENABLE(VIBRATION)
-PassRefPtr<VibrationProvider> EwkContext::vibrationProvider()
-{
-    return m_vibrationProvider;
-}
-#endif
-
 void EwkContext::addVisitedLink(const String& visitedURL)
 {
-    toImpl(m_context.get())->addVisitedLink(visitedURL);
+    m_context->addVisitedLink(visitedURL);
 }
 
 void EwkContext::setCacheModel(Ewk_Cache_Model cacheModel)
 {
-    WKContextSetCacheModel(m_context.get(), static_cast<Ewk_Cache_Model>(cacheModel));
+    m_context->setCacheModel(static_cast<WebKit::CacheModel>(cacheModel));
 }
 
 Ewk_Cache_Model EwkContext::cacheModel() const
 {
-    return static_cast<Ewk_Cache_Model>(WKContextGetCacheModel(m_context.get()));
+    return static_cast<Ewk_Cache_Model>(m_context->cacheModel());
 }
+
+#if ENABLE(NETSCAPE_PLUGIN_API)
+void EwkContext::setAdditionalPluginPath(const String& path)
+{
+    m_context->setAdditionalPluginsDirectory(path);
+}
+#endif
 
 Ewk_Cookie_Manager* ewk_context_cookie_manager_get(const Ewk_Context* ewkContext)
 {
@@ -251,11 +241,6 @@ Ewk_Storage_Manager* ewk_context_storage_manager_get(const Ewk_Context* ewkConte
     EWK_OBJ_GET_IMPL_OR_RETURN(const EwkContext, ewkContext, impl, 0);
 
     return impl->storageManager();
-}
-
-WKContextRef EwkContext::wkContext()
-{
-    return m_context.get();
 }
 
 DownloadManagerEfl* EwkContext::downloadManager() const
@@ -296,15 +281,6 @@ Eina_Bool ewk_context_url_scheme_register(Ewk_Context* ewkContext, const char* s
     return true;
 }
 
-void ewk_context_vibration_client_callbacks_set(Ewk_Context* ewkContext, Ewk_Vibration_Client_Vibrate_Cb vibrate, Ewk_Vibration_Client_Vibration_Cancel_Cb cancel, void* data)
-{
-    EWK_OBJ_GET_IMPL_OR_RETURN(EwkContext, ewkContext, impl);
-
-#if ENABLE(VIBRATION)
-    impl->vibrationProvider()->setVibrationClientCallbacks(vibrate, cancel, data);
-#endif
-}
-
 void ewk_context_history_callbacks_set(Ewk_Context* ewkContext, Ewk_History_Navigation_Cb navigate, Ewk_History_Client_Redirection_Cb clientRedirect, Ewk_History_Server_Redirection_Cb serverRedirect, Ewk_History_Title_Update_Cb titleUpdate, Ewk_History_Populate_Visited_Links_Cb populateVisitedLinks, void* data)
 {
     EWK_OBJ_GET_IMPL_OR_RETURN(EwkContext, ewkContext, impl);
@@ -341,3 +317,15 @@ Ewk_Cache_Model ewk_context_cache_model_get(const Ewk_Context* ewkContext)
     return impl->cacheModel();
 }
 
+Eina_Bool ewk_context_additional_plugin_path_set(Ewk_Context* ewkContext, const char* path)
+{
+    EWK_OBJ_GET_IMPL_OR_RETURN(EwkContext, ewkContext, impl, false);
+    EINA_SAFETY_ON_NULL_RETURN_VAL(path, false);
+
+#if ENABLE(NETSCAPE_PLUGIN_API)
+    impl->setAdditionalPluginPath(String::fromUTF8(path));
+    return true;
+#else
+    return false;
+#endif
+}

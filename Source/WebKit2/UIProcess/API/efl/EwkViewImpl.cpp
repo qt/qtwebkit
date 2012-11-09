@@ -47,6 +47,7 @@
 #include "ewk_popup_menu_item_private.h"
 #include "ewk_popup_menu_private.h"
 #include "ewk_private.h"
+#include "ewk_security_origin_private.h"
 #include "ewk_settings_private.h"
 #include "ewk_view.h"
 #include "ewk_view_private.h"
@@ -55,6 +56,9 @@
 #include <Edje.h>
 #include <WebCore/Cursor.h>
 
+#if ENABLE(VIBRATION)
+#include "VibrationClientEfl.h"
+#endif
 
 #if ENABLE(FULLSCREEN_API)
 #include "WebFullScreenManagerProxy.h"
@@ -101,13 +105,16 @@ EwkViewImpl::EwkViewImpl(Evas_Object* view, PassRefPtr<EwkContext> context, Pass
     : m_view(view)
     , m_context(context)
     , m_pageClient(behavior == DefaultBehavior ? PageClientDefaultImpl::create(this) : PageClientLegacyImpl::create(this))
-    , m_pageProxy(toImpl(m_context->wkContext())->createWebPage(m_pageClient.get(), pageGroup.get()))
+    , m_pageProxy(m_context->webContext()->createWebPage(m_pageClient.get(), pageGroup.get()))
     , m_pageLoadClient(PageLoadClientEfl::create(this))
     , m_pagePolicyClient(PagePolicyClientEfl::create(this))
     , m_pageUIClient(PageUIClientEfl::create(this))
     , m_resourceLoadClient(ResourceLoadClientEfl::create(this))
     , m_findClient(FindClientEfl::create(this))
     , m_formClient(FormClientEfl::create(this))
+#if ENABLE(VIBRATION)
+    , m_vibrationClient(VibrationClientEfl::create(this))
+#endif
     , m_backForwardList(Ewk_Back_Forward_List::create(toAPI(m_pageProxy->backForwardList())))
 #if USE(TILED_BACKING_STORE)
     , m_scaleFactor(1)
@@ -331,7 +338,9 @@ void EwkViewImpl::enterFullScreen()
 {
     Ewk_View_Smart_Data* sd = smartData();
 
-    if (!sd->api->fullscreen_enter || !sd->api->fullscreen_enter(sd)) {
+    RefPtr<EwkSecurityOrigin> origin = EwkSecurityOrigin::create(KURL(ParsedURLString, String::fromUTF8(m_url)));
+
+    if (!sd->api->fullscreen_enter || !sd->api->fullscreen_enter(sd, origin.get())) {
         Ecore_Evas* ecoreEvas = ecore_evas_ecore_evas_get(sd->base.evas);
         ecore_evas_fullscreen_set(ecoreEvas, true);
     }
@@ -351,6 +360,29 @@ void EwkViewImpl::exitFullScreen()
     }
 }
 #endif
+
+WKRect EwkViewImpl::windowGeometry() const
+{
+    Evas_Coord x, y, width, height;
+    Ewk_View_Smart_Data* sd = smartData();
+
+    if (!sd->api->window_geometry_get || !sd->api->window_geometry_get(sd, &x, &y, &width, &height)) {
+        Ecore_Evas* ee = ecore_evas_ecore_evas_get(sd->base.evas);
+        ecore_evas_request_geometry_get(ee, &x, &y, &width, &height);
+    }
+
+    return WKRectMake(x, y, width, height);
+}
+
+void EwkViewImpl::setWindowGeometry(const WKRect& rect)
+{
+    Ewk_View_Smart_Data* sd = smartData();
+
+    if (!sd->api->window_geometry_set || !sd->api->window_geometry_set(sd, rect.origin.x, rect.origin.y, rect.size.width, rect.size.height)) {
+        Ecore_Evas* ee = ecore_evas_ecore_evas_get(sd->base.evas);
+        ecore_evas_move_resize(ee, rect.origin.x, rect.origin.y, rect.size.width, rect.size.height);
+    }
+}
 
 void EwkViewImpl::setImageData(void* imageData, const IntSize& size)
 {

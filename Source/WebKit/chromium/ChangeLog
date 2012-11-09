@@ -1,3 +1,326 @@
+2012-11-08  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r134010.
+        http://trac.webkit.org/changeset/134010
+        https://bugs.webkit.org/show_bug.cgi?id=101716
+
+        Broke the chromium windows build. (Requested by noel_ on
+        #webkit).
+
+        * src/IDBCallbacksProxy.cpp:
+        * src/IDBDatabaseBackendProxy.cpp:
+        (WebKit::IDBDatabaseBackendProxy::transaction):
+        (WebKit):
+        * src/IDBDatabaseBackendProxy.h:
+        (IDBDatabaseBackendProxy):
+        * src/IDBObjectStoreBackendProxy.cpp:
+        (WebKit::IDBObjectStoreBackendProxy::putWithIndexKeys):
+        (WebKit):
+        (WebKit::IDBObjectStoreBackendProxy::setIndexKeys):
+        (WebKit::IDBObjectStoreBackendProxy::createIndex):
+        (WebKit::IDBObjectStoreBackendProxy::setIndexesReady):
+        (WebKit::IDBObjectStoreBackendProxy::index):
+        (WebKit::IDBObjectStoreBackendProxy::deleteIndex):
+        * src/IDBObjectStoreBackendProxy.h:
+        (IDBObjectStoreBackendProxy):
+        * src/WebIDBDatabaseImpl.cpp:
+        (WebKit::WebIDBDatabaseImpl::deleteObjectStore):
+        (WebKit):
+        (WebKit::WebIDBDatabaseImpl::transaction):
+        * src/WebIDBDatabaseImpl.h:
+        (WebIDBDatabaseImpl):
+        * src/WebIDBObjectStoreImpl.cpp:
+        (WebKit::WebIDBObjectStoreImpl::putWithIndexKeys):
+        (WebKit):
+        (WebKit::WebIDBObjectStoreImpl::setIndexKeys):
+        (WebKit::WebIDBObjectStoreImpl::setIndexesReady):
+        (WebKit::WebIDBObjectStoreImpl::index):
+        (WebKit::WebIDBObjectStoreImpl::deleteIndex):
+        * src/WebIDBObjectStoreImpl.h:
+        (WebIDBObjectStoreImpl):
+        * src/WebIDBTransactionImpl.cpp:
+        (WebKit::WebIDBTransactionImpl::objectStore):
+        (WebKit):
+        * src/WebIDBTransactionImpl.h:
+        * tests/IDBRequestTest.cpp:
+
+2012-11-08  Alec Flett  <alecflett@chromium.org>
+
+        IndexedDB: switch frontend to use int64_t-based references
+        https://bugs.webkit.org/show_bug.cgi?id=100426
+
+        Reviewed by Tony Chang.
+
+        Remove implementation stubs from chromium API for
+        methods obsoleted by https://bugs.webkit.org/show_bug.cgi?id=100425
+
+        * src/IDBObjectStoreBackendProxy.cpp:
+        * src/IDBObjectStoreBackendProxy.h:
+        (IDBObjectStoreBackendProxy):
+        * src/WebIDBDatabaseImpl.cpp:
+        * src/WebIDBDatabaseImpl.h:
+        (WebIDBDatabaseImpl):
+        * src/WebIDBObjectStoreImpl.cpp:
+        * src/WebIDBObjectStoreImpl.h:
+        (WebIDBObjectStoreImpl):
+
+2012-11-08  Keishi Hattori  <keishi@webkit.org>
+
+        WebPagePopupImpl::handleKeyEvent is called after WebPagePopupImpl::close
+        https://bugs.webkit.org/show_bug.cgi?id=93800
+
+        Reviewed by Kent Tamura.
+
+        We need to set m_closing to true in WebPagePopupImpl::close so we won't access m_page in WebPagePopupImpl::handleKeyEvent.
+
+        * src/WebPagePopupImpl.cpp:
+        (WebKit::WebPagePopupImpl::close): Set m_closing to true.
+
+2012-11-08  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r133984.
+        http://trac.webkit.org/changeset/133984
+        https://bugs.webkit.org/show_bug.cgi?id=101684
+
+        windows build error. (Requested by hayato on #webkit).
+
+        * src/IDBObjectStoreBackendProxy.cpp:
+        (WebKit::IDBObjectStoreBackendProxy::putWithIndexKeys):
+        (WebKit):
+        (WebKit::IDBObjectStoreBackendProxy::setIndexKeys):
+        (WebKit::IDBObjectStoreBackendProxy::createIndex):
+        (WebKit::IDBObjectStoreBackendProxy::setIndexesReady):
+        (WebKit::IDBObjectStoreBackendProxy::index):
+        (WebKit::IDBObjectStoreBackendProxy::deleteIndex):
+        * src/IDBObjectStoreBackendProxy.h:
+        (IDBObjectStoreBackendProxy):
+        * src/WebIDBDatabaseImpl.cpp:
+        (WebKit::WebIDBDatabaseImpl::deleteObjectStore):
+        (WebKit):
+        (WebKit::WebIDBDatabaseImpl::transaction):
+        * src/WebIDBDatabaseImpl.h:
+        (WebIDBDatabaseImpl):
+        * src/WebIDBObjectStoreImpl.cpp:
+        (WebKit::WebIDBObjectStoreImpl::putWithIndexKeys):
+        (WebKit):
+        (WebKit::WebIDBObjectStoreImpl::setIndexKeys):
+        (WebKit::WebIDBObjectStoreImpl::setIndexesReady):
+        (WebKit::WebIDBObjectStoreImpl::index):
+        (WebKit::WebIDBObjectStoreImpl::deleteIndex):
+        * src/WebIDBObjectStoreImpl.h:
+        (WebIDBObjectStoreImpl):
+        * src/WebIDBTransactionImpl.cpp:
+        (WebKit::WebIDBTransactionImpl::objectStore):
+        (WebKit):
+        * src/WebIDBTransactionImpl.h:
+
+2012-11-08  Alec Flett  <alecflett@chromium.org>
+
+        IndexedDB: switch frontend to use int64_t-based references
+        https://bugs.webkit.org/show_bug.cgi?id=100426
+
+        Reviewed by Tony Chang.
+
+        Remove implementation stubs from chromium API for
+        methods obsoleted by https://bugs.webkit.org/show_bug.cgi?id=100425
+
+        * src/IDBObjectStoreBackendProxy.cpp:
+        * src/IDBObjectStoreBackendProxy.h:
+        (IDBObjectStoreBackendProxy):
+        * src/WebIDBDatabaseImpl.cpp:
+        * src/WebIDBDatabaseImpl.h:
+        (WebIDBDatabaseImpl):
+        * src/WebIDBObjectStoreImpl.cpp:
+        * src/WebIDBObjectStoreImpl.h:
+        (WebIDBObjectStoreImpl):
+
+2012-11-07  Kent Tamura  <tkent@chromium.org>
+
+        [Chromium] WebElement::hasHTMLTagName returns true for non-HTML elements
+        https://bugs.webkit.org/show_bug.cgi?id=101537
+
+        Reviewed by Abhishek Arya.
+
+        We should not do ignore-case comparison for tagName, which is always
+        upper-case and createElementNS(xhtmlNS, "INPUT") doesn't create an
+        HTMLInputElement object. We need to check if localName is equal to
+        "input" in this case.
+
+        * src/WebElement.cpp:
+        (WebKit::WebElement::hasHTMLTagName):
+
+2012-11-08  Joshua Bell  <jsbell@chromium.org>
+
+        Expose snapshots in platform/leveldb wrapper API
+        https://bugs.webkit.org/show_bug.cgi?id=100786
+
+        Reviewed by Tony Chang.
+
+        Add unit tests for transactions/snapshots.
+
+        * tests/LevelDBTest.cpp:
+        (WebCore::encodeString): Don't append to pre-sized vector.
+        (WebCore::TEST):
+        (WebCore):
+
+2012-11-08  Adam Barth  <abarth@webkit.org>
+
+        Unreviewed.
+
+        Roll Chromium DEPS: 166678 => 166755
+
+        * DEPS:
+
+2012-11-08  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
+2012-11-08  Sami Kyostila  <skyostil@chromium.org>
+
+        Introduce WebScreenInfo.deviceScaleFactor
+        https://bugs.webkit.org/show_bug.cgi?id=101613
+
+        Reviewed by Adam Barth.
+
+        Introduce the WebScreenInfo.deviceScaleFactor property, which specifies the
+        ratio between physical and logical pixels. This is the first step in replacing
+        horizontalDPI/verticalDPI in favor of the deviceScaleFactor.
+
+        For now, this value is only initialized on Mac, because the other ports that
+        use it initialize the value in Chromium, whereas Windows and X11 default to a
+        factor of 1. The value on Mac is truncated to an integer to match the
+        expectation in Chromium's RenderWidget.
+
+        * src/mac/WebScreenInfoFactory.mm:
+        (WebKit::WebScreenInfoFactory::screenInfo):
+
+2012-11-08  Dan Carney  <dcarney@google.com>
+
+        Cleanup IDBBindingUtilitiesTest
+        https://bugs.webkit.org/show_bug.cgi?id=100860
+
+        Reviewed by Adam Barth.
+
+        Small cleanup of IDBBindingUtilitiesTest as per
+        https://bugs.webkit.org/show_bug.cgi?id=99975#c38
+
+        * tests/IDBBindingUtilitiesTest.cpp:
+        (IDBKeyFromValueAndKeyPathTest):
+        (WebKit::IDBKeyFromValueAndKeyPathTest::IDBKeyFromValueAndKeyPathTest):
+        (WebKit::IDBKeyFromValueAndKeyPathTest::context):
+        (WebKit):
+        (WebKit::TEST_F):
+
+2012-11-08  Keishi Hattori  <keishi@webkit.org>
+
+        Add properties for week/month picker in DateTimeChooserImpl::writeDocument
+        https://bugs.webkit.org/show_bug.cgi?id=101552
+
+        Reviewed by Kent Tamura.
+
+        Changing the arguments for calendar picker to support week/month picker.
+
+        * src/DateTimeChooserImpl.cpp:
+        (WebKit::DateTimeChooserImpl::writeDocument):
+
+2012-11-08  Dimitri Glazkov  <dglazkov@chromium.org>
+
+        Unreviewed, rolling out r133429.
+        http://trac.webkit.org/changeset/133429
+        https://bugs.webkit.org/show_bug.cgi?id=101173
+
+        Speculative roll out, investigating perf regression.
+
+        * src/ContextFeaturesClientImpl.cpp:
+        (WebKit::ContextFeaturesClientImpl::askIfIsEnabled):
+
+2012-11-08  Yury Semikhatsky  <yurys@chromium.org>
+
+        Web Inspector: move front-end methods called from native part to InspectorFrontendAPI
+        https://bugs.webkit.org/show_bug.cgi?id=101463
+
+        Reviewed by Vsevolod Vlasov.
+
+        Moved Web Inspector methods called from native code to InspectorFrontendAPI. Updated
+        WebDevToolsFrontendImpl appropriately.
+
+        * src/WebDevToolsFrontendImpl.cpp:
+        (WebKit::WebDevToolsFrontendImpl::dispatchOnInspectorFrontend):
+
+2012-11-08  Alec Flett  <alecflett@chromium.org>
+
+        IndexedDB: Rename methods and remove dead code from IDBBackingStore
+        https://bugs.webkit.org/show_bug.cgi?id=101488
+
+        Reviewed by Ojan Vafai.
+
+        Update IDBFakeBackingStore to reflect method changes in IDBBackingStore.
+
+        * tests/IDBFakeBackingStore.h:
+
+2012-08-20  Taiju Tsuiki  <tzik@chromium.org>
+
+        Web Inspector: Drop dimmed crumb handling
+        https://bugs.webkit.org/show_bug.cgi?id=94457
+
+        Reviewed by Vsevolod Vlasov.
+
+        * src/js/devTools.css:
+
+2012-11-07  Adam Barth  <abarth@webkit.org>
+
+        [V8] We should hide the DOMWrapperMaps inside DOMDataStore
+        https://bugs.webkit.org/show_bug.cgi?id=101430
+
+        Reviewed by Kentaro Hara.
+
+        Remove unneeded header includes.
+
+        * src/WebScriptController.cpp:
+
+2012-11-07  Varun Jain  <varunjain@chromium.org>
+
+        Add new gesture type, LongTap, which is basically the completion of a GestureLongPress
+        https://bugs.webkit.org/show_bug.cgi?id=101385
+
+        Reviewed by Adam Barth.
+
+        Test: Only creating the new enum. No functionality change, hence no tests required.
+
+        * public/WebInputEvent.h:
+        (WebKit::WebInputEvent::isGestureEventType):
+        * src/PageWidgetDelegate.cpp:
+        (WebKit::PageWidgetDelegate::handleInputEvent):
+        * src/WebInputEventConversion.cpp:
+        (WebKit::PlatformGestureEventBuilder::PlatformGestureEventBuilder):
+        * src/WebPopupMenuImpl.cpp:
+        (WebKit::WebPopupMenuImpl::handleInputEvent):
+        * src/WebViewImpl.cpp:
+        (WebKit::WebViewImpl::handleGestureEvent):
+
+2012-11-05  Emil A Eklund  <eae@chromium.org>
+
+        Remove LayoutTypes abstraction
+        https://bugs.webkit.org/show_bug.cgi?id=93050
+
+        Reviewed by Levi Weintraub.
+
+        Remove LayoutTypes abstraction and rename FractionalLayout* to
+        Layout* now that all platforms use the FractionalLayout version
+        (albeit with different fractions).
+
+        No new tests, no change in functionality.
+
+        * src/LinkHighlight.cpp:
+
+2012-11-07  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
 2012-11-07  Kenneth Rohde Christiansen  <kenneth@webkit.org>
 
         Remove support for "desktop-width" in the viewport meta tag

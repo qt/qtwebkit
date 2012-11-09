@@ -89,11 +89,13 @@ config.kPlatforms = {
             // that the gardener only need to look at garden-o-matic and never at the waterfall. Not really sure who
             // watches the GPU bots.
             // The 10.8 Tests bot is really an FYI bot at this point
+            // WebKit Android doesn't upload its results yet.
             return builderName.indexOf('GPU') == -1 &&
                    builderName.indexOf('deps') == -1 &&
                    builderName.indexOf('ASAN') == -1 &&
                    builderName.indexOf('Content Shell') == -1 &&
-                   builderName.indexOf('Mac10.8 Tests') == -1;
+                   builderName.indexOf('Mac10.8 Tests') == -1 &&
+                   builderName.indexOf('WebKit Android') == -1;
         },
     },
     'gtk' : {
@@ -138,6 +140,29 @@ config.kPlatforms = {
         },
         _builderApplies: function(builderName) {
             return builderName.indexOf('Qt') != -1;
+        },
+    },
+    'efl' : {
+        label : 'EFL',
+        buildConsoleURL: 'http://build.webkit.org',
+        layoutTestResultsURL: 'http://build.webkit.org/results',
+        waterfallURL: 'http://build.webkit.org/waterfall',
+        builders: {
+            'EFL Linux 64-bit Debug WK2' : {version : '64-bit WK2', debug: true},
+            'EFL Linux 64-bit Release WK2' : {version: '64-bit WK2'},
+            'EFL Linux 64-bit Release' : {version: '64-bit'},
+        },
+        haveBuilderAccumulatedResults : false,
+        useDirectoryListingForOldBuilds: false,
+        useFlakinessDashboard: false,
+        resultsDirectoryNameFromBuilderName: function(builderName) {
+            return encodeURIComponent(builderName);
+        },
+        resultsDirectoryForBuildNumber: function(buildNumber, revision) {
+            return encodeURIComponent('r' + revision + ' (' + buildNumber + ')');
+        },
+        _builderApplies: function(builderName) {
+            return builderName.indexOf('EFL') != -1;
         },
     },
 };

@@ -1583,7 +1583,7 @@ END
     my $raisesExceptions = @{$function->raisesExceptions};
     if (!$raisesExceptions) {
         foreach my $parameter (@{$function->parameters}) {
-            if ((!$parameter->extendedAttributes->{"Callback"} and TypeCanFailConversion($parameter)) or $parameter->extendedAttributes->{"IsIndex"}) {
+            if ($parameter->extendedAttributes->{"IsIndex"}) {
                 $raisesExceptions = 1;
             }
         }
@@ -1745,12 +1745,12 @@ sub GenerateParametersCheck
                 $parameterCheckString .= "    RefPtr<" . $parameter->type . "> $parameterName;\n";
                 $parameterCheckString .= "    if (args.Length() > $paramIndex && !args[$paramIndex]->IsNull() && !args[$paramIndex]->IsUndefined()) {\n";
                 $parameterCheckString .= "        if (!args[$paramIndex]->IsFunction())\n";
-                $parameterCheckString .= "            return setDOMException(TYPE_MISMATCH_ERR, args.GetIsolate());\n";
+                $parameterCheckString .= "            return throwTypeError(0, args.GetIsolate());\n";
                 $parameterCheckString .= "        $parameterName = ${className}::create(args[$paramIndex], getScriptExecutionContext());\n";
                 $parameterCheckString .= "    }\n";
             } else {
                 $parameterCheckString .= "    if (args.Length() <= $paramIndex || !args[$paramIndex]->IsFunction())\n";
-                $parameterCheckString .= "        return setDOMException(TYPE_MISMATCH_ERR, args.GetIsolate());\n";
+                $parameterCheckString .= "        return throwTypeError(0, args.GetIsolate());\n";
                 $parameterCheckString .= "    RefPtr<" . $parameter->type . "> $parameterName = ${className}::create(args[$paramIndex], getScriptExecutionContext());\n";
             }
         } elsif ($parameter->extendedAttributes->{"Clamp"}) {
@@ -1797,13 +1797,6 @@ sub GenerateParametersCheck
             }
             $parameterCheckString .= "    if (${parameterName}DidThrow)\n";
             $parameterCheckString .= "        return v8Undefined();\n";
-        } elsif (TypeCanFailConversion($parameter)) {
-            $parameterCheckString .= "    $nativeType $parameterName = " .
-                 JSValueToNative($parameter, "args[$paramIndex]", "args.GetIsolate()") . ";\n";
-            $parameterCheckString .= "    if (UNLIKELY(!$parameterName)) {\n";
-            $parameterCheckString .= "        ec = TYPE_MISMATCH_ERR;\n";
-            $parameterCheckString .= "        goto fail;\n";
-            $parameterCheckString .= "    }\n";
         } elsif ($parameter->isVariadic) {
             my $nativeElementType = GetNativeType($parameter->type);
             if ($nativeElementType =~ />$/) {
@@ -1871,7 +1864,7 @@ sub GenerateConstructorCallback
     }
     if (!$raisesExceptions) {
         foreach my $parameter (@{$function->parameters}) {
-            if ((!$parameter->extendedAttributes->{"Callback"} and TypeCanFailConversion($parameter)) or $parameter->extendedAttributes->{"IsIndex"}) {
+            if ($parameter->extendedAttributes->{"IsIndex"}) {
                 $raisesExceptions = 1;
             }
         }
@@ -2049,7 +2042,7 @@ sub GenerateNamedConstructorCallback
     }
     if (!$raisesExceptions) {
         foreach my $parameter (@{$function->parameters}) {
-            if ((!$parameter->extendedAttributes->{"Callback"} and TypeCanFailConversion($parameter)) or $parameter->extendedAttributes->{"IsIndex"}) {
+            if ($parameter->extendedAttributes->{"IsIndex"}) {
                 $raisesExceptions = 1;
             }
         }
@@ -2060,20 +2053,15 @@ sub GenerateNamedConstructorCallback
     my @beforeArgumentList;
     my @afterArgumentList;
 
+    my $toActiveDOMObject = "0";
     if ($dataNode->extendedAttributes->{"ActiveDOMObject"}) {
-        push(@implContent, <<END);
-WrapperTypeInfo V8${implClassName}Constructor::info = { V8${implClassName}Constructor::GetTemplate, V8${implClassName}::derefObject, V8${implClassName}::toActiveDOMObject, 0, V8${implClassName}::installPerContextPrototypeProperties, 0, WrapperTypeObjectPrototype };
-
-END
-    } else {
-        push(@implContent, <<END);
-WrapperTypeInfo V8${implClassName}Constructor::info = { V8${implClassName}Constructor::GetTemplate, 0, 0, 0, V8${implClassName}::installPerContextPrototypeProperties, 0, WrapperTypeObjectPrototype };
-
-END
+        $toActiveDOMObject = "V8${implClassName}::toActiveDOMObject";
     }
-
     AddToImplIncludes("Frame.h");
+
     push(@implContent, <<END);
+WrapperTypeInfo V8${implClassName}Constructor::info = { V8${implClassName}Constructor::GetTemplate, V8${implClassName}::derefObject, ${toActiveDOMObject}, 0, V8${implClassName}::installPerContextPrototypeProperties, 0, WrapperTypeObjectPrototype };
+
 static v8::Handle<v8::Value> V8${implClassName}ConstructorCallback(const v8::Arguments& args)
 {
     INC_STATS("DOM.${implClassName}.Constructor");
@@ -3734,17 +3722,6 @@ sub TranslateParameter
     if ($signature->type eq "TimeoutHandler") {
       $signature->type("DOMString");
     }
-}
-
-sub TypeCanFailConversion
-{
-    my $signature = shift;
-
-    my $type = GetTypeFromSignature($signature);
-
-    AddToImplIncludes("ExceptionCode.h") if $type eq "Attr";
-    return 1 if $type eq "Attr";
-    return 0;
 }
 
 sub JSValueToNative

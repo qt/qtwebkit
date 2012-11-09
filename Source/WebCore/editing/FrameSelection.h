@@ -28,7 +28,7 @@
 
 #include "EditingStyle.h"
 #include "IntRect.h"
-#include "LayoutTypes.h"
+#include "LayoutRect.h"
 #include "Range.h"
 #include "ScrollBehavior.h"
 #include "Timer.h"
@@ -209,7 +209,6 @@ public:
     void textWasReplaced(CharacterData*, unsigned offset, unsigned oldLength, unsigned newLength);
 
     void setCaretVisible(bool caretIsVisible) { setCaretVisibility(caretIsVisible ? Visible : Hidden); }
-    void clearCaretRectIfNeeded();
     bool recomputeCaretRect();
     void invalidateCaretRect();
     void paintCaret(GraphicsContext*, const LayoutPoint&, const LayoutRect& clipRect);

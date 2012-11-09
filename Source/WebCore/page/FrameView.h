@@ -28,7 +28,7 @@
 #include "AdjustViewSizeOrNot.h"
 #include "Color.h"
 #include "Frame.h"
-#include "LayoutTypes.h"
+#include "LayoutRect.h"
 #include "Pagination.h"
 #include "PaintPhase.h"
 #include "ScrollView.h"
@@ -216,7 +216,7 @@ public:
 
     void beginDeferredRepaints();
     void endDeferredRepaints();
-    void checkFlushDeferredRepaintsAfterLoadComplete();
+    void handleLoadCompleted();
     void flushDeferredRepaints();
     void startDeferredRepaintTimer(double delay);
     void resetDeferredRepaintDelay();
