@@ -56,7 +56,7 @@ void DynamicNodeListCacheBase::invalidateCache() const
     m_isItemCacheValid = false;
     m_isNameCacheValid = false;
     m_isItemRefElementsCacheValid = false;
-    if (type() == NodeListCollectionType)
+    if (isNodeList(type()))
         return;
 
     const HTMLCollectionCacheBase* cacheBase = static_cast<const HTMLCollectionCacheBase*>(this);
@@ -69,6 +69,14 @@ void DynamicNodeListCacheBase::invalidateCache() const
     if (type() == ItemProperties)
         static_cast<const HTMLPropertiesCollection*>(this)->invalidateCache();
 #endif
+}
+
+void DynamicNodeListCacheBase::invalidateIdNameCacheMaps() const
+{
+    ASSERT(hasIdNameCache());
+    const HTMLCollectionCacheBase* cacheBase = static_cast<const HTMLCollectionCacheBase*>(this);
+    cacheBase->m_idCache.clear();
+    cacheBase->m_nameCache.clear();
 }
 
 unsigned DynamicNodeList::length() const
@@ -87,7 +95,7 @@ Node* DynamicNodeList::itemWithName(const AtomicString& elementId) const
 
     if (rootNode->inDocument()) {
 #if ENABLE(MICRODATA)
-        if (rootType() == NodeListIsRootedAtDocumentIfOwnerHasItemrefAttr)
+        if (type() == PropertyNodeListType)
             static_cast<const PropertyNodeList*>(this)->updateRefElements();
 #endif
 

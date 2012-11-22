@@ -31,39 +31,18 @@
 #include "config.h"
 #include "V8GCController.h"
 
-#include "ActiveDOMObject.h"
 #include "Attr.h"
-#include "DOMDataStore.h"
-#include "DOMImplementation.h"
 #include "HTMLImageElement.h"
-#include "HTMLNames.h"
 #include "MemoryUsageSupport.h"
-#include "MessagePort.h"
-#include "RetainedDOMInfo.h"
-#include "RetainedObjectInfo.h"
+#include "TraceEvent.h"
 #include "V8AbstractEventListener.h"
 #include "V8Binding.h"
-#include "V8CSSRule.h"
-#include "V8CSSRuleList.h"
-#include "V8CSSStyleDeclaration.h"
-#include "V8DOMImplementation.h"
 #include "V8MessagePort.h"
+#include "V8MutationObserver.h"
 #include "V8Node.h"
 #include "V8RecursionScope.h"
-#include "V8StyleSheet.h"
-#include "V8StyleSheetList.h"
 #include "WrapperTypeInfo.h"
-
 #include <algorithm>
-#include <utility>
-#include <v8-debug.h>
-#include <wtf/HashMap.h>
-#include <wtf/StdLibExtras.h>
-#include <wtf/UnusedParam.h>
-
-#if PLATFORM(CHROMIUM)
-#include "TraceEvent.h"
-#endif
 
 namespace WebCore {
 
@@ -198,6 +177,14 @@ public:
             MessagePort* port = static_cast<MessagePort*>(object);
             if (port->isEntangled() || port->hasPendingActivity())
                 m_grouper.keepAlive(wrapper);
+#if ENABLE(MUTATION_OBSERVERS)
+        } else if (V8MutationObserver::info.equals(type)) {
+            // FIXME: Allow opaqueRootForGC to operate on multiple roots and move this logic into V8MutationObserverCustom.
+            MutationObserver* observer = static_cast<MutationObserver*>(object);
+            HashSet<Node*> observedNodes = observer->getObservedNodes();
+            for (HashSet<Node*>::iterator it = observedNodes.begin(); it != observedNodes.end(); ++it)
+                m_grouper.addToGroup(V8GCController::opaqueRootForGC(*it), wrapper);
+#endif // ENABLE(MUTATION_OBSERVERS)
         } else {
             ActiveDOMObject* activeDOMObject = type->toActiveDOMObject(wrapper);
             if (activeDOMObject && activeDOMObject->hasPendingActivity())
@@ -230,18 +217,103 @@ private:
     WrapperGrouper m_grouper;
 };
 
+// Regarding a minor GC algorithm for DOM nodes, see this document:
+// https://docs.google.com/a/google.com/presentation/d/1uifwVYGNYTZDoGLyCb7sXa7g49mWNMW2gaWvMN5NLk8/edit#slide=id.p
+//
+// m_edenNodes stores nodes that have wrappers that have been created since the last minor/major GC.
+Vector<Node*>* V8GCController::m_edenNodes = 0;
+
+static void gcTree(Node* startNode)
+{
+    Vector<v8::Persistent<v8::Value>, initialNodeVectorSize> newSpaceWrappers;
+
+    // We traverse a DOM tree in the DFS order starting from startNode.
+    // The traversal order does not matter for correctness but does matter for performance.
+    Node* node = startNode;
+    // To make each minor GC time bounded, we might need to give up
+    // traversing at some point for a large DOM tree. That being said,
+    // I could not observe the need even in pathological test cases.
+    do {
+        ASSERT(node);
+        if (!node->wrapper().IsEmpty()) {
+            if (!node->inEden()) {
+                // The fact that we encounter a node that is not in the Eden space
+                // implies that its wrapper might be in the old space of V8.
+                // This indicates that the minor GC cannot anyway judge reachability
+                // of this DOM tree. Thus we give up traversing the DOM tree.
+                return;
+            }
+            // A once traversed node is removed from the Eden space.
+            node->setEden(false);
+            newSpaceWrappers.append(node->wrapper());
+        }
+        if (node->firstChild()) {
+            node = node->firstChild();
+            continue;
+        }
+        while (!node->nextSibling()) {
+            if (!node->parentNode())
+                break;
+            node = node->parentNode();
+        }
+        if (node->parentNode())
+            node = node->nextSibling();
+    } while (node != startNode);
+
+    // We completed the DOM tree traversal. All wrappers in the DOM tree are
+    // stored in newSpaceWrappers and are expected to exist in the new space of V8.
+    // We report those wrappers to V8 as an object group.
+    for (size_t i = 0; i < newSpaceWrappers.size(); i++)
+        newSpaceWrappers[i].MarkPartiallyDependent();
+    if (newSpaceWrappers.size() > 0)
+        v8::V8::AddObjectGroup(&newSpaceWrappers[0], newSpaceWrappers.size());
+}
+
+void V8GCController::didCreateWrapperForNode(Node* node)
+{
+    // To make minor GC cycle time bounded, we limit the number of wrappers handled
+    // by each minor GC cycle to 10000. This value was selected so that the minor
+    // GC cycle time is bounded to 20 ms in a case where the new space size
+    // is 16 MB and it is full of wrappers (which is almost the worst case).
+    // Practically speaking, as far as I crawled real web applications,
+    // the number of wrappers handled by each minor GC cycle is at most 3000.
+    // So this limit is mainly for pathological micro benchmarks.
+    const unsigned wrappersHandledByEachMinorGC = 10000;
+    ASSERT(!node->wrapper().IsEmpty());
+    if (!m_edenNodes)
+        m_edenNodes = adoptPtr(new Vector<Node*>).leakPtr();
+    if (m_edenNodes->size() <= wrappersHandledByEachMinorGC) {
+        // A node of a newly created wrapper is put into the Eden space.
+        m_edenNodes->append(node);
+        node->setEden(true);
+    }
+}
+
 void V8GCController::gcPrologue(v8::GCType type, v8::GCCallbackFlags flags)
 {
     if (type == v8::kGCTypeScavenge)
         minorGCPrologue();
     else if (type == v8::kGCTypeMarkSweepCompact)
         majorGCPrologue();
+
+    if (isMainThreadOrGCThread() && m_edenNodes) {
+        // The Eden space is cleared at every minor/major GC.
+        m_edenNodes->clear();
+    }
 }
 
 void V8GCController::minorGCPrologue()
 {
+    if (isMainThreadOrGCThread() && m_edenNodes) {
+        for (size_t i = 0; i < m_edenNodes->size(); i++) {
+            ASSERT(!m_edenNodes->at(i)->wrapper().IsEmpty());
+            if (m_edenNodes->at(i)->inEden()) // This branch is just for performance.
+                gcTree(m_edenNodes->at(i));
+        }
+    }
 }
 
+// Create object groups for DOM tree nodes.
 void V8GCController::majorGCPrologue()
 {
     TRACE_EVENT_BEGIN0("v8", "GC");
@@ -256,7 +328,6 @@ void V8GCController::majorGCPrologue()
     data->stringCache()->clearOnGC();
 }
 
-#if PLATFORM(CHROMIUM)
 static int workingSetEstimateMB = 0;
 
 static Mutex& workingSetEstimateMBMutex()
@@ -264,7 +335,6 @@ static Mutex& workingSetEstimateMBMutex()
     AtomicallyInitializedStatic(Mutex&, mutex = *new Mutex);
     return mutex;
 }
-#endif
 
 void V8GCController::gcEpilogue(v8::GCType type, v8::GCCallbackFlags flags)
 {
@@ -282,20 +352,17 @@ void V8GCController::majorGCEpilogue()
 {
     v8::HandleScope scope;
 
-#if PLATFORM(CHROMIUM)
     // The GC can happen on multiple threads in case of dedicated workers which run in-process.
     {
         MutexLocker locker(workingSetEstimateMBMutex());
         workingSetEstimateMB = MemoryUsageSupport::actualMemoryUsageMB();
     }
-#endif
 
     TRACE_EVENT_END0("v8", "GC");
 }
 
 void V8GCController::checkMemoryUsage()
 {
-#if PLATFORM(CHROMIUM)
     const int lowMemoryUsageMB = MemoryUsageSupport::lowMemoryUsageMB();
     const int highMemoryUsageMB = MemoryUsageSupport::highMemoryUsageMB();
     const int highUsageDeltaMB = MemoryUsageSupport::highUsageDeltaMB();
@@ -319,7 +386,6 @@ void V8GCController::checkMemoryUsage()
         // We are approaching OOM and memory usage increased by highUsageDeltaMB since the last GC.
         v8::V8::LowMemoryNotification();
     }
-#endif
 }
 
 void V8GCController::hintForCollectGarbage()

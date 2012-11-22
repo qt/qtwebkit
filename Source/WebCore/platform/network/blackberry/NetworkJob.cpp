@@ -64,7 +64,8 @@ inline static bool isUnauthorized(int statusCode)
 }
 
 NetworkJob::NetworkJob()
-    : m_playerId(0)
+    : FrameDestructionObserver(0)
+    , m_playerId(0)
     , m_deleteJobTimer(this, &NetworkJob::fireDeleteJobTimer)
     , m_streamFactory(0)
     , m_isFile(false)
@@ -81,11 +82,11 @@ NetworkJob::NetworkJob()
     , m_needsRetryAsFTPDirectory(false)
     , m_isOverrideContentType(false)
     , m_newJobWithCredentialsStarted(false)
+    , m_isHeadMethod(false)
     , m_extendedStatusCode(0)
     , m_redirectCount(0)
     , m_deferredData(*this)
     , m_deferLoadingCount(0)
-    , m_frame(0)
     , m_isAuthenticationChallenging(false)
 {
 }
@@ -102,10 +103,13 @@ bool NetworkJob::initialize(int playerId,
                             const BlackBerry::Platform::NetworkRequest& request,
                             PassRefPtr<ResourceHandle> handle,
                             BlackBerry::Platform::NetworkStreamFactory* streamFactory,
-                            const Frame& frame,
+                            Frame* frame,
                             int deferLoadingCount,
                             int redirectCount)
 {
+    BLACKBERRY_ASSERT(handle);
+    BLACKBERRY_ASSERT(frame);
+
     m_playerId = playerId;
     m_pageGroupName = pageGroupName;
 
@@ -116,17 +120,20 @@ bool NetworkJob::initialize(int playerId,
     m_handle = handle;
 
     m_streamFactory = streamFactory;
-    m_frame = &frame;
 
-    if (m_frame && m_frame->loader()->pageDismissalEventBeingDispatched() != FrameLoader::NoDismissal) {
+    if (frame && frame->loader()->pageDismissalEventBeingDispatched() != FrameLoader::NoDismissal) {
         // In the case the frame will be detached soon, we still need to ping the server, but it is
         // no longer safe to reference the Frame object.
         // See http://trac.webkit.org/changeset/65910 and https://bugs.webkit.org/show_bug.cgi?id=30457.
-        m_frame = 0;
-    }
+        // m_frame would be set to zero.
+        observeFrame(0);
+    } else
+        observeFrame(frame);
 
     m_redirectCount = redirectCount;
     m_deferLoadingCount = deferLoadingCount;
+
+    m_isHeadMethod = m_handle->firstRequest().httpMethod().upper() == "HEAD";
 
     // We don't need to explicitly call notifyHeaderReceived, as the Content-Type
     // will ultimately get parsed when sendResponseIfNeeded gets called.
@@ -290,9 +297,7 @@ void NetworkJob::notifyAuthReceived(BlackBerry::Platform::NetworkRequest::AuthTy
         AuthenticationChallenge& challenge = m_handle->getInternal()->m_currentWebChallenge;
         if (!challenge.isNull()) {
             const ProtectionSpace& oldSpace = challenge.protectionSpace();
-            if (oldSpace.authenticationScheme() != scheme) {
-                // The scheme might have changed, but the server type shouldn't have!
-                BLACKBERRY_ASSERT(serverType == oldSpace.serverType());
+            if (oldSpace.authenticationScheme() != scheme && oldSpace.serverType() == serverType) {
                 ProtectionSpace newSpace(oldSpace.host(), oldSpace.port(), oldSpace.serverType(), oldSpace.realm(), scheme);
                 m_handle->getInternal()->m_currentWebChallenge = AuthenticationChallenge(newSpace,
                                                                                          challenge.proposedCredential(),
@@ -329,11 +334,7 @@ void NetworkJob::handleNotifyHeaderReceived(const String& key, const String& val
     else if (lowerKey == "content-disposition")
         m_contentDisposition = value;
     else if (lowerKey == "set-cookie") {
-        // FIXME: If a tab is closed, sometimes network data will come in after the frame has been detached from its page but before it is deleted.
-        // If this happens, m_frame->page() will return 0, and m_frame->loader()->client() will be in a bad state and calling into it will crash.
-        // For now we check for this explicitly by checking m_frame->page(). But we should find out why the network job hasn't been cancelled when the frame was detached.
-        // See RIM PR 134207
-        if (m_frame && m_frame->page() && m_frame->loader() && m_frame->loader()->client()
+        if (m_frame && m_frame->loader() && m_frame->loader()->client()
             && static_cast<FrameLoaderClientBlackBerry*>(m_frame->loader()->client())->cookiesEnabled()) {
             handleSetCookieHeader(value);
             // If there are several "Set-Cookie" headers, we should combine the following ones with the first.
@@ -539,7 +540,7 @@ bool NetworkJob::shouldReleaseClientResource()
 
 bool NetworkJob::shouldNotifyClientFailed() const
 {
-    return m_extendedStatusCode < 0 || (isError(m_extendedStatusCode) && !m_dataReceived);
+    return m_extendedStatusCode < 0 || (isError(m_extendedStatusCode) && !m_dataReceived && !m_isHeadMethod);
 }
 
 bool NetworkJob::retryAsFTPDirectory()
@@ -585,7 +586,7 @@ bool NetworkJob::startNewJobWithRequest(ResourceRequest& newRequest, bool increa
         handle,
         newRequest,
         m_streamFactory,
-        *m_frame,
+        m_frame,
         m_deferLoadingCount,
         increaseRedirectCount ? m_redirectCount + 1 : m_redirectCount);
     return true;
@@ -747,22 +748,31 @@ bool NetworkJob::sendRequestWithCredentials(ProtectionSpaceServerType type, Prot
 
     String host;
     int port;
+    BlackBerry::Platform::ProxyInfo proxyInfo;
     if (type == ProtectionSpaceProxyHTTP || type == ProtectionSpaceProxyHTTPS) {
-        // proxyAddress returns host:port, without a protocol. KURL can't parse this, so stick http
-        // on the front.
-        // (We could split into host and port by hand, but that gets hard to parse with IPv6 urls,
-        // so better to reuse KURL's parsing.)
-        StringBuilder proxyAddress;
+        proxyInfo = BlackBerry::Platform::Settings::instance()->proxyInfo(newURL.string());
+        ASSERT(!proxyInfo.address.empty());
+        if (proxyInfo.address.empty()) {
+            // Fall back to the response url if there's no proxy
+            // FIXME: is this the best way to handle this?
+            host = m_response.url().host();
+            port = m_response.url().port();
+        } else {
+            // proxyInfo returns host:port, without a protocol. KURL can't parse this, so stick http
+            // on the front.
+            // (We could split into host and port by hand, but that gets hard to parse with IPv6 urls,
+            // so better to reuse KURL's parsing.)
+            StringBuilder proxyAddress;
+            if (type == ProtectionSpaceProxyHTTP)
+                proxyAddress.append("http://");
+            else
+                proxyAddress.append("https://");
+            proxyAddress.append(proxyInfo.address);
 
-        if (type == ProtectionSpaceProxyHTTP)
-            proxyAddress.append("http://");
-        else
-            proxyAddress.append("https://");
-
-        proxyAddress.append(BlackBerry::Platform::Settings::instance()->proxyAddress(newURL.string()));
-        KURL proxyURL(KURL(), proxyAddress.toString());
-        host = proxyURL.host();
-        port = proxyURL.port();
+            KURL proxyURL(KURL(), proxyAddress.toString());
+            host = proxyURL.host();
+            port = proxyURL.port();
+        }
     } else {
         host = m_response.url().host();
         port = m_response.url().port();
@@ -797,9 +807,9 @@ bool NetworkJob::sendRequestWithCredentials(ProtectionSpaceServerType type, Prot
         String username;
         String password;
 
-        if (type == ProtectionSpaceProxyHTTP || type == ProtectionSpaceProxyHTTPS) {
-            username = String(BlackBerry::Platform::Settings::instance()->proxyUsername());
-            password = String(BlackBerry::Platform::Settings::instance()->proxyPassword());
+        if (!proxyInfo.address.empty()) {
+            username = proxyInfo.username;
+            password = proxyInfo.password;
         } else {
             username = m_handle->getInternal()->m_user;
             password = m_handle->getInternal()->m_pass;
@@ -808,10 +818,12 @@ bool NetworkJob::sendRequestWithCredentials(ProtectionSpaceServerType type, Prot
         // Before asking the user for credentials, we check if the URL contains that.
         if (!username.isEmpty() || !password.isEmpty()) {
             // Prevent them from been used again if they are wrong.
-            // If they are correct, they will the put into CredentialStorage.
-            if (type == ProtectionSpaceProxyHTTP || type == ProtectionSpaceProxyHTTPS)
-                BlackBerry::Platform::Settings::instance()->setProxyCredential("", "");
-            else {
+            // If they are correct, they will be put into CredentialStorage.
+            if (!proxyInfo.address.empty()) {
+                proxyInfo.username.clear();
+                proxyInfo.password.clear();
+                BlackBerry::Platform::Settings::instance()->storeProxyCredentials(proxyInfo);
+            } else {
                 m_handle->getInternal()->m_user = "";
                 m_handle->getInternal()->m_pass = "";
             }
@@ -857,8 +869,17 @@ void NetworkJob::storeCredentials()
     challenge.setStored(true);
 
     if (challenge.protectionSpace().serverType() == ProtectionSpaceProxyHTTP || challenge.protectionSpace().serverType() == ProtectionSpaceProxyHTTPS) {
-        BlackBerry::Platform::Settings::instance()->setProxyCredential(challenge.proposedCredential().user().utf8().data(),
-                                                                challenge.proposedCredential().password().utf8().data());
+        StringBuilder proxyAddress;
+        proxyAddress.append(challenge.protectionSpace().host());
+        proxyAddress.append(":");
+        proxyAddress.appendNumber(challenge.protectionSpace().port());
+
+        BlackBerry::Platform::ProxyInfo proxyInfo;
+        proxyInfo.address = proxyAddress.toString();
+        proxyInfo.username = challenge.proposedCredential().user();
+        proxyInfo.password = challenge.proposedCredential().password();
+
+        BlackBerry::Platform::Settings::instance()->storeProxyCredentials(proxyInfo);
         if (m_frame && m_frame->page())
             m_frame->page()->chrome()->client()->platformPageClient()->syncProxyCredential(challenge.proposedCredential());
     }
@@ -914,6 +935,19 @@ void NetworkJob::notifyChallengeResult(const KURL& url, const ProtectionSpace& p
     newRequest.setURL(url);
     newRequest.setMustHandleInternally(true);
     m_newJobWithCredentialsStarted = startNewJobWithRequest(newRequest);
+}
+
+void NetworkJob::frameDestroyed()
+{
+    if (m_frame && !m_cancelled)
+        cancelJob();
+    FrameDestructionObserver::frameDestroyed();
+}
+
+void NetworkJob::willDetachPage()
+{
+    if (m_frame && !m_cancelled)
+        cancelJob();
 }
 
 } // namespace WebCore

@@ -1,9 +1,10 @@
 #include "config.h"
 #include "SlotVisitor.h"
+#include "SlotVisitorInlines.h"
 
 #include "ConservativeRoots.h"
 #include "CopiedSpace.h"
-#include "CopiedSpaceInlineMethods.h"
+#include "CopiedSpaceInlines.h"
 #include "GCThread.h"
 #include "JSArray.h"
 #include "JSDestructibleObject.h"
@@ -15,7 +16,7 @@
 namespace JSC {
 
 SlotVisitor::SlotVisitor(GCThreadSharedData& shared)
-    : m_stack(shared.m_segmentAllocator)
+    : m_stack(shared.m_globalData->heap.blockAllocator())
     , m_visitCount(0)
     , m_isInParallelMode(false)
     , m_shared(shared)
@@ -335,12 +336,12 @@ void SlotVisitor::finalizeUnconditionalFinalizers()
 void SlotVisitor::validate(JSCell* cell)
 {
     if (!cell) {
-        dataLog("cell is NULL\n");
+        dataLogF("cell is NULL\n");
         CRASH();
     }
 
     if (!cell->structure()) {
-        dataLog("cell at %p has a null structure\n" , cell);
+        dataLogF("cell at %p has a null structure\n" , cell);
         CRASH();
     }
 
@@ -353,7 +354,7 @@ void SlotVisitor::validate(JSCell* cell)
             parentClassName = cell->structure()->structure()->JSCell::classInfo()->className;
         if (cell->structure()->JSCell::classInfo())
             ourClassName = cell->structure()->JSCell::classInfo()->className;
-        dataLog("parent structure (%p <%s>) of cell at %p doesn't match cell's structure (%p <%s>)\n",
+        dataLogF("parent structure (%p <%s>) of cell at %p doesn't match cell's structure (%p <%s>)\n",
                 cell->structure()->structure(), parentClassName, cell, cell->structure(), ourClassName);
         CRASH();
     }

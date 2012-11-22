@@ -38,7 +38,6 @@
 #include "ExceptionCode.h"
 #include "ScheduledAction.h"
 #include "ScriptCallStack.h"
-#include "ScriptCallStackFactory.h"
 #include "V8Binding.h"
 #include "V8Utilities.h"
 #include "V8WorkerContextEventListener.h"
@@ -99,9 +98,8 @@ v8::Handle<v8::Value> V8WorkerContext::importScriptsCallback(const v8::Arguments
 
     Vector<String> urls;
     for (int i = 0; i < args.Length(); i++) {
-        v8::TryCatch tryCatch;
-        v8::Handle<v8::String> scriptUrl = args[i]->ToString();
-        if (tryCatch.HasCaught() || scriptUrl.IsEmpty())
+        EXCEPTION_BLOCK(v8::Handle<v8::String>, scriptUrl, args[i]->ToString());
+        if (scriptUrl.IsEmpty())
             return v8::Undefined();
         urls.append(toWebCoreString(scriptUrl));
     }

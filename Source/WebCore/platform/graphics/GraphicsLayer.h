@@ -242,9 +242,14 @@ public:
     const FloatPoint& replicatedLayerPosition() const { return m_replicatedLayerPosition; }
     void setReplicatedLayerPosition(const FloatPoint& p) { m_replicatedLayerPosition = p; }
 
+    enum ShouldSetNeedsDisplay {
+        DontSetNeedsDisplay,
+        SetNeedsDisplay
+    };
+
     // Offset is origin of the renderer minus origin of the graphics layer (so either zero or negative).
     IntSize offsetFromRenderer() const { return m_offsetFromRenderer; }
-    void setOffsetFromRenderer(const IntSize&);
+    void setOffsetFromRenderer(const IntSize&, ShouldSetNeedsDisplay = SetNeedsDisplay);
 
     // The position of the layer (the location of its top-left corner in its parent)
     const FloatPoint& position() const { return m_position; }
@@ -339,6 +344,7 @@ public:
     
     // Layer contents
     virtual void setContentsToImage(Image*) { }
+    virtual bool shouldDirectlyCompositeImage(Image*) const { return true; }
     virtual void setContentsToMedia(PlatformLayer*) { } // video or plug-in
     virtual void setContentsToBackgroundColor(const Color&) { }
     virtual void setContentsToCanvas(PlatformLayer*) { }

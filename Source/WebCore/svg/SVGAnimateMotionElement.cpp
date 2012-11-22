@@ -102,16 +102,16 @@ bool SVGAnimateMotionElement::isSupportedAttribute(const QualifiedName& attrName
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
 }
 
-void SVGAnimateMotionElement::parseAttribute(const Attribute& attribute)
+void SVGAnimateMotionElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (!isSupportedAttribute(attribute.name())) {
-        SVGAnimationElement::parseAttribute(attribute);
+    if (!isSupportedAttribute(name)) {
+        SVGAnimationElement::parseAttribute(name, value);
         return;
     }
 
-    if (attribute.name() == SVGNames::pathAttr) {
+    if (name == SVGNames::pathAttr) {
         m_path = Path();
-        buildPathFromString(attribute.value(), m_path);
+        buildPathFromString(value, m_path);
         updateAnimationPath();
         return;
     }
@@ -121,8 +121,8 @@ void SVGAnimateMotionElement::parseAttribute(const Attribute& attribute)
     
 SVGAnimateMotionElement::RotateMode SVGAnimateMotionElement::rotateMode() const
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, autoVal, ("auto"));
-    DEFINE_STATIC_LOCAL(const AtomicString, autoReverse, ("auto-reverse"));
+    DEFINE_STATIC_LOCAL(const AtomicString, autoVal, ("auto", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(const AtomicString, autoReverse, ("auto-reverse", AtomicString::ConstructFromLiteral));
     const AtomicString& rotate = getAttribute(SVGNames::rotateAttr);
     if (rotate == autoVal)
         return RotateAuto;

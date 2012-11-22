@@ -68,11 +68,11 @@ WebInspector.ScriptsPanel = function(workspaceForTest)
     this.debugToolbar = this._createDebugToolbar(helpSection);
 
     const initialDebugSidebarWidth = 225;
-    const maximalDebugSidebarWidthPercent = 50;
-    this.createSplitView(this.element, WebInspector.SplitView.SidebarPosition.Right, initialDebugSidebarWidth);
+    const minimumDebugSidebarWidthPercent = 50;
+    this.createSidebarView(this.element, WebInspector.SidebarView.SidebarPosition.Right, initialDebugSidebarWidth);
     this.splitView.element.id = "scripts-split-view";
-    this.splitView.minimalSidebarWidth = Preferences.minScriptsSidebarWidth;
-    this.splitView.minimalMainWidthPercent = 100 - maximalDebugSidebarWidthPercent;
+    this.splitView.setMinimumSidebarWidth(Preferences.minScriptsSidebarWidth);
+    this.splitView.setMinimumMainWidthPercent(minimumDebugSidebarWidthPercent);
 
     this.sidebarElement.appendChild(this.debugToolbar);
 
@@ -82,12 +82,12 @@ WebInspector.ScriptsPanel = function(workspaceForTest)
 
     // Create scripts navigator
     const initialNavigatorWidth = 225;
-    const minimalViewsContainerWidthPercent = 50;
-    this.editorView = new WebInspector.SplitView(WebInspector.SplitView.SidebarPosition.Left, "scriptsPanelNavigatorSidebarWidth", initialNavigatorWidth);
+    const minimumViewsContainerWidthPercent = 50;
+    this.editorView = new WebInspector.SidebarView(WebInspector.SidebarView.SidebarPosition.Left, "scriptsPanelNavigatorSidebarWidth", initialNavigatorWidth);
     this.editorView.element.tabIndex = 0;
 
-    this.editorView.minimalSidebarWidth = Preferences.minScriptsSidebarWidth;
-    this.editorView.minimalMainWidthPercent = minimalViewsContainerWidthPercent;
+    this.editorView.setMinimumSidebarWidth(Preferences.minScriptsSidebarWidth);
+    this.editorView.setMinimumMainWidthPercent(minimumViewsContainerWidthPercent);
     this.editorView.show(this.splitView.mainElement);
 
     this._navigator = new WebInspector.ScriptsNavigator();
@@ -126,8 +126,11 @@ WebInspector.ScriptsPanel = function(workspaceForTest)
     this._debugSidebarContentsElement.id = "scripts-debug-sidebar-contents";
     this.sidebarElement.appendChild(this._debugSidebarContentsElement);
 
-    for (var pane in this.sidebarPanes)
+    for (var pane in this.sidebarPanes) {
+        if (this.sidebarPanes[pane] === this.sidebarPanes.domBreakpoints)
+            continue;
         this._debugSidebarContentsElement.appendChild(this.sidebarPanes[pane].element);
+    }
 
     this.sidebarPanes.callstack.expanded = true;
 
@@ -313,7 +316,7 @@ WebInspector.ScriptsPanel.prototype = {
         }
 
         this._showDebuggerSidebar();
-        this._toggleDebuggerSidebarButton.disabled = true;
+        this._toggleDebuggerSidebarButton.setEnabled(false);
         window.focus();
         InspectorFrontendHost.bringToFront();
     },
@@ -325,7 +328,7 @@ WebInspector.ScriptsPanel.prototype = {
         this._stepping = false;
 
         this._clearInterface();
-        this._toggleDebuggerSidebarButton.disabled = false;
+        this._toggleDebuggerSidebarButton.setEnabled(true);
     },
 
     _debuggerWasEnabled: function()

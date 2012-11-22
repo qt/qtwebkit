@@ -58,7 +58,7 @@ using namespace HTMLNames;
 DocumentStyleSheetCollection::DocumentStyleSheetCollection(Document* document)
     : m_document(document)
     , m_pendingStylesheets(0)
-    , m_pageGroupUserSheetCacheValid(false)
+    , m_injectedStyleSheetCacheValid(false)
     , m_hadActiveLoadingStylesheet(false)
     , m_needsUpdateActiveStylesheetsOnStyleRecalc(false)
     , m_usesSiblingRules(false)
@@ -73,16 +73,14 @@ DocumentStyleSheetCollection::DocumentStyleSheetCollection(Document* document)
 
 DocumentStyleSheetCollection::~DocumentStyleSheetCollection()
 {
-    if (m_pageUserSheet)
-        m_pageUserSheet->clearOwnerNode();
-    if (m_pageGroupUserSheets) {
-        for (size_t i = 0; i < m_pageGroupUserSheets->size(); ++i)
-            (*m_pageGroupUserSheets)[i]->clearOwnerNode();
-    }
-    if (m_userSheets) {
-        for (size_t i = 0; i < m_userSheets->size(); ++i)
-            (*m_userSheets)[i]->clearOwnerNode();
-    }
+    if (m_pageUserStyleSheet)
+        m_pageUserStyleSheet->clearOwnerNode();
+    for (unsigned i = 0; i < m_injectedUserStyleSheets.size(); ++i)
+        m_injectedUserStyleSheets[i]->clearOwnerNode();
+    for (unsigned i = 0; i < m_injectedAuthorStyleSheets.size(); ++i)
+        m_injectedAuthorStyleSheets[i]->clearOwnerNode();
+    for (unsigned i = 0; i < m_userStyleSheets.size(); ++i)
+        m_userStyleSheets[i]->clearOwnerNode();
 }
 
 void DocumentStyleSheetCollection::combineCSSFeatureFlags()
@@ -102,10 +100,10 @@ void DocumentStyleSheetCollection::resetCSSFeatureFlags()
     m_usesBeforeAfterRules = styleResolver->usesBeforeAfterRules();
 }
 
-CSSStyleSheet* DocumentStyleSheetCollection::pageUserSheet()
+CSSStyleSheet* DocumentStyleSheetCollection::pageUserStyleSheet()
 {
-    if (m_pageUserSheet)
-        return m_pageUserSheet.get();
+    if (m_pageUserStyleSheet)
+        return m_pageUserStyleSheet.get();
     
     Page* owningPage = m_document->page();
     if (!owningPage)
@@ -116,42 +114,55 @@ CSSStyleSheet* DocumentStyleSheetCollection::pageUserSheet()
         return 0;
     
     // Parse the sheet and cache it.
-    m_pageUserSheet = CSSStyleSheet::createInline(m_document, m_document->settings()->userStyleSheetLocation());
-    m_pageUserSheet->contents()->setIsUserStyleSheet(true);
-    m_pageUserSheet->contents()->parseString(userSheetText);
-    return m_pageUserSheet.get();
+    m_pageUserStyleSheet = CSSStyleSheet::createInline(m_document, m_document->settings()->userStyleSheetLocation());
+    m_pageUserStyleSheet->contents()->setIsUserStyleSheet(true);
+    m_pageUserStyleSheet->contents()->parseString(userSheetText);
+    return m_pageUserStyleSheet.get();
 }
 
-void DocumentStyleSheetCollection::clearPageUserSheet()
+void DocumentStyleSheetCollection::clearPageUserStyleSheet()
 {
-    if (m_pageUserSheet) {
-        m_pageUserSheet = 0;
-        m_document->styleResolverChanged(DeferRecalcStyle);
-    }
+    if (!m_pageUserStyleSheet)
+        return;
+    m_pageUserStyleSheet = 0;
+    m_document->styleResolverChanged(DeferRecalcStyle);
 }
 
-void DocumentStyleSheetCollection::updatePageUserSheet()
+void DocumentStyleSheetCollection::updatePageUserStyleSheet()
 {
-    clearPageUserSheet();
-    if (pageUserSheet())
+    clearPageUserStyleSheet();
+    if (pageUserStyleSheet())
         m_document->styleResolverChanged(RecalcStyleImmediately);
 }
 
-const Vector<RefPtr<CSSStyleSheet> >* DocumentStyleSheetCollection::pageGroupUserSheets() const
+const Vector<RefPtr<CSSStyleSheet> >& DocumentStyleSheetCollection::injectedUserStyleSheets() const
 {
-    if (m_pageGroupUserSheetCacheValid)
-        return m_pageGroupUserSheets.get();
-    
-    m_pageGroupUserSheetCacheValid = true;
-    
+    updateInjectedStyleSheetCache();
+    return m_injectedUserStyleSheets;
+}
+
+const Vector<RefPtr<CSSStyleSheet> >& DocumentStyleSheetCollection::injectedAuthorStyleSheets() const
+{
+    updateInjectedStyleSheetCache();
+    return m_injectedAuthorStyleSheets;
+}
+
+void DocumentStyleSheetCollection::updateInjectedStyleSheetCache() const
+{
+    if (m_injectedStyleSheetCacheValid)
+        return;
+    m_injectedStyleSheetCacheValid = true;
+    m_injectedUserStyleSheets.clear();
+    m_injectedAuthorStyleSheets.clear();
+
     Page* owningPage = m_document->page();
     if (!owningPage)
-        return 0;
+        return;
         
     const PageGroup& pageGroup = owningPage->group();
     const UserStyleSheetMap* sheetsMap = pageGroup.userStyleSheets();
     if (!sheetsMap)
-        return 0;
+        return;
 
     UserStyleSheetMap::const_iterator end = sheetsMap->end();
     for (UserStyleSheetMap::const_iterator it = sheetsMap->begin(); it != end; ++it) {
@@ -163,38 +174,27 @@ const Vector<RefPtr<CSSStyleSheet> >* DocumentStyleSheetCollection::pageGroupUse
             if (!UserContentURLPattern::matchesPatterns(m_document->url(), sheet->whitelist(), sheet->blacklist()))
                 continue;
             RefPtr<CSSStyleSheet> groupSheet = CSSStyleSheet::createInline(const_cast<Document*>(m_document), sheet->url());
-            if (!m_pageGroupUserSheets)
-                m_pageGroupUserSheets = adoptPtr(new Vector<RefPtr<CSSStyleSheet> >);
-            m_pageGroupUserSheets->append(groupSheet);
-            groupSheet->contents()->setIsUserStyleSheet(sheet->level() == UserStyleUserLevel);
+            bool isUserStyleSheet = sheet->level() == UserStyleUserLevel;
+            if (isUserStyleSheet)
+                m_injectedUserStyleSheets.append(groupSheet);
+            else
+                m_injectedAuthorStyleSheets.append(groupSheet);
+            groupSheet->contents()->setIsUserStyleSheet(isUserStyleSheet);
             groupSheet->contents()->parseString(sheet->source());
         }
     }
-
-    return m_pageGroupUserSheets.get();
 }
 
-void DocumentStyleSheetCollection::clearPageGroupUserSheets()
+void DocumentStyleSheetCollection::invalidateInjectedStyleSheetCache()
 {
-    m_pageGroupUserSheetCacheValid = false;
-    if (m_pageGroupUserSheets && m_pageGroupUserSheets->size()) {
-        m_pageGroupUserSheets->clear();
-        m_document->styleResolverChanged(DeferRecalcStyle);
-    }
-}
-
-void DocumentStyleSheetCollection::updatePageGroupUserSheets()
-{
-    clearPageGroupUserSheets();
-    if (pageGroupUserSheets() && pageGroupUserSheets()->size())
-        m_document->styleResolverChanged(RecalcStyleImmediately);
+    m_injectedStyleSheetCacheValid = false;
+    m_document->styleResolverChanged(DeferRecalcStyle);
 }
 
 void DocumentStyleSheetCollection::addUserSheet(PassRefPtr<StyleSheetContents> userSheet)
 {
-    if (!m_userSheets)
-        m_userSheets = adoptPtr(new Vector<RefPtr<CSSStyleSheet> >);
-    m_userSheets->append(CSSStyleSheet::create(userSheet, m_document));
+    ASSERT(userSheet->isUserStyleSheet());
+    m_userStyleSheets.append(CSSStyleSheet::create(userSheet, m_document));
     m_document->styleResolverChanged(RecalcStyleImmediately);
 }
 
@@ -429,12 +429,31 @@ static void filterEnabledCSSStyleSheets(Vector<RefPtr<CSSStyleSheet> >& result, 
     }
 }
 
-static void collectActiveCSSStyleSheetsFromSeamlessParents(Vector<RefPtr<CSSStyleSheet> >& sheets, Document* document)
+static void collectActiveStyleSheetsFromSeamlessParents(Vector<RefPtr<CSSStyleSheet> >& sheets, Document* document)
 {
     HTMLIFrameElement* seamlessParentIFrame = document->seamlessParentIFrame();
     if (!seamlessParentIFrame)
         return;
     sheets.append(seamlessParentIFrame->document()->styleSheetCollection()->activeAuthorStyleSheets());
+}
+
+void DocumentStyleSheetCollection::updateStyleResolver(StyleResolverUpdateType updateType, const Vector<RefPtr<CSSStyleSheet> >& activeAuthorStyleSheets)
+{
+    if (updateType == Reconstruct) {
+        m_document->clearStyleResolver();
+        return;
+    }
+    StyleResolver* styleResolver = m_document->styleResolver();
+    unsigned firstNewIndex;
+    if (updateType == Reset) {
+        styleResolver->resetAuthorStyle();
+        firstNewIndex = 0;
+    } else {
+        ASSERT(updateType == Additive);
+        firstNewIndex = m_activeAuthorStyleSheets.size();
+    }
+    styleResolver->appendAuthorStyleSheets(firstNewIndex, activeAuthorStyleSheets);
+    resetCSSFeatureFlags();
 }
 
 bool DocumentStyleSheetCollection::updateActiveStyleSheets(UpdateFlag updateFlag)
@@ -451,32 +470,32 @@ bool DocumentStyleSheetCollection::updateActiveStyleSheets(UpdateFlag updateFlag
     if (!m_document->renderer() || !m_document->attached())
         return false;
 
-    Vector<RefPtr<StyleSheet> > activeStyleSheets;
-    collectActiveStyleSheets(activeStyleSheets);
+    Vector<RefPtr<StyleSheet> > documentAuthorStyleSheets;
+    collectActiveStyleSheets(documentAuthorStyleSheets);
 
-    Vector<RefPtr<CSSStyleSheet> > activeCSSStyleSheets;
-    collectActiveCSSStyleSheetsFromSeamlessParents(activeCSSStyleSheets, m_document);
-    filterEnabledCSSStyleSheets(activeCSSStyleSheets, activeStyleSheets);
+    Vector<RefPtr<CSSStyleSheet> > activeAuthorStyleSheets;
+    activeAuthorStyleSheets.append(injectedAuthorStyleSheets());
+    collectActiveStyleSheetsFromSeamlessParents(activeAuthorStyleSheets, m_document);
+    filterEnabledCSSStyleSheets(activeAuthorStyleSheets, documentAuthorStyleSheets);
+
+    Vector<RefPtr<CSSStyleSheet> > activeUserStyleSheets;
+    if (CSSStyleSheet* sheet = pageUserStyleSheet())
+        activeUserStyleSheets.append(sheet);
+    activeUserStyleSheets.append(injectedUserStyleSheets());
+    activeUserStyleSheets.append(documentUserStyleSheets());
+
+    if (activeUserStyleSheets != m_activeUserStyleSheets)
+        updateFlag = FullUpdate;
 
     StyleResolverUpdateType styleResolverUpdateType;
     bool requiresFullStyleRecalc;
-    analyzeStyleSheetChange(updateFlag, activeCSSStyleSheets, styleResolverUpdateType, requiresFullStyleRecalc);
+    analyzeStyleSheetChange(updateFlag, activeAuthorStyleSheets, styleResolverUpdateType, requiresFullStyleRecalc);
 
-    if (styleResolverUpdateType == Reconstruct)
-        m_document->clearStyleResolver();
-    else {
-        StyleResolver* styleResolver = m_document->styleResolver();
-        if (styleResolverUpdateType == Reset) {
-            styleResolver->resetAuthorStyle();
-            styleResolver->appendAuthorStyleSheets(0, activeCSSStyleSheets);
-        } else {
-            ASSERT(styleResolverUpdateType == Additive);
-            styleResolver->appendAuthorStyleSheets(m_activeAuthorStyleSheets.size(), activeCSSStyleSheets);
-        }
-        resetCSSFeatureFlags();
-    }
-    m_activeAuthorStyleSheets.swap(activeCSSStyleSheets);
-    m_styleSheetsForStyleSheetList.swap(activeStyleSheets);
+    updateStyleResolver(styleResolverUpdateType, activeAuthorStyleSheets);
+    
+    m_activeAuthorStyleSheets.swap(activeAuthorStyleSheets);
+    m_activeUserStyleSheets.swap(activeUserStyleSheets);
+    m_styleSheetsForStyleSheetList.swap(documentAuthorStyleSheets);
 
     m_usesRemUnits = styleSheetsUseRemUnits(m_activeAuthorStyleSheets);
     m_needsUpdateActiveStylesheetsOnStyleRecalc = false;
@@ -489,10 +508,12 @@ bool DocumentStyleSheetCollection::updateActiveStyleSheets(UpdateFlag updateFlag
 void DocumentStyleSheetCollection::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    info.addMember(m_pageUserSheet);
-    info.addMember(m_pageGroupUserSheets);
-    info.addMember(m_userSheets);
+    info.addMember(m_pageUserStyleSheet);
+    info.addMember(m_injectedUserStyleSheets);
+    info.addMember(m_injectedAuthorStyleSheets);
+    info.addMember(m_userStyleSheets);
     info.addMember(m_activeAuthorStyleSheets);
+    info.addMember(m_activeUserStyleSheets);
     info.addMember(m_styleSheetsForStyleSheetList);
     info.addMember(m_styleSheetCandidateNodes);
     info.addMember(m_preferredStylesheetSetName);

@@ -52,7 +52,7 @@ PassRefPtr<HTMLOutputElement> HTMLOutputElement::create(const QualifiedName& tag
 
 const AtomicString& HTMLOutputElement::formControlType() const
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, output, ("output"));
+    DEFINE_STATIC_LOCAL(const AtomicString, output, ("output", AtomicString::ConstructFromLiteral));
     return output;
 }
 
@@ -61,12 +61,12 @@ bool HTMLOutputElement::supportsFocus() const
     return Node::supportsFocus() && !disabled();
 }
 
-void HTMLOutputElement::parseAttribute(const Attribute& attribute)
+void HTMLOutputElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (attribute.name() == HTMLNames::forAttr)
-        setFor(attribute.value());
+    if (name == HTMLNames::forAttr)
+        setFor(value);
     else
-        HTMLFormControlElement::parseAttribute(attribute);
+        HTMLFormControlElement::parseAttribute(name, value);
 }
 
 DOMSettableTokenList* HTMLOutputElement::htmlFor() const

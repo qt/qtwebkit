@@ -704,7 +704,7 @@ namespace JSC {
         SharedSymbolTable* symbolTable(CodeSpecializationKind kind) const { return m_unlinkedExecutable->symbolTable(kind); }
 
         void clearCodeIfNotCompiling();
-        void clearUnlinkedCodeIfNotCompiling();
+        void clearUnlinkedCodeForRecompilationIfNotCompiling();
         static void visitChildren(JSCell*, SlotVisitor&);
         static Structure* createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue proto)
         {
@@ -752,6 +752,7 @@ namespace JSC {
         : Base(globalData, scope->globalObject()->functionStructure())
         , m_executable(globalData, this, executable)
         , m_scope(globalData, this, scope)
+        , m_inheritorIDWatchpoint(InitializedBlind) // See comment in JSFunction.cpp concerning the reason for using InitializedBlind as opposed to InitializedWatching.
     {
     }
 

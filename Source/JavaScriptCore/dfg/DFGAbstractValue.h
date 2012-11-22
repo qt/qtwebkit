@@ -284,6 +284,21 @@ struct AbstractValue {
         checkConsistency();
     }
     
+    bool filterByValue(JSValue value)
+    {
+        if (!validate(value))
+            return false;
+        
+        if (!!value && value.isCell())
+            filter(StructureSet(value.asCell()->structure()));
+        else
+            filter(speculationFromValue(value));
+        
+        m_value = value;
+        
+        return true;
+    }
+    
     bool validateType(JSValue value) const
     {
         if (isTop())
@@ -327,6 +342,15 @@ struct AbstractValue {
         return true;
     }
     
+    Structure* bestProvenStructure() const
+    {
+        if (m_currentKnownStructure.hasSingleton())
+            return m_currentKnownStructure.singleton();
+        if (m_futurePossibleStructure.hasSingleton())
+            return m_futurePossibleStructure.singleton();
+        return 0;
+    }
+    
     void checkConsistency() const
     {
         if (!(m_type & SpecCell)) {
@@ -351,7 +375,7 @@ struct AbstractValue {
     {
         fprintf(out, "(%s, %s, ", speculationToString(m_type), arrayModesToString(m_arrayModes));
         m_currentKnownStructure.dump(out);
-        dataLog(", ");
+        dataLogF(", ");
         m_futurePossibleStructure.dump(out);
         if (!!m_value)
             fprintf(out, ", %s", m_value.description());

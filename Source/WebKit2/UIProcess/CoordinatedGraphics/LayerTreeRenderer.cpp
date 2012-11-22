@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies)
+    Copyright (C) 2012 Company 100, Inc.
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -27,7 +28,6 @@
 #include "GraphicsLayerTextureMapper.h"
 #include "LayerTreeCoordinatorProxy.h"
 #include "MessageID.h"
-#include "ShareableBitmap.h"
 #include "TextureMapper.h"
 #include "TextureMapperBackingStore.h"
 #include "TextureMapperGL.h"
@@ -36,6 +36,13 @@
 #include <OpenGLShims.h>
 #include <wtf/Atomics.h>
 #include <wtf/MainThread.h>
+
+#if ENABLE(CSS_SHADERS)
+#include "CustomFilterProgram.h"
+#include "CustomFilterProgramInfo.h"
+#include "WebCustomFilterOperation.h"
+#include "WebCustomFilterProgram.h"
+#endif
 
 namespace WebKit {
 
@@ -92,6 +99,9 @@ LayerTreeRenderer::LayerTreeRenderer(LayerTreeCoordinatorProxy* layerTreeCoordin
 #if ENABLE(REQUEST_ANIMATION_FRAME)
     , m_animationFrameRequested(false)
 #endif
+    , m_accelerationMode(TextureMapper::OpenGLMode)
+    , m_backgroundColor(Color::white)
+    , m_setDrawsBackground(false)
 {
 }
 
@@ -112,6 +122,7 @@ void LayerTreeRenderer::paintToCurrentGLContext(const TransformationMatrix& matr
     if (!m_textureMapper)
         m_textureMapper = TextureMapper::create(TextureMapper::OpenGLMode);
     ASSERT(m_textureMapper->accelerationMode() == TextureMapper::OpenGLMode);
+    syncRemoteContent();
 
     adjustPositionForFixedLayers();
     GraphicsLayer* currentRootLayer = rootLayer();
@@ -128,6 +139,13 @@ void LayerTreeRenderer::paintToCurrentGLContext(const TransformationMatrix& matr
         layer->applyAnimationsRecursively();
     m_textureMapper->beginPainting(PaintFlags);
     m_textureMapper->beginClip(TransformationMatrix(), clipRect);
+
+    if (m_setDrawsBackground) {
+        RGBA32 rgba = makeRGBA32FromFloats(m_backgroundColor.red(),
+            m_backgroundColor.green(), m_backgroundColor.blue(),
+            m_backgroundColor.alpha() * opacity);
+        m_textureMapper->drawSolidColor(clipRect, TransformationMatrix(), Color(rgba));
+    }
 
     if (currentRootLayer->opacity() != opacity || currentRootLayer->transform() != matrix) {
         currentRootLayer->setOpacity(opacity);
@@ -177,6 +195,10 @@ void LayerTreeRenderer::paintToGraphicsContext(BackingStore::PlatformGraphicsCon
     GraphicsContext graphicsContext(painter);
     m_textureMapper->setGraphicsContext(&graphicsContext);
     m_textureMapper->beginPainting();
+
+    if (m_setDrawsBackground)
+        m_textureMapper->drawSolidColor(graphicsContext.clipBounds(), TransformationMatrix(), m_backgroundColor);
+
     layer->paint();
     m_textureMapper->endPainting();
     m_textureMapper->setGraphicsContext(0);
@@ -221,24 +243,40 @@ void LayerTreeRenderer::didChangeScrollPosition(const IntPoint& position)
 }
 
 #if USE(GRAPHICS_SURFACE)
-void LayerTreeRenderer::syncCanvas(WebLayerID id, const WebCore::IntSize& canvasSize, const GraphicsSurfaceToken& token, uint32_t frontBuffer)
+void LayerTreeRenderer::createCanvas(WebLayerID id, const WebCore::IntSize& canvasSize, PassRefPtr<GraphicsSurface> surface)
 {
-    if (canvasSize.isEmpty() || !m_textureMapper)
-        return;
-
-    ensureLayer(id);
+    ASSERT(m_textureMapper);
     GraphicsLayer* layer = layerByID(id);
+    ASSERT(layer);
+    ASSERT(!m_surfaceBackingStores.contains(id));
 
-    RefPtr<TextureMapperSurfaceBackingStore> canvasBackingStore;
-    SurfaceBackingStoreMap::iterator it = m_surfaceBackingStores.find(id);
-    if (it == m_surfaceBackingStores.end()) {
-        canvasBackingStore = TextureMapperSurfaceBackingStore::create();
-        m_surfaceBackingStores.set(id, canvasBackingStore);
-    } else
-        canvasBackingStore = it->value;
+    RefPtr<TextureMapperSurfaceBackingStore> canvasBackingStore(TextureMapperSurfaceBackingStore::create());
+    m_surfaceBackingStores.set(id, canvasBackingStore);
 
-    canvasBackingStore->setGraphicsSurface(token, canvasSize, frontBuffer);
+    canvasBackingStore->setGraphicsSurface(surface);
     layer->setContentsToMedia(canvasBackingStore.get());
+}
+
+void LayerTreeRenderer::syncCanvas(WebLayerID id, uint32_t frontBuffer)
+{
+    ASSERT(m_textureMapper);
+    ASSERT(m_surfaceBackingStores.contains(id));
+
+    SurfaceBackingStoreMap::iterator it = m_surfaceBackingStores.find(id);
+    RefPtr<TextureMapperSurfaceBackingStore> canvasBackingStore = it->value;
+
+    canvasBackingStore->swapBuffersIfNeeded(frontBuffer);
+}
+
+void LayerTreeRenderer::destroyCanvas(WebLayerID id)
+{
+    ASSERT(m_textureMapper);
+    GraphicsLayer* layer = layerByID(id);
+    ASSERT(layer);
+    ASSERT(m_surfaceBackingStores.contains(id));
+
+    m_surfaceBackingStores.remove(id);
+    layer->setContentsToMedia(0);
 }
 #endif
 
@@ -269,9 +307,44 @@ void LayerTreeRenderer::setLayerFilters(WebLayerID id, const FilterOperations& f
     ASSERT(it != m_layers.end());
 
     GraphicsLayer* layer = it->value;
+#if ENABLE(CSS_SHADERS)
+    injectCachedCustomFilterPrograms(filters);
+#endif
     layer->setFilters(filters);
 }
 #endif
+
+#if ENABLE(CSS_SHADERS)
+void LayerTreeRenderer::injectCachedCustomFilterPrograms(const FilterOperations& filters) const
+{
+    for (size_t i = 0; i < filters.size(); ++i) {
+        FilterOperation* operation = filters.operations().at(i).get();
+        if (operation->getOperationType() != FilterOperation::CUSTOM)
+            continue;
+
+        WebCustomFilterOperation* customOperation = static_cast<WebCustomFilterOperation*>(operation);
+        ASSERT(!customOperation->program());
+        CustomFilterProgramMap::const_iterator iter = m_customFilterPrograms.find(customOperation->programID());
+        ASSERT(iter != m_customFilterPrograms.end());
+        customOperation->setProgram(iter->value.get());
+    }
+}
+
+void LayerTreeRenderer::createCustomFilterProgram(int id, const WebCore::CustomFilterProgramInfo& programInfo)
+{
+    ASSERT(!m_customFilterPrograms.contains(id));
+    m_customFilterPrograms.set(id, WebCustomFilterProgram::create(programInfo.vertexShaderString(), programInfo.fragmentShaderString(), programInfo.programType(), programInfo.mixSettings(), programInfo.meshType()));
+}
+
+void LayerTreeRenderer::removeCustomFilterProgram(int id)
+{
+    CustomFilterProgramMap::iterator iter = m_customFilterPrograms.find(id);
+    ASSERT(iter != m_customFilterPrograms.end());
+    if (m_textureMapper)
+        m_textureMapper->removeCachedCustomFilterProgram(iter->value.get());
+    m_customFilterPrograms.remove(iter);
+}
+#endif // ENABLE(CSS_SHADERS)
 
 void LayerTreeRenderer::setLayerState(WebLayerID id, const WebLayerInfo& layerInfo)
 {
@@ -301,7 +374,7 @@ void LayerTreeRenderer::setLayerState(WebLayerID id, const WebLayerInfo& layerIn
     else
         m_fixedLayers.remove(id);
 
-    assignImageToLayer(layer, layerInfo.imageBackingStoreID);
+    assignImageBackingToLayer(layer, layerInfo.imageID);
 
     // Never make the root layer clip.
     layer->setMasksToBounds(layerInfo.isRootLayer ? false : layerInfo.masksToBounds);
@@ -354,9 +427,9 @@ void LayerTreeRenderer::setRootLayerID(WebLayerID layerID)
     m_rootLayer->addChild(layer);
 }
 
-PassRefPtr<CoordinatedBackingStore> LayerTreeRenderer::getBackingStore(WebLayerID id)
+PassRefPtr<CoordinatedBackingStore> LayerTreeRenderer::getBackingStore(GraphicsLayer* graphicsLayer)
 {
-    TextureMapperLayer* layer = toTextureMapperLayer(layerByID(id));
+    TextureMapperLayer* layer = toTextureMapperLayer(graphicsLayer);
     ASSERT(layer);
     RefPtr<CoordinatedBackingStore> backingStore = static_cast<CoordinatedBackingStore*>(layer->backingStore().get());
     if (!backingStore) {
@@ -367,46 +440,111 @@ PassRefPtr<CoordinatedBackingStore> LayerTreeRenderer::getBackingStore(WebLayerI
     return backingStore;
 }
 
+void LayerTreeRenderer::removeBackingStoreIfNeeded(GraphicsLayer* graphicsLayer)
+{
+    TextureMapperLayer* layer = toTextureMapperLayer(graphicsLayer);
+    ASSERT(layer);
+    RefPtr<CoordinatedBackingStore> backingStore = static_cast<CoordinatedBackingStore*>(layer->backingStore().get());
+    ASSERT(backingStore);
+    if (backingStore->isEmpty())
+        layer->setBackingStore(0);
+}
+
+void LayerTreeRenderer::resetBackingStoreSizeToLayerSize(GraphicsLayer* graphicsLayer)
+{
+    TextureMapperLayer* layer = toTextureMapperLayer(graphicsLayer);
+    ASSERT(layer);
+    RefPtr<CoordinatedBackingStore> backingStore = static_cast<CoordinatedBackingStore*>(layer->backingStore().get());
+    ASSERT(backingStore);
+    backingStore->setSize(graphicsLayer->size());
+}
+
 void LayerTreeRenderer::createTile(WebLayerID layerID, int tileID, float scale)
 {
-    getBackingStore(layerID)->createTile(tileID, scale);
+    GraphicsLayer* layer = layerByID(layerID);
+    ASSERT(layer);
+    RefPtr<CoordinatedBackingStore> backingStore = getBackingStore(layer);
+    backingStore->createTile(tileID, scale);
+    resetBackingStoreSizeToLayerSize(layer);
 }
 
 void LayerTreeRenderer::removeTile(WebLayerID layerID, int tileID)
 {
-    getBackingStore(layerID)->removeTile(tileID);
+    GraphicsLayer* layer = layerByID(layerID);
+    ASSERT(layer);
+    RefPtr<CoordinatedBackingStore> backingStore = getBackingStore(layer);
+    backingStore->removeTile(tileID);
+    resetBackingStoreSizeToLayerSize(layer);
+    removeBackingStoreIfNeeded(layer);
 }
 
 void LayerTreeRenderer::updateTile(WebLayerID layerID, int tileID, const TileUpdate& update)
 {
-    RefPtr<CoordinatedBackingStore> backingStore = getBackingStore(layerID);
-    backingStore->updateTile(tileID, update.sourceRect, update.targetRect, update.surface, update.offset);
+    GraphicsLayer* layer = layerByID(layerID);
+    ASSERT(layer);
+    RefPtr<CoordinatedBackingStore> backingStore = getBackingStore(layer);
+    backingStore->updateTile(tileID, update.sourceRect, update.tileRect, update.surface, update.offset);
+    resetBackingStoreSizeToLayerSize(layer);
     m_backingStoresWithPendingBuffers.add(backingStore);
 }
 
-void LayerTreeRenderer::createImage(int64_t imageID, PassRefPtr<ShareableBitmap> weakBitmap)
+void LayerTreeRenderer::createImageBacking(CoordinatedImageBackingID imageID)
 {
-    RefPtr<ShareableBitmap> bitmap = weakBitmap;
-    RefPtr<TextureMapperTiledBackingStore> backingStore = TextureMapperTiledBackingStore::create();
-    m_directlyCompositedImages.set(imageID, backingStore);
-    backingStore->updateContents(m_textureMapper.get(), bitmap->createImage().get(), BitmapTexture::UpdateCannotModifyOriginalImageData);
+    ASSERT(!m_imageBackings.contains(imageID));
+    RefPtr<CoordinatedBackingStore> backingStore(CoordinatedBackingStore::create());
+    m_imageBackings.add(imageID, backingStore.release());
 }
 
-void LayerTreeRenderer::destroyImage(int64_t imageID)
+void LayerTreeRenderer::updateImageBacking(CoordinatedImageBackingID imageID, PassRefPtr<ShareableSurface> surface)
 {
-    m_directlyCompositedImages.remove(imageID);
+    ASSERT(m_imageBackings.contains(imageID));
+    ImageBackingMap::iterator it = m_imageBackings.find(imageID);
+    RefPtr<CoordinatedBackingStore> backingStore = it->value;
+
+    // CoordinatedImageBacking is realized to CoordinatedBackingStore with only one tile in UI Process.
+    backingStore->createTile(1 /* id */, 1 /* scale */);
+    IntRect rect(IntPoint::zero(), surface->size());
+    // See CoordinatedGraphicsLayer::shouldDirectlyCompositeImage()
+    ASSERT(2000 >= std::max(rect.width(), rect.height()));
+    backingStore->setSize(rect.size());
+    backingStore->updateTile(1 /* id */, rect, rect, surface, rect.location());
+
+    m_backingStoresWithPendingBuffers.add(backingStore);
 }
 
-void LayerTreeRenderer::assignImageToLayer(GraphicsLayer* layer, int64_t imageID)
+void LayerTreeRenderer::clearImageBackingContents(CoordinatedImageBackingID imageID)
 {
-    if (!imageID) {
+    ASSERT(m_imageBackings.contains(imageID));
+    ImageBackingMap::iterator it = m_imageBackings.find(imageID);
+    RefPtr<CoordinatedBackingStore> backingStore = it->value;
+    backingStore->removeAllTiles();
+    m_backingStoresWithPendingBuffers.add(backingStore);
+}
+
+void LayerTreeRenderer::removeImageBacking(CoordinatedImageBackingID imageID)
+{
+    ASSERT(m_imageBackings.contains(imageID));
+
+    // We don't want TextureMapperLayer refers a dangling pointer.
+    ImageBackingMap::iterator it = m_imageBackings.find(imageID);
+    m_releasedImageBackings.append(it->value);
+    m_imageBackings.remove(imageID);
+}
+
+void LayerTreeRenderer::assignImageBackingToLayer(GraphicsLayer* layer, CoordinatedImageBackingID imageID)
+{
+    if (imageID == InvalidCoordinatedImageBackingID) {
         layer->setContentsToMedia(0);
         return;
     }
-
-    HashMap<int64_t, RefPtr<TextureMapperBackingStore> >::iterator it = m_directlyCompositedImages.find(imageID);
-    ASSERT(it != m_directlyCompositedImages.end());
+    ImageBackingMap::iterator it = m_imageBackings.find(imageID);
+    ASSERT(it != m_imageBackings.end());
     layer->setContentsToMedia(it->value.get());
+}
+
+void LayerTreeRenderer::removeReleasedImageBackingsIfNeeded()
+{
+    m_releasedImageBackings.clear();
 }
 
 void LayerTreeRenderer::commitTileOperations()
@@ -427,6 +565,7 @@ void LayerTreeRenderer::flushLayerChanges()
 
     m_rootLayer->flushCompositingState(FloatRect());
     commitTileOperations();
+    removeReleasedImageBackingsIfNeeded();
 
     // The pending tiles state is on its way for the screen, tell the web process to render the next one.
     dispatchOnMainThread(bind(&LayerTreeRenderer::renderNextFrame, this));
@@ -442,10 +581,6 @@ void LayerTreeRenderer::ensureRootLayer()
 {
     if (m_rootLayer)
         return;
-    if (!m_textureMapper) {
-        m_textureMapper = TextureMapper::create(TextureMapper::OpenGLMode);
-        static_cast<TextureMapperGL*>(m_textureMapper.get())->setEnableEdgeDistanceAntialiasing(true);
-    }
 
     m_rootLayer = createLayer(InvalidWebLayerID);
     m_rootLayer->setMasksToBounds(false);
@@ -454,6 +589,8 @@ void LayerTreeRenderer::ensureRootLayer()
 
     // The root layer should not have zero size, or it would be optimized out.
     m_rootLayer->setSize(FloatSize(1.0, 1.0));
+
+    ASSERT(m_textureMapper);
     toTextureMapperLayer(m_rootLayer.get())->setTextureMapper(m_textureMapper.get());
 }
 
@@ -483,7 +620,7 @@ void LayerTreeRenderer::purgeGLResources()
     if (layer)
         layer->clearBackingStoresRecursive();
 
-    m_directlyCompositedImages.clear();
+    m_imageBackings.clear();
 #if USE(GRAPHICS_SURFACE)
     m_surfaceBackingStores.clear();
 #endif
@@ -506,6 +643,17 @@ void LayerTreeRenderer::setLayerAnimations(WebLayerID id, const GraphicsLayerAni
     GraphicsLayerTextureMapper* layer = toGraphicsLayerTextureMapper(layerByID(id));
     if (!layer)
         return;
+#if ENABLE(CSS_SHADERS)
+    for (size_t i = 0; i < animations.animations().size(); ++i) {
+        const KeyframeValueList& keyframes = animations.animations().at(i).keyframes();
+        if (keyframes.property() != AnimatedPropertyWebkitFilter)
+            continue;
+        for (size_t j = 0; j < keyframes.size(); ++j) {
+            const FilterAnimationValue* filterValue = static_cast<const FilterAnimationValue*>(keyframes.at(i));
+            injectCachedCustomFilterPrograms(*filterValue->value());
+        }
+    }
+#endif
     layer->setAnimations(animations);
 }
 
@@ -547,6 +695,11 @@ void LayerTreeRenderer::setActive(bool active)
     m_isActive = active;
     if (m_isActive)
         renderNextFrame();
+}
+
+void LayerTreeRenderer::setBackgroundColor(const WebCore::Color& color)
+{
+    m_backgroundColor = color;
 }
 
 } // namespace WebKit

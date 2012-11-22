@@ -41,7 +41,6 @@ public:
     {
         return reinterpret_cast<TestNode*>(object->GetAlignedPointerFromInternalField(v8DOMWrapperObjectIndex));
     }
-    inline static v8::Handle<v8::Object> wrap(TestNode*, v8::Handle<v8::Object> creationContext = v8::Handle<v8::Object>(), v8::Isolate* = 0);
     static void derefObject(void*);
     static WrapperTypeInfo info;
     static v8::Handle<v8::Value> constructorCallback(const v8::Arguments&);
@@ -49,23 +48,52 @@ public:
     static void installPerContextProperties(v8::Handle<v8::Object>, TestNode*) { }
     static void installPerContextPrototypeProperties(v8::Handle<v8::Object>) { }
 private:
-    static v8::Handle<v8::Object> wrapSlow(PassRefPtr<TestNode>, v8::Handle<v8::Object> creationContext, v8::Isolate*);
+    friend v8::Handle<v8::Object> wrap(TestNode*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
+    static v8::Handle<v8::Object> createWrapper(PassRefPtr<TestNode>, v8::Handle<v8::Object> creationContext, v8::Isolate*);
 };
 
-v8::Handle<v8::Object> V8TestNode::wrap(TestNode* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+
+inline v8::Handle<v8::Object> wrap(TestNode* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate = 0)
 {
-        v8::Handle<v8::Object> wrapper = V8DOMWrapper::getCachedWrapper(impl);
-        if (!wrapper.IsEmpty())
-            return wrapper;
-    return V8TestNode::wrapSlow(impl, creationContext, isolate);
+    ASSERT(impl);
+    ASSERT(DOMDataStore::getNode(impl, isolate).IsEmpty());
+    return V8TestNode::createWrapper(impl, creationContext, isolate);
+}
+
+inline v8::Handle<v8::Object> toV8Object(TestNode* impl, v8::Handle<v8::Object> creationContext = v8::Handle<v8::Object>(), v8::Isolate* isolate = 0)
+{
+    if (UNLIKELY(!impl))
+        return v8::Handle<v8::Object>();
+    v8::Handle<v8::Object> wrapper = DOMDataStore::getNode(impl, isolate);
+    if (!wrapper.IsEmpty())
+        return wrapper;
+    return wrap(impl, creationContext, isolate);
 }
 
 inline v8::Handle<v8::Value> toV8(TestNode* impl, v8::Handle<v8::Object> creationContext = v8::Handle<v8::Object>(), v8::Isolate* isolate = 0)
 {
-    if (!impl)
+    if (UNLIKELY(!impl))
         return v8NullWithCheck(isolate);
-    return V8TestNode::wrap(impl, creationContext, isolate);
+    v8::Handle<v8::Value> wrapper = DOMDataStore::getNode(impl, isolate);
+    if (!wrapper.IsEmpty())
+        return wrapper;
+    return wrap(impl, creationContext, isolate);
 }
+
+inline v8::Handle<v8::Value> toV8Fast(TestNode* impl, const v8::AccessorInfo& info, Node* holder)
+{
+    if (UNLIKELY(!impl))
+        return v8::Null(info.GetIsolate());
+    // What we'd really like to check here is whether we're in the main world or
+    // in an isolated world. The fastest way we know how to do that is to check
+    // whether the holder's inline wrapper is the same wrapper we see in the
+    // v8::AccessorInfo.
+    v8::Handle<v8::Object> wrapper = (holder->wrapper() == info.Holder()) ? impl->wrapper() : DOMDataStore::getNode(impl, info.GetIsolate());
+    if (!wrapper.IsEmpty())
+        return wrapper;
+    return wrap(impl, info.Holder(), info.GetIsolate());
+}
+
 inline v8::Handle<v8::Value> toV8(PassRefPtr< TestNode > impl, v8::Handle<v8::Object> creationContext = v8::Handle<v8::Object>(), v8::Isolate* isolate = 0)
 {
     return toV8(impl.get(), creationContext, isolate);

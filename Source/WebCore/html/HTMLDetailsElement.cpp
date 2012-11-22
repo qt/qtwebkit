@@ -39,7 +39,7 @@ using namespace HTMLNames;
 
 static const AtomicString& summaryQuerySelector()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, selector, ("summary:first-of-type"));
+    DEFINE_STATIC_LOCAL(AtomicString, selector, ("summary:first-of-type", AtomicString::ConstructFromLiteral));
     return selector;
 };
 
@@ -126,15 +126,15 @@ Element* HTMLDetailsElement::findMainSummary() const
     return static_cast<DetailsSummaryElement*>(userAgentShadowRoot()->firstChild())->fallbackSummary();
 }
 
-void HTMLDetailsElement::parseAttribute(const Attribute& attribute)
+void HTMLDetailsElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (attribute.name() == openAttr) {
+    if (name == openAttr) {
         bool oldValue = m_isOpen;
-        m_isOpen =  !attribute.isNull();
+        m_isOpen = !value.isNull();
         if (oldValue != m_isOpen)
             reattachIfAttached();
     } else
-        HTMLElement::parseAttribute(attribute);
+        HTMLElement::parseAttribute(name, value);
 }
 
 bool HTMLDetailsElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const

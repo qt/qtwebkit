@@ -24,9 +24,6 @@
 
 messages -> NetworkProcessConnection {
 
-    // FIXME (NetworkProcess): This message is for the NetworkProcess to tell the WebProcess to start a load.
-    // Once the NetworkProcess is doing the loading itself then we should remove it.
-    StartResourceLoad(uint64_t resourceLoadIdentifier)
 }
 
 #endif // ENABLE(NETWORK_PROCESS)

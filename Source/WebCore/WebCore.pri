@@ -53,8 +53,10 @@ INCLUDEPATH += \
     $$SOURCE_DIR/platform/animation \
     $$SOURCE_DIR/platform/audio \
     $$SOURCE_DIR/platform/graphics \
+    $$SOURCE_DIR/platform/graphics/cpu/arm \
+    $$SOURCE_DIR/platform/graphics/cpu/arm/filters \
     $$SOURCE_DIR/platform/graphics/filters \
-    $$SOURCE_DIR/platform/graphics/filters/arm \
+    $$SOURCE_DIR/platform/graphics/filters/texmap \
     $$SOURCE_DIR/platform/graphics/opengl \
     $$SOURCE_DIR/platform/graphics/opentype \
     $$SOURCE_DIR/platform/graphics/qt \
@@ -207,7 +209,18 @@ enable?(WEB_AUDIO) {
 }
 
 use?(3D_GRAPHICS) {
-    contains(QT_CONFIG, opengles2):!win32: LIBS += -lEGL
+    win32: {
+        win32-g++: {
+            # Make sure OpenGL libs are after the webcore lib so MinGW can resolve symbols
+            contains(QT_CONFIG, opengles2) {
+                LIBS += $$QMAKE_LIBS_OPENGL_ES2
+            } else {
+                LIBS += $$QMAKE_LIBS_OPENGL
+            }
+        }
+    } else {
+        contains(QT_CONFIG, opengles2): LIBS += -lEGL
+    }
 }
 
 use?(GRAPHICS_SURFACE) {

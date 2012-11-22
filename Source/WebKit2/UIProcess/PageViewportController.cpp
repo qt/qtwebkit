@@ -52,11 +52,14 @@ PageViewportController::PageViewportController(WebKit::WebPageProxy* proxy, Page
 {
     // Initializing Viewport Raw Attributes to avoid random negative or infinity scale factors
     // if there is a race condition between the first layout and setting the viewport attributes for the first time.
-    m_rawAttributes.initialScale = 1;
     m_rawAttributes.minimumScale = 1;
     m_rawAttributes.maximumScale = 1;
     m_rawAttributes.userScalable = m_allowsUserScaling;
-    m_rawAttributes.initiallyFitToViewport = true;
+
+    // The initial scale might be implicit and set to -1, in this case we have to infer it
+    // using the viewport size and the final layout size.
+    // To be able to assert for valid scale we initialize it to -1.
+    m_rawAttributes.initialScale = -1;
 
     ASSERT(m_client);
     m_client->setController(this);
@@ -106,7 +109,8 @@ void PageViewportController::didCommitLoad()
 void PageViewportController::didChangeContentsSize(const IntSize& newSize)
 {
     m_contentsSize = newSize;
-    updateMinimumScaleToFit();
+    if (updateMinimumScaleToFit())
+        m_client->didChangeViewportAttributes();
 }
 
 void PageViewportController::didRenderFrame(const IntSize& contentsSize, const IntRect& coveredRect)
@@ -145,8 +149,8 @@ void PageViewportController::pageTransitionViewportReady()
 {
     if (!m_rawAttributes.layoutSize.isEmpty()) {
         m_hadUserInteraction = false;
-        float initialScale = m_rawAttributes.initiallyFitToViewport ? m_minimumScaleToFit : m_rawAttributes.initialScale;
-        applyScaleAfterRenderingContents(innerBoundedViewportScale(toViewportScale(initialScale)));
+        ASSERT(m_rawAttributes.initialScale > 0);
+        applyScaleAfterRenderingContents(innerBoundedViewportScale(toViewportScale(m_rawAttributes.initialScale)));
     }
 
     // At this point we should already have received the first viewport arguments and the requested scroll
@@ -213,10 +217,18 @@ void PageViewportController::didChangeViewportAttributes(const WebCore::Viewport
         return;
 
     m_rawAttributes = newAttributes;
-    WebCore::restrictScaleFactorToInitialScaleIfNotUserScalable(m_rawAttributes);
-
     m_allowsUserScaling = !!m_rawAttributes.userScalable;
-    updateMinimumScaleToFit();
+
+    if (!updateMinimumScaleToFit())
+        return;
+
+    ASSERT(m_minimumScaleToFit > 0);
+
+    // Set the initial scale if it was not specified in the viewport meta tag.
+    if (m_rawAttributes.initialScale < 0)
+        m_rawAttributes.initialScale = m_minimumScaleToFit;
+
+    WebCore::restrictScaleFactorToInitialScaleIfNotUserScalable(m_rawAttributes);
 
     m_client->didChangeViewportAttributes();
 }
@@ -260,12 +272,15 @@ void PageViewportController::applyPositionAfterRenderingContents(const FloatPoin
     syncVisibleContents();
 }
 
-void PageViewportController::updateMinimumScaleToFit()
+bool PageViewportController::updateMinimumScaleToFit()
 {
-    if (m_viewportSize.isEmpty())
-        return;
+    if (m_viewportSize.isEmpty() || m_contentsSize.isEmpty())
+        return false;
 
     float minimumScale = WebCore::computeMinimumScaleFactorForContentContained(m_rawAttributes, WebCore::roundedIntSize(m_viewportSize), WebCore::roundedIntSize(m_contentsSize), devicePixelRatio());
+
+    if (minimumScale <= 0)
+        return false;
 
     if (!fuzzyCompare(minimumScale, m_minimumScaleToFit, 0.001)) {
         m_minimumScaleToFit = minimumScale;
@@ -273,8 +288,9 @@ void PageViewportController::updateMinimumScaleToFit()
         if (!m_hadUserInteraction && !hasSuspendedContent())
             applyScaleAfterRenderingContents(toViewportScale(minimumScale));
 
-        m_client->didChangeViewportAttributes();
+        return true;
     }
+    return false;
 }
 
 } // namespace WebKit

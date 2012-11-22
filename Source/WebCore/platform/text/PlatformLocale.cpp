@@ -32,6 +32,7 @@
 #include "PlatformLocale.h"
 
 #include "DateTimeFormat.h"
+#include "LocalizedStrings.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
@@ -98,13 +99,33 @@ void DateTimeStringBuilder::visitField(DateTimeFormat::FieldType fieldType, int 
         // Always use padding width of 4 so it matches DateTimeEditElement.
         appendNumber(m_date.fullYear(), 4);
         return;
-    case DateTimeFormat::FieldTypeMonth:
-        // Always use padding width of 2 so it matches DateTimeEditElement.
-        appendNumber(m_date.month() + 1, 2);
+    case DateTimeFormat::FieldTypeMonth:    
+        if (numberOfPatternCharacters == 3)
+            m_builder.append(m_localizer.shortMonthLabels()[m_date.month()]);
+        else if (numberOfPatternCharacters == 4)
+            m_builder.append(m_localizer.monthLabels()[m_date.month()]);
+        else {
+            // Always use padding width of 2 so it matches DateTimeEditElement.
+            appendNumber(m_date.month() + 1, 2);
+        }
+        return;
+    case DateTimeFormat::FieldTypeMonthStandAlone:
+        if (numberOfPatternCharacters == 3)
+            m_builder.append(m_localizer.shortStandAloneMonthLabels()[m_date.month()]);
+        else if (numberOfPatternCharacters == 4)
+            m_builder.append(m_localizer.standAloneMonthLabels()[m_date.month()]);
+        else {
+            // Always use padding width of 2 so it matches DateTimeEditElement.
+            appendNumber(m_date.month() + 1, 2);
+        }
         return;
     case DateTimeFormat::FieldTypeDayOfMonth:
         // Always use padding width of 2 so it matches DateTimeEditElement.
         appendNumber(m_date.monthDay(), 2);
+        return;
+    case DateTimeFormat::FieldTypeWeekOfYear:
+        // Always use padding width of 2 so it matches DateTimeEditElement.
+        appendNumber(m_date.week(), 2);
         return;
     case DateTimeFormat::FieldTypePeriod:
         m_builder.append(m_localizer.timeAMPMLabels()[(m_date.hour() >= 12 ? 1 : 0)]);
@@ -317,43 +338,40 @@ String Locale::localizedDecimalSeparator()
 #endif
 
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES)
-String Locale::dateTimeFormatWithSeconds()
-{
-    if (!m_dateTimeFormatWithSeconds.isNull())
-        return m_dateTimeFormatWithSeconds;
-    // FIXME: We should retrieve the separator and the order from the system.
-    StringBuilder builder;
-    builder.append(dateFormat());
-    builder.append(' ');
-    builder.append(timeFormat());
-    m_dateTimeFormatWithSeconds = builder.toString();
-    return m_dateTimeFormatWithSeconds;
-}
-
-String Locale::dateTimeFormatWithoutSeconds()
-{
-    if (!m_dateTimeFormatWithoutSeconds.isNull())
-        return m_dateTimeFormatWithoutSeconds;
-    // FIXME: We should retrieve the separator and the order from the system.
-    StringBuilder builder;
-    builder.append(dateFormat());
-    builder.append(' ');
-    builder.append(shortTimeFormat());
-    m_dateTimeFormatWithoutSeconds = builder.toString();
-    return m_dateTimeFormatWithoutSeconds;
-}
 
 String Locale::formatDateTime(const DateComponents& date, FormatType formatType)
 {
-    if (date.type() != DateComponents::Time && date.type() != DateComponents::Date)
+    if (date.type() == DateComponents::Invalid)
         return String();
-    // FIXME: Supports all types.
+#if !ENABLE(INPUT_TYPE_WEEK)
+    if (date.type() == DateComponents::Week)
+        return String();
+#endif
 
     DateTimeStringBuilder builder(*this, date);
-    if (date.type() == DateComponents::Time)
+    switch (date.type()) {
+    case DateComponents::Time:
         builder.build(formatType == FormatTypeShort ? shortTimeFormat() : timeFormat());
-    else if (date.type() == DateComponents::Date)
+        break;
+    case DateComponents::Date:
         builder.build(dateFormat());
+        break;
+    case DateComponents::Month:
+        builder.build(monthFormat());
+        break;
+    case DateComponents::Week:    
+#if ENABLE(INPUT_TYPE_WEEK)
+        builder.build(weekFormatInLDML());
+        break;
+#endif
+    case DateComponents::DateTime:
+    case DateComponents::DateTimeLocal:
+        builder.build(formatType == FormatTypeShort ? dateTimeFormatWithoutSeconds() : dateTimeFormatWithSeconds());
+        break;
+    case DateComponents::Invalid:
+        ASSERT_NOT_REACHED();
+        break;
+    }
     return builder.toString();
 }
 #endif

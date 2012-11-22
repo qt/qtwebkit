@@ -30,6 +30,8 @@
 
 #include "CodeBlock.h"
 #include "DFGBasicBlock.h"
+#include "GetByIdStatus.h"
+#include "PutByIdStatus.h"
 
 namespace JSC { namespace DFG {
 
@@ -150,16 +152,16 @@ void AbstractState::initialize(Graph& graph)
             int operand = graph.m_mustHandleValues.operandForIndex(i);
             block->valuesAtHead.operand(operand).merge(value);
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-            dataLog("    Initializing Block #%u, operand r%d, to ", blockIndex, operand);
+            dataLogF("    Initializing Block #%u, operand r%d, to ", blockIndex, operand);
             block->valuesAtHead.operand(operand).dump(WTF::dataFile());
-            dataLog("\n");
+            dataLogF("\n");
 #endif
         }
         block->cfaShouldRevisit = true;
     }
 }
 
-bool AbstractState::endBasicBlock(MergeMode mergeMode, BranchDirection* branchDirectionPtr)
+bool AbstractState::endBasicBlock(MergeMode mergeMode)
 {
     ASSERT(m_block);
     
@@ -167,6 +169,7 @@ bool AbstractState::endBasicBlock(MergeMode mergeMode, BranchDirection* branchDi
     
     block->cfaFoundConstants = m_foundConstants;
     block->cfaDidFinish = m_isValid;
+    block->cfaBranchDirection = m_branchDirection;
     
     if (!m_isValid) {
         reset();
@@ -178,7 +181,7 @@ bool AbstractState::endBasicBlock(MergeMode mergeMode, BranchDirection* branchDi
     if (mergeMode != DontMerge || !ASSERT_DISABLED) {
         for (size_t argument = 0; argument < block->variablesAtTail.numberOfArguments(); ++argument) {
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-            dataLog("        Merging state for argument %zu.\n", argument);
+            dataLogF("        Merging state for argument %zu.\n", argument);
 #endif
             AbstractValue& destination = block->valuesAtTail.argument(argument);
             changed |= mergeStateAtTail(destination, m_variables.argument(argument), block->variablesAtTail.argument(argument));
@@ -186,7 +189,7 @@ bool AbstractState::endBasicBlock(MergeMode mergeMode, BranchDirection* branchDi
         
         for (size_t local = 0; local < block->variablesAtTail.numberOfLocals(); ++local) {
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-            dataLog("        Merging state for local %zu.\n", local);
+            dataLogF("        Merging state for local %zu.\n", local);
 #endif
             AbstractValue& destination = block->valuesAtTail.local(local);
             changed |= mergeStateAtTail(destination, m_variables.local(local), block->variablesAtTail.local(local));
@@ -195,12 +198,8 @@ bool AbstractState::endBasicBlock(MergeMode mergeMode, BranchDirection* branchDi
     
     ASSERT(mergeMode != DontMerge || !changed);
     
-    BranchDirection branchDirection = m_branchDirection;
-    if (branchDirectionPtr)
-        *branchDirectionPtr = branchDirection;
-    
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-    dataLog("        Branch direction = %s\n", branchDirectionToString(branchDirection));
+    dataLogF("        Branch direction = %s\n", branchDirectionToString(m_branchDirection));
 #endif
     
     reset();
@@ -208,7 +207,7 @@ bool AbstractState::endBasicBlock(MergeMode mergeMode, BranchDirection* branchDi
     if (mergeMode != MergeToSuccessors)
         return changed;
     
-    return mergeToSuccessors(m_graph, block, branchDirection);
+    return mergeToSuccessors(m_graph, block);
 }
 
 void AbstractState::reset()
@@ -216,6 +215,27 @@ void AbstractState::reset()
     m_block = 0;
     m_isValid = false;
     m_branchDirection = InvalidBranchDirection;
+}
+
+AbstractState::BooleanResult AbstractState::booleanResult(Node& node, AbstractValue& value)
+{
+    JSValue childConst = value.value();
+    if (childConst) {
+        if (childConst.toBoolean(m_codeBlock->globalObjectFor(node.codeOrigin)->globalExec()))
+            return DefinitelyTrue;
+        return DefinitelyFalse;
+    }
+
+    // Next check if we can fold because we know that the source is an object or string and does not equal undefined.
+    if (isCellSpeculation(value.m_type)
+        && value.m_currentKnownStructure.hasSingleton()) {
+        Structure* structure = value.m_currentKnownStructure.singleton();
+        if (!structure->masqueradesAsUndefined(m_codeBlock->globalObjectFor(node.codeOrigin))
+            && structure->typeInfo().type() != StringType)
+            return DefinitelyTrue;
+    }
+    
+    return UnknownBooleanResult;
 }
 
 bool AbstractState::execute(unsigned indexInBlock)
@@ -236,6 +256,12 @@ bool AbstractState::execute(unsigned indexInBlock)
     case WeakJSConstant:
     case PhantomArguments: {
         forNode(nodeIndex).set(m_graph.valueOfJSConstant(nodeIndex));
+        node.setCanExit(false);
+        break;
+    }
+        
+    case Identity: {
+        forNode(nodeIndex) = forNode(node.child1());
         node.setCanExit(false);
         break;
     }
@@ -424,7 +450,10 @@ bool AbstractState::execute(unsigned indexInBlock)
             break;
         }
         speculateNumberUnary(node);
-        forNode(nodeIndex).set(SpecDouble);
+        if (isInt32Speculation(forNode(node.child1()).m_type))
+            forNode(nodeIndex).set(SpecDoubleReal);
+        else
+            forNode(nodeIndex).set(SpecDouble);
         break;
     }
         
@@ -448,9 +477,13 @@ bool AbstractState::execute(unsigned indexInBlock)
             forNode(nodeIndex).set(SpecInt32);
             break;
         }
-        if (Node::shouldSpeculateNumber(m_graph[node.child1()], m_graph[node.child2()])) {
+        if (Node::shouldSpeculateNumberExpectingDefined(m_graph[node.child1()], m_graph[node.child2()])) {
             speculateNumberBinary(node);
-            forNode(nodeIndex).set(SpecDouble);
+            if (isRealNumberSpeculation(forNode(node.child1()).m_type)
+                && isRealNumberSpeculation(forNode(node.child2()).m_type))
+                forNode(nodeIndex).set(SpecDoubleReal);
+            else
+                forNode(nodeIndex).set(SpecDouble);
             break;
         }
         if (node.op() == ValueAdd) {
@@ -522,7 +555,11 @@ bool AbstractState::execute(unsigned indexInBlock)
             break;
         }
         speculateNumberBinary(node);
-        forNode(nodeIndex).set(SpecDouble);
+        if (isRealNumberSpeculation(forNode(node.child1()).m_type)
+            || isRealNumberSpeculation(forNode(node.child2()).m_type))
+            forNode(nodeIndex).set(SpecDoubleReal);
+        else
+            forNode(nodeIndex).set(SpecDouble);
         break;
     }
         
@@ -560,7 +597,7 @@ bool AbstractState::execute(unsigned indexInBlock)
                 break;
             }
         }
-        if (Node::shouldSpeculateInteger(
+        if (Node::shouldSpeculateIntegerForArithmetic(
                 m_graph[node.child1()], m_graph[node.child2()])
             && node.canSpeculateInteger()) {
             speculateInt32Binary(node, true); // forcing can-exit, which is a bit on the conservative side.
@@ -580,7 +617,7 @@ bool AbstractState::execute(unsigned indexInBlock)
             node.setCanExit(false);
             break;
         }
-        if (m_graph[node.child1()].shouldSpeculateInteger()
+        if (m_graph[node.child1()].shouldSpeculateIntegerForArithmetic()
             && node.canSpeculateInteger()) {
             speculateInt32Unary(node, true);
             forNode(nodeIndex).set(SpecInt32);
@@ -605,8 +642,18 @@ bool AbstractState::execute(unsigned indexInBlock)
     }
             
     case LogicalNot: {
-        JSValue childConst = forNode(node.child1()).value();
-        if (childConst && trySetConstant(nodeIndex, jsBoolean(!childConst.toBoolean(m_codeBlock->globalObjectFor(node.codeOrigin)->globalExec())))) {
+        bool didSetConstant = false;
+        switch (booleanResult(node, forNode(node.child1()))) {
+        case DefinitelyTrue:
+            didSetConstant = trySetConstant(nodeIndex, jsBoolean(false));
+            break;
+        case DefinitelyFalse:
+            didSetConstant = trySetConstant(nodeIndex, jsBoolean(true));
+            break;
+        default:
+            break;
+        }
+        if (didSetConstant) {
             m_foundConstants = true;
             node.setCanExit(false);
             break;
@@ -678,12 +725,13 @@ bool AbstractState::execute(unsigned indexInBlock)
     case CompareGreater:
     case CompareGreaterEq:
     case CompareEq: {
+        bool constantWasSet = false;
+
         JSValue leftConst = forNode(node.child1()).value();
         JSValue rightConst = forNode(node.child2()).value();
         if (leftConst && rightConst && leftConst.isNumber() && rightConst.isNumber()) {
             double a = leftConst.asNumber();
             double b = rightConst.asNumber();
-            bool constantWasSet;
             switch (node.op()) {
             case CompareLess:
                 constantWasSet = trySetConstant(nodeIndex, jsBoolean(a < b));
@@ -705,11 +753,20 @@ bool AbstractState::execute(unsigned indexInBlock)
                 constantWasSet = false;
                 break;
             }
-            if (constantWasSet) {
-                m_foundConstants = true;
-                node.setCanExit(false);
-                break;
-            }
+        }
+        
+        if (!constantWasSet && node.op() == CompareEq) {
+            SpeculatedType leftType = forNode(node.child1()).m_type;
+            SpeculatedType rightType = forNode(node.child2()).m_type;
+            if ((isInt32Speculation(leftType) && isOtherSpeculation(rightType))
+                || (isOtherSpeculation(leftType) && isInt32Speculation(rightType)))
+                constantWasSet = trySetConstant(nodeIndex, jsBoolean(false));
+        }
+        
+        if (constantWasSet) {
+            m_foundConstants = true;
+            node.setCanExit(false);
+            break;
         }
         
         forNode(nodeIndex).set(SpecBoolean);
@@ -842,6 +899,7 @@ bool AbstractState::execute(unsigned indexInBlock)
         switch (node.arrayMode().type()) {
         case Array::SelectUsingPredictions:
         case Array::Unprofiled:
+        case Array::Undecided:
             ASSERT_NOT_REACHED();
             break;
         case Array::ForceExit:
@@ -858,6 +916,24 @@ bool AbstractState::execute(unsigned indexInBlock)
         case Array::Arguments:
             forNode(node.child2()).filter(SpecInt32);
             forNode(nodeIndex).makeTop();
+            break;
+        case Array::Int32:
+            forNode(node.child2()).filter(SpecInt32);
+            if (node.arrayMode().isOutOfBounds()) {
+                clobberWorld(node.codeOrigin, indexInBlock);
+                forNode(nodeIndex).makeTop();
+            } else
+                forNode(nodeIndex).set(SpecInt32);
+            break;
+        case Array::Double:
+            forNode(node.child2()).filter(SpecInt32);
+            if (node.arrayMode().isOutOfBounds()) {
+                clobberWorld(node.codeOrigin, indexInBlock);
+                forNode(nodeIndex).makeTop();
+            } else if (node.arrayMode().isSaneChain())
+                forNode(nodeIndex).set(SpecDouble);
+            else
+                forNode(nodeIndex).set(SpecDoubleReal);
             break;
         case Array::Contiguous:
         case Array::ArrayStorage:
@@ -925,6 +1001,20 @@ bool AbstractState::execute(unsigned indexInBlock)
             break;
         case Array::Generic:
             clobberWorld(node.codeOrigin, indexInBlock);
+            break;
+        case Array::Int32:
+            forNode(child1).filter(SpecCell);
+            forNode(child2).filter(SpecInt32);
+            forNode(child3).filter(SpecInt32);
+            if (node.arrayMode().isOutOfBounds())
+                clobberWorld(node.codeOrigin, indexInBlock);
+            break;
+        case Array::Double:
+            forNode(child1).filter(SpecCell);
+            forNode(child2).filter(SpecInt32);
+            forNode(child3).filter(SpecRealNumber);
+            if (node.arrayMode().isOutOfBounds())
+                clobberWorld(node.codeOrigin, indexInBlock);
             break;
         case Array::Contiguous:
         case Array::ArrayStorage:
@@ -1018,6 +1108,16 @@ bool AbstractState::execute(unsigned indexInBlock)
             
     case ArrayPush:
         node.setCanExit(true);
+        switch (node.arrayMode().type()) {
+        case Array::Int32:
+            forNode(node.child2()).filter(SpecInt32);
+            break;
+        case Array::Double:
+            forNode(node.child2()).filter(SpecRealNumber);
+            break;
+        default:
+            break;
+        }
         clobberWorld(node.codeOrigin, indexInBlock);
         forNode(nodeIndex).set(SpecNumber);
         break;
@@ -1043,23 +1143,21 @@ bool AbstractState::execute(unsigned indexInBlock)
         break;
             
     case Branch: {
-        JSValue value = forNode(node.child1()).value();
-        if (value) {
-            bool booleanValue = value.toBoolean(m_codeBlock->globalObjectFor(node.codeOrigin)->globalExec());
-            if (booleanValue)
-                m_branchDirection = TakeTrue;
-            else
-                m_branchDirection = TakeFalse;
+        BooleanResult result = booleanResult(node, forNode(node.child1()));
+        if (result == DefinitelyTrue) {
+            m_branchDirection = TakeTrue;
+            node.setCanExit(false);
+            break;
+        }
+        if (result == DefinitelyFalse) {
+            m_branchDirection = TakeFalse;
             node.setCanExit(false);
             break;
         }
         // FIXME: The above handles the trivial cases of sparse conditional
         // constant propagation, but we can do better:
-        // 1) If the abstract value does not have a concrete value but describes
-        //    something that is known to evaluate true (or false) then we ought
-        //    to sparse conditional that.
-        // 2) We can specialize the source variable's value on each direction of
-        //    the branch.
+        // We can specialize the source variable's value on each direction of
+        // the branch.
         Node& child = m_graph[node.child1()];
         if (child.shouldSpeculateBoolean())
             speculateBooleanUnary(node);
@@ -1122,13 +1220,13 @@ bool AbstractState::execute(unsigned indexInBlock)
             
     case NewArray:
         node.setCanExit(true);
-        forNode(nodeIndex).set(m_graph.globalObjectFor(node.codeOrigin)->arrayStructure());
+        forNode(nodeIndex).set(m_graph.globalObjectFor(node.codeOrigin)->arrayStructureForIndexingTypeDuringAllocation(node.indexingType()));
         m_haveStructures = true;
         break;
         
     case NewArrayBuffer:
         node.setCanExit(true);
-        forNode(nodeIndex).set(m_graph.globalObjectFor(node.codeOrigin)->arrayStructure());
+        forNode(nodeIndex).set(m_graph.globalObjectFor(node.codeOrigin)->arrayStructureForIndexingTypeDuringAllocation(node.indexingType()));
         m_haveStructures = true;
         break;
 
@@ -1156,6 +1254,7 @@ bool AbstractState::execute(unsigned indexInBlock)
             // be hit, but then again, you never know.
             destination = source;
             node.setCanExit(false);
+            m_foundConstants = true; // Tell the constant folder to turn this into Identity.
             break;
         }
         
@@ -1188,10 +1287,14 @@ bool AbstractState::execute(unsigned indexInBlock)
         destination.set(SpecFinalObject);
         break;
     }
+        
+    case InheritorIDWatchpoint:
+        node.setCanExit(true);
+        break;
 
     case NewObject:
         node.setCanExit(false);
-        forNode(nodeIndex).set(m_codeBlock->globalObjectFor(node.codeOrigin)->emptyObjectStructure());
+        forNode(nodeIndex).set(node.structure());
         m_haveStructures = true;
         break;
         
@@ -1308,8 +1411,30 @@ bool AbstractState::execute(unsigned indexInBlock)
             m_isValid = false;
             break;
         }
-        if (isCellSpeculation(m_graph[node.child1()].prediction()))
+        if (isCellSpeculation(m_graph[node.child1()].prediction())) {
             forNode(node.child1()).filter(SpecCell);
+
+            if (Structure* structure = forNode(node.child1()).bestProvenStructure()) {
+                GetByIdStatus status = GetByIdStatus::computeFor(
+                    m_graph.m_globalData, structure,
+                    m_graph.m_codeBlock->identifier(node.identifierNumber()));
+                if (status.isSimple()) {
+                    // Assert things that we can't handle and that the computeFor() method
+                    // above won't be able to return.
+                    ASSERT(status.structureSet().size() == 1);
+                    ASSERT(status.chain().isEmpty());
+                    
+                    if (status.specificValue())
+                        forNode(nodeIndex).set(status.specificValue());
+                    else
+                        forNode(nodeIndex).makeTop();
+                    forNode(node.child1()).filter(status.structureSet());
+                    
+                    m_foundConstants = true;
+                    break;
+                }
+            }
+        }
         clobberWorld(node.codeOrigin, indexInBlock);
         forNode(nodeIndex).makeTop();
         break;
@@ -1374,7 +1499,7 @@ bool AbstractState::execute(unsigned indexInBlock)
         forNode(nodeIndex).clear(); // The result is not a JS value.
         break;
     case CheckArray: {
-        if (node.arrayMode().alreadyChecked(forNode(node.child1()))) {
+        if (node.arrayMode().alreadyChecked(m_graph, node, forNode(node.child1()))) {
             m_foundConstants = true;
             node.setCanExit(false);
             break;
@@ -1384,11 +1509,11 @@ bool AbstractState::execute(unsigned indexInBlock)
         case Array::String:
             forNode(node.child1()).filter(SpecString);
             break;
+        case Array::Int32:
+        case Array::Double:
         case Array::Contiguous:
         case Array::ArrayStorage:
         case Array::SlowPutArrayStorage:
-            // This doesn't filter anything meaningful right now. We may want to add
-            // CFA tracking of array mode speculations, but we don't have that, yet.
             forNode(node.child1()).filter(SpecCell);
             break;
         case Array::Arguments:
@@ -1430,7 +1555,7 @@ bool AbstractState::execute(unsigned indexInBlock)
         break;
     }
     case Arrayify: {
-        if (node.arrayMode().alreadyChecked(forNode(node.child1()))) {
+        if (node.arrayMode().alreadyChecked(m_graph, node, forNode(node.child1()))) {
             m_foundConstants = true;
             node.setCanExit(false);
             break;
@@ -1472,25 +1597,65 @@ bool AbstractState::execute(unsigned indexInBlock)
         break; 
     }
     case GetByOffset:
-        node.setCanExit(!isCellSpeculation(forNode(node.child1()).m_type));
-        forNode(node.child1()).filter(SpecCell);
+        if (!m_graph[node.child1()].hasStorageResult()) {
+            node.setCanExit(!isCellSpeculation(forNode(node.child1()).m_type));
+            forNode(node.child1()).filter(SpecCell);
+        }
         forNode(nodeIndex).makeTop();
         break;
             
-    case PutByOffset:
-        node.setCanExit(!isCellSpeculation(forNode(node.child1()).m_type));
-        forNode(node.child1()).filter(SpecCell);
+    case PutByOffset: {
+        bool canExit = false;
+        if (!m_graph[node.child1()].hasStorageResult()) {
+            canExit |= !isCellSpeculation(forNode(node.child1()).m_type);
+            forNode(node.child1()).filter(SpecCell);
+        }
+        canExit |= !isCellSpeculation(forNode(node.child2()).m_type);
+        forNode(node.child2()).filter(SpecCell);
+        node.setCanExit(canExit);
         break;
+    }
             
-    case CheckFunction:
+    case CheckFunction: {
+        JSValue value = forNode(node.child1()).value();
+        if (value == node.function()) {
+            m_foundConstants = true;
+            ASSERT(value);
+            node.setCanExit(false);
+            break;
+        }
+        
         node.setCanExit(true); // Lies! We can do better.
-        forNode(node.child1()).filter(SpecFunction);
-        // FIXME: Should be able to propagate the fact that we know what the function is.
+        if (!forNode(node.child1()).filterByValue(node.function())) {
+            m_isValid = false;
+            break;
+        }
         break;
+    }
         
     case PutById:
     case PutByIdDirect:
         node.setCanExit(true);
+        if (Structure* structure = forNode(node.child1()).bestProvenStructure()) {
+            PutByIdStatus status = PutByIdStatus::computeFor(
+                m_graph.m_globalData,
+                m_graph.globalObjectFor(node.codeOrigin),
+                structure,
+                m_graph.m_codeBlock->identifier(node.identifierNumber()),
+                node.op() == PutByIdDirect);
+            if (status.isSimpleReplace()) {
+                forNode(node.child1()).filter(structure);
+                m_foundConstants = true;
+                break;
+            }
+            if (status.isSimpleTransition()) {
+                clobberStructures(indexInBlock);
+                forNode(node.child1()).set(status.newStructure());
+                m_haveStructures = true;
+                m_foundConstants = true;
+                break;
+            }
+        }
         forNode(node.child1()).filter(SpecCell);
         clobberWorld(node.codeOrigin, indexInBlock);
         break;
@@ -1622,15 +1787,15 @@ inline bool AbstractState::mergeStateAtTail(AbstractValue& destination, Abstract
         return false;
     
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-    dataLog("          It's live, node @%u.\n", nodeIndex);
+    dataLogF("          It's live, node @%u.\n", nodeIndex);
 #endif
     
     if (node.variableAccessData()->isCaptured()) {
         source = inVariable;
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-        dataLog("          Transfering ");
+        dataLogF("          Transfering ");
         source.dump(WTF::dataFile());
-        dataLog(" from last access due to captured variable.\n");
+        dataLogF(" from last access due to captured variable.\n");
 #endif
     } else {
         switch (node.op()) {
@@ -1640,9 +1805,9 @@ inline bool AbstractState::mergeStateAtTail(AbstractValue& destination, Abstract
             // The block transfers the value from head to tail.
             source = inVariable;
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-            dataLog("          Transfering ");
+            dataLogF("          Transfering ");
             source.dump(WTF::dataFile());
-            dataLog(" from head to tail.\n");
+            dataLogF(" from head to tail.\n");
 #endif
             break;
             
@@ -1650,9 +1815,9 @@ inline bool AbstractState::mergeStateAtTail(AbstractValue& destination, Abstract
             // The block refines the value with additional speculations.
             source = forNode(nodeIndex);
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-            dataLog("          Refining to ");
+            dataLogF("          Refining to ");
             source.dump(WTF::dataFile());
-            dataLog("\n");
+            dataLogF("\n");
 #endif
             break;
             
@@ -1665,9 +1830,9 @@ inline bool AbstractState::mergeStateAtTail(AbstractValue& destination, Abstract
             } else
                 source = forNode(node.child1());
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-            dataLog("          Setting to ");
+            dataLogF("          Setting to ");
             source.dump(WTF::dataFile());
-            dataLog("\n");
+            dataLogF("\n");
 #endif
             break;
         
@@ -1681,7 +1846,7 @@ inline bool AbstractState::mergeStateAtTail(AbstractValue& destination, Abstract
         // Abstract execution did not change the output value of the variable, for this
         // basic block, on this iteration.
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-        dataLog("          Not changed!\n");
+        dataLogF("          Not changed!\n");
 #endif
         return false;
     }
@@ -1691,7 +1856,7 @@ inline bool AbstractState::mergeStateAtTail(AbstractValue& destination, Abstract
     // true to indicate that the fixpoint must go on!
     destination = source;
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-    dataLog("          Changed!\n");
+    dataLogF("          Changed!\n");
 #endif
     return true;
 }
@@ -1722,7 +1887,7 @@ inline bool AbstractState::merge(BasicBlock* from, BasicBlock* to)
 }
 
 inline bool AbstractState::mergeToSuccessors(
-    Graph& graph, BasicBlock* basicBlock, BranchDirection branchDirection)
+    Graph& graph, BasicBlock* basicBlock)
 {
     Node& terminal = graph[basicBlock->last()];
     
@@ -1730,25 +1895,25 @@ inline bool AbstractState::mergeToSuccessors(
     
     switch (terminal.op()) {
     case Jump: {
-        ASSERT(branchDirection == InvalidBranchDirection);
+        ASSERT(basicBlock->cfaBranchDirection == InvalidBranchDirection);
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-        dataLog("        Merging to block #%u.\n", terminal.takenBlockIndex());
+        dataLogF("        Merging to block #%u.\n", terminal.takenBlockIndex());
 #endif
         return merge(basicBlock, graph.m_blocks[terminal.takenBlockIndex()].get());
     }
         
     case Branch: {
-        ASSERT(branchDirection != InvalidBranchDirection);
+        ASSERT(basicBlock->cfaBranchDirection != InvalidBranchDirection);
         bool changed = false;
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-        dataLog("        Merging to block #%u.\n", terminal.takenBlockIndex());
+        dataLogF("        Merging to block #%u.\n", terminal.takenBlockIndex());
 #endif
-        if (branchDirection != TakeFalse)
+        if (basicBlock->cfaBranchDirection != TakeFalse)
             changed |= merge(basicBlock, graph.m_blocks[terminal.takenBlockIndex()].get());
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
-        dataLog("        Merging to block #%u.\n", terminal.notTakenBlockIndex());
+        dataLogF("        Merging to block #%u.\n", terminal.notTakenBlockIndex());
 #endif
-        if (branchDirection != TakeTrue)
+        if (basicBlock->cfaBranchDirection != TakeTrue)
             changed |= merge(basicBlock, graph.m_blocks[terminal.notTakenBlockIndex()].get());
         return changed;
     }
@@ -1756,7 +1921,7 @@ inline bool AbstractState::mergeToSuccessors(
     case Return:
     case Throw:
     case ThrowReferenceError:
-        ASSERT(branchDirection == InvalidBranchDirection);
+        ASSERT(basicBlock->cfaBranchDirection == InvalidBranchDirection);
         return false;
         
     default:

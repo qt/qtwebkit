@@ -1,3 +1,329 @@
+2012-11-21  Filip Pizlo  <fpizlo@apple.com>
+
+        Rename dataLog() and dataLogV() to dataLogF() and dataLogFV()
+        https://bugs.webkit.org/show_bug.cgi?id=103001
+
+        Rubber stamped by Dan Bernstein.
+
+        * wtf/DataLog.cpp:
+        (WTF::dataLogFV):
+        (WTF::dataLogF):
+        (WTF::dataLogFString):
+        * wtf/DataLog.h:
+        (WTF):
+        * wtf/HashTable.cpp:
+        (WTF::HashTableStats::dumpStats):
+        * wtf/HashTable.h:
+        (WTF::HashTable::Stats::dumpStats):
+        * wtf/MetaAllocator.cpp:
+        (WTF::MetaAllocator::dumpProfile):
+        * wtf/StackStats.cpp:
+        (WTF::StackStats::initialize):
+        (WTF::StackStats::PerThreadStats::PerThreadStats):
+        (WTF::StackStats::CheckPoint::CheckPoint):
+        (WTF::StackStats::CheckPoint::~CheckPoint):
+        (WTF::StackStats::probe):
+        (WTF::StackStats::LayoutCheckPoint::LayoutCheckPoint):
+        * wtf/text/WTFString.cpp:
+        (String::show):
+
+2012-11-21  Anthony G. Basile  <blueness@gentoo.org>
+
+        Source/WTF/wtf/Assertions.cpp: fix build on a uClibc system
+        https://bugs.webkit.org/show_bug.cgi?id=102946
+
+        Reviewed by Tony Chang.
+
+        Webkit-Gtk fails to build on a uClibc system because
+        Assertions.cpp assumes that all Linux systems have execinfo.h
+        and provide backtrace(). This is not necessarily the case for
+        uClibc which can be configured without these.  This patch
+        refines the check for OS(LINUX) to prevent this breakage.
+        Originally reported at https://bugs.gentoo.org/441674
+
+        * wtf/Assertions.cpp:
+
+2012-11-19  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG should be able to cache closure calls
+        https://bugs.webkit.org/show_bug.cgi?id=102662
+
+        Reviewed by Gavin Barraclough.
+
+        Added support to the meta allocator for easily querying whether an address falls within
+        a certain allocated chunk. Also added a useful debug routine to SentinelLinkedList,
+        which can be used to check if a node is on a particular list.
+
+        * wtf/MetaAllocatorHandle.h:
+        (MetaAllocatorHandle):
+        (WTF::MetaAllocatorHandle::containsIntegerAddress):
+        (WTF::MetaAllocatorHandle::contains):
+        * wtf/SentinelLinkedList.h:
+        (SentinelLinkedList):
+        (WTF::::isOnList):
+        (WTF):
+
+2012-11-19  Laszlo Gombos  <l.gombos@samsung.com>
+
+        Remove ReadWriteLock
+        https://bugs.webkit.org/show_bug.cgi?id=101637
+
+        Reviewed by Darin Adler.
+
+        Remove ReadWriteLock as it does not seems to be used.
+
+        * wtf/Platform.h: Remove the definition of HAVE_PTHREAD_RWLOCK.
+
+        * wtf/ThreadingPrimitives.h: Remove the PlatformReadWriteLock type 
+        and the ReadWriteLock class.
+
+        * wtf/ThreadingPthreads.cpp: Remove the implementation of
+        the ReadWriteLock class using pthreads.
+
+2012-11-19  Brady Eidson  <beidson@apple.com>
+
+        Add 64-bit specializations for atomicIncrement and atomicDecrement
+        https://bugs.webkit.org/show_bug.cgi?id=102702
+
+        Reviewed by Eric Carlson.
+
+        * wtf/Atomics.h:
+        (WTF::atomicIncrement): Add A 64-bit version for Darwin.
+        (WTF::atomicDecrement): Ditto.
+
+2012-11-18  Laszlo Gombos  <l.gombos@samsung.com>
+
+        Remove non-existent directories from the make system
+        https://bugs.webkit.org/show_bug.cgi?id=102632
+
+        Reviewed by Adam Barth.
+
+        Remove (non-existent) symbian references from the exclude list in gyp project files.
+
+        * WTF.gyp/WTF.gyp:
+
+2012-11-16  Michael Saboff  <msaboff@apple.com>
+
+        String::fromUTF8() should take advantage of the ASCII check in convertUTF8ToUTF16()
+        https://bugs.webkit.org/show_bug.cgi?id=100577
+
+        Reviewed by Oliver Hunt.
+
+        Passed in ASCII flag to convertUTF8ToUTF16() and if try, create an 8 bit string from the original arguments.
+        Relanding after fix to https://bugs.webkit.org/show_bug.cgi?id=102482.
+
+        * wtf/text/WTFString.cpp:
+        (WTF::String::fromUTF8):
+
+2012-11-15  Yury Semikhatsky  <yurys@chromium.org>
+
+        Memory instrumentation: add code for reporting stack traces of unknown instrumented objects
+        https://bugs.webkit.org/show_bug.cgi?id=102384
+
+        Reviewed by Pavel Feldman.
+
+        Added an option to collect stack traces for instrumented pointers so that they
+        can be printed in case the check failed for the pointer. This code is hidden
+        behind a define.
+
+        * wtf/MemoryInstrumentation.h:
+        (MemoryInstrumentationClient):
+        (WTF::MemoryInstrumentation::checkCountedObject): the method now returns false
+        in case the check has failed.
+        (InstrumentedPointer):
+        (WTF::::InstrumentedPointer):
+        (WTF):
+        (WTF::::process):
+
+2012-11-15  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Windows Fibers can corrupt the cached StackBounds
+        https://bugs.webkit.org/show_bug.cgi?id=102411
+
+        Reviewed by Geoffrey Garen.
+
+        Windows has support for something called fibers, which are like lightweight versions of 
+        threads. Multiple fibers can run within the context of a single thread and they have access 
+        to the same thread local storage but have different stacks. If we create a new JSGlobalContext 
+        on one fiber, then switch to another fiber and create a JSGlobalContext there, we will call 
+        initializeThreading() once for each new JSGlobalContext created. However, since these fibers 
+        are technically running inside the same thread, they will clobber each other's wtfThreadData(), 
+        which is stored using thread local storage. This can lead to corruption of the WTFThreadData 
+        structure for the fibers other than the last one to create a new JSGlobalContext, including 
+        the StackBounds data structure which is used during conservative scanning, among other things. 
+        This can lead to crashes during garbage collection on Windows if fibers are used.
+
+        A quick fix would be to always get a fresh StackBounds data structure when asking for it 
+        instead of using the cached version from the thread local storage. There is a larger problem 
+        in that these fibers can corrupt other WebKit data that uses thread local storage. We'll leave 
+        those theoretical fixes for future theoretical bugs.
+
+        * wtf/WTFThreadData.h:
+        (WTF::WTFThreadData::stack): We now refresh the m_stackBounds field whenever somebody asks for 
+        the StackBounds.
+
+2012-11-15  Maciej Stachowiak  <mjs@apple.com>
+
+        Fix an erroneous comment about the operators required by binarySearch
+        https://bugs.webkit.org/show_bug.cgi?id=102406
+
+        Reviewed by Anders Carlsson.
+
+        * wtf/StdLibExtras.h: binarySearch needs '==' and '<', not '--', '<' and '>'.
+
+2012-11-14  Michael Saboff  <msaboff@apple.com>
+
+        String::append() should handle two 8 bit strings without converting both to 16 bits
+        https://bugs.webkit.org/show_bug.cgi?id=102286
+
+        Reviewed by Oliver Hunt.
+
+        If both strings are 8 bit, then allocate and copy to a new 8 bit string.  Since most strings are
+        8 bit, this will save up to 3x the resulting string length in bytes.  2x is due to the possible
+        surviving 16 bit source string upconversion and 1x for the 16 bit result now being 8 bit.
+
+        * wtf/text/WTFString.cpp:
+        (WTF::String::append):
+
+2012-11-14  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [Qt][ARM] Enable the DFG JIT on ARMv7(Thumb2)
+        https://bugs.webkit.org/show_bug.cgi?id=101747
+
+        Reviewed by Simon Hausmann.
+
+        * wtf/Platform.h:
+
+2012-11-13  Christophe Dumez  <christophe.dumez@intel.com>
+
+        Use prefix form of increment / decrement operators in WTF String classes when possible
+        https://bugs.webkit.org/show_bug.cgi?id=101859
+
+        Reviewed by Benjamin Poulain.
+
+        Use prefix form of increment / decrement operators whenever possible in
+        WTF String classes as this seems to be the convention in WebKit.
+
+        * wtf/text/ASCIIFastPath.h:
+        (WTF::copyLCharsFromUCharSource):
+        * wtf/text/AtomicString.cpp:
+        (WTF::AtomicString::add):
+        * wtf/text/Base64.cpp:
+        (WTF::base64Encode):
+        (WTF::base64DecodeInternal):
+        * wtf/text/StringBuilder.cpp:
+        (WTF::StringBuilder::allocateBufferUpConvert):
+        * wtf/text/StringConcatenate.h:
+        * wtf/text/StringImpl.cpp:
+        (WTF::StringImpl::getData16SlowCase):
+        (WTF::StringImpl::upconvertCharacters):
+        (WTF::StringImpl::containsOnlyWhitespace):
+        (WTF::StringImpl::lower):
+        (WTF::StringImpl::upper):
+        (WTF::StringImpl::foldCase):
+        (WTF::StringImpl::stripMatchedCharacters):
+        (WTF::StringImpl::removeCharacters):
+        (WTF::StringImpl::simplifyMatchedCharactersToSpace):
+        (WTF::reverseFindInner):
+        (WTF::reverseFindIgnoringCaseInner):
+        (WTF::StringImpl::replace):
+        (WTF::StringImpl::createWithTerminatingNullCharacter):
+        * wtf/text/StringImpl.h:
+        (WTF::codePointCompare):
+        * wtf/text/WTFString.cpp:
+        (WTF::String::String):
+        (WTF::toIntegralType):
+
+2012-11-13  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Build fix after r134490.
+
+        * wtf/FastMalloc.cpp:
+
+2012-11-13  Brent Fulgham  <bfulgham@webkit.org> and Alex Christensen <alex.christensen@flexsim.com>
+
+        Fix FastMalloc.cpp compile error for MSVC in 64-bit.
+        https://bugs.webkit.org/show_bug.cgi?id=88344
+
+        Reviewed by Ryosuke Niwa.
+
+        MSVC will not compile array declarations of zero size. The existing
+        padding math for TCMalloc_Central_FreeListPadded would evaluate
+        to zero on 64-bit machines, preventing the compile from finishing.
+
+        * wtf/FastMalloc.cpp:
+        (TCMalloc_Central_FreeListPadded_Template): Add new template (and
+        zero-size specialization) to provide proper behavior under 64-bit
+        Windows build.
+
+2012-11-13  Brent Fulgham <bfulgham@webkit.org> and Alex Christensen  <alex.christensen@flexsim.com>
+
+        FastMalloc.cpp needs to be reordered before padding bug can be fixed
+        https://bugs.webkit.org/show_bug.cgi?id=89366
+
+        Note: This file violates Style rules.  This change only moves
+        the TCMalloc_Central_FreeList class declaration and the various
+        FastMallocZone methods earlier in the file.
+
+        Reviewed by Ryosuke Niwa.
+
+        * wtf/FastMalloc.cpp:
+        Reordered definitions to prepare for adding specialized template
+        (WTF):
+        (TCMalloc_Central_FreeList):
+        (WTF::TCMalloc_Central_FreeList::length):
+        (WTF::TCMalloc_Central_FreeList::tc_length):
+        (WTF::TCMalloc_Central_FreeList::enumerateFreeObjects):
+        (TCMalloc_Central_FreeListPadded):
+        (FastMallocZone):
+        (WTF::FastMallocZone::goodSize):
+        (WTF::FastMallocZone::check):
+        (WTF::FastMallocZone::print):
+        (WTF::FastMallocZone::log):
+        (WTF::FastMallocZone::forceLock):
+        (WTF::FastMallocZone::forceUnlock):
+        (WTF::FastMallocZone::statistics):
+        (WTF::FastMallocZone::zoneValloc):
+        (WTF::FastMallocZone::zoneDestroy):
+        (WTF::KernelSupportsTLS):
+        (WTF::CheckIfKernelSupportsTLS):
+        (TCMalloc_ThreadCache):
+
+2012-11-11  Kenichi Ishibashi  <bashi@chromium.org>
+
+        WTFString::utf8() should have a mode of conversion to use replacement character
+        https://bugs.webkit.org/show_bug.cgi?id=101678
+
+        Reviewed by Alexander Pavlov.
+
+        Introduce conversion mode to String::utf8().
+        There are three conversion modes; lenient mode, strict mode, and
+        "replacing unpaired surrogates with the replacement character" (replacement) mode.
+        Lenient mode converts unpaired surrogates. Strict mode fails when there is an unpaired
+        surrogates and returns CString(). Replacement mode replaces unpaired surrogates with
+        the replacement character(U+FFFD). Replacement mode implements the algorithm defined at
+        http://dev.w3.org/2006/webapi/WebIDL/#dfn-obtain-unicode. WebSocket::send() requires
+        this algorithm to encode a string to utf-8.
+
+        * wtf/text/WTFString.cpp:
+        (WTF::String::utf8): Changed to take ConversionMode as the argument.
+        * wtf/text/WTFString.h:
+        (String):
+
+2012-11-09  Alexei Filippov  <alph@chromium.org>
+
+        Web Inspector: Fix heap snapshots counted several times by NMI
+        https://bugs.webkit.org/show_bug.cgi?id=101085
+
+        The fix moves snapshots size counting to V8PerIsolateData class. As long
+        as it has one instance per isolate its reportMemoryUsage should be
+        called once per isolate.
+
+        Reviewed by Yury Semikhatsky.
+
+        * wtf/MemoryInstrumentation.h:
+        (WTF::MemoryClassInfo::addPrivateBuffer):
+
 2012-11-08  Michael Saboff  <msaboff@apple.com>
 
         HashAndUTF8CharactersTranslator should create an 8 bit string if possible

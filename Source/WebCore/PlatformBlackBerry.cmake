@@ -67,18 +67,8 @@ LIST(APPEND WebCore_SOURCES
     platform/blackberry/CookieParser.cpp
     platform/blackberry/FileSystemBlackBerry.cpp
     platform/blackberry/ParsedCookie.cpp
-    platform/graphics/ImageSource.cpp
     platform/graphics/WOFFFileFormat.cpp
     platform/graphics/opentype/OpenTypeSanitizer.cpp
-    platform/image-decoders/ImageDecoder.cpp
-    platform/image-decoders/bmp/BMPImageDecoder.cpp
-    platform/image-decoders/bmp/BMPImageReader.cpp
-    platform/image-decoders/gif/GIFImageDecoder.cpp
-    platform/image-decoders/gif/GIFImageReader.cpp
-    platform/image-decoders/ico/ICOImageDecoder.cpp
-    platform/image-decoders/jpeg/JPEGImageDecoder.cpp
-    platform/image-decoders/png/PNGImageDecoder.cpp
-    platform/image-decoders/webp/WEBPImageDecoder.cpp
     platform/image-encoders/JPEGImageEncoder.cpp
     platform/image-encoders/skia/JPEGImageEncoder.cpp
     platform/posix/FileSystemPOSIX.cpp
@@ -141,6 +131,7 @@ LIST(APPEND WebCore_INCLUDE_DIRECTORIES
 LIST(APPEND WebCore_SOURCES
     editing/blackberry/EditorBlackBerry.cpp
     editing/blackberry/SmartReplaceBlackBerry.cpp
+    loader/blackberry/CookieJarBlackBerry.cpp
     page/blackberry/AccessibilityObjectBlackBerry.cpp
     page/blackberry/DragControllerBlackBerry.cpp
     page/blackberry/EventHandlerBlackBerry.cpp
@@ -148,7 +139,6 @@ LIST(APPEND WebCore_SOURCES
     platform/blackberry/ClipboardBlackBerry.cpp
     platform/blackberry/ContextMenuBlackBerry.cpp
     platform/blackberry/ContextMenuItemBlackBerry.cpp
-    platform/blackberry/CookieJarBlackBerry.cpp
     platform/blackberry/CursorBlackBerry.cpp
     platform/blackberry/DragDataBlackBerry.cpp
     platform/blackberry/DragImageBlackBerry.cpp

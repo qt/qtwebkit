@@ -31,6 +31,8 @@
 #ifndef WebPluginContainer_h
 #define WebPluginContainer_h
 
+#include "platform/WebCommon.h"
+
 struct NPObject;
 
 namespace WebKit {
@@ -40,6 +42,7 @@ class WebPlugin;
 class WebString;
 class WebURL;
 class WebURLRequest;
+struct WebPoint;
 struct WebRect;
 
 class WebPluginContainer {
@@ -110,6 +113,15 @@ public:
 
     // Notifies when the plugin starts/stops accepting touch events.
     virtual void setIsAcceptingTouchEvents(bool) = 0;
+
+    // Notifies when the plugin starts/stops accepting wheel events. Without
+    // calling the function with true, the container might not always able to
+    // receive wheel events in some cases (such as when threaded compositing
+    // is in use but a scroll bar is not in use).
+    virtual void setWantsWheelEvents(bool) = 0;
+
+    // Converts view's window coordinates to plugin's local coordinates.
+    virtual WebPoint windowToLocalPoint(const WebPoint&) = 0;
 
     virtual WebPlugin* plugin() = 0;
     virtual void setPlugin(WebPlugin*) = 0;

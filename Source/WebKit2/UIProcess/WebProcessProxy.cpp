@@ -93,6 +93,9 @@ WebProcessProxy::WebProcessProxy(PassRefPtr<WebContext> context)
     : m_responsivenessTimer(this)
     , m_context(context)
     , m_mayHaveUniversalFileReadSandboxExtension(false)
+#if ENABLE(CUSTOM_PROTOCOLS)
+    , m_customProtocolManagerProxy(this)
+#endif
 {
     connect();
 }
@@ -101,7 +104,10 @@ WebProcessProxy::~WebProcessProxy()
 {
     if (m_connection)
         m_connection->invalidate();
-    
+
+    if (m_webConnection)
+        m_webConnection->invalidate();
+
     for (size_t i = 0; i < m_pendingMessages.size(); ++i)
         m_pendingMessages[i].first.releaseArguments();
 
@@ -114,10 +120,10 @@ WebProcessProxy::~WebProcessProxy()
 WebProcessProxy* WebProcessProxy::fromConnection(CoreIPC::Connection* connection)
 {
     ASSERT(connection);
-    WebConnectionToWebProcess* webConnection = static_cast<WebConnectionToWebProcess*>(connection->client());
 
-    WebProcessProxy* webProcessProxy = webConnection->webProcessProxy();
+    WebProcessProxy* webProcessProxy = static_cast<WebProcessProxy*>(connection->client());
     ASSERT(webProcessProxy->connection() == connection);
+
     return webProcessProxy;
 }
 
@@ -135,9 +141,14 @@ void WebProcessProxy::connect()
 void WebProcessProxy::disconnect()
 {
     if (m_connection) {
-        m_connection->connection()->removeQueueClient(this);
+        m_connection->removeQueueClient(this);
         m_connection->invalidate();
         m_connection = nullptr;
+    }
+
+    if (m_webConnection) {
+        m_webConnection->invalidate();
+        m_webConnection = nullptr;
     }
 
     m_responsivenessTimer.stop();
@@ -180,6 +191,21 @@ void WebProcessProxy::terminate()
 {
     if (m_processLauncher)
         m_processLauncher->terminateProcess();
+}
+
+void WebProcessProxy::addMessageReceiver(CoreIPC::StringReference messageReceiverName, CoreIPC::MessageReceiver* messageReceiver)
+{
+    m_messageReceiverMap.addMessageReceiver(messageReceiverName, messageReceiver);
+}
+
+void WebProcessProxy::addMessageReceiver(CoreIPC::StringReference messageReceiverName, uint64_t destinationID, CoreIPC::MessageReceiver* messageReceiver)
+{
+    m_messageReceiverMap.addMessageReceiver(messageReceiverName, destinationID, messageReceiver);
+}
+
+void WebProcessProxy::removeMessageReceiver(CoreIPC::StringReference messageReceiverName, uint64_t destinationID)
+{
+    m_messageReceiverMap.removeMessageReceiver(messageReceiverName, destinationID);
 }
 
 WebPageProxy* WebProcessProxy::webPage(uint64_t pageID) const
@@ -415,6 +441,9 @@ void WebProcessProxy::getNetworkProcessConnection(PassRefPtr<Messages::WebProces
 
 void WebProcessProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
 {
+    if (m_messageReceiverMap.dispatchMessage(connection, messageID, decoder))
+        return;
+
     if (m_context->dispatchMessage(connection, messageID, decoder))
         return;
 
@@ -422,6 +451,13 @@ void WebProcessProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC
         didReceiveWebProcessProxyMessage(connection, messageID, decoder);
         return;
     }
+
+#if ENABLE(CUSTOM_PROTOCOLS)
+    if (messageID.is<CoreIPC::MessageClassCustomProtocolManagerProxy>()) {
+        m_customProtocolManagerProxy.didReceiveMessage(connection, messageID, decoder);
+        return;
+    }
+#endif
 
     uint64_t pageID = decoder.destinationID();
     if (!pageID)
@@ -436,6 +472,9 @@ void WebProcessProxy::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC
 
 void WebProcessProxy::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder, OwnPtr<CoreIPC::MessageEncoder>& replyEncoder)
 {
+    if (m_messageReceiverMap.dispatchSyncMessage(connection, messageID, decoder, replyEncoder))
+        return;
+
     if (m_context->dispatchSyncMessage(connection, messageID, decoder, replyEncoder))
         return;
 
@@ -467,6 +506,8 @@ void WebProcessProxy::didClose(CoreIPC::Connection*)
     // to be deleted before we can finish our work.
     RefPtr<WebProcessProxy> protect(this);
 
+    webConnection()->didClose();
+
     Vector<RefPtr<WebPageProxy> > pages;
     copyValuesToVector(m_pageMap, pages);
 
@@ -474,14 +515,19 @@ void WebProcessProxy::didClose(CoreIPC::Connection*)
 
     for (size_t i = 0, size = pages.size(); i < size; ++i)
         pages[i]->processDidCrash();
+
 }
 
-void WebProcessProxy::didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference messageReceiverName, CoreIPC::StringReference messageName)
+void WebProcessProxy::didReceiveInvalidMessage(CoreIPC::Connection* connection, CoreIPC::StringReference messageReceiverName, CoreIPC::StringReference messageName)
 {
     WTFLogAlways("Received an invalid message \"%s.%s\" from the web process.\n", messageReceiverName.toString().data(), messageName.toString().data());
 
     // Terminate the WebProcesses.
     terminate();
+
+    // Since we've invalidated the connection we'll never get a CoreIPC::Connection::Client::didClose
+    // callback so we'll explicitly call it here instead.
+    didClose(connection);
 }
 
 void WebProcessProxy::didBecomeUnresponsive(ResponsivenessTimer*)
@@ -516,10 +562,18 @@ void WebProcessProxy::didFinishLaunching(ProcessLauncher*, CoreIPC::Connection::
 void WebProcessProxy::didFinishLaunching(CoreIPC::Connection::Identifier connectionIdentifier)
 {
     ASSERT(!m_connection);
-    
-    m_connection = WebConnectionToWebProcess::create(this, connectionIdentifier, RunLoop::main());
-    m_connection->connection()->addQueueClient(this);
-    m_connection->connection()->open();
+
+    m_connection = CoreIPC::Connection::createServerConnection(connectionIdentifier, this, RunLoop::main());
+#if OS(DARWIN)
+    m_connection->setShouldCloseConnectionOnMachExceptions();
+#elif PLATFORM(QT) && !OS(WINDOWS)
+    m_connection->setShouldCloseConnectionOnProcessTermination(processIdentifier());
+#endif
+
+    m_connection->addQueueClient(this);
+    m_connection->open();
+
+    m_webConnection = WebConnectionToWebProcess::create(this);
 
     for (size_t i = 0; i < m_pendingMessages.size(); ++i) {
         CoreIPC::Connection::OutgoingMessage& outgoingMessage = m_pendingMessages[i].first;

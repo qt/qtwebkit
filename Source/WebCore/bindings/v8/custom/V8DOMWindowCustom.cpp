@@ -49,7 +49,6 @@
 #include "PlatformScreen.h"
 #include "ScheduledAction.h"
 #include "ScriptCallStack.h"
-#include "ScriptCallStackFactory.h"
 #include "ScriptSourceCode.h"
 #include "SerializedScriptValue.h"
 #include "Settings.h"
@@ -315,25 +314,17 @@ static v8::Handle<v8::Value> handlePostMessageCallback(const v8::Arguments& args
     //   postMessage(message, {sequence of transferrables}, targetOrigin);
     MessagePortArray portArray;
     ArrayBufferArray arrayBufferArray;
-    String targetOrigin;
-    {
-        v8::TryCatch tryCatch;
-        int targetOriginArgIndex = 1;
-        if (args.Length() > 2) {
-            int transferablesArgIndex = 2;
-            if (isLegacyTargetOriginDesignation(args[2])) {
-                targetOriginArgIndex = 2;
-                transferablesArgIndex = 1;
-            }
-            if (!extractTransferables(args[transferablesArgIndex], portArray, arrayBufferArray, args.GetIsolate()))
-                return v8::Undefined();
-        } 
-        targetOrigin = toWebCoreStringWithNullOrUndefinedCheck(args[targetOriginArgIndex]);
-
-        if (tryCatch.HasCaught())
+    int targetOriginArgIndex = 1;
+    if (args.Length() > 2) {
+        int transferablesArgIndex = 2;
+        if (isLegacyTargetOriginDesignation(args[2])) {
+            targetOriginArgIndex = 2;
+            transferablesArgIndex = 1;
+        }
+        if (!extractTransferables(args[transferablesArgIndex], portArray, arrayBufferArray, args.GetIsolate()))
             return v8::Undefined();
     }
-
+    STRING_TO_V8PARAMETER_EXCEPTION_BLOCK(V8Parameter<WithUndefinedOrNullCheck>, targetOrigin, args[targetOriginArgIndex]);
 
     bool didThrow = false;
     RefPtr<SerializedScriptValue> message =
@@ -557,7 +548,7 @@ bool V8DOMWindow::namedSecurityCheck(v8::Local<v8::Object> host, v8::Local<v8::V
         return false;
 
     if (key->IsString()) {
-        DEFINE_STATIC_LOCAL(AtomicString, nameOfProtoProperty, ("__proto__"));
+        DEFINE_STATIC_LOCAL(AtomicString, nameOfProtoProperty, ("__proto__", AtomicString::ConstructFromLiteral));
 
         String name = toWebCoreString(key);
         Frame* childFrame = target->tree()->scopedChild(name);

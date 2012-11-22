@@ -43,6 +43,10 @@ inline bool tryToDisassemble(const MacroAssemblerCodePtr&, size_t, const char*, 
 }
 #endif
 
+// Prints either the disassembly, or a line of text indicating that disassembly failed and
+// the range of machine code addresses.
+void disassemble(const MacroAssemblerCodePtr&, size_t, const char* prefix, FILE* out);
+
 } // namespace JSC
 
 #endif // Disassembler_h

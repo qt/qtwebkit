@@ -69,6 +69,8 @@ class DisplaySleepDisabler;
 #endif
 
 #if ENABLE(VIDEO_TRACK)
+class InbandTextTrackPrivate;
+
 typedef PODIntervalTree<double, TextTrackCue*> CueIntervalTree;
 typedef Vector<CueIntervalTree::IntervalType> CueList;
 #endif
@@ -213,6 +215,8 @@ public:
     PassRefPtr<TextTrack> addTextTrack(const String& kind, const String& label, ExceptionCode& ec) { return addTextTrack(kind, label, emptyString(), ec); }
     PassRefPtr<TextTrack> addTextTrack(const String& kind, ExceptionCode& ec) { return addTextTrack(kind, emptyString(), emptyString(), ec); }
 
+    void processInbandTextTracks();
+
     TextTrackList* textTracks();
     CueList currentlyActiveCues() const { return m_currentlyActiveCues; }
 
@@ -230,9 +234,9 @@ public:
         {
         }
 
-        Vector<HTMLTrackElement*> tracks;
-        HTMLTrackElement* visibleTrack;
-        HTMLTrackElement* defaultTrack;
+        Vector<RefPtr<TextTrack> > tracks;
+        RefPtr<TextTrack> visibleTrack;
+        RefPtr<TextTrack> defaultTrack;
         GroupKind kind;
         bool hasSrcLang;
     };
@@ -320,11 +324,13 @@ public:
 
     virtual bool willRespondToMouseClickEvents() OVERRIDE;
 
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
+
 protected:
     HTMLMediaElement(const QualifiedName&, Document*, bool);
     virtual ~HTMLMediaElement();
 
-    virtual void parseAttribute(const Attribute&) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual void finishParsingChildren();
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
     virtual void attach() OVERRIDE;
@@ -441,6 +447,7 @@ private:
     virtual bool mediaPlayerIsLooping() const OVERRIDE;
     virtual HostWindow* mediaPlayerHostWindow() OVERRIDE;
     virtual IntRect mediaPlayerWindowClipRect() OVERRIDE;
+    virtual CachedResourceLoader* mediaPlayerCachedResourceLoader() OVERRIDE;
 
 #if PLATFORM(WIN) && USE(AVFOUNDATION)
     virtual GraphicsDeviceAdapter* mediaPlayerGraphicsDeviceAdapter(const MediaPlayer*) const OVERRIDE;

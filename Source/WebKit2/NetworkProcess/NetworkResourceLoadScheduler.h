@@ -26,14 +26,18 @@
 #ifndef NetworkResourceLoadScheduler_h
 #define NetworkResourceLoadScheduler_h
 
+#include "NetworkResourceLoader.h"
+#include <WebCore/ResourceLoaderOptions.h>
 #include <WebCore/ResourceRequest.h>
 #include <WebCore/Timer.h>
+#include <wtf/HashSet.h>
 
 #if ENABLE(NETWORK_PROCESS)
 
 namespace WebKit {
 
 class HostRecord;
+class NetworkResourceLoadParameters;
 class NetworkConnectionToWebProcess;
 typedef uint64_t ResourceLoadIdentifier;
 
@@ -44,7 +48,7 @@ public:
     NetworkResourceLoadScheduler();
     
     // Adds the request to the queue for its host and create a unique identifier for it.
-    ResourceLoadIdentifier scheduleNetworkRequest(const WebCore::ResourceRequest&, WebCore::ResourceLoadPriority, NetworkConnectionToWebProcess*);
+    ResourceLoadIdentifier scheduleResourceLoad(const NetworkResourceLoadParameters&, NetworkConnectionToWebProcess*);
     
     // Creates a unique identifier for an already-in-progress load.
     ResourceLoadIdentifier addLoadInProgress(const WebCore::KURL&);
@@ -52,11 +56,16 @@ public:
     // Called by the WebProcess when a ResourceLoader is being cleaned up.
     void removeLoadIdentifier(ResourceLoadIdentifier);
 
-    void crossOriginRedirectReceived(ResourceLoadIdentifier, const WebCore::KURL& redirectURL);
+    // Called within the NetworkProcess on a background thread when a resource load has finished.
+    void scheduleRemoveLoadIdentifier(ResourceLoadIdentifier);
+
+    void receivedRedirect(ResourceLoadIdentifier, const WebCore::KURL& redirectURL);
     void servePendingRequests(WebCore::ResourceLoadPriority = WebCore::ResourceLoadPriorityVeryLow);
     void suspendPendingRequests();
     void resumePendingRequests();
     
+    NetworkResourceLoader* networkResourceLoaderForIdentifier(ResourceLoadIdentifier);
+
 private:
     enum CreateHostPolicy {
         CreateIfNotFound,
@@ -72,6 +81,11 @@ private:
 
     unsigned platformInitializeMaximumHTTPConnectionCountPerHost();
 
+    static void removeScheduledLoadIdentifiers(void* context);
+    void removeScheduledLoadIdentifiers();
+
+    HashMap<ResourceLoadIdentifier, RefPtr<NetworkResourceLoader> > m_resourceLoaders;
+
     typedef HashMap<String, HostRecord*, StringHash> HostMap;
     HostMap m_hosts;
 
@@ -84,6 +98,9 @@ private:
     bool m_isSerialLoadingEnabled;
 
     WebCore::Timer<NetworkResourceLoadScheduler> m_requestTimer;
+    
+    Mutex m_identifiersToRemoveMutex;
+    HashSet<ResourceLoadIdentifier> m_identifiersToRemove;
 };
 
 } // namespace WebKit

@@ -68,7 +68,7 @@ bool HTMLOptGroupElement::isFocusable() const
 
 const AtomicString& HTMLOptGroupElement::formControlType() const
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, optgroup, ("optgroup"));
+    DEFINE_STATIC_LOCAL(const AtomicString, optgroup, ("optgroup", AtomicString::ConstructFromLiteral));
     return optgroup;
 }
 
@@ -78,10 +78,13 @@ void HTMLOptGroupElement::childrenChanged(bool changedByParser, Node* beforeChan
     HTMLElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
 }
 
-void HTMLOptGroupElement::parseAttribute(const Attribute& attribute)
+void HTMLOptGroupElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    HTMLElement::parseAttribute(attribute);
+    HTMLElement::parseAttribute(name, value);
     recalcSelectOptions();
+
+    if (name == disabledAttr)
+        invalidateParentDistributionIfNecessary(this, SelectRuleFeatureSet::RuleFeatureDisabled | SelectRuleFeatureSet::RuleFeatureEnabled);
 }
 
 void HTMLOptGroupElement::recalcSelectOptions()

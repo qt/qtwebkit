@@ -111,8 +111,9 @@
       '../platform/graphics',
       '../platform/graphics/chromium',
       '../platform/graphics/chromium/cc',
+      '../platform/graphics/cpu/arm',
+      '../platform/graphics/cpu/arm/filters',
       '../platform/graphics/filters',
-      '../platform/graphics/filters/arm',
       '../platform/graphics/filters/skia',
       '../platform/graphics/gpu',
       '../platform/graphics/opentype',
@@ -878,6 +879,23 @@
           ],
         },
         {
+          'action_name': 'Settings',
+          'inputs': [
+            '../page/make_settings.pl',
+            '../page/Settings.in',
+          ],
+          'outputs': [
+            '<(SHARED_INTERMEDIATE_DIR)/webkit/SettingsMacros.h',
+          ],
+          'action': [
+            'python',
+            'scripts/action_makenames.py',
+            '<@(_outputs)',
+            '--',
+            '<@(_inputs)',
+          ],
+        },
+        {
           'action_name': 'UserAgentStyleSheets',
           'variables': {
             'scripts': [
@@ -936,7 +954,7 @@
           'action': [
             'python',
             '../make-file-arrays.py',
-            '--condition=ENABLE(CALENDAR_PICKER)',
+            '--condition=ENABLE(CALENDAR_PICKER) OR ENABLE(INPUT_TYPE_COLOR)',
             '--out-h=<(SHARED_INTERMEDIATE_DIR)/webkit/PickerCommon.h',
             '--out-cpp=<(SHARED_INTERMEDIATE_DIR)/webkit/PickerCommon.cpp',
             '<@(_inputs)',
@@ -994,7 +1012,7 @@
           'action': [
             'python',
             '../make-file-arrays.py',
-            '--condition=ENABLE(INPUT_TYPE_COLOR) AND ENABLE(DATALIST_ELEMENT) AND ENABLE(PAGE_POPUP)',
+            '--condition=ENABLE(INPUT_TYPE_COLOR)',
             '--out-h=<(SHARED_INTERMEDIATE_DIR)/webkit/ColorSuggestionPicker.h',
             '--out-cpp=<(SHARED_INTERMEDIATE_DIR)/webkit/ColorSuggestionPicker.cpp',
             '<@(_inputs)',
@@ -1149,7 +1167,6 @@
             '../bindings/scripts/CodeGenerator.pm',
             '../bindings/scripts/CodeGeneratorV8.pm',
             '../bindings/scripts/IDLParser.pm',
-            '../bindings/scripts/IDLStructure.pm',
             '../bindings/scripts/preprocessor.pm',
             '<(SHARED_INTERMEDIATE_DIR)/supplemental_dependency.tmp',
             '<(additional_idl_files_list)',
@@ -1400,6 +1417,7 @@
       'direct_dependent_settings': {
         'defines': [
           'WEBCORE_NAVIGATOR_VENDOR="Google Inc."',
+          'WEBKIT_IMPLEMENTATION=1',
         ],
         'include_dirs': [
           '../../Platform/chromium',
@@ -1592,8 +1610,8 @@
       ],
       'sources/': [
         # FIXME: Figure out how to store these patterns in a variable.
-        ['exclude', '(cairo|ca|cf|cg|curl|efl|freetype|gstreamer|gtk|linux|mac|opengl|openvg|opentype|pango|posix|qt|soup|svg|symbian|texmap|iphone|win|wince|wx)/'],
-        ['exclude', '(?<!Chromium)(Cairo|CF|CG|Curl|Gtk|JSC|Linux|Mac|OpenType|POSIX|Posix|Qt|Safari|Soup|Symbian|Win|WinCE|Wx)\\.(cpp|mm?)$'],
+        ['exclude', '(cairo|ca|cf|cg|curl|efl|freetype|gstreamer|gtk|linux|mac|opengl|openvg|opentype|pango|posix|qt|soup|svg|texmap|iphone|win|wince|wx)/'],
+        ['exclude', '(?<!Chromium)(Cairo|CF|CG|Curl|Gtk|JSC|Linux|Mac|OpenType|POSIX|Posix|Qt|Safari|Soup|Win|WinCE|Wx)\\.(cpp|mm?)$'],
 
         ['exclude', 'AllInOne\\.cpp$'],
       ],
@@ -1639,9 +1657,6 @@
       'dependencies': [
         'webcore_prerequisites',
       ],
-      'defines': [
-        'WEBKIT_IMPLEMENTATION=1',
-      ],
       # This is needed for mac because of webkit_system_interface. It'd be nice
       # if this hard dependency could be split off the rest.
       'hard_dependency': 1,
@@ -1657,15 +1672,15 @@
         ['include', 'platform/'],
 
         # FIXME: Figure out how to store these patterns in a variable.
-        ['exclude', '(cairo|ca|cf|cg|curl|efl|freetype|gstreamer|gtk|harfbuzz|linux|mac|opengl|openvg|opentype|pango|posix|qt|soup|svg|symbian|texmap|iphone|win|wince|wx)/'],
-        ['exclude', '(?<!Chromium)(Cairo|CF|CG|Curl|Gtk|JSC|Linux|Mac|OpenType|POSIX|Posix|Qt|Safari|Soup|Symbian|Win|WinCE|Wx)\\.(cpp|mm?)$'],
+        ['exclude', '(cairo|ca|cf|cg|curl|efl|freetype|gstreamer|gtk|harfbuzz|linux|mac|opengl|openvg|opentype|pango|posix|qt|soup|svg|texmap|iphone|win|wince|wx)/'],
+        ['exclude', '(?<!Chromium)(Cairo|CF|CG|Curl|Gtk|JSC|Linux|Mac|OpenType|POSIX|Posix|Qt|Safari|Soup|Win|WinCE|Wx)\\.(cpp|mm?)$'],
 
         ['exclude', 'platform/LinkHash\\.cpp$'],
         ['exclude', 'platform/MIMETypeRegistry\\.cpp$'],
         ['exclude', 'platform/Theme\\.cpp$'],
         # *NEON.cpp files need special compile options.
         # They are moved to the webcore_arm_neon target.
-        ['exclude', 'platform/graphics/filters/arm/.*NEON\\.(cpp|h)'],
+        ['exclude', 'platform/graphics/cpu/arm/filters/.*NEON\\.(cpp|h)'],
         ['exclude', 'platform/image-encoders/JPEGImageEncoder\\.(cpp|h)$'],
         ['exclude', 'platform/image-encoders/PNGImageEncoder\\.(cpp|h)$'],
         ['exclude', 'platform/network/ResourceHandle\\.cpp$'],
@@ -1682,6 +1697,26 @@
                     ],
                 }],
             ],
+        }],
+        ['use_default_render_theme==1', {
+          'sources/': [
+            ['exclude', 'platform/chromium/PlatformThemeChromiumLinux.h'],
+            ['exclude', 'platform/chromium/PlatformThemeChromiumLinux.cpp'],
+            ['exclude', 'platform/chromium/PlatformThemeChromiumWin.h'],
+            ['exclude', 'platform/chromium/PlatformThemeChromiumWin.cpp'],
+            ['exclude', 'platform/chromium/ScrollbarThemeChromiumLinux.cpp'],
+            ['exclude', 'platform/chromium/ScrollbarThemeChromiumLinux.h'],
+            ['exclude', 'platform/chromium/ScrollbarThemeChromiumWin.cpp'],
+            ['exclude', 'platform/chromium/ScrollbarThemeChromiumWin.h'],
+          ],
+        }],
+        ['use_default_render_theme==0', {
+          'sources/': [
+            ['exclude', 'platform/chromium/PlatformThemeChromiumDefault.cpp'],
+            ['exclude', 'platform/chromium/PlatformThemeChromiumDefault.h'],
+            ['exclude', 'platform/chromium/ScrollbarThemeChromiumDefault.cpp'],
+            ['exclude', 'platform/chromium/ScrollbarThemeChromiumDefault.h'],
+          ],
         }],
         ['use_x11 == 1', {
           'sources/': [
@@ -1747,7 +1782,6 @@
           ],
           'sources': [
             '../editing/SmartReplaceCF.cpp',
-            '../rendering/RenderThemeMac.mm',
             '../../WebKit/mac/WebCoreSupport/WebSystemInterface.mm',
           ],
           'sources/': [
@@ -1768,7 +1802,6 @@
             # Cherry-pick some files that can't be included by broader regexps.
             # Some of these are used instead of Chromium platform files, see
             # the specific exclusions in the "exclude" list below.
-            ['include', 'rendering/RenderThemeMac\\.mm$'],
             ['include', 'platform/graphics/mac/ColorMac\\.mm$'],
             ['include', 'platform/graphics/mac/ComplexTextControllerCoreText\\.mm$'],
             ['include', 'platform/graphics/mac/FloatPointMac\\.mm$'],
@@ -1917,9 +1950,6 @@
       'dependencies': [
         'webcore_prerequisites',
       ],
-      'defines': [
-        'WEBKIT_IMPLEMENTATION=1',
-      ],
       'sources': [
         '<@(webcore_platform_geometry_files)',
       ],
@@ -1941,7 +1971,7 @@
           ],
           'sources/': [
             ['exclude', '.*'],
-            ['include', 'platform/graphics/filters/arm/.*NEON\\.(cpp|h)'],
+            ['include', 'platform/graphics/cpu/arm/filters/.*NEON\\.(cpp|h)'],
           ],
           'cflags': ['-marm'],
           'conditions': [
@@ -1960,9 +1990,6 @@
       'dependencies': [
         'webcore_prerequisites',
       ],
-      'defines': [
-        'WEBKIT_IMPLEMENTATION=1',
-      ],
       'sources': [
         '<@(webcore_privateheader_files)',
         '<@(webcore_files)',
@@ -1972,12 +1999,24 @@
         ['include', 'rendering/'],
 
         # FIXME: Figure out how to store these patterns in a variable.
-        ['exclude', '(cairo|ca|cf|cg|curl|efl|freetype|gstreamer|gtk|linux|mac|opengl|openvg|opentype|pango|posix|qt|soup|svg|symbian|texmap|iphone|win|wince|wx)/'],
-        ['exclude', '(?<!Chromium)(Cairo|CF|CG|Curl|Gtk|JSC|Linux|Mac|OpenType|POSIX|Posix|Qt|Safari|Soup|Symbian|Win|WinCE|Wx)\\.(cpp|mm?)$'],
-
+        ['exclude', '(cairo|ca|cf|cg|curl|efl|freetype|gstreamer|gtk|linux|mac|opengl|openvg|opentype|pango|posix|qt|soup|svg|texmap|iphone|win|wince|wx)/'],
+        ['exclude', '(?<!Chromium)(Cairo|CF|CG|Curl|Gtk|JSC|Linux|Mac|OpenType|POSIX|Posix|Qt|Safari|Soup|Win|WinCE|Wx)\\.(cpp|mm?)$'],
+        # Previous rule excludes things like ChromiumFooWin, include those.
+        ['include', 'rendering/.*Chromium.*\\.(cpp|mm?)$'],
         ['exclude', 'AllInOne\\.cpp$'],
       ],
       'conditions': [
+        ['use_default_render_theme==0', {
+          'sources/': [
+            ['exclude', 'rendering/RenderThemeChromiumDefault.*'],
+          ],
+        }],
+        ['use_default_render_theme==1', {
+          'sources/': [
+            ['exclude', 'RenderThemeChromiumLinux.*'],
+            ['exclude', 'RenderThemeChromiumWin.*'],
+          ],
+        }],
         ['OS=="win"', {
           'sources/': [
             ['exclude', 'Posix\\.cpp$'],
@@ -1992,6 +2031,9 @@
             # RenderThemeChromiumSkia is not used on mac since RenderThemeChromiumMac
             # does not reference the Skia code that is used by Windows, Linux and Android.
             ['exclude', 'rendering/RenderThemeChromiumSkia\\.cpp$'],
+            # RenderThemeChromiumFontProvider is used by RenderThemeChromiumSkia.
+            ['exclude', 'rendering/RenderThemeChromiumFontProvider\\.cpp'],
+            ['exclude', 'rendering/RenderThemeChromiumFontProvider\\.h'],
           ],
         },{ # OS!="mac"
           'sources/': [['exclude', 'Mac\\.(cpp|mm?)$']]
@@ -2017,6 +2059,7 @@
         }],
         ['OS=="android"', {
           'sources/': [
+            ['include', 'rendering/RenderThemeChromiumFontProviderLinux\\.cpp$'],
             ['include', 'rendering/RenderThemeChromiumLinux\\.cpp$'],
           ],
         },{ # OS!="android"
@@ -2029,9 +2072,6 @@
     {
       'target_name': 'webcore_remaining',
       'type': 'static_library',
-      'defines': [
-        'WEBKIT_IMPLEMENTATION=1',
-      ],
       'dependencies': [
         '<(chromium_src_dir)/third_party/v8-i18n/build/all.gyp:v8-i18n',
         'webcore_prerequisites',
@@ -2060,8 +2100,8 @@
         ['exclude', 'bridge/jni/jsc/'],
 
         # FIXME: Figure out how to store these patterns in a variable.
-        ['exclude', '(cairo|ca|cf|cg|curl|efl|freetype|gstreamer|gtk|linux|mac|opengl|openvg|opentype|pango|posix|qt|soup|svg|symbian|texmap|iphone|win|wince|wx)/'],
-        ['exclude', '(?<!Chromium)(Cairo|CF|CG|Curl|Gtk|JSC|Linux|Mac|OpenType|POSIX|Posix|Qt|Safari|Soup|Symbian|Win|WinCE|Wx)\\.(cpp|mm?)$'],
+        ['exclude', '(atk|cairo|ca|cf|cg|curl|efl|freetype|gstreamer|gtk|linux|mac|opengl|openvg|opentype|pango|posix|qt|soup|svg|texmap|iphone|win|wince|wx)/'],
+        ['exclude', '(?<!Chromium)(Cairo|CF|CG|Curl|Gtk|JSC|Linux|Mac|OpenType|POSIX|Posix|Qt|Safari|Soup|Win|WinCE|Wx)\\.(cpp|mm?)$'],
 
         ['exclude', 'AllInOne\\.cpp$'],
 

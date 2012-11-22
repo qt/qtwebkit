@@ -30,7 +30,7 @@
 #if USE(JSVALUE32_64)
 #include "JIT.h"
 
-#include "JITInlineMethods.h"
+#include "JITInlines.h"
 #include "JITStubCall.h"
 #include "JSArray.h"
 #include "JSCell.h"
@@ -1467,9 +1467,19 @@ void JIT::emit_op_init_lazy_reg(Instruction* currentInstruction)
     emitStore(dst, JSValue());
 }
 
+void JIT::emit_op_get_callee(Instruction* currentInstruction)
+{
+    int dst = currentInstruction[1].u.operand;
+    emitGetFromCallFrameHeaderPtr(JSStack::Callee, regT0);
+    move(TrustedImm32(JSValue::CellTag), regT1);
+    emitValueProfilingSite();
+    emitStore(dst, regT1, regT0);
+}
+
 void JIT::emit_op_create_this(Instruction* currentInstruction)
 {
-    emitGetFromCallFrameHeaderPtr(JSStack::Callee, regT0);
+    int callee = currentInstruction[2].u.operand;
+    emitLoadPayload(callee, regT0);
     loadPtr(Address(regT0, JSFunction::offsetOfCachedInheritorID()), regT2);
     addSlowCase(branchTestPtr(Zero, regT2));
     

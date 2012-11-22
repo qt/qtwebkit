@@ -177,13 +177,19 @@ void RenderSliderContainer::layout()
         style()->setDirection(LTR);
     }
 
+    RenderBox* thumb = 0;
+    if (input->sliderThumbElement() && input->sliderThumbElement()->renderer()) {
+        thumb = toRenderBox(input->sliderThumbElement()->renderer());
+        // Reset the thumb location before layout.
+        thumb->setLocation(LayoutPoint());
+    }
+
     RenderFlexibleBox::layout();
 
     style()->setDirection(oldTextDirection);
     // These should always exist, unless someone mutates the shadow DOM (e.g., in the inspector).
-    if (!input->sliderThumbElement() || !input->sliderThumbElement()->renderer())
+    if (!thumb)
         return;
-    RenderBox* thumb = toRenderBox(input->sliderThumbElement()->renderer());
     RenderBox* track = toRenderBox(thumb->parent());
 
     double percentageOffset = sliderPosition(input).toDouble();
@@ -400,13 +406,13 @@ HTMLInputElement* SliderThumbElement::hostInput() const
 
 static const AtomicString& sliderThumbShadowPseudoId()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, sliderThumb, ("-webkit-slider-thumb"));
+    DEFINE_STATIC_LOCAL(const AtomicString, sliderThumb, ("-webkit-slider-thumb", AtomicString::ConstructFromLiteral));
     return sliderThumb;
 }
 
 static const AtomicString& mediaSliderThumbShadowPseudoId()
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, mediaSliderThumb, ("-webkit-media-slider-thumb"));
+    DEFINE_STATIC_LOCAL(const AtomicString, mediaSliderThumb, ("-webkit-media-slider-thumb", AtomicString::ConstructFromLiteral));
     return mediaSliderThumb;
 }
 
@@ -501,8 +507,8 @@ RenderObject* SliderContainerElement::createRenderer(RenderArena* arena, RenderS
 
 const AtomicString& SliderContainerElement::shadowPseudoId() const
 {
-    DEFINE_STATIC_LOCAL(const AtomicString, mediaSliderContainer, ("-webkit-media-slider-container"));
-    DEFINE_STATIC_LOCAL(const AtomicString, sliderContainer, ("-webkit-slider-container"));
+    DEFINE_STATIC_LOCAL(const AtomicString, mediaSliderContainer, ("-webkit-media-slider-container", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(const AtomicString, sliderContainer, ("-webkit-slider-container", AtomicString::ConstructFromLiteral));
 
     HTMLInputElement* input = shadowHost()->toInputElement();
     if (!input)

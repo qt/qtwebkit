@@ -28,41 +28,61 @@
 #include "ImageFrameGenerator.h"
 
 #include "ImageDecoder.h"
-#include "ImageDecodingStore.h"
 #include "SharedBuffer.h"
 
-namespace {
-
-// An unique ID for an image file.
-int s_nextImageId = 0;
-
-} // namespace
+#include "skia/ext/image_operations.h"
 
 namespace WebCore {
 
-ImageFrameGenerator::ImageFrameGenerator(PassOwnPtr<ImageDecoder> decoder)
-    : m_decoder(decoder)
+ImageFrameGenerator::ImageFrameGenerator(PassRefPtr<SharedBuffer> data, bool allDataReceived)
+    : m_allDataReceived(false)
 {
-    m_fullSize = SkISize::Make(m_decoder->size().width(), m_decoder->size().height());
-    m_imageId = s_nextImageId++;
+    setData(data, allDataReceived);
 }
 
 ImageFrameGenerator::~ImageFrameGenerator()
 {
-    if (ImageDecodingStore::instanceOnMainThread())
-        ImageDecodingStore::instanceOnMainThread()->frameGeneratorBeingDestroyed(this);
-}
-
-ImageDecoder* ImageFrameGenerator::decoder()
-{
-    return m_decoder.get();
 }
 
 void ImageFrameGenerator::setData(PassRefPtr<SharedBuffer> data, bool allDataReceived)
 {
-    m_data = data;
-    if (m_decoder)
-        m_decoder->setData(m_data.get(), allDataReceived);
+    // FIXME: Doing a full copy is expensive, instead copy only new data.
+    RefPtr<SharedBuffer> dataCopy = data->copy();
+
+    MutexLocker lock(m_mutex);
+    m_data = dataCopy;
+    m_allDataReceived = allDataReceived;
+}
+
+SkBitmap ImageFrameGenerator::decodeAndScale(const SkISize& scaledSize, const SkIRect& scaledSubset)
+{
+    RefPtr<SharedBuffer> data;
+    bool allDataReceived = false;
+    {
+        MutexLocker lock(m_mutex);
+
+        // FIXME: We should do a shallow copy instead. Now we're restricted by the API of SharedBuffer.
+        data = m_data->copy();
+        allDataReceived = m_allDataReceived;
+    }
+
+    OwnPtr<ImageDecoder> decoder(adoptPtr(ImageDecoder::create(*data.get(), ImageSource::AlphaPremultiplied, ImageSource::GammaAndColorProfileApplied)));
+    if (!decoder)
+        return SkBitmap();
+
+    decoder->setData(data.get(), allDataReceived);
+    ImageFrame* frame = decoder->frameBufferAtIndex(0);
+    if (!frame)
+        return SkBitmap();
+
+    SkBitmap bitmap = frame->getSkBitmap();
+    SkISize bitmapSize = SkISize::Make(bitmap.width(), bitmap.height());
+    if (bitmapSize != scaledSize)
+        bitmap = skia::ImageOperations::Resize(bitmap, skia::ImageOperations::RESIZE_LANCZOS3, scaledSize.width(), scaledSize.height());
+
+    SkBitmap bitmapSubset;
+    bitmap.extractSubset(&bitmapSubset, scaledSubset);
+    return bitmapSubset;
 }
 
 } // namespace WebCore

@@ -26,9 +26,16 @@
 #include "config.h"
 #include "NetworkProcessConnection.h"
 
+#include "DataReference.h"
+#include "NetworkConnectionToWebProcessMessages.h"
+#include "WebCoreArgumentCoders.h"
 #include "WebProcess.h"
+#include "WebResourceBuffer.h"
+#include <WebCore/ResourceBuffer.h>
 
 #if ENABLE(NETWORK_PROCESS)
+
+using namespace WebCore;
 
 namespace WebKit {
 
@@ -44,15 +51,13 @@ NetworkProcessConnection::~NetworkProcessConnection()
 
 void NetworkProcessConnection::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
 {
-    if (messageID.is<CoreIPC::MessageClassNetworkProcessConnection>()) {
-        didReceiveNetworkProcessConnectionMessage(connection, messageID, decoder);
+    if (messageID.is<CoreIPC::MessageClassWebResourceLoader>()) {
+        if (WebResourceLoader* webResourceLoader = WebProcess::shared().webResourceLoadScheduler().webResourceLoaderForIdentifier(decoder.destinationID()))
+            webResourceLoader->didReceiveWebResourceLoaderMessage(connection, messageID, decoder);
+        
         return;
     }
-    ASSERT_NOT_REACHED();
-}
 
-void NetworkProcessConnection::didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&)
-{
     ASSERT_NOT_REACHED();
 }
 
@@ -66,11 +71,6 @@ void NetworkProcessConnection::didReceiveInvalidMessage(CoreIPC::Connection*, Co
 {
 }
 
-void NetworkProcessConnection::startResourceLoad(ResourceLoadIdentifier resourceLoadIdentifier)
-{
-    WebProcess::shared().webResourceLoadScheduler().startResourceLoad(resourceLoadIdentifier);
-}
-    
 } // namespace WebKit
 
 #endif // ENABLE(NETWORK_PROCESS)

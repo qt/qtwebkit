@@ -30,6 +30,7 @@
 #include "CounterDirectives.h"
 #include "CursorData.h"
 #include "DataRef.h"
+#include "ExclusionShapeValue.h"
 #include "FillLayer.h"
 #include "LineClampValue.h"
 #include "NinePieceImage.h"
@@ -137,10 +138,10 @@ public:
 
     LengthSize m_pageSize;
 
-    RefPtr<BasicShape> m_shapeInside;
-    RefPtr<BasicShape> m_shapeOutside;
-    Length m_wrapMargin;
-    Length m_wrapPadding;
+    RefPtr<ExclusionShapeValue> m_shapeInside;
+    RefPtr<ExclusionShapeValue> m_shapeOutside;
+    Length m_shapeMargin;
+    Length m_shapePadding;
 
     RefPtr<ClipPathOperation> m_clipPath;
 

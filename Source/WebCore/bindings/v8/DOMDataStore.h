@@ -32,7 +32,9 @@
 #define DOMDataStore_h
 
 #include "DOMWrapperMap.h"
+#include "DOMWrapperWorld.h"
 #include "Node.h"
+#include "V8GCController.h"
 #include <v8.h>
 #include <wtf/HashMap.h>
 #include <wtf/MainThread.h>
@@ -59,12 +61,19 @@ public:
 
     static DOMDataStore* current(v8::Isolate*);
 
+    static v8::Handle<v8::Object> getNode(Node* object, v8::Isolate* isolate)
+    {
+        if (LIKELY(!DOMWrapperWorld::isolatedWorldsExist()))
+            return getWrapperFromObject(object);
+        return current(isolate)->get(object);
+    }
+
     template<typename T>
-    inline v8::Handle<v8::Object> get(T* object) const
+    inline v8::Handle<v8::Object> get(T* object)
     {
         if (wrapperIsStoredInObject(object))
             return getWrapperFromObject(object);
-        return m_domObjectMap->get(object);
+        return m_wrapperMap.get(object);
     }
 
     template<typename T>
@@ -72,7 +81,7 @@ public:
     {
         if (setWrapperInObject(object, wrapper))
             return;
-        m_domObjectMap->set(object, wrapper);
+        m_wrapperMap.set(object, wrapper);
     }
 
     void reportMemoryUsage(MemoryObjectInfo*) const;
@@ -81,15 +90,14 @@ private:
     bool wrapperIsStoredInObject(void*) const { return false; }
     bool wrapperIsStoredInObject(ScriptWrappable*) const { return m_type == MainWorld; }
 
-    v8::Handle<v8::Object> getWrapperFromObject(void*) const
+    static v8::Handle<v8::Object> getWrapperFromObject(void*)
     {
         ASSERT_NOT_REACHED();
         return v8::Handle<v8::Object>();
     }
 
-    v8::Handle<v8::Object> getWrapperFromObject(ScriptWrappable* object) const
+    static v8::Handle<v8::Object> getWrapperFromObject(ScriptWrappable* object)
     {
-        ASSERT(m_type == MainWorld);
         return object->wrapper();
     }
 
@@ -103,11 +111,21 @@ private:
         wrapper.MakeWeak(object, weakCallback);
         return true;
     }
+    bool setWrapperInObject(Node* object, v8::Persistent<v8::Object> wrapper)
+    {
+        if (m_type != MainWorld)
+            return false;
+        ASSERT(object->wrapper().IsEmpty());
+        object->setWrapper(wrapper);
+        V8GCController::didCreateWrapperForNode(object);
+        wrapper.MakeWeak(static_cast<ScriptWrappable*>(object), weakCallback);
+        return true;
+    }
 
     static void weakCallback(v8::Persistent<v8::Value>, void* context);
 
     Type m_type;
-    OwnPtr<DOMWrapperMap<void> > m_domObjectMap;
+    DOMWrapperMap<void> m_wrapperMap;
 };
 
 } // namespace WebCore

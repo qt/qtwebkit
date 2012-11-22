@@ -67,7 +67,8 @@ public:
     // (e.g., after setting docoument.domain).
     void updateSecurityOrigin();
 
-    bool isContextInitialized();
+    bool isContextInitialized() { return !m_context.isEmpty(); }
+    bool isGlobalInitialized() { return !m_global.isEmpty(); }
 
     v8::Persistent<v8::Context> createNewContext(v8::Handle<v8::Object> global, int extensionGroup, int worldId);
 
@@ -79,29 +80,16 @@ public:
 
     void destroyGlobal();
 
-    V8PerContextData* perContextData() { return m_perContextData.get(); }
-
-    DOMWrapperWorld* world() { return m_world.get(); }
-
-    // Returns the isolated world associated with
-    // v8::Context::GetEntered(). Because worlds are isolated, the entire
-    // JavaScript call stack should be from the same isolated world.
-    // Returns 0 if the entered context is from the main world.
-    //
-    // FIXME: Consider edge cases with DOM mutation events that might
-    // violate this invariant.
-    //
-    // FIXME: This is poorly named after the deletion of isolated contexts.
-    static V8DOMWindowShell* getEntered()
+    static V8DOMWindowShell* isolated(v8::Handle<v8::Context> context)
     {
-        if (!DOMWrapperWorld::isolatedWorldsExist())
-            return 0;
-        if (!v8::Context::InContext())
-            return 0;
-        return enteredIsolatedWorldContext();
+        return static_cast<V8DOMWindowShell*>(context->GetAlignedPointerFromEmbedderData(v8ContextIsolatedWindowShell));
     }
 
+    V8PerContextData* perContextData() { return m_perContextData.get(); }
+    DOMWrapperWorld* world() { return m_world.get(); }
+
     void destroyIsolatedShell();
+
 private:
     V8DOMWindowShell(Frame*, PassRefPtr<DOMWrapperWorld>);
 

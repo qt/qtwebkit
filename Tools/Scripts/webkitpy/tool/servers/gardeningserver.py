@@ -38,21 +38,6 @@ from webkitpy.layout_tests.port import builders
 _log = logging.getLogger(__name__)
 
 
-class BuildCoverageExtrapolator(object):
-    def __init__(self, test_configuration_converter):
-        self._test_configuration_converter = test_configuration_converter
-
-    @memoized
-    def _covered_test_configurations_for_builder_name(self):
-        coverage = {}
-        for builder_name in builders.all_builder_names():
-            coverage[builder_name] = self._test_configuration_converter.to_config_set(builders.coverage_specifiers_for_builder_name(builder_name))
-        return coverage
-
-    def extrapolate_test_configurations(self, builder_name):
-        return self._covered_test_configurations_for_builder_name()[builder_name]
-
-
 class GardeningHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer):
     def __init__(self, httpd_port, config):
         server_name = ''
@@ -63,7 +48,7 @@ class GardeningHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer
     def url(self, args=None):
         # We can't use urllib.encode() here because that encodes spaces as plus signs and the buildbots don't decode those properly.
         arg_string = ('?' + '&'.join("%s=%s" % (key, urllib.quote(value)) for (key, value) in args.items())) if args else ''
-        return 'file://' + os.path.join(GardeningHTTPRequestHandler.STATIC_FILE_DIRECTORY, 'garden-o-matic.html' + arg_string)
+        return 'http://localhost:8127/garden-o-matic.html' + arg_string
 
 
 class GardeningHTTPRequestHandler(ReflectionHandler):
@@ -82,18 +67,6 @@ class GardeningHTTPRequestHandler(ReflectionHandler):
 
     allow_cross_origin_requests = True
     debug_output = ''
-
-    def rollout(self):
-        revision = self.query['revision'][0]
-        reason = self.query['reason'][0]
-        self._run_webkit_patch([
-            'rollout',
-            '--force-clean',
-            '--non-interactive',
-            revision,
-            reason,
-        ])
-        self._serve_text('success')
 
     def ping(self):
         self._serve_text('pong')
@@ -139,4 +112,4 @@ class GardeningHTTPRequestHandler(ReflectionHandler):
                 self._serve_file(fullpath, headers_only=(self.command == 'HEAD'))
                 return
 
-        self._send_response(403)
+        self.send_response(403)

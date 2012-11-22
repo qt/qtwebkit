@@ -20,8 +20,11 @@
 #ifndef EWK2UnitTestBase_h
 #define EWK2UnitTestBase_h
 
+#include "EWK2UnitTestEnvironment.h"
 #include <EWebKit2.h>
+#include <Ecore.h>
 #include <Ecore_Evas.h>
+#include <Eina.h>
 #include <Evas.h>
 #include <gtest/gtest.h>
 
@@ -47,9 +50,9 @@ protected:
     bool waitUntilTitleChangedTo(const char* expectedTitle, double timeoutSeconds = defaultTimeoutSeconds);
     bool waitUntilURLChangedTo(const char* expectedURL, double timeoutSeconds = defaultTimeoutSeconds);
 
-    void mouseClick(int x, int y);
-    void mouseDown(int x, int y);
-    void mouseUp(int x, int y);
+    void mouseClick(int x, int y, int button = 1 /*Left*/);
+    void mouseDown(int x, int y, int button = 1 /*Left*/);
+    void mouseUp(int x, int y, int button = 1 /*Left*/);
     void mouseMove(int x, int y);
     void multiDown(int id, int x, int y);
     void multiUp(int id, int x, int y);

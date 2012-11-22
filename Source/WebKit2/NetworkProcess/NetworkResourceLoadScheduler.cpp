@@ -5,7 +5,9 @@
 #include "Logging.h"
 #include "NetworkConnectionToWebProcess.h"
 #include "NetworkProcessconnectionMessages.h"
-#include "NetworkRequest.h"
+#include "NetworkResourceLoadParameters.h"
+#include "NetworkResourceLoader.h"
+#include <wtf/MainThread.h>
 #include <wtf/text/CString.h>
 
 #if ENABLE(NETWORK_PROCESS)
@@ -37,18 +39,24 @@ void NetworkResourceLoadScheduler::requestTimerFired(WebCore::Timer<NetworkResou
     servePendingRequests();
 }
 
-ResourceLoadIdentifier NetworkResourceLoadScheduler::scheduleNetworkRequest(const ResourceRequest& request, ResourceLoadPriority priority, NetworkConnectionToWebProcess* connection)
-{    
+ResourceLoadIdentifier NetworkResourceLoadScheduler::scheduleResourceLoad(const NetworkResourceLoadParameters& loadParameters, NetworkConnectionToWebProcess* connection)
+{
+    ResourceLoadPriority priority = loadParameters.priority();
+    const ResourceRequest& resourceRequest = loadParameters.request();
+    
     ResourceLoadIdentifier identifier = ++s_currentResourceLoadIdentifier;
+    RefPtr<NetworkResourceLoader> loader = NetworkResourceLoader::create(loadParameters, identifier, connection);
+    
+    m_resourceLoaders.add(identifier, loader);
 
-    LOG(Network, "(NetworkProcess) NetworkResourceLoadScheduler::scheduleNetworkRequest resource %llu '%s'", identifier, request.url().string().utf8().data());
+    LOG(NetworkScheduling, "(NetworkProcess) NetworkResourceLoadScheduler::scheduleNetworkResourceRequest resource %llu '%s'", identifier, resourceRequest.url().string().utf8().data());
 
-    HostRecord* host = hostForURL(request.url(), CreateIfNotFound);
+    HostRecord* host = hostForURL(resourceRequest.url(), CreateIfNotFound);
     bool hadRequests = host->hasRequests();
-    host->schedule(NetworkRequest::create(request, identifier, connection), priority);
+    host->schedule(loader);
     m_identifiers.add(identifier, host);
 
-    if (priority > ResourceLoadPriorityLow || !request.url().protocolIsInHTTPFamily() || (priority == ResourceLoadPriorityLow && !hadRequests)) {
+    if (priority > ResourceLoadPriorityLow || !resourceRequest.url().protocolIsInHTTPFamily() || (priority == ResourceLoadPriorityLow && !hadRequests)) {
         // Try to request important resources immediately.
         servePendingRequestsForHost(host, priority);
         return identifier;
@@ -63,7 +71,7 @@ ResourceLoadIdentifier NetworkResourceLoadScheduler::addLoadInProgress(const Web
 {
     ResourceLoadIdentifier identifier = ++s_currentResourceLoadIdentifier;
 
-    LOG(Network, "(NetworkProcess) NetworkResourceLoadScheduler::addLoadInProgress resource %llu with url '%s'", identifier, url.string().utf8().data());
+    LOG(NetworkScheduling, "(NetworkProcess) NetworkResourceLoadScheduler::addLoadInProgress resource %llu with url '%s'", identifier, url.string().utf8().data());
 
     HostRecord* host = hostForURL(url, CreateIfNotFound);
     host->addLoadInProgress(identifier);
@@ -90,21 +98,34 @@ HostRecord* NetworkResourceLoadScheduler::hostForURL(const WebCore::KURL& url, C
 
 void NetworkResourceLoadScheduler::removeLoadIdentifier(ResourceLoadIdentifier identifier)
 {
+    ASSERT(isMainThread());
     ASSERT(identifier);
 
-    LOG(Network, "(NetworkProcess) NetworkResourceLoadScheduler::removeLoadIdentifier removing load identifier %llu", identifier);
+    LOG(NetworkScheduling, "(NetworkProcess) NetworkResourceLoadScheduler::removeLoadIdentifier removing load identifier %llu", identifier);
 
     HostRecord* host = m_identifiers.take(identifier);
-    ASSERT(host);
+    
+    // Due to a race condition the WebProcess might have messaged the NetworkProcess to remove this identifier
+    // after the NetworkProcess has already removed it internally.
+    // In this situation we might not have a HostRecord to clean up.
     if (host)
         host->remove(identifier);
+    
+    m_resourceLoaders.remove(identifier);
 
     scheduleServePendingRequests();
 }
 
-void NetworkResourceLoadScheduler::crossOriginRedirectReceived(ResourceLoadIdentifier identifier, const WebCore::KURL& redirectURL)
+NetworkResourceLoader* NetworkResourceLoadScheduler::networkResourceLoaderForIdentifier(ResourceLoadIdentifier identifier)
 {
-    LOG(Network, "(NetworkProcess) NetworkResourceLoadScheduler::crossOriginRedirectReceived resource %llu redirected to '%s'", identifier, redirectURL.string().utf8().data());
+    ASSERT(m_resourceLoaders.get(identifier));
+    return m_resourceLoaders.get(identifier).get();
+}
+
+void NetworkResourceLoadScheduler::receivedRedirect(ResourceLoadIdentifier identifier, const WebCore::KURL& redirectURL)
+{
+    ASSERT(isMainThread());
+    LOG(NetworkScheduling, "(NetworkProcess) NetworkResourceLoadScheduler::receivedRedirect resource %llu redirected to '%s'", identifier, redirectURL.string().utf8().data());
 
     HostRecord* oldHost = m_identifiers.get(identifier);
     HostRecord* newHost = hostForURL(redirectURL, CreateIfNotFound);
@@ -124,7 +145,7 @@ void NetworkResourceLoadScheduler::servePendingRequests(ResourceLoadPriority min
     if (m_suspendPendingRequestsCount)
         return;
 
-    LOG(Network, "(NetworkProcess) NetworkResourceLoadScheduler::servePendingRequests Serving requests for up to %i hosts", m_hosts.size());
+    LOG(NetworkScheduling, "(NetworkProcess) NetworkResourceLoadScheduler::servePendingRequests Serving requests for up to %i hosts", m_hosts.size());
 
     m_requestTimer.stop();
     
@@ -146,18 +167,18 @@ void NetworkResourceLoadScheduler::servePendingRequests(ResourceLoadPriority min
 
 void NetworkResourceLoadScheduler::servePendingRequestsForHost(HostRecord* host, ResourceLoadPriority minimumPriority)
 {
-    LOG(Network, "NetworkResourceLoadScheduler::servePendingRequests Host name='%s'", host->name().utf8().data());
+    LOG(NetworkScheduling, "NetworkResourceLoadScheduler::servePendingRequests Host name='%s'", host->name().utf8().data());
 
     for (int priority = ResourceLoadPriorityHighest; priority >= minimumPriority; --priority) {
-        HostRecord::RequestQueue& requestsPending = host->requestsPending(ResourceLoadPriority(priority));
+        HostRecord::LoaderQueue& loadersPending = host->loadersPending(ResourceLoadPriority(priority));
 
-        while (!requestsPending.isEmpty()) {
-            RefPtr<NetworkRequest> request = requestsPending.first();
+        while (!loadersPending.isEmpty()) {
+            RefPtr<NetworkResourceLoader> loader = loadersPending.first();
             
             // This request might be from WebProcess we've lost our connection to.
             // If so we should just skip it.
-            if (!request->connectionToWebProcess()) {
-                requestsPending.removeFirst();
+            if (!loader->connectionToWebProcess()) {
+                loadersPending.removeFirst();
                 continue;
             }
 
@@ -173,13 +194,13 @@ void NetworkResourceLoadScheduler::servePendingRequestsForHost(HostRecord* host,
             // still important and somehow account for it.
 
             bool shouldLimitRequests = !host->name().isNull();
-            if (shouldLimitRequests && host->limitRequests(ResourceLoadPriority(priority), request->connectionToWebProcess()->isSerialLoadingEnabled()))
+            if (shouldLimitRequests && host->limitRequests(ResourceLoadPriority(priority), loader->connectionToWebProcess()->isSerialLoadingEnabled()))
                 return;
 
-            requestsPending.removeFirst();
-            host->addLoadInProgress(request->identifier());
-            
-            request->connectionToWebProcess()->connection()->send(Messages::NetworkProcessConnection::StartResourceLoad(request->identifier()), 0);
+            loadersPending.removeFirst();
+            host->addLoadInProgress(loader->identifier());
+
+            loader->start();
         }
     }
 }
@@ -198,6 +219,43 @@ void NetworkResourceLoadScheduler::resumePendingRequests()
 
     if (!m_hosts.isEmpty() || m_nonHTTPProtocolHost->hasRequests())
         scheduleServePendingRequests();
+}
+
+static bool removeScheduledLoadIdentifiersCalled = false;
+
+void NetworkResourceLoadScheduler::removeScheduledLoadIdentifiers(void* context)
+{
+    ASSERT(isMainThread());
+    ASSERT(removeScheduledLoadIdentifiersCalled);
+
+    NetworkResourceLoadScheduler* scheduler = static_cast<NetworkResourceLoadScheduler*>(context);
+    scheduler->removeScheduledLoadIdentifiers();
+}
+
+void NetworkResourceLoadScheduler::removeScheduledLoadIdentifiers()
+{
+    Vector<ResourceLoadIdentifier> identifiers;
+    {
+        MutexLocker locker(m_identifiersToRemoveMutex);
+        copyToVector(m_identifiersToRemove, identifiers);
+        m_identifiersToRemove.clear();
+        removeScheduledLoadIdentifiersCalled = false;
+    }
+    
+    for (size_t i = 0; i < identifiers.size(); ++i)
+        removeLoadIdentifier(identifiers[i]);
+}
+
+void NetworkResourceLoadScheduler::scheduleRemoveLoadIdentifier(ResourceLoadIdentifier identifier)
+{
+    MutexLocker locker(m_identifiersToRemoveMutex);
+    
+    m_identifiersToRemove.add(identifier);
+    
+    if (!removeScheduledLoadIdentifiersCalled) {
+        removeScheduledLoadIdentifiersCalled = true;
+        callOnMainThread(NetworkResourceLoadScheduler::removeScheduledLoadIdentifiers, this);
+    }
 }
 
 } // namespace WebKit

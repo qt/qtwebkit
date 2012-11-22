@@ -26,6 +26,7 @@
 #ifndef WebResourceLoadScheduler_h
 #define WebResourceLoadScheduler_h
 
+#include "WebResourceLoader.h"
 #include <WebCore/ResourceLoadPriority.h>
 #include <WebCore/ResourceLoadScheduler.h>
 #include <WebCore/ResourceLoader.h>
@@ -57,17 +58,13 @@ public:
 
     virtual void setSerialLoadingEnabled(bool) OVERRIDE;
 
+    WebResourceLoader* webResourceLoaderForIdentifier(ResourceLoadIdentifier identifier) const { return m_webResourceLoaders.get(identifier).get(); }
+
 private:
     void scheduleLoad(WebCore::ResourceLoader*, WebCore::ResourceLoadPriority);
-
-    // NetworkProcessConnection gets to tell loads to actually start.
-    // FIXME (NetworkProcess): Once actual loading takes place in the NetworkProcess we won't need this.
-    friend class NetworkProcessConnection;
-    void startResourceLoad(ResourceLoadIdentifier);
     
-    typedef HashMap<unsigned long, RefPtr<WebCore::ResourceLoader> > ResourceLoaderMap;
-    ResourceLoaderMap m_pendingResourceLoaders;
-    ResourceLoaderMap m_activeResourceLoaders;
+    HashMap<unsigned long, RefPtr<WebCore::ResourceLoader> > m_coreResourceLoaders;
+    HashMap<unsigned long, RefPtr<WebResourceLoader> > m_webResourceLoaders;
     
     unsigned m_suspendPendingRequestsCount;
 

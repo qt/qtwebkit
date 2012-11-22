@@ -111,7 +111,6 @@ DRTTestRunner::DRTTestRunner(TestShell* shell)
     // they will use when called by JavaScript. The actual binding of those
     // names to their methods will be done by calling bindToJavaScript() (defined
     // by CppBoundClass, the parent to DRTTestRunner).
-    bindMethod("addFileToPasteboardOnDrag", &DRTTestRunner::addFileToPasteboardOnDrag);
 #if ENABLE(INPUT_SPEECH)
     bindMethod("addMockSpeechInputResult", &DRTTestRunner::addMockSpeechInputResult);
     bindMethod("setMockSpeechInputDumpRect", &DRTTestRunner::setMockSpeechInputDumpRect);
@@ -121,9 +120,6 @@ DRTTestRunner::DRTTestRunner(TestShell* shell)
     bindMethod("setMockSpeechRecognitionError", &DRTTestRunner::setMockSpeechRecognitionError);
     bindMethod("wasMockSpeechRecognitionAborted", &DRTTestRunner::wasMockSpeechRecognitionAborted);
 #endif
-    bindMethod("addOriginAccessWhitelistEntry", &DRTTestRunner::addOriginAccessWhitelistEntry);
-    bindMethod("addUserScript", &DRTTestRunner::addUserScript);
-    bindMethod("addUserStyleSheet", &DRTTestRunner::addUserStyleSheet);
     bindMethod("clearAllDatabases", &DRTTestRunner::clearAllDatabases);
     bindMethod("closeWebInspector", &DRTTestRunner::closeWebInspector);
 #if ENABLE(POINTER_LOCK)
@@ -132,14 +128,12 @@ DRTTestRunner::DRTTestRunner(TestShell* shell)
     bindMethod("didNotAcquirePointerLock", &DRTTestRunner::didNotAcquirePointerLock);
 #endif
     bindMethod("disableAutoResizeMode", &DRTTestRunner::disableAutoResizeMode);
-    bindMethod("disableImageLoading", &DRTTestRunner::disableImageLoading);
     bindMethod("display", &DRTTestRunner::display);
     bindMethod("displayInvalidatedRegion", &DRTTestRunner::displayInvalidatedRegion);
     bindMethod("dumpAsText", &DRTTestRunner::dumpAsText);
     bindMethod("dumpBackForwardList", &DRTTestRunner::dumpBackForwardList);
     bindMethod("dumpChildFramesAsText", &DRTTestRunner::dumpChildFramesAsText);
     bindMethod("dumpChildFrameScrollPositions", &DRTTestRunner::dumpChildFrameScrollPositions);
-    bindMethod("dumpDatabaseCallbacks", &DRTTestRunner::dumpDatabaseCallbacks);
     bindMethod("dumpEditingCallbacks", &DRTTestRunner::dumpEditingCallbacks);
     bindMethod("dumpFrameLoadCallbacks", &DRTTestRunner::dumpFrameLoadCallbacks);
     bindMethod("dumpProgressFinishedCallback", &DRTTestRunner::dumpProgressFinishedCallback);
@@ -151,34 +145,15 @@ DRTTestRunner::DRTTestRunner(TestShell* shell)
     bindMethod("dumpTitleChanges", &DRTTestRunner::dumpTitleChanges);
     bindMethod("dumpPermissionClientCallbacks", &DRTTestRunner::dumpPermissionClientCallbacks);
     bindMethod("dumpCreateView", &DRTTestRunner::dumpCreateView);
-    bindMethod("elementDoesAutoCompleteForElementWithId", &DRTTestRunner::elementDoesAutoCompleteForElementWithId);
     bindMethod("enableAutoResizeMode", &DRTTestRunner::enableAutoResizeMode);
     bindMethod("evaluateInWebInspector", &DRTTestRunner::evaluateInWebInspector);
-    bindMethod("evaluateScriptInIsolatedWorld", &DRTTestRunner::evaluateScriptInIsolatedWorld);
-    bindMethod("evaluateScriptInIsolatedWorldAndReturnValue", &DRTTestRunner::evaluateScriptInIsolatedWorldAndReturnValue);
-    bindMethod("setIsolatedWorldSecurityOrigin", &DRTTestRunner::setIsolatedWorldSecurityOrigin);
-    bindMethod("setIsolatedWorldContentSecurityPolicy", &DRTTestRunner::setIsolatedWorldContentSecurityPolicy);
-    bindMethod("execCommand", &DRTTestRunner::execCommand);
-    bindMethod("forceRedSelectionColors", &DRTTestRunner::forceRedSelectionColors);
 #if ENABLE(NOTIFICATIONS)
     bindMethod("grantWebNotificationPermission", &DRTTestRunner::grantWebNotificationPermission);
-    bindMethod("denyWebNotificationPermission", &DRTTestRunner::denyWebNotificationPermission);
-    bindMethod("removeAllWebNotificationPermissions", &DRTTestRunner::removeAllWebNotificationPermissions);
-    bindMethod("simulateWebNotificationClick", &DRTTestRunner::simulateWebNotificationClick);
 #endif
-    bindMethod("findString", &DRTTestRunner::findString);
-    bindMethod("isCommandEnabled", &DRTTestRunner::isCommandEnabled);
-    bindMethod("hasCustomPageSizeStyle", &DRTTestRunner::hasCustomPageSizeStyle);
-    bindMethod("loseCompositorContext", &DRTTestRunner::loseCompositorContext);
-    bindMethod("markerTextForListItem", &DRTTestRunner::markerTextForListItem);
     bindMethod("notifyDone", &DRTTestRunner::notifyDone);
-    bindMethod("numberOfActiveAnimations", &DRTTestRunner::numberOfActiveAnimations);
     bindMethod("numberOfPendingGeolocationPermissionRequests", &DRTTestRunner:: numberOfPendingGeolocationPermissionRequests);
-    bindMethod("objCIdentityIsEqual", &DRTTestRunner::objCIdentityIsEqual);
     bindMethod("overridePreference", &DRTTestRunner::overridePreference);
     bindMethod("pathToLocalResource", &DRTTestRunner::pathToLocalResource);
-    bindMethod("pauseAnimationAtTimeOnElementWithId", &DRTTestRunner::pauseAnimationAtTimeOnElementWithId);
-    bindMethod("pauseTransitionAtTimeOnElementWithId", &DRTTestRunner::pauseTransitionAtTimeOnElementWithId);
     bindMethod("queueBackNavigation", &DRTTestRunner::queueBackNavigation);
     bindMethod("queueForwardNavigation", &DRTTestRunner::queueForwardNavigation);
     bindMethod("queueLoadingScript", &DRTTestRunner::queueLoadingScript);
@@ -186,32 +161,24 @@ DRTTestRunner::DRTTestRunner(TestShell* shell)
     bindMethod("queueLoadHTMLString", &DRTTestRunner::queueLoadHTMLString);
     bindMethod("queueNonLoadingScript", &DRTTestRunner::queueNonLoadingScript);
     bindMethod("queueReload", &DRTTestRunner::queueReload);
-    bindMethod("removeOriginAccessWhitelistEntry", &DRTTestRunner::removeOriginAccessWhitelistEntry);
     bindMethod("repaintSweepHorizontally", &DRTTestRunner::repaintSweepHorizontally);
-    bindMethod("resetPageVisibility", &DRTTestRunner::resetPageVisibility);
-    bindMethod("setAcceptsEditing", &DRTTestRunner::setAcceptsEditing);
     bindMethod("setAllowDisplayOfInsecureContent", &DRTTestRunner::setAllowDisplayOfInsecureContent);
     bindMethod("setAllowFileAccessFromFileURLs", &DRTTestRunner::setAllowFileAccessFromFileURLs);
     bindMethod("setAllowRunningOfInsecureContent", &DRTTestRunner::setAllowRunningOfInsecureContent);
     bindMethod("setAllowUniversalAccessFromFileURLs", &DRTTestRunner::setAllowUniversalAccessFromFileURLs);
     bindMethod("setAlwaysAcceptCookies", &DRTTestRunner::setAlwaysAcceptCookies);
     bindMethod("setAuthorAndUserStylesEnabled", &DRTTestRunner::setAuthorAndUserStylesEnabled);
-    bindMethod("setAutofilled", &DRTTestRunner::setAutofilled);
     bindMethod("setCanOpenWindows", &DRTTestRunner::setCanOpenWindows);
     bindMethod("setCloseRemainingWindowsWhenComplete", &DRTTestRunner::setCloseRemainingWindowsWhenComplete);
     bindMethod("setCustomPolicyDelegate", &DRTTestRunner::setCustomPolicyDelegate);
     bindMethod("setDatabaseQuota", &DRTTestRunner::setDatabaseQuota);
     bindMethod("setDeferMainResourceDataLoad", &DRTTestRunner::setDeferMainResourceDataLoad);
-    bindMethod("setDomainRelaxationForbiddenForURLScheme", &DRTTestRunner::setDomainRelaxationForbiddenForURLScheme);
     bindMethod("setAudioData", &DRTTestRunner::setAudioData);
     bindMethod("setGeolocationPermission", &DRTTestRunner::setGeolocationPermission);
-    bindMethod("setIconDatabaseEnabled", &DRTTestRunner::setIconDatabaseEnabled);
     bindMethod("setJavaScriptCanAccessClipboard", &DRTTestRunner::setJavaScriptCanAccessClipboard);
-    bindMethod("setMinimumTimerInterval", &DRTTestRunner::setMinimumTimerInterval);
     bindMethod("setMockDeviceOrientation", &DRTTestRunner::setMockDeviceOrientation);
     bindMethod("setMockGeolocationPositionUnavailableError", &DRTTestRunner::setMockGeolocationPositionUnavailableError);
     bindMethod("setMockGeolocationPosition", &DRTTestRunner::setMockGeolocationPosition);
-    bindMethod("setPageVisibility", &DRTTestRunner::setPageVisibility);
     bindMethod("setPluginsEnabled", &DRTTestRunner::setPluginsEnabled);
 #if ENABLE(POINTER_LOCK)
     bindMethod("setPointerLockWillRespondAsynchronously", &DRTTestRunner::setPointerLockWillRespondAsynchronously);
@@ -220,81 +187,37 @@ DRTTestRunner::DRTTestRunner(TestShell* shell)
     bindMethod("setPopupBlockingEnabled", &DRTTestRunner::setPopupBlockingEnabled);
     bindMethod("setPOSIXLocale", &DRTTestRunner::setPOSIXLocale);
     bindMethod("setPrinting", &DRTTestRunner::setPrinting);
-    bindMethod("setScrollbarPolicy", &DRTTestRunner::setScrollbarPolicy);
     bindMethod("setSelectTrailingWhitespaceEnabled", &DRTTestRunner::setSelectTrailingWhitespaceEnabled);
-    bindMethod("setTextSubpixelPositioning", &DRTTestRunner::setTextSubpixelPositioning);
     bindMethod("setBackingScaleFactor", &DRTTestRunner::setBackingScaleFactor);
     bindMethod("setSmartInsertDeleteEnabled", &DRTTestRunner::setSmartInsertDeleteEnabled);
     bindMethod("setStopProvisionalFrameLoads", &DRTTestRunner::setStopProvisionalFrameLoads);
-    bindMethod("setTabKeyCyclesThroughElements", &DRTTestRunner::setTabKeyCyclesThroughElements);
     bindMethod("setUserStyleSheetEnabled", &DRTTestRunner::setUserStyleSheetEnabled);
     bindMethod("setUserStyleSheetLocation", &DRTTestRunner::setUserStyleSheetLocation);
-    bindMethod("setValueForUser", &DRTTestRunner::setValueForUser);
     bindMethod("setWillSendRequestClearHeader", &DRTTestRunner::setWillSendRequestClearHeader);
     bindMethod("setWillSendRequestReturnsNull", &DRTTestRunner::setWillSendRequestReturnsNull);
     bindMethod("setWillSendRequestReturnsNullOnRedirect", &DRTTestRunner::setWillSendRequestReturnsNullOnRedirect);
     bindMethod("setWindowIsKey", &DRTTestRunner::setWindowIsKey);
     bindMethod("setXSSAuditorEnabled", &DRTTestRunner::setXSSAuditorEnabled);
-    bindMethod("setAsynchronousSpellCheckingEnabled", &DRTTestRunner::setAsynchronousSpellCheckingEnabled);
     bindMethod("showWebInspector", &DRTTestRunner::showWebInspector);
 #if ENABLE(NOTIFICATIONS)
     bindMethod("simulateLegacyWebNotificationClick", &DRTTestRunner::simulateLegacyWebNotificationClick);
 #endif
-    bindMethod("startSpeechInput", &DRTTestRunner::startSpeechInput);
     bindMethod("testRepaint", &DRTTestRunner::testRepaint);
     bindMethod("waitForPolicyDelegate", &DRTTestRunner::waitForPolicyDelegate);
     bindMethod("waitUntilDone", &DRTTestRunner::waitUntilDone);
     bindMethod("windowCount", &DRTTestRunner::windowCount);
-    bindMethod("setTextDirection", &DRTTestRunner::setTextDirection);
     bindMethod("setImagesAllowed", &DRTTestRunner::setImagesAllowed);
     bindMethod("setScriptsAllowed", &DRTTestRunner::setScriptsAllowed);
     bindMethod("setStorageAllowed", &DRTTestRunner::setStorageAllowed);
     bindMethod("setPluginsAllowed", &DRTTestRunner::setPluginsAllowed);
 
-    // The following are stubs.
-    bindMethod("abortModal", &DRTTestRunner::abortModal);
-    bindMethod("accessStoredWebScriptObject", &DRTTestRunner::accessStoredWebScriptObject);
-    bindMethod("addDisallowedURL", &DRTTestRunner::addDisallowedURL);
-    bindMethod("applicationCacheDiskUsageForOrigin", &DRTTestRunner::applicationCacheDiskUsageForOrigin);
-    bindMethod("callShouldCloseOnWebView", &DRTTestRunner::callShouldCloseOnWebView);
-    bindMethod("clearAllApplicationCaches", &DRTTestRunner::clearAllApplicationCaches);
-    bindMethod("clearApplicationCacheForOrigin", &DRTTestRunner::clearApplicationCacheForOrigin);
-    bindMethod("clearBackForwardList", &DRTTestRunner::clearBackForwardList);
-    bindMethod("dumpAsWebArchive", &DRTTestRunner::dumpAsWebArchive);
-    bindMethod("keepWebHistory", &DRTTestRunner::keepWebHistory);
-    bindMethod("objCClassNameOf", &DRTTestRunner::objCClassNameOf);
-    bindMethod("setApplicationCacheOriginQuota", &DRTTestRunner::setApplicationCacheOriginQuota);
-    bindMethod("setCallCloseOnWebViews", &DRTTestRunner::setCallCloseOnWebViews);
-    bindMethod("setMainFrameIsFirstResponder", &DRTTestRunner::setMainFrameIsFirstResponder);
-    bindMethod("setPrivateBrowsingEnabled", &DRTTestRunner::setPrivateBrowsingEnabled);
-    bindMethod("setUseDashboardCompatibilityMode", &DRTTestRunner::setUseDashboardCompatibilityMode);
-    bindMethod("storeWebScriptObject", &DRTTestRunner::storeWebScriptObject);
-    bindMethod("deleteAllLocalStorage", &DRTTestRunner::deleteAllLocalStorage);
-    bindMethod("localStorageDiskUsageForOrigin", &DRTTestRunner::localStorageDiskUsageForOrigin);
-    bindMethod("originsWithLocalStorage", &DRTTestRunner::originsWithLocalStorage);
-    bindMethod("deleteLocalStorageForOrigin", &DRTTestRunner::deleteLocalStorageForOrigin);
-    bindMethod("observeStorageTrackerNotifications", &DRTTestRunner::observeStorageTrackerNotifications);
-    bindMethod("syncLocalStorage", &DRTTestRunner::syncLocalStorage);
     bindMethod("setShouldStayOnPageAfterHandlingBeforeUnload", &DRTTestRunner::setShouldStayOnPageAfterHandlingBeforeUnload);
-    bindMethod("enableFixedLayoutMode", &DRTTestRunner::enableFixedLayoutMode);
-    bindMethod("setFixedLayoutSize", &DRTTestRunner::setFixedLayoutSize);
-    bindMethod("selectionAsMarkup", &DRTTestRunner::selectionAsMarkup);
-    bindMethod("setHasCustomFullScreenBehavior", &DRTTestRunner::setHasCustomFullScreenBehavior);
-    bindMethod("textSurroundingNode", &DRTTestRunner::textSurroundingNode);
-
-    // The fallback method is called when an unknown method is invoked.
-    bindFallbackMethod(&DRTTestRunner::fallbackMethod);
 
     // Shared properties.
-    // globalFlag is used by a number of layout tests in
-    // LayoutTests\http\tests\security\dataURL.
-    bindProperty("globalFlag", &m_globalFlag);
     // webHistoryItemCount is used by tests in LayoutTests\http\tests\history
     bindProperty("webHistoryItemCount", &m_webHistoryItemCount);
     bindProperty("titleTextDirection", &m_titleTextDirection);
-    bindProperty("platformName", &m_platformName);
     bindProperty("interceptPostMessage", &m_interceptPostMessage);
-    bindProperty("workerThreadCount", &DRTTestRunner::workerThreadCount);
     bindMethod("sendWebIntentResponse", &DRTTestRunner::sendWebIntentResponse);
     bindMethod("deliverWebIntent", &DRTTestRunner::deliverWebIntent);
 }
@@ -360,12 +283,6 @@ void DRTTestRunner::dumpAsText(const CppArgumentList& arguments, CppVariant* res
     if (arguments.size() > 0 && arguments[0].isBool())
         m_generatePixelResults = arguments[0].value.boolValue;
 
-    result->setNull();
-}
-
-void DRTTestRunner::dumpDatabaseCallbacks(const CppArgumentList&, CppVariant* result)
-{
-    // Do nothing; we don't use this flag anywhere for now
     result->setNull();
 }
 
@@ -444,13 +361,6 @@ void DRTTestRunner::dumpPermissionClientCallbacks(const CppArgumentList&, CppVar
 void DRTTestRunner::dumpCreateView(const CppArgumentList&, CppVariant* result)
 {
     m_dumpCreateView = true;
-    result->setNull();
-}
-
-void DRTTestRunner::setAcceptsEditing(const CppArgumentList& arguments, CppVariant* result)
-{
-    if (arguments.size() > 0 && arguments[0].isBool())
-        m_acceptsEditing = arguments[0].value.boolValue;
     result->setNull();
 }
 
@@ -633,31 +543,11 @@ void DRTTestRunner::queueLoadHTMLString(const CppArgumentList& arguments, CppVar
     result->setNull();
 }
 
-void DRTTestRunner::objCIdentityIsEqual(const CppArgumentList& arguments, CppVariant* result)
-{
-    if (arguments.size() < 2) {
-        // This is the best we can do to return an error.
-        result->setNull();
-        return;
-    }
-    result->set(arguments[0].isEqual(arguments[1]));
-}
-
 void DRTTestRunner::reset()
 {
-    if (m_shell) {
-        m_shell->webView()->setZoomLevel(false, 0);
-        m_shell->webView()->setTabKeyCyclesThroughElements(true);
-#if !OS(DARWIN) && !OS(WINDOWS) // Actually, TOOLKIT_GTK
-        // (Constants copied because we can't depend on the header that defined
-        // them from this file.)
-        m_shell->webView()->setSelectionColors(0xff1e90ff, 0xff000000, 0xffc8c8c8, 0xff323232);
-#endif
-        m_shell->webView()->removeAllUserContent();
-        WebKit::WebSize empty;
-        m_shell->webView()->disableAutoResizeMode();
+    TestRunner::reset();
+    if (m_shell)
         m_shell->webViewHost()->setDeviceScaleFactor(1);
-    }
     m_dumpAsText = false;
     m_dumpAsAudio = false;
     m_dumpCreateView = false;
@@ -675,24 +565,19 @@ void DRTTestRunner::reset()
     m_dumpTitleChanges = false;
     m_dumpPermissionClientCallbacks = false;
     m_generatePixelResults = true;
-    m_acceptsEditing = true;
     m_waitUntilDone = false;
     m_canOpenWindows = false;
     m_testRepaint = false;
     m_sweepHorizontally = false;
-    m_shouldAddFileToPasteboard = false;
     m_stopProvisionalFrameLoads = false;
     m_deferMainResourceDataLoad = true;
-    m_globalFlag.set(false);
     m_webHistoryItemCount.set(0);
     m_titleTextDirection.set("ltr");
-    m_platformName.set("chromium");
     m_interceptPostMessage.set(false);
     m_userStyleSheetLocation = WebURL();
     m_isPrinting = false;
 
     webkit_support::SetAcceptAllCookies(false);
-    WebSecurityPolicy::resetOriginAccessWhitelists();
 
     // Reset the default quota for each origin to 5MB
     webkit_support::SetDatabaseQuota(5 * 1024 * 1024);
@@ -706,10 +591,6 @@ void DRTTestRunner::reset()
     m_workQueue.reset();
     m_taskList.revokeAll();
     m_shouldStayOnPageAfterHandlingBeforeUnload = false;
-    m_hasCustomFullScreenBehavior = false;
-#if OS(LINUX) || OS(ANDROID)
-    WebFontRendering::setSubpixelPositioning(false);
-#endif
 }
 
 void DRTTestRunner::locationChangeDone()
@@ -736,13 +617,6 @@ void DRTTestRunner::setCanOpenWindows(const CppArgumentList&, CppVariant* result
     result->setNull();
 }
 
-void DRTTestRunner::setTabKeyCyclesThroughElements(const CppArgumentList& arguments, CppVariant* result)
-{
-    if (arguments.size() > 0 && arguments[0].isBool())
-        m_shell->webView()->setTabKeyCyclesThroughElements(arguments[0].toBoolean());
-    result->setNull();
-}
-
 void DRTTestRunner::windowCount(const CppArgumentList&, CppVariant* result)
 {
     result->set(static_cast<int>(m_shell->windowCount()));
@@ -759,13 +633,6 @@ void DRTTestRunner::setAlwaysAcceptCookies(const CppArgumentList& arguments, Cpp
 {
     if (arguments.size() > 0)
         webkit_support::SetAcceptAllCookies(cppVariantToBool(arguments[0]));
-    result->setNull();
-}
-
-void DRTTestRunner::setAsynchronousSpellCheckingEnabled(const CppArgumentList& arguments, CppVariant* result)
-{
-    if (arguments.size() > 0 && arguments[0].isBool())
-        m_shell->webView()->settings()->setAsynchronousSpellCheckingEnabled(cppVariantToBool(arguments[0]));
     result->setNull();
 }
 
@@ -817,35 +684,6 @@ void DRTTestRunner::setAuthorAndUserStylesEnabled(const CppArgumentList& argumen
     result->setNull();
 }
 
-void DRTTestRunner::execCommand(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-    if (arguments.size() <= 0 || !arguments[0].isString())
-        return;
-
-    std::string command = arguments[0].toString();
-    std::string value("");
-    // Ignore the second parameter (which is userInterface)
-    // since this command emulates a manual action.
-    if (arguments.size() >= 3 && arguments[2].isString())
-        value = arguments[2].toString();
-
-    // Note: webkit's version does not return the boolean, so neither do we.
-    m_shell->webView()->focusedFrame()->executeCommand(WebString::fromUTF8(command), WebString::fromUTF8(value));
-}
-
-void DRTTestRunner::isCommandEnabled(const CppArgumentList& arguments, CppVariant* result)
-{
-    if (arguments.size() <= 0 || !arguments[0].isString()) {
-        result->setNull();
-        return;
-    }
-
-    std::string command = arguments[0].toString();
-    bool rv = m_shell->webView()->focusedFrame()->isCommandEnabled(WebString::fromUTF8(command));
-    result->set(rv);
-}
-
 void DRTTestRunner::setPopupBlockingEnabled(const CppArgumentList& arguments, CppVariant* result)
 {
     if (arguments.size() > 0 && arguments[0].isBool()) {
@@ -881,49 +719,6 @@ void DRTTestRunner::setPluginsAllowed(const CppArgumentList& arguments, CppVaria
 {
     if (arguments.size() > 0 && arguments[0].isBool())
         m_shell->webPermissions()->setPluginsAllowed(arguments[0].toBoolean());
-    result->setNull();
-}
-
-void DRTTestRunner::setUseDashboardCompatibilityMode(const CppArgumentList&, CppVariant* result)
-{
-    // We have no need to support Dashboard Compatibility Mode (mac-only)
-    result->setNull();
-}
-
-void DRTTestRunner::clearAllApplicationCaches(const CppArgumentList&, CppVariant* result)
-{
-    // FIXME: Implement to support application cache quotas.
-    result->setNull();
-}
-
-void DRTTestRunner::clearApplicationCacheForOrigin(const CppArgumentList&, CppVariant* result)
-{
-    // FIXME: Implement to support deleting all application cache for an origin.
-    result->setNull();
-}
-
-void DRTTestRunner::setApplicationCacheOriginQuota(const CppArgumentList&, CppVariant* result)
-{
-    // FIXME: Implement to support application cache quotas.
-    result->setNull();
-}
-
-void DRTTestRunner::originsWithApplicationCache(const CppArgumentList&, CppVariant* result)
-{
-    // FIXME: Implement to support getting origins that have application caches.
-    result->setNull();
-}
-
-void DRTTestRunner::applicationCacheDiskUsageForOrigin(const CppArgumentList&, CppVariant* result)
-{
-    // FIXME: Implement to support getting disk usage by all application cache for an origin.
-    result->setNull();
-}
-
-void DRTTestRunner::setScrollbarPolicy(const CppArgumentList&, CppVariant* result)
-{
-    // FIXME: implement.
-    // Currently only has a non-null implementation on QT.
     result->setNull();
 }
 
@@ -1008,12 +803,6 @@ void DRTTestRunner::pathToLocalResource(const CppArgumentList& arguments, CppVar
     result->set(webkit_support::RewriteLayoutTestsURL(url).spec());
 }
 
-void DRTTestRunner::addFileToPasteboardOnDrag(const CppArgumentList&, CppVariant* result)
-{
-    result->setNull();
-    m_shouldAddFileToPasteboard = true;
-}
-
 void DRTTestRunner::setStopProvisionalFrameLoads(const CppArgumentList&, CppVariant* result)
 {
     result->setNull();
@@ -1032,97 +821,6 @@ void DRTTestRunner::setSelectTrailingWhitespaceEnabled(const CppArgumentList& ar
     if (arguments.size() > 0 && arguments[0].isBool())
         m_shell->webViewHost()->setSelectTrailingWhitespaceEnabled(arguments[0].value.boolValue);
     result->setNull();
-}
-
-bool DRTTestRunner::pauseAnimationAtTimeOnElementWithId(const WebString& animationName, double time, const WebString& elementId)
-{
-    WebFrame* webFrame = m_shell->webView()->mainFrame();
-    if (!webFrame)
-        return false;
-
-    WebAnimationController* controller = webFrame->animationController();
-    if (!controller)
-        return false;
-
-    WebElement element = webFrame->document().getElementById(elementId);
-    if (element.isNull())
-        return false;
-    return controller->pauseAnimationAtTime(element, animationName, time);
-}
-
-bool DRTTestRunner::pauseTransitionAtTimeOnElementWithId(const WebString& propertyName, double time, const WebString& elementId)
-{
-    WebFrame* webFrame = m_shell->webView()->mainFrame();
-    if (!webFrame)
-        return false;
-
-    WebAnimationController* controller = webFrame->animationController();
-    if (!controller)
-        return false;
-
-    WebElement element = webFrame->document().getElementById(elementId);
-    if (element.isNull())
-        return false;
-    return controller->pauseTransitionAtTime(element, propertyName, time);
-}
-
-bool DRTTestRunner::elementDoesAutoCompleteForElementWithId(const WebString& elementId)
-{
-    WebFrame* webFrame = m_shell->webView()->mainFrame();
-    if (!webFrame)
-        return false;
-
-    WebElement element = webFrame->document().getElementById(elementId);
-    if (element.isNull() || !element.hasTagName("input"))
-        return false;
-
-    WebInputElement inputElement = element.to<WebInputElement>();
-    return inputElement.autoComplete();
-}
-
-int DRTTestRunner::numberOfActiveAnimations()
-{
-    WebFrame* webFrame = m_shell->webView()->mainFrame();
-    if (!webFrame)
-        return -1;
-
-    WebAnimationController* controller = webFrame->animationController();
-    if (!controller)
-        return -1;
-
-    return controller->numberOfActiveAnimations();
-}
-
-void DRTTestRunner::pauseAnimationAtTimeOnElementWithId(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->set(false);
-    if (arguments.size() > 2 && arguments[0].isString() && arguments[1].isNumber() && arguments[2].isString()) {
-        WebString animationName = cppVariantToWebString(arguments[0]);
-        double time = arguments[1].toDouble();
-        WebString elementId = cppVariantToWebString(arguments[2]);
-        result->set(pauseAnimationAtTimeOnElementWithId(animationName, time, elementId));
-    }
-}
-
-void DRTTestRunner::pauseTransitionAtTimeOnElementWithId(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->set(false);
-    if (arguments.size() > 2 && arguments[0].isString() && arguments[1].isNumber() && arguments[2].isString()) {
-        WebString propertyName = cppVariantToWebString(arguments[0]);
-        double time = arguments[1].toDouble();
-        WebString elementId = cppVariantToWebString(arguments[2]);
-        result->set(pauseTransitionAtTimeOnElementWithId(propertyName, time, elementId));
-    }
-}
-
-void DRTTestRunner::elementDoesAutoCompleteForElementWithId(const CppArgumentList& arguments, CppVariant* result)
-{
-    if (arguments.size() != 1 || !arguments[0].isString()) {
-        result->set(false);
-        return;
-    }
-    WebString elementId = cppVariantToWebString(arguments[0]);
-    result->set(elementDoesAutoCompleteForElementWithId(elementId));
 }
 
 void DRTTestRunner::enableAutoResizeMode(const CppArgumentList& arguments, CppVariant* result)
@@ -1159,29 +857,6 @@ void DRTTestRunner::disableAutoResizeMode(const CppArgumentList& arguments, CppV
     result->set(true);
 }
 
-void DRTTestRunner::numberOfActiveAnimations(const CppArgumentList&, CppVariant* result)
-{
-    result->set(numberOfActiveAnimations());
-}
-
-void DRTTestRunner::disableImageLoading(const CppArgumentList&, CppVariant* result)
-{
-    m_shell->preferences()->loadsImagesAutomatically = false;
-    m_shell->applyPreferences();
-    result->setNull();
-}
-
-void DRTTestRunner::setIconDatabaseEnabled(const CppArgumentList&, CppVariant* result)
-{
-    // We don't use the WebKit icon database.
-    result->setNull();
-}
-
-void DRTTestRunner::callShouldCloseOnWebView(const CppArgumentList&, CppVariant* result)
-{
-    result->set(m_shell->webView()->dispatchBeforeUnloadEvent());
-}
-
 #if ENABLE(NOTIFICATIONS)
 void DRTTestRunner::grantWebNotificationPermission(const CppArgumentList& arguments, CppVariant* result)
 {
@@ -1193,24 +868,6 @@ void DRTTestRunner::grantWebNotificationPermission(const CppArgumentList& argume
     m_shell->notificationPresenter()->grantPermission(cppVariantToWebString(arguments[0]));
 #endif
     result->set(true);
-}
-
-void DRTTestRunner::denyWebNotificationPermission(const CppArgumentList& arguments, CppVariant* result)
-{
-    // FIXME: Implement.
-    result->setNull();
-}
-
-void DRTTestRunner::removeAllWebNotificationPermissions(const CppArgumentList& arguments, CppVariant* result)
-{
-    // FIXME: Implement.
-    result->setNull();
-}
-
-void DRTTestRunner::simulateWebNotificationClick(const CppArgumentList& arguments, CppVariant* result)
-{
-    // FIXME: Implement.
-    result->setNull();
 }
 
 void DRTTestRunner::simulateLegacyWebNotificationClick(const CppArgumentList& arguments, CppVariant* result)
@@ -1228,31 +885,10 @@ void DRTTestRunner::simulateLegacyWebNotificationClick(const CppArgumentList& ar
 }
 #endif
 
-void DRTTestRunner::setDomainRelaxationForbiddenForURLScheme(const CppArgumentList& arguments, CppVariant* result)
-{
-    if (arguments.size() != 2 || !arguments[0].isBool() || !arguments[1].isString())
-        return;
-    m_shell->webView()->setDomainRelaxationForbidden(cppVariantToBool(arguments[0]), cppVariantToWebString(arguments[1]));
-}
-
 void DRTTestRunner::setDeferMainResourceDataLoad(const CppArgumentList& arguments, CppVariant* result)
 {
     if (arguments.size() == 1)
         m_deferMainResourceDataLoad = cppVariantToBool(arguments[0]);
-}
-
-//
-// Unimplemented stubs
-//
-
-void DRTTestRunner::dumpAsWebArchive(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-}
-
-void DRTTestRunner::setMainFrameIsFirstResponder(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
 }
 
 void DRTTestRunner::dumpSelectionRect(const CppArgumentList& arguments, CppVariant* result)
@@ -1266,7 +902,7 @@ void DRTTestRunner::display(const CppArgumentList& arguments, CppVariant* result
     WebViewHost* host = m_shell->webViewHost();
     const WebKit::WebSize& size = m_shell->webView()->size();
     WebRect rect(0, 0, size.width, size.height);
-    host->updatePaintRect(rect);
+    host->proxy()->setPaintRect(rect);
     host->paintInvalidatedRegion();
     host->displayRepaintMask();
     result->setNull();
@@ -1292,46 +928,6 @@ void DRTTestRunner::repaintSweepHorizontally(const CppArgumentList&, CppVariant*
     result->setNull();
 }
 
-void DRTTestRunner::clearBackForwardList(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-}
-
-void DRTTestRunner::keepWebHistory(const CppArgumentList& arguments,  CppVariant* result)
-{
-    result->setNull();
-}
-
-void DRTTestRunner::storeWebScriptObject(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-}
-
-void DRTTestRunner::accessStoredWebScriptObject(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-}
-
-void DRTTestRunner::objCClassNameOf(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-}
-
-void DRTTestRunner::addDisallowedURL(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-}
-
-void DRTTestRunner::setCallCloseOnWebViews(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-}
-
-void DRTTestRunner::setPrivateBrowsingEnabled(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-}
-
 void DRTTestRunner::setJavaScriptCanAccessClipboard(const CppArgumentList& arguments, CppVariant* result)
 {
     if (arguments.size() > 0 && arguments[0].isBool()) {
@@ -1348,70 +944,6 @@ void DRTTestRunner::setXSSAuditorEnabled(const CppArgumentList& arguments, CppVa
         m_shell->applyPreferences();
     }
     result->setNull();
-}
-
-void DRTTestRunner::evaluateScriptInIsolatedWorldAndReturnValue(const CppArgumentList& arguments, CppVariant* result)
-{
-    v8::HandleScope scope;
-    WebVector<v8::Local<v8::Value> > values;
-    if (arguments.size() >= 2 && arguments[0].isNumber() && arguments[1].isString()) {
-        WebScriptSource source(cppVariantToWebString(arguments[1]));
-        // This relies on the iframe focusing itself when it loads. This is a bit
-        // sketchy, but it seems to be what other tests do.
-        m_shell->webView()->focusedFrame()->executeScriptInIsolatedWorld(arguments[0].toInt32(), &source, 1, 1, &values);
-    }
-    result->setNull();
-    // Since only one script was added, only one result is expected
-    if (values.size() == 1 && !values[0].IsEmpty()) {
-        v8::Local<v8::Value> scriptValue = values[0];
-        // FIXME: There are many more types that can be handled.
-        if (scriptValue->IsString()) {
-            v8::String::AsciiValue asciiV8(scriptValue);
-            result->set(std::string(*asciiV8));
-        } else if (scriptValue->IsBoolean())
-            result->set(scriptValue->ToBoolean()->Value());
-        else if (scriptValue->IsNumber()) {
-            if (scriptValue->IsInt32())
-                result->set(scriptValue->ToInt32()->Value());
-            else
-                result->set(scriptValue->ToNumber()->Value());
-        } else if (scriptValue->IsNull())
-              result->setNull();
-    }
-}
-
-void DRTTestRunner::evaluateScriptInIsolatedWorld(const CppArgumentList& arguments, CppVariant* result)
-{
-    if (arguments.size() >= 2 && arguments[0].isNumber() && arguments[1].isString()) {
-        WebScriptSource source(cppVariantToWebString(arguments[1]));
-        // This relies on the iframe focusing itself when it loads. This is a bit
-        // sketchy, but it seems to be what other tests do.
-        m_shell->webView()->focusedFrame()->executeScriptInIsolatedWorld(arguments[0].toInt32(), &source, 1, 1);
-    }
-    result->setNull();
-}
-
-void DRTTestRunner::setIsolatedWorldSecurityOrigin(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-
-    if (arguments.size() != 2 || !arguments[0].isNumber() || !(arguments[1].isString() || arguments[1].isNull()))
-        return;
-
-    WebSecurityOrigin origin;
-    if (arguments[1].isString())
-        origin = WebSecurityOrigin::createFromString(cppVariantToWebString(arguments[1]));
-    m_shell->webView()->focusedFrame()->setIsolatedWorldSecurityOrigin(arguments[0].toInt32(), origin);
-}
-
-void DRTTestRunner::setIsolatedWorldContentSecurityPolicy(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-
-    if (arguments.size() != 2 || !arguments[0].isNumber() || !arguments[1].isString())
-        return;
-
-    m_shell->webView()->focusedFrame()->setIsolatedWorldContentSecurityPolicy(arguments[0].toInt32(), cppVariantToWebString(arguments[1]));
 }
 
 void DRTTestRunner::setAllowUniversalAccessFromFileURLs(const CppArgumentList& arguments, CppVariant* result)
@@ -1446,63 +978,6 @@ void DRTTestRunner::setAllowRunningOfInsecureContent(const CppArgumentList& argu
         m_shell->webPermissions()->setRunningInsecureContentAllowed(arguments[0].value.boolValue);
 
     result->setNull();
-}
-
-// Need these conversions because the format of the value for booleans
-// may vary - for example, on mac "1" and "0" are used for boolean.
-bool DRTTestRunner::cppVariantToBool(const CppVariant& value)
-{
-    if (value.isBool())
-        return value.toBoolean();
-    if (value.isNumber())
-        return value.toInt32();
-    if (value.isString()) {
-        string valueString = value.toString();
-        if (valueString == "true" || valueString == "1")
-            return true;
-        if (valueString == "false" || valueString == "0")
-            return false;
-    }
-    logErrorToConsole("Invalid value. Expected boolean value.");
-    return false;
-}
-
-int32_t DRTTestRunner::cppVariantToInt32(const CppVariant& value)
-{
-    if (value.isNumber())
-        return value.toInt32();
-    if (value.isString()) {
-        string stringSource = value.toString();
-        const char* source = stringSource.data();
-        char* end;
-        long number = strtol(source, &end, 10);
-        if (end == source + stringSource.length() && number >= numeric_limits<int32_t>::min() && number <= numeric_limits<int32_t>::max())
-            return static_cast<int32_t>(number);
-    }
-    logErrorToConsole("Invalid value for preference. Expected integer value.");
-    return 0;
-}
-
-WebString DRTTestRunner::cppVariantToWebString(const CppVariant& value)
-{
-    if (!value.isString()) {
-        logErrorToConsole("Invalid value for preference. Expected string value.");
-        return WebString();
-    }
-    return WebString::fromUTF8(value.toString());
-}
-
-Vector<WebString> DRTTestRunner::cppVariantToWebStringArray(const CppVariant& value)
-{
-    if (!value.isObject()) {
-        logErrorToConsole("Invalid value for preference. Expected object value.");
-        return Vector<WebString>();
-    }
-    Vector<WebString> resultVector;
-    Vector<string> stringVector = value.toStringVector();
-    for (size_t i = 0; i < stringVector.size(); ++i)
-        resultVector.append(WebString::fromUTF8(stringVector[i].c_str()));
-    return resultVector;
 }
 
 // Sets map based on scriptFontPairs, a collapsed vector of pairs of ISO 15924
@@ -1624,53 +1099,9 @@ void DRTTestRunner::overridePreference(const CppArgumentList& arguments, CppVari
     } else {
         string message("Invalid name for preference: ");
         message.append(key);
-        logErrorToConsole(message);
+        printErrorMessage(message);
     }
     m_shell->applyPreferences();
-}
-
-void DRTTestRunner::fallbackMethod(const CppArgumentList&, CppVariant* result)
-{
-    printf("CONSOLE MESSAGE: JavaScript ERROR: unknown method called on DRTTestRunner\n");
-    result->setNull();
-}
-
-void DRTTestRunner::addOriginAccessWhitelistEntry(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-
-    if (arguments.size() != 4 || !arguments[0].isString() || !arguments[1].isString()
-        || !arguments[2].isString() || !arguments[3].isBool())
-        return;
-
-    WebKit::WebURL url(GURL(arguments[0].toString()));
-    if (!url.isValid())
-        return;
-
-    WebSecurityPolicy::addOriginAccessWhitelistEntry(
-        url,
-        cppVariantToWebString(arguments[1]),
-        cppVariantToWebString(arguments[2]),
-        arguments[3].toBoolean());
-}
-
-void DRTTestRunner::removeOriginAccessWhitelistEntry(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-
-    if (arguments.size() != 4 || !arguments[0].isString() || !arguments[1].isString()
-        || !arguments[2].isString() || !arguments[3].isBool())
-        return;
-
-    WebKit::WebURL url(GURL(arguments[0].toString()));
-    if (!url.isValid())
-        return;
-
-    WebSecurityPolicy::removeOriginAccessWhitelistEntry(
-        url,
-        cppVariantToWebString(arguments[1]),
-        cppVariantToWebString(arguments[2]),
-        arguments[3].toBoolean());
 }
 
 void DRTTestRunner::clearAllDatabases(const CppArgumentList& arguments, CppVariant* result)
@@ -1693,47 +1124,10 @@ void DRTTestRunner::setPOSIXLocale(const CppArgumentList& arguments, CppVariant*
         setlocale(LC_ALL, arguments[0].toString().c_str());
 }
 
-// Parse a single argument. The method returns true if there is an argument that
-// is a number or if there is no argument at all. It returns false only if there
-// is some argument that is not a number. The value parameter is filled with the
-// parsed number, or given the default if there is no argument.
-static bool parseCppArgumentInt32(const CppArgumentList& arguments, int argIndex, int* value, int defaultValue)
-{
-    if (static_cast<int>(arguments.size()) > argIndex) {
-        if (!arguments[argIndex].isNumber())
-            return false;
-        *value = arguments[argIndex].toInt32();
-        return true;
-    }
-    *value = defaultValue;
-    return true;
-}
-
-static bool parsePageNumber(const CppArgumentList& arguments, int argOffset, int* pageNumber)
-{
-    if (static_cast<int>(arguments.size()) > argOffset + 1)
-        return false;
-    if (!parseCppArgumentInt32(arguments, argOffset, pageNumber, 0))
-        return false;
-    return true;
-}
-
 void DRTTestRunner::setPrinting(const CppArgumentList& arguments, CppVariant* result)
 {
     setIsPrinting(true);
     result->setNull();
-}
-
-void DRTTestRunner::hasCustomPageSizeStyle(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->set(false);
-    int pageIndex = 0;
-    if (!parsePageNumber(arguments, 0, &pageIndex))
-        return;
-    WebFrame* frame = m_shell->webView()->mainFrame();
-    if (!frame)
-        return;
-    result->set(frame->hasCustomPageSizeStyle(pageIndex));
 }
 
 void DRTTestRunner::numberOfPendingGeolocationPermissionRequests(const CppArgumentList& arguments, CppVariant* result)
@@ -1746,49 +1140,12 @@ void DRTTestRunner::numberOfPendingGeolocationPermissionRequests(const CppArgume
     result->set(numberOfRequests);
 }
 
-void DRTTestRunner::logErrorToConsole(const std::string& text)
-{
-    m_shell->webViewHost()->didAddMessageToConsole(
-        WebConsoleMessage(WebConsoleMessage::LevelError, WebString::fromUTF8(text)),
-        WebString(), 0);
-}
-
 void DRTTestRunner::evaluateInWebInspector(const CppArgumentList& arguments, CppVariant* result)
 {
     result->setNull();
     if (arguments.size() < 2 || !arguments[0].isNumber() || !arguments[1].isString())
         return;
     m_shell->drtDevToolsAgent()->evaluateInWebInspector(arguments[0].toInt32(), arguments[1].toString());
-}
-
-void DRTTestRunner::forceRedSelectionColors(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-    m_shell->webView()->setSelectionColors(0xffee0000, 0xff00ee00, 0xff000000, 0xffc0c0c0);
-}
-
-void DRTTestRunner::addUserScript(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-    if (arguments.size() < 3 || !arguments[0].isString() || !arguments[1].isBool() || !arguments[2].isBool())
-        return;
-    WebView::addUserScript(
-        cppVariantToWebString(arguments[0]), WebVector<WebString>(),
-        arguments[1].toBoolean() ? WebView::UserScriptInjectAtDocumentStart : WebView::UserScriptInjectAtDocumentEnd,
-        arguments[2].toBoolean() ? WebView::UserContentInjectInAllFrames : WebView::UserContentInjectInTopFrameOnly);
-}
-
-void DRTTestRunner::addUserStyleSheet(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-    if (arguments.size() < 2 || !arguments[0].isString() || !arguments[1].isBool())
-        return;
-    WebView::addUserStyleSheet(
-        cppVariantToWebString(arguments[0]), WebVector<WebString>(),
-        arguments[1].toBoolean() ? WebView::UserContentInjectInAllFrames : WebView::UserContentInjectInTopFrameOnly,
-        // Chromium defaults to InjectInSubsequentDocuments, but for compatibility
-        // with the other ports' DRTs, we use UserStyleInjectInExistingDocuments.
-        WebView::UserStyleInjectInExistingDocuments);
 }
 
 void DRTTestRunner::setMockDeviceOrientation(const CppArgumentList& arguments, CppVariant* result)
@@ -1845,11 +1202,6 @@ void DRTTestRunner::setMockGeolocationPositionUnavailableError(const CppArgument
         windowList[i]->geolocationClientMock()->setPositionUnavailableError(cppVariantToWebString(arguments[0]));
 }
 
-void DRTTestRunner::abortModal(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-}
-
 #if ENABLE(INPUT_SPEECH)
 void DRTTestRunner::addMockSpeechInputResult(const CppArgumentList& arguments, CppVariant* result)
 {
@@ -1901,180 +1253,12 @@ void DRTTestRunner::wasMockSpeechRecognitionAborted(const CppArgumentList&, CppV
 }
 #endif
 
-void DRTTestRunner::startSpeechInput(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-    if (arguments.size() != 1)
-        return;
-
-    WebElement element;
-    if (!WebBindings::getElement(arguments[0].value.objectValue, &element))
-        return;
-
-    WebInputElement* input = toWebInputElement(&element);
-    if (!input)
-        return;
-
-    if (!input->isSpeechInputEnabled())
-        return;
-
-    input->startSpeechInput();
-}
-
-void DRTTestRunner::loseCompositorContext(const CppArgumentList& args, CppVariant*)
-{
-    int numTimes;
-    if (args.size() == 1 || !args[0].isNumber())
-        numTimes = 1;
-    else
-        numTimes = args[0].toInt32();
-    m_shell->webView()->loseCompositorContext(numTimes);
-}
-
-void DRTTestRunner::markerTextForListItem(const CppArgumentList& args, CppVariant* result)
-{
-    WebElement element;
-    if (!WebBindings::getElement(args[0].value.objectValue, &element))
-        result->setNull();
-    else
-        result->set(element.document().frame()->markerTextForListItem(element).utf8());
-}
-
-void DRTTestRunner::findString(const CppArgumentList& arguments, CppVariant* result)
-{
-    if (arguments.size() < 1 || !arguments[0].isString())
-        return;
-
-    WebFindOptions findOptions;
-    bool wrapAround = false;
-    if (arguments.size() >= 2) {
-        Vector<std::string> optionsArray = arguments[1].toStringVector();
-        findOptions.matchCase = true;
-
-        for (size_t i = 0; i < optionsArray.size(); ++i) {
-            const std::string& option = optionsArray[i];
-            // FIXME: Support all the options, so we can run findString.html too.
-            if (option == "CaseInsensitive")
-                findOptions.matchCase = false;
-            else if (option == "Backwards")
-                findOptions.forward = false;
-            else if (option == "WrapAround")
-                wrapAround = true;
-        }
-    }
-
-    WebFrame* frame = m_shell->webView()->mainFrame();
-    const bool findResult = frame->find(0, cppVariantToWebString(arguments[0]), findOptions, wrapAround, 0);
-    result->set(findResult);
-}
-
-void DRTTestRunner::setMinimumTimerInterval(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-    if (arguments.size() < 1 || !arguments[0].isNumber())
-        return;
-    m_shell->webView()->settings()->setMinimumTimerInterval(arguments[0].toDouble());
-}
-
-void DRTTestRunner::setAutofilled(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-    if (arguments.size() != 2 || !arguments[1].isBool())
-        return;
-
-    WebElement element;
-    if (!WebBindings::getElement(arguments[0].value.objectValue, &element))
-        return;
-
-    WebInputElement* input = toWebInputElement(&element);
-    if (!input)
-        return;
-
-    input->setAutofilled(arguments[1].value.boolValue);
-}
-
-void DRTTestRunner::setValueForUser(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-    if (arguments.size() != 2)
-        return;
-
-    WebElement element;
-    if (!WebBindings::getElement(arguments[0].value.objectValue, &element))
-        return;
-
-    WebInputElement* input = toWebInputElement(&element);
-    if (!input)
-        return;
-
-    input->setValue(cppVariantToWebString(arguments[1]), true);
-}
-
-void DRTTestRunner::deleteAllLocalStorage(const CppArgumentList& arguments, CppVariant*)
-{
-    // Not Implemented
-}
-
-void DRTTestRunner::localStorageDiskUsageForOrigin(const CppArgumentList& arguments, CppVariant*)
-{
-    // Not Implemented
-}
-
-void DRTTestRunner::originsWithLocalStorage(const CppArgumentList& arguments, CppVariant*)
-{
-    // Not Implemented
-}
-
-void DRTTestRunner::deleteLocalStorageForOrigin(const CppArgumentList& arguments, CppVariant*)
-{
-    // Not Implemented
-}
-
-void DRTTestRunner::observeStorageTrackerNotifications(const CppArgumentList&, CppVariant*)
-{
-    // Not Implemented
-}
-
-void DRTTestRunner::syncLocalStorage(const CppArgumentList&, CppVariant*)
-{
-    // Not Implemented
-}
-
 void DRTTestRunner::setShouldStayOnPageAfterHandlingBeforeUnload(const CppArgumentList& arguments, CppVariant* result)
 {
     if (arguments.size() == 1 && arguments[0].isBool())
         m_shouldStayOnPageAfterHandlingBeforeUnload = arguments[0].toBoolean();
 
     result->setNull();
-}
-
-void DRTTestRunner::enableFixedLayoutMode(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-    if (arguments.size() <  1 || !arguments[0].isBool())
-        return;
-    bool enableFixedLayout = arguments[0].toBoolean();
-    m_shell->webView()->enableFixedLayoutMode(enableFixedLayout);
-}
-
-void DRTTestRunner::setFixedLayoutSize(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-    if (arguments.size() <  2 || !arguments[0].isNumber() || !arguments[1].isNumber())
-        return;
-    int width = arguments[0].toInt32();
-    int height = arguments[1].toInt32();
-    m_shell->webView()->setFixedLayoutSize(WebSize(width, height));
-}
-
-void DRTTestRunner::selectionAsMarkup(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->set(m_shell->webView()->mainFrame()->selectionAsMarkup().utf8());
-}
-
-void DRTTestRunner::workerThreadCount(CppVariant* result)
-{
-    result->set(static_cast<int>(WebWorkerInfo::dedicatedWorkerCount()));
 }
 
 void DRTTestRunner::sendWebIntentResponse(const CppArgumentList& arguments, CppVariant* result)
@@ -2120,17 +1304,6 @@ void DRTTestRunner::deliverWebIntent(const CppArgumentList& arguments, CppVarian
     m_shell->webView()->mainFrame()->deliverIntent(intent, 0, m_intentClient.get());
 }
 
-void DRTTestRunner::setTextSubpixelPositioning(const CppArgumentList& arguments, CppVariant* result)
-{
-#if OS(LINUX) || OS(ANDROID)
-    // Since FontConfig doesn't provide a variable to control subpixel positioning, we'll fall back
-    // to setting it globally for all fonts.
-    if (arguments.size() > 0 && arguments[0].isBool())
-        WebFontRendering::setSubpixelPositioning(arguments[0].value.boolValue);
-#endif
-    result->setNull();
-}
-
 class InvokeCallbackTask : public WebMethodTask<DRTTestRunner> {
 public:
     InvokeCallbackTask(DRTTestRunner* object, PassOwnArrayPtr<CppVariant> callbackArguments, uint32_t numberOfArguments)
@@ -2174,52 +1347,6 @@ void DRTTestRunner::setPluginsEnabled(const CppArgumentList& arguments, CppVaria
     result->setNull();
 }
 
-void DRTTestRunner::resetPageVisibility(const CppArgumentList& arguments, CppVariant* result)
-{
-    m_shell->webView()->setVisibilityState(WebPageVisibilityStateVisible, true);
-}
-
-void DRTTestRunner::setPageVisibility(const CppArgumentList& arguments, CppVariant* result)
-{
-    if (arguments.size() > 0 && arguments[0].isString()) {
-        string newVisibility = arguments[0].toString();
-        if (newVisibility == "visible")
-            m_shell->webView()->setVisibilityState(WebPageVisibilityStateVisible, false);
-        else if (newVisibility == "hidden")
-            m_shell->webView()->setVisibilityState(WebPageVisibilityStateHidden, false);
-        else if (newVisibility == "prerender")
-            m_shell->webView()->setVisibilityState(WebPageVisibilityStatePrerender, false);
-        else if (newVisibility == "preview")
-            m_shell->webView()->setVisibilityState(WebPageVisibilityStatePreview, false);
-    }
-}
-
-void DRTTestRunner::setAutomaticLinkDetectionEnabled(bool)
-{
-    // Not Implemented
-}
-
-void DRTTestRunner::setTextDirection(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-    if (arguments.size() != 1 || !arguments[0].isString())
-        return;
-
-    // Map a direction name to a WebTextDirection value.
-    std::string directionName = arguments[0].toString();
-    WebKit::WebTextDirection direction;
-    if (directionName == "auto")
-        direction = WebKit::WebTextDirectionDefault;
-    else if (directionName == "rtl")
-        direction = WebKit::WebTextDirectionRightToLeft;
-    else if (directionName == "ltr")
-        direction = WebKit::WebTextDirectionLeftToRight;
-    else
-        return;
-
-    m_shell->webView()->setTextDirection(direction);
-}
-
 void DRTTestRunner::setAudioData(const CppArgumentList& arguments, CppVariant* result)
 {
     result->setNull();
@@ -2235,14 +1362,6 @@ void DRTTestRunner::setAudioData(const CppArgumentList& arguments, CppVariant* r
         return;
 
     setShouldDumpAsAudio(true);
-}
-
-void DRTTestRunner::setHasCustomFullScreenBehavior(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-    if (arguments.size() <  1 || !arguments[0].isBool())
-        return;
-    m_hasCustomFullScreenBehavior = arguments[0].toBoolean();
 }
 
 #if ENABLE(POINTER_LOCK)
@@ -2276,27 +1395,3 @@ void DRTTestRunner::setPointerLockWillFailSynchronously(const CppArgumentList&, 
     result->setNull();
 }
 #endif
-
-void DRTTestRunner::textSurroundingNode(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-    if (arguments.size() < 4 || !arguments[0].isObject() || !arguments[1].isNumber() || !arguments[2].isNumber() || !arguments[3].isNumber())
-        return;
-
-    WebNode node;
-    if (!WebBindings::getNode(arguments[0].value.objectValue, &node))
-        return;
-
-    if (node.isNull() || !node.isTextNode())
-        return;
-
-    WebPoint point(arguments[1].toInt32(), arguments[2].toInt32());
-    unsigned maxLength = arguments[3].toInt32();
-
-    WebSurroundingText surroundingText;
-    surroundingText.initialize(node, point, maxLength);
-    if (surroundingText.isNull())
-        return;
-
-    result->set(surroundingText.textContent().utf8());
-}

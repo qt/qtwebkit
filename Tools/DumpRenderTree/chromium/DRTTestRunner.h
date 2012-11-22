@@ -63,7 +63,10 @@ class ScopedTempDirectory;
 
 class TestShell;
 
-class DRTTestRunner : public TestRunner {
+using WebTestRunner::CppArgumentList;
+using WebTestRunner::CppVariant;
+
+class DRTTestRunner : public WebTestRunner::TestRunner {
 public:
     // Builds the property and method lists needed to bind this class to a JS
     // object.
@@ -75,13 +78,6 @@ public:
     // plain text, rather than as a text representation of the renderer's state.
     // It takes an optional argument, whether to dump pixels results or not.
     void dumpAsText(const CppArgumentList&, CppVariant*);
-
-    // This function should set a flag that tells the test_shell to print a line
-    // of descriptive text for each database command. It should take no
-    // arguments, and ignore any that may be present. However, at the moment, we
-    // don't have any DB function that prints messages, so for now this function
-    // doesn't do anything.
-    void dumpDatabaseCallbacks(const CppArgumentList&, CppVariant*);
 
     // This function sets a flag that tells the test_shell to print a line of
     // descriptive text for each editing command. It takes no arguments, and
@@ -136,11 +132,6 @@ public:
     // It takes no arguments, and ignores any that may be present.
     void dumpCreateView(const CppArgumentList&, CppVariant*);
 
-    // When called with a boolean argument, this sets a flag that controls
-    // whether content-editable elements accept editing focus when an editing
-    // attempt is made. It ignores any additional arguments.
-    void setAcceptsEditing(const CppArgumentList&, CppVariant*);
-
     // Functions for dealing with windows. By default we block all new windows.
     void windowCount(const CppArgumentList&, CppVariant*);
     void setCanOpenWindows(const CppArgumentList&, CppVariant*);
@@ -161,15 +152,8 @@ public:
     void queueLoad(const CppArgumentList&, CppVariant*);
     void queueLoadHTMLString(const CppArgumentList&, CppVariant*);
 
-    // Although this is named "objC" to match the Mac version, it actually tests
-    // the identity of its two arguments in C++.
-    void objCIdentityIsEqual(const CppArgumentList&, CppVariant*);
-
     // Changes the cookie policy from the default to allow all cookies.
     void setAlwaysAcceptCookies(const CppArgumentList&, CppVariant*);
-
-    // Changes asynchronous spellchecking flag on the settings.
-    void setAsynchronousSpellCheckingEnabled(const CppArgumentList&, CppVariant*);
 
     // Shows DevTools window.
     void showWebInspector(const CppArgumentList&, CppVariant*);
@@ -178,9 +162,6 @@ public:
     // Gives focus to the window.
     void setWindowIsKey(const CppArgumentList&, CppVariant*);
 
-    // Method that controls whether pressing Tab key cycles through page elements
-    // or inserts a '\t' char in text area
-    void setTabKeyCyclesThroughElements(const CppArgumentList&, CppVariant*);
 
     // Passes through to WebPreferences which allows the user to have a custom
     // style sheet.
@@ -189,13 +170,6 @@ public:
 
     // Passes this preference through to WebSettings.
     void setAuthorAndUserStylesEnabled(const CppArgumentList&, CppVariant*);
-
-    // Puts Webkit in "dashboard compatibility mode", which is used in obscure
-    // Mac-only circumstances. It's not really necessary, and will most likely
-    // never be used by Chrome, but some layout tests depend on its presence.
-    void setUseDashboardCompatibilityMode(const CppArgumentList&, CppVariant*);
-
-    void setScrollbarPolicy(const CppArgumentList&, CppVariant*);
 
     // Causes navigation actions just printout the intended navigation instead
     // of taking you to the page. This is used for cases like mailto, where you
@@ -217,16 +191,6 @@ public:
     // Converts a URL starting with file:///tmp/ to the local mapping.
     void pathToLocalResource(const CppArgumentList&, CppVariant*);
 
-    // Sets a bool such that when a drag is started, we fill the drag clipboard
-    // with a fake file object.
-    void addFileToPasteboardOnDrag(const CppArgumentList&, CppVariant*);
-
-    // Executes an internal command (superset of document.execCommand() commands).
-    void execCommand(const CppArgumentList&, CppVariant*);
-
-    // Checks if an internal command is currently available.
-    void isCommandEnabled(const CppArgumentList&, CppVariant*);
-
     // Set the WebPreference that controls webkit's popup blocking.
     void setPopupBlockingEnabled(const CppArgumentList&, CppVariant*);
 
@@ -239,52 +203,28 @@ public:
 
     // Enable or disable trailing whitespace selection on double click.
     void setSelectTrailingWhitespaceEnabled(const CppArgumentList&, CppVariant*);
-
-    void pauseAnimationAtTimeOnElementWithId(const CppArgumentList&, CppVariant*);
-    void pauseTransitionAtTimeOnElementWithId(const CppArgumentList&, CppVariant*);
-    void elementDoesAutoCompleteForElementWithId(const CppArgumentList&, CppVariant*);
     void enableAutoResizeMode(const CppArgumentList&, CppVariant*);
     void disableAutoResizeMode(const CppArgumentList&, CppVariant*);
-    void numberOfActiveAnimations(const CppArgumentList&, CppVariant*);
-    void disableImageLoading(const CppArgumentList&, CppVariant*);
-    void setIconDatabaseEnabled(const CppArgumentList&, CppVariant*);
     void dumpSelectionRect(const CppArgumentList&, CppVariant*);
 
 #if ENABLE(NOTIFICATIONS)
     // Grants permission for desktop notifications to an origin
     void grantWebNotificationPermission(const CppArgumentList&, CppVariant*);
-    void denyWebNotificationPermission(const CppArgumentList&, CppVariant*);
-    void removeAllWebNotificationPermissions(const CppArgumentList&, CppVariant*);
-    void simulateWebNotificationClick(const CppArgumentList&, CppVariant*);
     // Simulates a click on a desktop notification.
     void simulateLegacyWebNotificationClick(const CppArgumentList&, CppVariant*);
 #endif
 
-    void setDomainRelaxationForbiddenForURLScheme(const CppArgumentList&, CppVariant*);
     void setDeferMainResourceDataLoad(const CppArgumentList&, CppVariant*);
 
     // Deals with Web Audio WAV file data.
     void setAudioData(const CppArgumentList&, CppVariant*);
     const WebKit::WebArrayBufferView& audioData() const { return m_audioData; } 
 
-    // The following are only stubs.
-    // FIXME: Implement any of these that are needed to pass the layout tests.
-    void dumpAsWebArchive(const CppArgumentList&, CppVariant*);
     void dumpTitleChanges(const CppArgumentList&, CppVariant*);
-    void setMainFrameIsFirstResponder(const CppArgumentList&, CppVariant*);
     void display(const CppArgumentList&, CppVariant*);
     void displayInvalidatedRegion(const CppArgumentList&, CppVariant*);
     void testRepaint(const CppArgumentList&, CppVariant*);
     void repaintSweepHorizontally(const CppArgumentList&, CppVariant*);
-    void clearBackForwardList(const CppArgumentList&, CppVariant*);
-    void keepWebHistory(const CppArgumentList&, CppVariant*);
-    void storeWebScriptObject(const CppArgumentList&, CppVariant*);
-    void accessStoredWebScriptObject(const CppArgumentList&, CppVariant*);
-    void objCClassNameOf(const CppArgumentList&, CppVariant*);
-    void addDisallowedURL(const CppArgumentList&, CppVariant*);
-    void callShouldCloseOnWebView(const CppArgumentList&, CppVariant*);
-    void setCallCloseOnWebViews(const CppArgumentList&, CppVariant*);
-    void setPrivateBrowsingEnabled(const CppArgumentList&, CppVariant*);
 
     void setJavaScriptCanAccessClipboard(const CppArgumentList&, CppVariant*);
     void setXSSAuditorEnabled(const CppArgumentList&, CppVariant*);
@@ -294,32 +234,6 @@ public:
     void setAllowFileAccessFromFileURLs(const CppArgumentList&, CppVariant*);
     void setAllowRunningOfInsecureContent(const CppArgumentList&, CppVariant*);
 
-    void evaluateScriptInIsolatedWorldAndReturnValue(const CppArgumentList&, CppVariant*);
-    void evaluateScriptInIsolatedWorld(const CppArgumentList&, CppVariant*);
-    void setIsolatedWorldSecurityOrigin(const CppArgumentList&, CppVariant*);
-    void setIsolatedWorldContentSecurityPolicy(const CppArgumentList&, CppVariant*);
-
-    // The fallback method is called when a nonexistent method is called on
-    // the layout test controller object.
-    // It is usefull to catch typos in the JavaScript code (a few layout tests
-    // do have typos in them) and it allows the script to continue running in
-    // that case (as the Mac does).
-    void fallbackMethod(const CppArgumentList&, CppVariant*);
-
-    // Allows layout tests to manage origins' whitelisting.
-    void addOriginAccessWhitelistEntry(const CppArgumentList&, CppVariant*);
-    void removeOriginAccessWhitelistEntry(const CppArgumentList&, CppVariant*);
-
-    // Clears all application caches.
-    void clearAllApplicationCaches(const CppArgumentList&, CppVariant*);
-    // Clears an application cache for an origin.
-    void clearApplicationCacheForOrigin(const CppArgumentList&, CppVariant*);
-    // Returns origins that have application caches.
-    void originsWithApplicationCache(const CppArgumentList&, CppVariant*);
-    // Sets the application cache quota for the localhost origin.
-    void setApplicationCacheOriginQuota(const CppArgumentList&, CppVariant*);
-    // Returns disk usage by all application caches for an origin.
-    void applicationCacheDiskUsageForOrigin(const CppArgumentList&, CppVariant*);
 
     // Clears all databases.
     void clearAllDatabases(const CppArgumentList&, CppVariant*);
@@ -333,22 +247,11 @@ public:
     // Causes layout to happen as if targetted to printed pages.
     void setPrinting(const CppArgumentList&, CppVariant*);
 
-    // Returns true if the current page box has custom page size style for
-    // printing.
-    void hasCustomPageSizeStyle(const CppArgumentList&, CppVariant*);
-
     // Gets the number of geolocation permissions requests pending.
     void numberOfPendingGeolocationPermissionRequests(const CppArgumentList&, CppVariant*);
 
     // Allows layout tests to exec scripts at WebInspector side.
     void evaluateInWebInspector(const CppArgumentList&, CppVariant*);
-
-    // Forces the selection colors for testing under Linux.
-    void forceRedSelectionColors(const CppArgumentList&, CppVariant*);
-
-    // Adds a user script or user style sheet to be injected into new documents.
-    void addUserScript(const CppArgumentList&, CppVariant*);
-    void addUserStyleSheet(const CppArgumentList&, CppVariant*);
 
     // DeviceOrientation related functions
     void setMockDeviceOrientation(const CppArgumentList&, CppVariant*);
@@ -357,9 +260,6 @@ public:
     void setGeolocationPermission(const CppArgumentList&, CppVariant*);
     void setMockGeolocationPosition(const CppArgumentList&, CppVariant*);
     void setMockGeolocationPositionUnavailableError(const CppArgumentList&, CppVariant*);
-
-    // Empty stub method to keep parity with object model exposed by global DRTTestRunner.
-    void abortModal(const CppArgumentList&, CppVariant*);
 
     // Speech input related functions.
 #if ENABLE(INPUT_SPEECH)
@@ -371,30 +271,6 @@ public:
     void setMockSpeechRecognitionError(const CppArgumentList&, CppVariant*);
     void wasMockSpeechRecognitionAborted(const CppArgumentList&, CppVariant*);
 #endif
-    void startSpeechInput(const CppArgumentList&, CppVariant*);
-
-    void loseCompositorContext(const CppArgumentList& args, CppVariant* result);
-
-    void markerTextForListItem(const CppArgumentList&, CppVariant*);
-    void findString(const CppArgumentList&, CppVariant*);
-
-    void setMinimumTimerInterval(const CppArgumentList&, CppVariant*);
-
-    // Expects the first argument to be an input element and the second argument to be a boolean.
-    // Forwards the setAutofilled() call to the element.
-    void setAutofilled(const CppArgumentList&, CppVariant*);
-
-    // Expects the first argument to be an input element and the second argument to be a string value.
-    // Forwards the setValueForUser() call to the element.
-    void setValueForUser(const CppArgumentList&, CppVariant*);
-
-    // LocalStorage origin-related
-    void deleteAllLocalStorage(const CppArgumentList&, CppVariant*);
-    void originsWithLocalStorage(const CppArgumentList&, CppVariant*);
-    void deleteLocalStorageForOrigin(const CppArgumentList&, CppVariant*);
-    void localStorageDiskUsageForOrigin(const CppArgumentList&, CppVariant*);
-    void observeStorageTrackerNotifications(const CppArgumentList&, CppVariant*);
-    void syncLocalStorage(const CppArgumentList&, CppVariant*);
 
     // WebPermissionClient related.
     void setImagesAllowed(const CppArgumentList&, CppVariant*);
@@ -406,22 +282,7 @@ public:
     // Enable or disable plugins.
     void setPluginsEnabled(const CppArgumentList&, CppVariant*);
 
-    // Switch the visibility of the page.
-    void setPageVisibility(const CppArgumentList&, CppVariant*);
-    void resetPageVisibility(const CppArgumentList&, CppVariant*);
-
-    // Changes the direction of the focused element.
-    void setTextDirection(const CppArgumentList&, CppVariant*);
-
     void setShouldStayOnPageAfterHandlingBeforeUnload(const CppArgumentList&, CppVariant*);
-
-    void enableFixedLayoutMode(const CppArgumentList&, CppVariant*);
-    void setFixedLayoutSize(const CppArgumentList&, CppVariant*);
-
-    void selectionAsMarkup(const CppArgumentList&, CppVariant*);
-
-    // Switch the link detection.
-    void setAutomaticLinkDetectionEnabled(bool);
 
 #if ENABLE(POINTER_LOCK)
     void didAcquirePointerLock(const CppArgumentList&, CppVariant*);
@@ -431,8 +292,6 @@ public:
     void setPointerLockWillRespondAsynchronously(const CppArgumentList&, CppVariant*);
 #endif
 
-    void workerThreadCount(CppVariant*);
-
     // Expects one string argument for sending successful result, zero
     // arguments for sending a failure result.
     void sendWebIntentResponse(const CppArgumentList&, CppVariant*);
@@ -440,21 +299,8 @@ public:
     // Cause the web intent to be delivered to this context.
     void deliverWebIntent(const CppArgumentList&, CppVariant*);
 
-    // Enables or disables subpixel positioning (i.e. fractional X positions for
-    // glyphs) in text rendering on Linux. Since this method changes global
-    // settings, tests that call it must use their own custom font family for
-    // all text that they render. If not, an already-cached style will be used,
-    // resulting in the changed setting being ignored.
-    void setTextSubpixelPositioning(const CppArgumentList&, CppVariant*);
-
     // Used to set the device scale factor.
     void setBackingScaleFactor(const CppArgumentList&, CppVariant*);
-
-    // Retrieves the text surrounding a position in a text node.
-    // Expects the first argument to be a text node, the second and third to be
-    // point coordinates relative to the node and the fourth the maximum text
-    // length to retrieve.
-    void textSurroundingNode(const CppArgumentList&, CppVariant*);
 
 public:
     // The following methods are not exposed to JavaScript.
@@ -484,9 +330,7 @@ public:
     bool shouldGeneratePixelResults() { return m_generatePixelResults; }
     void setShouldGeneratePixelResults(bool value) { m_generatePixelResults = value; }
     bool shouldDumpCreateView() { return m_dumpCreateView; }
-    bool acceptsEditing() { return m_acceptsEditing; }
     bool canOpenWindows() { return m_canOpenWindows; }
-    bool shouldAddFileToPasteboard() { return m_shouldAddFileToPasteboard; }
     bool stopProvisionalFrameLoads() { return m_stopProvisionalFrameLoads; }
     bool deferMainResourceDataLoad() { return m_deferMainResourceDataLoad; }
     void setShowDebugLayerTree(bool value) { m_showDebugLayerTree = value; }
@@ -505,9 +349,6 @@ public:
 
     bool testRepaint() const { return m_testRepaint; }
     bool sweepHorizontally() const { return m_sweepHorizontally; }
-
-    void setHasCustomFullScreenBehavior(const CppArgumentList&, CppVariant*);
-    bool hasCustomFullScreenBehavior() const { return m_hasCustomFullScreenBehavior; }
 
     // Called by the webview delegate when the toplevel frame load is done.
     void locationChangeDone();
@@ -567,26 +408,12 @@ private:
         bool m_frozen;
         DRTTestRunner* m_controller;
     };
-
-    // Support for overridePreference.
-    bool cppVariantToBool(const CppVariant&);
-    int32_t cppVariantToInt32(const CppVariant&);
-    WebKit::WebString cppVariantToWebString(const CppVariant&);
-    Vector<WebKit::WebString> cppVariantToWebStringArray(const CppVariant&);
-
-    void logErrorToConsole(const std::string&);
     void completeNotifyDone(bool isTimeout);
     class NotifyDoneTimedOutTask: public WebTestRunner::WebMethodTask<DRTTestRunner> {
     public:
         NotifyDoneTimedOutTask(DRTTestRunner* object): WebTestRunner::WebMethodTask<DRTTestRunner>(object) { }
         virtual void runIfValid() { m_object->completeNotifyDone(true); }
     };
-
-
-    bool pauseAnimationAtTimeOnElementWithId(const WebKit::WebString& animationName, double time, const WebKit::WebString& elementId);
-    bool pauseTransitionAtTimeOnElementWithId(const WebKit::WebString& propertyName, double time, const WebKit::WebString& elementId);
-    bool elementDoesAutoCompleteForElementWithId(const WebKit::WebString&);
-    int numberOfActiveAnimations();
 
     // Used for test timeouts.
     WebTestRunner::WebTaskList m_taskList;
@@ -658,11 +485,6 @@ private:
     // is invoked.
     bool m_dumpCreateView;
 
-    // If true, the element will be treated as editable. This value is returned
-    // from various editing callbacks that are called just before edit operations
-    // are allowed.
-    bool m_acceptsEditing;
-
     // If true, new windows can be opened via javascript or by plugins. By
     // default, set to false and can be toggled to true using
     // setCanOpenWindows().
@@ -679,9 +501,6 @@ private:
     // If true and test_repaint_ is true as well, pixel dump will be produced as
     // a series of 1px-wide, view-tall paints across the width of the view.
     bool m_sweepHorizontally;
-
-    // If true and a drag starts, adds a file to the drag&drop clipboard.
-    bool m_shouldAddFileToPasteboard;
 
     // If true, stops provisional frame loads during the
     // DidStartProvisionalLoadForFrame callback.
@@ -701,16 +520,11 @@ private:
 
     WorkQueue m_workQueue;
 
-    CppVariant m_globalFlag;
-
     // Bound variable counting the number of top URLs visited.
     CppVariant m_webHistoryItemCount;
 
     // Bound variable tracking the directionality of the <title> tag.
     CppVariant m_titleTextDirection;
-
-    // Bound variable to return the name of this platform (chromium).
-    CppVariant m_platformName;
 
     // Bound variable to set whether postMessages should be intercepted or not
     CppVariant m_interceptPostMessage;
@@ -724,10 +538,6 @@ private:
     OwnPtr<WebKit::WebDeliveredIntentClient> m_intentClient;
 
     bool m_shouldStayOnPageAfterHandlingBeforeUnload;
-
-    // If true, calls to WebViewHost::enter/exitFullScreenNow will not result in 
-    // calls to Document::will/did/Enter/ExitFullScreen.
-    bool m_hasCustomFullScreenBehavior;
 };
 
 #endif // DRTTestRunner_h

@@ -1514,7 +1514,7 @@ sub launcherName()
     } elsif (isAppleWebKit()) {
         return "Safari";
     } elsif (isEfl()) {
-        return "EWebLauncher";
+        return "EWebLauncher/MiniBrowser";
     } elsif (isWinCE()) {
         return "WinCELauncher";
     }
@@ -1873,9 +1873,13 @@ sub retrieveQMakespecVar
 sub qtMakeCommand($)
 {
     my ($qmakebin) = @_;
-    chomp(my $mkspec = `$qmakebin -query QT_HOST_DATA`);
-    $mkspec .= "/mkspecs/default";
-    my $compiler = retrieveQMakespecVar("$mkspec/qmake.conf", "QMAKE_CC");
+    chomp(my $hostDataPath = `$qmakebin -query QT_HOST_DATA`);
+    my $mkspecPath = $hostDataPath . "/mkspecs/default/qmake.conf";
+    if (! -e $mkspecPath) {
+        chomp(my $mkspec= `$qmakebin -query QMAKE_XSPEC`);
+        $mkspecPath = $hostDataPath . "/mkspecs/" . $mkspec . "/qmake.conf";
+    }
+    my $compiler = retrieveQMakespecVar($mkspecPath, "QMAKE_CC");
 
     #print "default spec: " . $mkspec . "\n";
     #print "compiler found: " . $compiler . "\n";
@@ -2281,14 +2285,14 @@ sub buildQMakeProjects
 
     my $buildHint = "";
 
-    my $pathToQmakeCache = File::Spec->catfile($dir, ".qmake.cache");
-    if (-e $pathToQmakeCache && open(QMAKECACHE, $pathToQmakeCache)) {
-        while (<QMAKECACHE>) {
+    my $pathToBuiltRevisions = File::Spec->catfile($dir, ".builtRevisions.cache");
+    if (-e $pathToBuiltRevisions && open(BUILTREVISIONS, $pathToBuiltRevisions)) {
+        while (<BUILTREVISIONS>) {
             if ($_ =~ m/^SVN_REVISION\s=\s(\d+)$/) {
                 $previousSvnRevision = $1;
             }
         }
-        close(QMAKECACHE);
+        close(BUILTREVISIONS);
     }
 
     my $result = 0;
@@ -2356,9 +2360,9 @@ sub buildQMakeProjects
 
     if ($result eq 0) {
         # Now that the build completed successfully we can save the SVN revision
-        open(QMAKECACHE, ">>$pathToQmakeCache");
-        print QMAKECACHE "SVN_REVISION = $svnRevision\n";
-        close(QMAKECACHE);
+        open(BUILTREVISIONS, ">>$pathToBuiltRevisions");
+        print BUILTREVISIONS "SVN_REVISION = $svnRevision\n";
+        close(BUILTREVISIONS);
     } elsif (!$command =~ /incremental/ && exitStatus($result)) {
         my $exitCode = exitStatus($result);
         my $failMessage = <<EOF;

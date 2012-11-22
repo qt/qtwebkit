@@ -35,6 +35,7 @@
 #include "EventNames.h"
 #include "EventTarget.h"
 #include "IDBTransactionCallbacks.h"
+#include "ScriptWrappable.h"
 #include <wtf/HashSet.h>
 #include <wtf/RefCounted.h>
 
@@ -47,7 +48,7 @@ class IDBOpenDBRequest;
 class IDBTransactionBackendInterface;
 struct IDBObjectStoreMetadata;
 
-class IDBTransaction : public IDBTransactionCallbacks, public EventTarget, public ActiveDOMObject {
+class IDBTransaction : public ScriptWrappable, public IDBTransactionCallbacks, public EventTarget, public ActiveDOMObject {
 public:
     enum Mode {
         READ_ONLY = 0,
@@ -69,7 +70,7 @@ public:
     static const AtomicString& modeToString(Mode, ExceptionCode&);
 
     IDBTransactionBackendInterface* backend() const;
-    bool isActive() const { return m_active; }
+    bool isActive() const { return m_state == Active; }
     bool isFinished() const { return m_state == Finished; }
     bool isReadOnly() const { return m_mode == READ_ONLY; }
     bool isVersionChange() const { return m_mode == VERSION_CHANGE; }
@@ -136,8 +137,8 @@ private:
     virtual EventTargetData* ensureEventTargetData();
 
     enum State {
-        Unused, // No requests have been made.
-        Used, // At least one request has been made.
+        Inactive, // Created or started, but not in an event callback
+        Active, // Created or started, in creation scope or an event callback
         Finishing, // In the process of aborting or completing.
         Finished, // No more events will fire and no new requests may be filed.
     };
@@ -147,7 +148,6 @@ private:
     const Vector<String> m_objectStoreNames;
     IDBOpenDBRequest* m_openDBRequest;
     const Mode m_mode;
-    bool m_active;
     State m_state;
     bool m_hasPendingActivity;
     bool m_contextStopped;

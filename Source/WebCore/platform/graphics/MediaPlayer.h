@@ -59,8 +59,10 @@ namespace WebCore {
 class AudioSourceProvider;
 class Document;
 class GStreamerGWorld;
+class InbandTextTrackPrivate;
 class MediaPlayerPrivateInterface;
 class MediaSource;
+class TextTrackClient;
 
 // Structure that will hold every native
 // types supported by the current media player.
@@ -93,6 +95,7 @@ struct PlatformMedia {
 
 extern const PlatformMedia NoPlatformMedia;
 
+class CachedResourceLoader;
 class ContentType;
 class FrameView;
 class GraphicsContext;
@@ -206,6 +209,7 @@ public:
     virtual bool mediaPlayerIsLooping() const { return false; }
     virtual HostWindow* mediaPlayerHostWindow() { return 0; }
     virtual IntRect mediaPlayerWindowClipRect() { return IntRect(); }
+    virtual CachedResourceLoader* mediaPlayerCachedResourceLoader() { return 0; }
 };
 
 class MediaPlayerSupportsTypeClient {
@@ -422,6 +426,13 @@ public:
     String userAgent() const;
 
     String engineDescription() const;
+
+    CachedResourceLoader* cachedResourceLoader();
+
+#if ENABLE(VIDEO_TRACK)
+    void getTextTracks(Vector<RefPtr<InbandTextTrackPrivate> >&);
+    void setTextTrackClient(TextTrackClient*);
+#endif
 
 private:
     MediaPlayer(MediaPlayerClient*);

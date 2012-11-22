@@ -82,7 +82,7 @@ enum JavaScriptDataType { JSUndefined = 0, JSNull, JSBoolean, JSNumber, JSString
 
 enum ActivationStateType { ActivationActive, ActivationInactive, ActivationStandby };
 
-enum TargetDetectionStrategy {PointBased, RectBased};
+enum TargetDetectionStrategy {PointBased, RectBased, FocusBased};
 
 class BLACKBERRY_EXPORT WebPage : public Platform::GuardedPointerBase {
 public:
@@ -135,7 +135,6 @@ public:
     bool isVisible() const;
 
     void setScreenOrientation(int);
-    void setHasPendingSurfaceSizeChange();
     void applyPendingOrientationIfNeeded();
 
     Platform::ViewportAccessor* webkitThreadViewportAccessor() const;
@@ -155,7 +154,9 @@ public:
 
     // For conversion to mouse events.
     void touchEventCancel();
-    bool touchPointAsMouseEvent(const Platform::TouchPoint&, bool useFatFingers = true);
+    void touchPointAsMouseEvent(const Platform::TouchPoint&);
+
+    void playSoundIfAnchorIsTarget() const;
 
     // Returns true if the key stroke was handled by WebKit.
     bool keyEvent(const Platform::KeyboardEvent&);

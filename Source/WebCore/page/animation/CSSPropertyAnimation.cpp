@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2007, 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2012 Adobe Systems Incorporated. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,6 +36,7 @@
 #include "CSSImageValue.h"
 #include "CSSPrimitiveValue.h"
 #include "CSSPropertyNames.h"
+#include "ClipPathOperation.h"
 #include "FloatConversion.h"
 #include "IdentityTransformOperation.h"
 #include "Matrix3DTransformOperation.h"
@@ -124,6 +126,38 @@ static inline TransformOperations blendFunc(const AnimationBase* anim, const Tra
         return to.blendByMatchingOperations(from, progress);
     return to.blendByUsingMatrixInterpolation(from, progress, anim->renderer()->isBox() ? toRenderBox(anim->renderer())->borderBoxRect().size() : LayoutSize());
 }
+
+static inline PassRefPtr<ClipPathOperation> blendFunc(const AnimationBase*, ClipPathOperation* from, ClipPathOperation* to, double progress)
+{
+    // Other clip-path operations than BasicShapes can not be animated.
+    if (from->getOperationType() != ClipPathOperation::SHAPE || to->getOperationType() != ClipPathOperation::SHAPE)
+        return to;
+
+    const BasicShape* fromShape = static_cast<ShapeClipPathOperation*>(from)->basicShape();
+    const BasicShape* toShape = static_cast<ShapeClipPathOperation*>(to)->basicShape();
+
+    if (!fromShape->canBlend(toShape))
+        return to;
+
+    return ShapeClipPathOperation::create(toShape->blend(fromShape, progress));
+}
+
+#if ENABLE(CSS_EXCLUSIONS)
+static inline PassRefPtr<ExclusionShapeValue> blendFunc(const AnimationBase*, ExclusionShapeValue* from, ExclusionShapeValue* to, double progress)
+{
+    // FIXME Bug 102723: Shape-inside should be able to animate a value of 'outside-shape' when shape-outside is set to a BasicShape
+    if (from->type() != ExclusionShapeValue::SHAPE || to->type() != ExclusionShapeValue::SHAPE)
+        return to;
+
+    const BasicShape* fromShape = from->shape();
+    const BasicShape* toShape = to->shape();
+
+    if (!fromShape->canBlend(toShape))
+        return to;
+
+    return ExclusionShapeValue::createShapeValue(toShape->blend(fromShape, progress));
+}
+#endif
 
 #if ENABLE(CSS_FILTERS)
 static inline PassRefPtr<FilterOperation> blendFunc(const AnimationBase* anim, FilterOperation* fromOp, FilterOperation* toOp, double progress, bool blendToPassthrough = false)
@@ -367,6 +401,24 @@ protected:
     void (RenderStyle::*m_setter)(PassRefPtr<T>);
 };
 
+
+class PropertyWrapperClipPath : public RefCountedPropertyWrapper<ClipPathOperation> {
+public:
+    PropertyWrapperClipPath(CSSPropertyID prop, ClipPathOperation* (RenderStyle::*getter)() const, void (RenderStyle::*setter)(PassRefPtr<ClipPathOperation>))
+        : RefCountedPropertyWrapper<ClipPathOperation>(prop, getter, setter)
+    {
+    }
+};
+
+#if ENABLE(CSS_EXCLUSIONS)
+class PropertyWrapperExclusionShape : public RefCountedPropertyWrapper<ExclusionShapeValue> {
+public:
+    PropertyWrapperExclusionShape(CSSPropertyID prop, ExclusionShapeValue* (RenderStyle::*getter)() const, void (RenderStyle::*setter)(PassRefPtr<ExclusionShapeValue>))
+        : RefCountedPropertyWrapper<ExclusionShapeValue>(prop, getter, setter)
+    {
+    }
+};
+#endif
 
 class StyleImagePropertyWrapper : public RefCountedPropertyWrapper<StyleImage> {
 public:
@@ -1112,6 +1164,12 @@ void CSSPropertyAnimation::ensurePropertyMap()
 #if ENABLE(CSS_FILTERS)
     gPropertyWrappers->append(new PropertyWrapper<const FilterOperations&>(CSSPropertyWebkitFilter, &RenderStyle::filter, &RenderStyle::setFilter));
 #endif
+#endif
+
+    gPropertyWrappers->append(new PropertyWrapperClipPath(CSSPropertyWebkitClipPath, &RenderStyle::clipPath, &RenderStyle::setClipPath));
+
+#if ENABLE(CSS_EXCLUSIONS)
+    gPropertyWrappers->append(new PropertyWrapperExclusionShape(CSSPropertyWebkitShapeInside, &RenderStyle::shapeInside, &RenderStyle::setShapeInside));
 #endif
 
     gPropertyWrappers->append(new PropertyWrapperVisitedAffectedColor(CSSPropertyWebkitColumnRuleColor, MaybeInvalidColor, &RenderStyle::columnRuleColor, &RenderStyle::setColumnRuleColor, &RenderStyle::visitedLinkColumnRuleColor, &RenderStyle::setVisitedLinkColumnRuleColor));

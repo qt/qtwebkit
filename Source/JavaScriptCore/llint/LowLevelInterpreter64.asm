@@ -241,17 +241,28 @@ _llint_op_create_arguments:
 
 _llint_op_create_this:
     traceExecution()
-    loadp Callee[cfr], t0
+    loadisFromInstruction(2, t0)
+    loadp [cfr, t0, 8], t0
     loadp JSFunction::m_cachedInheritorID[t0], t2
     btpz t2, .opCreateThisSlow
     allocateBasicJSObject(JSFinalObjectSizeClassIndex, t2, t0, t1, t3, .opCreateThisSlow)
     loadisFromInstruction(1, t1)
     storeq t0, [cfr, t1, 8]
-    dispatch(2)
+    dispatch(3)
 
 .opCreateThisSlow:
     callSlowPath(_llint_slow_path_create_this)
-    dispatch(2)
+    dispatch(3)
+
+
+_llint_op_get_callee:
+    traceExecution()
+    loadisFromInstruction(1, t0)
+    loadpFromInstruction(2, t2)
+    loadp Callee[cfr], t1
+    valueProfile(t1, t2)
+    storep t1, [cfr, t0, 8]
+    dispatch(3)
 
 
 _llint_op_convert_this:
@@ -1025,7 +1036,9 @@ _llint_op_get_by_val:
     sxi2q t1, t1
     loadp JSObject::m_butterfly[t0], t3
     andi IndexingShapeMask, t2
+    bieq t2, Int32Shape, .opGetByValIsContiguous
     bineq t2, ContiguousShape, .opGetByValNotContiguous
+.opGetByValIsContiguous:
 
     biaeq t1, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t3], .opGetByValSlow
     loadisFromInstruction(1, t0)
@@ -1034,6 +1047,16 @@ _llint_op_get_by_val:
     jmp .opGetByValDone
 
 .opGetByValNotContiguous:
+    bineq t2, DoubleShape, .opGetByValNotDouble
+    biaeq t1, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t3], .opGetByValSlow
+    loadis 8[PB, PC, 8], t0
+    loadd [t3, t1, 8], ft0
+    bdnequn ft0, ft0, .opGetByValSlow
+    fd2q ft0, t2
+    subq tagTypeNumber, t2
+    jmp .opGetByValDone
+    
+.opGetByValNotDouble:
     subi ArrayStorageShape, t2
     bia t2, SlowPutArrayStorageShape - ArrayStorageShape, .opGetByValSlow
     biaeq t1, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t3], .opGetByValSlow
@@ -1109,6 +1132,24 @@ _llint_op_get_by_pname:
     dispatch(7)
 
 
+macro contiguousPutByVal(storeCallback)
+    biaeq t3, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t0], .outOfBounds
+.storeResult:
+    loadisFromInstruction(3, t2)
+    storeCallback(t2, t1, [t0, t3, 8])
+    dispatch(5)
+
+.outOfBounds:
+    biaeq t3, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t0], .opPutByValSlow
+    if VALUE_PROFILER
+        loadp 32[PB, PC, 8], t2
+        storeb 1, ArrayProfile::m_mayStoreToHole[t2]
+    end
+    addi 1, t3, t2
+    storei t2, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t0]
+    jmp .storeResult
+end
+
 _llint_op_put_by_val:
     traceExecution()
     loadisFromInstruction(1, t0)
@@ -1121,25 +1162,38 @@ _llint_op_put_by_val:
     sxi2q t3, t3
     loadp JSObject::m_butterfly[t1], t0
     andi IndexingShapeMask, t2
-    bineq t2, ContiguousShape, .opPutByValNotContiguous
-    
-    biaeq t3, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t0], .opPutByValContiguousOutOfBounds
-.opPutByValContiguousStoreResult:
-    loadisFromInstruction(3, t2)
-    loadConstantOrVariable(t2, t1)
-    writeBarrier(t1)
-    storeq t1, [t0, t3, 8]
-    dispatch(5)
+    bineq t2, Int32Shape, .opPutByValNotInt32
+    contiguousPutByVal(
+        macro (operand, scratch, address)
+            loadConstantOrVariable(operand, scratch)
+            bpb scratch, tagTypeNumber, .opPutByValSlow
+            storep scratch, address
+        end)
 
-.opPutByValContiguousOutOfBounds:
-    biaeq t3, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t0], .opPutByValSlow
-    if VALUE_PROFILER
-        loadpFromInstruction(4, t2)
-        storeb 1, ArrayProfile::m_mayStoreToHole[t2]
-    end
-    addi 1, t3, t2
-    storei t2, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t0]
-    jmp .opPutByValContiguousStoreResult
+.opPutByValNotInt32:
+    bineq t2, DoubleShape, .opPutByValNotDouble
+    contiguousPutByVal(
+        macro (operand, scratch, address)
+            loadConstantOrVariable(operand, scratch)
+            bqb scratch, tagTypeNumber, .notInt
+            ci2d scratch, ft0
+            jmp .ready
+        .notInt:
+            addp tagTypeNumber, scratch
+            fq2d scratch, ft0
+            bdnequn ft0, ft0, .opPutByValSlow
+        .ready:
+            stored ft0, address
+        end)
+
+.opPutByValNotDouble:
+    bineq t2, ContiguousShape, .opPutByValNotContiguous
+    contiguousPutByVal(
+        macro (operand, scratch, address)
+            loadConstantOrVariable(operand, scratch)
+            writeBarrier(scratch)
+            storep scratch, address
+        end)
 
 .opPutByValNotContiguous:
     bineq t2, ArrayStorageShape, .opPutByValSlow

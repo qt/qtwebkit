@@ -27,10 +27,6 @@
 #include "config.h"
 
 #include "UnitTestUtils/EWK2UnitTestBase.h"
-#include "UnitTestUtils/EWK2UnitTestEnvironment.h"
-#include <EWebKit2.h>
-#include <Ecore.h>
-#include <gtest/gtest.h>
 
 using namespace EWK2UnitTest;
 
@@ -129,11 +125,9 @@ TEST_F(EWK2UnitTestBase, ewk_context_additional_plugin_path_set)
 {
     Ewk_Context* context = ewk_view_context_get(webView());
 
-    char* path = 0;
-    ASSERT_FALSE(ewk_context_additional_plugin_path_set(context, path));
+    ASSERT_FALSE(ewk_context_additional_plugin_path_set(context, 0));
 
-    path = "/plugins";
-    ASSERT_TRUE(ewk_context_additional_plugin_path_set(context, path));
+    ASSERT_TRUE(ewk_context_additional_plugin_path_set(context, "/plugins"));
 
     /* FIXME: Get additional plugin path and compare with the path. */
 }

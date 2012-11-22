@@ -31,6 +31,7 @@
 #include "config.h"
 #include "DOMWrapperWorld.h"
 
+#include "DOMDataStore.h"
 #include <wtf/MainThread.h>
 #include <wtf/StdLibExtras.h>
 
@@ -48,6 +49,14 @@ PassRefPtr<DOMWrapperWorld> DOMWrapperWorld::createMainWorld()
     return adoptRef(new DOMWrapperWorld(mainWorldId, mainWorldExtensionGroup));
 }
 
+DOMWrapperWorld::DOMWrapperWorld(int worldId, int extensionGroup)
+    : m_worldId(worldId)
+    , m_extensionGroup(extensionGroup)
+{
+    if (isIsolatedWorld())
+        m_domDataStore = adoptPtr(new DOMDataStore(DOMDataStore::IsolatedWorld));
+}
+
 DOMWrapperWorld* mainThreadNormalWorld()
 {
     ASSERT(isMainThread());
@@ -55,12 +64,20 @@ DOMWrapperWorld* mainThreadNormalWorld()
     return cachedNormalWorld.get();
 }
 
-// FIXME: This should probably go to PerIsolateData.
 typedef HashMap<int, DOMWrapperWorld*> WorldMap;
 static WorldMap& isolatedWorldMap()
 {
+    ASSERT(isMainThread());
     DEFINE_STATIC_LOCAL(WorldMap, map, ());
     return map;
+}
+
+void DOMWrapperWorld::getAllWorlds(Vector<RefPtr<DOMWrapperWorld> >& worlds)
+{
+    worlds.append(mainThreadNormalWorld());
+    WorldMap& isolatedWorlds = isolatedWorldMap();
+    for (WorldMap::iterator it = isolatedWorlds.begin(); it != isolatedWorlds.end(); ++it)
+        worlds.append(it->value);
 }
 
 void DOMWrapperWorld::deallocate(DOMWrapperWorld* world)

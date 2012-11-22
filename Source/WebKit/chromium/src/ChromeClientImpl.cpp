@@ -37,7 +37,11 @@
 #if ENABLE(INPUT_TYPE_COLOR)
 #include "ColorChooser.h"
 #include "ColorChooserClient.h"
+#if ENABLE(PAGE_POPUP)
+#include "ColorChooserPopupUIController.h"
+#else
 #include "ColorChooserUIController.h"
+#endif
 #endif
 #include "Console.h"
 #include "Cursor.h"
@@ -46,6 +50,7 @@
 #include "DateTimeChooserImpl.h"
 #include "Document.h"
 #include "DocumentLoader.h"
+#include "ExternalDateTimeChooser.h"
 #include "ExternalPopupMenu.h"
 #include "FileChooser.h"
 #include "FileIconLoader.h"
@@ -292,7 +297,12 @@ static inline void updatePolicyForEvent(const WebInputEvent* inputEvent, WebNavi
     bool alt = mouseEvent->modifiers & WebMouseEvent::AltKey;
     bool meta = mouseEvent->modifiers & WebMouseEvent::MetaKey;
 
-    WebViewImpl::navigationPolicyFromMouseEvent(buttonNumber, ctrl, shift, alt, meta, policy);
+    WebNavigationPolicy userPolicy = *policy;
+    WebViewImpl::navigationPolicyFromMouseEvent(buttonNumber, ctrl, shift, alt, meta, &userPolicy);
+    // User and app agree that we want a new window; let the app override the decorations.
+    if (userPolicy == WebNavigationPolicyNewWindow && *policy == WebNavigationPolicyNewPopup)
+        return;
+    *policy = userPolicy;
 }
 
 WebNavigationPolicy ChromeClientImpl::getNavigationPolicy()
@@ -590,7 +600,7 @@ void ChromeClientImpl::mouseDidMoveOverElement(
             Widget* widget = toRenderWidget(object)->widget();
             if (widget && widget->isPluginContainer()) {
                 WebPluginContainerImpl* plugin = static_cast<WebPluginContainerImpl*>(widget);
-                url = plugin->plugin()->linkAtPosition(result.roundedPoint());
+                url = plugin->plugin()->linkAtPosition(result.roundedPointInInnerNodeFrame());
             }
         }
     }
@@ -615,22 +625,18 @@ void ChromeClientImpl::dispatchViewportPropertiesDidChange(const ViewportArgumen
     if (!m_webView->settings()->viewportEnabled() || !m_webView->isFixedLayoutModeEnabled() || !m_webView->client() || !m_webView->page())
         return;
 
-    FrameView* frameView = m_webView->mainFrameImpl()->frameView();
-    int dpi = screenHorizontalDPI(frameView);
-    ASSERT(dpi > 0);
-
     WebViewClient* client = m_webView->client();
-    WebRect deviceRect = client->windowRect();
+    WebSize deviceSize = m_webView->size();
     // If the window size has not been set yet don't attempt to set the viewport
-    if (!deviceRect.width || !deviceRect.height)
+    if (!deviceSize.width || !deviceSize.height)
         return;
 
     Settings* settings = m_webView->page()->settings();
-    float devicePixelRatio = dpi / ViewportArguments::deprecatedTargetDPI;
+    float devicePixelRatio = client->screenInfo().deviceScaleFactor;
     // Call the common viewport computing logic in ViewportArguments.cpp.
     ViewportAttributes computed = computeViewportAttributes(
-        arguments, settings->layoutFallbackWidth(), deviceRect.width, deviceRect.height,
-        devicePixelRatio, IntSize(deviceRect.width, deviceRect.height));
+        arguments, settings->layoutFallbackWidth(), deviceSize.width, deviceSize.height,
+        devicePixelRatio, IntSize(deviceSize.width, deviceSize.height));
 
     restrictScaleFactorToInitialScaleIfNotUserScalable(computed);
 
@@ -675,7 +681,14 @@ void ChromeClientImpl::reachedApplicationCacheOriginQuota(SecurityOrigin*, int64
 #if ENABLE(INPUT_TYPE_COLOR)
 PassOwnPtr<ColorChooser> ChromeClientImpl::createColorChooser(ColorChooserClient* chooserClient, const Color&)
 {
-    return adoptPtr(new ColorChooserUIController(this, chooserClient));
+    OwnPtr<ColorChooserUIController> controller;
+#if ENABLE(PAGE_POPUP)
+    controller = adoptPtr(new ColorChooserPopupUIController(this, chooserClient));
+#else
+    controller = adoptPtr(new ColorChooserUIController(this, chooserClient));
+#endif
+    controller->openUI();
+    return controller.release();
 }
 PassOwnPtr<WebColorChooser> ChromeClientImpl::createWebColorChooser(WebColorChooserClient* chooserClient, const WebColor& initialColor)
 {
@@ -692,8 +705,7 @@ PassRefPtr<DateTimeChooser> ChromeClientImpl::openDateTimeChooser(DateTimeChoose
 #if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
     return DateTimeChooserImpl::create(this, pickerClient, parameters);
 #else
-    notImplemented();
-    return PassRefPtr<DateTimeChooser>();
+    return ExternalDateTimeChooser::create(this, m_webView->client(), pickerClient, parameters);
 #endif
 }
 #endif

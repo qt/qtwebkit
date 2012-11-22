@@ -37,26 +37,12 @@
     bottom: 0;
 }
 
-.canvas-trace-log {
-    position: absolute;
-    top: 400px;
-    left: 5px;
-    right: 5px;
-    bottom: 10px;
-    font-size: 13px;
-    overflow: auto;
-    white-space: nowrap;
-}
-
-.canvas-trace-log div {
-    padding-bottom: 4px;
-}
-
 #canvas-replay-image-container {
-    height: 400px;
     text-align: center;
-    padding: 5px 5px 16px 5px;
-    background-color: white;
+    background-color: black;
+    overflow: hidden;
+    padding: 5px;
+    color: white;
 }
 
 #canvas-replay-image {
@@ -67,4 +53,13 @@
     max-height: 100%;
     margin: auto;
     display: block;
+}
+
+#canvas-replay-image.wait {
+    content: url(Images/spinnerActiveSelected.gif);
+    zoom: inherit;
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    margin: -16px 0 0 -16px;
 }

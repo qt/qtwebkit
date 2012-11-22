@@ -57,14 +57,20 @@ bool LazyDecodingPixelRef::isClipped() const
 
 void* LazyDecodingPixelRef::onLockPixels(SkColorTable**)
 {
-    ASSERT(isMainThread());
-    return ImageDecodingStore::instanceOnMainThread()->lockPixels(m_frameGenerator, m_scaledSize, m_scaledSubset);
+    m_mutex.lock();
+    ASSERT(m_lockedBitmap.isNull());
+    m_lockedBitmap = m_frameGenerator->decodeAndScale(m_scaledSize, m_scaledSubset);
+    if (m_lockedBitmap.isNull())
+        return 0;
+    m_lockedBitmap.lockPixels();
+    return m_lockedBitmap.getAddr(0, 0);
 }
 
 void LazyDecodingPixelRef::onUnlockPixels()
 {
-    ASSERT(isMainThread());
-    ImageDecodingStore::instanceOnMainThread()->unlockPixels();
+    m_lockedBitmap.unlockPixels();
+    m_lockedBitmap.reset();
+    m_mutex.unlock();
 }
 
 bool LazyDecodingPixelRef::onLockPixelsAreWritable() const

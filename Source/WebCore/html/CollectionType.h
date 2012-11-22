@@ -31,7 +31,6 @@ enum CollectionType {
     DocImages,    // all <img> elements in the document
     DocApplets,   // all <object> and <applet> elements
     DocEmbeds,    // all <embed> elements
-    DocObjects,   // all <object> elements
     DocForms,     // all <form> elements
     DocLinks,     // all <a> _and_ <area> elements with a value for href
     DocAnchors,   // all <a> elements with a value for name
@@ -61,14 +60,24 @@ enum CollectionType {
 #endif
 
     FormControls,
-    NodeListCollectionType
+
+    // Live node lists.
+
+    ChildNodeListType,
+    ClassNodeListType,
+    NameNodeListType,
+    TagNodeListType,
+    RadioNodeListType,
+    LabelsNodeListType,
+    MicroDataItemListType,
+    PropertyNodeListType,
 };
 
 static const CollectionType FirstUnnamedDocumentCachedType = DocImages;
 static const unsigned NumUnnamedDocumentCachedTypes = WindowNamedItems - DocImages;
 
 static const CollectionType FirstNodeCollectionType = NodeChildren;
-static const unsigned NumNodeCollectionTypes = FormControls - NodeChildren + 1;
+static const CollectionType FirstNodeListType = ChildNodeListType;
 
 inline bool isUnnamedDocumentCachedType(CollectionType type)
 {
@@ -78,6 +87,11 @@ inline bool isUnnamedDocumentCachedType(CollectionType type)
 inline bool isNodeCollectionType(CollectionType type)
 {
     return type >= FirstNodeCollectionType;
+}
+
+inline bool isNodeList(CollectionType type)
+{
+    return type >= FirstNodeListType;
 }
 
 } // namespace

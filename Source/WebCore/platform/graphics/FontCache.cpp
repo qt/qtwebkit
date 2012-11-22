@@ -134,8 +134,8 @@ static FontPlatformDataCache* gFontPlatformDataCache = 0;
 static const AtomicString& alternateFamilyName(const AtomicString& familyName)
 {
     // Alias Courier <-> Courier New
-    DEFINE_STATIC_LOCAL(AtomicString, courier, ("Courier"));
-    DEFINE_STATIC_LOCAL(AtomicString, courierNew, ("Courier New"));
+    DEFINE_STATIC_LOCAL(AtomicString, courier, ("Courier", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, courierNew, ("Courier New", AtomicString::ConstructFromLiteral));
     if (equalIgnoringCase(familyName, courier))
         return courierNew;
 #if !OS(WINDOWS)
@@ -147,16 +147,16 @@ static const AtomicString& alternateFamilyName(const AtomicString& familyName)
 #endif
 
     // Alias Times and Times New Roman.
-    DEFINE_STATIC_LOCAL(AtomicString, times, ("Times"));
-    DEFINE_STATIC_LOCAL(AtomicString, timesNewRoman, ("Times New Roman"));
+    DEFINE_STATIC_LOCAL(AtomicString, times, ("Times", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, timesNewRoman, ("Times New Roman", AtomicString::ConstructFromLiteral));
     if (equalIgnoringCase(familyName, times))
         return timesNewRoman;
     if (equalIgnoringCase(familyName, timesNewRoman))
         return times;
     
     // Alias Arial and Helvetica
-    DEFINE_STATIC_LOCAL(AtomicString, arial, ("Arial"));
-    DEFINE_STATIC_LOCAL(AtomicString, helvetica, ("Helvetica"));
+    DEFINE_STATIC_LOCAL(AtomicString, arial, ("Arial", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, helvetica, ("Helvetica", AtomicString::ConstructFromLiteral));
     if (equalIgnoringCase(familyName, arial))
         return helvetica;
     if (equalIgnoringCase(familyName, helvetica))
@@ -165,14 +165,14 @@ static const AtomicString& alternateFamilyName(const AtomicString& familyName)
 #if OS(WINDOWS)
     // On Windows, bitmap fonts are blocked altogether so that we have to 
     // alias MS Sans Serif (bitmap font) -> Microsoft Sans Serif (truetype font)
-    DEFINE_STATIC_LOCAL(AtomicString, msSans, ("MS Sans Serif"));
-    DEFINE_STATIC_LOCAL(AtomicString, microsoftSans, ("Microsoft Sans Serif"));
+    DEFINE_STATIC_LOCAL(AtomicString, msSans, ("MS Sans Serif", AtomicString::ConstructFromLiteral));
+    DEFINE_STATIC_LOCAL(AtomicString, microsoftSans, ("Microsoft Sans Serif", AtomicString::ConstructFromLiteral));
     if (equalIgnoringCase(familyName, msSans))
         return microsoftSans;
 
     // Alias MS Serif (bitmap) -> Times New Roman (truetype font). There's no 
-    // 'Microsoft Sans Serif-equivalent' for Serif. 
-    static AtomicString msSerif("MS Serif");
+    // 'Microsoft Sans Serif-equivalent' for Serif.
+    DEFINE_STATIC_LOCAL(AtomicString, msSerif, ("MS Serif", AtomicString::ConstructFromLiteral));
     if (equalIgnoringCase(familyName, msSerif))
         return timesNewRoman;
 #endif
@@ -228,7 +228,7 @@ FontPlatformData* FontCache::getCachedFontPlatformData(const FontDescription& fo
 }
 
 #if ENABLE(OPENTYPE_VERTICAL)
-typedef HashMap<FontCache::FontFileKey, OwnPtr<OpenTypeVerticalData>, WTF::IntHash<FontCache::FontFileKey>, WTF::UnsignedWithZeroKeyHashTraits<FontCache::FontFileKey> > FontVerticalDataCache;
+typedef HashMap<FontCache::FontFileKey, RefPtr<OpenTypeVerticalData>, WTF::IntHash<FontCache::FontFileKey>, WTF::UnsignedWithZeroKeyHashTraits<FontCache::FontFileKey> > FontVerticalDataCache;
 
 FontVerticalDataCache& fontVerticalDataCacheInstance()
 {
@@ -236,19 +236,17 @@ FontVerticalDataCache& fontVerticalDataCacheInstance()
     return fontVerticalDataCache;
 }
 
-OpenTypeVerticalData* FontCache::getVerticalData(const FontFileKey& key, const FontPlatformData& platformData)
+PassRefPtr<OpenTypeVerticalData> FontCache::getVerticalData(const FontFileKey& key, const FontPlatformData& platformData)
 {
     FontVerticalDataCache& fontVerticalDataCache = fontVerticalDataCacheInstance();
     FontVerticalDataCache::iterator result = fontVerticalDataCache.find(key);
     if (result != fontVerticalDataCache.end())
-        return result.get()->value.get();
+        return result.get()->value;
 
-    OpenTypeVerticalData* verticalData = new OpenTypeVerticalData(platformData);
-    if (!verticalData->isOpenType()) {
-        delete verticalData;
-        verticalData = 0; // Put 0 in cache to mark that this isn't an OpenType font.
-    }
-    fontVerticalDataCache.set(key, adoptPtr(verticalData));
+    RefPtr<OpenTypeVerticalData> verticalData = OpenTypeVerticalData::create(platformData);
+    if (!verticalData->isOpenType())
+        verticalData.clear();
+    fontVerticalDataCache.set(key, verticalData);
     return verticalData;
 }
 #endif

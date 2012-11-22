@@ -37,13 +37,14 @@ namespace WebCore {
 
 #define V8_HIDDEN_PROPERTIES(V) \
     V(attributeListener) \
+    V(callback) \
+    V(detail) \
     V(document) \
     V(domStringMap) \
     V(domTokenList) \
     V(event) \
     V(listener) \
     V(ownerNode) \
-    V(perContextData) \
     V(scriptState) \
     V(sleepFunction) \
     V(state) \

@@ -67,12 +67,6 @@ public:
     // after shutdown.
     virtual void shutdown() { }
 
-    // These may only be called before initialize.
-    virtual void setPerTilePaintingEnabled(bool) { }
-    virtual void setPartialSwapEnabled(bool) { }
-    virtual void setAcceleratedAnimationEnabled(bool) { }
-    virtual void setPageScalePinchZoomEnabled(bool) { }
-
     // May return 0 if initialization fails.
     virtual WebLayerTreeView* createLayerTreeView(WebLayerTreeViewClient*, const WebLayer& root, const WebLayerTreeView::Settings&) { return 0; }
 

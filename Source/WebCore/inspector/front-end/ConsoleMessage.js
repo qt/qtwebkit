@@ -328,8 +328,11 @@ WebInspector.ConsoleMessageImpl.prototype = {
                     span.addStyleClass("console-formatted-preview-node");
                 else if (property.subtype === "regexp")
                     span.addStyleClass("console-formatted-string");
-            }
-            span.textContent = property.value;
+                span.textContent = property.value;
+            } else if (property.type === "function")
+                span.textContent = "function";
+            else
+                span.textContent = property.value;
         }
         if (preview.overflow)
             titleElement.createChild("span").textContent = "\u2026";
@@ -474,14 +477,16 @@ WebInspector.ConsoleMessageImpl.prototype = {
             return Math.floor(obj.value);
         }
 
+        var currentStyle = null;
         function styleFormatter(obj)
         {
+            currentStyle = {};
             var buffer = document.createElement("span");
             buffer.setAttribute("style", obj.description);
             for (var i = 0; i < buffer.style.length; i++) {
                 var property = buffer.style[i];
                 if (isWhitelistedProperty(property))
-                    formattedResult.style[property] = buffer.style[property];
+                    currentStyle[property] = buffer.style[property];
             }
         }
 
@@ -513,8 +518,17 @@ WebInspector.ConsoleMessageImpl.prototype = {
         {
             if (b instanceof Node)
                 a.appendChild(b);
-            else if (b)
-                a.appendChild(WebInspector.linkifyStringAsFragment(b.toString()));
+            else if (b) {
+                var toAppend = WebInspector.linkifyStringAsFragment(b.toString());
+                if (currentStyle) {
+                    var wrapper = document.createElement('span');
+                    for (var key in currentStyle)
+                        wrapper.style[key] = currentStyle[key];
+                    wrapper.appendChild(toAppend);
+                    toAppend = wrapper;
+                }
+                a.appendChild(toAppend);
+            }
             return a;
         }
 

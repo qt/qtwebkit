@@ -457,8 +457,16 @@ BytecodeGenerator::BytecodeGenerator(JSGlobalData& globalData, FunctionBodyNode*
 
     if (isConstructor()) {
         prependComment("'this' because we are a Constructor function");
-        emitOpcode(op_create_this);
-        instructions().append(m_thisRegister.index());
+
+        RefPtr<RegisterID> func = newTemporary(); 
+
+        UnlinkedValueProfile profile = emitProfiledOpcode(op_get_callee);
+        instructions().append(func->index());
+        instructions().append(profile);
+
+        emitOpcode(op_create_this); 
+        instructions().append(m_thisRegister.index()); 
+        instructions().append(func->index()); 
     } else if (!codeBlock->isStrictMode() && (functionBody->usesThis() || codeBlock->usesEval() || m_shouldEmitDebugHooks)) {
         UnlinkedValueProfile profile = emitProfiledOpcode(op_convert_this);
         instructions().append(m_thisRegister.index());
@@ -711,6 +719,15 @@ UnlinkedArrayProfile BytecodeGenerator::newArrayProfile()
 {
 #if ENABLE(VALUE_PROFILER)
     return m_codeBlock->addArrayProfile();
+#else
+    return 0;
+#endif
+}
+
+UnlinkedArrayAllocationProfile BytecodeGenerator::newArrayAllocationProfile()
+{
+#if ENABLE(VALUE_PROFILER)
+    return m_codeBlock->addArrayAllocationProfile();
 #else
     return 0;
 #endif
@@ -1605,6 +1622,7 @@ RegisterID* BytecodeGenerator::emitNewArray(RegisterID* dst, ElementNode* elemen
             instructions().append(dst->index());
             instructions().append(constantBufferIndex);
             instructions().append(length);
+            instructions().append(newArrayAllocationProfile());
             return dst;
         }
     }
@@ -1622,6 +1640,7 @@ RegisterID* BytecodeGenerator::emitNewArray(RegisterID* dst, ElementNode* elemen
     instructions().append(dst->index());
     instructions().append(argv.size() ? argv[0]->index() : 0); // argv
     instructions().append(argv.size()); // argc
+    instructions().append(newArrayAllocationProfile());
     return dst;
 }
 
@@ -1757,12 +1776,14 @@ ExpectedFunction BytecodeGenerator::emitExpectedFunctionSnippet(RegisterID* dst,
                 emitOpcode(op_new_array_with_size);
                 instructions().append(dst->index());
                 instructions().append(callArguments.argumentRegister(0)->index());
+                instructions().append(newArrayAllocationProfile());
             } else {
                 ASSERT(callArguments.argumentCountIncludingThis() == 1);
                 emitOpcode(op_new_array);
                 instructions().append(dst->index());
                 instructions().append(0);
                 instructions().append(0);
+                instructions().append(newArrayAllocationProfile());
             }
         }
         break;

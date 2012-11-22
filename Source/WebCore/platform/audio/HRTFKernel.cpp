@@ -36,6 +36,7 @@
 #include "Biquad.h"
 #include "FFTFrame.h"
 #include "FloatConversion.h"
+#include "PlatformMemoryInstrumentation.h"
 #include <wtf/MathExtras.h>
 
 using namespace std;
@@ -69,7 +70,7 @@ static float extractAverageGroupDelay(AudioChannel* channel, size_t analysisFFTS
     return frameDelay;
 }
 
-HRTFKernel::HRTFKernel(AudioChannel* channel, size_t fftSize, float sampleRate, bool bassBoost)
+HRTFKernel::HRTFKernel(AudioChannel* channel, size_t fftSize, float sampleRate)
     : m_frameDelay(0)
     , m_sampleRate(sampleRate)
 {
@@ -80,15 +81,6 @@ HRTFKernel::HRTFKernel(AudioChannel* channel, size_t fftSize, float sampleRate, 
 
     float* impulseResponse = channel->mutableData();
     size_t responseLength = channel->length();
-
-    if (bassBoost) {
-        // Run through some post-processing to boost the bass a little -- the HRTF's seem to be a little bass-deficient.
-        // FIXME: this post-processing should have already been applied to the HRTF file resources.  Once the files are put into this form,
-        // then this code path can be removed along with the bassBoost parameter.
-        Biquad filter;
-        filter.setLowShelfParams(700.0 / nyquist(), 6.0); // boost 6dB at 700Hz
-        filter.process(impulseResponse, impulseResponse, responseLength);
-    }
 
     // We need to truncate to fit into 1/2 the FFT size (with zero padding) in order to do proper convolution.
     size_t truncatedResponseLength = min(responseLength, fftSize / 2); // truncate if necessary to max impulse response length allowed by FFT
@@ -139,6 +131,12 @@ PassRefPtr<HRTFKernel> HRTFKernel::createInterpolatedKernel(HRTFKernel* kernel1,
     
     OwnPtr<FFTFrame> interpolatedFrame = FFTFrame::createInterpolatedFrame(*kernel1->fftFrame(), *kernel2->fftFrame(), x);
     return HRTFKernel::create(interpolatedFrame.release(), frameDelay, sampleRate1);
+}
+
+void HRTFKernel::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::AudioSharedData);
+    info.addMember(m_fftFrame);
 }
 
 } // namespace WebCore

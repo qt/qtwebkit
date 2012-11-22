@@ -710,7 +710,7 @@ void CachedResource::updateResponseAfterRevalidation(const ResourceResponse& val
 {
     m_responseTimestamp = currentTime();
 
-    DEFINE_STATIC_LOCAL(const AtomicString, contentHeaderPrefix, ("content-"));
+    DEFINE_STATIC_LOCAL(const AtomicString, contentHeaderPrefix, ("content-", AtomicString::ConstructFromLiteral));
     // RFC2616 10.3.5
     // Update cached headers from the 304 response
     const HTTPHeaderMap& newHeaders = validatingResponse.httpHeaderFields();
@@ -801,16 +801,13 @@ bool CachedResource::makePurgeable(bool purgeable)
         // Should not make buffer purgeable if it has refs other than this since we don't want two copies.
         if (!m_data->hasOneRef())
             return false;
-        
-        if (m_data->hasPurgeableBuffer()) {
-            m_purgeableData = m_data->releasePurgeableBuffer();
-        } else {
-            m_purgeableData = PurgeableBuffer::create(m_data->data(), m_data->size());
-            if (!m_purgeableData)
-                return false;
-            m_purgeableData->setPurgePriority(purgePriority());
-        }
-        
+
+        m_data->createPurgeableBuffer();
+        if (!m_data->hasPurgeableBuffer())
+            return false;
+
+        m_purgeableData = m_data->releasePurgeableBuffer();
+        m_purgeableData->setPurgePriority(purgePriority());
         m_purgeableData->makePurgeable(true);
         m_data.clear();
         return true;

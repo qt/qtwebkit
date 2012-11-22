@@ -35,6 +35,8 @@
 - (void)saveToPDF;
 
 - (void)pdfLayerController:(PDFLayerController *)pdfLayerController didChangeActiveAnnotation:(PDFAnnotation *)annotation;
+- (void)pdfLayerController:(PDFLayerController *)pdfLayerController clickedLinkWithURL:(NSURL *)url;
+- (void)pdfLayerController:(PDFLayerController *)pdfLayerController didChangeContentScaleFactor:(CGFloat)scaleFactor;
 
 @end
 
@@ -52,8 +54,11 @@
 - (void)setDisplayMode:(int)mode;
 - (void)setDisplaysPageBreaks:(BOOL)pageBreaks;
 
-- (CGFloat)tileScaleFactor;
-- (void)setTileScaleFactor:(CGFloat)scaleFactor;
+- (CGFloat)contentScaleFactor;
+- (void)setContentScaleFactor:(CGFloat)scaleFactor;
+
+- (CGFloat)deviceScaleFactor;
+- (void)setDeviceScaleFactor:(CGFloat)scaleFactor;
 
 - (CGSize)contentSize;
 - (CGSize)contentSizeRespectingZoom;
@@ -67,11 +72,14 @@
 - (void)scrollWithDelta:(CGSize)delta;
 
 - (void)mouseDown:(NSEvent *)event;
+- (void)rightMouseDown:(NSEvent *)event;
 - (void)mouseMoved:(NSEvent *)event;
 - (void)mouseUp:(NSEvent *)event;
 - (void)mouseDragged:(NSEvent *)event;
 - (void)mouseEntered:(NSEvent *)event;
 - (void)mouseExited:(NSEvent *)event;
+
+- (NSMenu *)menuForEvent:(NSEvent *)event;
 
 - (NSArray *)findString:(NSString *)string caseSensitive:(BOOL)isCaseSensitive highlightMatches:(BOOL)shouldHighlightMatches;
 

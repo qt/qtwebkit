@@ -44,6 +44,7 @@
 #include "Settings.h"
 #include "WebInputEventConversion.h"
 #include "WebPagePopup.h"
+#include "WebSettingsImpl.h"
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
 #include "WebWidgetClient.h"
@@ -242,7 +243,7 @@ void WebPagePopupImpl::layout()
 
 void WebPagePopupImpl::paint(WebCanvas* canvas, const WebRect& rect, PaintOptions)
 {
-    PageWidgetDelegate::paint(m_page.get(), 0, canvas, rect, PageWidgetDelegate::Opaque);
+    PageWidgetDelegate::paint(m_page.get(), 0, canvas, rect, PageWidgetDelegate::Opaque, m_webView->settingsImpl()->applyDeviceScaleFactorInCompositor());
 }
 
 void WebPagePopupImpl::resize(const WebSize& newSize)
@@ -304,6 +305,7 @@ void WebPagePopupImpl::setFocus(bool enable)
 
 void WebPagePopupImpl::close()
 {
+    m_closing = true;
     if (m_page && m_page->mainFrame())
         m_page->mainFrame()->loader()->frameDetached();
     m_page.clear();

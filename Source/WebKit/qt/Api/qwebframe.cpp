@@ -1598,7 +1598,7 @@ QWebHitTestResultPrivate::QWebHitTestResultPrivate(const WebCore::HitTestResult 
 {
     if (!hitTest.innerNode())
         return;
-    pos = hitTest.roundedPoint();
+    pos = hitTest.roundedPointInInnerNodeFrame();
     WebCore::TextDirection dir;
     title = hitTest.title(dir);
     linkText = hitTest.textContent();
@@ -1624,9 +1624,9 @@ QWebHitTestResultPrivate::QWebHitTestResultPrivate(const WebCore::HitTestResult 
     isContentSelected = hitTest.isSelected();
     isScrollBar = hitTest.scrollbar();
 
-    if (innerNonSharedNode && innerNonSharedNode->document()
-        && innerNonSharedNode->document()->frame())
-        frame = QWebFramePrivate::kit(innerNonSharedNode->document()->frame());
+    WebCore::Frame *innerNodeFrame = hitTest.innerNodeFrame();
+    if (innerNodeFrame)
+        frame = QWebFramePrivate::kit(innerNodeFrame);
 
     enclosingBlock = QWebElement(WebCore::enclosingBlock(innerNode.get()));
 }
@@ -1684,7 +1684,9 @@ bool QWebHitTestResult::isNull() const
 }
 
 /*!
-    Returns the position where the hit test occured.
+    Returns the position where the hit test occured in the coordinates of frame containing the element hit.
+
+    \sa frame()
 */
 QPoint QWebHitTestResult::pos() const
 {
@@ -1848,7 +1850,7 @@ QWebElement QWebHitTestResult::element() const
 }
 
 /*!
-    Returns the frame the hit test was executed in.
+    Returns the frame of the element hit.
 */
 QWebFrame *QWebHitTestResult::frame() const
 {

@@ -3,7 +3,7 @@
  *           (C) 1999 Antti Koivisto (koivisto@kde.org)
  *           (C) 2001 Peter Kelly (pmk@post.com)
  *           (C) 2001 Dirk Mueller (mueller@kde.org)
- * Copyright (C) 2003, 2004, 2005, 2006, 2008, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2003, 2004, 2005, 2006, 2008, 2010, 2012 Apple Inc. All rights reserved.
  * Copyright (C) 2012 Nokia Corporation and/or its subsidiary(-ies).
  *
  * This library is free software; you can redistribute it and/or
@@ -54,16 +54,10 @@ public:
     const AtomicString& idForStyleResolution() const { return m_idForStyleResolution; }
     void setIdForStyleResolution(const AtomicString& newId) const { m_idForStyleResolution = newId; }
 
-    const StylePropertySet* inlineStyle() const { return m_inlineStyleDecl.get(); }
-    StylePropertySet* inlineStyle() { return m_inlineStyleDecl.get(); }
-    StylePropertySet* ensureInlineStyle(StyledElement*);
-    StylePropertySet* ensureMutableInlineStyle(StyledElement*);
-    void updateInlineStyleAvoidingMutation(StyledElement*, const String& text) const;
-    void destroyInlineStyle(StyledElement*);
-    void detachCSSOMWrapperIfNeeded(StyledElement*);
+    const StylePropertySet* inlineStyle() const { return m_inlineStyle.get(); }
 
-    const StylePropertySet* attributeStyle() const { return m_attributeStyle.get(); }
-    void setAttributeStyle(PassRefPtr<StylePropertySet> style) const { m_attributeStyle = style; }
+    const StylePropertySet* presentationAttributeStyle() const;
+    void setPresentationAttributeStyle(PassRefPtr<StylePropertySet>) const;
 
     size_t length() const;
     bool isEmpty() const { return !length(); }
@@ -94,34 +88,40 @@ protected:
     ElementAttributeData()
         : m_isMutable(true)
         , m_arraySize(0)
+        , m_presentationAttributeStyleIsDirty(false)
+        , m_styleAttributeIsDirty(false)
     { }
 
     ElementAttributeData(unsigned arraySize)
         : m_isMutable(false)
         , m_arraySize(arraySize)
+        , m_presentationAttributeStyleIsDirty(false)
+        , m_styleAttributeIsDirty(false)
     { }
 
-    unsigned m_isMutable : 1;
-    unsigned m_arraySize : 31;
+    ElementAttributeData(const ElementAttributeData&, bool isMutable);
 
-    mutable RefPtr<StylePropertySet> m_inlineStyleDecl;
-    mutable RefPtr<StylePropertySet> m_attributeStyle;
+    unsigned m_isMutable : 1;
+    unsigned m_arraySize : 29;
+    mutable unsigned m_presentationAttributeStyleIsDirty : 1;
+    mutable unsigned m_styleAttributeIsDirty : 1;
+
+    mutable RefPtr<StylePropertySet> m_inlineStyle;
     mutable SpaceSplitString m_classNames;
     mutable AtomicString m_idForStyleResolution;
 
 private:
     friend class Element;
-    friend class HTMLConstructionSite;
+    friend class StyledElement;
     friend class ImmutableElementAttributeData;
     friend class MutableElementAttributeData;
 
     Attribute* getAttributeItem(const AtomicString& name, bool shouldIgnoreAttributeCase);
     const Attribute* getAttributeItem(const AtomicString& name, bool shouldIgnoreAttributeCase) const;
     size_t getAttributeItemIndexSlowCase(const AtomicString& name, bool shouldIgnoreAttributeCase) const;
-    void cloneDataFrom(const ElementAttributeData& sourceData, const Element& sourceElement, Element& targetElement);
-    void clearAttributes();
 
     PassRefPtr<ElementAttributeData> makeMutableCopy() const;
+    PassRefPtr<ElementAttributeData> makeImmutableCopy() const;
 
     Vector<Attribute, 4>& mutableAttributeVector();
     const Vector<Attribute, 4>& mutableAttributeVector() const;
@@ -130,6 +130,7 @@ private:
 class ImmutableElementAttributeData : public ElementAttributeData {
 public:
     ImmutableElementAttributeData(const Vector<Attribute>&);
+    ImmutableElementAttributeData(const MutableElementAttributeData&);
     ~ImmutableElementAttributeData();
 
     void* m_attributeArray;
@@ -139,7 +140,9 @@ class MutableElementAttributeData : public ElementAttributeData {
 public:
     MutableElementAttributeData() { }
     MutableElementAttributeData(const ImmutableElementAttributeData&);
+    MutableElementAttributeData(const MutableElementAttributeData&);
 
+    mutable RefPtr<StylePropertySet> m_presentationAttributeStyle;
     Vector<Attribute, 4> m_attributeVector;
 };
 
@@ -166,6 +169,19 @@ inline size_t ElementAttributeData::length() const
     if (isMutable())
         return mutableAttributeVector().size();
     return m_arraySize;
+}
+
+inline const StylePropertySet* ElementAttributeData::presentationAttributeStyle() const
+{
+    if (!m_isMutable)
+        return 0;
+    return static_cast<const MutableElementAttributeData*>(this)->m_presentationAttributeStyle.get();
+}
+
+inline void ElementAttributeData::setPresentationAttributeStyle(PassRefPtr<StylePropertySet> style) const
+{
+    ASSERT(m_isMutable);
+    static_cast<const MutableElementAttributeData*>(this)->m_presentationAttributeStyle = style;
 }
 
 inline Attribute* ElementAttributeData::getAttributeItem(const AtomicString& name, bool shouldIgnoreAttributeCase)

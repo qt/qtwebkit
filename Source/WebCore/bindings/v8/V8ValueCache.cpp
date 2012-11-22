@@ -26,14 +26,21 @@
 #include "config.h"
 #include "V8ValueCache.h"
 
-#include "BindingVisitors.h"
 #include "V8Binding.h"
 
 namespace WebCore {
 
 static v8::Local<v8::String> makeExternalString(const String& string)
 {
-    WebCoreStringResource* stringResource = new WebCoreStringResource(string);
+    if (string.is8Bit() && string.containsOnlyASCII()) {
+        WebCoreStringResource8* stringResource = new WebCoreStringResource8(string);
+        v8::Local<v8::String> newString = v8::String::NewExternal(stringResource);
+        if (newString.IsEmpty())
+            delete stringResource;
+        return newString;
+    }
+
+    WebCoreStringResource16* stringResource = new WebCoreStringResource16(string);
     v8::Local<v8::String> newString = v8::String::NewExternal(stringResource);
     if (newString.IsEmpty())
         delete stringResource;
@@ -91,13 +98,6 @@ v8::Local<v8::String> StringCache::v8ExternalStringSlow(StringImpl* stringImpl, 
     m_lastV8String = wrapper;
 
     return newString;
-}
-
-void WebCoreStringResource::visitStrings(ExternalStringVisitor* visitor)
-{
-    visitor->visitJSExternalString(m_plainString.impl());
-    if (m_plainString.impl() != m_atomicString.impl() && !m_atomicString.isNull())
-        visitor->visitJSExternalString(m_atomicString.impl());
 }
 
 void IntegerCache::createSmallIntegers(v8::Isolate* isolate)

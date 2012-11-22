@@ -34,8 +34,6 @@
 
 namespace WebCore {
 
-class ExternalStringVisitor;
-
 class StringCache {
 public:
     StringCache() { }
@@ -69,87 +67,6 @@ private:
 };
 
 const int numberOfCachedSmallIntegers = 64;
-
-// WebCoreStringResource is a helper class for v8ExternalString. It is used
-// to manage the life-cycle of the underlying buffer of the external string.
-class WebCoreStringResource : public v8::String::ExternalStringResource {
-public:
-    explicit WebCoreStringResource(const String& string)
-        : m_plainString(string)
-    {
-#ifndef NDEBUG
-        m_threadId = WTF::currentThread();
-#endif
-        ASSERT(!string.isNull());
-        v8::V8::AdjustAmountOfExternalAllocatedMemory(2 * string.length());
-    }
-
-    explicit WebCoreStringResource(const AtomicString& string)
-        : m_plainString(string.string())
-        , m_atomicString(string)
-    {
-#ifndef NDEBUG
-        m_threadId = WTF::currentThread();
-#endif
-        ASSERT(!string.isNull());
-        v8::V8::AdjustAmountOfExternalAllocatedMemory(2 * string.length());
-    }
-
-    virtual ~WebCoreStringResource()
-    {
-#ifndef NDEBUG
-        ASSERT(m_threadId == WTF::currentThread());
-#endif
-        int reducedExternalMemory = -2 * m_plainString.length();
-        if (m_plainString.impl() != m_atomicString.impl() && !m_atomicString.isNull())
-            reducedExternalMemory *= 2;
-        v8::V8::AdjustAmountOfExternalAllocatedMemory(reducedExternalMemory);
-    }
-
-    virtual const uint16_t* data() const
-    {
-        return reinterpret_cast<const uint16_t*>(m_plainString.impl()->characters());
-    }
-
-    virtual size_t length() const { return m_plainString.impl()->length(); }
-
-    const String& webcoreString() { return m_plainString; }
-
-    const AtomicString& atomicString()
-    {
-#ifndef NDEBUG
-        ASSERT(m_threadId == WTF::currentThread());
-#endif
-        if (m_atomicString.isNull()) {
-            m_atomicString = AtomicString(m_plainString);
-            ASSERT(!m_atomicString.isNull());
-            if (m_plainString.impl() != m_atomicString.impl())
-                v8::V8::AdjustAmountOfExternalAllocatedMemory(2 * m_atomicString.length());
-        }
-        return m_atomicString;
-    }
-
-    void visitStrings(ExternalStringVisitor*);
-
-    static WebCoreStringResource* toStringResource(v8::Handle<v8::String> v8String)
-    {
-        return static_cast<WebCoreStringResource*>(v8String->GetExternalStringResource());
-    }
-
-private:
-    // A shallow copy of the string. Keeps the string buffer alive until the V8 engine garbage collects it.
-    String m_plainString;
-    // If this string is atomic or has been made atomic earlier the
-    // atomic string is held here. In the case where the string starts
-    // off non-atomic and becomes atomic later it is necessary to keep
-    // the original string alive because v8 may keep derived pointers
-    // into that string.
-    AtomicString m_atomicString;
-
-#ifndef NDEBUG
-    WTF::ThreadIdentifier m_threadId;
-#endif
-};
 
 class IntegerCache {
 public:

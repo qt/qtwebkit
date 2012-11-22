@@ -359,24 +359,6 @@ bool WebRuntimeFeatures::isPeerConnectionEnabled()
 #endif
 }
 
-void WebRuntimeFeatures::enableDeprecatedPeerConnection(bool enable)
-{
-#if ENABLE(MEDIA_STREAM)
-    RuntimeEnabledFeatures::setDeprecatedPeerConnectionEnabled(enable);
-#else
-    UNUSED_PARAM(enable);
-#endif
-}
-
-bool WebRuntimeFeatures::isDeprecatedPeerConnectionEnabled()
-{
-#if ENABLE(MEDIA_STREAM)
-    return RuntimeEnabledFeatures::deprecatedPeerConnectionEnabled();
-#else
-    return false;
-#endif
-}
-
 void WebRuntimeFeatures::enableFullScreenAPI(bool enable)
 {
 #if ENABLE(FULLSCREEN_API)
@@ -390,24 +372,6 @@ bool WebRuntimeFeatures::isFullScreenAPIEnabled()
 {
 #if ENABLE(FULLSCREEN_API)
     return RuntimeEnabledFeatures::webkitFullScreenAPIEnabled();
-#else
-    return false;
-#endif
-}
-
-void WebRuntimeFeatures::enablePointerLock(bool enable)
-{
-#if ENABLE(POINTER_LOCK)
-    RuntimeEnabledFeatures::setPointerLockEnabled(enable);
-#else
-    UNUSED_PARAM(enable);
-#endif
-}
-
-bool WebRuntimeFeatures::isPointerLockEnabled()
-{
-#if ENABLE(POINTER_LOCK)
-    return RuntimeEnabledFeatures::pointerLockEnabled();
 #else
     return false;
 #endif

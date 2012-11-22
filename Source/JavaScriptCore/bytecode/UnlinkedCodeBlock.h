@@ -36,6 +36,7 @@
 #include "Nodes.h"
 #include "RegExp.h"
 #include "SpecialPointer.h"
+#include "Weak.h"
 
 #include <wtf/RefCountedArray.h>
 #include <wtf/Vector.h>
@@ -56,6 +57,7 @@ class UnlinkedFunctionCodeBlock;
 
 typedef unsigned UnlinkedValueProfile;
 typedef unsigned UnlinkedArrayProfile;
+typedef unsigned UnlinkedArrayAllocationProfile;
 typedef unsigned UnlinkedLLIntCallLinkInfo;
 
 struct ExecutableInfo {
@@ -107,7 +109,7 @@ public:
 
     FunctionExecutable* link(JSGlobalData&, const SourceCode&, size_t lineOffset, size_t sourceOffset);
 
-    void clearCode()
+    void clearCodeForRecompilation()
     {
         m_symbolTableForCall.clear();
         m_symbolTableForConstruct.clear();
@@ -135,8 +137,8 @@ public:
 
 private:
     UnlinkedFunctionExecutable(JSGlobalData*, Structure*, const SourceCode&, FunctionBodyNode*);
-    WriteBarrier<UnlinkedFunctionCodeBlock> m_codeBlockForCall;
-    WriteBarrier<UnlinkedFunctionCodeBlock> m_codeBlockForConstruct;
+    Weak<UnlinkedFunctionCodeBlock> m_codeBlockForCall;
+    Weak<UnlinkedFunctionCodeBlock> m_codeBlockForConstruct;
 
     unsigned m_numCapturedVariables : 29;
     bool m_forceUsesArguments : 1;
@@ -392,6 +394,8 @@ public:
 
     UnlinkedArrayProfile addArrayProfile() { return m_arrayProfileCount++; }
     unsigned numberOfArrayProfiles() { return m_arrayProfileCount; }
+    UnlinkedArrayAllocationProfile addArrayAllocationProfile() { return m_arrayAllocationProfileCount++; }
+    unsigned numberOfArrayAllocationProfiles() { return m_arrayAllocationProfileCount; }
     UnlinkedValueProfile addValueProfile() { return m_valueProfileCount++; }
     unsigned numberOfValueProfiles() { return m_valueProfileCount; }
 
@@ -518,6 +522,7 @@ private:
     unsigned m_resolveOperationCount;
     unsigned m_putToBaseOperationCount;
     unsigned m_arrayProfileCount;
+    unsigned m_arrayAllocationProfileCount;
     unsigned m_valueProfileCount;
     unsigned m_llintCallLinkInfoCount;
 

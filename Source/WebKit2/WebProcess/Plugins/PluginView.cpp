@@ -68,7 +68,7 @@ using namespace WebCore;
 
 namespace WebKit {
 
-static const double pluginSnapshotTimerDelay = 3;
+static const double pluginSnapshotTimerDelay = 1;
 
 class PluginView::URLRequest : public RefCounted<URLRequest> {
 public:
@@ -782,6 +782,11 @@ bool PluginView::handleEditingCommand(const String& commandName, const String& a
 bool PluginView::isEditingCommandEnabled(const String& commandName)
 {
     return m_plugin->isEditingCommandEnabled(commandName);
+}
+
+bool PluginView::shouldAllowScripting()
+{
+    return m_plugin->shouldAllowScripting();
 }
 
 void PluginView::notifyWidget(WidgetNotification notification)

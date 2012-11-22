@@ -29,13 +29,17 @@
 #include "Logging.h"
 #include "NetworkConnectionToWebProcessMessages.h"
 #include "NetworkProcessConnection.h"
+#include "NetworkResourceLoadParameters.h"
 #include "WebCoreArgumentCoders.h"
 #include "WebProcess.h"
+#include "WebResourceLoader.h"
 #include <WebCore/DocumentLoader.h>
 #include <WebCore/Frame.h>
 #include <WebCore/FrameLoader.h>
 #include <WebCore/NetscapePlugInStreamLoader.h>
+#include <WebCore/ResourceBuffer.h>
 #include <WebCore/ResourceLoader.h>
+#include <WebCore/Settings.h>
 #include <WebCore/SubresourceLoader.h>
 #include <wtf/text/CString.h>
 
@@ -72,7 +76,7 @@ PassRefPtr<NetscapePlugInStreamLoader> WebResourceLoadScheduler::schedulePluginS
 
 void WebResourceLoadScheduler::scheduleLoad(ResourceLoader* resourceLoader, ResourceLoadPriority priority)
 {
-    LOG(Network, "(WebProcess) WebResourceLoadScheduler::scheduleLoad, url '%s' priority %i", resourceLoader->url().string().utf8().data(), priority);
+    LOG(NetworkScheduling, "(WebProcess) WebResourceLoadScheduler::scheduleLoad, url '%s' priority %i", resourceLoader->url().string().utf8().data(), priority);
 
     ASSERT(resourceLoader);
     ASSERT(priority != ResourceLoadPriorityUnresolved);
@@ -93,21 +97,29 @@ void WebResourceLoadScheduler::scheduleLoad(ResourceLoader* resourceLoader, Reso
         DEFINE_STATIC_LOCAL(KURL, dataURL, (KURL(), "data:"));
         request.setURL(dataURL);
     }
-
-    if (!WebProcess::shared().networkConnection()->connection()->sendSync(Messages::NetworkConnectionToWebProcess::ScheduleNetworkRequest(request, priority), Messages::NetworkConnectionToWebProcess::ScheduleNetworkRequest::Reply(identifier), 0)) {
+    
+    // FIXME (NetworkProcess): When the ResourceLoader asks its FrameLoaderClient about using
+    // credential storage it passes along its identifier.
+    // But at this point it doesn't have the correct identifier yet.
+    // In practice clients we know about don't care about the identifier, but this is another reason
+    // we need to make sure ResourceLoaders get correct identifiers right off the bat.
+    StoredCredentials allowStoredCredentials = resourceLoader->shouldUseCredentialStorage() ? AllowStoredCredentials : DoNotAllowStoredCredentials;
+    
+    NetworkResourceLoadParameters loadParameters(request, priority, resourceLoader->shouldSniffContent() ? SniffContent : DoNotSniffContent, allowStoredCredentials);
+    if (!WebProcess::shared().networkConnection()->connection()->sendSync(Messages::NetworkConnectionToWebProcess::ScheduleResourceLoad(loadParameters), Messages::NetworkConnectionToWebProcess::ScheduleResourceLoad::Reply(identifier), 0)) {
         // FIXME (NetworkProcess): What should we do if this fails?
         ASSERT_NOT_REACHED();
     }
     
     resourceLoader->setIdentifier(identifier);
-    m_pendingResourceLoaders.set(identifier, resourceLoader);
+    m_webResourceLoaders.set(identifier, WebResourceLoader::create(resourceLoader));
     
     notifyDidScheduleResourceRequest(resourceLoader);
 }
 
 void WebResourceLoadScheduler::addMainResourceLoad(ResourceLoader* resourceLoader)
 {
-    LOG(Network, "(WebProcess) WebResourceLoadScheduler::addMainResourceLoad, url '%s'", resourceLoader->url().string().utf8().data());
+    LOG(NetworkScheduling, "(WebProcess) WebResourceLoadScheduler::addMainResourceLoad, url '%s'", resourceLoader->url().string().utf8().data());
 
     ResourceLoadIdentifier identifier;
 
@@ -118,13 +130,13 @@ void WebResourceLoadScheduler::addMainResourceLoad(ResourceLoader* resourceLoade
 
     resourceLoader->setIdentifier(identifier);
     
-    m_activeResourceLoaders.set(identifier, resourceLoader);
+    m_coreResourceLoaders.set(identifier, resourceLoader);
 }
 
 void WebResourceLoadScheduler::remove(ResourceLoader* resourceLoader)
 {
     ASSERT(resourceLoader);
-    LOG(Network, "(WebProcess) WebResourceLoadScheduler::remove, url '%s'", resourceLoader->url().string().utf8().data());
+    LOG(NetworkScheduling, "(WebProcess) WebResourceLoadScheduler::remove, url '%s'", resourceLoader->url().string().utf8().data());
 
     // FIXME (NetworkProcess): It's possible for a resourceLoader to be removed before it ever started,
     // meaning before it even has an identifier.
@@ -137,29 +149,24 @@ void WebResourceLoadScheduler::remove(ResourceLoader* resourceLoader)
         return;
     }
     
+    // FIXME (NetworkProcess): We should only tell the NetworkProcess to remove load identifiers for ResourceLoaders that were never started.
+    // If a resource load was actually started within the NetworkProcess then the NetworkProcess handles clearing out the identifier.
     WebProcess::shared().networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::RemoveLoadIdentifier(identifier), 0);
     
-    ASSERT(m_pendingResourceLoaders.contains(identifier) || m_activeResourceLoaders.contains(identifier));
-    m_pendingResourceLoaders.remove(identifier);
-    m_activeResourceLoaders.remove(identifier);
+    ASSERT(m_webResourceLoaders.contains(identifier) || m_coreResourceLoaders.contains(identifier));
+    m_webResourceLoaders.remove(identifier);
+    m_coreResourceLoaders.remove(identifier);
 }
 
-void WebResourceLoadScheduler::crossOriginRedirectReceived(ResourceLoader* resourceLoader, const KURL& redirectURL)
+void WebResourceLoadScheduler::crossOriginRedirectReceived(ResourceLoader*, const KURL&)
 {
-    LOG(Network, "(WebProcess) WebResourceLoadScheduler::crossOriginRedirectReceived. From '%s' to '%s'", resourceLoader->url().string().utf8().data(), redirectURL.string().utf8().data());
-
-    ASSERT(resourceLoader);
-    ASSERT(resourceLoader->identifier());
-
-    if (!WebProcess::shared().networkConnection()->connection()->sendSync(Messages::NetworkConnectionToWebProcess::crossOriginRedirectReceived(resourceLoader->identifier(), redirectURL), Messages::NetworkConnectionToWebProcess::crossOriginRedirectReceived::Reply(), 0)) {
-        // FIXME (NetworkProcess): What should we do if this fails?
-        ASSERT_NOT_REACHED();
-    }
+    // We handle cross origin redirects entirely within the NetworkProcess.
+    // We override this call in the WebProcess to make it a no-op.
 }
 
 void WebResourceLoadScheduler::servePendingRequests(ResourceLoadPriority minimumPriority)
 {
-    LOG(Network, "(WebProcess) WebResourceLoadScheduler::servePendingRequests");
+    LOG(NetworkScheduling, "(WebProcess) WebResourceLoadScheduler::servePendingRequests");
     
     // If this WebProcess has its own request suspension count then we don't even
     // have to bother messaging the NetworkProcess.
@@ -187,25 +194,6 @@ void WebResourceLoadScheduler::resumePendingRequests()
 void WebResourceLoadScheduler::setSerialLoadingEnabled(bool enabled)
 {
     WebProcess::shared().networkConnection()->connection()->sendSync(Messages::NetworkConnectionToWebProcess::SetSerialLoadingEnabled(enabled), Messages::NetworkConnectionToWebProcess::SetSerialLoadingEnabled::Reply(), 0);
-}
-
-void WebResourceLoadScheduler::startResourceLoad(ResourceLoadIdentifier identifier)
-{
-    RefPtr<ResourceLoader> loader = m_pendingResourceLoaders.take(identifier);
-    
-    // <rdar://problem/12596761> and http://webkit.org/b/100792
-    // There is a race condition where the WebProcess might tell the NetworkProcess to remove a resource load identifier
-    // at the very time the NetworkProcess is telling the WebProcess to start that particular load.
-    // We'd like to remove that race condition but it makes sense for release builds to do an early return.
-    ASSERT(loader);
-    if (!loader)
-        return;
-    
-    LOG(Network, "(WebProcess) WebResourceLoadScheduler::startResourceLoad starting load for '%s'", loader->url().string().utf8().data());
-
-    m_activeResourceLoaders.set(identifier, loader);
-
-    startResourceLoader(loader.get());
 }
 
 } // namespace WebKit

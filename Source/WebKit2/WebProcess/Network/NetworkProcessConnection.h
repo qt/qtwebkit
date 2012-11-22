@@ -32,6 +32,16 @@
 
 #if ENABLE(NETWORK_PROCESS)
 
+namespace CoreIPC {
+class DataReference;
+}
+
+namespace WebCore {
+class ResourceError;
+class ResourceRequest;
+class ResourceResponse;
+}
+
 namespace WebKit {
 
 typedef uint64_t ResourceLoadIdentifier;
@@ -51,13 +61,8 @@ private:
 
     // CoreIPC::Connection::Client
     virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
-    virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&);
     virtual void didClose(CoreIPC::Connection*);
     virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference messageReceiverName, CoreIPC::StringReference messageName) OVERRIDE;
-
-    void didReceiveNetworkProcessConnectionMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
-
-    void startResourceLoad(ResourceLoadIdentifier);
 
     // The connection from the web process to the network process.
     RefPtr<CoreIPC::Connection> m_connection;

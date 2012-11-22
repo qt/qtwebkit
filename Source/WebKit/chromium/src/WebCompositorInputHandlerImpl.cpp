@@ -27,12 +27,12 @@
 
 #include "WebCompositorInputHandlerImpl.h"
 
-#include "PlatformGestureCurveFactory.h"
-#include "PlatformGestureCurveTarget.h"
 #include "TraceEvent.h"
 #include "WebCompositorInputHandlerClient.h"
 #include "WebInputEvent.h"
+#include <public/Platform.h>
 #include <public/WebInputHandlerClient.h>
+#include <wtf/PassOwnPtr.h>
 #include <wtf/ThreadingPrimitives.h>
 
 using namespace WebCore;
@@ -119,9 +119,9 @@ WebCompositorInputHandlerImpl::EventDisposition WebCompositorInputHandlerImpl::h
         switch (scrollStatus) {
         case WebInputHandlerClient::ScrollStatusStarted: {
             TRACE_EVENT_INSTANT2("cc", "WebCompositorInputHandlerImpl::handleInput wheel scroll", "deltaX", -wheelEvent.deltaX, "deltaY", -wheelEvent.deltaY);
-            m_inputHandlerClient->scrollBy(WebPoint(wheelEvent.x, wheelEvent.y), IntSize(-wheelEvent.deltaX, -wheelEvent.deltaY));
+            bool didScroll = m_inputHandlerClient->scrollByIfPossible(WebPoint(wheelEvent.x, wheelEvent.y), IntSize(-wheelEvent.deltaX, -wheelEvent.deltaY));
             m_inputHandlerClient->scrollEnd();
-            return DidHandle;
+            return didScroll ? DidHandle : DropEvent;
         }
         case WebInputHandlerClient::ScrollStatusIgnored:
             // FIXME: This should be DropEvent, but in cases where we fail to properly sync scrollability it's safer to send the
@@ -154,9 +154,9 @@ WebCompositorInputHandlerImpl::EventDisposition WebCompositorInputHandlerImpl::h
             return DidNotHandle;
 
         const WebGestureEvent& gestureEvent = *static_cast<const WebGestureEvent*>(&event);
-        m_inputHandlerClient->scrollBy(WebPoint(gestureEvent.x, gestureEvent.y),
+        bool didScroll = m_inputHandlerClient->scrollByIfPossible(WebPoint(gestureEvent.x, gestureEvent.y),
             IntSize(-gestureEvent.data.scrollUpdate.deltaX, -gestureEvent.data.scrollUpdate.deltaY));
-        return DidHandle;
+        return didScroll ? DidHandle : DropEvent;
     } else if (event.type == WebInputEvent::GestureScrollEnd) {
         ASSERT(m_expectScrollUpdateEnd);
 #ifndef NDEBUG
@@ -206,8 +206,8 @@ WebCompositorInputHandlerImpl::EventDisposition WebCompositorInputHandlerImpl::h
     switch (scrollStatus) {
     case WebInputHandlerClient::ScrollStatusStarted: {
         m_inputHandlerClient->scrollEnd();
-        m_wheelFlingCurve = PlatformGestureCurveFactory::get()->createCurve(gestureEvent.data.flingStart.sourceDevice, FloatPoint(gestureEvent.data.flingStart.velocityX, gestureEvent.data.flingStart.velocityY));
-        TRACE_EVENT_ASYNC_BEGIN1("cc", "WebCompositorInputHandlerImpl::handleGestureFling::started", this, "curve", m_wheelFlingCurve->debugName());
+        m_wheelFlingCurve = adoptPtr(Platform::current()->createFlingAnimationCurve(gestureEvent.data.flingStart.sourceDevice, WebFloatPoint(gestureEvent.data.flingStart.velocityX, gestureEvent.data.flingStart.velocityY), WebSize()));
+        TRACE_EVENT_ASYNC_BEGIN0("cc", "WebCompositorInputHandlerImpl::handleGestureFling::started", this);
         m_wheelFlingParameters.delta = WebFloatPoint(gestureEvent.data.flingStart.velocityX, gestureEvent.data.flingStart.velocityY);
         m_wheelFlingParameters.point = WebPoint(gestureEvent.x, gestureEvent.y);
         m_wheelFlingParameters.globalPoint = WebPoint(gestureEvent.globalX, gestureEvent.globalY);
@@ -273,16 +273,16 @@ bool WebCompositorInputHandlerImpl::cancelCurrentFling()
     return hadFlingAnimation;
 }
 
-void WebCompositorInputHandlerImpl::scrollBy(const IntPoint& increment)
+void WebCompositorInputHandlerImpl::scrollBy(const WebPoint& increment)
 {
-    if (increment == IntPoint::zero())
+    if (increment == WebPoint())
         return;
 
-    TRACE_EVENT2("cc", "WebCompositorInputHandlerImpl::scrollBy", "x", increment.x(), "y", increment.y());
+    TRACE_EVENT2("cc", "WebCompositorInputHandlerImpl::scrollBy", "x", increment.x, "y", increment.y);
     WebMouseWheelEvent syntheticWheel;
     syntheticWheel.type = WebInputEvent::MouseWheel;
-    syntheticWheel.deltaX = increment.x();
-    syntheticWheel.deltaY = increment.y();
+    syntheticWheel.deltaX = increment.x;
+    syntheticWheel.deltaY = increment.y;
     syntheticWheel.hasPreciseScrollingDeltas = true;
     syntheticWheel.x = m_wheelFlingParameters.point.x;
     syntheticWheel.y = m_wheelFlingParameters.point.y;
@@ -293,8 +293,8 @@ void WebCompositorInputHandlerImpl::scrollBy(const IntPoint& increment)
     WebCompositorInputHandlerImpl::EventDisposition disposition = handleInputEventInternal(syntheticWheel);
     switch (disposition) {
     case DidHandle:
-        m_wheelFlingParameters.cumulativeScroll.width += increment.x();
-        m_wheelFlingParameters.cumulativeScroll.height += increment.y();
+        m_wheelFlingParameters.cumulativeScroll.width += increment.x;
+        m_wheelFlingParameters.cumulativeScroll.height += increment.y;
     case DropEvent:
         break;
     case DidNotHandle:

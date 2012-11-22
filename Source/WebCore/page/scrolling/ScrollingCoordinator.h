@@ -62,6 +62,14 @@ class ViewportConstraints;
 class ScrollingTree;
 #endif
 
+IntSize scrollOffsetForFixedPosition(const IntRect& visibleContentRect, const IntSize& contentsSize, const IntPoint& scrollPosition,
+    const IntPoint& scrollOrigin, float frameScaleFactor, bool fixedElementsLayoutRelativeToFrame);
+
+enum SetOrSyncScrollingLayerPosition {
+    SetScrollingLayerPosition,
+    SyncScrollingLayerPosition
+};
+
 class ScrollingCoordinator : public ThreadSafeRefCounted<ScrollingCoordinator> {
 public:
     static PassRefPtr<ScrollingCoordinator> create(Page*);
@@ -109,7 +117,6 @@ public:
     virtual void commitTreeStateIfNeeded() { }
     virtual bool requestScrollPositionUpdate(FrameView*, const IntPoint&) { return false; }
     virtual bool handleWheelEvent(FrameView*, const PlatformWheelEvent&) { return true; }
-    virtual void updateMainFrameScrollPositionAndScrollLayerPosition() { }
     virtual ScrollingNodeID attachToStateTree(ScrollingNodeType, ScrollingNodeID newNodeID, ScrollingNodeID /*parentID*/) { return newNodeID; }
     virtual void detachFromStateTree(ScrollingNodeID) { }
     virtual void clearStateTree() { }
@@ -121,7 +128,8 @@ public:
     ScrollingNodeID uniqueScrollLayerID();
 
     // Dispatched by the scrolling tree whenever the main frame scroll position changes.
-    void updateMainFrameScrollPosition(const IntPoint&, bool programmaticScroll);
+    void scheduleUpdateMainFrameScrollPosition(const IntPoint&, bool programmaticScroll, SetOrSyncScrollingLayerPosition);
+    void updateMainFrameScrollPosition(const IntPoint&, bool programmaticScroll, SetOrSyncScrollingLayerPosition);
 
     enum MainThreadScrollingReasonFlags {
         ForcedOnMainThread = 1 << 0,
@@ -157,6 +165,13 @@ private:
 
     virtual bool hasVisibleSlowRepaintFixedObjects(FrameView*) const;
     void updateShouldUpdateScrollLayerPositionOnMainThread();
+    
+    void updateMainFrameScrollPositionTimerFired(Timer<ScrollingCoordinator>*);
+
+    Timer<ScrollingCoordinator> m_updateMainFrameScrollPositionTimer;
+    IntPoint m_scheduledUpdateScrollPosition;
+    bool m_scheduledUpdateIsProgrammaticScroll;
+    SetOrSyncScrollingLayerPosition m_scheduledScrollingLayerPositionAction;
 
     bool m_forceMainThreadScrollLayerPositionUpdates;
 };

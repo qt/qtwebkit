@@ -52,7 +52,6 @@ public:
     virtual ~IDBTransactionBackendImpl();
 
     // IDBTransactionBackendInterface
-    virtual PassRefPtr<IDBObjectStoreBackendInterface> objectStore(const String& name, ExceptionCode&);
     virtual PassRefPtr<IDBObjectStoreBackendInterface> objectStore(int64_t, ExceptionCode&);
     virtual void didCompleteTaskEvents();
     virtual void abort();
@@ -68,15 +67,15 @@ public:
     void addPendingEvents(int);
     void addPreemptiveEvent() { m_pendingPreemptiveEvents++; }
     void didCompletePreemptiveEvent() { m_pendingPreemptiveEvents--; ASSERT(m_pendingPreemptiveEvents >= 0); }
-    IDBBackingStore::Transaction* backingStoreTransaction() { return m_transaction.get(); }
+    IDBBackingStore::Transaction* backingStoreTransaction() { return &m_transaction; }
 
 private:
     IDBTransactionBackendImpl(const Vector<int64_t>& objectStoreIds, unsigned short mode, IDBDatabaseBackendImpl*);
 
     enum State {
         Unused, // Created, but no tasks yet.
-        StartPending, // Enqueued tasks, but SQLite transaction not yet started.
-        Running, // SQLite transaction started but not yet finished.
+        StartPending, // Enqueued tasks, but backing store transaction not yet started.
+        Running, // Backing store transaction started but not yet finished.
         Finished, // Either aborted or committed.
     };
 
@@ -84,6 +83,7 @@ private:
     void commit();
 
     bool isTaskQueueEmpty() const;
+    bool hasPendingTasks() const;
 
     void taskTimerFired(Timer<IDBTransactionBackendImpl>*);
     void taskEventTimerFired(Timer<IDBTransactionBackendImpl>*);
@@ -101,7 +101,7 @@ private:
     TaskQueue m_preemptiveTaskQueue;
     TaskQueue m_abortTaskQueue;
 
-    RefPtr<IDBBackingStore::Transaction> m_transaction;
+    IDBBackingStore::Transaction m_transaction;
 
     // FIXME: delete the timer once we have threads instead.
     Timer<IDBTransactionBackendImpl> m_taskTimer;

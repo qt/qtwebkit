@@ -345,6 +345,22 @@
                 "hidden": true
             },
             {
+                "name": "canShowFPSCounter",
+                "description": "Tells if backend supports a FPS counter display",
+                "returns": [
+                    { "name": "show", "type": "boolean", "description": "True if the FPS count can be shown" }
+                ],
+                "hidden": true
+            },
+            {
+                "name": "setShowFPSCounter",
+                "description": "Requests that backend shows the FPS counter",
+                "parameters": [
+                    { "name": "show", "type": "boolean", "description": "True for showing the FPS counter" }
+                ],
+                "hidden": true
+            },
+            {
                 "name": "getScriptExecutionStatus",
                 "description": "Determines if scripts can be executed in the page.",
                 "returns": [
@@ -808,7 +824,7 @@
                 "type": "object",
                 "description": "HTTP response data.",
                 "properties": [
-                    { "name": "url", "type": "string", "description": "Response URL." },
+                    { "name": "url", "type": "string", "description": "Response URL. This URL can be different from CachedResource.url in case of redirect." },
                     { "name": "status", "type": "number", "description": "HTTP response status code." },
                     { "name": "statusText", "type": "string", "description": "HTTP response status text." },
                     { "name": "headers", "$ref": "Headers", "description": "HTTP response headers." },
@@ -860,7 +876,7 @@
                 "type": "object",
                 "description": "Information about the cached resource.",
                 "properties": [
-                    { "name": "url", "type": "string", "description": "Resource URL." },
+                    { "name": "url", "type": "string", "description": "Resource URL. This is the url of the original network request." },
                     { "name": "type", "$ref": "Page.ResourceType", "description": "Type of this resource." },
                     { "name": "response", "$ref": "Response", "optional": true, "description": "Cached response data." },
                     { "name": "bodySize", "type": "number", "description": "Cached response body size." }

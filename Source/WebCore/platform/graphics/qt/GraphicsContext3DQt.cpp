@@ -68,6 +68,7 @@ public:
     virtual void paintToTextureMapper(TextureMapper*, const FloatRect& target, const TransformationMatrix&, float opacity, BitmapTexture* mask);
 #endif
 #if USE(GRAPHICS_SURFACE)
+    virtual IntSize platformLayerSize() const;
     virtual uint32_t copyToGraphicsSurface();
     virtual GraphicsSurfaceToken graphicsSurfaceToken() const;
 #endif
@@ -277,6 +278,11 @@ void GraphicsContext3DPrivate::paintToTextureMapper(TextureMapper* textureMapper
 #endif // USE(ACCELERATED_COMPOSITING)
 
 #if USE(GRAPHICS_SURFACE)
+IntSize GraphicsContext3DPrivate::platformLayerSize() const
+{
+    return IntSize(m_context->m_currentWidth, m_context->m_currentHeight);
+}
+
 uint32_t GraphicsContext3DPrivate::copyToGraphicsSurface()
 {
     if (!m_graphicsSurface)
@@ -319,12 +325,12 @@ void GraphicsContext3DPrivate::blitMultisampleFramebufferAndRestoreContext() con
 
     const QOpenGLContext* currentContext = QOpenGLContext::currentContext();
     QSurface* currentSurface = 0;
-    if (currentContext != m_platformContext) {
+    if (currentContext && currentContext != m_platformContext) {
         currentSurface = currentContext->surface();
         m_platformContext->makeCurrent(m_surface);
     }
     blitMultisampleFramebuffer();
-    if (currentSurface)
+    if (currentContext)
         const_cast<QOpenGLContext*>(currentContext)->makeCurrent(currentSurface);
 }
 

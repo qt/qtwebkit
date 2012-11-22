@@ -33,9 +33,15 @@
 #include "ArrayProfile.h"
 #include "SpeculatedType.h"
 
-namespace JSC { namespace DFG {
+namespace JSC {
 
+struct CodeOrigin;
+
+namespace DFG {
+
+class Graph;
 struct AbstractValue;
+struct Node;
 
 // Use a namespace + enum instead of enum alone to avoid the namespace collision
 // that would otherwise occur, since we say things like "Int8Array" and "JSArray"
@@ -52,7 +58,10 @@ enum Type {
     ForceExit, // Implies that we have no idea how to execute this operation, so we should just give up.
     Generic,
     String,
-    
+
+    Undecided,
+    Int32,
+    Double,
     Contiguous,
     ArrayStorage,
     SlowPutArrayStorage,
@@ -77,11 +86,11 @@ enum Class {
 };
 
 enum Speculation {
-    InBounds,
-    ToHole,
-    OutOfBounds
+    SaneChain, // In bounds and the array prototype chain is still intact, i.e. loading a hole doesn't require special treatment.
+    InBounds, // In bounds and not loading a hole.
+    ToHole, // Potentially storing to a hole.
+    OutOfBounds // Out-of-bounds access and anything can happen.
 };
-
 enum Conversion {
     AsIs,
     Convert
@@ -159,7 +168,7 @@ public:
             mySpeculation = Array::InBounds;
         
         if (isJSArray()) {
-            if (profile->usesOriginalArrayStructures())
+            if (profile->usesOriginalArrayStructures() && benefitsFromOriginalArray())
                 myArrayClass = Array::OriginalArray;
             else
                 myArrayClass = Array::Array;
@@ -169,15 +178,27 @@ public:
         return ArrayMode(type(), myArrayClass, mySpeculation, conversion());
     }
     
-    ArrayMode refine(SpeculatedType base, SpeculatedType index) const;
+    ArrayMode withType(Array::Type type) const
+    {
+        return ArrayMode(type, arrayClass(), speculation(), conversion());
+    }
     
-    bool alreadyChecked(AbstractValue&) const;
+    ArrayMode withTypeAndConversion(Array::Type type, Array::Conversion conversion) const
+    {
+        return ArrayMode(type, arrayClass(), speculation(), conversion);
+    }
+    
+    ArrayMode refine(SpeculatedType base, SpeculatedType index, SpeculatedType value = SpecNone) const;
+    
+    bool alreadyChecked(Graph&, Node&, AbstractValue&) const;
     
     const char* toString() const;
     
     bool usesButterfly() const
     {
         switch (type()) {
+        case Array::Int32:
+        case Array::Double:
         case Array::Contiguous:
         case Array::ArrayStorage:
         case Array::SlowPutArrayStorage:
@@ -203,9 +224,20 @@ public:
         return arrayClass() == Array::OriginalArray;
     }
     
+    bool isSaneChain() const
+    {
+        return speculation() == Array::SaneChain;
+    }
+    
     bool isInBounds() const
     {
-        return speculation() == Array::InBounds;
+        switch (speculation()) {
+        case Array::SaneChain:
+        case Array::InBounds:
+            return true;
+        default:
+            return false;
+        }
     }
     
     bool mayStoreToHole() const
@@ -263,6 +295,7 @@ public:
         case Array::Unprofiled:
         case Array::ForceExit:
         case Array::Generic:
+        case Array::Undecided:
             return false;
         default:
             return true;
@@ -277,6 +310,8 @@ public:
         case Array::ForceExit:
         case Array::Generic:
             return false;
+        case Array::Int32:
+        case Array::Double:
         case Array::Contiguous:
         case Array::ArrayStorage:
         case Array::SlowPutArrayStorage:
@@ -285,6 +320,23 @@ public:
             return true;
         }
     }
+    
+    bool benefitsFromOriginalArray() const
+    {
+        switch (type()) {
+        case Array::Int32:
+        case Array::Double:
+        case Array::Contiguous:
+        case Array::ArrayStorage:
+            return true;
+        default:
+            return false;
+        }
+    }
+    
+    // Returns 0 if this is not OriginalArray.
+    Structure* originalArrayStructure(Graph&, const CodeOrigin&) const;
+    Structure* originalArrayStructure(Graph&, Node&) const;
     
     bool benefitsFromStructureCheck() const
     {
@@ -309,6 +361,10 @@ public:
         switch (type()) {
         case Array::Generic:
             return ALL_ARRAY_MODES;
+        case Array::Int32:
+            return arrayModesWithIndexingShape(Int32Shape);
+        case Array::Double:
+            return arrayModesWithIndexingShape(DoubleShape);
         case Array::Contiguous:
             return arrayModesWithIndexingShape(ContiguousShape);
         case Array::ArrayStorage:
@@ -353,6 +409,8 @@ private:
             return 0;
         }
     }
+    
+    bool alreadyChecked(Graph&, Node&, AbstractValue&, IndexingType shape) const;
     
     union {
         struct {

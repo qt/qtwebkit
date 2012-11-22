@@ -538,7 +538,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\runtime\ButterflyInlineMethods.h"
+				RelativePath="..\..\runtime\ButterflyInlines.h"
 				>
 			</File>
 			<File
@@ -546,7 +546,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\runtime\IndexingHeaderInlineMethods.h"
+				RelativePath="..\..\runtime\IndexingHeaderInlines.h"
 				>
 			</File>
 			<File
@@ -1010,7 +1010,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\runtime\JSValueInlineMethods.h"
+				RelativePath="..\..\runtime\JSValueInlines.h"
 				>
 			</File>
 			<File
@@ -1582,6 +1582,14 @@
 			Name="bytecode"
 			>
 			<File
+				RelativePath="..\..\bytecode\ArrayAllocationProfile.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\bytecode\ArrayAllocationProfile.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\bytecode\ArrayProfile.cpp"
 				>
 			</File>
@@ -1922,6 +1930,14 @@
 			Name="jit"
 			>
 			<File
+				RelativePath="..\..\jit\ClosureCallStubRoutine.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\jit\ClosureCallStubRoutine.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\jit\ExecutableAllocator.cpp"
 				>
 			</File>
@@ -1970,6 +1986,14 @@
 				>
 			</File>
 			<File
+				RelativePath="..\..\jit\JITDisassembler.cpp"
+				>
+			</File>
+			<File
+				RelativePath="..\..\jit\JITDisassembler.h"
+				>
+			</File>
+			<File
 				RelativePath="..\..\jit\JITExceptions.cpp"
 				>
 			</File>
@@ -1978,7 +2002,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\jit\JITInlineMethods.h"
+				RelativePath="..\..\jit\JITInlines.h"
 				>
 			</File>
 			<File
@@ -2117,6 +2141,10 @@
 		<Filter
 			Name="disassembler"
 			>
+			<File
+				RelativePath="..\..\disassembler\Disassembler.cpp"
+				>
+			</File>
 			<File
 				RelativePath="..\..\disassembler\Disassembler.h"
 				>
@@ -2354,7 +2382,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\heap\CopiedSpaceInlineMethods.h"
+				RelativePath="..\..\heap\CopiedSpaceInlines.h"
 				>
 			</File>
 			<File
@@ -2366,7 +2394,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\heap\CopyVisitorInlineMethods.h"
+				RelativePath="..\..\heap\CopyVisitorInlines.h"
 				>
 			</File>
 			<File
@@ -2554,7 +2582,7 @@
 				>
 			</File>
 			<File
-				RelativePath="..\..\heap\MarkStackInlineMethods.h"
+				RelativePath="..\..\heap\MarkStackInlines.h"
 				>
 			</File>
 			<File

@@ -47,16 +47,8 @@ V8ArrayBufferDeallocationObserver* V8ArrayBufferDeallocationObserver::instance()
 }
 
 
-v8::Handle<v8::Value> V8ArrayBuffer::constructorCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8ArrayBuffer::constructorCallbackCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.ArrayBuffer.Constructor");
-
-    if (!args.IsConstructCall())
-        return throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
-
-    if (ConstructorMode::current() == ConstructorMode::WrapExistingObject)
-        return args.Holder();
-
     // If we return a previously constructed ArrayBuffer,
     // e.g. from the call to ArrayBufferView.buffer, this code is called
     // with a zero-length argument list. The V8DOMWrapper will then
@@ -79,13 +71,12 @@ v8::Handle<v8::Value> V8ArrayBuffer::constructorCallback(const v8::Arguments& ar
     if (length >= 0)
         buffer = ArrayBuffer::create(static_cast<unsigned>(length), 1);
     if (!buffer.get())
-        return throwError(RangeError, "ArrayBuffer size is not a small enough positive integer.", args.GetIsolate());
+        return throwError(v8RangeError, "ArrayBuffer size is not a small enough positive integer.", args.GetIsolate());
     buffer->setDeallocationObserver(V8ArrayBufferDeallocationObserver::instance());
     v8::V8::AdjustAmountOfExternalAllocatedMemory(buffer->byteLength());
     // Transform the holder into a wrapper object for the array.
     v8::Handle<v8::Object> wrapper = args.Holder();
-    V8DOMWrapper::setDOMWrapper(wrapper, &info, buffer.get());
-    V8DOMWrapper::setJSWrapperForDOMObject(buffer.release(), wrapper);
+    V8DOMWrapper::createDOMWrapper(buffer.release(), &info, wrapper);
     return wrapper;
 }
 

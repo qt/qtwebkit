@@ -48,11 +48,11 @@ public:
     static PassRefPtr<ResourceBuffer> create(const char* data, int size) { return adoptRef(new ResourceBuffer(data, size)); }
     static PassRefPtr<ResourceBuffer> adoptSharedBuffer(PassRefPtr<SharedBuffer> shared) { return shared ? adoptRef(new ResourceBuffer(shared)) : 0; }
 
-    ~ResourceBuffer();
+    virtual ~ResourceBuffer();
 
-    const char* data() const;
-    unsigned size() const;
-    bool isEmpty() const;
+    virtual const char* data() const;
+    virtual unsigned size() const;
+    virtual bool isEmpty() const;
 
     void append(const char*, unsigned);
     void clear();
@@ -63,6 +63,7 @@ public:
     PassRefPtr<ResourceBuffer> copy() const;
 
     bool hasPurgeableBuffer() const;
+    void createPurgeableBuffer() const;
     
     // Ensure this buffer has no other clients before calling this.
     PassOwnPtr<PurgeableBuffer> releasePurgeableBuffer();
@@ -79,11 +80,13 @@ public:
 
     void reportMemoryUsage(MemoryObjectInfo*) const;
 
-private:
+protected:
     ResourceBuffer();
+
+private:
     ResourceBuffer(const char*, int);
     ResourceBuffer(PassRefPtr<SharedBuffer>);
-    
+
     RefPtr<SharedBuffer> m_sharedBuffer;
 };
 

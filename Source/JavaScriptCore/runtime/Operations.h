@@ -26,7 +26,7 @@
 #include "Interpreter.h"
 #include "JSProxy.h"
 #include "JSString.h"
-#include "JSValueInlineMethods.h"
+#include "JSValueInlines.h"
 
 namespace JSC {
 
@@ -86,6 +86,7 @@ namespace JSC {
 
             if (ropeBuilder.length() < oldLength) // True for overflow
                 return throwOutOfMemoryError(exec);
+            oldLength = ropeBuilder.length();
         }
 
         return ropeBuilder.release();
@@ -105,6 +106,7 @@ namespace JSC {
 
             if (ropeBuilder.length() < oldLength) // True for overflow
                 return throwOutOfMemoryError(exec);
+            oldLength = ropeBuilder.length();
         }
 
         return ropeBuilder.release();
@@ -353,6 +355,23 @@ namespace JSC {
                 asObject(base)->flattenDictionaryObject(callFrame->globalData());
 
             ++count;
+        }
+    }
+
+    inline bool isPrototypeChainNormalized(JSGlobalObject* globalObject, Structure* structure)
+    {
+        for (;;) {
+            if (structure->typeInfo().type() == ProxyType)
+                return false;
+            
+            JSValue v = structure->prototypeForLookup(globalObject);
+            if (v.isNull())
+                return true;
+            
+            structure = v.asCell()->structure();
+            
+            if (structure->isDictionary())
+                return false;
         }
     }
 

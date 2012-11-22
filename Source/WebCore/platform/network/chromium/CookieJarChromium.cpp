@@ -32,52 +32,94 @@
 #include "CookieJar.h"
 
 #include "Cookie.h"
-#include "Document.h"
-#include "PlatformSupport.h"
+#include "NetworkingContext.h"
+#include <public/Platform.h>
+#include <public/WebCookie.h>
+#include <public/WebCookieJar.h>
+#include <public/WebURL.h>
+#include <public/WebVector.h>
 
 namespace WebCore {
 
-void setCookies(Document* document, const KURL& url, const String& value)
+void setCookiesFromDOM(NetworkingContext* context, const KURL& firstPartyForCookies, const KURL& url, const String& cookieStr)
 {
-    PlatformSupport::setCookies(document, url, value);
+    if (!context)
+        return;
+    WebKit::WebCookieJar* cookieJar = context->cookieJar();
+    if (cookieJar)
+        cookieJar->setCookie(url, firstPartyForCookies, cookieStr);
 }
 
-String cookies(const Document* document, const KURL& url)
+String cookiesForDOM(NetworkingContext* context, const KURL& firstPartyForCookies, const KURL& url)
 {
-    return PlatformSupport::cookies(document, url);
+    if (!context)
+        return String();
+    String result;
+    WebKit::WebCookieJar* cookieJar = context->cookieJar();
+    if (cookieJar)
+        result = cookieJar->cookies(url, firstPartyForCookies);
+    return result;
 }
 
-String cookieRequestHeaderFieldValue(const Document* document, const KURL& url)
+String cookieRequestHeaderFieldValue(NetworkingContext* context, const KURL& firstPartyForCookies, const KURL& url)
 {
-    return PlatformSupport::cookieRequestHeaderFieldValue(document, url);
+    if (!context)
+        return String();
+    String result;
+    WebKit::WebCookieJar* cookieJar = context->cookieJar();
+    if (cookieJar)
+        result = cookieJar->cookieRequestHeaderFieldValue(url, firstPartyForCookies);
+    return result;
 }
 
-bool cookiesEnabled(const Document* document)
+bool cookiesEnabled(NetworkingContext* context, const KURL& cookieURL, const KURL& firstPartyForCookies)
 {
-    return PlatformSupport::cookiesEnabled(document);
+    bool result = false;
+    if (!context)
+        return result;
+    WebKit::WebCookieJar* cookieJar = context->cookieJar();
+    if (cookieJar)
+        result = cookieJar->cookiesEnabled(cookieURL, firstPartyForCookies);
+    return result;
 }
 
-bool getRawCookies(const Document* document, const KURL& url, Vector<Cookie>& rawCookies)
+bool getRawCookies(NetworkingContext* context, const KURL& firstPartyForCookies, const KURL& url, Vector<Cookie>& rawCookies)
 {
-    return PlatformSupport::rawCookies(document, url, rawCookies);
+    rawCookies.clear();
+    if (!context)
+        return false;
+    WebKit::WebVector<WebKit::WebCookie> webCookies;
+    WebKit::WebCookieJar* cookieJar = context->cookieJar();
+    if (cookieJar)
+        cookieJar->rawCookies(url, firstPartyForCookies, webCookies);
+    for (unsigned i = 0; i < webCookies.size(); ++i) {
+        const WebKit::WebCookie& webCookie = webCookies[i];
+        Cookie cookie(webCookie.name, webCookie.value, webCookie.domain, webCookie.path, webCookie.expires, webCookie.httpOnly, webCookie.secure, webCookie.session);
+        rawCookies.append(cookie);
+    }
+    return true;
 }
 
-void deleteCookie(const Document* document, const KURL& url, const String& cookieName)
+void deleteCookie(NetworkingContext* context, const KURL& url, const String& cookieName)
 {
-    return PlatformSupport::deleteCookie(document, url, cookieName);
+    if (!context)
+        return;
+    WebKit::WebCookieJar* cookieJar = context->cookieJar();
+    if (cookieJar)
+        cookieJar->deleteCookie(url, cookieName);
 }
 
-void getHostnamesWithCookies(HashSet<String>& hostnames)
+void getHostnamesWithCookies(NetworkingContext* /*context*/, HashSet<String>& /*hostnames*/)
 {
     // FIXME: Not yet implemented
 }
 
-void deleteCookiesForHostname(const String& hostname)
+void deleteCookiesForHostname(NetworkingContext* /*context*/, const String& /*hostname*/)
 {
     // FIXME: Not yet implemented
 }
 
-void deleteAllCookies()
+void deleteAllCookies(NetworkingContext* /*context*/)
 {
     // FIXME: Not yet implemented
 }

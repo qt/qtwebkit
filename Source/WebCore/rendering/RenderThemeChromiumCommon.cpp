@@ -33,7 +33,6 @@ namespace WebCore {
 
 bool RenderThemeChromiumCommon::supportsDataListUI(const AtomicString& type)
 {
-    // FIXME: We still need to support datetime, date, month, week, time, datetime-local.
     return type == InputTypeNames::text() || type == InputTypeNames::search() || type == InputTypeNames::url()
         || type == InputTypeNames::telephone() || type == InputTypeNames::email() || type == InputTypeNames::number()
 #if ENABLE(INPUT_TYPE_COLOR)
@@ -42,6 +41,10 @@ bool RenderThemeChromiumCommon::supportsDataListUI(const AtomicString& type)
 #if ENABLE(CALENDAR_PICKER)
         || type == InputTypeNames::date()
 #endif
+        || type == InputTypeNames::datetime()
+        || type == InputTypeNames::datetimelocal()
+        || type == InputTypeNames::month()
+        || type == InputTypeNames::week()
         || type == InputTypeNames::time()
         || type == InputTypeNames::range();
 }
@@ -49,8 +52,11 @@ bool RenderThemeChromiumCommon::supportsDataListUI(const AtomicString& type)
 #if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
 bool RenderThemeChromiumCommon::supportsCalendarPicker(const AtomicString& type)
 {
-    // FIXME: We'd like to support datetime, datetime-local, month, and week too.
-    return type == InputTypeNames::date();
+    return type == InputTypeNames::date()
+        || type == InputTypeNames::datetime()
+        || type == InputTypeNames::datetimelocal()
+        || type == InputTypeNames::month()
+        || type == InputTypeNames::week();
 }
 #endif
 

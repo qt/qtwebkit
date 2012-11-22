@@ -121,7 +121,7 @@ defineTest(detectFeatures) {
     }
 
     # Gamepad API Support
-    !contains(QT_CONFIG, no-pkg-config):packagesExist(libudev): WEBKIT_CONFIG += gamepad
+    packagesExist(libudev): WEBKIT_CONFIG += gamepad
 
     # Support for Graphics Surface
     # GraphicsSurface requires GraphicsContext3D and hence use_3d_graphics
@@ -133,6 +133,10 @@ defineTest(detectFeatures) {
 
     # Slider Touch is sensible to use when compiling WebKit2
     enable?(touch_events): WEBKIT_CONFIG += touch_slider
+
+
+    # Minibrowser must be able to query for QtTestSupport
+    build?(qttestsupport): WEBKIT_CONFIG += have_qttestsupport
 
     # ---------------- Sanitize features -------------------
 

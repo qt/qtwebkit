@@ -876,8 +876,8 @@ void ContextMenuController::populate()
                 if (!(frame->page() && frame->page()->inspectorController()->hasInspectorFrontendClient())) {
 #endif
 
-                // In GTK+ unavailable items are not hidden but insensitive
-#if PLATFORM(GTK)
+                // In GTK+ and EFL, unavailable items are not hidden but insensitive.
+#if PLATFORM(GTK) || PLATFORM(EFL)
                 appendItem(BackItem, m_contextMenu.get());
                 appendItem(ForwardItem, m_contextMenu.get());
                 appendItem(StopItem, m_contextMenu.get());
@@ -1099,9 +1099,9 @@ void ContextMenuController::addInspectElementItem()
 
     ContextMenuItem InspectElementItem(ActionType, ContextMenuItemTagInspectElement, contextMenuItemTagInspectElement());
 #if USE(CROSS_PLATFORM_CONTEXT_MENUS)
-    if (!m_contextMenu->items().isEmpty())
+    if (m_contextMenu && !m_contextMenu->items().isEmpty())
 #else
-    if (m_contextMenu->itemCount())
+    if (m_contextMenu && m_contextMenu->itemCount())
 #endif
         appendItem(*separatorItem(), m_contextMenu.get());
     appendItem(InspectElementItem, m_contextMenu.get());

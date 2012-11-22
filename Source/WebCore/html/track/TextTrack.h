@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -83,8 +84,8 @@ public:
     static const AtomicString& hiddenKeyword();
     static const AtomicString& showingKeyword();
 
-    AtomicString mode() const;
-    void setMode(const AtomicString&);
+    virtual AtomicString mode() const;
+    virtual void setMode(const AtomicString&);
 
     bool showingByDefault() const { return m_showingByDefault; }
     void setShowingByDefault(bool showing) { m_showingByDefault = showing; }
@@ -96,7 +97,7 @@ public:
     TextTrackCueList* cues();
     TextTrackCueList* activeCues() const;
 
-    virtual void clearClient() { m_client = 0; }
+    void clearClient() { m_client = 0; }
     TextTrackClient* client() { return m_client; }
 
     void addCue(PassRefPtr<TextTrackCue>, ExceptionCode&);
@@ -114,6 +115,13 @@ public:
     void invalidateTrackIndex();
 
     bool isRendered();
+    int trackIndexRelativeToRenderedTracks();
+
+    bool hasBeenConfigured() const { return m_hasBeenConfigured; }
+    void setHasBeenConfigured(bool flag) { m_hasBeenConfigured = flag; }
+
+    virtual bool isDefault() const { return false; }
+    virtual void setIsDefault(bool) { }
 
 protected:
     TextTrack(ScriptExecutionContext*, TextTrackClient*, const AtomicString& kind, const AtomicString& label, const AtomicString& language, TextTrackType);
@@ -130,8 +138,10 @@ private:
     TextTrackClient* m_client;
     TextTrackType m_trackType;
     ReadinessState m_readinessState;
-    bool m_showingByDefault;
     int m_trackIndex;
+    int m_renderedTrackIndex;
+    bool m_showingByDefault;
+    bool m_hasBeenConfigured;
 };
 
 } // namespace WebCore

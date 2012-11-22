@@ -30,8 +30,6 @@
  *   ewk_auth_request_ref() on the request object to process the authentication asynchronously.
  * - "back,forward,list,changed", void: reports that the view's back / forward list had changed.
  * - "cancel,vibration", void: request to cancel the vibration.
- * - "close,window", void: window is closed.
- * - "create,window", Evas_Object**: a new window is created.
  * - "download,cancelled", Ewk_Download_Job*: reports that a download was effectively cancelled.
  * - "download,failed", Ewk_Download_Job_Error*: reports that a download failed with the given error.
  * - "download,finished", Ewk_Download_Job*: reports that a download completed successfully.
@@ -84,15 +82,18 @@
 #include "ewk_back_forward_list.h"
 #include "ewk_color_picker.h"
 #include "ewk_context.h"
+#include "ewk_context_menu.h"
 #include "ewk_download_job.h"
 #include "ewk_error.h"
 #include "ewk_intent.h"
 #include "ewk_popup_menu.h"
 #include "ewk_resource.h"
+#include "ewk_security_origin.h"
 #include "ewk_settings.h"
 #include "ewk_touch.h"
 #include "ewk_url_request.h"
 #include "ewk_url_response.h"
+#include "ewk_window_features.h"
 #include <Evas.h>
 
 #ifdef __cplusplus
@@ -113,6 +114,9 @@ struct Ewk_View_Smart_Class {
     Evas_Smart_Class sc; /**< all but 'data' is free to be changed. */
     unsigned long version;
 
+    Eina_Bool (*context_menu_show)(Ewk_View_Smart_Data *sd, Evas_Coord x, Evas_Coord y, Ewk_Context_Menu *menu);
+    Eina_Bool (*context_menu_hide)(Ewk_View_Smart_Data *sd);
+
     Eina_Bool (*popup_menu_show)(Ewk_View_Smart_Data *sd, Eina_Rectangle rect, Ewk_Text_Direction text_direction, double page_scale_factor, Ewk_Popup_Menu *menu);
     Eina_Bool (*popup_menu_hide)(Ewk_View_Smart_Data *sd);
 
@@ -121,7 +125,7 @@ struct Ewk_View_Smart_Class {
     //  - if overridden, have to call parent method if desired
     Eina_Bool (*focus_in)(Ewk_View_Smart_Data *sd);
     Eina_Bool (*focus_out)(Ewk_View_Smart_Data *sd);
-    Eina_Bool (*fullscreen_enter)(Ewk_View_Smart_Data *sd);
+    Eina_Bool (*fullscreen_enter)(Ewk_View_Smart_Data *sd, Ewk_Security_Origin *origin);
     Eina_Bool (*fullscreen_exit)(Ewk_View_Smart_Data *sd);
     Eina_Bool (*mouse_wheel)(Ewk_View_Smart_Data *sd, const Evas_Event_Mouse_Wheel *ev);
     Eina_Bool (*mouse_down)(Ewk_View_Smart_Data *sd, const Evas_Event_Mouse_Down *ev);
@@ -146,13 +150,18 @@ struct Ewk_View_Smart_Class {
     // storage:
     //   - Web database.
     unsigned long long (*exceeded_database_quota)(Ewk_View_Smart_Data *sd, const char *databaseName, const char *displayName, unsigned long long currentQuota, unsigned long long currentOriginUsage, unsigned long long currentDatabaseUsage, unsigned long long expectedUsage);
+
+    // window creation and closing:
+    //   - Create a new window with specified features and close window.
+    Evas_Object *(*window_create)(Ewk_View_Smart_Data *sd, const Ewk_Window_Features *window_features);
+    void (*window_close)(Ewk_View_Smart_Data *sd);
 };
 
 /**
  * The version you have to put into the version field
  * in the @a Ewk_View_Smart_Class structure.
  */
-#define EWK_VIEW_SMART_CLASS_VERSION 7UL
+#define EWK_VIEW_SMART_CLASS_VERSION 8UL
 
 /**
  * Initializer for whole Ewk_View_Smart_Class structure.
@@ -164,7 +173,7 @@ struct Ewk_View_Smart_Class {
  * @see EWK_VIEW_SMART_CLASS_INIT_VERSION
  * @see EWK_VIEW_SMART_CLASS_INIT_NAME_VERSION
  */
-#define EWK_VIEW_SMART_CLASS_INIT(smart_class_init) {smart_class_init, EWK_VIEW_SMART_CLASS_VERSION, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
+#define EWK_VIEW_SMART_CLASS_INIT(smart_class_init) {smart_class_init, EWK_VIEW_SMART_CLASS_VERSION, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}
 
 /**
  * Initializer to zero a whole Ewk_View_Smart_Class structure.
@@ -643,7 +652,7 @@ EAPI const char *ewk_view_theme_get(const Evas_Object *o);
  * @return @c eina_strinshare containing the current encoding, or
  *         @c NULL if it's not set
  */
-EAPI const char  *ewk_view_setting_encoding_custom_get(const Evas_Object *o);
+EAPI const char  *ewk_view_custom_encoding_get(const Evas_Object *o);
 
 /**
  * Sets the custom character encoding and reloads the page.
@@ -653,7 +662,7 @@ EAPI const char  *ewk_view_setting_encoding_custom_get(const Evas_Object *o);
  *
  * @return @c EINA_TRUE on success @c EINA_FALSE otherwise
  */
-EAPI Eina_Bool    ewk_view_setting_encoding_custom_set(Evas_Object *o, const char *encoding);
+EAPI Eina_Bool    ewk_view_custom_encoding_set(Evas_Object *o, const char *encoding);
 
 /**
  * Searches and hightlights the given string in the document.
@@ -799,6 +808,31 @@ EAPI Eina_Bool ewk_view_pagination_mode_set(Evas_Object *o, Ewk_Pagination_Mode 
  * @return The pagination mode of the current web page
  */
 EAPI Ewk_Pagination_Mode ewk_view_pagination_mode_get(const Evas_Object *o);
+
+/**
+ * Exit fullscreen mode.
+ *
+ * @param o view object where to exit fullscreen
+ *
+ * @return @c EINA_TRUE if successful, @c EINA_FALSE otherwise
+ */
+EAPI Eina_Bool ewk_view_fullscreen_exit(Evas_Object *o);
+
+/**
+ * Sets whether the ewk_view background matches page background color.
+ *
+ * If enabled sets view background color close to page color on page load.
+ * This helps to reduce flicker on page scrolling and repainting in places
+ * where page content is not ready for painting.
+ * View background color can interfere with semi-transparent pages and is
+ * disabled by default.
+ *
+ * @param o view object to enable/disable background matching
+ * @param enabled a state to set
+ *
+ * @return @c EINA_TRUE on success or @c EINA_FALSE on failure
+ */
+EAPI void ewk_view_draws_page_background_set(Evas_Object *o, Eina_Bool enabled);
 
 #ifdef __cplusplus
 }

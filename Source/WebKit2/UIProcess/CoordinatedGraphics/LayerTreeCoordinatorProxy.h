@@ -57,6 +57,10 @@ public:
 #if ENABLE(CSS_FILTERS)
     void setCompositingLayerFilters(WebLayerID, const WebCore::FilterOperations&);
 #endif
+#if ENABLE(CSS_SHADERS)
+    void createCustomFilterProgram(int id, const WebCore::CustomFilterProgramInfo&);
+    void removeCustomFilterProgram(int id);
+#endif
     void deleteCompositingLayer(WebLayerID);
     void setRootCompositingLayer(WebLayerID);
     void setContentsSize(const WebCore::FloatSize&);
@@ -67,14 +71,18 @@ public:
     void removeTileForLayer(int layerID, int tileID);
     void createUpdateAtlas(int atlasID, const ShareableSurface::Handle&);
     void removeUpdateAtlas(int atlasID);
-    void createDirectlyCompositedImage(int64_t, const WebKit::ShareableBitmap::Handle&);
-    void destroyDirectlyCompositedImage(int64_t);
+    void createImageBacking(CoordinatedImageBackingID);
+    void updateImageBacking(CoordinatedImageBackingID, const ShareableSurface::Handle&);
+    void clearImageBackingContents(CoordinatedImageBackingID);
+    void removeImageBacking(CoordinatedImageBackingID);
     void didReceiveLayerTreeCoordinatorProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
     void updateViewport();
     void renderNextFrame();
     void didChangeScrollPosition(const WebCore::IntPoint& position);
 #if USE(GRAPHICS_SURFACE)
-    void syncCanvas(uint32_t id, const WebCore::IntSize& canvasSize, const WebCore::GraphicsSurfaceToken&, uint32_t frontBuffer);
+    void createCanvas(WebLayerID, const WebCore::IntSize&, const WebCore::GraphicsSurfaceToken&);
+    void syncCanvas(WebLayerID, uint32_t frontBuffer);
+    void destroyCanvas(WebLayerID);
 #endif
     void purgeBackingStores();
     LayerTreeRenderer* layerTreeRenderer() const { return m_renderer.get(); }
@@ -84,6 +92,7 @@ public:
     void requestAnimationFrame();
     void animationFrameReady();
 #endif
+    void setBackgroundColor(const WebCore::Color&);
 
 protected:
     void dispatchUpdate(const Function<void()>&);

@@ -20,13 +20,7 @@
 #include "config.h"
 
 #include "UnitTestUtils/EWK2UnitTestBase.h"
-#include "UnitTestUtils/EWK2UnitTestEnvironment.h"
 #include "UnitTestUtils/EWK2UnitTestServer.h"
-#include <EWebKit2.h>
-#include <Ecore.h>
-#include <Eina.h>
-#include <Evas.h>
-#include <gtest/gtest.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/UnusedParam.h>
@@ -142,12 +136,12 @@ TEST_F(EWK2UnitTestBase, ewk_view_navigation)
 
 TEST_F(EWK2UnitTestBase, ewk_view_setting_encoding_custom)
 {
-    ASSERT_FALSE(ewk_view_setting_encoding_custom_get(webView()));
-    ASSERT_TRUE(ewk_view_setting_encoding_custom_set(webView(), "UTF-8"));
-    ASSERT_STREQ("UTF-8", ewk_view_setting_encoding_custom_get(webView()));
+    ASSERT_FALSE(ewk_view_custom_encoding_get(webView()));
+    ASSERT_TRUE(ewk_view_custom_encoding_set(webView(), "UTF-8"));
+    ASSERT_STREQ("UTF-8", ewk_view_custom_encoding_get(webView()));
     // Set the default charset.
-    ASSERT_TRUE(ewk_view_setting_encoding_custom_set(webView(), 0));
-    ASSERT_FALSE(ewk_view_setting_encoding_custom_get(webView()));
+    ASSERT_TRUE(ewk_view_custom_encoding_set(webView(), 0));
+    ASSERT_FALSE(ewk_view_custom_encoding_get(webView()));
 }
 
 static void onFormAboutToBeSubmitted(void* userData, Evas_Object*, void* eventInfo)
@@ -242,7 +236,13 @@ TEST_F(EWK2UnitTestBase, ewk_view_mouse_events_enabled)
     ASSERT_FALSE(ewk_view_mouse_events_enabled_get(webView()));
 }
 
-static Eina_Bool fullScreenCallback(Ewk_View_Smart_Data* smartData)
+static Eina_Bool fullScreenCallback(Ewk_View_Smart_Data* smartData, Ewk_Security_Origin*)
+{
+    fullScreenCallbackCalled = true;
+    return false;
+}
+
+static Eina_Bool fullScreenExitCallback(Ewk_View_Smart_Data* smartData)
 {
     fullScreenCallbackCalled = true;
     return false;
@@ -278,7 +278,7 @@ TEST_F(EWK2UnitTestBase, ewk_view_full_screen_exit)
         "}</script></head>"
         "<body><div id=\"fullscreen\" style=\"width:100px; height:100px\" onclick=\"makeFullScreenAndExit()\"></div></body>";
 
-    ewkViewClass()->fullscreen_exit = fullScreenCallback;
+    ewkViewClass()->fullscreen_exit = fullScreenExitCallback;
 
     ewk_view_html_string_load(webView(), fullscreenHTML, "file:///", 0);
     ASSERT_TRUE(waitUntilLoadFinished());

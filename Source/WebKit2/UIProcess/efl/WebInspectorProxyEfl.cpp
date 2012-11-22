@@ -90,13 +90,15 @@ WebPageProxy* WebInspectorProxy::platformCreateInspectorPage()
 #if USE(ACCELERATED_COMPOSITING) && defined HAVE_ECORE_X
     const char* engine = "opengl_x11";
     m_inspectorWindow = ecore_evas_new(engine, 0, 0, initialWindowWidth, initialWindowHeight, 0);
-#else
-    m_inspectorWindow = ecore_evas_new(0, 0, 0, initialWindowWidth, initialWindowHeight, 0);
+
+    // Gracefully fall back to software if evas_gl engine is not available.
+    if (!m_inspectorWindow)
 #endif
+        m_inspectorWindow = ecore_evas_new(0, 0, 0, initialWindowWidth, initialWindowHeight, 0);
     if (!m_inspectorWindow)
         return 0;
 
-    m_inspectorView = ewk_view_base_add(ecore_evas_get(m_inspectorWindow), toAPI(page()->process()->context()), toAPI(inspectorPageGroup()));
+    m_inspectorView = ewk_view_base_add(ecore_evas_get(m_inspectorWindow), toAPI(page()->process()->context()), toAPI(inspectorPageGroup()), EwkViewImpl::LegacyBehavior);
     EwkViewImpl* inspectorViewImpl = EwkViewImpl::fromEvasObject(m_inspectorView);
     inspectorViewImpl->setThemePath(TEST_THEME_DIR "/default.edj");
 
@@ -184,6 +186,11 @@ void WebInspectorProxy::platformDetach()
 }
 
 void WebInspectorProxy::platformSetAttachedWindowHeight(unsigned)
+{
+    notImplemented();
+}
+
+void WebInspectorProxy::platformAttachAvailabilityChanged(bool)
 {
     notImplemented();
 }
