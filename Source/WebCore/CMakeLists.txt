@@ -334,6 +334,7 @@ SET(WebCore_IDL_FILES
     css/WebKitCSSMatrix.idl
     css/WebKitCSSRegionRule.idl
     css/WebKitCSSTransformValue.idl
+    css/WebKitCSSViewportRule.idl
 
     dom/Attr.idl
     dom/BeforeLoadEvent.idl
@@ -1146,7 +1147,6 @@ SET(WebCore_SOURCES
     dom/DocumentStyleSheetCollection.cpp
     dom/DocumentType.cpp
     dom/DynamicNodeList.cpp
-    dom/EditingText.cpp
     dom/Element.cpp
     dom/ElementAttributeData.cpp
     dom/ElementRareData.cpp

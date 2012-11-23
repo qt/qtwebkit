@@ -386,7 +386,7 @@ WebInspector.HeapSnapshotView.prototype = {
     _changeFilter: function()
     {
         var profileIndex = this.filterSelectElement.selectedIndex - 1;
-        this.dataGrid._filterSelectIndexChanged(this._profiles(), profileIndex);
+        this.dataGrid.filterSelectIndexChanged(this._profiles(), profileIndex);
 
         if (!this.currentQuery || !this._searchFinishedCallback || !this._searchResults)
             return;
@@ -416,6 +416,9 @@ WebInspector.HeapSnapshotView.prototype = {
         this.dataGrid.changeNameFilter(filter);
     },
 
+    /**
+     * @return {!Array.<!WebInspector.ProfileHeader>}
+     */
     _profiles: function()
     {
         return this.parent.getProfiles(WebInspector.HeapSnapshotProfileType.TypeId);
@@ -803,7 +806,7 @@ WebInspector.HeapSnapshotProfileType.prototype = {
 /**
  * @constructor
  * @extends {WebInspector.ProfileHeader}
- * @param {WebInspector.HeapSnapshotProfileType} type
+ * @param {!WebInspector.HeapSnapshotProfileType} type
  * @param {string} title
  * @param {number=} uid
  * @param {number=} maxJSObjectId
@@ -962,16 +965,18 @@ WebInspector.HeapProfileHeader.prototype = {
     saveToFile: function()
     {
         this._numberOfChunks = 0;
+
+        var fileOutputStream = new WebInspector.FileOutputStream();
         function onOpen()
         {
+            this._receiver = fileOutputStream;
             this._savedChunks = 0;
             this._updateTransferProgress(0, this._totalNumberOfChunks);
             ProfilerAgent.getProfile(this.profileType().id, this.uid);
         }
         this._savingToFile = true;
         this._fileName = this._fileName || "Heap-" + new Date().toISO8601Compact() + ".heapsnapshot";
-        this._receiver = new WebInspector.FileOutputStream();
-        this._receiver.open(this._fileName, onOpen.bind(this));
+        fileOutputStream.open(this._fileName, onOpen.bind(this));
     },
 
     /**

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2012 Digia Plc and/or its subsidiary(-ies).
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -15,31 +15,36 @@
  * along with this library; see the file COPYING.LIB.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301, USA.
+ *
  */
 
 #include "config.h"
-#include "EditingText.h"
+#include "InitWebKitQt.h"
 
-#include "Document.h"
+#include "InitWebCoreQt.h"
 
-// FIXME: Does this really require a class? Perhaps instead any text node
-// inside an editable element could have the "always create a renderer" behavior.
+#include "QStyleFacadeImp.h"
 
-namespace WebCore {
+#include <QApplication>
+#include <QStyle>
 
-inline EditingText::EditingText(Document* document, const String& data)
-    : Text(document, data)
+namespace WebKit {
+
+Q_DECL_EXPORT void initializeWebKitWidgets()
 {
+    static bool initialized = false;
+    if (initialized)
+        return;
+
+    setWebKitWidgetsInitCallback(QStyleFacadeImp::create);
+    initializeWebKitQt();
+
+    // QWebSettings::SearchCancelButtonGraphic
+    setImagePlatformResource("searchCancelButton", QApplication::style()->standardPixmap(QStyle::SP_DialogCloseButton));
+    // QWebSettings::SearchCancelButtonPressedGraphic
+    setImagePlatformResource("searchCancelButtonPressed", QApplication::style()->standardPixmap(QStyle::SP_DialogCloseButton));
+
+    initialized = true;
 }
 
-PassRefPtr<EditingText> EditingText::create(Document* document, const String& data)
-{
-    return adoptRef(new EditingText(document, data));
 }
-
-bool EditingText::rendererIsNeeded(const NodeRenderingContext&)
-{
-    return true;
-}
-
-} // namespace WebCore

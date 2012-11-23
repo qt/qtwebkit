@@ -44,6 +44,7 @@ SET(webkit2_api_harness_SOURCES
 # Release builds before adding it to test_webkit2_api_BINARIES.
 
 SET(test_webkit2_api_BINARIES
+    AboutBlankLoad
     CookieManager
     DOMWindowExtensionNoCache
     DocumentStartUserScriptAlertCrash
@@ -65,7 +66,9 @@ SET(test_webkit2_api_BINARIES
     ParentFrame
     PreventEmptyUserAgent
     PrivateBrowsingPushStateNoHistoryCallback
+    ResponsivenessTimerDoesntFireEarly
     WKConnection
+    WKPreferences
     WKString
     WKStringJSString
     WKURL
@@ -87,12 +90,9 @@ ADD_DEFINITIONS(-DTHEME_DIR="${THEME_BINARY_DIR}")
 
 # Tests disabled because of missing features on the test harness:
 #
-#   AboutBlankLoad
 #   HitTestResultNodeHandle
 #   MouseMoveAfterCrash
-#   ResponsivenessTimerDoesntFireEarly
 #   SpacebarScrolling
-#   WKPreferences
 #
 # Flaky test, fails on Release but passes on Debug:
 #

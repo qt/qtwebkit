@@ -1,3 +1,320 @@
+2012-11-23  Wojciech Bielawski  <w.bielawski@samsung.com>
+
+        [WK2][WKTR] WebKitTestRunner needs eventSender.contextClick()
+        https://bugs.webkit.org/show_bug.cgi?id=86881
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        InjectedBundle API extended to retrieve contextMenu entries names.
+        WebContextMenu exteded with function to retrieve menu items.
+        This API is required by layout tests.
+        Common code in WebContextMenu.cpp moved to separate method menuItemsWithUserData().
+        Behaviour of dependend methods is unchanged.
+
+        * WebProcess/InjectedBundle/API/c/WKBundlePage.cpp:
+        (WKBundlePageGetContextMenuEntriesNames):
+        * WebProcess/InjectedBundle/API/c/WKBundlePage.h:
+        * WebProcess/WebPage/WebContextMenu.cpp:
+        (WebKit::WebContextMenu::items):
+        (WebKit):
+        * WebProcess/WebPage/WebContextMenu.h:
+        (WebContextMenu):
+
+2012-11-22  Pierre Rossi  <pierre.rossi@gmail.com>
+
+        [Qt] Avoid initializing PlatformStrategies twice.
+
+        Rubber-stamped by Simon Hausmann.
+
+        This fixes another regression introduced in r135515:
+        initializeWebKitQt shouldn't implicitely call initializeWebCoreQt
+        since it can be called from WebKit2 to initialize QStyle for testing.
+        This would then lead to things such as PlatformStrategies being
+        initialized twice.
+
+        * qt/MainQt.cpp: No need to initialize anything if we're not using QStyle.
+        (WebKit):
+        (main):
+
+2012-11-22  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Use custom private macros to define GObjects
+        https://bugs.webkit.org/show_bug.cgi?id=99705
+
+        Reviewed by Martin Robinson.
+
+        Add WEBKIT_DEFINE_TYPE macros, similar and compatible with
+        G_DEFINE_TYPE macros, to define GObject types. These macros also
+        define the init and finalize functions reducing the GObject
+        boilerplate and hiding the placement new syntax that causes some
+        confusion. The patch replaces the use of G_DEFINE_TYPE macros by
+        WEBKIT_DEFINE_TYPE ones and removes the init and finalize
+        implementations, moving custom code when needed to the private
+        struct constructor/destructor or constructed/dispose virtual
+        methods when appropriate.
+
+        * UIProcess/API/gtk/WebKitBackForwardList.cpp:
+        * UIProcess/API/gtk/WebKitBackForwardListItem.cpp:
+        (webkit_back_forward_list_item_class_init):
+        * UIProcess/API/gtk/WebKitContextMenu.cpp:
+        (webkitContextMenuDispose):
+        (webkit_context_menu_class_init):
+        * UIProcess/API/gtk/WebKitContextMenuItem.cpp:
+        (_WebKitContextMenuItemPrivate::~_WebKitContextMenuItemPrivate):
+        (_WebKitContextMenuItemPrivate):
+        (webkit_context_menu_item_class_init):
+        * UIProcess/API/gtk/WebKitCookieManager.cpp:
+        (_WebKitCookieManagerPrivate::~_WebKitCookieManagerPrivate):
+        (_WebKitCookieManagerPrivate):
+        * UIProcess/API/gtk/WebKitDownload.cpp:
+        (webkit_download_class_init):
+        * UIProcess/API/gtk/WebKitFaviconDatabase.cpp:
+        (webkit_favicon_database_class_init):
+        * UIProcess/API/gtk/WebKitFileChooserRequest.cpp:
+        (webkitFileChooserRequestDispose):
+        (webkit_file_chooser_request_class_init):
+        * UIProcess/API/gtk/WebKitFindController.cpp:
+        (webkit_find_controller_class_init):
+        * UIProcess/API/gtk/WebKitFormSubmissionRequest.cpp:
+        (webkitFormSubmissionRequestDispose):
+        (webkit_form_submission_request_class_init):
+        * UIProcess/API/gtk/WebKitGeolocationPermissionRequest.cpp:
+        (webkitGeolocationPermissionRequestDispose):
+        (webkit_geolocation_permission_request_class_init):
+        * UIProcess/API/gtk/WebKitHitTestResult.cpp:
+        (webkit_hit_test_result_class_init):
+        * UIProcess/API/gtk/WebKitNavigationPolicyDecision.cpp:
+        (webkit_navigation_policy_decision_class_init):
+        * UIProcess/API/gtk/WebKitPlugin.cpp:
+        (_WebKitPluginPrivate::~_WebKitPluginPrivate):
+        (_WebKitPluginPrivate):
+        (webkit_plugin_class_init):
+        * UIProcess/API/gtk/WebKitPolicyDecision.cpp:
+        (webkitPolicyDecisionDispose):
+        (webkit_policy_decision_class_init):
+        (webkit_policy_decision_use):
+        (webkit_policy_decision_ignore):
+        (webkit_policy_decision_download):
+        * UIProcess/API/gtk/WebKitPrintOperation.cpp:
+        (_WebKitPrintOperationPrivate::~_WebKitPrintOperationPrivate):
+        (_WebKitPrintOperationPrivate):
+        (webkit_print_operation_class_init):
+        * UIProcess/API/gtk/WebKitPrivate.h:
+        * UIProcess/API/gtk/WebKitResponsePolicyDecision.cpp:
+        (webkit_response_policy_decision_class_init):
+        * UIProcess/API/gtk/WebKitSecurityManager.cpp:
+        (webkit_security_manager_class_init):
+        * UIProcess/API/gtk/WebKitSettings.cpp:
+        (_WebKitSettingsPrivate::_WebKitSettingsPrivate):
+        (_WebKitSettingsPrivate):
+        (webkit_settings_class_init):
+        * UIProcess/API/gtk/WebKitURIRequest.cpp:
+        (webkit_uri_request_class_init):
+        * UIProcess/API/gtk/WebKitURIResponse.cpp:
+        (webkit_uri_response_class_init):
+        * UIProcess/API/gtk/WebKitURISchemeRequest.cpp:
+        (webkit_uri_scheme_request_class_init):
+        * UIProcess/API/gtk/WebKitWebContext.cpp:
+        * UIProcess/API/gtk/WebKitWebInspector.cpp:
+        (_WebKitWebInspectorPrivate::~_WebKitWebInspectorPrivate):
+        (_WebKitWebInspectorPrivate):
+        (webkit_web_inspector_class_init):
+        * UIProcess/API/gtk/WebKitWebResource.cpp:
+        (webkit_web_resource_class_init):
+        * UIProcess/API/gtk/WebKitWebView.cpp:
+        (_WebKitWebViewPrivate::~_WebKitWebViewPrivate):
+        (_WebKitWebViewPrivate):
+        (webkitWebViewConstructed):
+        (webkitWebViewDispose):
+        (webkit_web_view_class_init):
+        * UIProcess/API/gtk/WebKitWebViewBase.cpp:
+        (_WebKitWebViewBasePrivate::_WebKitWebViewBasePrivate):
+        (_WebKitWebViewBasePrivate):
+        (_WebKitWebViewBasePrivate::~_WebKitWebViewBasePrivate):
+        (webkitWebViewBaseDispose):
+        (webkitWebViewBaseConstructed):
+        (webkit_web_view_base_class_init):
+        * UIProcess/API/gtk/WebKitWebViewBaseAccessible.cpp:
+        (webkit_web_view_base_accessible_class_init):
+        * UIProcess/API/gtk/WebKitWindowProperties.cpp:
+        (webkit_window_properties_class_init):
+
+2012-11-22  KwangYong Choi  <ky0.choi@samsung.com>
+
+        [EFL][WK2] Buildfix when ENABLE_NETSCAPE_PLUGIN_API is disabled
+        https://bugs.webkit.org/show_bug.cgi?id=103044
+
+        Reviewed by Kentaro Hara.
+
+        enum ProcessType has PluginProcess only if ENABLE(PLUGIN_PROCESS) is enabled.
+        So, guard PluginProcess with ENABLE(PLUGIN_PROCESS).
+
+        * UIProcess/Launcher/efl/ProcessLauncherEfl.cpp:
+        (WebKit::ProcessLauncher::launchProcess):
+
+2012-09-26  Gustavo Noronha Silva  <gns@gnome.org>
+
+        [GTK] Split SVG from WebCore to work-around make limitation
+        https://bugs.webkit.org/show_bug.cgi?id=97735
+
+        Reviewed by Carlos Garcia Campos.
+
+        Add a new libtool convenience library, libWebCoreSVG.la, to work-around
+        make limitation when linking libWebCore.
+
+        * GNUmakefile.am: link libWebCoreSVG.la into libwebkit2gtk.
+
+2012-11-22  Simon Hausmann  <simon.hausmann@digia.com>, Pierre Rossi <pierre.rossi@digia.com>
+
+        [Qt] Separate QWidget dependant code into separate WebKitWidgets static library
+        https://bugs.webkit.org/show_bug.cgi?id=102800
+
+        Reviewed by Tor Arne Vestbø.
+
+        This patch separates code that needs to use QWidget related APIs in
+        WebKit/qt/WebCoreSupport and Api from code that doesn't. This means for
+        example FrameLoaderClientQt.cpp remains in the WebKit1 static library,
+        while qwebpage.cpp and qwebframe.cpp become part of the WebKitWidgets
+        static library. WebKit1 is compiled without QT += widgets and therefore
+        any widget related dependency has been moved "up" and out of WebKit1 into
+        the WebKitWidgets library.
+
+        Between the code in WebKit.a and WebKitWidgets.a new adapters and
+        interfaces have been introduced, such as QWebPageAdapter and
+        QWebFrameAdapter. QWebPageAdapter, when used from WebKit1, is a way to
+        call out into the API layer, implemented by QWebPage (QWebPagePrivate).
+        The other way around if QWebPage wants to access WebCore or
+        WebCoreSupport related functionality, it will go through
+        QWebPageAdapater (as base class). The separation in the direction up
+        into the API layer is complete with this patch, no code in WebKit1
+        depends on QtWidgets. The separation the other way around, code in the
+        API layer not using any WebCore types, is not complete yet.
+
+        Some classes such as QWebSettings, QWebElement or
+        DumpRenderTreeSupportQt remain in WebKit1. While they are API layer,
+        they do not depend on widget related Qt APIs and they make much more
+        use of WebCore internal APIs and therefore are easier to keep in
+        WebKit1.
+
+        In the future we plan to place a real shared library boundary between
+        WebKit1 and WebKitWidgets, by keeping the WebKit1 static library as
+        part of the QtWebKit shared library and by turning the WebKitWidgets
+        static library into a shared one.
+
+        * qt/MainQt.cpp:
+        (WebKit):
+        (main):
+
+2012-11-22  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        [WK2][EFL] No need to remove surface before replacing
+        https://bugs.webkit.org/show_bug.cgi?id=103055
+
+        Rubberstamped by Simon Hausmann.
+
+        The surface is stored in a OwnPtr which automatically
+        frees the existing surface after replacing it with a new
+        one. For some reason, this also fixes resizing issues on
+        my Nvidia driver.
+
+        * UIProcess/API/efl/EwkViewImpl.cpp:
+        (EwkViewImpl::createGLSurface):
+        * UIProcess/API/efl/EwkViewImpl.h:
+        * UIProcess/API/efl/ewk_view.cpp:
+        (_ewk_view_smart_calculate):
+
+2012-11-22  Christophe Dumez  <christophe.dumez@intel.com>
+
+        WebKitTestRunner needs layoutTestController.setCacheModel
+        https://bugs.webkit.org/show_bug.cgi?id=42684
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Add Bundle C API for WebKitTestRunner to set the
+        cache model.
+
+        * WebProcess/InjectedBundle/API/c/WKBundle.cpp:
+        (WKBundleSetCacheModel):
+        * WebProcess/InjectedBundle/API/c/WKBundlePrivate.h:
+        * WebProcess/InjectedBundle/InjectedBundle.cpp:
+        (WebKit::InjectedBundle::setCacheModel):
+        (WebKit):
+        * WebProcess/InjectedBundle/InjectedBundle.h:
+        (InjectedBundle):
+        * WebProcess/WebProcess.h:
+        (WebProcess):
+
+2012-11-22  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        REGRESSION(r135399): Wrong assertion causing an assertion failure: m_rawAttributes.initialScale > 0
+        https://bugs.webkit.org/show_bug.cgi?id=102971
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        m_rawAttributes.initialScale has to be initialized even if m_minimumScaleToFit hasn't changed
+        it's value.
+
+        * UIProcess/PageViewportController.cpp:
+        (WebKit::PageViewportController::didChangeViewportAttributes):
+
+2012-11-22  Eunmi Lee  <eunmi15.lee@samsung.com>
+
+        [EFL][WK2] Correct the parameters of WebPlatformTouchPoint.
+        https://bugs.webkit.org/show_bug.cgi?id=102865
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Set the screen position as a third parameter and contents position as
+        a fourth parameter of WebPlatformTouchPoint().
+
+        * Shared/efl/WebEventFactory.cpp:
+        (WebKit::WebEventFactory::createWebTouchEvent):
+
+2012-11-22  Huang Dongsung  <luxtella@company100.net>
+
+        Coordinated Graphics: Remove an invisible TiledBackingStore of CoordinatedGraphicsLayer.
+        https://bugs.webkit.org/show_bug.cgi?id=102894
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        CoordinatedGraphicsLayer does not need to have a backing store
+        if (!drawsContent() || !contentsAreVisible() || m_size.isEmpty()).
+
+        * WebProcess/WebPage/CoordinatedGraphics/CoordinatedGraphicsLayer.cpp:
+        (WebCore::CoordinatedGraphicsLayer::updateContentBuffers):
+
+2012-11-22  Huang Dongsung  <luxtella@company100.net>
+
+        Coordinated Graphics: refactor LayerTreeRenderer.
+        https://bugs.webkit.org/show_bug.cgi?id=103004
+
+        Reviewed by Noam Rosenthal.
+
+        This patch changes two subjects.
+        1. Add ASSERT(isMainThread()) in all methods that are called in the main thread.
+        In addition, make dispatchOnMainThread() use callOnMainThread(const Function<void()>&
+        function) instead of its own implementation.
+
+        2. Remove setAccelerationMode() because we don't use m_accelerationMode member
+        except for the setter.
+
+        * UIProcess/API/efl/EwkViewImpl.cpp:
+        (EwkViewImpl::createGLSurface):
+        * UIProcess/CoordinatedGraphics/LayerTreeRenderer.cpp:
+        (WebKit):
+        (WebKit::LayerTreeRenderer::dispatchOnMainThread):
+        (WebKit::LayerTreeRenderer::LayerTreeRenderer):
+        (WebKit::LayerTreeRenderer::animationFrameReady):
+        (WebKit::LayerTreeRenderer::updateViewport):
+        (WebKit::LayerTreeRenderer::renderNextFrame):
+        (WebKit::LayerTreeRenderer::purgeGLResources):
+        (WebKit::LayerTreeRenderer::detach):
+        (WebKit::LayerTreeRenderer::setActive):
+        * UIProcess/CoordinatedGraphics/LayerTreeRenderer.h:
+        (LayerTreeRenderer):
+        * UIProcess/efl/PageClientBase.cpp:
+        (WebKit::PageClientBase::createDrawingAreaProxy):
+
 2012-11-21  Jinwoo Song  <jinwoo7.song@samsung.com>
 
         [EFL][WK2] Use consistent class names in the clients

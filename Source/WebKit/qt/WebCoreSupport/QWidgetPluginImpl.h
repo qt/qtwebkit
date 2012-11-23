@@ -1,7 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Ltd.
- * Copyright (C) 2009-2010 ProFUSION embedded systems
- * Copyright (C) 2009-2010 Samsung Electronics
+ * Copyright (C) 2012 Digia Plc and/or its subsidiary(-ies).
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -17,20 +15,30 @@
  * along with this library; see the file COPYING.LIB.  If not, write to
  * the Free Software Foundation, Inc., 51 Franklin Street, Fifth Floor,
  * Boston, MA 02110-1301, USA.
+ *
  */
+#ifndef QWidgetPluginImpl_h
+#define QWidgetPluginImpl_h
 
-#include "config.h"
-#include "AccessibilityObject.h"
+#include "QtPluginWidgetAdapter.h"
 
-#if HAVE(ACCESSIBILITY)
+QT_BEGIN_NAMESPACE
+class QWidget;
+QT_END_NAMESPACE
 
-namespace WebCore {
+class QWidgetPluginImpl : public QtPluginWidgetAdapter {
+    Q_OBJECT
+public:
+    QWidgetPluginImpl(QWidget *w) : m_widget(w) { }
+    virtual ~QWidgetPluginImpl();
+    virtual void update(const QRect &) OVERRIDE;
+    virtual void setGeometryAndClip(const QRect&, const QRect&, bool isVisible) OVERRIDE;
+    virtual void setVisible(bool) OVERRIDE;
+    virtual void setStyleSheet(const QString&) OVERRIDE;
+    virtual void setWidgetParent(QObject *) OVERRIDE;
+    virtual QObject* handle() const OVERRIDE;
+private:
+    QWidget *m_widget;
+};
 
-bool AccessibilityObject::accessibilityIgnoreAttachment() const
-{
-    return false;
-}
-
-} // namespace WebCore
-
-#endif // HAVE(ACCESSIBILITY)
+#endif // QWidgetPluginImpl_h

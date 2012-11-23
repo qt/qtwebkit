@@ -617,7 +617,6 @@ bool EwkViewImpl::createGLSurface(const IntSize& viewSize)
         if (!m_evasGL) {
             WARN("Failed to create Evas_GL, falling back to software mode.");
             m_isHardwareAccelerated = false;
-            layerTreeRenderer()->setAccelerationMode(TextureMapper::SoftwareMode);
 #if ENABLE(WEBGL)
             m_pageProxy->pageGroup()->preferences()->setWebGLEnabled(false);
 #endif
@@ -643,7 +642,7 @@ bool EwkViewImpl::createGLSurface(const IntSize& viewSize)
         EVAS_GL_MULTISAMPLE_NONE
     };
 
-    ASSERT(!m_evasGLSurface);
+    // Replaces if non-null, and frees existing surface after (OwnPtr).
     m_evasGLSurface = EvasGLSurface::create(evasGL(), &evasGLConfig, viewSize);
     if (!m_evasGLSurface)
         return false;

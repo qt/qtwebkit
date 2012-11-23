@@ -94,18 +94,19 @@ V8DOMWindowShell::V8DOMWindowShell(Frame* frame, PassRefPtr<DOMWrapperWorld> wor
 
 void V8DOMWindowShell::destroyIsolatedShell()
 {
-    disposeContext(true);
+    ASSERT(m_world->isIsolatedWorld());
+
+    if (m_context.isEmpty())
+        return;
+
+    v8::HandleScope handleScope;
+    m_world->makeContextWeak(m_context.get());
+    disposeContext();
+    destroyGlobal();
 }
 
-static void isolatedContextWeakCallback(v8::Persistent<v8::Value> object, void* parameter)
+void V8DOMWindowShell::disposeContext()
 {
-    // Handle will be disposed in delete.
-    delete static_cast<V8DOMWindowShell*>(parameter);
-}
-
-void V8DOMWindowShell::disposeContext(bool weak)
-{
-    ASSERT(!m_context.get().IsWeak());
     m_perContextData.clear();
 
     if (m_context.isEmpty())
@@ -113,22 +114,13 @@ void V8DOMWindowShell::disposeContext(bool weak)
 
     m_frame->loader()->client()->willReleaseScriptContext(m_context.get(), m_world->worldId());
 
-    if (!weak)
-        m_context.clear();
-    else {
-        ASSERT(!m_world->isMainWorld());
-        destroyGlobal();
-        m_frame = 0;
-        m_context.get().MakeWeak(this, isolatedContextWeakCallback);
-    }
+    m_context.clear();
 
     // It's likely that disposing the context has created a lot of
     // garbage. Notify V8 about this so it'll have a chance of cleaning
     // it up when idle.
-    if (m_world->isMainWorld()) {
-        bool isMainFrame = m_frame->page() && (m_frame->page()->mainFrame() == m_frame);
-        V8GCForContextDispose::instance().notifyContextDisposed(isMainFrame);
-    }
+    bool isMainFrame = m_frame->page() && (m_frame->page()->mainFrame() == m_frame);
+    V8GCForContextDispose::instance().notifyContextDisposed(isMainFrame);
 }
 
 void V8DOMWindowShell::destroyGlobal()
@@ -222,6 +214,8 @@ bool V8DOMWindowShell::initializeIfNeeded()
     v8::Local<v8::Context> context = v8::Local<v8::Context>::New(m_context.get());
     v8::Context::Scope contextScope(context);
 
+    m_world->setIsolatedWorldField(m_context.get());
+
     if (m_global.isEmpty()) {
         m_global.set(context->Global());
         if (m_global.isEmpty()) {
@@ -230,13 +224,10 @@ bool V8DOMWindowShell::initializeIfNeeded()
         }
     }
 
-    if (isMainWorld)
-        context->SetAlignedPointerInEmbedderData(v8ContextIsolatedWindowShell, 0);
-    else {
+    if (!isMainWorld) {
         V8DOMWindowShell* mainWindow = m_frame->script()->existingWindowShell(mainThreadNormalWorld());
         if (mainWindow && !mainWindow->context().IsEmpty())
             setInjectedScriptContextDebugId(m_context.get(), m_frame->script()->contextDebugId(mainWindow->context()));
-        context->SetAlignedPointerInEmbedderData(v8ContextIsolatedWindowShell, this);
     }
 
     m_perContextData = V8PerContextData::create(m_context.get());
@@ -328,7 +319,6 @@ bool V8DOMWindowShell::installDOMWindow()
     V8DOMWindow::installPerContextProperties(windowWrapper, window);
 
     V8DOMWrapper::setDOMWrapper(v8::Handle<v8::Object>::Cast(windowWrapper->GetPrototype()), &V8DOMWindow::info, window);
-    V8DOMWrapper::createDOMWrapper(PassRefPtr<DOMWindow>(window), &V8DOMWindow::info, windowWrapper);
 
     // Install the windowWrapper as the prototype of the innerGlobalObject.
     // The full structure of the global object is as follows:
@@ -346,6 +336,7 @@ bool V8DOMWindowShell::installDOMWindow()
     v8::Handle<v8::Object> innerGlobalObject = toInnerGlobalObject(m_context.get());
     V8DOMWrapper::setDOMWrapper(innerGlobalObject, &V8DOMWindow::info, window);
     innerGlobalObject->SetPrototype(windowWrapper);
+    V8DOMWrapper::createDOMWrapper(PassRefPtr<DOMWindow>(window), &V8DOMWindow::info, windowWrapper);
     return true;
 }
 

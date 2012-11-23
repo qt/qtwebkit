@@ -27,6 +27,7 @@
 #define V8StringResource_h
 
 #include <v8.h>
+#include <wtf/Threading.h>
 #include <wtf/text/AtomicString.h>
 #include <wtf/text/WTFString.h>
 

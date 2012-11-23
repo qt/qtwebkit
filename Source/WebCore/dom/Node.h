@@ -317,7 +317,7 @@ public:
     virtual void notifyLoadedSheetAndAllCriticalSubresources(bool /* error loading subresource */) { }
     virtual void startLoadingDynamicSheet() { ASSERT_NOT_REACHED(); }
 
-    bool hasName() const { return getFlag(HasNameFlag); }
+    bool hasName() const { return !isTextNode() && getFlag(HasNameOrIsEditingTextFlag); }
     bool hasID() const;
     bool hasClass() const;
 
@@ -331,8 +331,9 @@ public:
     StyleChangeType styleChangeType() const { return static_cast<StyleChangeType>(m_nodeFlags & StyleChangeMask); }
     bool childNeedsStyleRecalc() const { return getFlag(ChildNeedsStyleRecalcFlag); }
     bool isLink() const { return getFlag(IsLinkFlag); }
+    bool isEditingText() const { return isTextNode() && getFlag(HasNameOrIsEditingTextFlag); }
 
-    void setHasName(bool f) { setFlag(f, HasNameFlag); }
+    void setHasName(bool f) { ASSERT(!isTextNode()); setFlag(f, HasNameOrIsEditingTextFlag); }
     void setChildNeedsStyleRecalc() { setFlag(ChildNeedsStyleRecalcFlag); }
     void clearChildNeedsStyleRecalc() { clearFlag(ChildNeedsStyleRecalcFlag); }
 
@@ -356,8 +357,8 @@ public:
     bool hasEventTargetData() const { return getFlag(HasEventTargetDataFlag); }
     void setHasEventTargetData(bool flag) { setFlag(flag, HasEventTargetDataFlag); }
 
-    bool inEden() const { return getFlag(InEdenFlag); }
-    void setEden(bool flag) { setFlag(flag, InEdenFlag); }
+    bool isV8CollectableDuringMinorGC() const { return getFlag(V8CollectableDuringMinorGCFlag); }
+    void setV8CollectableDuringMinorGC(bool flag) { setFlag(flag, V8CollectableDuringMinorGCFlag); }
 
     enum ShouldSetAttached {
         SetAttached,
@@ -717,14 +718,14 @@ private:
 
         SelfOrAncestorHasDirAutoFlag = 1 << 21,
 
-        HasNameFlag = 1 << 22,
+        HasNameOrIsEditingTextFlag = 1 << 22,
 
         InNamedFlowFlag = 1 << 23,
         HasSyntheticAttrChildNodesFlag = 1 << 24,
         HasCustomCallbacksFlag = 1 << 25,
         HasScopedHTMLStyleChildFlag = 1 << 26,
         HasEventTargetDataFlag = 1 << 27,
-        InEdenFlag = 1 << 28,
+        V8CollectableDuringMinorGCFlag = 1 << 28,
         IsInsertionPointFlag = 1 << 29,
 
 #if ENABLE(SVG)
@@ -753,7 +754,8 @@ protected:
         CreateFrameOwnerElement = CreateHTMLElement | HasCustomCallbacksFlag,
         CreateSVGElement = CreateStyledElement | IsSVGFlag,
         CreateDocument = CreateContainer | InDocumentFlag,
-        CreateInsertionPoint = CreateHTMLElement | IsInsertionPointFlag
+        CreateInsertionPoint = CreateHTMLElement | IsInsertionPointFlag,
+        CreateEditingText = CreateText | HasNameOrIsEditingTextFlag,
     };
     Node(Document*, ConstructionType);
 

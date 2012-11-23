@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2012 Digia Plc and/or its subsidiary(-ies).
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -17,24 +17,27 @@
  * Boston, MA 02110-1301, USA.
  *
  */
+#ifndef QWebUndoCommand_h
+#define QWebUndoCommand_h
 
-#ifndef EditingText_h
-#define EditingText_h
+#include <qsharedpointer.h>
+#include <qundostack.h>
 
-#include "Text.h"
+class UndoStepQt;
 
-namespace WebCore {
+#ifndef QT_NO_UNDOCOMMAND
 
-class EditingText : public Text {
+class QWebUndoCommand : public QUndoCommand {
 public:
-    static PassRefPtr<EditingText> create(Document*, const String&);
+    QWebUndoCommand(QSharedPointer<UndoStepQt>, QUndoCommand *parent = 0);
+
+    void undo();
+    void redo();
 
 private:
-    virtual bool rendererIsNeeded(const NodeRenderingContext&);
-
-    EditingText(Document*, const String&);
+    QSharedPointer<UndoStepQt> m_step;
 };
 
-} // namespace WebCore
+#endif // QT_NO_UNDOCOMMAND
 
-#endif // EditingText_h
+#endif // QWebUndoCommand_h

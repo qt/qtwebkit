@@ -72,7 +72,7 @@ WebInspector.CanvasProfileView = function(profile)
     this._splitView.show(this.element);
 
     this._enableWaitIcon(true);
-    CanvasAgent.getTraceLog(this._traceLogId, this._didReceiveTraceLog.bind(this));
+    CanvasAgent.getTraceLog(this._traceLogId, 0, this._didReceiveTraceLog.bind(this));
 }
 
 WebInspector.CanvasProfileView.prototype = {
@@ -276,7 +276,7 @@ WebInspector.CanvasProfileType.prototype = {
 /**
  * @constructor
  * @extends {WebInspector.ProfileHeader}
- * @param {WebInspector.CanvasProfileType} type
+ * @param {!WebInspector.CanvasProfileType} type
  * @param {string} title
  * @param {number=} uid
  */
