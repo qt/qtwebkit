@@ -31,12 +31,12 @@
 
 namespace JSC {
 
-void disassemble(const MacroAssemblerCodePtr& codePtr, size_t size, const char* prefix, FILE* out)
+void disassemble(const MacroAssemblerCodePtr& codePtr, size_t size, const char* prefix, PrintStream& out)
 {
     if (tryToDisassemble(codePtr, size, prefix, out))
         return;
     
-    fprintf(out, "%sdisassembly not available for range %p...%p\n", prefix, codePtr.executableAddress(), static_cast<char*>(codePtr.executableAddress()) + size);
+    out.printf("%sdisassembly not available for range %p...%p\n", prefix, codePtr.executableAddress(), static_cast<char*>(codePtr.executableAddress()) + size);
 }
 
 } // namespace JSC

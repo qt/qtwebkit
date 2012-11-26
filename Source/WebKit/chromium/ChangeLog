@@ -1,3 +1,38 @@
+2012-11-24  Silvia Pfeiffer  <silviapf@chromium.org>
+
+        [chromium] Remove traces of MediaControlRootElement
+        https://bugs.webkit.org/show_bug.cgi?id=103174
+
+        Reviewed by Adam Barth.
+
+        Now that nothing is using MediaControlRootElement any more,
+        we can remove the FIXME and MediaControlRootElement enum left
+        over from bug 88871.
+
+        * public/WebContextMenuData.h:
+
+2012-11-23  Robert Kroeger  <rjkroege@chromium.org>
+
+        Remove unused ScrollByPixelVelocity
+        https://bugs.webkit.org/show_bug.cgi?id=102840
+
+        Reviewed by Sam Weinig.
+
+        Removed test for deleted code.
+
+        * tests/ScrollAnimatorNoneTest.cpp:
+
+2012-11-23  Alexis Menard  <alexis@webkit.org>
+
+        [CSS3 Backgrounds and Borders] Implement new CSS3 background-position parsing.
+        https://bugs.webkit.org/show_bug.cgi?id=102104
+
+        Reviewed by Julien Chaffraix.
+
+        Protect the new feature behind a feature flag.
+
+        * features.gypi:
+
 2012-11-23  Yury Semikhatsky  <yurys@chromium.org>
 
         Unreviewed. Fix Chromium Win compilation after r135580.

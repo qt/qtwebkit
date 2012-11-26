@@ -46,7 +46,6 @@
 #include "DOMSettableTokenList.h"
 #include "Document.h"
 #include "DocumentType.h"
-#include "DynamicNodeList.h"
 #include "Element.h"
 #include "ElementRareData.h"
 #include "ElementShadow.h"
@@ -68,6 +67,7 @@
 #include "InspectorCounters.h"
 #include "KeyboardEvent.h"
 #include "LabelsNodeList.h"
+#include "LiveNodeList.h"
 #include "Logging.h"
 #include "MouseEvent.h"
 #include "MutationEvent.h"
@@ -971,7 +971,7 @@ unsigned Node::nodeIndex() const
 template<unsigned type>
 bool shouldInvalidateNodeListCachesForAttr(const unsigned nodeListCounts[], const QualifiedName& attrName)
 {
-    if (nodeListCounts[type] && DynamicNodeListCacheBase::shouldInvalidateTypeOnAttributeChange(static_cast<NodeListInvalidationType>(type), attrName))
+    if (nodeListCounts[type] && LiveNodeListBase::shouldInvalidateTypeOnAttributeChange(static_cast<NodeListInvalidationType>(type), attrName))
         return true;
     return shouldInvalidateNodeListCachesForAttr<type + 1>(nodeListCounts, attrName);
 }
@@ -997,8 +997,8 @@ bool Document::shouldInvalidateNodeListCaches(const QualifiedName* attrName) con
 
 void Document::invalidateNodeListCaches(const QualifiedName* attrName)
 {
-    HashSet<DynamicNodeListCacheBase*>::iterator end = m_listsInvalidatedAtDocument.end();
-    for (HashSet<DynamicNodeListCacheBase*>::iterator it = m_listsInvalidatedAtDocument.begin(); it != end; ++it)
+    HashSet<LiveNodeListBase*>::iterator end = m_listsInvalidatedAtDocument.end();
+    for (HashSet<LiveNodeListBase*>::iterator it = m_listsInvalidatedAtDocument.begin(); it != end; ++it)
         (*it)->invalidateCache(attrName);
 }
 
@@ -1193,7 +1193,7 @@ static void checkAcceptChild(Node* newParent, Node* newChild, ExceptionCode& ec)
     // HIERARCHY_REQUEST_ERR: Raised if this node is of a type that does not allow children of the type of the
     // newChild node, or if the node to append is one of this node's ancestors.
 
-    if (newChild == newParent || newParent->isDescendantOf(newChild)) {
+    if (newChild->contains(newParent)) {
         ec = HIERARCHY_REQUEST_ERR;
         return;
     }
@@ -1267,7 +1267,7 @@ void Node::attach()
 
     // FIXME: This is O(N^2) for the innerHTML case, where all children are replaced at once (and not attached).
     // If this node got a renderer it may be the previousRenderer() of sibling text nodes and thus affect the
-    // result of Text::rendererIsNeeded() for those nodes.
+    // result of Text::textRendererIsNeeded() for those nodes.
     if (renderer()) {
         for (Node* next = nextSibling(); next; next = next->nextSibling()) {
             if (next->renderer())
@@ -1275,7 +1275,7 @@ void Node::attach()
             if (!next->attached())
                 break;  // Assume this means none of the following siblings are attached.
             if (next->isTextNode())
-                next->createRendererIfNeeded();
+                toText(next)->createTextRendererIfNeeded();
         }
     }
 
@@ -1393,22 +1393,6 @@ Node *Node::nextLeafNode() const
 ContainerNode* Node::parentNodeForRenderingAndStyle()
 {
     return NodeRenderingContext(this).parentNodeForRenderingAndStyle();
-}
-
-void Node::createRendererIfNeeded()
-{
-    NodeRenderingContext(this).createRendererIfNeeded();
-}
-
-bool Node::rendererIsNeeded(const NodeRenderingContext& context)
-{
-    return (document()->documentElement() == this) || (context.style()->display() != NONE);
-}
-
-RenderObject* Node::createRenderer(RenderArena*, RenderStyle*)
-{
-    ASSERT_NOT_REACHED();
-    return 0;
 }
 
 RenderStyle* Node::virtualComputedStyle(PseudoId pseudoElementSpecifier)
@@ -2620,9 +2604,9 @@ bool Node::dispatchGestureEvent(const PlatformGestureEvent& event)
 }
 #endif
 
-void Node::dispatchSimulatedClick(Event* underlyingEvent, bool sendMouseEvents, bool showPressedLook)
+void Node::dispatchSimulatedClick(Event* underlyingEvent, SimulatedClickMouseEventOptions eventOptions, SimulatedClickVisualOptions visualOptions)
 {
-    EventDispatcher::dispatchSimulatedClick(this, underlyingEvent, sendMouseEvents, showPressedLook);
+    EventDispatcher::dispatchSimulatedClick(this, underlyingEvent, eventOptions, visualOptions);
 }
 
 bool Node::dispatchBeforeLoadEvent(const String& sourceURL)

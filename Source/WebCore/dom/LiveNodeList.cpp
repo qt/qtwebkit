@@ -21,7 +21,7 @@
  */
 
 #include "config.h"
-#include "DynamicNodeList.h"
+#include "LiveNodeList.h"
 
 #include "Document.h"
 #include "Element.h"
@@ -32,7 +32,7 @@
 
 namespace WebCore {
 
-Node* DynamicNodeListCacheBase::rootNode() const
+Node* LiveNodeListBase::rootNode() const
 {
     if (isRootedAtDocument() && m_ownerNode->inDocument())
         return m_ownerNode->document();
@@ -52,7 +52,7 @@ Node* DynamicNodeListCacheBase::rootNode() const
     return m_ownerNode.get();
 }
 
-void DynamicNodeListCacheBase::invalidateCache() const
+void LiveNodeListBase::invalidateCache() const
 {
     m_cachedItem = 0;
     m_isLengthCacheValid = false;
@@ -74,7 +74,7 @@ void DynamicNodeListCacheBase::invalidateCache() const
 #endif
 }
 
-void DynamicNodeListCacheBase::invalidateIdNameCacheMaps() const
+void LiveNodeListBase::invalidateIdNameCacheMaps() const
 {
     ASSERT(hasIdNameCache());
     const HTMLCollection* cacheBase = static_cast<const HTMLCollection*>(this);
@@ -82,37 +82,15 @@ void DynamicNodeListCacheBase::invalidateIdNameCacheMaps() const
     cacheBase->m_nameCache.clear();
 }
 
-void DynamicNodeListCacheBase::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+void LiveNodeListBase::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
+    NodeList::reportMemoryUsage(memoryObjectInfo);
     info.addMember(m_ownerNode);
     info.addWeakPointer(m_cachedItem);
 }
 
-void DynamicNodeList::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    NodeList::reportMemoryUsage(memoryObjectInfo);
-    DynamicNodeListCacheBase::reportMemoryUsage(memoryObjectInfo);
-}
-
-void DynamicSubtreeNodeList::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    DynamicNodeList::reportMemoryUsage(memoryObjectInfo);
-}
-
-unsigned DynamicNodeList::length() const
-{
-    return lengthCommon();
-}
-
-Node* DynamicNodeList::item(unsigned offset) const
-{
-    return itemCommon(offset);
-}
-
-Node* DynamicNodeList::itemWithName(const AtomicString& elementId) const
+Node* LiveNodeList::namedItem(const AtomicString& elementId) const
 {
     Node* rootNode = this->rootNode();
 

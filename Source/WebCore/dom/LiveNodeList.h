@@ -21,8 +21,8 @@
  *
  */
 
-#ifndef DynamicNodeList_h
-#define DynamicNodeList_h
+#ifndef LiveNodeList_h
+#define LiveNodeList_h
 
 #include "CollectionType.h"
 #include "Document.h"
@@ -41,14 +41,14 @@ enum NodeListRootType {
     NodeListIsRootedAtDocumentIfOwnerHasItemrefAttr,
 };
 
-class DynamicNodeListCacheBase {
+class LiveNodeListBase : public NodeList {
 public:
     enum ItemAfterOverrideType {
         OverridesItemAfter,
         DoesNotOverrideItemAfter,
     };
 
-    DynamicNodeListCacheBase(Node* ownerNode, NodeListRootType rootType, NodeListInvalidationType invalidationType,
+    LiveNodeListBase(Node* ownerNode, NodeListRootType rootType, NodeListInvalidationType invalidationType,
         bool shouldOnlyIncludeDirectChildren, CollectionType collectionType, ItemAfterOverrideType itemAfterOverrideType)
         : m_ownerNode(ownerNode)
         , m_cachedItem(0)
@@ -68,11 +68,12 @@ public:
         ASSERT(!m_overridesItemAfter || !isNodeList(collectionType));
     }
 
-    virtual ~DynamicNodeListCacheBase() { }
-
     virtual void reportMemoryUsage(MemoryObjectInfo*) const;
 
-public:
+    // DOM API
+    virtual unsigned length() const OVERRIDE;
+    virtual Node* item(unsigned offset) const OVERRIDE;
+
     ALWAYS_INLINE bool hasIdNameCache() const { return !isNodeList(type()); }
     ALWAYS_INLINE bool isRootedAtDocument() const { return m_rootType == NodeListIsRootedAtDocument || m_rootType == NodeListIsRootedAtDocumentIfOwnerHasItemrefAttr; }
     ALWAYS_INLINE NodeListInvalidationType invalidationType() const { return static_cast<NodeListInvalidationType>(m_invalidationType); }
@@ -123,8 +124,6 @@ protected:
     bool hasNameCache() const { return m_isNameCacheValid; }
     void setHasNameCache() const { m_isNameCacheValid = true; }
 
-    unsigned lengthCommon() const;
-    Node* itemCommon(unsigned offset) const;
     Node* itemBeforeOrAfterCachedItem(unsigned offset) const;
     Node* itemAfter(unsigned&, Node* previousItem) const;
 
@@ -153,7 +152,7 @@ private:
     mutable unsigned m_isItemRefElementsCacheValid : 1;
 };
 
-ALWAYS_INLINE bool DynamicNodeListCacheBase::shouldInvalidateTypeOnAttributeChange(NodeListInvalidationType type, const QualifiedName& attrName)
+ALWAYS_INLINE bool LiveNodeListBase::shouldInvalidateTypeOnAttributeChange(NodeListInvalidationType type, const QualifiedName& attrName)
 {
     switch (type) {
     case InvalidateOnClassAttrChange:
@@ -182,49 +181,29 @@ ALWAYS_INLINE bool DynamicNodeListCacheBase::shouldInvalidateTypeOnAttributeChan
     return false;
 }
 
-class DynamicNodeList : public NodeList, public DynamicNodeListCacheBase {
+class LiveNodeList : public LiveNodeListBase {
 public:
-    DynamicNodeList(PassRefPtr<Node> ownerNode, CollectionType collectionType, NodeListRootType rootType, NodeListInvalidationType invalidationType)
-        : DynamicNodeListCacheBase(ownerNode.get(), rootType, invalidationType, collectionType == ChildNodeListType,
+    LiveNodeList(PassRefPtr<Node> ownerNode, CollectionType collectionType, NodeListInvalidationType invalidationType, NodeListRootType rootType = NodeListIsRootedAtNode)
+        : LiveNodeListBase(ownerNode.get(), rootType, invalidationType, collectionType == ChildNodeListType,
         collectionType, DoesNotOverrideItemAfter)
-    { }
-    virtual ~DynamicNodeList() { }
+    {
+        if (collectionType != ChildNodeListType)
+            document()->registerNodeListCache(this);
+    }
 
-    // DOM methods & attributes for NodeList
-    virtual unsigned length() const OVERRIDE;
-    virtual Node* item(unsigned offset) const OVERRIDE;
-    virtual Node* itemWithName(const AtomicString&) const;
+    virtual ~LiveNodeList()
+    {
+        if (type() != ChildNodeListType)
+            document()->unregisterNodeListCache(this);
+    }
 
-    // Other methods (not part of DOM)
+    virtual Node* namedItem(const AtomicString&) const OVERRIDE;
     virtual bool nodeMatches(Element*) const = 0;
 
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
-
 private:
-    virtual bool isDynamicNodeList() const OVERRIDE { return true; }
-};
-
-class DynamicSubtreeNodeList : public DynamicNodeList {
-public:
-    virtual ~DynamicSubtreeNodeList()
-    {
-        document()->unregisterNodeListCache(this);
-    }
-
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
-
-protected:
-    DynamicSubtreeNodeList(PassRefPtr<Node> node, CollectionType type, NodeListInvalidationType invalidationType, NodeListRootType rootType = NodeListIsRootedAtNode)
-        : DynamicNodeList(node, type, rootType, invalidationType)
-    {
-        document()->registerNodeListCache(this);
-    }
-
-private:
-    Node* itemForwardsFromCurrent(Node* start, unsigned offset, int remainingOffset) const;
-    Node* itemBackwardsFromCurrent(Node* start, unsigned offset, int remainingOffset) const;
+    virtual bool isLiveNodeList() const OVERRIDE { return true; }
 };
 
 } // namespace WebCore
 
-#endif // DynamicNodeList_h
+#endif // LiveNodeList_h

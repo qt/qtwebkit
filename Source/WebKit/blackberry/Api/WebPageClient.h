@@ -151,7 +151,7 @@ public:
     virtual void showVirtualKeyboard(bool) = 0;
 
     virtual void requestSpellingCheckingOptions(imf_sp_text_t&, const BlackBerry::Platform::IntRect& documentCaretRect, const BlackBerry::Platform::IntSize& screenOffset) = 0;
-    virtual int32_t checkSpellingOfStringAsync(wchar_t* text, int length) = 0;
+    virtual int32_t checkSpellingOfStringAsync(wchar_t* text, const unsigned length) = 0;
 
     virtual void notifySelectionDetailsChanged(const Platform::IntRect& documentStartRect, const Platform::IntRect& documentEndRect, const Platform::IntRectRegion& documentRegion, bool overrideTouchHandling = false) = 0;
     virtual void cancelSelectionVisuals() = 0;
@@ -201,7 +201,6 @@ public:
 
     virtual BlackBerry::Platform::ViewportAccessor* userInterfaceViewportAccessor() const = 0;
 
-    virtual void resetBitmapZoomScale(double scale) = 0;
     virtual void animateBlockZoom(double finalScale, const Platform::FloatPoint& finalDocumentScrollPosition) = 0;
 
     virtual void setPreventsScreenIdleDimming(bool noDimming) = 0;

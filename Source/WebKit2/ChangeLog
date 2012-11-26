@@ -1,3 +1,169 @@
+2012-11-25  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [WK2] TiledBackingStore: page contents is scaled wrongly
+        https://bugs.webkit.org/show_bug.cgi?id=103090
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Before this change the page contents scaling in PageViewportController was
+        defined all the times by m_rawAttributes.initialScale. If initial scale had not
+        been specified in the viewport meta tag it was set to m_minimumScaleToFit inside
+        PageViewportController::didChangeViewportAttributes().
+
+        The problem was that m_minimumScaleToFit could have wrong value as contents size
+        might have not be updated by the time PageViewportController::didChangeViewportAttributes()
+        was invoked.
+
+        The solution is to use m_minimumScaleToFit for contents scaling if initial scale
+        is not specified in the viewport meta tag, as it is updated all the time. 
+        Also a flag m_initiallyFitToViewport is added to PageViewportController to detect
+        whether m_minimumScaleToFit should be used for scaling.
+
+        * UIProcess/PageViewportController.cpp:
+        (WebKit::PageViewportController::PageViewportController):
+        (WebKit::PageViewportController::didChangeContentsSize):
+        (WebKit::PageViewportController::pageTransitionViewportReady):
+        (WebKit::PageViewportController::didChangeViewportAttributes):
+        * UIProcess/PageViewportController.h:
+        (PageViewportController):
+
+2012-11-24  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL][WK2] Stop the mess with DECLARE_EWK_VIEW_CALLBACK arg type definition
+        https://bugs.webkit.org/show_bug.cgi?id=103187
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Now the client should pass to DECLARE_EWK_VIEW_CALLBACK macro exacly the 
+        same arg type s/he wants to have in the Ewk_View callback.
+
+        * UIProcess/API/efl/EwkViewCallbacks.h:
+        (EvasObjectHolder):
+        (EwkViewCallbacks::EvasObjectHolder::EvasObjectHolder):
+        (EwkViewCallbacks):
+
+2012-11-24  Mikhail Pozdnyakov  <mikhail.pozdnyakov@intel.com>
+
+        [EFL][WK2] Check errors in EwkView callbacks usage at compile time
+        https://bugs.webkit.org/show_bug.cgi?id=103177
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Errors in EwkView callbacks usage are now checked at compile time.
+
+        * UIProcess/API/efl/EwkViewCallbacks.h:
+        (CallBack):
+        (EwkViewCallbacks::CallBack::CallBack):
+        (EwkViewCallbacks::CallBack::call):
+
+2012-11-23  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r135575.
+        http://trac.webkit.org/changeset/135575
+        https://bugs.webkit.org/show_bug.cgi?id=103169
+
+        It made all tests assert (Requested by Ossy on #webkit).
+
+        * qt/MainQt.cpp:
+        (WebKit):
+        (main):
+
+2012-11-23  Alexis Menard  <alexis@webkit.org>
+
+        [CSS3 Backgrounds and Borders] Implement new CSS3 background-position parsing.
+        https://bugs.webkit.org/show_bug.cgi?id=102104
+
+        Reviewed by Julien Chaffraix.
+
+        Protect the new feature behind a feature flag.
+
+        * Configurations/FeatureDefines.xcconfig:
+
+2012-11-23  Huang Dongsung  <luxtella@company100.net>
+
+        Coordinated Graphics: Match the behavior of selfOrAncestorHaveNonAffineTransforms() to its name.
+        https://bugs.webkit.org/show_bug.cgi?id=103097
+
+        Reviewed by Noam Rosenthal.
+
+        CoordinatedGraphicsLayer::selfOrAncestorHaveNonAffineTransforms() does
+        not check its ancestor. This patch makes this method check its ancestor
+        to match its name.
+
+        * WebProcess/WebPage/CoordinatedGraphics/CoordinatedGraphicsLayer.cpp:
+        (WebCore::CoordinatedGraphicsLayer::selfOrAncestorHaveNonAffineTransforms):
+
+2012-11-23  Huang Dongsung  <luxtella@company100.net>
+
+        Coordinated Graphics: LayerTreeRenderer::removeTile() does not remove tiles actually.
+        https://bugs.webkit.org/show_bug.cgi?id=103030
+
+        Reviewed by Noam Rosenthal.
+
+        LayerTreeRenderer::removeTile() must add a backing store into
+        m_backingStoresWithPendingBuffers. Otherwise, tiles are not removed.
+
+        * UIProcess/CoordinatedGraphics/LayerTreeRenderer.cpp:
+        (WebKit::LayerTreeRenderer::removeTile):
+
+2012-11-23  Huang Dongsung  <luxtella@company100.net>
+
+        [TexMap] Remove dependency of TextureMapperLayer on GraphicsLayerTextureMapper.
+        https://bugs.webkit.org/show_bug.cgi?id=103046
+
+        Reviewed by Noam Rosenthal.
+
+        This patch makes GraphicsLayerTextureMapper create its own backing
+        store. However, LayerTreeRenderer also creates its own backing store. So
+        when LayerTreeRenderer uses GraphicsLayerTextureMapper,
+        LayerTreeRenderer needs GraphicsLayerTextureMapper to not create its own
+        backing store.
+
+        * UIProcess/CoordinatedGraphics/LayerTreeRenderer.cpp:
+        (WebKit::LayerTreeRenderer::createLayer):
+        (WebKit::LayerTreeRenderer::getBackingStore):
+
+2012-11-23  Huang Dongsung  <luxtella@company100.net>
+
+        REGRESSION(r135486): ASSERT(isMainThread()) hit in LayerTreeRenderer::setActive(bool)
+        https://bugs.webkit.org/show_bug.cgi?id=103077
+
+        Reviewed by Noam Rosenthal.
+
+        Currently, the painting thread uses purgeGLResources() and setActive().
+        QQuickWebPage::updatePaintNode() indirectly calls both methods after
+        locking the main thread.
+
+        This patch changes two points.
+        1. Remove ASSERT(isMainThread()) in methods that the painting thread can
+        call.
+        2. Make purgeGLResources() and setActive() call methods of
+        LayerTreeCoordinatorProxy via dispatchOnMainThread().
+
+        * UIProcess/CoordinatedGraphics/LayerTreeRenderer.cpp:
+        (WebKit::LayerTreeRenderer::LayerTreeRenderer):
+        (WebKit::LayerTreeRenderer::renderNextFrame):
+        (WebKit::LayerTreeRenderer::purgeGLResources):
+        (WebKit):
+        (WebKit::LayerTreeRenderer::purgeBackingStores):
+        (WebKit::LayerTreeRenderer::setActive):
+        * UIProcess/CoordinatedGraphics/LayerTreeRenderer.h:
+        (LayerTreeRenderer):
+
+2012-11-23  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2][AC] EwkViewImpl::transformToScreen() does not retrieve the Ecore_X_Window properly
+        https://bugs.webkit.org/show_bug.cgi?id=103133
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        If accelerated compositing is enabled, EwkViewImpl::transformToScreen() should
+        attempt to retrieve the Ecore_X_Window using ecore_evas_gl_x11_window_get() first
+        and only fall back to ecore_evas_software_x11_window_get().
+
+        * UIProcess/API/efl/EwkViewImpl.cpp:
+        (EwkViewImpl::transformToScreen):
+
 2012-11-23  Wojciech Bielawski  <w.bielawski@samsung.com>
 
         [WK2][WKTR] WebKitTestRunner needs eventSender.contextClick()
