@@ -1,3 +1,181 @@
+2012-11-28  Filip Pizlo  <fpizlo@apple.com>
+
+        SpeculatedType dumping should not use the static char buffer[thingy] idiom
+        https://bugs.webkit.org/show_bug.cgi?id=103584
+
+        Reviewed by Michael Saboff.
+
+        Added a StringPrintStream, and made it easy to create dumpers for typedefs to primitives.
+
+        * GNUmakefile.list.am:
+        * WTF.gypi:
+        * WTF.pro:
+        * WTF.vcproj/WTF.vcproj:
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/CMakeLists.txt:
+        * wtf/PrintStream.cpp:
+        (WTF::dumpCharacter):
+        * wtf/PrintStream.h:
+        (WTF::printInternal):
+        * wtf/StringPrintStream.cpp: Added.
+        (WTF::StringPrintStream::StringPrintStream):
+        (WTF::StringPrintStream::~StringPrintStream):
+        (WTF::StringPrintStream::vprintf):
+        (WTF::StringPrintStream::toCString):
+        (WTF::StringPrintStream::increaseSize):
+        * wtf/StringPrintStream.h: Added.
+        (StringPrintStream):
+        (WTF::toCString):
+
+2012-11-28  Michael Saboff  <msaboff@apple.com>
+
+        Update String Stats for recent dataLog changes and add summary
+        https://bugs.webkit.org/show_bug.cgi?id=103583
+
+        Reviewed by Filip Pizlo.
+
+        Updated calls to dataLog() to dataLogF() as a results of r135469.
+        Added total savings from 8 bit strings in bytes and as a percentage.
+
+        * wtf/text/StringImpl.cpp:
+        (WTF::StringStats::printStats):
+
+2012-11-28  Roger Fong  <roger_fong@apple.com>
+
+        Make DataLog work/compile properly on Windows.
+        https://bugs.webkit.org/show_bug.cgi?id=103544
+
+        Reviewed by Filip Pizlo.
+
+        * wtf/DataLog.cpp:
+        (WTF::initializeLogFileOnce):
+
+2012-11-28  Filip Pizlo  <fpizlo@apple.com>
+
+        It should be possible to say dataLog("count = ", count, "\n") instead of dataLogF("count = %d\n", count)
+        https://bugs.webkit.org/show_bug.cgi?id=103009
+
+        Reviewed by Michael Saboff.
+
+        Added the ability to use out.print(...) and dataLog(...) variadically and with
+        WTF::printInternal(PrintStream&, const T&) overloads for any type T that you want
+        to be able to pass as an argument to out.print() or dataLog(). Also added one
+        example class for doing this: RawPointer, which can be used to force a pointer
+        to be printed as "%p" rather than matching any overloads that you might want to
+        introduce.
+
+        * GNUmakefile.list.am:
+        * WTF.gypi:
+        * WTF.pro:
+        * WTF.vcproj/WTF.vcproj:
+        * WTF.xcodeproj/project.pbxproj:
+        * wtf/CMakeLists.txt:
+        * wtf/DataLog.h:
+        (WTF):
+        (WTF::dataLog):
+        * wtf/PrintStream.cpp:
+        (WTF::printInternal):
+        (WTF):
+        * wtf/PrintStream.h:
+        (PrintStream):
+        (WTF::PrintStream::print):
+        (WTF):
+        * wtf/RawPointer.h: Added.
+        (WTF):
+        (RawPointer):
+        (WTF::RawPointer::RawPointer):
+        (WTF::RawPointer::value):
+
+2012-11-27  Filip Pizlo  <fpizlo@apple.com>
+
+        Convert some remaining uses of FILE* to PrintStream&.
+
+        Rubber stamped by Mark Hahnenberg.
+
+        * wtf/BitVector.cpp:
+        (WTF::BitVector::dump):
+        * wtf/BitVector.h:
+        (BitVector):
+
+2012-11-27  Pratik Solanki  <psolanki@apple.com>
+
+        objc/objc-runtime.h does not exist on all PLATFORM(MAC)
+        https://bugs.webkit.org/show_bug.cgi?id=101780
+
+        Reviewed by Brent Fulgham.
+
+        Clean up header includes so we don't include objc/objc-runtime.h.
+
+        * wtf/Functional.h:
+        * wtf/ObjcRuntimeExtras.h: Include objc/message.h here so we don't rely on proper ordering
+        of includes in files that include this header.
+
+2012-11-27  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r135828.
+        http://trac.webkit.org/changeset/135828
+        https://bugs.webkit.org/show_bug.cgi?id=103405
+
+        [Chromium] Multiple ASAN errors after a WebKit roll due to
+        mismatched malloc/delete (not free) resulting from
+        StringImpl::deref() (Requested by apavlov on #webkit).
+
+        * wtf/FastAllocBase.h:
+        * wtf/Platform.h:
+
+2012-11-26  Adam Barth  <abarth@webkit.org>
+
+        [Chromium] fastMalloc has an extra branch on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=103027
+
+        Reviewed by Eric Seidel.
+
+        There's no need to override the new/delete operators on non-Mac
+        platform because:
+
+        1) We use the system malloc anyway.
+        2) We've modified the system malloc to crash in out-of-memory conditions.
+
+        This patch removes a branch (and a call) from malloc, which will
+        hopefully improve performance. I haven't measured the performance
+        characteristics of this patch, but I will look at the graphs closely
+        when landing.
+
+        * wtf/FastAllocBase.h:
+        * wtf/Platform.h:
+
+2012-11-26  Filip Pizlo  <fpizlo@apple.com>
+
+        DataLog to a file should work if there are multiple processes using WTF
+        https://bugs.webkit.org/show_bug.cgi?id=103323
+
+        Reviewed by Mark Hahnenberg.
+
+        Whereas before DataLog would open a file with the name you specified, now it'll open a file with the
+        name plus the PID appended to it. So if you are dealing with multiple processes running with DataLog
+        to a file enabled, you'll get multiple separate log files.
+
+        * wtf/DataLog.cpp:
+        (WTF::initializeLogFileOnce):
+
+2012-11-26  Zeno Albisser  <zeno@webkit.org>
+
+        [Qt] Fix the LLInt build on Mac
+        https://bugs.webkit.org/show_bug.cgi?id=97587
+
+        Reviewed by Simon Hausmann.
+
+        * wtf/InlineASM.h:
+            Use OS(DARWIN) instead of PLATFORM(MAC),
+            in order to allow Qt to use the same code.
+        * wtf/Platform.h:
+
+2012-11-26  Patrick Gansterer  <paroga@webkit.org>
+
+        Build fix for WinCE after r135640.
+
+        * wtf/DataLog.cpp:
+
 2012-11-24  Adam Barth  <abarth@webkit.org>
 
         Chromium should use TCMalloc on Mac to go fast

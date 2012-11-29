@@ -743,6 +743,9 @@ void InputHandler::requestSpellingCheckingOptions(imf_sp_text_t& spellCheckingOp
     if (m_webPage->focusedOrMainFrame()->selection()->selectionType() != VisibleSelection::CaretSelection)
         return;
 
+    if (!m_currentFocusElement || !m_currentFocusElement->document() || !m_currentFocusElement->document()->frame())
+        return;
+
     // imf_sp_text_t should be generated in pixel viewport coordinates.
     WebCore::IntRect caretRect = m_webPage->focusedOrMainFrame()->selection()->selection().visibleStart().absoluteCaretBounds();
     caretRect = m_webPage->focusedOrMainFrame()->view()->contentsToRootView(caretRect);
@@ -1120,8 +1123,6 @@ void InputHandler::ensureFocusTextElementVisible(CaretScrollType scrollType)
 
     int fontHeight = selectionFocusRect.height();
 
-    m_webPage->suspendBackingStore();
-
     // If the text is too small, zoom in to make it a minimum size.
     // The minimum size being defined as 3 mm is a good value based on my observations.
     static const int s_minimumTextHeightInPixels = Graphics::Screen::primaryScreen()->heightInMMToPixels(3);
@@ -1221,7 +1222,6 @@ void InputHandler::ensureFocusTextElementVisible(CaretScrollType scrollType)
         m_webPage->m_userPerformedManualScroll = true;
         m_webPage->client()->animateBlockZoom(zoomScaleRequired, m_webPage->m_finalBlockPoint);
     }
-    m_webPage->resumeBackingStore();
 }
 
 void InputHandler::ensureFocusPluginElementVisible()

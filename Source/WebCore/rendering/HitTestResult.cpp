@@ -104,7 +104,7 @@ HitTestLocation::HitTestLocation(const HitTestLocation& other, const LayoutSize&
     , m_boundingBox(other.m_boundingBox)
     , m_transformedPoint(other.m_transformedPoint)
     , m_transformedRect(other.m_transformedRect)
-    , m_region(region)
+    , m_region(region ? region : other.m_region)
     , m_isRectBased(other.m_isRectBased)
     , m_isRectilinear(other.m_isRectilinear)
 {
@@ -192,34 +192,34 @@ IntRect HitTestLocation::rectForPoint(const LayoutPoint& point, unsigned topPadd
     return IntRect(actualPoint, actualPadding);
 }
 
-HitTestResult::HitTestResult() : HitTestLocation()
-    , m_isOverWidget(false)
+HitTestResult::HitTestResult()
+    : m_isOverWidget(false)
 {
 }
 
 HitTestResult::HitTestResult(const LayoutPoint& point)
-    : HitTestLocation(point)
+    : m_hitTestLocation(point)
     , m_pointInMainFrame(point)
     , m_isOverWidget(false)
 {
 }
 
 HitTestResult::HitTestResult(const LayoutPoint& centerPoint, unsigned topPadding, unsigned rightPadding, unsigned bottomPadding, unsigned leftPadding)
-    : HitTestLocation(centerPoint, topPadding, rightPadding, bottomPadding, leftPadding)
+    : m_hitTestLocation(centerPoint, topPadding, rightPadding, bottomPadding, leftPadding)
     , m_pointInMainFrame(centerPoint)
     , m_isOverWidget(false)
 {
 }
 
 HitTestResult::HitTestResult(const HitTestLocation& other)
-    : HitTestLocation(other)
-    , m_pointInMainFrame(point())
+    : m_hitTestLocation(other)
+    , m_pointInMainFrame(m_hitTestLocation.point())
     , m_isOverWidget(false)
 {
 }
 
 HitTestResult::HitTestResult(const HitTestResult& other)
-    : HitTestLocation(other)
+    : m_hitTestLocation(other.m_hitTestLocation)
     , m_innerNode(other.innerNode())
     , m_innerNonSharedNode(other.innerNonSharedNode())
     , m_pointInMainFrame(other.m_pointInMainFrame)
@@ -238,7 +238,7 @@ HitTestResult::~HitTestResult()
 
 HitTestResult& HitTestResult::operator=(const HitTestResult& other)
 {
-    HitTestLocation::operator=(other);
+    m_hitTestLocation = other.m_hitTestLocation;
     m_innerNode = other.innerNode();
     m_innerNonSharedNode = other.innerNonSharedNode();
     m_pointInMainFrame = other.m_pointInMainFrame;
@@ -315,7 +315,7 @@ bool HitTestResult::isSelected() const
     if (!frame)
         return false;
 
-    return frame->selection()->contains(point());
+    return frame->selection()->contains(m_hitTestLocation.point());
 }
 
 String HitTestResult::spellingToolTip(TextDirection& dir) const
@@ -326,7 +326,7 @@ String HitTestResult::spellingToolTip(TextDirection& dir) const
     if (!m_innerNonSharedNode)
         return String();
     
-    DocumentMarker* marker = m_innerNonSharedNode->document()->markers()->markerContainingPoint(point(), DocumentMarker::Grammar);
+    DocumentMarker* marker = m_innerNonSharedNode->document()->markers()->markerContainingPoint(m_hitTestLocation.point(), DocumentMarker::Grammar);
     if (!marker)
         return String();
 
@@ -342,7 +342,7 @@ String HitTestResult::replacedString() const
     if (!m_innerNonSharedNode)
         return String();
     
-    DocumentMarker* marker = m_innerNonSharedNode->document()->markers()->markerContainingPoint(point(), DocumentMarker::Replacement);
+    DocumentMarker* marker = m_innerNonSharedNode->document()->markers()->markerContainingPoint(m_hitTestLocation.point(), DocumentMarker::Replacement);
     if (!marker)
         return String();
     
@@ -700,21 +700,6 @@ bool HitTestResult::addNodeToRectBasedTestResult(Node* node, const HitTestReques
     mutableRectBasedTestResult().add(node);
 
     bool regionFilled = rect.contains(locationInContainer.boundingBox());
-    // FIXME: This code (incorrectly) attempts to correct for culled inline nodes. See https://bugs.webkit.org/show_bug.cgi?id=85849.
-    if (node->renderer()->isInline() && !regionFilled) {
-        for (RenderObject* curr = node->renderer()->parent(); curr; curr = curr->parent()) {
-            if (!curr->isRenderInline())
-                break;
-
-            // We need to make sure the nodes for culled inlines get included.
-            RenderInline* currInline = toRenderInline(curr);
-            if (currInline->alwaysCreateLineBoxes())
-                break;
-
-            if (currInline->visibleToHitTesting() && currInline->node())
-                mutableRectBasedTestResult().add(currInline->node()->shadowAncestorNode());
-        }
-    }
     return !regionFilled;
 }
 
@@ -735,21 +720,6 @@ bool HitTestResult::addNodeToRectBasedTestResult(Node* node, const HitTestReques
     mutableRectBasedTestResult().add(node);
 
     bool regionFilled = rect.contains(locationInContainer.boundingBox());
-    // FIXME: This code (incorrectly) attempts to correct for culled inline nodes. See https://bugs.webkit.org/show_bug.cgi?id=85849.
-    if (node->renderer()->isInline() && !regionFilled) {
-        for (RenderObject* curr = node->renderer()->parent(); curr; curr = curr->parent()) {
-            if (!curr->isRenderInline())
-                break;
-
-            // We need to make sure the nodes for culled inlines get included.
-            RenderInline* currInline = toRenderInline(curr);
-            if (currInline->alwaysCreateLineBoxes())
-                break;
-
-            if (currInline->visibleToHitTesting() && currInline->node())
-                mutableRectBasedTestResult().add(currInline->node()->shadowAncestorNode());
-        }
-    }
     return !regionFilled;
 }
 

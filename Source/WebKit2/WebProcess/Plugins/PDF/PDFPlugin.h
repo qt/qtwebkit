@@ -94,10 +94,15 @@ private:
     virtual void setScrollOffset(const WebCore::IntPoint&) OVERRIDE;
     virtual void invalidateScrollbarRect(WebCore::Scrollbar*, const WebCore::IntRect&) OVERRIDE;
     virtual void invalidateScrollCornerRect(const WebCore::IntRect&) OVERRIDE;
+    virtual WebCore::IntPoint currentMousePosition() const { return m_lastMousePositionInPluginCoordinates; }
     
     NSEvent *nsEventForWebMouseEvent(const WebMouseEvent&);
+    WebCore::IntPoint convertFromPluginToPDFView(const WebCore::IntPoint&) const;
+    WebCore::IntPoint convertFromRootViewToPlugin(const WebCore::IntPoint&) const;
     
     bool supportsForms();
+
+    void updatePageAndDeviceScaleFactors();
 
     RetainPtr<CALayer> m_containerLayer;
     RetainPtr<CALayer> m_contentLayer;
@@ -110,8 +115,8 @@ private:
     RefPtr<WebCore::Element> m_annotationContainer;
 
     WebCore::AffineTransform m_rootViewToPluginTransform;
-    WebCore::IntPoint m_lastMousePoint;
     WebMouseEvent m_lastMouseEvent;
+    WebCore::IntPoint m_lastMousePositionInPluginCoordinates;
     
     RetainPtr<WKPDFLayerControllerDelegate> m_pdfLayerControllerDelegate;
 };

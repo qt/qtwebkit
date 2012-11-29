@@ -1125,6 +1125,10 @@
 			>
 		</File>
 		<File
+			RelativePath="..\wtf\RawPointer.h"
+			>
+		</File>
+		<File
 			RelativePath="..\wtf\RedBlackTree.h"
 			>
 		</File>
@@ -1206,6 +1210,14 @@
 		</File>
 		<File
 			RelativePath="..\wtf\StringHasher.h"
+			>
+		</File>
+		<File
+			RelativePath="..\wtf\StringPrintStream.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\wtf\StringPrintStream.h"
 			>
 		</File>
 		<File

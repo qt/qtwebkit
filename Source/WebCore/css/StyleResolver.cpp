@@ -716,7 +716,7 @@ void StyleResolver::sortAndTransferMatchedRules(MatchResult& result)
     bool swapVisitedUnvisited = InspectorInstrumentation::forcePseudoState(m_element, CSSSelector::PseudoVisited);
     for (unsigned i = 0; i < m_matchedRules.size(); i++) {
         if (m_style && m_matchedRules[i]->containsUncommonAttributeSelector())
-            m_style->setAffectedByUncommonAttributeSelectors();
+            m_style->setUnique();
         unsigned linkMatchType = m_matchedRules[i]->linkMatchType();
         if (swapVisitedUnvisited && linkMatchType && linkMatchType != SelectorChecker::MatchAll)
             linkMatchType = (linkMatchType == SelectorChecker::MatchVisited) ? SelectorChecker::MatchLink : SelectorChecker::MatchVisited;
@@ -1176,8 +1176,6 @@ bool StyleResolver::canShareStyleWithElement(StyledElement* element) const
 #endif
     if (element->isLink() != m_element->isLink())
         return false;
-    if (style->affectedByUncommonAttributeSelectors())
-        return false;
     if (element->hovered() != m_element->hovered())
         return false;
     if (element->active() != m_element->active())
@@ -1249,12 +1247,14 @@ inline StyledElement* StyleResolver::findSiblingForStyleSharing(Node* node, unsi
     return static_cast<StyledElement*>(node);
 }
 
-static inline bool parentStylePreventsSharing(const RenderStyle* parentStyle)
+static inline bool parentElementPreventsSharing(const Element* parentElement)
 {
-    return parentStyle->childrenAffectedByPositionalRules()
-        || parentStyle->childrenAffectedByFirstChildRules()
-        || parentStyle->childrenAffectedByLastChildRules() 
-        || parentStyle->childrenAffectedByDirectAdjacentRules();
+    if (!parentElement)
+        return false;
+    return parentElement->childrenAffectedByPositionalRules()
+        || parentElement->childrenAffectedByFirstChildRules()
+        || parentElement->childrenAffectedByLastChildRules()
+        || parentElement->childrenAffectedByDirectAdjacentRules();
 }
 
 RenderStyle* StyleResolver::locateSharedStyle()
@@ -1271,7 +1271,7 @@ RenderStyle* StyleResolver::locateSharedStyle()
     // Ids stop style sharing if they show up in the stylesheets.
     if (m_styledElement->hasID() && m_features.idsInRules.contains(m_styledElement->idForStyleResolution().impl()))
         return 0;
-    if (parentStylePreventsSharing(m_parentStyle))
+    if (parentElementPreventsSharing(m_element->parentElement()))
         return 0;
     if (m_styledElement->hasScopedHTMLStyleChild())
         return 0;
@@ -1306,7 +1306,7 @@ RenderStyle* StyleResolver::locateSharedStyle()
     if (styleSharingCandidateMatchesHostRules())
         return 0;
     // Tracking child index requires unique style for each node. This may get set by the sibling rule match above.
-    if (parentStylePreventsSharing(m_parentStyle))
+    if (parentElementPreventsSharing(m_element->parentElement()))
         return 0;
     return shareElement->renderStyle();
 }
@@ -1398,7 +1398,7 @@ PassRefPtr<RenderStyle> StyleResolver::styleForDocument(Document* document, CSSF
         documentStyle->setPageScaleTransform(frame ? frame->frameScaleFactor() : 1);
         documentStyle->setLocale(document->contentLanguage());
     }
-    // FIXME: This overrides any -webkit-user-modify inherited from the parent iframe.
+    // This overrides any -webkit-user-modify inherited from the parent iframe.
     documentStyle->setUserModify(document->inDesignMode() ? READ_WRITE : READ_ONLY);
 
     Element* docElement = document->documentElement();
@@ -3190,7 +3190,7 @@ void StyleResolver::applyProperty(CSSPropertyID id, CSSValue* value)
             m_style->resetColumnRule();
         return;
     case CSSPropertyWebkitMarquee:
-        if (!m_parentNode || !value->isInheritedValue())
+        if (!isInherit)
             return;
         m_style->setMarqueeDirection(m_parentStyle->marqueeDirection());
         m_style->setMarqueeIncrement(m_parentStyle->marqueeIncrement());
@@ -3776,7 +3776,6 @@ void StyleResolver::applyProperty(CSSPropertyID id, CSSValue* value)
     case CSSPropertyWebkitLineSnap:
     case CSSPropertyWebkitMarqueeDirection:
     case CSSPropertyWebkitMarqueeStyle:
-    case CSSPropertyWebkitMaskAttachment:
     case CSSPropertyWebkitMaskBoxImage:
     case CSSPropertyWebkitMaskBoxImageOutset:
     case CSSPropertyWebkitMaskBoxImageRepeat:
@@ -3958,7 +3957,7 @@ void StyleResolver::checkForGenericFamilyChange(RenderStyle* style, RenderStyle*
         size = fontSizeForKeyword(m_checker.document(), CSSValueXxSmall + childFont.keywordSize() - 1, childFont.useFixedDefaultSize());
     else {
         Settings* settings = documentSettings();
-        float fixedScaleFactor = settings
+        float fixedScaleFactor = (settings && settings->defaultFixedFontSize() && settings->defaultFontSize())
             ? static_cast<float>(settings->defaultFixedFontSize()) / settings->defaultFontSize()
             : 1;
         size = parentFont.useFixedDefaultSize() ?

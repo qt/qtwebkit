@@ -90,6 +90,9 @@ void GraphicsLayerTextureMapper::willBeDestroyed()
 */
 void GraphicsLayerTextureMapper::setNeedsDisplay()
 {
+    if (!m_hasOwnBackingStore)
+        return;
+
     m_needsDisplay = true;
     notifyChange(TextureMapperLayer::DisplayChange);
     addRepaintRect(FloatRect(FloatPoint(), m_size));
@@ -107,6 +110,9 @@ void GraphicsLayerTextureMapper::setContentsNeedsDisplay()
 */
 void GraphicsLayerTextureMapper::setNeedsDisplayInRect(const FloatRect& rect)
 {
+    if (!m_hasOwnBackingStore)
+        return;
+
     if (m_needsDisplay)
         return;
     m_needsDisplayRect.unite(rect);
@@ -191,6 +197,11 @@ void GraphicsLayerTextureMapper::setMaskLayer(GraphicsLayer* value)
         return;
     GraphicsLayer::setMaskLayer(value);
     notifyChange(TextureMapperLayer::MaskLayerChange);
+
+    if (!value)
+        return;
+    value->setSize(size());
+    value->setContentsVisible(contentsAreVisible());
 }
 
 
@@ -232,6 +243,8 @@ void GraphicsLayerTextureMapper::setSize(const FloatSize& value)
         return;
 
     GraphicsLayer::setSize(value);
+    if (maskLayer())
+        maskLayer()->setSize(value);
     notifyChange(TextureMapperLayer::SizeChange);
 }
 
@@ -294,6 +307,8 @@ void GraphicsLayerTextureMapper::setContentsVisible(bool value)
         return;
     notifyChange(TextureMapperLayer::ContentsVisibleChange);
     GraphicsLayer::setContentsVisible(value);
+    if (maskLayer())
+        maskLayer()->setContentsVisible(value);
 }
 
 /* \reimp (GraphicsLayer.h)
@@ -395,8 +410,6 @@ void GraphicsLayerTextureMapper::didFlushCompositingState()
 {
     updateBackingStore();
     m_changeMask = 0;
-    m_needsDisplay = false;
-    m_needsDisplayRect = IntRect();
 }
 
 void GraphicsLayerTextureMapper::didFlushCompositingStateRecursive()
@@ -421,6 +434,10 @@ void GraphicsLayerTextureMapper::updateBackingStore()
 
 void GraphicsLayerTextureMapper::prepareBackingStore()
 {
+    TextureMapper* textureMapper = m_layer->textureMapper();
+    if (!textureMapper)
+        return;
+
     if (!shouldHaveBackingStore()) {
         m_backingStore.clear();
         return;
@@ -431,9 +448,6 @@ void GraphicsLayerTextureMapper::prepareBackingStore()
         dirtyRect.intersect(enclosingIntRect(m_needsDisplayRect));
     if (dirtyRect.isEmpty())
         return;
-
-    TextureMapper* textureMapper = m_layer->textureMapper();
-    ASSERT(textureMapper);
 
     if (!m_backingStore)
         m_backingStore = TextureMapperTiledBackingStore::create();

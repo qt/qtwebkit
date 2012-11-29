@@ -301,14 +301,14 @@ public:
     void dump(PrintStream& out) const
     {
         if (isTop()) {
-            out.printf("TOP");
+            out.print("TOP");
             return;
         }
         
-        out.printf("[");
+        out.print("[");
         if (m_structure)
-            out.printf("%p", m_structure);
-        out.printf("]");
+            out.print(RawPointer(m_structure));
+        out.print("]");
     }
 
 private:

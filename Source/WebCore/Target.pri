@@ -831,6 +831,7 @@ SOURCES += \
     loader/EmptyClients.cpp \
     loader/FormState.cpp \
     loader/FormSubmission.cpp \
+    loader/FrameLoadRequest.cpp \
     loader/FrameLoader.cpp \
     loader/FrameLoaderStateMachine.cpp \
     loader/HistoryController.cpp \
@@ -4079,6 +4080,17 @@ contains(CONFIG, opengl-shims) {
     HEADERS += platform/graphics/OpenGLShims.h
     SOURCES += platform/graphics/OpenGLShims.cpp
     DEFINES += QT_OPENGL_SHIMS=1
+}
+
+contains(DEFINES, ENABLE_OPENCL=1) {
+    HEADERS += \
+        platform/graphics/gpu/opencl/OpenCLHandle.h \
+        platform/graphics/gpu/opencl/FilterContextOpenCL.h
+    SOURCES += \
+        platform/graphics/gpu/opencl/FilterContextOpenCL.cpp \
+        platform/graphics/gpu/opencl/OpenCLFESourceAlpha.cpp \
+        platform/graphics/gpu/opencl/OpenCLFESourceGraphic.cpp \
+        platform/graphics/gpu/opencl/OpenCLFETurbulence.cpp
 }
 
 use?(GRAPHICS_SURFACE) {

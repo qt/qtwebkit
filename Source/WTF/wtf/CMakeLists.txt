@@ -90,6 +90,7 @@ SET(WTF_HEADERS
     PrintStream.h
     RandomNumber.h
     RandomNumberSeed.h
+    RawPointer.h
     RedBlackTree.h
     RefCounted.h
     RefCountedLeakCounter.h
@@ -104,6 +105,7 @@ SET(WTF_HEADERS
     StdLibExtras.h
     StringExtras.h
     StringHasher.h
+    StringPrintStream.h
     TCPackedCache.h
     TCPageMap.h
     TCSpinLock.h
@@ -183,6 +185,7 @@ SET(WTF_SOURCES
     SHA1.cpp
     StackBounds.cpp
     StringExtras.cpp
+    StringPrintStream.cpp
     Threading.cpp
     TypeTraits.cpp
     WTFThreadData.cpp

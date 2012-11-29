@@ -39,38 +39,18 @@ namespace WebCore {
 
 String cookies(Document const* document, KURL const& url)
 {
-    Frame* frame = document->frame();
-    Page* page = frame ? frame->page() : 0;
-
-    if (!page)
+    if (!document->settings()->cookieEnabled())
         return String();
 
-    if (!(frame && frame->loader() && frame->loader()->client()))
-        return String();
-
-    if (!static_cast<FrameLoaderClientBlackBerry*>(frame->loader()->client())->cookiesEnabled())
-        return String();
-
-    ASSERT(document && url == document->cookieURL());
     // 'HttpOnly' cookies should no be accessible from scripts, so we filter them out here
     return cookieManager().getCookie(url, NoHttpOnlyCookie);
 }
 
 void setCookies(Document* document, KURL const& url, String const& value)
 {
-    Frame* frame = document->frame();
-    Page* page = frame ? frame->page() : 0;
-
-    if (!page)
+    if (!document->settings()->cookieEnabled())
         return;
 
-    if (!(frame && frame->loader() && frame->loader()->client()))
-        return;
-
-    if (!static_cast<FrameLoaderClientBlackBerry*>(frame->loader()->client())->cookiesEnabled())
-        return;
-
-    ASSERT(document && url == document->cookieURL());
     cookieManager().setCookies(url, value, NoHttpOnlyCookie);
 }
 
@@ -98,12 +78,7 @@ void deleteCookie(const Document* document, const KURL& url, const String& cooki
 
 String cookieRequestHeaderFieldValue(const Document* document, const KURL &url)
 {
-    ASSERT(document);
-
-    if (!(document->frame() && document->frame()->loader() && document->frame()->loader()->client()))
-        return String();
-
-    if (!static_cast<FrameLoaderClientBlackBerry*>(document->frame()->loader()->client())->cookiesEnabled())
+    if (!document->settings()->cookieEnabled())
         return String();
 
     return cookieManager().getCookie(url, WithHttpOnlyCookies);

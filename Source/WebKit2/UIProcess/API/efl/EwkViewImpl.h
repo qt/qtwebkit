@@ -28,6 +28,7 @@
 #include "WKGeometry.h"
 #include "WKRetainPtr.h"
 #include <Evas.h>
+#include <WebCore/FloatPoint.h>
 #include <WebCore/IntRect.h>
 #include <WebCore/TextDirection.h>
 #include <WebCore/Timer.h>
@@ -200,13 +201,8 @@ public:
     void setScaleFactor(float scaleFactor) { m_scaleFactor = scaleFactor; }
     float scaleFactor() const { return m_scaleFactor; }
 
-    void setScrollPosition(WebCore::IntPoint position) { m_scrollPosition = position; }
-    const WebCore::IntPoint scrollPosition() const { return m_scrollPosition; }
-#endif
-#if USE(ACCELERATED_COMPOSITING)
-    Evas_GL* evasGL() { return m_evasGL.get(); }
-    Evas_GL_Context* evasGLContext() { return m_evasGLContext ? m_evasGLContext->context() : 0; }
-    Evas_GL_Surface* evasGLSurface() { return m_evasGLSurface ? m_evasGLSurface->surface() : 0; }
+    void setPagePosition(const WebCore::FloatPoint& position) { m_pagePosition = position; }
+    const WebCore::IntPoint discretePagePosition() const { return roundedIntPoint(m_pagePosition); }
 #endif
 
     // FIXME: needs refactoring (split callback invoke)
@@ -215,7 +211,14 @@ public:
     bool isHardwareAccelerated() const { return m_isHardwareAccelerated; }
     void setDrawsBackground(bool enable) { m_setDrawsBackground = enable; }
 
+    WKImageRef takeSnapshot();
+
 private:
+#if USE(ACCELERATED_COMPOSITING)
+    Evas_GL_Context* evasGLContext() { return m_evasGLContext ? m_evasGLContext->context() : 0; }
+    Evas_GL_Surface* evasGLSurface() { return m_evasGLSurface ? m_evasGLSurface->surface() : 0; }
+#endif
+
     inline Ewk_View_Smart_Data* smartData() const;
     void displayTimerFired(WebCore::Timer<EwkViewImpl>*);
 
@@ -259,7 +262,7 @@ private:
     OwnPtr<EwkBackForwardList> m_backForwardList;
 #if USE(TILED_BACKING_STORE)
     float m_scaleFactor;
-    WebCore::IntPoint m_scrollPosition;
+    WebCore::FloatPoint m_pagePosition;
 #endif
     OwnPtr<EwkSettings> m_settings;
     RefPtr<EwkWindowFeatures> m_windowFeatures;

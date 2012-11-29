@@ -736,6 +736,7 @@ public:
     void printMainFrame();
     
     void setMediaVolume(float);
+    void setMayStartMediaWhenInWindow(bool);
 
     // WebPopupMenuProxy::Client
     virtual NativeWebMouseEvent* currentlyProcessedMouseDownEvent();
@@ -753,6 +754,8 @@ public:
     void setColorChooserColor(const WebCore::Color&);
     void endColorChooser();
 #endif
+
+    const WebLoaderClient& loaderClient() { return m_loaderClient; }
 
 private:
     WebPageProxy(PageClient*, PassRefPtr<WebProcessProxy>, WebPageGroup*, uint64_t pageID);
@@ -948,7 +951,7 @@ private:
     void searchWithSpotlight(const String&);
 
     // Dictionary.
-    void didPerformDictionaryLookup(const String&, const DictionaryPopupInfo&);
+    void didPerformDictionaryLookup(const AttributedString&, const DictionaryPopupInfo&);
 #endif
 
     // Spelling and grammar.
@@ -1238,6 +1241,7 @@ private:
     bool m_suppressVisibilityUpdates;
 
     float m_mediaVolume;
+    bool m_mayStartMediaWhenInWindow;
 
 #if PLATFORM(QT)
     WTF::HashSet<RefPtr<QtRefCountedNetworkRequestData> > m_applicationSchemeRequests;

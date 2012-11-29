@@ -107,7 +107,6 @@ void CoordinatedGraphicsLayer::didChangeGeometry()
 
 CoordinatedGraphicsLayer::CoordinatedGraphicsLayer(GraphicsLayerClient* client)
     : GraphicsLayer(client)
-    , m_maskTarget(0)
     , m_inUpdateMode(false)
     , m_shouldUpdateVisibleRect(true)
     , m_shouldSyncLayerState(true)
@@ -269,6 +268,8 @@ void CoordinatedGraphicsLayer::setContentsVisible(bool b)
     if (contentsAreVisible() == b)
         return;
     GraphicsLayer::setContentsVisible(b);
+    if (maskLayer())
+        maskLayer()->setContentsVisible(b);
 
     didChangeLayerState();
 }
@@ -390,8 +391,8 @@ void CoordinatedGraphicsLayer::setMaskLayer(GraphicsLayer* layer)
         return;
 
     layer->setSize(size());
+    layer->setContentsVisible(contentsAreVisible());
     CoordinatedGraphicsLayer* CoordinatedGraphicsLayer = toCoordinatedGraphicsLayer(layer);
-    CoordinatedGraphicsLayer->setMaskTarget(this);
     CoordinatedGraphicsLayer->didChangeLayerState();
     didChangeLayerState();
 
@@ -653,8 +654,6 @@ void CoordinatedGraphicsLayer::adjustContentsScale()
 
     // No reason to save the previous backing store for non-visible areas.
     m_previousBackingStore->removeAllNonVisibleTiles();
-
-    createBackingStore();
 }
 
 void CoordinatedGraphicsLayer::createBackingStore()

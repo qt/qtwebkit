@@ -30,6 +30,7 @@
 #include <wtf/FastAllocBase.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/Platform.h>
+#include <wtf/RawPointer.h>
 #include <wtf/StdLibExtras.h>
 
 namespace WTF {
@@ -49,10 +50,175 @@ public:
     // Typically a no-op for many subclasses of PrintStream, this is a hint that
     // the implementation should flush its buffers if it had not done so already.
     virtual void flush();
+    
+    template<typename T>
+    void print(const T& value)
+    {
+        printInternal(*this, value);
+    }
+    
+    template<typename T1, typename T2>
+    void print(const T1& value1, const T2& value2)
+    {
+        print(value1);
+        print(value2);
+    }
+    
+    template<typename T1, typename T2, typename T3>
+    void print(const T1& value1, const T2& value2, const T3& value3)
+    {
+        print(value1);
+        print(value2);
+        print(value3);
+    }
+    
+    template<typename T1, typename T2, typename T3, typename T4>
+    void print(const T1& value1, const T2& value2, const T3& value3, const T4& value4)
+    {
+        print(value1);
+        print(value2);
+        print(value3);
+        print(value4);
+    }
+    
+    template<typename T1, typename T2, typename T3, typename T4, typename T5>
+    void print(const T1& value1, const T2& value2, const T3& value3, const T4& value4, const T5& value5)
+    {
+        print(value1);
+        print(value2);
+        print(value3);
+        print(value4);
+        print(value5);
+    }
+    
+    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6>
+    void print(const T1& value1, const T2& value2, const T3& value3, const T4& value4, const T5& value5, const T6& value6)
+    {
+        print(value1);
+        print(value2);
+        print(value3);
+        print(value4);
+        print(value5);
+        print(value6);
+    }
+    
+    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7>
+    void print(const T1& value1, const T2& value2, const T3& value3, const T4& value4, const T5& value5, const T6& value6, const T7& value7)
+    {
+        print(value1);
+        print(value2);
+        print(value3);
+        print(value4);
+        print(value5);
+        print(value6);
+        print(value7);
+    }
+    
+    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8>
+    void print(const T1& value1, const T2& value2, const T3& value3, const T4& value4, const T5& value5, const T6& value6, const T7& value7, const T8& value8)
+    {
+        print(value1);
+        print(value2);
+        print(value3);
+        print(value4);
+        print(value5);
+        print(value6);
+        print(value7);
+        print(value8);
+    }
+    
+    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8, typename T9>
+    void print(const T1& value1, const T2& value2, const T3& value3, const T4& value4, const T5& value5, const T6& value6, const T7& value7, const T8& value8, const T9& value9)
+    {
+        print(value1);
+        print(value2);
+        print(value3);
+        print(value4);
+        print(value5);
+        print(value6);
+        print(value7);
+        print(value8);
+        print(value9);
+    }
+    
+    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8, typename T9, typename T10>
+    void print(const T1& value1, const T2& value2, const T3& value3, const T4& value4, const T5& value5, const T6& value6, const T7& value7, const T8& value8, const T9& value9, const T10& value10)
+    {
+        print(value1);
+        print(value2);
+        print(value3);
+        print(value4);
+        print(value5);
+        print(value6);
+        print(value7);
+        print(value8);
+        print(value9);
+        print(value10);
+    }
 };
+
+void printInternal(PrintStream&, const char*);
+void printInternal(PrintStream&, const CString&);
+void printInternal(PrintStream&, const String&);
+inline void printInternal(PrintStream& out, char* value) { printInternal(out, static_cast<const char*>(value)); }
+inline void printInternal(PrintStream& out, CString& value) { printInternal(out, static_cast<const CString&>(value)); }
+inline void printInternal(PrintStream& out, String& value) { printInternal(out, static_cast<const String&>(value)); }
+void printInternal(PrintStream&, bool);
+void printInternal(PrintStream&, int);
+void printInternal(PrintStream&, unsigned);
+void printInternal(PrintStream&, long);
+void printInternal(PrintStream&, unsigned long);
+void printInternal(PrintStream&, long long);
+void printInternal(PrintStream&, unsigned long long);
+void printInternal(PrintStream&, float);
+void printInternal(PrintStream&, double);
+void printInternal(PrintStream&, RawPointer);
+
+template<typename T>
+void printInternal(PrintStream& out, const T& value)
+{
+    value.dump(out);
+}
+
+#define MAKE_PRINT_ADAPTOR(Name, Type, function) \
+    class Name {                                 \
+    public:                                      \
+        Name(const Type& value)                  \
+            : m_value(value)                     \
+        {                                        \
+        }                                        \
+        void dump(PrintStream& out) const        \
+        {                                        \
+            function(out, m_value);              \
+        }                                        \
+    private:                                     \
+        Type m_value;                            \
+    }
+
+#define MAKE_PRINT_METHOD_ADAPTOR(Name, Type, method) \
+    class Name {                                 \
+    public:                                      \
+        Name(const Type& value)                  \
+            : m_value(value)                     \
+        {                                        \
+        }                                        \
+        void dump(PrintStream& out) const        \
+        {                                        \
+            m_value.method(out);                 \
+        }                                        \
+    private:                                     \
+        Type m_value;                            \
+    }
+
+// Use an adaptor-based dumper for characters to avoid situations where
+// you've "compressed" an integer to a character and it ends up printing
+// as ASCII when you wanted it to print as a number.
+void dumpCharacter(PrintStream&, char);
+MAKE_PRINT_ADAPTOR(CharacterDump, char, dumpCharacter);
 
 } // namespace WTF
 
+using WTF::CharacterDump;
 using WTF::PrintStream;
 
 #endif // PrintStream_h

@@ -22,37 +22,22 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WheelFlingPlatformGestureCurve_h
-#define WheelFlingPlatformGestureCurve_h
+#ifndef WebAudioDestinationConsumer_h
+#define WebAudioDestinationConsumer_h
 
-#include "FloatPoint.h"
-#include "PlatformGestureCurve.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
+#include "WebVector.h"
 
-namespace WebCore {
+namespace WebKit {
 
-class PlatformGestureCurveTarget;
-
-// Implementation of PlatformGestureCurve suitable for mouse wheel-based fling
-// scroll. A Rayleigh distribtution curve is used to define the velocity profile,
-// so velocity starts at zero, accelerates to a maximum proportional to 'velocity',
-// then gently tails off to zero again.
-class WheelFlingPlatformGestureCurve : public PlatformGestureCurve {
+class WebAudioDestinationConsumer {
 public:
-    static PassOwnPtr<PlatformGestureCurve> create(const FloatPoint& velocity);
-    virtual ~WheelFlingPlatformGestureCurve();
+    virtual ~WebAudioDestinationConsumer() { }
 
-    virtual const char* debugName() const OVERRIDE;
-    virtual bool apply(double time, PlatformGestureCurveTarget*) OVERRIDE;
-
-private:
-    explicit WheelFlingPlatformGestureCurve(const FloatPoint& velocity);
-
-    FloatPoint m_velocity;
-    IntPoint m_cumulativeScroll;
+    // The size of the vector is the number of audio channels, and numberOfFrames is the
+    // number of audio frames in the (possibly multi-channel) buffer in a planar format.
+    virtual void consumeAudio(const WebVector<const float*>&, size_t numberOfFrames) = 0;
 };
 
-} // namespace WebCore
+} // namespace WebKit
 
-#endif
+#endif // WebAudioDestinationConsumer_h

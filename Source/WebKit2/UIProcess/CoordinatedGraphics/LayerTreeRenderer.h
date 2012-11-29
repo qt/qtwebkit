@@ -41,6 +41,7 @@
 namespace WebCore {
 class CustomFilterProgram;
 class CustomFilterProgramInfo;
+class TextureMapperLayer;
 }
 
 namespace WebKit {
@@ -138,14 +139,15 @@ private:
     void renderNextFrame();
     void purgeBackingStores();
 
-
     void assignImageBackingToLayer(WebCore::GraphicsLayer*, CoordinatedImageBackingID);
     void removeReleasedImageBackingsIfNeeded();
     void ensureRootLayer();
     void ensureLayer(WebLayerID);
-    void commitTileOperations();
+    void commitPendingBackingStoreOperations();
 
-    PassRefPtr<CoordinatedBackingStore> getBackingStore(WebCore::GraphicsLayer*);
+    CoordinatedBackingStore* getBackingStore(WebCore::GraphicsLayer*);
+    void prepareContentBackingStore(WebCore::GraphicsLayer*);
+    void createBackingStoreIfNeeded(WebCore::GraphicsLayer*);
     void removeBackingStoreIfNeeded(WebCore::GraphicsLayer*);
     void resetBackingStoreSizeToLayerSize(WebCore::GraphicsLayer*);
 
@@ -162,6 +164,9 @@ private:
     typedef HashMap<CoordinatedImageBackingID, RefPtr<CoordinatedBackingStore> > ImageBackingMap;
     ImageBackingMap m_imageBackings;
     Vector<RefPtr<CoordinatedBackingStore> > m_releasedImageBackings;
+
+    typedef HashMap<WebCore::TextureMapperLayer*, RefPtr<CoordinatedBackingStore> > BackingStoreMap;
+    BackingStoreMap m_pendingSyncBackingStores;
 
     HashSet<RefPtr<CoordinatedBackingStore> > m_backingStoresWithPendingBuffers;
 

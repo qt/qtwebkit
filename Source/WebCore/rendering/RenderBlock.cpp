@@ -675,6 +675,7 @@ void RenderBlock::splitFlow(RenderObject* beforeChild, RenderBlock* newBlockBox,
         // We can reuse this block and make it the preBlock of the next continuation.
         pre = block;
         pre->removePositionedObjects(0);
+        pre->removeFloatingObjects();
         block = toRenderBlock(block->parent());
     } else {
         // No anonymous block available for use.  Make one.
@@ -3759,6 +3760,15 @@ void RenderBlock::removePositionedObjects(RenderBlock* o, ContainingBlockState c
     
     for (unsigned i = 0; i < deadObjects.size(); i++)
         removePositionedObject(deadObjects.at(i));
+}
+
+void RenderBlock::removeFloatingObjects()
+{
+    if (!m_floatingObjects)
+        return;
+
+    deleteAllValues(m_floatingObjects->set());
+    m_floatingObjects->clear();
 }
 
 RenderBlock::FloatingObject* RenderBlock::insertFloatingObject(RenderBox* o)
@@ -7245,7 +7255,14 @@ bool RenderBlock::lineWidthForPaginatedLineChanged(RootInlineBox* rootBox, Layou
     if (!inRenderFlowThread())
         return false;
 
-    return rootBox->paginatedLineWidth() != availableLogicalWidthForContent(rootBox->lineTopWithLeading() + lineDelta);
+    RenderRegion* currentRegion = regionAtBlockOffset(rootBox->lineTopWithLeading() + lineDelta);
+    // Just bail if we still don't have a region.
+    if (!rootBox->hasContainingRegion() && !currentRegion)
+        return false;
+    // Just bail if the region didn't change.
+    if (rootBox->hasContainingRegion() && rootBox->containingRegion() == currentRegion)
+        return false;
+    return rootBox->paginatedLineWidth() != availableLogicalWidthForContent(currentRegion, offsetFromLogicalTopOfFirstPage());
 }
 
 LayoutUnit RenderBlock::offsetFromLogicalTopOfFirstPage() const

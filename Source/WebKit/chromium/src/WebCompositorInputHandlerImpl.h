@@ -78,12 +78,15 @@ private:
 
     EventDisposition handleGestureFling(const WebGestureEvent&);
 
+    // Returns true if we scrolled by the increment.
+    bool touchpadFlingScroll(const WebPoint& increment);
+
     // Returns true if we actually had an active fling to cancel.
     bool cancelCurrentFling();
 
-    OwnPtr<WebGestureCurve> m_wheelFlingCurve;
+    OwnPtr<WebGestureCurve> m_flingCurve;
     // Parameters for the active fling animation, stored in case we need to transfer it out later.
-    WebActiveWheelFlingParameters m_wheelFlingParameters;
+    WebActiveWheelFlingParameters m_flingParameters;
 
     WebCompositorInputHandlerClient* m_client;
     int m_identifier;
@@ -93,7 +96,8 @@ private:
     bool m_expectScrollUpdateEnd;
     bool m_expectPinchUpdateEnd;
 #endif
-    bool m_gestureScrollStarted;
+    bool m_gestureScrollOnImplThread;
+    bool m_gesturePinchOnImplThread;
 
     static int s_nextAvailableIdentifier;
     static HashSet<WebCompositorInputHandlerImpl*>* s_compositors;

@@ -35,11 +35,13 @@
 #include "PagePolicyClientEfl.h"
 #include "PageUIClientEfl.h"
 #include "ResourceLoadClientEfl.h"
+#include "SnapshotImageGL.h"
 #include "WKDictionary.h"
 #include "WKGeometry.h"
 #include "WKNumber.h"
 #include "WKString.h"
 #include "WebContext.h"
+#include "WebImage.h"
 #include "WebPageGroup.h"
 #include "WebPageProxy.h"
 #include "WebPopupMenuProxyEfl.h"
@@ -62,6 +64,7 @@
 #include <Edje.h>
 #include <WebCore/CairoUtilitiesEfl.h>
 #include <WebCore/Cursor.h>
+#include <WebKit2/WKImageCairo.h>
 
 #if ENABLE(VIBRATION)
 #include "VibrationClientEfl.h"
@@ -288,8 +291,8 @@ AffineTransform EwkViewImpl::transformFromScene() const
     AffineTransform transform;
 
 #if USE(TILED_BACKING_STORE)
-    transform.translate(m_scrollPosition.x(), m_scrollPosition.y());
     transform.scale(1 / m_scaleFactor);
+    transform.translate(discretePagePosition().x(), discretePagePosition().y());
 #endif
 
     Ewk_View_Smart_Data* sd = smartData();
@@ -358,7 +361,7 @@ void EwkViewImpl::displayTimerFired(Timer<EwkViewImpl>*)
 #if USE(COORDINATED_GRAPHICS)
     Ewk_View_Smart_Data* sd = smartData();
 
-    evas_gl_make_current(evasGL(), evasGLSurface(), evasGLContext());
+    evas_gl_make_current(m_evasGL.get(), evasGLSurface(), evasGLContext());
 
     // We are supposed to clip to the actual viewport, nothing less.
     IntRect viewport(sd->view.x, sd->view.y, sd->view.w, sd->view.h);
@@ -380,8 +383,8 @@ void EwkViewImpl::displayTimerFired(Timer<EwkViewImpl>*)
             return;
 
         RefPtr<cairo_t> graphicsContext = adoptRef(cairo_create(surface.get()));
+        cairo_translate(graphicsContext.get(), - discretePagePosition().x(), - discretePagePosition().y());
         cairo_scale(graphicsContext.get(), m_scaleFactor, m_scaleFactor);
-        cairo_translate(graphicsContext.get(), -m_scrollPosition.x(), -m_scrollPosition.y());
         renderer->paintToGraphicsContext(graphicsContext.get());
         evas_object_image_data_update_add(sd->image, 0, 0, viewport.width(), viewport.height());
     }
@@ -632,7 +635,7 @@ bool EwkViewImpl::createGLSurface(const IntSize& viewSize)
     }
 
     if (!m_evasGLContext) {
-        m_evasGLContext = EvasGLContext::create(evasGL());
+        m_evasGLContext = EvasGLContext::create(m_evasGL.get());
         if (!m_evasGLContext) {
             WARN("Failed to create GLContext.");
             return false;
@@ -650,18 +653,20 @@ bool EwkViewImpl::createGLSurface(const IntSize& viewSize)
     };
 
     // Replaces if non-null, and frees existing surface after (OwnPtr).
-    m_evasGLSurface = EvasGLSurface::create(evasGL(), &evasGLConfig, viewSize);
+    m_evasGLSurface = EvasGLSurface::create(m_evasGL.get(), &evasGLConfig, viewSize);
     if (!m_evasGLSurface)
         return false;
 
     Evas_Native_Surface nativeSurface;
-    evas_gl_native_surface_get(evasGL(), evasGLSurface(), &nativeSurface);
+    evas_gl_native_surface_get(m_evasGL.get(), evasGLSurface(), &nativeSurface);
     evas_object_image_native_surface_set(sd->image, &nativeSurface);
 
-    evas_gl_make_current(evasGL(), evasGLSurface(), evasGLContext());
+    evas_gl_make_current(m_evasGL.get(), evasGLSurface(), evasGLContext());
 
-    Evas_GL_API* gl = evas_gl_api_get(evasGL());
+    Evas_GL_API* gl = evas_gl_api_get(m_evasGL.get());
     gl->glViewport(0, 0, viewSize.width() + sd->view.x, viewSize.height() + sd->view.y);
+    gl->glClearColor(1.0, 1.0, 1.0, 0);
+    gl->glClear(GL_COLOR_BUFFER_BIT);
 
     return true;
 }
@@ -1011,4 +1016,23 @@ void EwkViewImpl::onFaviconChanged(const char* pageURL, void* eventInfo)
         return;
 
     viewImpl->informIconChange();
+}
+
+WKImageRef EwkViewImpl::takeSnapshot()
+{
+    Ewk_View_Smart_Data* sd = smartData();
+#if USE(ACCELERATED_COMPOSITING)
+    if (!m_isHardwareAccelerated)
+#endif
+        return WKImageCreateFromCairoSurface(createSurfaceForImage(sd->image).get(), 0);
+
+#if USE(ACCELERATED_COMPOSITING)
+    Evas_Native_Surface* nativeSurface = evas_object_image_native_surface_get(sd->image);
+    unsigned char* buffer = getImageFromCurrentTexture(sd->view.w, sd->view.h, nativeSurface->data.opengl.texture_id);
+    RefPtr<cairo_surface_t> surface = adoptRef(cairo_image_surface_create_for_data(buffer, CAIRO_FORMAT_ARGB32, sd->view.w, sd->view.h, sd->view.w * 4));
+    WKImageRef image = WKImageCreateFromCairoSurface(surface.get(), 0);
+    delete[] buffer;
+
+    return image;
+#endif
 }

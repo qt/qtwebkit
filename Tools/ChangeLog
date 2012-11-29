@@ -1,3 +1,1019 @@
+2012-11-29  Sudarsana Nagineni  <sudarsana.nagineni@intel.com>
+
+        [EFL][WK2] Add support for PlatformWebView::simulateMouseMove() in TestWebKitAPI
+        https://bugs.webkit.org/show_bug.cgi?id=103252
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Add support for PlatformWebView::simulateMouseMove() and enable
+        WebKit2 API test MouseMoveAfterCrash.
+
+        * TestWebKitAPI/PlatformEfl.cmake: Enable MouseMoveAfterCrash API
+        test.
+        * TestWebKitAPI/efl/PlatformWebView.cpp:
+        (TestWebKitAPI::onWebProcessCrashed): Handle 'webprocess,crashed' signal
+        to prevent loading an error page since the test case is reloading actual
+        page after web process has terminated and recovered.
+        (TestWebKitAPI):
+        (TestWebKitAPI::PlatformWebView::PlatformWebView):
+        (TestWebKitAPI::PlatformWebView::simulateMouseMove): Implemented.
+
+2012-11-29  Andras Becsi  <andras.becsi@digia.com>
+
+        [Qt] Fix installation of QtWebProcess binary
+        https://bugs.webkit.org/show_bug.cgi?id=101735
+
+        Reviewed by Simon Hausmann.
+
+        Add config test to detect the availability of support
+        for "program executables" in Qt (libexec).
+
+        This test can be removed after the Qt5 release.
+
+        * Tools.pro:
+        * qmake/mkspecs/features/features.prf:
+        * qmake/config.tests/libexecdir/libexecdir.cpp:
+        * qmake/config.tests/libexecdir/libexecdir.pro:
+
+2012-11-29  Eric Seidel  <eric@webkit.org>
+
+        run-perf-tests does not work when the layout test directory does not exist
+        https://bugs.webkit.org/show_bug.cgi?id=103572
+
+        Reviewed by Ryosuke Niwa.
+
+        Make sure that Profiler() calls maybe_make_directory for the output_dir
+        before ever using it.  It's a little awkward to create the directory
+        from the constructor, but its simplest that way as the various subclasses
+        all use the directory at different times.
+
+        Since this required having a filesystem in Profiler (and I didn't want
+        to grab inside Workspace to get one), I just made Profiler expect a
+        SystemHost instead of a separate filesystem, executive and workspace.
+
+        * Scripts/webkitpy/common/system/profiler.py:
+        (ProfilerFactory.create_profiler):
+        (Profiler.__init__):
+        (SingleFileOutputProfiler.__init__):
+        (GooglePProf.__init__):
+        (GooglePProf.profile_after_exit):
+        (Instruments.__init__):
+        (Instruments.attach_to_pid):
+        * Scripts/webkitpy/common/system/profiler_unittest.py:
+        (ProfilerFactoryTest.test_basic):
+
+2012-11-28  Vivek Galatage  <vivek.vg@samsung.com>
+
+        Adding secondary email id
+        https://bugs.webkit.org/show_bug.cgi?id=103594
+
+        Unreviewed. Adding secondary email.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-11-28  Kent Tamura  <tkent@chromium.org>
+
+        garden-o-matic: Use indeterminate <progress> in the status area
+        https://bugs.webkit.org/show_bug.cgi?id=103494
+
+        Reviewed by Adam Barth.
+
+        * BuildSlaveSupport/build.webkit.org-config/public_html/TestFailures/scripts/ui.js:
+        Wrap the "Processing..." message with an indeterminate progress bar.
+        We keep the message as a fallback content.
+        * BuildSlaveSupport/build.webkit.org-config/public_html/TestFailures/scripts/ui_unittests.js:
+        Follow the above change.
+
+2012-11-28  Nima Ghanavatian  <nghanavatian@rim.com>
+
+        Adding Nima Ghanavatian to committers.py
+        https://bugs.webkit.org/show_bug.cgi?id=103533
+
+        Reviewed by Rob Buis.
+
+        Adding myself to committers.py as a Committer.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-11-28  peavo@outlook.com  <peavo@outlook.com>
+
+        [WinCairo] Crash when requesting favicon.
+        https://bugs.webkit.org/show_bug.cgi?id=102689
+
+        Reviewed by Brent Fulgham.
+
+        * TestWebKitAPI/Tests/WebCore/win: Added.
+        * TestWebKitAPI/Tests/WebCore/win/BitmapImage.cpp: Added.
+        (TestWebKitAPI::BitmapImageTest::BitmapImageTest): Allocate frame in constructor.
+        (TestWebKitAPI::BitmapImageTest::frameCount): Override frameCount() method.
+        (TestWebKitAPI::TEST): Added new test.
+        * TestWebKitAPI/config.h: Make sure defines are correct for WinCairo.
+       * TestWebKitAPI/win/TestWebKitAPI.vcproj: Added new test.
+
+2012-11-28  Eric Seidel  <eric@webkit.org>
+
+        run-perf-tests should have a --profile option for easy profiling
+        https://bugs.webkit.org/show_bug.cgi?id=99517
+
+        Reviewed by Adam Barth.
+
+        This is a very basic implementation which works on Mac and Linux
+        and makes it trivial for anyone to profile a PerformanceTest.
+
+        Currently it's not "hard" to profile a PerformanceTest
+        but lowering the barriers to entry here allows all of us to focus
+        less on the tools and more on the code.
+
+        This also paves the way for adding easy mobile-profiling (e.g. chromium-android)
+        which is actually "hard", and this option will make much easier.
+
+        * Scripts/webkitpy/common/system/profiler.py: Added.
+        (ProfilerFactory):
+        (ProfilerFactory.create_profiler):
+        (Profiler):
+        (Profiler.__init__):
+        (Profiler.adjusted_environment):
+        (Profiler.attach_to_pid):
+        (Profiler.did_stop):
+        (SingleFileOutputProfiler):
+        (SingleFileOutputProfiler.__init__):
+        (GooglePProf):
+        (GooglePProf.__init__):
+        (GooglePProf.adjusted_environment):
+        (GooglePProf.did_stop):
+        (Instruments):
+        (Instruments.__init__):
+        (Instruments.attach_to_pid):
+        * Scripts/webkitpy/common/system/profiler_unittest.py: Added.
+        (ProfilerFactoryTest):
+        (ProfilerFactoryTest.test_basic):
+        * Scripts/webkitpy/layout_tests/port/driver.py:
+        (Driver.__init__):
+        (Driver._start):
+        (Driver.stop):
+        (Driver.cmd_line):
+        * Scripts/webkitpy/performance_tests/perftest.py:
+        (PerfTest.parse_output):
+        * Scripts/webkitpy/performance_tests/perftest_unittest.py:
+        (MainTest.test_parse_output):
+        (MainTest.test_parse_output_with_failing_line):
+        * Scripts/webkitpy/performance_tests/perftestsrunner.py:
+        (PerfTestsRunner._parse_args):
+        (PerfTestsRunner.run):
+
+2012-11-28  Zan Dobersek  <zandobersek@gmail.com>
+
+        Remove deprecated logging usage from QueueEngine
+        https://bugs.webkit.org/show_bug.cgi?id=103532
+
+        Reviewed by Dirk Pranke.
+
+        Replace usage of deprecated logging in webkitpy.tool.bot.queueengine with
+        logging through the Logger object. The unit test is modified to reflect
+        these changes.
+
+        After these changes the deprecated logging (i.e. logging to stderr) is not
+        used anymore through webkitpy and can be removed.
+
+        * Scripts/webkitpy/tool/bot/queueengine.py:
+        (QueueEngine.exit_after_handled_error):
+        (QueueEngine.run):
+        (QueueEngine._stopping):
+        (QueueEngine._sleep):
+        * Scripts/webkitpy/tool/bot/queueengine_unittest.py:
+        (QueueEngineTest._run_engine):
+
+2012-11-28  Nate Chapin  <japhet@chromium.org>
+
+        Move empty loading to DocumentLoader, simplify FrameLoader::init()
+        https://bugs.webkit.org/show_bug.cgi?id=101512
+
+        Reviewed by Adam Barth.
+
+        * DumpRenderTree/chromium/WebViewHost.cpp:
+        (WebViewHost::updateForCommittedLoad): This function doesn't play nicely with empty urls and incorrectly
+            interprets them as a non-empty load. This change is required for
+             http/tests/navigation/new-window-redirect-history.html to continue to pass in chromium.
+        * TestWebKitAPI/Tests/WebKit2/AboutBlankLoad.cpp: This test relies on a callback that no longer
+             is sent for about:blank loads.  Hook into didFinishLoadForFrame() instead.
+        (TestWebKitAPI::didFinishLoadForFrame):
+        (TestWebKitAPI::TEST):
+
+2012-11-28  Sadrul Habib Chowdhury  <sadrul@chromium.org>
+
+        [chromium] Allow plugins to opt-in to receive synthetic mouse events out of touch events.
+        https://bugs.webkit.org/show_bug.cgi?id=103092
+
+        Reviewed by Tony Chang.
+
+        Update the test web-plugin to be able to opt-in to receive synthesized mouse events created
+        from touch events.
+
+        * DumpRenderTree/chromium/TestWebPlugin.cpp:
+        (parseTouchEventRequestType):
+        (TestWebPlugin::TestWebPlugin):
+        (TestWebPlugin::initialize):
+        * DumpRenderTree/chromium/TestWebPlugin.h:
+        (TestWebPlugin):
+
+2012-11-28  Sudarsana Nagineni  <sudarsana.nagineni@intel.com>
+
+        [EFL][WK2] Add support for PlatformWebView::simulateSpacebarKeyPress() in TestWebKitAPI
+        https://bugs.webkit.org/show_bug.cgi?id=103123
+
+        Reviewed by Laszlo Gombos.
+
+        Add support for PlatformWebView::simulateSpacebarKeyPress().
+        This functionality is needed by WebKit2 API test MouseMoveAfterCrash
+        which is going to be unskipped in bug #103252.
+
+        * TestWebKitAPI/efl/PlatformUtilities.cpp:
+        (TestWebKitAPI::Util::sleep):
+        * TestWebKitAPI/efl/PlatformWebView.cpp: Use usleep() instead of
+        sleep().
+        (TestWebKitAPI::PlatformWebView::simulateSpacebarKeyPress):
+        (TestWebKitAPI):
+
+2012-11-28  Yael Aharon  <yael.aharon@intel.com>
+
+        Minor cleanup in TestInvocation
+        https://bugs.webkit.org/show_bug.cgi?id=103512
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Remove a function declaration that is not defined and not used.
+        Fix spelling error in m_webProcessIsUnresponsive.
+
+        * WebKitTestRunner/TestInvocation.cpp:
+        (WTR::TestInvocation::TestInvocation):
+        (WTR::TestInvocation::invoke):
+        * WebKitTestRunner/TestInvocation.h:
+        (TestInvocation):
+        * WebKitTestRunner/cairo/TestInvocationCairo.cpp:
+        (WTR::TestInvocation::dumpPixelsAndCompareWithExpected):
+        * WebKitTestRunner/qt/TestInvocationQt.cpp:
+        (WTR::TestInvocation::dumpPixelsAndCompareWithExpected):
+
+2012-11-28  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        Unreviewed. Use my personal email as bugzilla email.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-11-28  Thiago Marcos P. Santos  <thiago.santos@intel.com>
+
+        Unreviewed. Adding myself to committers.py.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-11-26  Andrey Adaikin  <aandrey@chromium.org>
+
+        Unreviewed. Adding myself to committers.py.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-11-28  Tommy Widenflycht  <tommyw@google.com>
+
+        Add basic implementation for MediaStreamAudioDestinationNode
+        https://bugs.webkit.org/show_bug.cgi?id=101815
+
+        Reviewed by Chris Rogers.
+
+        Adds a bit of code that exercises the WebKit API.
+
+        * DumpRenderTree/chromium/MockWebMediaStreamCenter.cpp:
+        (MockWebMediaStreamSourceConsumer):
+        (MockWebMediaStreamSourceConsumer::~MockWebMediaStreamSourceConsumer):
+        (MockWebMediaStreamCenter::didCreateMediaStream):
+
+2012-11-28  Matt Falkenhagen  <falken@chromium.org>
+
+        Unreviewed. Adding myself to committers list.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-11-27  Li Yin  <li.yin@intel.com>
+
+        Unreviewed. Adding myself to committers list.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-11-27  Christophe Dumez  <christophe.dumez@intel.com>
+
+        Unreviewed. Adding myself to committers.py.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-11-27  Vivek Galatage  <vivek.vg@samsung.com>
+
+        Unreviewd. Adding myself to committers list.
+
+        * Scripts/webkitpy/common/config/committers.py:
+
+2012-11-27  Tony Chang  <tony@chromium.org>
+
+        Bring back partytime!
+        https://bugs.webkit.org/show_bug.cgi?id=103466
+
+        Reviewed by Adam Barth.
+
+        "code 404, message Unknown function images/partytime_gif" since we didn't
+        allow .gif or .png files to be served.
+
+        * Scripts/webkitpy/tool/servers/gardeningserver.py:
+        (GardeningHTTPRequestHandler):
+
+2012-11-27  Adam Barth  <abarth@webkit.org>
+
+        run-perf-tests fails on Android because of stderr output
+        https://bugs.webkit.org/show_bug.cgi?id=103462
+
+        Reviewed by Ryosuke Niwa.
+
+        The chromium-android port produces some stderr output that causes
+        run-perf-tests to get sad and not record the results of the performance
+        test. This patch teaches run-perf-test to ignore this output much in
+        the same way that it currently ignores some stdout messages.
+
+        * Scripts/webkitpy/performance_tests/perftest.py:
+        (PerfTest.run):
+        (PerfTest._should_ignore_line):
+        (PerfTest):
+        (PerfTest._should_ignore_line_in_stderr):
+        (PerfTest._filter_stderr):
+        (PerfTest._should_ignore_line_in_parser_test_result):
+
+2012-11-27  Tony Chang  <tony@chromium.org>
+
+        Fix garden-o-matic for non-chromium ports
+        https://bugs.webkit.org/show_bug.cgi?id=103458
+
+        Reviewed by Adam Barth.
+
+        I was getting a 403 error when trying to select any non-chromium port.
+
+        * Scripts/webkitpy/tool/servers/reflectionhandler.py:
+        (ReflectionHandler._handle_request): Use the path without query params.
+
+2012-11-27  Yael Aharon  <yael.aharon@intel.com>
+
+        [EFL][WK2] 3D pixel tests are failing
+        https://bugs.webkit.org/show_bug.cgi?id=102833
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Generate a snapshot of the view in the UI process instead of the web process.
+        We have to use Texture Mapper in order to correctly paint 3D transforms etc.
+
+        * WebKitTestRunner/TestInvocation.h:
+        (TestInvocation):
+        * WebKitTestRunner/cairo/TestInvocationCairo.cpp:
+        (WTR::writeFunction):
+        (WTR::paintRepaintRectOverlay):
+        (WTR):
+        (WTR::TestInvocation::forceRepaintDoneCallback):
+        (WTR::TestInvocation::dumpPixelsAndCompareWithExpected):
+        * WebKitTestRunner/efl/PlatformWebViewEfl.cpp:
+        (WTR::PlatformWebView::windowSnapshotImage):
+
+2012-11-27  Adam Barth  <abarth@webkit.org>
+
+        Make it possible to run performance tests on Chromium Android
+        https://bugs.webkit.org/show_bug.cgi?id=103268
+
+        Reviewed by Ryosuke Niwa.
+
+        Based on a patch by Peter Beverloo.
+
+        This patch (almost) makes it possible to run WebKit performance tests
+        on the Chromium port for Android. There are a few things I had to do
+        in order to make this happen:
+
+        1) The worker number when creating a driver for a port is zero-based
+           for layout tests and elsewhere. Android uses this to determine
+           which device it has to run on, so make it zero based for performance
+           tests as well.
+
+        2) Tests aren't available on the Android device, so we start an HTTP
+           server that serves the tests to the device or emulator.
+
+        The one shortcoming of this patch is that chromium-android produces
+        some stderr output that confuses run-perf-tests. I'll address that
+        issue in a subsequent CL. This patch also depends on
+        https://codereview.chromium.org/11416182 in order to work.
+
+        * Scripts/webkitpy/layout_tests/port/chromium_android.py:
+        (ChromiumAndroidPort.start_http_server):
+        (ChromiumAndroidDriver._command_from_driver_input):
+        * Scripts/webkitpy/performance_tests/perftest.py:
+        (ReplayPerfTest.prepare):
+        * Scripts/webkitpy/performance_tests/perftestsrunner.py:
+        (PerfTestsRunner.__init__):
+        (PerfTestsRunner._parse_args):
+        (PerfTestsRunner._start_servers):
+        (PerfTestsRunner):
+        (PerfTestsRunner._stop_servers):
+        (PerfTestsRunner.run):
+        (PerfTestsRunner._run_tests_set):
+
+2012-11-27  Zan Dobersek  <zandobersek@gmail.com>
+
+        Remove use of deprecated logging from webkitpy.common and webkitpy.layout_tests
+        https://bugs.webkit.org/show_bug.cgi?id=103408
+
+        Reviewed by Dirk Pranke.
+
+        Remove the use of the deprecated log and error methods by replacing them with
+        logging through Python's logging.Logger objects.
+
+        This patch covers such changes in webkitpy.common and webkitpy.layout_tests and also
+        updates any affected unit test.
+
+        * Scripts/webkitpy/common/checkout/changelog.py:
+        (ChangeLogEntry._parse_entry):
+        * Scripts/webkitpy/common/checkout/checkout.py:
+        * Scripts/webkitpy/common/checkout/checkout_unittest.py:
+        (CheckoutTest.test_apply_patch):
+        * Scripts/webkitpy/common/checkout/deps_mock.py:
+        (MockDEPS.write_variable):
+        * Scripts/webkitpy/common/checkout/scm/detection.py:
+        (SCMDetector.default_scm):
+        * Scripts/webkitpy/common/checkout/scm/detection_unittest.py:
+        (SCMDetectorTest.test_detect_scm_system):
+        * Scripts/webkitpy/common/checkout/scm/git.py:
+        (Git._check_git_architecture):
+        (Git._commit_on_branch):
+        * Scripts/webkitpy/common/checkout/scm/scm.py:
+        (SCM.ensure_clean_working_directory):
+        (SCM.ensure_no_local_commits):
+        (SCM.will.commit_locally_with_message):
+        * Scripts/webkitpy/common/checkout/scm/svn.py:
+        (SVN.apply_reverse_diff):
+        * Scripts/webkitpy/common/net/bugzilla/attachment.py:
+        (Attachment._validate_flag_value):
+        * Scripts/webkitpy/common/net/bugzilla/bugzilla.py:
+        (Bugzilla._fetch_bug_page):
+        (Bugzilla.bug_id_for_attachment_id):
+        (Bugzilla.authenticate):
+        (Bugzilla._commit_queue_flag):
+        (Bugzilla.add_attachment_to_bug):
+        (Bugzilla.add_patch_to_bug):
+        (Bugzilla.create_bug):
+        (Bugzilla.clear_attachment_flags):
+        (Bugzilla.set_flag_on_attachment):
+        (Bugzilla.obsolete_attachment):
+        (Bugzilla.add_cc_to_bug):
+        (Bugzilla.post_comment_to_bug):
+        (Bugzilla.close_bug_as_fixed):
+        (Bugzilla.reassign_bug):
+        (reopen_bug):
+        * Scripts/webkitpy/common/net/bugzilla/bugzilla_mock.py:
+        (MockBugzilla.create_bug):
+        (MockBugzilla.reassign_bug):
+        (MockBugzilla.set_flag_on_attachment):
+        (MockBugzilla.post_comment_to_bug):
+        (MockBugzilla.add_attachment_to_bug):
+        (MockBugzilla.add_patch_to_bug):
+        (MockBugzilla.reopen_bug):
+        * Scripts/webkitpy/common/net/bugzilla/bugzilla_unittest.py:
+        (test_add_cc_to_bug):
+        (_assert_reopen):
+        (test_reopen_bug):
+        * Scripts/webkitpy/common/net/buildbot/buildbot_mock.py:
+        (MockBuilder.force_build):
+        * Scripts/webkitpy/common/net/credentials.py:
+        (Credentials._run_security_tool):
+        * Scripts/webkitpy/common/net/credentials_unittest.py:
+        (_assert_security_call):
+        * Scripts/webkitpy/common/net/irc/irc_mock.py:
+        (MockIRC.post):
+        (MockIRC.disconnect):
+        * Scripts/webkitpy/common/net/irc/ircproxy.py:
+        (IRCProxy.__init__):
+        (IRCProxy.disconnect):
+        * Scripts/webkitpy/common/net/irc/ircproxy_unittest.py:
+        (IRCProxyTest.test_trivial):
+        * Scripts/webkitpy/common/net/layouttestresults.py:
+        (ORWTResultsHTMLParser._failures_from_fail_row):
+        * Scripts/webkitpy/common/net/layouttestresults_unittest.py:
+        (test_failures_from_fail_row):
+        * Scripts/webkitpy/common/net/networktransaction.py:
+        * Scripts/webkitpy/common/net/resultsjsonparser.py:
+        (JSONTestResult._tokenize):
+        (JSONTestResult._failure_types_from_actual_result):
+        * Scripts/webkitpy/common/net/statusserver.py:
+        (StatusServer.update_status):
+        (StatusServer.update_svn_revision):
+        * Scripts/webkitpy/common/net/statusserver_mock.py:
+        (MockStatusServer.release_work_item):
+        (MockStatusServer.update_work_items):
+        (MockStatusServer.submit_to_ews):
+        (MockStatusServer.update_status):
+        * Scripts/webkitpy/common/net/unittestresults.py:
+        (UnitTestResults.results_from_string):
+        * Scripts/webkitpy/common/system/executive_mock.py:
+        (MockExecutive.running_pids):
+        (MockExecutive.run_and_throw_if_fail):
+        (MockExecutive.run_command):
+        (MockExecutive.popen):
+        * Scripts/webkitpy/common/system/user_mock.py:
+        (MockUser.confirm):
+        (MockUser.open_url):
+        * Scripts/webkitpy/common/system/workspace_unittest.py:
+        (WorkspaceTest.test_create_zip):
+        (WorkspaceTest.test_create_zip_exception):
+        * Scripts/webkitpy/common/watchlist/watchlist_mock.py:
+        (MockWatchList.determine_cc_and_messages):
+        * Scripts/webkitpy/layout_tests/port/chromium_win_unittest.py:
+        (ChromiumWinTest.test_setup_environ_for_server_register_cygwin):
+        * Scripts/webkitpy/layout_tests/port/efl_unittest.py:
+        (EflPortTest.test_show_results_html_file):
+        * Scripts/webkitpy/layout_tests/port/gtk_unittest.py:
+        (GtkPortTest.test_show_results_html_file):
+        * Scripts/webkitpy/layout_tests/port/mac_unittest.py:
+        (test_show_results_html_file):
+        * Scripts/webkitpy/layout_tests/port/port_testcase.py:
+        (test_build_driver):
+        * Scripts/webkitpy/layout_tests/port/qt_unittest.py:
+        (QtPortTest.test_show_results_html_file):
+        * Scripts/webkitpy/layout_tests/port/win_unittest.py:
+        (WinPortTest.test_show_results_html_file):
+        * Scripts/webkitpy/layout_tests/port/xvfbdriver_unittest.py:
+        (XvfbDriverTest.assertDriverStartSuccessful):
+        (XvfbDriverTest.test_start_no_pixel_tests):
+        (XvfbDriverTest.test_start_pixel_tests):
+        (XvfbDriverTest.test_start_arbitrary_worker_number):
+        (XvfbDriverTest.test_start_next_worker):
+        (XvfbDriverTest.test_stop):
+        * Scripts/webkitpy/layout_tests/servers/apache_http_server_unittest.py:
+        (TestLayoutTestApacheHttpd.test_start_cmd):
+        * Scripts/webkitpy/performance_tests/perftestsrunner_unittest.py:
+        (test_run_test_pause_before_testing):
+        (test_run_memory_test):
+        (_test_run_with_json_output):
+        (test_run_respects_no_results):
+        (test_run_generates_and_show_results_page):
+        (test_run_respects_no_show_results):
+        * Scripts/webkitpy/tool/bot/feeders_unittest.py:
+        (FeedersTest.test_commit_queue_feeder):
+        * Scripts/webkitpy/tool/bot/flakytestreporter_unittest.py:
+        (FlakyTestReporterTest.test_create_bug_for_flaky_test):
+        (test_report_flaky_tests_creating_bug):
+        * Scripts/webkitpy/tool/bot/irc_command_unittest.py:
+        (IRCCommandTest.test_rollout_updates_working_copy):
+        * Scripts/webkitpy/tool/bot/ircbot_unittest.py:
+        (IRCBotTest.test_exception_during_command):
+        (IRCBotTest.test_hi):
+        (IRCBotTest.test_help):
+        (IRCBotTest.test_restart):
+        (IRCBotTest.test_rollout):
+        (IRCBotTest.test_revert):
+        (IRCBotTest.test_roll_chromium_deps):
+        (IRCBotTest.test_roll_chromium_deps_to_lkgr):
+        (IRCBotTest.test_multi_rollout):
+        (IRCBotTest.test_rollout_with_r_in_svn_revision):
+        (IRCBotTest.test_multi_rollout_with_r_in_svn_revision):
+        (IRCBotTest.test_rollout_bananas):
+        (IRCBotTest.test_rollout_invalidate_revision):
+        (IRCBotTest.test_rollout_invalidate_reason):
+        (test_multi_rollout_invalidate_reason):
+        (test_rollout_no_reason):
+        (test_multi_rollout_no_reason):
+        * Scripts/webkitpy/tool/bot/sheriff_unittest.py:
+        (SheriffTest.test_post_blame_comment_on_bug):
+        * Scripts/webkitpy/tool/commands/applywatchlistlocal_unittest.py:
+        (ApplyWatchListLocalTest.test_args_parsing):
+        (test_args_parsing_with_bug):
+        * Scripts/webkitpy/tool/commands/download_unittest.py:
+        (test_land_cowboy):
+        (test_check_style):
+        (test_create_rollout):
+        (test_create_rollout_resolved):
+        (test_rollout):
+        * Scripts/webkitpy/tool/commands/earlywarningsystem_unittest.py:
+        (AbstractEarlyWarningSystemTest.test_failing_tests_message):
+        (EarlyWarningSytemTest._default_expected_logs):
+        (EarlyWarningSytemTest._test_builder_ews):
+        (EarlyWarningSytemTest._test_testing_ews):
+        * Scripts/webkitpy/tool/commands/openbugs_unittest.py:
+        (OpenBugsTest.test_args_parsing):
+        * Scripts/webkitpy/tool/commands/queries_unittest.py:
+        (QueryCommandsTest.test_bugs_to_commit):
+        (QueryCommandsTest.test_patches_in_commit_queue):
+        * Scripts/webkitpy/tool/commands/queues_unittest.py:
+        (FeederQueueTest.test_feeder_queue):
+        (AbstractPatchQueueTest.test_next_patch):
+        (AbstractPatchQueueTest.test_upload_results_archive_for_patch):
+        (CommitQueueTest.test_commit_queue):
+        (test_commit_queue_failure):
+        (test_commit_queue_failure_with_failing_tests):
+        (test_rollout):
+        (test_rollout_lands):
+        (test_auto_retry):
+        (test_manual_reject_during_processing):
+        (test_report_flaky_tests):
+        (StyleQueueTest.test_style_queue_with_style_exception):
+        (test_style_queue_with_watch_list_exception):
+        * Scripts/webkitpy/tool/commands/queuestest.py:
+        (QueuesTest._default_begin_work_queue_logs):
+        * Scripts/webkitpy/tool/commands/roll_unittest.py:
+        (RollCommandsTest.test_update_chromium_deps):
+        * Scripts/webkitpy/tool/commands/upload_unittest.py:
+        (UploadCommandsTest.test_assign_to_committer):
+        (test_post):
+        (test_attach_to_bug):
+        (test_attach_to_bug_no_description_or_comment):
+        (test_land_safely):
+        (test_prepare):
+        (test_upload):
+        (test_mark_bug_fixed):
+        * Scripts/webkitpy/tool/steps/applywatchlist_unittest.py:
+        (ApplyWatchListTest.test_apply_watch_list_local):
+        * Scripts/webkitpy/tool/steps/commit_unittest.py:
+        (CommitTest._test_check_test_expectations):
+        * Scripts/webkitpy/tool/steps/runtests_unittest.py:
+        (RunTestsTest.test_webkit_run_unit_tests):
+        * Scripts/webkitpy/tool/steps/steps_unittest.py:
+        (StepsTest._assert_step_output_with_bug):
+        (StepsTest._assert_post_diff_output_for_bug):
+        (StepsTest.test_post_diff):
+        (StepsTest.test_post_diff_for_commit):
+        (StepsTest.test_ensure_bug_is_open_and_assigned):
+        (StepsTest.test_runtests_args):
+        * Scripts/webkitpy/tool/steps/suggestreviewers_unittest.py:
+        (SuggestReviewersTest.test_basic):
+        * Scripts/webkitpy/tool/steps/validatechangelogs_unittest.py:
+        (ValidateChangeLogsTest._assert_start_line_produces_output):
+
+2012-11-27  Pratik Solanki  <psolanki@apple.com>
+
+        objc/objc-runtime.h does not exist on all PLATFORM(MAC)
+        https://bugs.webkit.org/show_bug.cgi?id=101780
+
+        Reviewed by Brent Fulgham.
+
+        Clean up header includes so we don't include objc/objc-runtime.h.
+
+        * DumpRenderTree/mac/DumpRenderTree.mm:
+        * DumpRenderTree/mac/ObjCPlugin.m:
+        * TestWebKitAPI/mac/InstanceMethodSwizzler.h:
+        * WebKitTestRunner/InjectedBundle/mac/ActivateFonts.mm:
+
+2012-11-27  Marja Hölttä  <marja@chromium.org>
+
+        Add callbacks to the FrameLoaderClient when a resource is requested
+        https://bugs.webkit.org/show_bug.cgi?id=92761
+
+        Reviewed by Adam Barth.
+
+        In Chromium, when an extension script cancels a network
+        request (which happens out of process), we'd like to
+        notify content scripts running on the current page about
+        which elements failed to load because the requests were
+        cancelled (as opposed to e.g. the network request just
+        didn't work). Since the resource request itself does not
+        carry any information what DOM element is was made for,
+        currently a content script has to search the DOM tree and
+        guess which requests will be cancelled by its counter
+        part. By adding these callbacks, the embedder can make
+        this connection explictly.
+
+        * DumpRenderTree/chromium/DRTTestRunner.cpp:
+        (DRTTestRunner::DRTTestRunner):
+        (DRTTestRunner::dumpResourceRequestCallbacks):
+        (DRTTestRunner::reset):
+        * DumpRenderTree/chromium/DRTTestRunner.h:
+        (DRTTestRunner):
+        (DRTTestRunner::setShouldDumpResourceRequestCallbacks):
+        (DRTTestRunner::shouldDumpResourceRequestCallbacks):
+        * DumpRenderTree/chromium/TestShell.h:
+        (TestShell::shouldDumpResourceRequestCallbacks):
+        * DumpRenderTree/chromium/WebViewHost.cpp:
+        (WebViewHost::willRequestResource):
+        * DumpRenderTree/chromium/WebViewHost.h:
+        (WebViewHost):
+
+2012-11-27  Víctor Manuel Jáquez Leal  <vjaquez@igalia.com>
+
+        [GStreamer] Verify if GStreamer was previously initialized
+        https://bugs.webkit.org/show_bug.cgi?id=103151
+
+        Reviewed by Philippe Normand.
+
+        This patch adds the gst_init() in GtkLauncher, so we can add the
+        GStreamer options in the command line through
+        gst_init_get_option_group().
+
+        This approach is not valid for MiniBrowser because it uses WebKit2,
+        where the GStreamer backend lives in the web process, which is
+        different from the UI process.
+
+        * GNUmakefile.am:
+        * GtkLauncher/main.c:
+        (main):
+
+2012-11-27  Andras Becsi  <andras.becsi@digia.com>
+
+        [Qt] Fix the build with new Qt5 hash
+        https://bugs.webkit.org/show_bug.cgi?id=103406
+
+        Reviewed by Csaba Osztrogonác.
+
+        Remove references to deprecated QApplication::GuiServer which
+        has been removed, and use QStyleFactory::create instead of
+        instantiating a QWindowsStyle directly since it is about to
+        become an internal class.
+
+        * DumpRenderTree/qt/DumpRenderTreeMain.cpp:
+        (main):
+        * QtTestBrowser/qttestbrowser.cpp:
+        (LauncherApplication::LauncherApplication):
+        * WebKitTestRunner/InjectedBundle/qt/InjectedBundleQt.cpp:
+        (WTR::InjectedBundle::platformInitialize):
+
+2012-11-27  Sadrul Habib Chowdhury  <sadrul@chromium.org>
+
+        [style] Add a style-check for enum-member names
+        https://bugs.webkit.org/show_bug.cgi?id=103157
+
+        Reviewed by Daniel Bates.
+
+        * Scripts/webkitpy/style/checkers/cpp.py:
+        (_EnumState):
+        (_EnumState.__init__):
+        (_EnumState.process_clean_line):
+        (check_enum_casing):
+        (check_style):
+        (process_line):
+        (_process_lines):
+        (CppChecker):
+        * Scripts/webkitpy/style/checkers/cpp_unittest.py:
+        (NoNonVirtualDestructorsTest.test_enum_casing):
+        (NoNonVirtualDestructorsTest.test_internal_braces.Foo):
+
+2012-11-26  Ryuan Choi  <ryuan.choi@gmail.com>
+
+        [EFL][jhbuild] Disable unnecessary options of elementary module
+        https://bugs.webkit.org/show_bug.cgi?id=103360
+
+        Reviewed by Gyuyoung Kim.
+
+        When jhbuild configures elementary, unnecessary options may be enabled by
+        user installed modules and it causes build break.
+
+        * efl/jhbuild.modules:
+        Added --disable-emap --disable-ethumb --disable-eweather to elementary.
+
+2012-11-26  Varun Jain  <varunjain@chromium.org>
+
+        LongPress and LongTap gestures should start drag/drop and open context menu respectively.
+        https://bugs.webkit.org/show_bug.cgi?id=101545
+
+        Reviewed by Antonio Gomes.
+
+        For LongPress, we simulate drag by sending a mouse down and mouse drag
+        events. If a drag is not started (because maybe there is no draggable
+        element), then we show context menu instead (which is the current
+        behavior for LongPress). For LongTap, we use the existing functions that
+        LongPress uses to summon the context menu. LongPress initiated drag and
+        drop can be enabled/disabled by the platform using the Setting
+        touchDragDropEnabled which is disabled by default.
+
+        * DumpRenderTree/chromium/TestRunner/src/EventSender.cpp:
+        (WebTestRunner):
+        (WebTestRunner::EventSender::EventSender):
+        (WebTestRunner::EventSender::gestureLongTap):
+        (WebTestRunner::EventSender::gestureEvent):
+        * DumpRenderTree/chromium/TestRunner/src/EventSender.h:
+        (EventSender):
+        * DumpRenderTree/chromium/TestRunner/src/TestRunner.cpp:
+        (WebTestRunner::TestRunner::TestRunner):
+        (WebTestRunner::TestRunner::setTouchDragDropEnabled):
+        (WebTestRunner):
+        * DumpRenderTree/chromium/TestRunner/src/TestRunner.h:
+        (TestRunner):
+
+2012-11-26  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL][WK2] Add setting to enable / disable HTML5 local storage functionality
+        https://bugs.webkit.org/show_bug.cgi?id=103224
+
+        Reviewed by Laszlo Gombos.
+
+        Add --local-storage command line argument to MiniBrowser to
+        explicitely disable HTML5 local storage functionality. This
+        is useful for testing purposes.
+
+        * MiniBrowser/efl/main.c:
+        (window_create):
+        (elm_main):
+
+2012-11-26  Zan Dobersek  <zandobersek@gmail.com>
+
+        Remove use of deprecated logging from most of webkitpy.tool
+        https://bugs.webkit.org/show_bug.cgi?id=103180
+
+        Reviewed by Dirk Pranke.
+
+        Remove calls to log and error methods of the deprecated_logging module, replacing them
+        by using Python's Logger objects. This patch covers the switch in all of webkitpy.tool
+        except the QueueEngine.
+
+        Unit tests are adjusted for these changes, moving output from expected stderr to expected logs.
+
+        * Scripts/webkitpy/tool/bot/commitqueuetask_unittest.py:
+        (MockCommitQueue.run_command):
+        (MockCommitQueue.command_passed):
+        (MockCommitQueue.command_failed):
+        (MockCommitQueue.report_flaky_tests):
+        (MockCommitQueue.archive_last_test_results):
+        (CommitQueueTaskTest._run_through_task):
+        (CommitQueueTaskTest.test_success_case):
+        (test_fast_success_case):
+        (test_clean_failure):
+        (test_update_failure):
+        (test_apply_failure):
+        (test_validate_changelog_failure):
+        (test_build_failure):
+        (test_red_build_failure):
+        (test_flaky_test_failure):
+        (test_failed_archive):
+        (test_double_flaky_test_failure):
+        (test_test_failure):
+        (test_red_test_failure):
+        (test_very_red_tree_retry):
+        (test_red_tree_patch_rejection):
+        (test_land_failure):
+        * Scripts/webkitpy/tool/bot/feeders.py:
+        (CommitQueueFeeder._update_work_items):
+        (EWSFeeder.feed):
+        * Scripts/webkitpy/tool/bot/feeders_unittest.py:
+        * Scripts/webkitpy/tool/bot/layouttestresultsreader.py:
+        (LayoutTestResultsReader.archive):
+        * Scripts/webkitpy/tool/bot/layouttestresultsreader_unittest.py:
+        (test_archive_last_layout_test_results):
+        * Scripts/webkitpy/tool/bot/sheriff.py:
+        * Scripts/webkitpy/tool/commands/abstractsequencedcommand.py:
+        (AbstractSequencedCommand.execute):
+        * Scripts/webkitpy/tool/commands/commandtest.py:
+        (CommandsTest.assert_execute_outputs):
+        * Scripts/webkitpy/tool/commands/download.py:
+        (AbstractPatchProcessingCommand._process_patch.execute):
+        (ProcessBugsMixin._fetch_list_of_patches_to_process):
+        (ProcessURLsMixin._fetch_list_of_patches_to_process):
+        (AbstractRolloutPrepCommand._commit_info):
+        * Scripts/webkitpy/tool/commands/download_unittest.py:
+        (AbstractRolloutPrepCommandTest.test_commit_info):
+        (DownloadCommandsTest.test_build):
+        (DownloadCommandsTest.test_build_and_test):
+        (test_apply_attachment):
+        (test_apply_from_bug):
+        (test_apply_watch_list):
+        (test_land):
+        (test_land_red_builders):
+        (test_check_style):
+        (test_build_attachment):
+        (test_land_attachment):
+        (test_land_from_bug):
+        (test_land_from_url):
+        (test_prepare_rollout):
+        (test_create_rollout):
+        (test_create_rollout_resolved):
+        (test_rollout):
+        * Scripts/webkitpy/tool/commands/earlywarningsystem.py:
+        (AbstractEarlyWarningSystem.handle_script_error.does):
+        * Scripts/webkitpy/tool/commands/earlywarningsystem_unittest.py:
+        (EarlyWarningSytemTest._default_expected_stderr):
+        (EarlyWarningSytemTest._default_expected_logs):
+        (EarlyWarningSytemTest._test_testing_ews):
+        * Scripts/webkitpy/tool/commands/openbugs.py:
+        (OpenBugs.execute):
+        * Scripts/webkitpy/tool/commands/openbugs_unittest.py:
+        (OpenBugsTest.test_args_parsing):
+        * Scripts/webkitpy/tool/commands/perfalizer.py:
+        (Perfalizer.handle_unexpected_error):
+        * Scripts/webkitpy/tool/commands/queries.py:
+        (PatchesInCommitQueue.execute):
+        (PatchesToCommitQueue._needs_commit_queue):
+        * Scripts/webkitpy/tool/commands/queries_unittest.py:
+        (QueryCommandsTest.test_bugs_to_commit):
+        (QueryCommandsTest.test_patches_in_commit_queue):
+        (QueryCommandsTest.test_patches_to_commit_queue):
+        * Scripts/webkitpy/tool/commands/queues.py:
+        (AbstractQueue._cc_watchers):
+        (AbstractQueue.begin_work_queue):
+        (FeederQueue.handle_unexpected_error):
+        (CommitQueue.handle_script_error):
+        (AbstractReviewQueue.handle_unexpected_error):
+        (AbstractReviewQueue.handle_script_error):
+        * Scripts/webkitpy/tool/commands/queues_unittest.py:
+        (test_auto_retry):
+        * Scripts/webkitpy/tool/commands/queuestest.py:
+        (QueuesTest.assert_outputs):
+        (QueuesTest._default_begin_work_queue_stderr):
+        (QueuesTest):
+        (QueuesTest._default_begin_work_queue_logs):
+        (QueuesTest.assert_queue_outputs):
+        * Scripts/webkitpy/tool/commands/roll_unittest.py:
+        (RollCommandsTest.test_update_chromium_deps):
+        (test_update_chromium_deps_older_revision):
+        * Scripts/webkitpy/tool/commands/sheriffbot.py:
+        (SheriffBot.handle_unexpected_error):
+        * Scripts/webkitpy/tool/commands/stepsequence.py:
+        (StepSequence.run_and_handle_errors):
+        * Scripts/webkitpy/tool/commands/upload.py:
+        (AssignToCommitter._assign_bug_to_last_patch_attacher):
+        (AbstractPatchUploadingCommand._prepare_state):
+        (PostCommits.execute):
+        (MarkBugFixed._determine_bug_id_and_svn_revision):
+        (MarkBugFixed.execute):
+        (CreateBug.create_bug_from_commit):
+        (CreateBug.execute):
+        * Scripts/webkitpy/tool/commands/upload_unittest.py:
+        (test_obsolete_attachments):
+        (test_land_safely):
+        (test_mark_bug_fixed):
+        * Scripts/webkitpy/tool/multicommandtool.py:
+        (Command.check_arguments_and_execute):
+        (MultiCommandTool.main):
+        * Scripts/webkitpy/tool/multicommandtool_unittest.py:
+        (CommandTest.test_required_arguments):
+        * Scripts/webkitpy/tool/steps/addsvnmimetypeforpng.py:
+        (AddSvnMimetypeForPng.run):
+        * Scripts/webkitpy/tool/steps/applypatch.py:
+        (ApplyPatch.run):
+        * Scripts/webkitpy/tool/steps/build.py:
+        (Build.run):
+        * Scripts/webkitpy/tool/steps/checkstyle.py:
+        * Scripts/webkitpy/tool/steps/closebug.py:
+        (CloseBug.run):
+        * Scripts/webkitpy/tool/steps/closebugforlanddiff.py:
+        (CloseBugForLandDiff.run):
+        * Scripts/webkitpy/tool/steps/closebugforlanddiff_unittest.py:
+        (CloseBugForLandDiffTest.test_empty_state):
+        * Scripts/webkitpy/tool/steps/commit.py:
+        (Commit.run):
+        * Scripts/webkitpy/tool/steps/commit_unittest.py:
+        (CommitTest._test_check_test_expectations):
+        * Scripts/webkitpy/tool/steps/ensurelocalcommitifneeded.py:
+        (EnsureLocalCommitIfNeeded.run):
+        * Scripts/webkitpy/tool/steps/obsoletepatches.py:
+        (ObsoletePatches.run):
+        * Scripts/webkitpy/tool/steps/preparechangelog.py:
+        (PrepareChangeLog.run):
+        * Scripts/webkitpy/tool/steps/reopenbugafterrollout.py:
+        (ReopenBugAfterRollout.run):
+        * Scripts/webkitpy/tool/steps/runtests.py:
+        (RunTests.run):
+        * Scripts/webkitpy/tool/steps/runtests_unittest.py:
+        (RunTestsTest.test_webkit_run_unit_tests):
+        * Scripts/webkitpy/tool/steps/steps_unittest.py:
+        (StepsTest.test_update_step):
+        (StepsTest.test_runtests_args):
+        * Scripts/webkitpy/tool/steps/update.py:
+        (Update.run):
+        * Scripts/webkitpy/tool/steps/updatechangelogswithreview_unittest.py:
+        (UpdateChangeLogsWithReviewerTest.test_guess_reviewer_from_bug):
+        (UpdateChangeLogsWithReviewerTest.test_guess_reviewer_from_multipatch_bug):
+        * Scripts/webkitpy/tool/steps/updatechangelogswithreviewer.py:
+        (UpdateChangeLogsWithReviewer._guess_reviewer_from_bug):
+        (UpdateChangeLogsWithReviewer.run):
+        * Scripts/webkitpy/tool/steps/updatechromiumdeps.py:
+        (UpdateChromiumDEPS._validate_revisions):
+        (UpdateChromiumDEPS.run):
+        * Scripts/webkitpy/tool/steps/validatechangelogs.py:
+        (ValidateChangeLogs._check_changelog_diff):
+        (ValidateChangeLogs.run):
+        * Scripts/webkitpy/tool/steps/validatechangelogs_unittest.py:
+        (ValidateChangeLogsTest._assert_start_line_produces_output):
+        * Scripts/webkitpy/tool/steps/validatereviewer.py:
+        (ValidateReviewer.run):
+
+2012-11-26  Zan Dobersek  <zandobersek@gmail.com>
+
+        Coverage testing in webkitpy should omit some paths
+        https://bugs.webkit.org/show_bug.cgi?id=103267
+
+        Reviewed by Dirk Pranke.
+
+        Omit testing coverage of any file under /usr directory and any file
+        that is of third party origin and was autoinstalled.
+
+        * Scripts/webkitpy/test/main.py:
+        (Tester._run_tests):
+
+2012-11-26  Jaehun Lim  <ljaehun.lim@samsung.com>
+
+        Text Autosizing: Add Text Autosizing APIs for WK2
+        https://bugs.webkit.org/show_bug.cgi?id=100633
+
+        Reviewed by Sam Weinig.
+
+        Add test cases for Text Autosizing in WKPreferences.
+
+        * TestWebKitAPI/Tests/WebKit2/WKPreferences.cpp:
+        (TestWebKitAPI::TEST):
+
 2012-11-26  Pierre Rossi  <pierre.rossi@gmail.com>
 
         [Qt] REGRESSION(r135575): It made all tests assert

@@ -455,6 +455,7 @@ void RenderInline::splitFlow(RenderObject* beforeChild, RenderBlock* newBlockBox
         // We can reuse this block and make it the preBlock of the next continuation.
         pre = block;
         pre->removePositionedObjects(0);
+        pre->removeFloatingObjects();
         block = block->containingBlock();
     } else {
         // No anonymous block available for use.  Make one.
@@ -772,6 +773,47 @@ bool RenderInline::nodeAtPoint(const HitTestRequest& request, HitTestResult& res
                                 const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction hitTestAction)
 {
     return m_lineBoxes.hitTest(this, request, result, locationInContainer, accumulatedOffset, hitTestAction);
+}
+
+namespace {
+
+class HitTestCulledInlinesGeneratorContext {
+public:
+    HitTestCulledInlinesGeneratorContext(Region& region, const HitTestLocation& location) : m_intersected(false), m_region(region), m_location(location) { }
+    void operator()(const FloatRect& rect)
+    {
+        m_intersected = m_intersected || m_location.intersects(rect);
+        m_region.unite(enclosingIntRect(rect));
+    }
+    bool intersected() const { return m_intersected; }
+private:
+    bool m_intersected;
+    Region& m_region;
+    const HitTestLocation& m_location;
+};
+
+} // unnamed namespace
+
+bool RenderInline::hitTestCulledInline(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset)
+{
+    ASSERT(result.isRectBasedTest() && !alwaysCreateLineBoxes());
+    if (!visibleToHitTesting())
+        return false;
+
+    HitTestLocation tmpLocation(locationInContainer, -toLayoutSize(accumulatedOffset));
+
+    Region regionResult;
+    HitTestCulledInlinesGeneratorContext context(regionResult, tmpLocation);
+    generateCulledLineBoxRects(context, this);
+
+    if (context.intersected()) {
+        updateHitTestResult(result, tmpLocation.point());
+        // We can not use addNodeToRectBasedTestResult to determine if we fully enclose the hit-test area
+        // because it can only handle rectangular targets.
+        result.addNodeToRectBasedTestResult(node(), request, locationInContainer);
+        return regionResult.contains(enclosingIntRect(tmpLocation.boundingBox()));
+    }
+    return false;
 }
 
 VisiblePosition RenderInline::positionForPoint(const LayoutPoint& point)

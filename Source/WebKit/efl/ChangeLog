@@ -1,3 +1,77 @@
+2012-11-29  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Broken rendering occurs when scrolling in ewk_view_single.
+        https://bugs.webkit.org/show_bug.cgi?id=77325
+
+        Reviewed by Gyuyoung Kim.
+
+        After r104687, broken rendering occurs when scrolling contents.
+        It's because scrollWidth can be smaller than width of image buffer.
+
+        This patch fixes it and renames parameter to avoid confusion.
+
+        * ewk/ewk_view_single.cpp:
+        (_ewk_view_screen_move):
+        (_ewk_view_single_scroll_process_single):
+
+2012-11-28  Ryuan Choi  <ryuan.choi@gmail.com>
+
+        [EFL] Generate big_button_theme.edj
+        https://bugs.webkit.org/show_bug.cgi?id=103511
+
+        Reviewed by Gyuyoung Kim.
+
+        big_button_theme.edj, binary file which is used for test, should be generated.
+
+        * DefaultTheme/CMakeLists.txt:
+        Introduced macro and new target to share files of default theme instead
+        of adding many files for big_button_theme.
+        * DefaultTheme/widget/button/button.edc:
+        Implemented for big_button_theme.
+
+2012-11-28  Ryuan Choi  <ryuan.choi@gmail.com>
+
+        [EFL] Refactor theme to choose whether to support foreground color of selection
+        https://bugs.webkit.org/show_bug.cgi?id=102037
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * DefaultTheme/default.edc:
+        Refactored color classes from active/inactive to foreground/background.
+
+2012-11-27  James Simonsen  <simonjam@chromium.org>
+
+        Consolidate FrameLoader::load() into one function taking a FrameLoadRequest
+        https://bugs.webkit.org/show_bug.cgi?id=102151
+
+        Reviewed by Adam Barth.
+
+        * ewk/ewk_frame.cpp:
+        (_ewk_frame_contents_set_internal):
+
+2012-11-27  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r135786.
+        http://trac.webkit.org/changeset/135786
+        https://bugs.webkit.org/show_bug.cgi?id=103379
+
+        It made 3 plugin tests timeout on several platforms (Requested
+        by Ossy on #webkit).
+
+        * ewk/ewk_frame.cpp:
+        (ewk_frame_uri_set):
+        (_ewk_frame_contents_set_internal):
+
+2012-11-26  James Simonsen  <simonjam@chromium.org>
+
+        Consolidate FrameLoader::load() into one function taking a FrameLoadRequest
+        https://bugs.webkit.org/show_bug.cgi?id=102151
+
+        Reviewed by Adam Barth.
+
+        * ewk/ewk_frame.cpp:
+        (_ewk_frame_contents_set_internal):
+
 2012-11-24  Viatcheslav Ostapenko  <v.ostapenko@samsung.com>
 
         [EFL] Layout test comes to crash on WK1

@@ -155,11 +155,9 @@ const int showTreeCharacterOffset = 39;
 
 // Base class for all rendering tree objects.
 class RenderObject : public CachedImageClient {
-    friend class LayoutRepainter;
     friend class RenderBlock;
     friend class RenderLayer;
     friend class RenderObjectChildList;
-    friend class RenderSVGContainer;
 public:
     // Anonymous objects should pass the document as their node, and they will then automatically be
     // marked as anonymous in the constructor.
@@ -243,7 +241,7 @@ public:
     // Function to return our enclosing flow thread if we are contained inside one.
     RenderFlowThread* enclosingRenderFlowThread() const;
 
-    RenderNamedFlowThread* enclosingRenderNamedFlowThread() const;
+    RenderNamedFlowThread* renderNamedFlowThreadWrapper() const;
 
     virtual bool isEmpty() const { return firstChild() == 0; }
 
@@ -811,6 +809,7 @@ public:
     IntRect pixelSnappedAbsoluteClippedOverflowRect() const;
     virtual LayoutRect clippedOverflowRectForRepaint(const RenderLayerModelObject* repaintContainer) const;
     virtual LayoutRect rectWithOutlineForRepaint(const RenderLayerModelObject* repaintContainer, LayoutUnit outlineWidth) const;
+    virtual LayoutRect outlineBoundsForRepaint(const RenderLayerModelObject* /*repaintContainer*/, const RenderGeometryMap* = 0) const { return LayoutRect(); }
 
     // Given a rect in the object's coordinate space, compute a rect suitable for repainting
     // that rect in view coordinates.
@@ -980,14 +979,15 @@ protected:
     virtual void willBeDestroyed();
     void arenaDelete(RenderArena*, void* objectBase);
 
-    virtual LayoutRect outlineBoundsForRepaint(const RenderLayerModelObject* /*repaintContainer*/, const RenderGeometryMap* = 0) const { return LayoutRect(); }
-
     virtual bool canBeReplacedWithInlineRunIn() const;
 
     virtual void insertedIntoTree();
     virtual void willBeRemovedFromTree();
 
 private:
+    void removeFromRenderFlowThread();
+    void removeFromRenderFlowThreadRecursive(RenderFlowThread*);
+
     RenderStyle* cachedFirstLineStyle() const;
     StyleDifference adjustStyleDifference(StyleDifference, unsigned contextSensitiveProperties) const;
 

@@ -129,13 +129,7 @@ ALWAYS_INLINE void JSObject::copyButterfly(CopyVisitor& visitor, Butterfly* butt
             size_t count;
             
             switch (structure->indexingType()) {
-            case ALL_UNDECIDED_INDEXING_TYPES: {
-                currentTarget = 0;
-                currentSource = 0;
-                count = 0;
-                break;
-            }
-                
+            case ALL_UNDECIDED_INDEXING_TYPES:
             case ALL_CONTIGUOUS_INDEXING_TYPES:
             case ALL_INT32_INDEXING_TYPES:
             case ALL_DOUBLE_INDEXING_TYPES: {
@@ -190,7 +184,7 @@ ALWAYS_INLINE void JSObject::visitButterfly(SlotVisitor& visitor, Butterfly* but
 
     // Mark the properties.
     visitor.appendValues(butterfly->propertyStorage() - storageSize, storageSize);
-    visitor.copyLater(butterfly->base(preCapacity, propertyCapacity), capacityInBytes);
+    visitor.copyLater(this, butterfly->base(preCapacity, propertyCapacity), capacityInBytes);
     
     // Mark the array if appropriate.
     switch (structure->indexingType()) {

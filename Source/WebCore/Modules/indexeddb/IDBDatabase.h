@@ -68,7 +68,6 @@ public:
     PassRefPtr<IDBTransaction> transaction(ScriptExecutionContext*, const Vector<String>&, const String& mode, ExceptionCode&);
     PassRefPtr<IDBTransaction> transaction(ScriptExecutionContext*, const String&, const String& mode, ExceptionCode&);
     void deleteObjectStore(const String& name, ExceptionCode&);
-    PassRefPtr<IDBVersionChangeRequest> setVersion(ScriptExecutionContext*, const String& version, ExceptionCode&);
     void close();
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(abort);
@@ -98,6 +97,8 @@ public:
     {
         return findObjectStoreId(name) != IDBObjectStoreMetadata::InvalidId;
     }
+
+    static int64_t nextTransactionId();
 
     using RefCounted<IDBDatabase>::ref;
     using RefCounted<IDBDatabase>::deref;
@@ -129,8 +130,6 @@ private:
     Vector<RefPtr<Event> > m_enqueuedEvents;
 
     RefPtr<IDBDatabaseCallbacks> m_databaseCallbacks;
-
-    bool m_didSpamConsole;
 };
 
 } // namespace WebCore

@@ -181,7 +181,7 @@
 #import <WebKitSystemInterface.h>
 #import <mach-o/dyld.h>
 #import <objc/objc-auto.h>
-#import <objc/objc-runtime.h>
+#import <objc/runtime.h>
 #import <runtime/ArrayPrototype.h>
 #import <runtime/DateInstance.h>
 #import <runtime/InitializeThreading.h>
@@ -1686,9 +1686,7 @@ static inline IMP getMethod(id o, SEL s)
     // for backwards compatibility.
     Page* page = core(self);
     if (page) {
-        unsigned milestones = 0;
-        if (cache->didFirstLayoutInFrameFunc)
-            milestones |= DidFirstLayout;
+        unsigned milestones = DidFirstLayout;
         if (cache->didFirstVisuallyNonEmptyLayoutInFrameFunc)
             milestones |= DidFirstVisuallyNonEmptyLayout;
         page->addLayoutMilestones(static_cast<LayoutMilestones>(milestones));

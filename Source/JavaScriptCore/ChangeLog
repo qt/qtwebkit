@@ -1,3 +1,420 @@
+2012-11-28  Filip Pizlo  <fpizlo@apple.com>
+
+        SpeculatedType dumping should not use the static char buffer[thingy] idiom
+        https://bugs.webkit.org/show_bug.cgi?id=103584
+
+        Reviewed by Michael Saboff.
+
+        Changed SpeculatedType to be "dumpable" by saying things like:
+        
+        dataLog("thingy = ", SpeculationDump(thingy))
+        
+        Removed the old stringification functions, and changed all code that referred to them
+        to use the new dataLog()/print() style.
+
+        * CMakeLists.txt:
+        * GNUmakefile.list.am:
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * Target.pri:
+        * bytecode/SpeculatedType.cpp:
+        (JSC::dumpSpeculation):
+        (JSC::speculationToAbbreviatedString):
+        (JSC::dumpSpeculationAbbreviated):
+        * bytecode/SpeculatedType.h:
+        * bytecode/ValueProfile.h:
+        (JSC::ValueProfileBase::dump):
+        * bytecode/VirtualRegister.h:
+        (WTF::printInternal):
+        * dfg/DFGAbstractValue.h:
+        (JSC::DFG::AbstractValue::dump):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::injectLazyOperandSpeculation):
+        (JSC::DFG::ByteCodeParser::getPredictionWithoutOSRExit):
+        * dfg/DFGGraph.cpp:
+        (JSC::DFG::Graph::dump):
+        (JSC::DFG::Graph::predictArgumentTypes):
+        * dfg/DFGGraph.h:
+        (Graph):
+        * dfg/DFGStructureAbstractValue.h:
+        * dfg/DFGVariableAccessDataDump.cpp: Added.
+        (JSC::DFG::VariableAccessDataDump::VariableAccessDataDump):
+        (JSC::DFG::VariableAccessDataDump::dump):
+        * dfg/DFGVariableAccessDataDump.h: Added.
+        (VariableAccessDataDump):
+
+2012-11-28  Michael Saboff  <msaboff@apple.com>
+
+        Change Bytecompiler s_dumpsGeneratedCode to an Options value
+        https://bugs.webkit.org/show_bug.cgi?id=103588
+
+        Reviewed by Filip Pizlo.
+
+        Moved the control of dumping bytecodes to Options::dumpGeneratedBytecodes.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::CodeBlock):
+        * bytecompiler/BytecodeGenerator.cpp:
+        * bytecompiler/BytecodeGenerator.h:
+        * jsc.cpp:
+        (runWithScripts):
+        * runtime/Options.h:
+
+2012-11-28  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Copying phase should use work lists
+        https://bugs.webkit.org/show_bug.cgi?id=101390
+
+        Reviewed by Filip Pizlo.
+
+        * JavaScriptCore.xcodeproj/project.pbxproj:
+        * heap/BlockAllocator.cpp:
+        (JSC::BlockAllocator::BlockAllocator):
+        * heap/BlockAllocator.h: New RegionSet for CopyWorkListSegments.
+        (BlockAllocator):
+        (JSC::CopyWorkListSegment):
+        * heap/CopiedBlock.h: Added a per-block CopyWorkList to keep track of the JSCells that need to be revisited during the copying
+        phase to copy their backing stores.
+        (CopiedBlock):
+        (JSC::CopiedBlock::CopiedBlock): 
+        (JSC::CopiedBlock::didSurviveGC):
+        (JSC::CopiedBlock::didEvacuateBytes): There is now a one-to-one relationship between GCThreads and the CopiedBlocks they're 
+        responsible for evacuating, we no longer need any of that fancy compare and swap stuff. 
+        (JSC::CopiedBlock::pin):
+        (JSC::CopiedBlock::hasWorkList): 
+        (JSC::CopiedBlock::workList):
+        * heap/CopiedBlockInlines.h: Added.
+        (JSC::CopiedBlock::reportLiveBytes): Since we now have to grab a SpinLock to perform operations on the CopyWorkList during marking,
+        we don't need to do any of that fancy compare and swap stuff we were doing for tracking live bytes.
+        * heap/CopiedSpace.h:
+        (CopiedSpace):
+        * heap/CopiedSpaceInlines.h:
+        (JSC::CopiedSpace::pin):
+        * heap/CopyVisitor.cpp:
+        (JSC::CopyVisitor::copyFromShared): We now iterate over a range of CopiedBlocks rather than MarkedBlocks and revisit the cells in those
+        blocks' CopyWorkLists.
+        * heap/CopyVisitor.h:
+        (CopyVisitor):
+        * heap/CopyVisitorInlines.h:
+        (JSC::CopyVisitor::visitCell): The function responsible for calling the correct copyBackingStore() function for each JSCell from 
+        a CopiedBlock's CopyWorkList.
+        (JSC::CopyVisitor::didCopy): We no longer need to check if the block is empty here because we know exactly when we're done 
+        evacuating a CopiedBlock, which is when we've gone through all of the CopiedBlock's CopyWorkList.
+        * heap/CopyWorkList.h: Added.
+        (CopyWorkListSegment): Individual chunk of a CopyWorkList that is allocated from the BlockAllocator.
+        (JSC::CopyWorkListSegment::create):
+        (JSC::CopyWorkListSegment::size):
+        (JSC::CopyWorkListSegment::isFull):
+        (JSC::CopyWorkListSegment::get):
+        (JSC::CopyWorkListSegment::append):
+        (JSC::CopyWorkListSegment::CopyWorkListSegment):
+        (JSC::CopyWorkListSegment::data):
+        (JSC::CopyWorkListSegment::endOfBlock):
+        (CopyWorkListIterator): Responsible for giving CopyVisitors a contiguous notion of access across the separate CopyWorkListSegments
+        that make up each CopyWorkList.
+        (JSC::CopyWorkListIterator::get):
+        (JSC::CopyWorkListIterator::operator*):
+        (JSC::CopyWorkListIterator::operator->):
+        (JSC::CopyWorkListIterator::operator++):
+        (JSC::CopyWorkListIterator::operator==):
+        (JSC::CopyWorkListIterator::operator!=):
+        (JSC::CopyWorkListIterator::CopyWorkListIterator):
+        (CopyWorkList): Data structure that keeps track of the JSCells that need copying in a particular CopiedBlock.
+        (JSC::CopyWorkList::CopyWorkList):
+        (JSC::CopyWorkList::~CopyWorkList):
+        (JSC::CopyWorkList::append):
+        (JSC::CopyWorkList::begin):
+        (JSC::CopyWorkList::end):
+        * heap/GCThreadSharedData.cpp:
+        (JSC::GCThreadSharedData::GCThreadSharedData): We no longer use the m_blockSnapshot from the Heap during the copying phase.
+        (JSC::GCThreadSharedData::didStartCopying): We now copy the set of all blocks in the CopiedSpace to a separate vector for 
+        iterating over during the copying phase since the set stored in the CopiedSpace will change as blocks are evacuated and 
+        recycled throughout the copying phase.
+        * heap/GCThreadSharedData.h:
+        (GCThreadSharedData): 
+        * heap/Heap.h:
+        (Heap):
+        * heap/SlotVisitor.h: We now need to know the object who is being marked that has a backing store so that we can store it 
+        in a CopyWorkList to revisit later during the copying phase.
+        * heap/SlotVisitorInlines.h:
+        (JSC::SlotVisitor::copyLater):
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::visitButterfly):
+
+2012-11-28  Filip Pizlo  <fpizlo@apple.com>
+
+        Disassembly methods should be able to disassemble to any PrintStream& rather than always using WTF::dataFile()
+        https://bugs.webkit.org/show_bug.cgi?id=103492
+
+        Reviewed by Mark Hahnenberg.
+
+        Switched disassembly code to use PrintStream&, and to use print() rather than printf().
+
+        * dfg/DFGDisassembler.cpp:
+        (JSC::DFG::Disassembler::dump):
+        (DFG):
+        (JSC::DFG::Disassembler::dumpDisassembly):
+        * dfg/DFGDisassembler.h:
+        (Disassembler):
+        * dfg/DFGGraph.cpp:
+        (JSC::DFG::printWhiteSpace):
+        (JSC::DFG::Graph::dumpCodeOrigin):
+        (JSC::DFG::Graph::printNodeWhiteSpace):
+        (JSC::DFG::Graph::dump):
+        (DFG):
+        (JSC::DFG::Graph::dumpBlockHeader):
+        * dfg/DFGGraph.h:
+        (Graph):
+        * jit/JITDisassembler.cpp:
+        (JSC::JITDisassembler::dump):
+        (JSC::JITDisassembler::dumpForInstructions):
+        (JSC::JITDisassembler::dumpDisassembly):
+        * jit/JITDisassembler.h:
+        (JITDisassembler):
+
+2012-11-28  Filip Pizlo  <fpizlo@apple.com>
+
+        It should be possible to say dataLog("count = ", count, "\n") instead of dataLogF("count = %d\n", count)
+        https://bugs.webkit.org/show_bug.cgi?id=103009
+
+        Reviewed by Michael Saboff.
+
+        Instead of converting all of JSC to use the new dataLog()/print() methods, I just changed
+        one place: dumping of abstract values. This is mainly just to ensure that the code I
+        added to WTF is actually doing things.
+
+        * bytecode/CodeBlock.cpp:
+        (JSC::CodeBlock::dump):
+        * dfg/DFGAbstractValue.h:
+        (JSC::DFG::AbstractValue::dump):
+        (WTF):
+        (WTF::printInternal):
+        * dfg/DFGStructureAbstractValue.h:
+        (JSC::DFG::StructureAbstractValue::dump):
+        (WTF):
+        (WTF::printInternal):
+
+2012-11-28  Oliver Hunt  <oliver@apple.com>
+
+        Make source cache include more information about the function extent.
+        https://bugs.webkit.org/show_bug.cgi?id=103552
+
+        Reviewed by Gavin Barraclough.
+
+        Add a bit more information to the source cache.
+
+        * parser/Parser.cpp:
+        (JSC::::parseFunctionInfo):
+           Store the function start offset
+        * parser/SourceProviderCacheItem.h:
+        (JSC::SourceProviderCacheItem::SourceProviderCacheItem):
+        (SourceProviderCacheItem):
+           Add additional field for the start of the real function string, and re-arrange
+           fields to avoid growing the struct.
+
+2012-11-27  Filip Pizlo  <fpizlo@apple.com>
+
+        Convert some remaining uses of FILE* to PrintStream&.
+
+        Rubber stamped by Mark Hahnenberg.
+
+        * bytecode/ValueProfile.h:
+        (JSC::ValueProfileBase::dump):
+        * bytecode/ValueRecovery.h:
+        (JSC::ValueRecovery::dump):
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::parseCodeBlock):
+        * dfg/DFGNode.h:
+        (JSC::DFG::Node::dumpChildren):
+
+2012-11-27  Filip Pizlo  <fpizlo@apple.com>
+
+        Fix indentation in JSValue.h
+
+        Rubber stamped by Mark Hahnenberg.
+
+        * runtime/JSValue.h:
+
+2012-11-26  Filip Pizlo  <fpizlo@apple.com>
+
+        DFG SetLocal should use forwardSpeculationCheck instead of its own half-baked version of same
+        https://bugs.webkit.org/show_bug.cgi?id=103353
+
+        Reviewed by Oliver Hunt and Gavin Barraclough.
+
+        Made it possible to use forward speculations for most of the operand classes. Changed the conditional
+        direction parameter from being 'bool isForward' to an enum (SpeculationDirection). Changed SetLocal
+        to use forward speculations and got rid of its half-baked version of same.
+        
+        Also added the ability to force the DFG's disassembler to dump all nodes, even ones that are dead.
+
+        * dfg/DFGByteCodeParser.cpp:
+        (JSC::DFG::ByteCodeParser::parseBlock):
+        * dfg/DFGDisassembler.cpp:
+        (JSC::DFG::Disassembler::dump):
+        * dfg/DFGDriver.cpp:
+        (JSC::DFG::compile):
+        * dfg/DFGSpeculativeJIT.cpp:
+        (JSC::DFG::SpeculativeJIT::speculationCheck):
+        (DFG):
+        (JSC::DFG::SpeculativeJIT::convertLastOSRExitToForward):
+        (JSC::DFG::SpeculativeJIT::speculationWatchpoint):
+        (JSC::DFG::SpeculativeJIT::terminateSpeculativeExecution):
+        (JSC::DFG::SpeculativeJIT::fillStorage):
+        * dfg/DFGSpeculativeJIT.h:
+        (SpeculativeJIT):
+        (JSC::DFG::SpeculateIntegerOperand::SpeculateIntegerOperand):
+        (JSC::DFG::SpeculateIntegerOperand::gpr):
+        (SpeculateIntegerOperand):
+        (JSC::DFG::SpeculateDoubleOperand::SpeculateDoubleOperand):
+        (JSC::DFG::SpeculateDoubleOperand::fpr):
+        (SpeculateDoubleOperand):
+        (JSC::DFG::SpeculateCellOperand::SpeculateCellOperand):
+        (JSC::DFG::SpeculateCellOperand::gpr):
+        (SpeculateCellOperand):
+        (JSC::DFG::SpeculateBooleanOperand::SpeculateBooleanOperand):
+        (JSC::DFG::SpeculateBooleanOperand::gpr):
+        (SpeculateBooleanOperand):
+        * dfg/DFGSpeculativeJIT32_64.cpp:
+        (JSC::DFG::SpeculativeJIT::fillSpeculateIntInternal):
+        (JSC::DFG::SpeculativeJIT::fillSpeculateInt):
+        (JSC::DFG::SpeculativeJIT::fillSpeculateIntStrict):
+        (JSC::DFG::SpeculativeJIT::fillSpeculateDouble):
+        (JSC::DFG::SpeculativeJIT::fillSpeculateCell):
+        (JSC::DFG::SpeculativeJIT::fillSpeculateBoolean):
+        (JSC::DFG::SpeculativeJIT::compile):
+        * dfg/DFGSpeculativeJIT64.cpp:
+        (JSC::DFG::SpeculativeJIT::fillSpeculateIntInternal):
+        (JSC::DFG::SpeculativeJIT::fillSpeculateInt):
+        (JSC::DFG::SpeculativeJIT::fillSpeculateIntStrict):
+        (JSC::DFG::SpeculativeJIT::fillSpeculateDouble):
+        (JSC::DFG::SpeculativeJIT::fillSpeculateCell):
+        (JSC::DFG::SpeculativeJIT::fillSpeculateBoolean):
+        (JSC::DFG::SpeculativeJIT::compile):
+        * runtime/Options.h:
+        (JSC):
+
+2012-11-26  Daniel Bates  <dbates@webkit.org>
+
+        Substitute "allSeparators8Bit" for "allSeperators8Bit" in JSC::jsSpliceSubstringsWithSeparators()
+        <https://bugs.webkit.org/show_bug.cgi?id=103303>
+
+        Reviewed by Simon Fraser.
+
+        Fix misspelled word, "Seperators" [sic], in a local variable name in JSC::jsSpliceSubstringsWithSeparators().
+
+        * runtime/StringPrototype.cpp:
+        (JSC::jsSpliceSubstringsWithSeparators):
+
+2012-11-26  Daniel Bates  <dbates@webkit.org>
+
+        JavaScript fails to handle String.replace() with large replacement string
+        https://bugs.webkit.org/show_bug.cgi?id=102956
+        <rdar://problem/12738012>
+
+        Reviewed by Oliver Hunt.
+
+        Fix an issue where we didn't check for overflow when computing the length
+        of the result of String.replace() with a large replacement string.
+
+        * runtime/StringPrototype.cpp:
+        (JSC::jsSpliceSubstringsWithSeparators):
+
+2012-11-26  Zeno Albisser  <zeno@webkit.org>
+
+        [Qt] Fix the LLInt build on Mac
+        https://bugs.webkit.org/show_bug.cgi?id=97587
+
+        Reviewed by Simon Hausmann.
+
+        * DerivedSources.pri:
+        * JavaScriptCore.pro:
+
+2012-11-26  Oliver Hunt  <oliver@apple.com>
+
+        32-bit build fix.  Move the method decalration outside of the X86_64 only section.
+
+        * assembler/MacroAssembler.h:
+        (MacroAssembler):
+        (JSC::MacroAssembler::shouldConsiderBlinding):
+
+2012-11-26  Oliver Hunt  <oliver@apple.com>
+
+        Don't blind all the things.
+        https://bugs.webkit.org/show_bug.cgi?id=102572
+
+        Reviewed by Gavin Barraclough.
+
+        No longer blind all the constants in the instruction stream.  We use a
+        simple non-deterministic filter to avoid blinding everything.  Also modified
+        the basic integer blinding logic to avoid blinding small negative values.
+
+        * assembler/MacroAssembler.h:
+        (MacroAssembler):
+        (JSC::MacroAssembler::shouldConsiderBlinding):
+        (JSC::MacroAssembler::shouldBlind):
+
+2012-11-26  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        JSObject::copyButterfly doesn't handle undecided indexing types correctly
+        https://bugs.webkit.org/show_bug.cgi?id=102573
+
+        Reviewed by Filip Pizlo.
+
+        We don't do any copying into the newly allocated vector and we don't zero-initialize CopiedBlocks 
+        during the copying phase, so we end up with uninitialized memory in arrays which have undecided indexing 
+        types. We should just do the actual memcpy from the old block to the new one. 
+
+        * runtime/JSObject.cpp:
+        (JSC::JSObject::copyButterfly): Just do the same thing that we do for other contiguous indexing types.
+
+2012-11-26  Julien BRIANCEAU   <jbrianceau@nds.com>
+
+        [sh4] JavaScriptCore JIT build is broken since r135330
+        Add missing implementation for sh4 arch.
+        https://bugs.webkit.org/show_bug.cgi?id=103145
+
+        Reviewed by Oliver Hunt.
+
+        * assembler/MacroAssemblerSH4.h:
+        (JSC::MacroAssemblerSH4::canJumpReplacePatchableBranchPtrWithPatch):
+        (MacroAssemblerSH4):
+        (JSC::MacroAssemblerSH4::startOfBranchPtrWithPatchOnRegister):
+        (JSC::MacroAssemblerSH4::revertJumpReplacementToBranchPtrWithPatch):
+        (JSC::MacroAssemblerSH4::startOfPatchableBranchPtrWithPatchOnAddress):
+        (JSC::MacroAssemblerSH4::revertJumpReplacementToPatchableBranchPtrWithPatch):
+        * assembler/SH4Assembler.h:
+        (JSC::SH4Assembler::revertJump):
+        (SH4Assembler):
+        (JSC::SH4Assembler::printInstr):
+
+2012-11-26  Yuqiang Xian  <yuqiang.xian@intel.com>
+
+        Use load64 instead of loadPtr to load a JSValue on JSVALUE64 platforms
+        https://bugs.webkit.org/show_bug.cgi?id=100909
+
+        Reviewed by Brent Fulgham.
+
+        This is a (trivial) fix after r132701.
+
+        * dfg/DFGOSRExitCompiler64.cpp:
+        (JSC::DFG::OSRExitCompiler::compileExit):
+
+2012-11-26  Gabor Ballabas  <gaborb@inf.u-szeged.hu>
+
+        [Qt][ARM] REGRESSION(r130826): It made 33 JSC test and 466 layout tests crash
+        https://bugs.webkit.org/show_bug.cgi?id=98857
+
+        Reviewed by Zoltan Herczeg.
+
+        Implement a new version of patchableBranch32 to fix crashing JSC
+        tests.
+
+        * assembler/MacroAssembler.h:
+        (MacroAssembler):
+        * assembler/MacroAssemblerARM.h:
+        (JSC::MacroAssemblerARM::patchableBranch32):
+        (MacroAssemblerARM):
+
 2012-11-21  Filip Pizlo  <fpizlo@apple.com>
 
         Any function that can log things should be able to easily log them to a memory buffer as well

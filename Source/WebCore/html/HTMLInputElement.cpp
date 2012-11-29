@@ -266,6 +266,11 @@ bool HTMLInputElement::valueMissing() const
     return willValidate() && m_inputType->valueMissing(value());
 }
 
+bool HTMLInputElement::hasBadInput() const
+{
+    return willValidate() && m_inputType->hasBadInput();
+}
+
 bool HTMLInputElement::patternMismatch() const
 {
     return willValidate() && m_inputType->patternMismatch(value());
@@ -1391,11 +1396,6 @@ String HTMLInputElement::localizeValue(const String& proposedValue) const
     return m_inputType->localizeValue(proposedValue);
 }
 
-bool HTMLInputElement::hasUnacceptableValue() const
-{
-    return m_inputType->hasUnacceptableValue();
-}
-
 bool HTMLInputElement::isInRange() const
 {
     return m_inputType->isInRange(value());
@@ -1436,6 +1436,16 @@ void HTMLInputElement::unregisterForSuspensionCallbackIfNeeded()
 bool HTMLInputElement::isRequiredFormControl() const
 {
     return m_inputType->supportsRequired() && required();
+}
+
+bool HTMLInputElement::shouldMatchReadOnlySelector() const
+{
+    return m_inputType->supportsReadOnly() && readOnly();
+}
+
+bool HTMLInputElement::shouldMatchReadWriteSelector() const
+{
+    return m_inputType->supportsReadOnly() && !readOnly();
 }
 
 void HTMLInputElement::addSearchResult()

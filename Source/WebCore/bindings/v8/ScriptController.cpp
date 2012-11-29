@@ -47,9 +47,7 @@
 #include "NPV8Object.h"
 #include "Node.h"
 #include "NotImplemented.h"
-#include "npruntime_impl.h"
-#include "npruntime_priv.h"
-#include "PlatformSupport.h"
+#include "PluginViewBase.h"
 #include "ScriptCallStack.h"
 #include "ScriptCallStackFactory.h"
 #include "ScriptRunner.h"
@@ -67,6 +65,8 @@
 #include "V8NPObject.h"
 #include "V8RecursionScope.h"
 #include "Widget.h"
+#include "npruntime_impl.h"
+#include "npruntime_priv.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/StringExtras.h>
@@ -434,22 +434,38 @@ void ScriptController::finishedWithEvent(Event* event)
 {
 }
 
+static inline v8::Local<v8::Context> contextForWorld(ScriptController* scriptController, DOMWrapperWorld* world)
+{
+    return v8::Local<v8::Context>::New(scriptController->windowShell(world)->context());
+}
+
 v8::Local<v8::Context> ScriptController::currentWorldContext()
 {
-    if (v8::Context::InContext()) {
-        v8::Handle<v8::Context> context = v8::Context::GetEntered();
-        if (DOMWrapperWorld::isolated(context)) {
-            if (m_frame == toFrameIfNotDetached(context))
-                return v8::Local<v8::Context>::New(context);
-            return v8::Local<v8::Context>();
-        }
-    }
-    return v8::Local<v8::Context>::New(windowShell(mainThreadNormalWorld())->context());
+    if (!v8::Context::InContext())
+        return contextForWorld(this, mainThreadNormalWorld());
+
+    v8::Handle<v8::Context> context = v8::Context::GetEntered();
+    DOMWrapperWorld* isolatedWorld = DOMWrapperWorld::isolated(context);
+    if (!isolatedWorld)
+        return contextForWorld(this, mainThreadNormalWorld());
+
+    Frame* frame = toFrameIfNotDetached(context);
+    if (!m_frame)
+        return v8::Local<v8::Context>();
+
+    if (m_frame == frame)
+        return v8::Local<v8::Context>::New(context);
+
+    // FIXME: Need to handle weak isolated worlds correctly.
+    if (isolatedWorld->createdFromUnitializedWorld())
+        return v8::Local<v8::Context>();
+
+    return contextForWorld(this, isolatedWorld);
 }
 
 v8::Local<v8::Context> ScriptController::mainWorldContext()
 {
-    return v8::Local<v8::Context>::New(windowShell(mainThreadNormalWorld())->context());
+    return contextForWorld(this, mainThreadNormalWorld());
 }
 
 v8::Local<v8::Context> ScriptController::mainWorldContext(Frame* frame)
@@ -457,7 +473,7 @@ v8::Local<v8::Context> ScriptController::mainWorldContext(Frame* frame)
     if (!frame)
         return v8::Local<v8::Context>();
 
-    return frame->script()->mainWorldContext();
+    return contextForWorld(frame->script(), mainThreadNormalWorld());
 }
 
 // Create a V8 object with an interceptor of NPObjectPropertyGetter.
@@ -505,10 +521,10 @@ PassScriptInstance ScriptController::createScriptInstanceForWidget(Widget* widge
 {
     ASSERT(widget);
 
-    if (widget->isFrameView())
+    if (!widget->isPluginViewBase())
         return 0;
 
-    NPObject* npObject = PlatformSupport::pluginScriptableObject(widget);
+    NPObject* npObject = static_cast<PluginViewBase*>(widget)->scriptableObject();
 
     if (!npObject)
         return 0;

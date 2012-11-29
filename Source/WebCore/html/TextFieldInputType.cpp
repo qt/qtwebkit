@@ -329,6 +329,11 @@ void TextFieldInputType::readonlyAttributeChanged()
         m_innerSpinButton->releaseCapture();
 }
 
+bool TextFieldInputType::supportsReadOnly() const
+{
+    return true;
+}
+
 bool TextFieldInputType::shouldUseInputMethod() const
 {
     return true;
@@ -458,7 +463,7 @@ void TextFieldInputType::subtreeHasChanged()
     // sanitizeValue() is needed because IME input doesn't dispatch BeforeTextInsertedEvent.
     element()->setValueFromRenderer(sanitizeValue(convertFromVisibleValue(element()->innerTextValue())));
     element()->updatePlaceholderVisibility(false);
-    // Recalc for :invalid and hasUnacceptableValue() change.
+    // Recalc for :invalid change.
     element()->setNeedsStyleRecalc();
 
     didSetValueByUserEdit(wasChanged ? ValueChangeStateChanged : ValueChangeStateNone);

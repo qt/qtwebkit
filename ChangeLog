@@ -1,3 +1,57 @@
+2012-11-28  Michael Pruett  <michael@68k.org>
+
+        IndexedDB: Remove duplicate toWireString() and createFromWire() methods in JSC SerializedScriptValue
+        https://bugs.webkit.org/show_bug.cgi?id=103554
+
+        Reviewed by Kentaro Hara.
+
+        In r135022, duplicate createFromWire() and toWireString() methods
+        were added to the JSC version of SerializedScriptValue. In
+        order to allow the JSC SerializedScriptValue to compile when
+        ENABLE(INDEXED_DATABASE) is turned on, these new methods have
+        been removed and the old methods have been moved outside the
+        ENABLE(INDEXED_DATABASE) guard.
+
+        * Source/autotools/symbols.filter:
+
+2012-11-28  Shinya Kawanaka  <shinyak@chromium.org>
+
+        [Shadow] Move Distribution stuffs from ShadowRoot
+        https://bugs.webkit.org/show_bug.cgi?id=103481
+
+        Reviewed by Hajime Morita.
+
+        * Source/autotools/symbols.filter:
+
+2012-11-26  Halton Huo  <halton.huo@intel.com>
+
+        [EFL] CMake shows ENABLE_3D_RENDERING and ENABLE_WEBGL is still OFF when AC is enabled
+        https://bugs.webkit.org/show_bug.cgi?id=100829
+
+        Reviewed by Gyuyoung Kim.
+
+        In WebKitFeatures.cmake, only use ${_name} for condition to print
+        a option as ON will prevent the overridden ones in OptionsXXX.cmake,
+        should use ${_WEBKIT_AVAILABLE_OPTIONS_INITALVALUE_${_name}} instead.
+
+        * Source/cmake/OptionsEfl.cmake: Turn on ENABLE_3D_RENDERING and
+        ENABLE_WEBGL
+        * Source/cmake/WebKitFeatures.cmake: Use
+        ${_WEBKIT_AVAILABLE_OPTIONS_INITALVALUE_${_name}} to as value of 
+        a feature is enabled. Adjust options in lexicographical order.
+
+2012-11-26  Kalev Lember  <kalevlember@gmail.com>
+
+        [GTK] Explicitly link against librt
+        https://bugs.webkit.org/show_bug.cgi?id=103194
+
+        Reviewed by Martin Robinson.
+
+        Fixes broken build with undefined references to shm_open / shm_unlink
+        symbols. SharedMemoryUnix.cpp uses these so we need to link with -lrt.
+
+        * configure.ac:
+
 2012-11-26  Laszlo Gombos  <l.gombos@samsung.com>
 
         [CMake] Allow user specified compiler flags to take precedence

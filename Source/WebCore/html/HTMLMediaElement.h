@@ -134,7 +134,7 @@ public:
     void setPreload(const String&);
 
     PassRefPtr<TimeRanges> buffered() const;
-    void load(ExceptionCode&);
+    void load();
     String canPlayType(const String& mimeType, const String& keySystem = String(), const KURL& = KURL()) const;
 
 // ready state
@@ -244,6 +244,9 @@ public:
     void configureTextTrackGroupForLanguage(const TrackGroup&) const;
     void configureTextTracks();
     void configureTextTrackGroup(const TrackGroup&) const;
+
+    void toggleTrackAtIndex(int index, bool exclusive = true);
+    static int textTracksOffIndex() { return -1; }
 
     bool userPrefersCaptions() const;
     bool userIsInterestedInThisTrackKind(String) const;

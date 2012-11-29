@@ -38,6 +38,7 @@
 #include "LoaderStrategy.h"
 #include "MemoryCache.h"
 #include "MutationEvent.h"
+#include "NodeRenderStyle.h"
 #include "ResourceLoadScheduler.h"
 #include "Page.h"
 #include "PlatformStrategies.h"
@@ -132,6 +133,70 @@ ContainerNode::~ContainerNode()
     removeAllChildren();
 }
 
+static inline bool isChildTypeAllowed(ContainerNode* newParent, Node* child)
+{
+    if (!child->isDocumentFragment())
+        return newParent->childTypeAllowed(child->nodeType());
+
+    for (Node* node = child->firstChild(); node; node = node->nextSibling()) {
+        if (!newParent->childTypeAllowed(node->nodeType()))
+            return false;
+    }
+    return true;
+}
+
+static inline ExceptionCode checkAcceptChild(ContainerNode* newParent, Node* newChild, Node* oldChild)
+{
+    // Not mentioned in spec: throw NOT_FOUND_ERR if newChild is null
+    if (!newChild)
+        return NOT_FOUND_ERR;
+
+    // Goes common casae fast path if possible.
+    if ((newChild->isElementNode() || newChild->isTextNode()) && newParent->isElementNode()) {
+        ASSERT(!newParent->isReadOnlyNode());
+        ASSERT(!newParent->isDocumentTypeNode());
+        ASSERT(isChildTypeAllowed(newParent, newChild));
+        if (newChild->contains(newParent))
+            return HIERARCHY_REQUEST_ERR;
+        return 0;
+    }
+
+    if (newParent->isReadOnlyNode())
+        return NO_MODIFICATION_ALLOWED_ERR;
+    if (newChild->inDocument() && newChild->isDocumentTypeNode())
+        return HIERARCHY_REQUEST_ERR;
+    if (newChild->contains(newParent))
+        return HIERARCHY_REQUEST_ERR;
+
+    if (oldChild && newParent->isDocumentNode()) {
+        if (!static_cast<Document*>(newParent)->canReplaceChild(newChild, oldChild))
+            return HIERARCHY_REQUEST_ERR;
+    } else if (!isChildTypeAllowed(newParent, newChild))
+        return HIERARCHY_REQUEST_ERR;
+
+    return 0;
+}
+
+static inline bool checkAddChild(ContainerNode* newParent, Node* newChild, ExceptionCode& ec)
+{
+    if (ExceptionCode code = checkAcceptChild(newParent, newChild, 0)) {
+        ec = code;
+        return false;
+    }
+
+    return true;
+}
+
+static inline bool checkReplaceChild(ContainerNode* newParent, Node* newChild, Node* oldChild, ExceptionCode& ec)
+{
+    if (ExceptionCode code = checkAcceptChild(newParent, newChild, oldChild)) {
+        ec = code;
+        return false;
+    }
+    
+    return true;
+}
+
 bool ContainerNode::insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionCode& ec, bool shouldLazyAttach)
 {
     // Check that this node is not "floating".
@@ -147,8 +212,7 @@ bool ContainerNode::insertBefore(PassRefPtr<Node> newChild, Node* refChild, Exce
         return appendChild(newChild, ec, shouldLazyAttach);
 
     // Make sure adding the new child is OK.
-    checkAddChild(newChild.get(), ec);
-    if (ec)
+    if (!checkAddChild(this, newChild.get(), ec))
         return false;
 
     // NOT_FOUND_ERR: Raised if refChild is not a child of this node
@@ -263,13 +327,17 @@ bool ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, Exce
     if (oldChild == newChild) // nothing to do
         return true;
 
+    if (!oldChild) {
+        ec = NOT_FOUND_ERR;
+        return false;
+    }
+
     // Make sure replacing the old child with the new is ok
-    checkReplaceChild(newChild.get(), oldChild, ec);
-    if (ec)
+    if (!checkReplaceChild(this, newChild.get(), oldChild, ec))
         return false;
 
     // NOT_FOUND_ERR: Raised if oldChild is not a child of this node.
-    if (!oldChild || oldChild->parentNode() != this) {
+    if (oldChild->parentNode() != this) {
         ec = NOT_FOUND_ERR;
         return false;
     }
@@ -290,8 +358,7 @@ bool ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, Exce
         return true;
 
     // Does this one more time because removeChild() fires a MutationEvent.
-    checkReplaceChild(newChild.get(), oldChild, ec);
-    if (ec)
+    if (!checkReplaceChild(this, newChild.get(), oldChild, ec))
         return false;
 
     NodeVector targets;
@@ -300,8 +367,7 @@ bool ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, Exce
         return false;
 
     // Does this yet another check because collectChildrenAndRemoveFromOldParent() fires a MutationEvent.
-    checkReplaceChild(newChild.get(), oldChild, ec);
-    if (ec)
+    if (!checkReplaceChild(this, newChild.get(), oldChild, ec))
         return false;
 
     InspectorInstrumentation::willInsertDOMNode(document(), this);
@@ -559,8 +625,7 @@ bool ContainerNode::appendChild(PassRefPtr<Node> newChild, ExceptionCode& ec, bo
     ec = 0;
 
     // Make sure adding the new child is ok
-    checkAddChild(newChild.get(), ec);
-    if (ec)
+    if (!checkAddChild(this, newChild.get(), ec))
         return false;
 
     if (newChild == m_lastChild) // nothing to do
@@ -887,10 +952,10 @@ void ContainerNode::setActive(bool down, bool pause)
     // note that we need to recalc the style
     // FIXME: Move to Element
     if (renderer()) {
-        bool reactsToPress = renderer()->style()->affectedByActiveRules();
+        bool reactsToPress = renderStyle()->affectedByActive() || (isElementNode() && toElement(this)->childrenAffectedByActive());
         if (reactsToPress)
             setNeedsStyleRecalc();
-        if (renderer() && renderer()->style()->hasAppearance()) {
+        if (renderStyle()->hasAppearance()) {
             if (renderer()->theme()->stateChanged(renderer(), PressedState))
                 reactsToPress = true;
         }
@@ -908,9 +973,9 @@ void ContainerNode::setActive(bool down, bool pause)
             // Do an immediate repaint.
             if (renderer())
                 renderer()->repaint(true);
-            
+
             // FIXME: Find a substitute for usleep for Win32.
-            // Better yet, come up with a way of doing this that doesn't use this sort of thing at all.            
+            // Better yet, come up with a way of doing this that doesn't use this sort of thing at all.
 #ifdef HAVE_FUNC_USLEEP
             // Now pause for a small amount of time (1/10th of a second from before we repainted in the pressed state)
             double remainingTime = 0.1 - (currentTime() - startTime);
@@ -930,7 +995,7 @@ void ContainerNode::setHovered(bool over)
     // note that we need to recalc the style
     // FIXME: Move to Element
     if (renderer()) {
-        if (renderer()->style()->affectedByHoverRules())
+        if (renderStyle()->affectedByHover() || (isElementNode() && toElement(this)->childrenAffectedByHover()))
             setNeedsStyleRecalc();
         if (renderer() && renderer()->style()->hasAppearance())
             renderer()->theme()->stateChanged(renderer(), HoverState);

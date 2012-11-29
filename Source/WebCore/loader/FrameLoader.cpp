@@ -214,14 +214,14 @@ FrameLoader::FrameLoader(Frame* frame, FrameLoaderClient* client)
     , m_subframeLoader(frame)
     , m_icon(frame)
     , m_mixedContentChecker(frame)
-    , m_state(FrameStateCommittedPage)
+    , m_state(FrameStateProvisional)
     , m_loadType(FrameLoadTypeStandard)
     , m_delegateIsHandlingProvisionalLoadError(false)
     , m_quickRedirectComing(false)
     , m_sentRedirectNotification(false)
     , m_inStopAllLoaders(false)
     , m_isExecutingJavaScriptFormAction(false)
-    , m_didCallImplicitClose(false)
+    , m_didCallImplicitClose(true)
     , m_wasUnloadEventEmitted(false)
     , m_pageDismissalEventBeingDispatched(NoDismissal)
     , m_isComplete(false)
@@ -254,19 +254,11 @@ FrameLoader::~FrameLoader()
 void FrameLoader::init()
 {
     // This somewhat odd set of steps gives the frame an initial empty document.
-    // It would be better if this could be done with even fewer steps.
-    m_stateMachine.advanceTo(FrameLoaderStateMachine::CreatingInitialEmptyDocument);
     setPolicyDocumentLoader(m_client->createDocumentLoader(ResourceRequest(KURL(ParsedURLString, emptyString())), SubstituteData()).get());
     setProvisionalDocumentLoader(m_policyDocumentLoader.get());
-    setState(FrameStateProvisional);
-    m_provisionalDocumentLoader->setResponse(ResourceResponse(KURL(), "text/html", 0, String(), String()));
-    m_provisionalDocumentLoader->finishedLoading();
-    ASSERT(!m_frame->document());
-    m_documentLoader->writer()->begin(KURL(), false);
-    m_documentLoader->writer()->end();
+    m_provisionalDocumentLoader->startLoadingMainResource();
     m_frame->document()->cancelParsing();
     m_stateMachine.advanceTo(FrameLoaderStateMachine::DisplayingInitialEmptyDocument);
-    m_didCallImplicitClose = true;
 
     m_networkingContext = m_client->createNetworkingContext();
     m_progressTracker = FrameProgressTracker::create(m_frame);
@@ -1252,36 +1244,36 @@ SubstituteData FrameLoader::defaultSubstituteDataForURL(const KURL& url)
     return SubstituteData(SharedBuffer::create(encodedSrcdoc.data(), encodedSrcdoc.length()), "text/html", "UTF-8", KURL());
 }
 
-void FrameLoader::load(const ResourceRequest& request, bool lockHistory)
+void FrameLoader::load(const FrameLoadRequest& passedRequest)
 {
-    load(request, defaultSubstituteDataForURL(request.url()), lockHistory);
-}
+    FrameLoadRequest request(passedRequest);
 
-void FrameLoader::load(const ResourceRequest& request, const SubstituteData& substituteData, bool lockHistory)
-{
     if (m_inStopAllLoaders)
         return;
-        
-    RefPtr<DocumentLoader> loader = m_client->createDocumentLoader(request, substituteData);
-    if (lockHistory && m_documentLoader)
+
+    if (!request.frameName().isEmpty()) {
+        Frame* frame = findFrameForNavigation(request.frameName());
+        if (frame) {
+            request.setShouldCheckNewWindowPolicy(false);
+            if (frame->loader() != this) {
+                frame->loader()->load(request);
+                return;
+            }
+        }
+    }
+
+    if (request.shouldCheckNewWindowPolicy()) {
+        policyChecker()->checkNewWindowPolicy(NavigationAction(request.resourceRequest(), NavigationTypeOther), FrameLoader::callContinueLoadAfterNewWindowPolicy, request.resourceRequest(), 0, request.frameName(), this);
+        return;
+    }
+
+    if (!request.hasSubstituteData())
+        request.setSubstituteData(defaultSubstituteDataForURL(request.resourceRequest().url()));
+
+    RefPtr<DocumentLoader> loader = m_client->createDocumentLoader(request.resourceRequest(), request.substituteData());
+    if (request.lockHistory() && m_documentLoader)
         loader->setClientRedirectSourceForHistory(m_documentLoader->didCreateGlobalHistoryEntry() ? m_documentLoader->urlForHistory().string() : m_documentLoader->clientRedirectSourceForHistory());
     load(loader.get());
-}
-
-void FrameLoader::load(const ResourceRequest& request, const String& frameName, bool lockHistory)
-{
-    if (frameName.isEmpty()) {
-        load(request, lockHistory);
-        return;
-    }
-
-    Frame* frame = findFrameForNavigation(frameName);
-    if (frame) {
-        frame->loader()->load(request, lockHistory);
-        return;
-    }
-
-    policyChecker()->checkNewWindowPolicy(NavigationAction(request, NavigationTypeOther), FrameLoader::callContinueLoadAfterNewWindowPolicy, request, 0, frameName, this);
 }
 
 void FrameLoader::loadWithNavigationAction(const ResourceRequest& request, const NavigationAction& action, bool lockHistory, FrameLoadType type, PassRefPtr<FormState> formState)

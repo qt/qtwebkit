@@ -1,3 +1,132 @@
+2012-11-28  Otto Derek Cheung  <otcheung@rim.com>
+
+        [BlackBerry] CookieJarBlackBerry will use document settings for cookiesEnabled
+        https://bugs.webkit.org/show_bug.cgi?id=103560
+
+        Reviewed by Rob Buis.
+
+        PR 253490
+
+        Syncing platform Websetting's cookieEnabled value with Page->setting's cookieEnabled
+        value.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::didChangeSettings):
+
+2012-11-27  James Simonsen  <simonjam@chromium.org>
+
+        Consolidate FrameLoader::load() into one function taking a FrameLoadRequest
+        https://bugs.webkit.org/show_bug.cgi?id=102151
+
+        Reviewed by Adam Barth.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::load):
+        (BlackBerry::WebKit::WebPagePrivate::loadString):
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::dispatchDidFailProvisionalLoad):
+
+2012-11-27  Jacky Jiang  <zhajiang@rim.com>
+
+        [BlackBerry] http:// origins can navigate to privileged local:// origins
+        https://bugs.webkit.org/show_bug.cgi?id=103437
+
+        Reviewed by Yong Li.
+
+        PR: 251489
+        When we aren't allowed to display the destination origin, we shouldn't
+        even create the window for it. In this way we can block the remote
+        origins(like http://) window.open local origins(like file:// and
+        local://) and avoid further security issues.
+        Chrome and Safari will open a blank window and fail to load. Firefox
+        will fail to open the window and report a load failure error which has
+        the same behavior as us. I would prefer this way as the window would
+        be useless and the calls after that would be harmful to us.
+
+        * WebCoreSupport/ChromeClientBlackBerry.cpp:
+        (WebCore::ChromeClientBlackBerry::createWindow):
+
+2012-11-27  Andrew Lo  <anlo@rim.com>
+
+        [BlackBerry] Remove unnecessary backing store suspension in InputHandler::ensureFocusTextElementVisible
+        https://bugs.webkit.org/show_bug.cgi?id=103441
+
+        Reviewed by Rob Buis.
+        Internally reviewed by Mike Fenton.
+
+        Remove unnecessary backing store suspension in
+        InputHandler::ensureFocusTextElementVisible.
+
+        Not necessary anymore since both zoom and scroll adjustments
+        happen in an animation.
+
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::ensureFocusTextElementVisible):
+
+2012-11-27  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r135786.
+        http://trac.webkit.org/changeset/135786
+        https://bugs.webkit.org/show_bug.cgi?id=103379
+
+        It made 3 plugin tests timeout on several platforms (Requested
+        by Ossy on #webkit).
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::load):
+        (BlackBerry::WebKit::WebPagePrivate::loadString):
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::dispatchDidFailProvisionalLoad):
+
+2012-11-26  James Simonsen  <simonjam@chromium.org>
+
+        Consolidate FrameLoader::load() into one function taking a FrameLoadRequest
+        https://bugs.webkit.org/show_bug.cgi?id=102151
+
+        Reviewed by Adam Barth.
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::load):
+        (BlackBerry::WebKit::WebPagePrivate::loadString):
+        * WebCoreSupport/FrameLoaderClientBlackBerry.cpp:
+        (WebCore::FrameLoaderClientBlackBerry::dispatchDidFailProvisionalLoad):
+
+2012-11-26  Genevieve Mak  <gmak@rim.com>
+
+        [BlackBerry] Form controls don't show pressed state.
+        https://bugs.webkit.org/show_bug.cgi?id=103292
+
+        Reviewed by Rob Buis.
+
+        Reviewed internally by Eli Fidler and Mike Lattanzio.
+        We weren't sending touch events to webpages unless they
+        had JS touch event listeners which form controls don't have.
+        Now send them always and do a little cleanup.
+        PR #249791
+
+        * Api/WebPage.cpp:
+        (BlackBerry::WebKit::WebPagePrivate::WebPagePrivate):
+        (BlackBerry::WebKit::WebPage::touchEvent):
+        * Api/WebPageClient.h:
+        * Api/WebPage_p.h:
+        (WebPagePrivate):
+        * WebCoreSupport/ChromeClientBlackBerry.cpp:
+        (WebCore::ChromeClientBlackBerry::needTouchEvents):
+
+2012-11-26  Nima Ghanavatian  <nghanavatian@rim.com>
+
+        [BlackBerry] Null check calls associated with retrieving the caret rect.
+        https://bugs.webkit.org/show_bug.cgi?id=103281
+
+        Reviewed by Rob Buis.
+
+        Some of these calls can return null, which could lead to a crash.
+
+        Internally reviewed by Gen Mak.
+
+        * WebKitSupport/InputHandler.cpp:
+        (BlackBerry::WebKit::InputHandler::requestSpellingCheckingOptions):
+
 2012-11-26  Jonathan Dong  <jonathan.dong@torchmobile.com.cn>
 
         [BlackBerry] Should not autofill username and password when there're more than one password inputs on the same page

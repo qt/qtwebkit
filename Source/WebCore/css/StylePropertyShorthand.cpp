@@ -370,11 +370,11 @@ const StylePropertyShorthand& webkitMaskShorthand()
 {
     static const CSSPropertyID maskProperties[] = {
         CSSPropertyWebkitMaskImage,
-        CSSPropertyWebkitMaskRepeatX,
-        CSSPropertyWebkitMaskRepeatY,
-        CSSPropertyWebkitMaskAttachment,
         CSSPropertyWebkitMaskPositionX,
         CSSPropertyWebkitMaskPositionY,
+        CSSPropertyWebkitMaskSize,
+        CSSPropertyWebkitMaskRepeatX,
+        CSSPropertyWebkitMaskRepeatY,
         CSSPropertyWebkitMaskOrigin,
         CSSPropertyWebkitMaskClip
     };

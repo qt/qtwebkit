@@ -1,14 +1,14 @@
 /*
- * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2012, Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
  * 1.  Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
+ *    notice, this list of conditions and the following disclaimer.
  * 2.  Redistributions in binary form must reproduce the above copyright
- *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution.
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY APPLE INC. AND ITS CONTRIBUTORS ``AS IS'' AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -22,28 +22,9 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef PlatformGestureCurve_h
-#define PlatformGestureCurve_h
-
-namespace WebCore {
-
-class PlatformGestureCurveTarget;
-
-// Abstract interface for curves used by ActivePlatformGestureAnimation. A
-// PlatformGestureCurve defines the animation parameters as a function of time
-// (zero-based), and applies the parameters directly to the target of the
-// animation.
-class PlatformGestureCurve {
-public:
-    virtual ~PlatformGestureCurve() { }
-
-    // Returns a name of the curve for use in debugging.
-    virtual const char* debugName() const = 0;
-
-    // Returns false if curve has finished and can no longer be applied.
-    virtual bool apply(double time, PlatformGestureCurveTarget*) = 0;
+[
+    Conditional=WEB_AUDIO&MEDIA_STREAM,
+    JSGenerateToJSObject
+] interface MediaStreamAudioDestinationNode : AudioSourceNode {
+    readonly attribute MediaStream stream;
 };
-
-} // namespace WebCore
-
-#endif

@@ -36,7 +36,7 @@ struct SameSizeAsElementAttributeData : public RefCounted<SameSizeAsElementAttri
     void* refPtrs[3];
 };
 
-COMPILE_ASSERT(sizeof(ElementAttributeData) == sizeof(ElementAttributeData), element_attribute_data_should_stay_small);
+COMPILE_ASSERT(sizeof(ElementAttributeData) == sizeof(SameSizeAsElementAttributeData), element_attribute_data_should_stay_small);
 
 static size_t sizeForImmutableElementAttributeDataWithAttributeCount(unsigned count)
 {
@@ -86,6 +86,9 @@ ElementAttributeData::ElementAttributeData(const ElementAttributeData& other, bo
     , m_arraySize(isMutable ? 0 : other.length())
     , m_presentationAttributeStyleIsDirty(other.m_presentationAttributeStyleIsDirty)
     , m_styleAttributeIsDirty(other.m_styleAttributeIsDirty)
+#if ENABLE(SVG)
+    , m_animatedSVGAttributesAreDirty(other.m_animatedSVGAttributesAreDirty)
+#endif
     , m_classNames(other.m_classNames)
     , m_idForStyleResolution(other.m_idForStyleResolution)
 {

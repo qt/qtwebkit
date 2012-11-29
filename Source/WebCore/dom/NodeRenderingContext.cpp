@@ -86,8 +86,8 @@ RenderObject* NodeRenderingContext::nextRenderer() const
     ComposedShadowTreeWalker walker(m_node);
     for (walker.nextSibling(); walker.get(); walker.nextSibling()) {
         if (RenderObject* renderer = walker.get()->renderer()) {
-            // Do not return elements that are attached to a different flow-thread.
-            if (renderer->style() && !renderer->style()->flowThread().isEmpty())
+            // Renderers for elements attached to a flow thread should be skipped because they are parented differently.
+            if (renderer->node()->isElementNode() && renderer->style() && !renderer->style()->flowThread().isEmpty())
                 continue;
             return renderer;
         }
@@ -110,8 +110,8 @@ RenderObject* NodeRenderingContext::previousRenderer() const
     ComposedShadowTreeWalker walker(m_node);
     for (walker.previousSibling(); walker.get(); walker.previousSibling()) {
         if (RenderObject* renderer = walker.get()->renderer()) {
-            // Do not return elements that are attached to a different flow-thread.
-            if (renderer->style() && !renderer->style()->flowThread().isEmpty())
+            // Renderers for elements attached to a flow thread should be skipped because they are parented differently.
+            if (renderer->node()->isElementNode() && renderer->style() && !renderer->style()->flowThread().isEmpty())
                 continue;
             return renderer;
         }
@@ -217,11 +217,9 @@ void NodeRenderingContext::createRendererForElementIfNeeded()
 
     moveToFlowThreadIfNeeded();
 
-    if (!element->rendererIsNeeded(*this)) {
-        if (m_style->affectedByEmpty())
-            element->setStyleAffectedByEmpty();
+    if (!element->rendererIsNeeded(*this))
         return;
-    }
+
     RenderObject* parentRenderer = this->parentRenderer();
     RenderObject* nextRenderer = this->nextRenderer();
 
@@ -238,6 +236,11 @@ void NodeRenderingContext::createRendererForElementIfNeeded()
         newRenderer->destroy();
         return;
     }
+
+    // Make sure the RenderObject already knows it is going to be added to a RenderFlowThread before we set the style
+    // for the first time. Otherwise code using inRenderFlowThread() in the styleWillChange and styleDidChange will fail.
+    newRenderer->setInRenderFlowThread(parentRenderer->inRenderFlowThread());
+
     element->setRenderer(newRenderer);
     newRenderer->setAnimatableStyle(m_style.release()); // setAnimatableStyle() can depend on renderer() already being set.
 
@@ -274,6 +277,11 @@ void NodeRenderingContext::createRendererForTextIfNeeded()
         newRenderer->destroy();
         return;
     }
+
+    // Make sure the RenderObject already knows it is going to be added to a RenderFlowThread before we set the style
+    // for the first time. Otherwise code using inRenderFlowThread() in the styleWillChange and styleDidChange will fail.
+    newRenderer->setInRenderFlowThread(parentRenderer->inRenderFlowThread());
+
     RenderObject* nextRenderer = this->nextRenderer();
     textNode->setRenderer(newRenderer);
     // Parent takes care of the animations, no need to call setAnimatableStyle.

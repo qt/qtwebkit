@@ -604,7 +604,7 @@ RenderFlowThread* RenderObject::enclosingRenderFlowThread() const
     return 0;
 }
 
-RenderNamedFlowThread* RenderObject::enclosingRenderNamedFlowThread() const
+RenderNamedFlowThread* RenderObject::renderNamedFlowThreadWrapper() const
 {
     RenderObject* object = const_cast<RenderObject*>(this);
     while (object && object->isAnonymousBlock() && !object->isRenderNamedFlowThread())
@@ -1292,10 +1292,13 @@ RenderLayerModelObject* RenderObject::containerForRepaint() const
     // If we have a flow thread, then we need to do individual repaints within the RenderRegions instead.
     // Return the flow thread as a repaint container in order to create a chokepoint that allows us to change
     // repainting to do individual region repaints.
-    // FIXME: Composited layers inside a flow thread will bypass this mechanism and will malfunction. It's not
-    // clear how to address this problem for composited descendants of a RenderFlowThread.
-    if (!repaintContainer && inRenderFlowThread())
-        repaintContainer = enclosingRenderFlowThread();
+    if (inRenderFlowThread()) {
+        RenderFlowThread* parentRenderFlowThread = enclosingRenderFlowThread();
+        // If we have already found a repaint container then we will repaint into that container only if it is part of the same
+        // flow thread. Otherwise we will need to catch the repaint call and send it to the flow thread.
+        if (!(repaintContainer && repaintContainer->inRenderFlowThread() && repaintContainer->enclosingRenderFlowThread() == parentRenderFlowThread))
+            repaintContainer = parentRenderFlowThread;
+    }
     return repaintContainer;
 }
 
@@ -2419,7 +2422,7 @@ void RenderObject::insertedIntoTree()
     if (!isFloating() && parent()->childrenInline())
         parent()->dirtyLinesFromChangedChild(this);
 
-    if (RenderNamedFlowThread* containerFlowThread = parent()->enclosingRenderNamedFlowThread())
+    if (RenderNamedFlowThread* containerFlowThread = parent()->renderNamedFlowThreadWrapper())
         containerFlowThread->addFlowChild(this);
 }
 
@@ -2444,18 +2447,37 @@ void RenderObject::willBeRemovedFromTree()
     if (isOutOfFlowPositioned() && parent()->childrenInline())
         parent()->dirtyLinesFromChangedChild(this);
 
-    if (inRenderFlowThread()) {
-        ASSERT(enclosingRenderFlowThread());
-        enclosingRenderFlowThread()->removeFlowChildInfo(this);
-    }
+    if (inRenderFlowThread())
+        removeFromRenderFlowThread();
 
-    if (RenderNamedFlowThread* containerFlowThread = parent()->enclosingRenderNamedFlowThread())
+    if (RenderNamedFlowThread* containerFlowThread = parent()->renderNamedFlowThreadWrapper())
         containerFlowThread->removeFlowChild(this);
 
 #if ENABLE(SVG)
     // Update cached boundaries in SVG renderers, if a child is removed.
     parent()->setNeedsBoundariesUpdate();
 #endif
+}
+
+void RenderObject::removeFromRenderFlowThread()
+{
+    RenderFlowThread* renderFlowThread = enclosingRenderFlowThread();
+    ASSERT(renderFlowThread);
+    // Sometimes we remove the element from the flow, but it's not destroyed at that time. 
+    // It's only until later when we actually destroy it and remove all the children from it. 
+    // Currently, that happens for firstLetter elements and list markers.
+    // Pass in the flow thread so that we don't have to look it up for all the children.
+    removeFromRenderFlowThreadRecursive(renderFlowThread);
+}
+
+void RenderObject::removeFromRenderFlowThreadRecursive(RenderFlowThread* renderFlowThread)
+{
+    if (const RenderObjectChildList* children = virtualChildren()) {
+        for (RenderObject* child = children->firstChild(); child; child = child->nextSibling())
+            child->removeFromRenderFlowThreadRecursive(renderFlowThread);
+    }
+    renderFlowThread->removeFlowChildInfo(this);
+    setInRenderFlowThread(false);
 }
 
 void RenderObject::destroyAndCleanupAnonymousWrappers()
@@ -2540,7 +2562,7 @@ void RenderObject::updateDragState(bool dragOn)
 {
     bool valueChanged = (dragOn != isDragging());
     setIsDragging(dragOn);
-    if (valueChanged && style()->affectedByDragRules() && node())
+    if (valueChanged && node() && (style()->affectedByDrag() || (node()->isElementNode() && toElement(node())->childrenAffectedByDrag())))
         node()->setNeedsStyleRecalc();
     for (RenderObject* curr = firstChild(); curr; curr = curr->nextSibling())
         curr->updateDragState(dragOn);

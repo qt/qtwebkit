@@ -36,7 +36,6 @@
 #include "IDBDatabaseError.h"
 #include "IDBDatabaseException.h"
 #include "IDBEventDispatcher.h"
-#include "IDBFactoryBackendInterface.h"
 #include "IDBIndex.h"
 #include "IDBKeyPath.h"
 #include "IDBObjectStore.h"
@@ -48,6 +47,8 @@
 #include "ScriptCallStack.h"
 #include "ScriptExecutionContext.h"
 #include <limits>
+#include <wtf/Atomics.h>
+#include <wtf/Threading.h>
 
 namespace WebCore {
 
@@ -64,7 +65,6 @@ IDBDatabase::IDBDatabase(ScriptExecutionContext* context, PassRefPtr<IDBDatabase
     , m_closePending(false)
     , m_contextStopped(false)
     , m_databaseCallbacks(callbacks)
-    , m_didSpamConsole(false)
 {
     // We pass a reference of this object before it can be adopted.
     relaxAdoptionRequirement();
@@ -74,6 +74,14 @@ IDBDatabase::IDBDatabase(ScriptExecutionContext* context, PassRefPtr<IDBDatabase
 IDBDatabase::~IDBDatabase()
 {
     close();
+}
+
+int64_t IDBDatabase::nextTransactionId()
+{
+    // Only keep a 32-bit counter to allow ports to use the other 32
+    // bits of the id.
+    AtomicallyInitializedStatic(int, currentTransactionId = 0);
+    return atomicIncrement(&currentTransactionId);
 }
 
 void IDBDatabase::transactionCreated(IDBTransaction* transaction)
@@ -202,30 +210,6 @@ void IDBDatabase::deleteObjectStore(const String& name, ExceptionCode& ec)
     }
 }
 
-PassRefPtr<IDBVersionChangeRequest> IDBDatabase::setVersion(ScriptExecutionContext* context, const String& version, ExceptionCode& ec)
-{
-    if (!m_didSpamConsole) {
-        String consoleMessage = ASCIILiteral("The setVersion() method is non-standard and will be removed. Use the \"upgradeneeded\" event instead.");
-        context->addConsoleMessage(JSMessageSource, LogMessageType, WarningMessageLevel, consoleMessage);
-        m_didSpamConsole = true;
-    }
-
-    if (version.isNull()) {
-        ec = TypeError;
-        return 0;
-    }
-
-    if (m_versionChangeTransaction) {
-        ec = IDBDatabaseException::IDB_INVALID_STATE_ERR;
-        return 0;
-    }
-
-    RefPtr<IDBVersionChangeRequest> request = IDBVersionChangeRequest::create(context, IDBAny::create(this), version);
-    ASSERT(m_backend);
-    m_backend->setVersion(version, request, m_databaseCallbacks, ec);
-    return request;
-}
-
 PassRefPtr<IDBTransaction> IDBDatabase::transaction(ScriptExecutionContext* context, const Vector<String>& scope, const String& modeString, ExceptionCode& ec)
 {
     if (!scope.size()) {
@@ -256,12 +240,14 @@ PassRefPtr<IDBTransaction> IDBDatabase::transaction(ScriptExecutionContext* cont
     // can be queued against the transaction at any point. They will start executing as soon as the
     // appropriate locks have been acquired.
     // Also note that each backend object corresponds to exactly one IDBTransaction object.
-    RefPtr<IDBTransactionBackendInterface> transactionBackend = m_backend->transaction(objectStoreIds, mode);
+    int64_t transactionId = nextTransactionId();
+    RefPtr<IDBTransactionBackendInterface> transactionBackend = m_backend->createTransaction(transactionId, objectStoreIds, mode);
     if (!transactionBackend) {
         ASSERT(ec);
         return 0;
     }
-    RefPtr<IDBTransaction> transaction = IDBTransaction::create(context, transactionBackend, scope, mode, this);
+
+    RefPtr<IDBTransaction> transaction = IDBTransaction::create(context, transactionId, transactionBackend, scope, mode, this);
     transactionBackend->setCallbacks(transaction.get());
     return transaction.release();
 }

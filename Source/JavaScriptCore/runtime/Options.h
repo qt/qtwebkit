@@ -68,9 +68,12 @@ namespace JSC {
     \
     v(bool, forceDFGCodeBlockLiveness, false) \
     \
+    v(bool, dumpGeneratedBytecodes, false) \
+    \
     /* showDisassembly implies showDFGDisassembly. */ \
     v(bool, showDisassembly, false) \
     v(bool, showDFGDisassembly, false) \
+    v(bool, showAllDFGNodes, false) \
     \
     v(unsigned, maximumOptimizationCandidateInstructionCount, 10000) \
     \

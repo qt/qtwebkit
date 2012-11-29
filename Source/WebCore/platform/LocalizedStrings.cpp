@@ -992,4 +992,15 @@ String validationMessageStepMismatchText(const String&, const String&)
     return WEB_UI_STRING("step mismatch", "Validation message for input form controls with value not respecting the step attribute");
 }
 
+String validationMessageBadInputForNumberText()
+{
+    notImplemented();
+    return validationMessageTypeMismatchText();
+}
+
+String clickToExitFullScreenText()
+{
+    return WEB_UI_STRING("Click to exit full screen mode", "Message to display in browser window when in webkit full screen mode.");
+}
+
 } // namespace WebCore

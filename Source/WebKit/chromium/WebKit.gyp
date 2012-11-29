@@ -108,6 +108,7 @@
                 'public/WebBindings.h',
                 'public/WebBlob.h',
                 'public/WebCache.h',
+                'public/WebCachedURLRequest.h',
                 'public/WebColorChooser.h',
                 'public/WebColorChooserClient.h',
                 'public/WebColorName.h',
@@ -288,6 +289,7 @@
                 'public/WebWorkerInfo.h',
                 'public/android/WebInputEventFactory.h',
                 'public/android/WebSandboxSupport.h',
+                'public/default/WebRenderTheme.h',
                 'public/gtk/WebInputEventFactory.h',
                 'public/linux/WebFontRenderStyle.h',
                 'public/linux/WebFontRendering.h',
@@ -432,6 +434,7 @@
                 'src/PrerendererClientImpl.h',
                 'src/PrerendererClientImpl.cpp',
                 'src/android/WebInputEventFactory.cpp',
+                'src/default/WebRenderTheme.cpp',
                 'src/linux/WebFontInfo.cpp',
                 'src/linux/WebFontRendering.cpp',
                 'src/linux/WebFontRenderStyle.cpp',
@@ -489,6 +492,7 @@
                 'src/WebBlob.cpp',
                 'src/WebBlobData.cpp',
                 'src/WebCache.cpp',
+                'src/WebCachedURLRequest.cpp',
                 'src/WebColorName.cpp',
                 'src/WebCommon.cpp',
                 'src/WebCompositorInputHandlerImpl.cpp',
@@ -838,6 +842,20 @@
                                 ],
                             },
                         }],
+                    ],
+                }],
+                ['use_default_render_theme==1', {
+                    'sources/': [
+                        ['exclude', 'src/linux/WebRenderTheme.cpp'],
+                        ['exclude', 'public/linux/WebRenderTheme.h'],
+                    ],
+                    'include_dirs': [
+                        'public/default',
+                    ],
+                }, { # else use_default_render_theme==0
+                    'sources/': [
+                        ['exclude', 'src/default/WebRenderTheme.cpp'],
+                        ['exclude', 'public/default/WebRenderTheme.h'],
                     ],
                 }],
             ],

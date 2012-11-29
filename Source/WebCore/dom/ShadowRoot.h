@@ -39,8 +39,9 @@ namespace WebCore {
 
 class Document;
 class DOMSelection;
-class InsertionPoint;
 class ElementShadow;
+class InsertionPoint;
+class ShadowRootContentDistributionData;
 
 class ShadowRoot : public DocumentFragment, public TreeScope, public DoublyLinkedListNode<ShadowRoot> {
     friend class WTF::DoublyLinkedListNode<ShadowRoot>;
@@ -90,18 +91,20 @@ public:
     InsertionPoint* assignedTo() const;
     void setAssignedTo(InsertionPoint*);
 
-    void registerShadowElement() { ++m_numberOfShadowElementChildren; }
-    void unregisterShadowElement() { --m_numberOfShadowElementChildren; }
-    bool hasShadowInsertionPoint() const { return m_numberOfShadowElementChildren > 0; }
+    void registerShadowElement();
+    void unregisterShadowElement();
+    bool hasShadowInsertionPoint() const;
 
-    void registerContentElement() { ++m_numberOfContentElementChildren; }
-    void unregisterContentElement() { --m_numberOfContentElementChildren; }
-    bool hasContentElement() const { return m_numberOfContentElementChildren > 0; }
+    void registerContentElement();
+    void unregisterContentElement();
+    bool hasContentElement() const;
 
-    void registerElementShadow() { ++m_numberOfElementShadowChildren; }
-    void unregisterElementShadow() { ASSERT(hasElementShadow()); --m_numberOfElementShadowChildren; }
-    bool hasElementShadow() const { return m_numberOfElementShadowChildren > 0; }
-    size_t countElementShadow() const { return m_numberOfElementShadowChildren; }
+    void registerElementShadow();
+    void unregisterElementShadow();
+    bool hasElementShadow() const;
+    unsigned countElementShadow() const;
+
+    const Vector<InsertionPoint*>& insertionPointList();
 
     virtual void registerScopedHTMLStyleChild() OVERRIDE;
     virtual void unregisterScopedHTMLStyleChild() OVERRIDE;
@@ -119,20 +122,22 @@ private:
     virtual PassRefPtr<Node> cloneNode(bool deep);
     virtual bool childTypeAllowed(NodeType) const;
     virtual void childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta) OVERRIDE;
+    virtual bool documentFragmentIsShadowRoot() const OVERRIDE { return true; }
 
     void setType(ShadowRootType type) { m_isAuthorShadowRoot = type == AuthorShadowRoot; }
 
+    ShadowRootContentDistributionData* distributionData() { return m_distributionData.get(); }
+    const ShadowRootContentDistributionData* distributionData() const { return m_distributionData.get(); }
+    ShadowRootContentDistributionData* ensureDistributionData();
+
     ShadowRoot* m_prev;
     ShadowRoot* m_next;
-    bool m_applyAuthorStyles : 1;
-    bool m_resetStyleInheritance : 1;
-    bool m_isAuthorShadowRoot : 1;
-    bool m_registeredWithParentShadowRoot : 1;
-    InsertionPoint* m_insertionPointAssignedTo;
-    size_t m_numberOfShadowElementChildren;
-    size_t m_numberOfContentElementChildren;
-    size_t m_numberOfElementShadowChildren;
-    size_t m_numberOfStyles;
+    OwnPtr<ShadowRootContentDistributionData> m_distributionData;
+    unsigned m_numberOfStyles : 28;
+    unsigned m_applyAuthorStyles : 1;
+    unsigned m_resetStyleInheritance : 1;
+    unsigned m_isAuthorShadowRoot : 1;
+    unsigned m_registeredWithParentShadowRoot : 1;
 };
 
 inline Element* ShadowRoot::host() const
@@ -143,17 +148,6 @@ inline Element* ShadowRoot::host() const
 inline void ShadowRoot::setHost(Element* host)
 {
     setParentOrHostNode(host);
-}
-
-inline InsertionPoint* ShadowRoot::assignedTo() const
-{
-    return m_insertionPointAssignedTo;
-}
-
-inline void ShadowRoot::setAssignedTo(InsertionPoint* insertionPoint)
-{
-    ASSERT(!m_insertionPointAssignedTo || !insertionPoint);
-    m_insertionPointAssignedTo = insertionPoint;
 }
 
 inline bool ShadowRoot::isUsedForRendering() const

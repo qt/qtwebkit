@@ -55,19 +55,23 @@
 
 namespace WebCore {
 
+struct SameSizeAsShadowRoot : public DocumentFragment, public TreeScope, public DoublyLinkedListNode<ShadowRoot> {
+    void* pointers[3];
+    unsigned countersAndFlags[1];
+};
+
+COMPILE_ASSERT(sizeof(ShadowRoot) == sizeof(SameSizeAsShadowRoot), shadowroot_should_stay_small);
+
 ShadowRoot::ShadowRoot(Document* document)
     : DocumentFragment(document, CreateShadowRoot)
     , TreeScope(this)
     , m_prev(0)
     , m_next(0)
+    , m_numberOfStyles(0)
     , m_applyAuthorStyles(false)
     , m_resetStyleInheritance(false)
+    , m_isAuthorShadowRoot(false)
     , m_registeredWithParentShadowRoot(false)
-    , m_insertionPointAssignedTo(0)
-    , m_numberOfShadowElementChildren(0)
-    , m_numberOfContentElementChildren(0)
-    , m_numberOfElementShadowChildren(0)
-    , m_numberOfStyles(0)
 {
     ASSERT(document);
     
@@ -286,12 +290,34 @@ void ShadowRoot::removedFrom(ContainerNode* insertionPoint)
     DocumentFragment::removedFrom(insertionPoint);
 }
 
+InsertionPoint* ShadowRoot::assignedTo() const
+{
+    if (!distributionData())
+        return 0;
+
+    return distributionData()->insertionPointAssignedTo();
+}
+
+void ShadowRoot::setAssignedTo(InsertionPoint* insertionPoint)
+{
+    ASSERT(!assignedTo() || !insertionPoint);
+    ensureDistributionData()->setInsertionPointAssignedTo(insertionPoint);
+}
+
 void ShadowRoot::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
 {
     GuardOrphanShadowRoot({ });
 
     ContainerNode::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
     owner()->invalidateDistribution();
+}
+
+const Vector<InsertionPoint*>& ShadowRoot::insertionPointList()
+{
+    typedef Vector<InsertionPoint*> InsertionPointVector;
+    DEFINE_STATIC_LOCAL(InsertionPointVector, emptyVector, ());
+
+    return distributionData() ? distributionData()->ensureInsertionPointList(this) : emptyVector;
 }
 
 void ShadowRoot::registerScopedHTMLStyleChild()
@@ -307,6 +333,77 @@ void ShadowRoot::unregisterScopedHTMLStyleChild()
     setHasScopedHTMLStyleChild(m_numberOfStyles > 0);
 }
 
+inline ShadowRootContentDistributionData* ShadowRoot::ensureDistributionData()
+{
+    if (m_distributionData)
+        return m_distributionData.get();
+
+    m_distributionData = adoptPtr(new ShadowRootContentDistributionData);
+    return m_distributionData.get();
+}   
+
+void ShadowRoot::registerShadowElement()
+{
+    ensureDistributionData()->incrementNumberOfShadowElementChildren();
+}
+
+void ShadowRoot::unregisterShadowElement()
+{
+    distributionData()->decrementNumberOfShadowElementChildren();
+}
+
+bool ShadowRoot::hasShadowInsertionPoint() const
+{
+    if (!distributionData())
+        return false;
+
+    return distributionData()->hasShadowElementChildren();
+}
+
+void ShadowRoot::registerContentElement()
+{
+    ensureDistributionData()->incrementNumberOfContentElementChildren();
+}
+
+void ShadowRoot::unregisterContentElement()
+{
+    distributionData()->decrementNumberOfContentElementChildren();
+}
+
+bool ShadowRoot::hasContentElement() const
+{
+    if (!distributionData())
+        return false;
+
+    return distributionData()->hasContentElementChildren();
+}
+
+void ShadowRoot::registerElementShadow()
+{
+    ensureDistributionData()->incrementNumberOfElementShadowChildren();
+}
+
+void ShadowRoot::unregisterElementShadow()
+{
+    ASSERT(hasElementShadow());
+    distributionData()->decrementNumberOfElementShadowChildren();
+}
+
+bool ShadowRoot::hasElementShadow() const
+{
+    if (!distributionData())
+        return false;
+
+    return distributionData()->hasElementShadowChildren();
+}
+
+unsigned ShadowRoot::countElementShadow() const 
+{
+    if (!distributionData())
+        return 0;
+
+    return distributionData()->numberOfElementShadowChildren();
+}
 
 void ShadowRoot::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
@@ -315,7 +412,7 @@ void ShadowRoot::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     TreeScope::reportMemoryUsage(memoryObjectInfo);
     info.addMember(m_prev);
     info.addMember(m_next);
-    info.addMember(m_insertionPointAssignedTo);
+    info.addMember(m_distributionData);
 }
 
 }

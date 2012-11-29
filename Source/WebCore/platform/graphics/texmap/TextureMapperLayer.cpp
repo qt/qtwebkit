@@ -418,7 +418,6 @@ void TextureMapperLayer::flushCompositingStateSelf(GraphicsLayerTextureMapper* g
     m_state.pos = graphicsLayer->position();
     m_state.anchorPoint = graphicsLayer->anchorPoint();
     m_state.size = graphicsLayer->size();
-    m_state.contentsRect = graphicsLayer->contentsRect();
     m_state.transform = graphicsLayer->transform();
     m_state.contentsRect = graphicsLayer->contentsRect();
     m_state.preserves3D = graphicsLayer->preserves3D();
@@ -485,13 +484,8 @@ void TextureMapperLayer::flushCompositingState(GraphicsLayerTextureMapper* graph
     if (graphicsLayer && !(options & ComputationsOnly))
         flushCompositingStateSelf(graphicsLayer, textureMapper);
 
-    if (graphicsLayer && m_state.maskLayer) {
+    if (graphicsLayer && m_state.maskLayer)
         m_state.maskLayer->flushCompositingState(toGraphicsLayerTextureMapper(graphicsLayer->maskLayer()), textureMapper);
-
-        // A mask layer has its parent's size by default, in case it's not set specifically.
-        if (m_state.maskLayer->m_size.isEmpty())
-            m_state.maskLayer->m_size = m_size;
-    }
 
     if (m_state.replicaLayer)
         m_state.replicaLayer->flushCompositingState(toGraphicsLayerTextureMapper(graphicsLayer->replicaLayer()), textureMapper);

@@ -104,19 +104,6 @@ using namespace WebKit;
 
 namespace WebCore {
 
-// Font -----------------------------------------------------------------------
-
-#if OS(WINDOWS)
-bool PlatformSupport::ensureFontLoaded(HFONT font)
-{
-    WebSandboxSupport* ss = WebKit::Platform::current()->sandboxSupport();
-
-    // if there is no sandbox, then we can assume the font
-    // was able to be loaded successfully already
-    return ss ? ss->ensureFontLoaded(font) : true;
-}
-#endif
-
 // Indexed Database -----------------------------------------------------------
 
 PassRefPtr<IDBFactoryBackendInterface> PlatformSupport::idbFactory()
@@ -133,14 +120,6 @@ bool PlatformSupport::plugins(bool refresh, Vector<PluginInfo>* results)
     WebPluginListBuilderImpl builder(results);
     webKitPlatformSupport()->getPluginList(refresh, &builder);
     return true;  // FIXME: There is no need for this function to return a value.
-}
-
-NPObject* PlatformSupport::pluginScriptableObject(Widget* widget)
-{
-    if (!widget || !widget->isPluginContainer())
-        return 0;
-
-    return static_cast<WebPluginContainerImpl*>(widget)->scriptableObject();
 }
 
 // Theming --------------------------------------------------------------------

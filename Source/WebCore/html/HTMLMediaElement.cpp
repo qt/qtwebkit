@@ -316,6 +316,10 @@ HTMLMediaElement::~HTMLMediaElement()
     if (m_mediaController)
         m_mediaController->removeMediaElement(this);
 
+#if ENABLE(MEDIA_SOURCE)
+    setSourceState(MediaSource::closedKeyword());
+#endif
+
     removeElementFromDocumentMap(this, document());
 }
 
@@ -676,16 +680,14 @@ String HTMLMediaElement::canPlayType(const String& mimeType, const String& keySy
     return canPlay;
 }
 
-void HTMLMediaElement::load(ExceptionCode& ec)
+void HTMLMediaElement::load()
 {
     RefPtr<HTMLMediaElement> protect(this); // loadInternal may result in a 'beforeload' event, which can make arbitrary DOM mutations.
     
     LOG(Media, "HTMLMediaElement::load()");
     
-    if (userGestureRequiredForLoad() && !ScriptController::processingUserGesture()) {
-        ec = INVALID_STATE_ERR;
+    if (userGestureRequiredForLoad() && !ScriptController::processingUserGesture())
         return;
-    }
     
     m_loadInitiatedByUserGesture = ScriptController::processingUserGesture();
     if (m_loadInitiatedByUserGesture)
@@ -2996,6 +2998,22 @@ void HTMLMediaElement::configureTextTrackGroup(const TrackGroup& group) const
     }
 }
 
+void HTMLMediaElement::toggleTrackAtIndex(int index, bool exclusive)
+{
+    TextTrackList* trackList = textTracks();
+    if (!trackList || !trackList->length())
+        return;
+
+    for (int i = 0, length = trackList->length(); i < length; ++i) {
+        TextTrack* track = trackList->item(i);
+        track->setShowingByDefault(false);
+        if (i == index)
+            track->setMode(TextTrack::showingKeyword());
+        else if (exclusive || index == HTMLMediaElement::textTracksOffIndex())
+            track->setMode(TextTrack::disabledKeyword());
+    }
+}
+
 void HTMLMediaElement::configureTextTracks()
 {
     TrackGroup captionAndSubtitleTracks(TrackGroup::CaptionsAndSubtitles);
@@ -3752,6 +3770,11 @@ void HTMLMediaElement::userCancelledLoad()
 void HTMLMediaElement::clearMediaPlayer(int flags)
 {
 #if !ENABLE(PLUGIN_PROXY_FOR_VIDEO)
+
+#if ENABLE(MEDIA_SOURCE)
+    setSourceState(MediaSource::closedKeyword());
+#endif
+
     m_player.clear();
 #endif
     stopPeriodicTimers();
@@ -3815,8 +3838,7 @@ void HTMLMediaElement::resume()
         // m_error is only left at MEDIA_ERR_ABORTED when the document becomes inactive (it is set to
         //  MEDIA_ERR_ABORTED while the abortEvent is being sent, but cleared immediately afterwards).
         // This behavior is not specified but it seems like a sensible thing to do.
-        ExceptionCode ec;
-        load(ec);
+        load();
     }
 
     if (renderer())

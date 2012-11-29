@@ -848,6 +848,15 @@ void WebViewImpl::setShowFPSCounter(bool show)
     settingsImpl()->setShowFPSCounter(show);
 }
 
+void WebViewImpl::setShowPaintRects(bool show)
+{
+    if (isAcceleratedCompositingActive()) {
+        TRACE_EVENT0("webkit", "WebViewImpl::setShowPaintRects");
+        m_layerTreeView->setShowPaintRects(show);
+    }
+    settingsImpl()->setShowPaintRects(show);
+}
+
 bool WebViewImpl::handleKeyEvent(const WebKeyboardEvent& event)
 {
     ASSERT((event.type == WebInputEvent::RawKeyDown)
@@ -1272,6 +1281,11 @@ void WebViewImpl::hasTouchEventHandlers(bool hasTouchHandlers)
 {
     if (m_client)
         m_client->hasTouchEventHandlers(hasTouchHandlers);
+}
+
+bool WebViewImpl::hasTouchEventHandlersAt(const WebPoint& point)
+{
+    return true;
 }
 
 #if !OS(DARWIN)
@@ -4105,17 +4119,6 @@ private:
 
 } // namespace
 
-WebGraphicsContext3D* WebViewImpl::createContext3D()
-{
-    // Temporarily, if the output surface can't be created, create a WebGraphicsContext3D
-    // directly. This allows bootstrapping the output surface system while downstream
-    // users of the API still use the old approach.
-    WebKit::WebGraphicsContext3D::Attributes attributes;
-    attributes.antialias = false;
-    attributes.shareResources = true;
-    return m_client->createGraphicsContext3D(attributes);
-}
-
 WebCompositorOutputSurface* WebViewImpl::createOutputSurface()
 {
     return m_client->createOutputSurface();
@@ -4180,11 +4183,6 @@ void WebViewImpl::didCompleteSwapBuffers()
         m_client->didCompleteSwapBuffers();
 }
 
-void WebViewImpl::didRebindGraphicsContext(bool success)
-{
-    didRecreateOutputSurface(success);
-}
-
 void WebViewImpl::didRecreateOutputSurface(bool success)
 {
     // Switch back to software rendering mode, if necessary
@@ -4212,6 +4210,12 @@ void WebViewImpl::scheduleComposite()
 
     ASSERT(!Platform::current()->compositorSupport()->isThreadingEnabled());
     m_client->scheduleComposite();
+}
+
+void WebViewImpl::createFontAtlas(SkBitmap& bitmap, WebRect asciiToRectTable[128], int& fontHeight)
+{
+    TRACE_EVENT0("webkit", "WebViewImpl::loadFontAtlas");
+    bitmap = WebCore::CompositorHUDFontAtlas::generateFontAtlas(asciiToRectTable, fontHeight);
 }
 
 void WebViewImpl::updateLayerTreeViewport()

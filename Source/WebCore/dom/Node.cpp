@@ -345,12 +345,6 @@ Node::StyleChange Node::diff(const RenderStyle* s1, const RenderStyle* s2, Docum
     else if (s1->hasExplicitlyInheritedProperties() || s2->hasExplicitlyInheritedProperties())
         ch = Inherit;
 
-    // For nth-child and other positional rules, treat styles as different if they have
-    // changed positionally in the DOM. This way subsequent sibling resolutions won't be confused
-    // by the wrong child index and evaluate to incorrect results.
-    if (ch == NoChange && s1->childIndex() != s2->childIndex())
-        ch = NoInherit;
-
     // If the pseudoStyles have changed, we want any StyleChange that is not NoChange
     // because setStyle will do the right thing with anything else.
     if (ch == NoChange && s1->hasAnyPublicPseudoStyles()) {
@@ -954,6 +948,12 @@ bool Node::isMouseFocusable() const
     return isFocusable();
 }
 
+bool Node::documentFragmentIsShadowRoot() const
+{
+    ASSERT_NOT_REACHED();
+    return false;
+}
+
 Node* Node::focusDelegate()
 {
     return this;
@@ -1150,82 +1150,6 @@ void Node::checkSetPrefix(const AtomicString& prefix, ExceptionCode& ec)
         return;
     }
     // Attribute-specific checks are in Attr::setPrefix().
-}
-
-static bool isChildTypeAllowed(Node* newParent, Node* child)
-{
-    if (child->nodeType() != Node::DOCUMENT_FRAGMENT_NODE) {
-        if (!newParent->childTypeAllowed(child->nodeType()))
-            return false;
-        return true;
-    }
-    
-    for (Node *n = child->firstChild(); n; n = n->nextSibling()) {
-        if (!newParent->childTypeAllowed(n->nodeType()))
-            return false;
-    }
-    return true;
-}
-
-bool Node::canReplaceChild(Node* newChild, Node*)
-{
-    return isChildTypeAllowed(this, newChild);
-}
-
-static void checkAcceptChild(Node* newParent, Node* newChild, ExceptionCode& ec)
-{
-    // Not mentioned in spec: throw NOT_FOUND_ERR if newChild is null
-    if (!newChild) {
-        ec = NOT_FOUND_ERR;
-        return;
-    }
-    
-    if (newParent->isReadOnlyNode()) {
-        ec = NO_MODIFICATION_ALLOWED_ERR;
-        return;
-    }
-
-    if (newChild->inDocument() && newChild->nodeType() == Node::DOCUMENT_TYPE_NODE) {
-        ec = HIERARCHY_REQUEST_ERR;
-        return;
-    }
-
-    // HIERARCHY_REQUEST_ERR: Raised if this node is of a type that does not allow children of the type of the
-    // newChild node, or if the node to append is one of this node's ancestors.
-
-    if (newChild->contains(newParent)) {
-        ec = HIERARCHY_REQUEST_ERR;
-        return;
-    }
-}
-
-void Node::checkReplaceChild(Node* newChild, Node* oldChild, ExceptionCode& ec)
-{
-    if (!oldChild) {
-        ec = NOT_FOUND_ERR;
-        return;
-    }
-
-    checkAcceptChild(this, newChild, ec);
-    if (ec)
-        return;
-
-    if (!canReplaceChild(newChild, oldChild)) {
-        ec = HIERARCHY_REQUEST_ERR;
-        return;
-    }
-}
-
-void Node::checkAddChild(Node *newChild, ExceptionCode& ec)
-{
-    checkAcceptChild(this, newChild, ec);
-    if (ec)
-        return;
-    
-    if (!isChildTypeAllowed(this, newChild)) {
-        ec = HIERARCHY_REQUEST_ERR;
-        return;
-    }
 }
 
 bool Node::isDescendantOf(const Node *other) const
@@ -1995,7 +1919,7 @@ unsigned short Node::compareDocumentPosition(Node* otherNode)
     // If the nodes have different owning documents, they must be disconnected.  Note that we avoid
     // comparing Attr nodes here, since they return false from inDocument() all the time (which seems like a bug).
     if (start1->inDocument() != start2->inDocument() ||
-        start1->document() != start2->document())
+        start1->treeScope() != start2->treeScope())
         return DOCUMENT_POSITION_DISCONNECTED | DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
 
     // We need to find a common ancestor container, and then compare the indices of the two immediate children.

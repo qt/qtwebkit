@@ -252,9 +252,15 @@ namespace WebCore {
     String validationMessageRangeUnderflowText(const String& minimum);
     String validationMessageRangeOverflowText(const String& maximum);
     String validationMessageStepMismatchText(const String& base, const String& step);
+    String validationMessageBadInputForNumberText();
+#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+    String validationMessageBadInputForDateTimeText();
+#endif
 #if USE(SOUP)
     String unacceptableTLSCertificate();
 #endif
+
+    String clickToExitFullScreenText();
 
 #if !PLATFORM(CHROMIUM)
 #define WEB_UI_STRING(string, description) WebCore::localizedString(string)

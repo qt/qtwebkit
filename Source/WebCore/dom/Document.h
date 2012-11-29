@@ -441,12 +441,9 @@ public:
     PassRefPtr<HTMLCollection> anchors();
     PassRefPtr<HTMLCollection> scripts();
     PassRefPtr<HTMLCollection> all();
-    void removeCachedHTMLCollection(HTMLCollection*, CollectionType);
 
     PassRefPtr<HTMLCollection> windowNamedItems(const AtomicString& name);
     PassRefPtr<HTMLCollection> documentNamedItems(const AtomicString& name);
-    void removeWindowNamedItemCache(HTMLCollection*, const AtomicString&);
-    void removeDocumentNamedItemCache(HTMLCollection*, const AtomicString&);
 
     // Other methods (not part of DOM)
     bool isHTMLDocument() const { return m_isHTML; }
@@ -718,8 +715,8 @@ public:
     bool hasPendingForcedStyleRecalc() const;
     void styleRecalcTimerFired(Timer<Document>*);
 
-    void registerNodeListCache(LiveNodeListBase*);
-    void unregisterNodeListCache(LiveNodeListBase*);
+    void registerNodeList(LiveNodeListBase*);
+    void unregisterNodeList(LiveNodeListBase*);
     bool shouldInvalidateNodeListCaches(const QualifiedName* attrName = 0) const;
     void invalidateNodeListCaches(const QualifiedName* attrName);
 
@@ -735,6 +732,7 @@ public:
     void nodeChildrenWillBeRemoved(ContainerNode*);
     // nodeWillBeRemoved is only safe when removing one node at a time.
     void nodeWillBeRemoved(Node*);
+    bool canReplaceChild(Node* newChild, Node* oldChild);
 
     void textInserted(Node*, unsigned offset, unsigned length);
     void textRemoved(Node*, unsigned offset, unsigned length);
@@ -1199,7 +1197,6 @@ private:
     virtual NodeType nodeType() const;
     virtual bool childTypeAllowed(NodeType) const;
     virtual PassRefPtr<Node> cloneNode(bool deep);
-    virtual bool canReplaceChild(Node* newChild, Node* oldChild);
 
     virtual void refScriptExecutionContext() { ref(); }
     virtual void derefScriptExecutionContext() { deref(); }
@@ -1238,7 +1235,7 @@ private:
     PageVisibilityState visibilityState() const;
 #endif
 
-    PassRefPtr<HTMLCollection> cachedCollection(CollectionType);
+    PassRefPtr<HTMLCollection> ensureCachedCollection(CollectionType);
 
 #if ENABLE(FULLSCREEN_API)
     void clearFullscreenElementStack();
@@ -1409,11 +1406,6 @@ private:
 
     HashSet<LiveNodeListBase*> m_listsInvalidatedAtDocument;
     unsigned m_nodeListCounts[numNodeListInvalidationTypes];
-
-    HTMLCollection* m_collections[NumUnnamedDocumentCachedTypes];
-    typedef HashMap<AtomicString, HTMLNameCollection*> NamedCollectionMap;
-    NamedCollectionMap m_documentNamedItemCollections;
-    NamedCollectionMap m_windowNamedItemCollections;
 
     RefPtr<XPathEvaluator> m_xpathEvaluator;
 
