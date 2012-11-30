@@ -1,3 +1,265 @@
+2012-11-29  Tommy Widenflycht  <tommyw@google.com>
+
+        Speech Recognition API: Update SpeechRecognitionEvent to match the specification
+        https://bugs.webkit.org/show_bug.cgi?id=103407
+
+        Reviewed by Adam Barth.
+
+        Changing the mock to use the new results delivery API.
+
+        * DumpRenderTree/chromium/MockWebSpeechRecognizer.cpp:
+
+2012-11-30  Simon Hausmann  <simon.hausmann@digia.com>, Pierre Rossi  <pierre.rossi@digia.com>
+
+        [Qt] Separate Qt WebKit into Qt WebKit and Qt WebKit Widgets
+        https://bugs.webkit.org/show_bug.cgi?id=99314
+
+        Reviewed by Tor Arne Vestbø.
+
+        This big change separates QtWebKit into QtWebKit and QtWebKitWidgets as
+        shared libraries.
+
+        It's a big refactoring that mostly involves moving WebCore dependent
+        code into QtWebKit and accessing it through exported QWebFrameAdapter
+        and QWebPageAdapter classes.
+
+        * DumpRenderTree/qt/DumpRenderTree.pro:
+        * DumpRenderTree/qt/DumpRenderTreeQt.cpp:
+        (WebCore::DumpRenderTree::dump): Adapt to internal API changes.
+        * MiniBrowser/qt/MiniBrowser.pro:
+        * Scripts/webkitpy/style/checker.py: Adapt Qt exceptions to new paths.
+        * Scripts/webkitpy/style/checker_unittest.py:
+        (GlobalVariablesTest.test_path_rules_specifier):
+        * WebKitTestRunner/InjectedBundle/Target.pri:
+        * qmake/mkspecs/features/default_post.prf:
+        * qmake/mkspecs/features/webkit_modules.prf:
+        * qmake/mkspecs/modules/webkitwidgets.prf: Removed.
+
+2012-11-30  Csaba Osztrogonác  <ossy@webkit.org>
+
+        [Qt] Unreviewed trivial fix.
+
+        Add empty.cpp back, it was removed accidentally by r129092.
+
+        * qmake/config.tests/gccdepends/empty.cpp: Added.
+
+2012-11-30  Tor Arne Vestbø  <tor.arne.vestbo@digia.com>
+
+        [Qt] Add support for prepare_docs and generate_docs
+
+        Follow-up to changes in Qt in how documentation is built.
+
+        Reviewed by Simon Hausmann.
+
+        * qmake/mkspecs/features/default_post.prf:
+
+2012-11-30  Zan Dobersek  <zandobersek@gmail.com>
+
+        Finally remove webkitpy.common.system.deprecated_logging
+        https://bugs.webkit.org/show_bug.cgi?id=103624
+
+        Reviewed by Adam Barth.
+
+        Remove the deprecated logging module and its unit tests now that such logging is not
+        used anymore in webkitpy.
+
+        The tee and OutputTee classes are moved into a new module, webkitpy.common.system.outputtee.
+        The tee class is renamed to Tee to conform with the usual guidelines.
+
+        Only unit test for the Tee class is currently provided as the OutputTee is not currently
+        using the webkitpy Filesystem abstraction that would make its functionality testable.
+
+        * Scripts/webkitpy/common/system/executive.py: tee (now Tee) is now in a new module.
+        (Executive.run_and_throw_if_fail):
+        * Scripts/webkitpy/common/system/outputtee.py: Renamed from Tools/Scripts/webkitpy/common/system/deprecated_logging.py.
+        (Tee):
+        (Tee.__init__):
+        (Tee.write):
+        (OutputTee):
+        (OutputTee.__init__):
+        (OutputTee.add_log):
+        (OutputTee.remove_log):
+        (OutputTee._open_log_file):
+        (OutputTee._tee_outputs_to_files):
+        * Scripts/webkitpy/common/system/outputtee_unittest.py: Renamed from Tools/Scripts/webkitpy/common/system/deprecated_logging_unittest.py.
+        (SimpleTeeTest):
+        (SimpleTeeTest.test_simple_tee):
+        * Scripts/webkitpy/tool/bot/queueengine.py: OutputTee is now in a new module.
+        * Scripts/webkitpy/webkitpy.pyproj: Remove the deprecated_logging module and related unit test file.
+
+2012-11-30  Sudarsana Nagineni  <sudarsana.nagineni@intel.com>
+
+        [EFL][WK2] Add support for PlatformWebView::simulateRightClick() in TestWebKitAPI
+        https://bugs.webkit.org/show_bug.cgi?id=103634
+
+        Reviewed by Gyuyoung Kim.
+
+        Add support for PlatformWebView::simulateRightClick() and enable
+        WebKit2 API test HitTestResultNodeHandle.
+
+        * TestWebKitAPI/PlatformEfl.cmake:
+        * TestWebKitAPI/efl/PlatformWebView.cpp:
+        (TestWebKitAPI::PlatformWebView::simulateRightClick):
+        (TestWebKitAPI):
+
+2012-11-30  Mihai Maerean  <mmaerean@adobe.com>
+
+        [CSSRegions] when WebKit uses V8, there should be a single variable to store if the CSS Regions feature is enabled
+        https://bugs.webkit.org/show_bug.cgi?id=101192
+
+        Reviewed by Hajime Morita.
+
+        Removed the CSS Regions flag in Settings and switched to using the new flag I have added in RuntimeEnabledFeatures.
+
+        Tests: No new tests because there is no functional change.
+
+        * DumpRenderTree/chromium/WebPreferences.cpp:
+        (WebPreferences::applyTo):
+
+2012-11-29  Rafael Weinstein  <rafaelw@chromium.org>
+
+        [HTMLTemplateElement] Add feature flag
+        https://bugs.webkit.org/show_bug.cgi?id=103694
+
+        Reviewed by Adam Barth.
+
+        This flag will guard the implementation of the HTMLTemplateElement.
+        http://dvcs.w3.org/hg/webcomponents/raw-file/tip/spec/templates/index.html
+
+        * Scripts/webkitperl/FeatureList.pm:
+
+2012-11-29  Dirk Pranke  <dpranke@chromium.org>
+
+        Ignore errors when removing directories on win32 during autoinstall
+        https://bugs.webkit.org/show_bug.cgi?id=103699
+
+        Unreviewed, build fix.
+
+        I think this will work on win32; if not, I'll have to actually
+        reproduce this :). The problem is that the logilab files
+        appear to contain a write-protected file, and deleting those
+        is problematic on windows.
+
+        * Scripts/webkitpy/common/system/autoinstall.py:
+        (AutoInstaller._install):
+        (AutoInstaller.install):
+
+2012-11-29  Dirk Pranke  <dpranke@chromium.org>
+
+        webkitpy: autoinstaller is failing on windows
+        https://bugs.webkit.org/show_bug.cgi?id=103699
+
+        Unreviewed, build fix.
+
+        We're attempting to create directories with forward slashes in them;
+        this is a no-no on windows.
+
+        * Scripts/webkitpy/common/system/autoinstall.py:
+        (AutoInstaller._create_scratch_directory_inner):
+
+2012-11-29  Dirk Pranke  <dpranke@chromium.org>
+
+        Fix python unit tests after r136158 (android port tests failing)
+        https://bugs.webkit.org/show_bug.cgi?id=103581
+
+        Unreviewed, build fix.
+
+        The unit tests apparently weren't ran for this patch; we failed
+        to update the mock executive calls out to adb to determine various
+        aspects of the environment, and were failing to create drivers.
+
+        * Scripts/webkitpy/layout_tests/port/chromium_android_unittest.py:
+        (MockRunCommand.mock_run_command_fn):
+
+2012-11-29  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r136175 and r136177.
+        http://trac.webkit.org/changeset/136175
+        http://trac.webkit.org/changeset/136177
+        https://bugs.webkit.org/show_bug.cgi?id=103683
+
+        Changes did not correct Windows build. (Requested by bfulgham
+        on #webkit).
+
+        * TestWebKitAPI/Tests/WebCore/win/BitmapImage.cpp:
+
+2012-11-29  Brent Fulgham  <bfulgham@webkit.org>
+
+        [Windows, WinCairo] Unreviewed build correction. Correct debug
+        build case on build machine.
+
+        * TestWebKitAPI/Tests/WebCore/win/BitmapImage.cpp:
+
+2012-11-29  Brent Fulgham  <bfulgham@webkit.org>
+
+        [Windows, WinCairo] Unreviewed build correction. Hide the
+        unexported 'notSolidColor' symbol when testing against
+        the BitmapImage class to avoid having to deal with a
+        debug-only symbol in the Windows export definition file.
+
+        * TestWebKitAPI/Tests/WebCore/win/BitmapImage.cpp: 
+
+2012-11-29  Peter Beverloo  <peter@chromium.org>
+
+        run-perf-tests --chromium-android should not require adb in my path
+        https://bugs.webkit.org/show_bug.cgi?id=103581
+
+        Reviewed by Eric Seidel.
+
+        Remove the need to have "adb" available in the path for Layout and Performance
+        tests. We'll determine the versions of the "adb" version in path (if any) and
+        the one provided in the Chromium Android checkout. Unless the "adb" available
+        in the path is newer, the provided version will be used.
+
+        Some other minor nits addressed:
+        - The path_to_forwarder/path_to_md5sum should not be in the "private overrides"
+          section, as they're not overriding anything and are used by the driver.
+        - Make _restart_adb_as_root slightly more robust by waiting for the device
+          to come back online regardless of the output.
+
+        * Scripts/webkitpy/layout_tests/port/chromium_android.py:
+        (ChromiumAndroidPort.__init__):
+        (ChromiumAndroidPort.check_build):
+        (ChromiumAndroidPort.path_to_adb):
+        (ChromiumAndroidPort):
+        (ChromiumAndroidPort.path_to_forwarder):
+        (ChromiumAndroidPort.path_to_md5sum):
+        (ChromiumAndroidPort._path_to_helper):
+        (ChromiumAndroidPort._determine_adb_version):
+        (ChromiumAndroidPort._get_devices):
+        (ChromiumAndroidDriver.__init__):
+        (ChromiumAndroidDriver._setup_md5sum_and_push_data_if_needed):
+        (ChromiumAndroidDriver._push_executable):
+        (ChromiumAndroidDriver._restart_adb_as_root):
+
+2012-11-29  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] [WebKit2] Embed the HTTP authentication dialog into the WebView
+        https://bugs.webkit.org/show_bug.cgi?id=103277
+
+        Reviewed by Carlos Garcia Campos.
+
+        Skip the new WebKit2GtkAuthenticationDialog files so that they are not processed
+        during gtkdoc generation.
+
+        * gtk/generate-gtkdoc:
+        (get_webkit2_options):
+
+2012-11-29  Eric Seidel  <eric@webkit.org>
+
+        run-perf-tests --chromium-android fails due to Skia INFO logging
+        https://bugs.webkit.org/show_bug.cgi?id=103585
+
+        Reviewed by Adam Barth.
+
+        Ignore all INFO logging from Chromium code.
+        Also added some basic testing of the ignored-stderr lines code.
+
+        * Scripts/webkitpy/performance_tests/perftest.py:
+        (PerfTest):
+        * Scripts/webkitpy/performance_tests/perftest_unittest.py:
+        (MainTest.test_ignored_stderr_lines):
+
 2012-11-29  Sudarsana Nagineni  <sudarsana.nagineni@intel.com>
 
         [EFL][WK2] Add support for PlatformWebView::simulateMouseMove() in TestWebKitAPI

@@ -690,6 +690,7 @@ SOURCES += \
     html/TextFieldInputType.cpp \
     html/TextInputType.cpp \
     html/TimeInputType.cpp \
+    html/TypeAhead.cpp \
     html/URLInputType.cpp \
     html/ValidationMessage.cpp \
     html/ValidityState.cpp \
@@ -1844,6 +1845,7 @@ HEADERS += \
     html/StepRange.h \
     html/TextDocument.h \
     html/TimeRanges.h \
+    html/TypeAhead.h \
     html/ValidityState.h \
     html/parser/CSSPreloadScanner.h \
     html/parser/HTMLConstructionSite.h \
@@ -2476,6 +2478,7 @@ HEADERS += \
     rendering/style/StyleTransformData.h \
     rendering/style/StyleVariableData.h \
     rendering/style/StyleVisualData.h \
+    rendering/style/GridTrackSize.h \
     rendering/style/SVGRenderStyleDefs.h \
     rendering/style/SVGRenderStyle.h \
     rendering/svg/RenderSVGBlock.h \
@@ -2854,7 +2857,6 @@ SOURCES += \
     platform/qt/PasteboardQt.cpp \
     platform/qt/PlatformKeyboardEventQt.cpp \
     platform/qt/PlatformScreenQt.cpp \
-    platform/qt/QStyleFacade.cpp \
     platform/qt/RenderThemeQStyle.cpp \
     platform/qt/RenderThemeQt.cpp \
     platform/qt/RenderThemeQtMobile.cpp \

@@ -3625,6 +3625,8 @@ webcore_sources += \
 	Source/WebCore/html/track/WebVTTToken.h \
 	Source/WebCore/html/track/WebVTTTokenizer.h \
 	Source/WebCore/html/track/WebVTTTokenizer.cpp \
+	Source/WebCore/html/TypeAhead.cpp \
+	Source/WebCore/html/TypeAhead.h \
 	Source/WebCore/html/URLInputType.cpp \
 	Source/WebCore/html/URLInputType.h \
 	Source/WebCore/html/ValidationMessage.cpp \
@@ -4504,6 +4506,7 @@ webcore_sources += \
 	Source/WebCore/rendering/style/StyleVariableData.h \
 	Source/WebCore/rendering/style/StyleVisualData.cpp \
 	Source/WebCore/rendering/style/StyleVisualData.h \
+	Source/WebCore/rendering/style/GridTrackSize.h \
 	Source/WebCore/rendering/TableLayout.h \
 	Source/WebCore/rendering/TrailingFloatsRootInlineBox.h \
 	Source/WebCore/storage/StorageTask.cpp \

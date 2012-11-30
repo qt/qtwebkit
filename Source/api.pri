@@ -8,31 +8,30 @@
 load(qt_build_config)
 
 TEMPLATE = lib
-TARGET = QtWebKitWidgets
+TARGET = QtWebKit
 
 WEBKIT_DESTDIR = $${ROOT_BUILD_DIR}/lib
 
 WEBKIT += wtf javascriptcore webcore
 
-build?(webkit1): WEBKIT += webkitwidgets webkit1
+build?(webkit1): WEBKIT += webkit1
 build?(webkit2): WEBKIT += webkit2
 
 # Ensure that changes to the WebKit1 and WebKit2 API will trigger a qmake of this
 # file, which in turn runs syncqt to update the forwarding headers.
 build?(webkit1): {
     QMAKE_INTERNAL_INCLUDED_FILES *= WebKit/WebKit1.pro
-    QMAKE_INTERNAL_INCLUDED_FILES *= WebKit/WebKitWidgets.pro
 }
 build?(webkit2): QMAKE_INTERNAL_INCLUDED_FILES *= WebKit2/Target.pri
 
 use?(3D_GRAPHICS): WEBKIT += angle
 
-MODULE = webkitwidgets
+MODULE = webkit
+CONFIG += creating_module
 
 # This is the canonical list of dependencies for the public API of
 # the QtWebKit library, and will end up in the library's prl file.
 QT_API_DEPENDS = core gui network
-build?(webkit1): QT_API_DEPENDS += widgets
 
 # We want the QtWebKit API forwarding includes to live in the root build dir.
 MODULE_BASE_DIR = $$_PRO_FILE_PWD_
@@ -53,7 +52,7 @@ load(webkit_modules)
 # For WebKit we don't want that behavior for the libraries, as we want
 # them to be self-contained in the WebKit build dir.
 #
-CONFIG += force_independent
+!production_build: CONFIG += force_independent
 
 BASE_TARGET = $$TARGET
 
@@ -63,7 +62,7 @@ load(qt_module)
 macx:!debug_and_release:debug: TARGET = $$BASE_TARGET
 
 # Make sure the install_name of the QtWebKit library point to webkit
-macx {
+force_independent:macx {
     # We do our own absolute path so that we can trick qmake into
     # using the webkit build path instead of the Qt install path.
     CONFIG -= absolute_library_soname

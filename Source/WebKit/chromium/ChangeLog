@@ -1,3 +1,169 @@
+2012-11-29  Tommy Widenflycht  <tommyw@google.com>
+
+        Speech Recognition API: Update SpeechRecognitionEvent to match the specification
+        https://bugs.webkit.org/show_bug.cgi?id=103407
+
+        Reviewed by Adam Barth.
+
+        Adding the new didReceiveResults method.
+
+        * public/WebSpeechRecognizerClient.h:
+        * src/SpeechRecognitionClientProxy.cpp:
+        (WebKit::SpeechRecognitionClientProxy::didReceiveResults):
+        (WebKit):
+        * src/SpeechRecognitionClientProxy.h:
+        (SpeechRecognitionClientProxy):
+
+2012-11-30  Keishi Hattori  <keishi@webkit.org>
+
+        [Chromium] Page popup doesn't change mouse cursor
+        https://bugs.webkit.org/show_bug.cgi?id=97454
+
+        Reviewed by Kent Tamura.
+
+        The mouse cursor should change based on the page popup content and not the main window content.
+        On Mac the mousemove event propagates to both the page popup and main window causing the cursor to flicker.
+        The change to ChromeClientImpl stops that.
+
+        * src/ChromeClientImpl.cpp:
+        (WebKit::ChromeClientImpl::setCursor): On Mac, don't update the mouse cursor if a popup is open.
+        * src/WebPagePopupImpl.cpp: Implement setCursor so the mouse cursor gets set based on the page popup content.
+
+2012-11-30  Mihai Maerean  <mmaerean@adobe.com>
+
+        [CSSRegions] when WebKit uses V8, there should be a single variable to store if the CSS Regions feature is enabled
+        https://bugs.webkit.org/show_bug.cgi?id=101192
+
+        Reviewed by Hajime Morita.
+
+        Removed the CSS Regions flag in Settings and switched to using the new flag I have added in RuntimeEnabledFeatures.
+
+        Tests: No new tests because there is no functional change.
+
+        * public/WebRuntimeFeatures.h:
+        (WebRuntimeFeatures):
+        * public/WebSettings.h: moved setExperimentalCSSRegionsEnabled to the bottom of the interface and made it a
+        no-op.  After this patch lands and Chromium's webkit_rev is increased, we'll remove any callers in Chromium. Once
+        the Chromium callers are gone and WebKit's chromium_rev is increased, we'll remove the deprecated API.
+        * src/WebRuntimeFeatures.cpp:
+        (WebKit::WebRuntimeFeatures::enableCSSRegions):
+        (WebKit):
+        (WebKit::WebRuntimeFeatures::isCSSRegionsEnabled):
+        * src/WebSettingsImpl.cpp:
+        * src/WebSettingsImpl.h:
+        (WebSettingsImpl):
+
+2012-11-29  Rafael Weinstein  <rafaelw@chromium.org>
+
+        [HTMLTemplateElement] Add feature flag
+        https://bugs.webkit.org/show_bug.cgi?id=103694
+
+        Reviewed by Adam Barth.
+
+        This flag will guard the implementation of the HTMLTemplateElement.
+        http://dvcs.w3.org/hg/webcomponents/raw-file/tip/spec/templates/index.html
+
+
+        * features.gypi:
+
+2012-11-29  David Grogan  <dgrogan@chromium.org>
+
+        IndexedDB: Propagate more leveldb errors to script
+        https://bugs.webkit.org/show_bug.cgi?id=103580
+
+        Reviewed by Tony Chang.
+
+        * tests/IDBFakeBackingStore.h:
+         Update method signatures.
+
+2012-11-29  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r136171.
+        http://trac.webkit.org/changeset/136171
+        https://bugs.webkit.org/show_bug.cgi?id=103695
+
+        Likely caused ReOpenedWithID and ReOpenedWithURL to fail in
+        linux/chromeos (Requested by zhenyao on #webkit).
+
+        * src/InspectorClientImpl.cpp:
+        (WebKit::InspectorClientImpl::startMainThreadMonitoring):
+        (WebKit):
+        (WebKit::InspectorClientImpl::stopMainThreadMonitoring):
+        (WebKit::InspectorClientImpl::willProcessTask):
+        (WebKit::InspectorClientImpl::didProcessTask):
+        * src/InspectorClientImpl.h:
+        (InspectorClientImpl):
+        * src/WebDevToolsAgentImpl.cpp:
+        (WebKit::WebDevToolsAgentImpl::attach):
+        (WebKit::WebDevToolsAgentImpl::detach):
+        * src/WebDevToolsAgentImpl.h:
+        (WebDevToolsAgentImpl):
+
+2012-11-29  Sadrul Habib Chowdhury  <sadrul@chromium.org>
+
+        [chromium] Remove deprecated API since it is no longer used
+        https://bugs.webkit.org/show_bug.cgi?id=103570
+
+        Reviewed by Adam Barth.
+
+        Remove WebPluginContainer::setIsAcceptingTouchEvents, since this is not used anymore,
+        in favour of WebPluginContainer::requestTouchEventType.
+
+        * public/WebPluginContainer.h:
+        (WebPluginContainer):
+        * src/WebPluginContainerImpl.cpp:
+        * src/WebPluginContainerImpl.h:
+        (WebPluginContainerImpl):
+
+2012-11-29  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed.  Rolled DEPS.
+
+        * DEPS:
+
+2012-11-29  Eugene Klyuchnikov  <eustas@chromium.org>
+
+        Web Inspector: Make main-thread monitoring go through InspectorController.
+        https://bugs.webkit.org/show_bug.cgi?id=103550
+
+        Reviewed by Pavel Feldman.
+
+        InspectorInstrumentation was a wrong path
+
+        * src/InspectorClientImpl.cpp: Remove TaskObserver implementation, and
+        listen/unlisten methods.
+        * src/InspectorClientImpl.h: Ditto.
+        * src/WebDevToolsAgentImpl.cpp:
+        (WebKit::WebDevToolsAgentImpl::attach):
+        Subscribe for main thread activity events.
+        (WebKit::WebDevToolsAgentImpl::detach):
+        Unsubscribe for main thread activity events.
+        (WebKit::WebDevToolsAgentImpl::willProcessTask): Implement TaskObserver
+        interface. Froward to InspectorController.
+        (WebKit::WebDevToolsAgentImpl::didProcessTask): Ditto.
+        * src/WebDevToolsAgentImpl.h: Implement TaskObserver interface.
+
+2012-11-29  Stephen Chenney  <schenney@chromium.org>
+
+        [Chromium] Add code supppression flags for skia
+
+        Unreviewed addition of Skia build flags to allow for their removal from Chromium's skia.gyp.
+
+        * skia_webkit.gyp: Added defines for SK_DISABLE_DITHER_32BIT_GRADIENT and SK_DISABLE_DASHING_OPTIMIZATION
+
+2012-11-29  Florin Malita  <fmalita@chromium.org>
+
+        [Skia] Add missing OpaqueRegionSkia notifier calls
+        https://bugs.webkit.org/show_bug.cgi?id=102824
+
+        Reviewed by Stephen White.
+
+        Add opaque region tracking unit tests for the new PlatformContextSkia draw methods.
+
+        * tests/PlatformContextSkiaTest.cpp:
+        (WebCore::TEST):
+        (WebCore):
+
 2012-11-29  Miguel Garcia  <miguelg@chromium.org>
 
         Fix typo in description of openDateTimeChooser documentation

@@ -20,13 +20,16 @@
 #ifndef QtPluginWidgetAdapter_h
 #define QtPluginWidgetAdapter_h
 
+#include <PlatformExportMacros.h>
 #include <QObject>
 #include <QRect>
 #include <QString>
+#include <qwebkitglobal.h>
 
-class QtPluginWidgetAdapter : public QObject {
+class WEBKIT_EXPORTDATA QtPluginWidgetAdapter : public QObject {
     Q_OBJECT
 public:
+    QtPluginWidgetAdapter();
     virtual void update(const QRect&) = 0;
     virtual void setGeometryAndClip(const QRect&, const QRect&, bool isVisible = false) = 0;
     virtual void setVisible(bool) = 0;

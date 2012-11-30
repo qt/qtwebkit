@@ -1,3 +1,1066 @@
+2012-11-29  Tommy Widenflycht  <tommyw@google.com>
+
+        Speech Recognition API: Update SpeechRecognitionEvent/Result to match the specification
+        https://bugs.webkit.org/show_bug.cgi?id=103407
+
+        Reviewed by Adam Barth.
+
+        This patch does the following:
+        o Adds results, and removing result on SpeechRecognitionEvent
+        o Renaming SpeechRecognitionResult::final to isFinal
+        o Moving emma to SpeechRecognitionEvent from SpeechRecognitionResult
+
+        Existing tests updated to test the new API.
+
+        * Modules/speech/SpeechRecognition.cpp:
+        (WebCore::SpeechRecognition::start):
+        (WebCore::SpeechRecognition::didReceiveResults):
+        (WebCore):
+        * Modules/speech/SpeechRecognition.h:
+        (SpeechRecognition):
+        * Modules/speech/SpeechRecognitionEvent.cpp:
+        (WebCore::SpeechRecognitionEvent::createResult):
+        (WebCore):
+        (WebCore::SpeechRecognitionEvent::SpeechRecognitionEvent):
+        (WebCore::SpeechRecognitionEvent::~SpeechRecognitionEvent):
+        (WebCore::emmaQualifiedName):
+        (WebCore::SpeechRecognitionEvent::emma):
+        * Modules/speech/SpeechRecognitionEvent.h:
+        (WebCore):
+        (SpeechRecognitionEventInit):
+        (SpeechRecognitionEvent):
+        (WebCore::SpeechRecognitionEvent::resultIndex):
+        (WebCore::SpeechRecognitionEvent::results):
+        * Modules/speech/SpeechRecognitionEvent.idl:
+        * Modules/speech/SpeechRecognitionResult.cpp:
+        * Modules/speech/SpeechRecognitionResult.h:
+        (WebCore::SpeechRecognitionResult::isFinal):
+        (SpeechRecognitionResult):
+        * Modules/speech/SpeechRecognitionResult.idl:
+        * WebCore.gypi:
+        * bindings/v8/custom/V8SpeechRecognitionEventCustom.cpp: Renamed from Source/WebCore/bindings/v8/custom/V8SpeechRecognitionResultCustom.cpp.
+        (WebCore):
+        (WebCore::V8SpeechRecognitionEvent::opaqueRootForGC):
+
+2012-11-30  Simon Hausmann  <simon.hausmann@digia.com>, Pierre Rossi  <pierre.rossi@digia.com>
+
+        [Qt] Separate Qt WebKit into Qt WebKit and Qt WebKit Widgets
+        https://bugs.webkit.org/show_bug.cgi?id=99314
+
+        Reviewed by Tor Arne Vestbø.
+
+        This big change separates QtWebKit into QtWebKit and QtWebKitWidgets as
+        shared libraries.
+
+        It's a big refactoring that mostly involves moving WebCore dependent
+        code into QtWebKit and accessing it through exported QWebFrameAdapter
+        and QWebPageAdapter classes.
+
+        * Target.pri:
+        * platform/qt/QStyleFacade.h: Get rid of styleForPage function, not needed
+        anymore.
+        * platform/qt/QWebPageClient.h:
+        (QWebPageClient): Remove a whole lot of cruft in favour of a simple GL enabling
+        callback to select the GL texture mapper.
+        (QWebPageClient::makeOpenGLContextCurrentIfAvailable):
+
+2012-11-30  Simon Hausmann  <simon.hausmann@digia.com>
+
+        Unreviewed, rolling out r136227.
+        http://trac.webkit.org/changeset/136227
+
+        Broke the Qt bots due to version mismatch
+
+        * platform/graphics/gstreamer/PlatformVideoWindowQt.cpp:
+        (FullScreenVideoWindow::FullScreenVideoWindow):
+        (PlatformVideoWindow::PlatformVideoWindow):
+
+2012-11-30  Samuel Rødal  <samuel.rodal@digia.com>
+
+        [Qt] Fixed use of to-be-removed compatibility functions in QWindow.
+
+        Reviewed by Simon Hausmann.
+
+        * platform/graphics/gstreamer/PlatformVideoWindowQt.cpp:
+        (FullScreenVideoWindow::FullScreenVideoWindow):
+        (PlatformVideoWindow::PlatformVideoWindow):
+
+2012-11-30  Arpita Bahuguna  <arpitabahuguna@gmail.com>
+
+        Caret is painted horizontally in vertical writing mode when there are no visible text
+        https://bugs.webkit.org/show_bug.cgi?id=102359
+
+        Reviewed by Ryosuke Niwa.
+
+        In the vertical writing mode the caret rect on an empty editable box or
+        an empty line is rendered as per the horizontal writing mode.
+
+        This changes though when any text is added; the caret is then displayed
+        in accordance with the vertical writing mode.
+
+        Test: editing/selection/caret-alignment-for-vertical-text.html
+
+        * rendering/RenderBox.cpp:
+        (WebCore::RenderBox::localCaretRect):
+        * rendering/RenderBoxModelObject.cpp:
+        (WebCore::RenderBoxModelObject::localCaretRectForEmptyElement):
+        The caret rect should be transposed for the vertical writing mode. Its
+        width and height values need to be interchanged for it to be oriented
+        as per the vertical text.
+
+2012-11-30  Sankeerth V S  <sankeerth.vs@samsung.com>
+
+        Web Inspector: [Timeline] JS error when clicking in Memory Statistics view
+        https://bugs.webkit.org/show_bug.cgi?id=103486
+
+        Reviewed by Alexander Pavlov.
+
+        The counter value can be null/undefined. Hence a check is needed
+        before we access the "time" property on this counter object.
+
+        No new tests required as UI related change.
+
+        * inspector/front-end/MemoryStatistics.js:
+        (WebInspector.MemoryStatistics.prototype._onClick):
+
+2012-11-30  Kent Tamura  <tkent@chromium.org>
+
+        Fix typos in DateTimeNumericFieldElement.cpp and DateTimeSymbolicFieldElement.cpp
+        https://bugs.webkit.org/show_bug.cgi?id=103717
+
+        Reviewed by Hajime Morita.
+
+        * html/shadow/DateTimeNumericFieldElement.cpp:
+        (WebCore::DateTimeNumericFieldElement::customStyleForRenderer):
+        maximum, not maxium.
+        * html/shadow/DateTimeSymbolicFieldElement.cpp:
+        (WebCore::DateTimeSymbolicFieldElement::customStyleForRenderer): Ditto.
+
+2012-11-30  Halton Huo  <halton.huo@intel.com>
+
+        [EFL] libwebcore_efl.a fail to link when enable webgl
+        https://bugs.webkit.org/show_bug.cgi?id=103610
+
+        Reviewed by Gyuyoung Kim.
+
+        libwebcore_efl.a should link to X11, Xcomposite and Xrender libraries when ENABLE_WEBGL is ON
+
+        No new tests, no behavior change for layout tests.
+
+        * PlatformEfl.cmake: Append ${X11_X11_LIB}, ${X11_Xcomposite_LIB} and ${X11_Xrender_LIB} to WebCore_LIBRARIES
+
+2012-11-30  Tim Horton  <timothy_horton@apple.com>
+
+        Unreviewed, fix the PDFPlugin build after http://trac.webkit.org/changeset/136205.
+
+        * WebCore.xcodeproj/project.pbxproj:
+
+2012-11-30  Mihai Maerean  <mmaerean@adobe.com>
+
+        [CSSRegions] when WebKit uses V8, there should be a single variable to store if the CSS Regions feature is enabled
+        https://bugs.webkit.org/show_bug.cgi?id=101192
+
+        Reviewed by Hajime Morita.
+
+        Removed the CSS Regions flag in Settings and switched to using the new flag I have added in RuntimeEnabledFeatures.
+
+        Tests: No new tests because there is no functional change.
+
+        * WebCore.exp.in:
+        * WebCore.vcproj/copyForwardingHeaders.cmd:
+        * WebCore.xcodeproj/project.pbxproj:
+        * bindings/generic/RuntimeEnabledFeatures.cpp:
+        (WebCore):
+        * bindings/generic/RuntimeEnabledFeatures.h:
+        (RuntimeEnabledFeatures):
+        (WebCore::RuntimeEnabledFeatures::setCSSRegionsEnabled):
+        (WebCore::RuntimeEnabledFeatures::cssRegionsEnabled):
+        * dom/Document.cpp:
+        (WebCore::Document::cssRegionsEnabled):
+        * page/Settings.cpp:
+        (WebCore::Settings::Settings):
+        * page/Settings.h:
+        (Settings):
+
+2012-11-29  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] [WebKit2] WebKitWebViewBase creates a GL context for the redirected XComposite window crashing WebKit in Xvfb
+        https://bugs.webkit.org/show_bug.cgi?id=103476
+
+        Reviewed by Alejandro G. Castro.
+
+        Allow creation of RedirectedXCompositeWindow in a mode which does not have a backing
+        GLContext. For WebKit2 the GLContext is always in the WebProcess. Creating the GLContext
+        in both processes can cause crashes when library is run in Xvfb.
+
+        No new tests. This fixes a crash running tests on some systems.
+
+        * platform/gtk/RedirectedXCompositeWindow.cpp:
+        (WebCore::RedirectedXCompositeWindow::RedirectedXCompositeWindow):
+        (WebCore::RedirectedXCompositeWindow::resize): Do not create the GLContext when
+        in the new no-GLContext mode.
+        (WebCore::RedirectedXCompositeWindow::context): ASSERT that we are not in
+        no-GLContext mode.
+
+2012-11-29  Keishi Hattori  <keishi@webkit.org>
+
+        Better type ahead for DateTimeSymbolicFieldElement
+        https://bugs.webkit.org/show_bug.cgi?id=103031
+
+        Reviewed by Kent Tamura.
+
+        This cuts out the type ahead code that will be used by HTMLSelectElement
+        and DateTimeSymbolicFieldElement into a TypeAhead class. This will
+        improve DateTimeSymbolicFieldElement type ahead which was first
+        character match only, by adding cycling, prefix match and index number
+        match.
+
+        Added tests to month-multiple-fields-keyboard-events.html.
+
+        * GNUmakefile.list.am: Added TypeAhead.{h,cpp}
+        * Target.pri: Ditto.
+        * WebCore.gypi: Ditto.
+        * WebCore.vcproj/WebCore.vcproj: Ditto.
+        * WebCore.xcodeproj/project.pbxproj: Ditto.
+        * CMakeLists.txt: Ditto.
+        * html/HTMLSelectElement.cpp:
+        (WebCore):
+        (WebCore::HTMLSelectElement::HTMLSelectElement):
+        (WebCore::HTMLSelectElement::indexOfSelectedOption): Returns index of current selection.
+        (WebCore::HTMLSelectElement::optionCount): Returns total number of options.
+        (WebCore::HTMLSelectElement::optionAtIndex): Returns option at index.
+        (WebCore::HTMLSelectElement::typeAheadFind): Use TypeAhead.
+        * html/HTMLSelectElement.h:
+        (HTMLSelectElement):
+        * html/TypeAhead.cpp: Added.
+        (WebCore):
+        (WebCore::TypeAhead::TypeAhead):
+        (WebCore::stripLeadingWhiteSpace): Moved from HTMLSelectElement.cpp.
+        (WebCore::TypeAhead::handleEvent): Returns index for match.
+        * html/TypeAhead.h: Added.
+        (WebCore):
+        (TypeAheadDataSource): Provide the data about the options that TypeAhead should match against.
+        (TypeAhead):
+        * html/shadow/DateTimeSymbolicFieldElement.cpp:
+        (WebCore::DateTimeSymbolicFieldElement::DateTimeSymbolicFieldElement):
+        (WebCore::DateTimeSymbolicFieldElement::handleKeyboardEvent):
+        (WebCore::DateTimeSymbolicFieldElement::indexOfSelectedOption):
+        (WebCore):
+        (WebCore::DateTimeSymbolicFieldElement::optionCount):
+        (WebCore::DateTimeSymbolicFieldElement::optionAtIndex):
+        * html/shadow/DateTimeSymbolicFieldElement.h:
+        (DateTimeSymbolicFieldElement):
+
+2012-11-29  Rafael Weinstein  <rafaelw@chromium.org>
+
+        [HTMLTemplateElement] Add feature flag
+        https://bugs.webkit.org/show_bug.cgi?id=103694
+
+        Reviewed by Adam Barth.
+
+        This flag will guard the implementation of the HTMLTemplateElement.
+        http://dvcs.w3.org/hg/webcomponents/raw-file/tip/spec/templates/index.html
+
+        * Configurations/FeatureDefines.xcconfig:
+        * GNUmakefile.features.am:
+
+2012-11-29  Viatcheslav Ostapenko  <v.ostapenko@samsung.com>
+
+        Fix typo in commit 136189
+        https://bugs.webkit.org/show_bug.cgi?id=103706
+
+        Reviewed by Kentaro Hara.
+
+        Because of typo in commit 136189 blue color value was set twice for every pixel.
+
+        * platform/image-decoders/jpeg/JPEGImageDecoder.cpp:
+        (WebCore::setPixel):
+
+2012-11-29  Elliott Sprehn  <esprehn@chromium.org>
+
+        Node::isDescendantOf contains logic that duplicates isDocumentNode
+        https://bugs.webkit.org/show_bug.cgi?id=103698
+
+        Reviewed by Hajime Morita.
+
+        Instead of checking for documents with node->document() == node just
+        use node->isDocumentNode().
+
+        * dom/Node.cpp:
+        (WebCore::Node::isDescendantOf):
+
+2012-11-29  Alexey Proskuryakov  <ap@apple.com>
+
+        [WK2] Forward cookie jar calls to NetworkProcess
+        https://bugs.webkit.org/show_bug.cgi?id=103457
+
+        Reviewed by Darin Adler.
+
+        * WebCore.exp.in:
+        * WebCore.xcodeproj/project.pbxproj:
+        PlatformCookieJar.h functions are now used in WebKit2.
+
+        * loader/CookieJar.cpp:
+        (WebCore::cookies):
+        (WebCore::setCookies):
+        (WebCore::cookiesEnabled):
+        (WebCore::cookieRequestHeaderFieldValue):
+        (WebCore::getRawCookies):
+        (WebCore::deleteCookie):
+        (WebCore::getHostnamesWithCookies):
+        (WebCore::deleteCookiesForHostname):
+        (WebCore::deleteAllCookies):
+        Use a strategy instead of going to PlatformCookieJar directly.
+
+        * platform/Cookie.h: (Cookie): Added a default constructor, so that Cookie could be
+        sent over IPC.
+
+        * platform/CookiesStrategy.h: Added functions for cookie jar.
+
+2012-11-29  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r136167.
+        http://trac.webkit.org/changeset/136167
+        https://bugs.webkit.org/show_bug.cgi?id=103701
+
+        Win debug build failure (Requested by zhenyao on #webkit).
+
+        * platform/graphics/chromium/LazyDecodingPixelRef.cpp:
+        (WebCore::LazyDecodingPixelRef::LazyDecodingPixelRef):
+        * platform/graphics/chromium/LazyDecodingPixelRef.h:
+        (LazyDecodingPixelRef):
+
+2012-11-29  David Grogan  <dgrogan@chromium.org>
+
+        IndexedDB: Propagate more leveldb errors to script
+        https://bugs.webkit.org/show_bug.cgi?id=103580
+
+        Reviewed by Tony Chang.
+
+        LevelDBDatabase used a single return value to indicate both I/O problems
+        and a missing key. Now an out variable is used to indicate if the
+        requested key was found. The return value is used to report corruption
+        or disk error.
+
+        This is a small step toward propagating low level errors everywhere
+        possible. So far only one scenario will newly cause script to receive
+        an error: when leveldb has trouble looking for existing keys during an
+        objectstore->add.
+
+        * Modules/indexeddb/IDBBackingStore.cpp:
+        (WebCore::getInt):
+        (WebCore::getVarInt):
+        (WebCore::getString):
+        (WebCore::IDBBackingStore::getKeyGeneratorCurrentNumber):
+        (WebCore::IDBBackingStore::maybeUpdateKeyGeneratorCurrentNumber):
+        (WebCore::IDBBackingStore::keyExistsInObjectStore):
+        * Modules/indexeddb/IDBBackingStore.h:
+        (IDBBackingStore):
+        * Modules/indexeddb/IDBObjectStoreBackendImpl.cpp:
+        (WebCore::IDBObjectStoreBackendImpl::setIndexKeys):
+        (WebCore::IDBObjectStoreBackendImpl::putInternal):
+        (WebCore::IDBObjectStoreBackendImpl::generateKey):
+        (WebCore::IDBObjectStoreBackendImpl::updateKeyGenerator):
+        * Modules/indexeddb/IDBObjectStoreBackendImpl.h:
+        (IDBObjectStoreBackendImpl):
+        * platform/leveldb/LevelDBDatabase.cpp:
+        (WebCore::LevelDBDatabase::safeGet):
+        * platform/leveldb/LevelDBDatabase.h:
+        (LevelDBDatabase):
+        * platform/leveldb/LevelDBTransaction.cpp:
+        (WebCore::LevelDBTransaction::safeGet):
+        (WebCore):
+        (WebCore::LevelDBTransaction::get):
+        * platform/leveldb/LevelDBTransaction.h:
+        (LevelDBTransaction):
+
+2012-11-29  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r136171.
+        http://trac.webkit.org/changeset/136171
+        https://bugs.webkit.org/show_bug.cgi?id=103695
+
+        Likely caused ReOpenedWithID and ReOpenedWithURL to fail in
+        linux/chromeos (Requested by zhenyao on #webkit).
+
+        * inspector/InspectorClient.h:
+        (WebCore::InspectorClient::startMainThreadMonitoring):
+        (WebCore::InspectorClient::stopMainThreadMonitoring):
+        * inspector/InspectorController.cpp:
+        * inspector/InspectorController.h:
+        (InspectorController):
+        * inspector/InspectorInstrumentation.cpp:
+        (WebCore):
+        (WebCore::InspectorInstrumentation::willProcessTaskImpl):
+        (WebCore::InspectorInstrumentation::didProcessTaskImpl):
+        * inspector/InspectorInstrumentation.h:
+        (InspectorInstrumentation):
+        (WebCore::InspectorInstrumentation::willProcessTask):
+        (WebCore):
+        (WebCore::InspectorInstrumentation::didProcessTask):
+        * inspector/InspectorTimelineAgent.cpp:
+        (WebCore::InspectorTimelineAgent::start):
+        (WebCore::InspectorTimelineAgent::stop):
+
+2012-11-29  Viatcheslav Ostapenko  <v.ostapenko@samsung.com>
+
+        Optimization in image decoding.
+        https://bugs.webkit.org/show_bug.cgi?id=88424
+
+        Reviewed by Brent Fulgham.
+
+        Reduce branching and multiplications in JPEG image decoding loops and functions.
+        Code is moved to the template functions with scale and color space template parameters
+        because they were reason of branches inside loops. With templated funtions compiler
+        will generate separate instance of function for every set of parameters removing
+        unreachable code in every condition where constant value is used.
+
+        Rebase and update of original patch by Misha Tyutyunik <michael.tyuytunik@nokia.com> .
+
+        Thanks to Noel Gordon for his help in cleaning up remaining issues.
+
+        Covered by existing tests.
+
+        * platform/image-decoders/jpeg/JPEGImageDecoder.cpp:
+        (WebCore):
+        (WebCore::setPixel):
+        (WebCore::JPEGImageDecoder::outputScanlines):
+        * platform/image-decoders/jpeg/JPEGImageDecoder.h:
+        (JPEGImageDecoder):
+
+2012-11-29  Kentaro Hara  <haraken@chromium.org>
+
+        Unreviewed, rolling out r135862.
+        http://trac.webkit.org/changeset/135862
+        https://bugs.webkit.org/show_bug.cgi?id=103367
+
+        We've been observing 'Fatal error in
+        v8::V8::AddMessageListener()' in bots
+
+        * bindings/v8/V8Binding.cpp:
+        (WebCore::v8NonStringValueToWebCoreString):
+        * bindings/v8/V8StringResource.cpp:
+        (WebCore::int32ToWebCoreStringFast):
+        (WebCore::int32ToWebCoreString):
+        * bindings/v8/V8StringResource.h:
+        (WebCore::V8StringResource::V8StringResource):
+        (WebCore::V8StringResource::prepareBase):
+        (WebCore::V8StringResource::setString):
+        (V8StringResource):
+        (WebCore::V8StringResource::toString):
+        (WebCore::::prepare):
+
+2012-11-29  Pavel Feldman  <pfeldman@chromium.org>
+
+        Web Inspector: optimize repaint regions upon text editing
+        https://bugs.webkit.org/show_bug.cgi?id=103674
+
+        Reviewed by Vsevolod Vlasov.
+
+        There is a lot happening that makes repaint area larger than it should be,
+        namely unnecessary tabbed pane and navigator updates.
+
+        * inspector/front-end/NavigatorView.js:
+        (WebInspector.NavigatorView.prototype._updateScriptTitle):
+        * inspector/front-end/TabbedPane.js:
+        (WebInspector.TabbedPaneTab.prototype.set title):
+
+2012-11-29  KyungTae Kim  <ktf.kim@samsung.com>
+
+        Unused parameters on plugins/npapi.cpp
+        https://bugs.webkit.org/show_bug.cgi?id=103676
+
+        Reviewed by Kentaro Hara.
+
+        Because 'instance' and 'menu' are not used when !PLATFORM(QT) || !defined(XP_MACOSX),
+        use UNUSED_PARAM macro to fix build warning -Wunused-parameter
+
+        * plugins/npapi.cpp:
+        (NPN_PopUpContextMenu):
+
+2012-11-29  Pablo Flouret  <pablof@motorola.com>
+
+        REGRESSION(r134693): Compilation error on @supports grammar code
+        https://bugs.webkit.org/show_bug.cgi?id=103678
+
+        Reviewed by Tony Chang.
+
+        Coming from https://bugs.webkit.org/show_bug.cgi?id=102295
+
+        No new tests, compile fix.
+
+        * css/CSSGrammar.y.in:
+
+2012-11-29  Simon Fraser  <simon.fraser@apple.com>
+
+        Avoid painting lots of small rects in WebLayer painting
+        https://bugs.webkit.org/show_bug.cgi?id=103673
+
+        Reviewed by Tim Horton.
+
+        r109186 added code in drawLayerContents() to enumerate over the rects in
+        the CALayer's dirty region, and paint them individually. This was done
+        to help performance on the IE Maze Solver test.
+        
+        On large, complex pages like Facebook, the overhead of traversing the
+        RenderLayer tree for painting is such that it's better to paint a single,
+        or fewer rects rather than lots of little ones.
+        
+        So adopt a heuristic similar to that in DrawingArea, where if the
+        combined area of the small rects is 75% or more of the combined rect,
+        just paint the combined rect. Also paint the combined rect if there
+        are more than 5 individual rects.
+        
+        I verified that this preserves the optimization for IE Maze Solver.
+
+        * platform/graphics/mac/WebLayer.mm:
+        (drawLayerContents):
+
+2012-11-29  Eugene Klyuchnikov  <eustas@chromium.org>
+
+        Web Inspector: Web Inspector: Make main-thread monitoring go through InspectorController.
+        https://bugs.webkit.org/show_bug.cgi?id=103550
+
+        Reviewed by Pavel Feldman.
+
+        InspectorInstrumentation was a wrong path.
+
+        * inspector/InspectorClient.h: Remove start/stop methods.
+        * inspector/InspectorController.cpp:
+        Dispatch main thread activity notifications. 
+        * inspector/InspectorController.h: Ditto.
+        * inspector/InspectorInstrumentation.cpp: Remove dispatching.
+        * inspector/InspectorInstrumentation.h: Ditto.
+        * inspector/InspectorTimelineAgent.cpp:
+        Do not subscribe for notifications explicitly.
+
+2012-11-29  Adam Barth  <abarth@webkit.org>
+
+        [V8] DOM callbacks shouldn't reimplement ScopedPersistent they should use it
+        https://bugs.webkit.org/show_bug.cgi?id=103662
+
+        Reviewed by Eric Seidel.
+
+        This patch replaces yet another instance of the ScopedPersistent
+        pattern with ScopedPersistent.
+
+        * bindings/scripts/CodeGeneratorV8.pm:
+        (GenerateCallbackHeader):
+        (GenerateCallbackImplementation):
+        * bindings/v8/custom/V8CustomSQLStatementErrorCallback.cpp:
+        (WebCore::V8SQLStatementErrorCallback::handleEvent):
+        * bindings/v8/custom/V8MutationCallbackCustom.cpp:
+        (WebCore::V8MutationCallback::handleEvent):
+
+2012-11-29  Min Qin  <qinmin@chromium.org>
+
+        Make LazyDecodingPixelRef inherit from skia::LazyPixelRef so that cc thread can access it
+        https://bugs.webkit.org/show_bug.cgi?id=103555
+
+        Reviewed by Stephen White.
+
+        Expose LazyDecodingPixelRef to the cc thread by inheriting from skia::LazyPixelRef.
+        No test added for now as impl side paiting is still WIP.
+
+        * platform/graphics/chromium/LazyDecodingPixelRef.cpp:
+        (WebCore::LazyDecodingPixelRef::LazyDecodingPixelRef):
+        (WebCore::LazyDecodingPixelRef::PrepareToDecode):
+        (WebCore):
+        (WebCore::LazyDecodingPixelRef::Decode):
+        * platform/graphics/chromium/LazyDecodingPixelRef.h:
+        (LazyDecodingPixelRef):
+
+2012-11-29  Julien Chaffraix  <jchaffraix@webkit.org>
+
+        Unreviewed build fix.
+
+        * WebCore.gypi:
+        The new file is GridTrackSize.h not GridTrackSizes.h. For some reason, the
+        EWS didn't complain.
+
+2012-11-29  John Knottenbelt  <jknotten@chromium.org>
+
+        Use GeolocationController's last geoposition as cached position.
+        https://bugs.webkit.org/show_bug.cgi?id=103540
+
+        Reviewed by Benjamin Poulain.
+
+        The page's GeolocationController mediates access to the
+        GeolocationClient for multiple frames' Geolocation instances. This
+        patch changes the position cache to be on the GeolocationController
+        rather than on the Geolocation instance.
+
+        This fixes a bug where if one frame has has received a fresh
+        position, then a request for a cached position from a second frame
+        does not succeed because the Geolocation instance in the second
+        frame's position cache hasn't received the position update that
+        went to the first frame.
+
+        Test: fast/dom/Geolocation/cached-position-iframe.html
+
+        * Modules/geolocation/Geolocation.cpp:
+        (WebCore::Geolocation::makeCachedPositionCallbacks):
+        (WebCore::Geolocation::haveSuitableCachedPosition):
+        (WebCore::Geolocation::positionChanged):
+        * Modules/geolocation/Geolocation.h:
+        * Modules/geolocation/GeolocationController.h:
+        (GeolocationController):
+
+2012-11-29  Alexei Filippov  <alph@chromium.org>
+
+        Web Inspector: Allow sorting in NMI snapshot grid view
+        https://bugs.webkit.org/show_bug.cgi?id=102955
+
+        Reviewed by Yury Semikhatsky.
+
+        * English.lproj/localizedStrings.js:
+        * inspector/front-end/NativeMemorySnapshotView.js:
+        (WebInspector.NativeSnapshotDataGrid.prototype.sortingChanged):
+        (WebInspector.NativeSnapshotDataGrid.prototype._sortingFunction):
+        (WebInspector.NativeSnapshotNode):
+        (WebInspector.NativeSnapshotNode.prototype._storeState):
+        (WebInspector.NativeSnapshotNode.prototype._restoreState):
+        (WebInspector.NativeSnapshotNode.prototype.uid):
+        (WebInspector.NativeSnapshotNode.prototype._createSizeCell):
+
+2012-11-29  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] [WebKit2] Embed the HTTP authentication dialog into the WebView
+        https://bugs.webkit.org/show_bug.cgi?id=103277
+
+        Reviewed by Carlos Garcia Campos.
+
+        Refactor the WebCore authentication dialog so that it can be reused for the WebKit2
+        embedded authentication dialog. The main purpose of this refactor is so that the
+        dialog does not rely on GtkDialog to add the action buttons to the dialog itself.
+        This also simplifies the structure of the dialog, using the GtkTable or GtkGrid to
+        contain more of the widget elements, greatly simplifying this code. We also expose
+        a new constructor that does not create the parent GtkDialog -- so that WebKit2
+        can embed the dialog directly into the WebView.
+
+        No new tests. This shouldn't change behavior, only slightly the look of the authentication
+        dialog.
+
+        * platform/gtk/GtkAuthenticationDialog.cpp:
+        (WebCore::GtkAuthenticationDialog::GtkAuthenticationDialog): Added this new constructor
+        which does not add the dialog contents to a GtkDialog.
+        (WebCore::packTwoColumnLayoutInBox): Added this generic method for creating a two column
+        layout in the style the dialog box needs (for both GTK+ 2.x and GTK+ 3.x).
+        (WebCore::createDialogLabel): Added this helper.
+        (WebCore::createDialogEntry): ditto.
+        (WebCore::GtkAuthenticationDialog::createContentsInContainer): Added this method which
+        can be used by subclasses to add the guts of the dialog to the parent container.
+        (WebCore::GtkAuthenticationDialog::show): Added some focus/default handling code that
+        GtkDialog was calling before.
+        (WebCore::GtkAuthenticationDialog::buttonClickedCallback): Added a button clicked handler.
+        Before GtkDialog handled this.
+        * platform/gtk/GtkAuthenticationDialog.h: Updated methods to reflect new functionality.
+        (WebCore::GtkAuthenticationDialog::~GtkAuthenticationDialog): Inline the default constructor.
+
+2012-11-29  Beth Dakin  <bdakin@apple.com>
+
+        https://bugs.webkit.org/show_bug.cgi?id=103577
+        TiledDrawingArea should recycle tiles
+        -and corresponding-
+        <rdar://problem/12714586>
+
+        Reviewed by Simon Fraser.
+
+        New class LayerPool will keep a list of layers to reuse so that 
+        we can avoid creating and destroying so many layer.
+
+        When removing layers, add them to the LayerPool
+        * platform/graphics/ca/mac/TileCache.mm:
+        (WebCore::TileCache::revalidateTiles):
+
+        Before creating a new layer, try to get one of the appropriate size 
+        from the LayerPool.
+        (WebCore::TileCache::createTileLayer):
+
+        New class.
+        * WebCore.xcodeproj/project.pbxproj:
+        * platform/graphics/ca/mac/LayerPool.h: Added.
+        (WebCore):
+        (LayerPool):
+        (WebCore::LayerPool::capacity):
+        (WebCore::LayerPool::canReuseLayerWithSize):
+        * platform/graphics/ca/mac/LayerPool.mm: Added.
+        (WebCore):
+        (WebCore::LayerPool:: LayerPool):
+        (WebCore::LayerPool::sharedPool):
+        (WebCore::LayerPool::bytesBackingLayerWithPixelSize):
+        (WebCore::LayerPool::listOfLayersWithSize):
+        (WebCore::LayerPool::addLayer):
+        (WebCore::LayerPool::takeLayerWithSize):
+        (WebCore::LayerPool::decayedCapacity):
+        (WebCore::LayerPool::schedulePrune):
+        (WebCore::LayerPool::prune):
+        (WebCore::LayerPool::drain):
+
+        If we're under memory pressure, drain the LayerPool
+        * platform/mac/MemoryPressureHandlerMac.mm:
+        (WebCore::MemoryPressureHandler::releaseMemory):
+
+2012-11-29  Julien Chaffraix  <jchaffraix@webkit.org>
+
+        [CSS Grid Layout] track sizing functions should have their own type
+        https://bugs.webkit.org/show_bug.cgi?id=103343
+
+        Reviewed by Tony Chang.
+
+        The current code uses a Length to represent the track sizing function. This is
+        fine as we only parse <length> | <percentage> but in order to support minmax
+        sizing, we have to store 2 Lengths. We could go with a pair but that would make
+        the code not very readable so this change introduces GridTrackSize.
+
+        Refactoring, covered by existing tests.
+
+        * GNUmakefile.list.am:
+        * Target.pri:
+        * WebCore.gypi:
+        * WebCore.vcproj/WebCore.vcproj:
+        * WebCore.xcodeproj/project.pbxproj:
+        Added GridTrackSize.h to all our build systems.
+
+        * css/CSSComputedStyleDeclaration.cpp:
+        (WebCore::valueForGridTrackBreadth):
+        (WebCore::valueForGridTrackList):
+        * css/StyleResolver.cpp:
+        (WebCore::createGridTrackBreadth):
+        (WebCore::createGridTrackList):
+        (WebCore::StyleResolver::applyProperty):
+        * rendering/RenderGrid.cpp:
+        (WebCore::RenderGrid::computePreferredLogicalWidths):
+        (WebCore::RenderGrid::computedUsedBreadthOfGridTracks):
+        * rendering/style/RenderStyle.h:
+        Updated the above call sites to use GridTrackSize. While
+        touching them, changed the code to use an empty Vector to represent
+        'none' instead of Length(Undefined).
+
+        * rendering/style/StyleGridData.h:
+        Updated #include, removed a comment as it would have gone stale after
+        adding more grammar support and added a FIXME to rename some variables.
+
+        * rendering/RenderGrid.cpp:
+        (WebCore::RenderGrid::layoutGridItems):
+        Implemented a work-around to avoid crashing due to implicit columns / rows.
+
+        * rendering/style/GridTrackSize.h: Added.
+        (WebCore::GridTrackSize::GridTrackSize):
+        (WebCore::GridTrackSize::length):
+        (WebCore::GridTrackSize::setLength):
+        (WebCore::GridTrackSize::type):
+        (WebCore::GridTrackSize::operator==):
+        New class, it now only wraps a single Length.
+
+2012-11-29  Helder Correia  <helder.correia@nokia.com>
+
+        Typo in Color creation function name
+        https://bugs.webkit.org/show_bug.cgi?id=103464
+
+        Reviewed by Alexey Proskuryakov.
+
+        Renaming createUnCheked() as createUnchecked().
+
+        No new tests.
+
+        * platform/graphics/Color.cpp:
+        (WebCore::colorFromPremultipliedARGB):
+        * platform/graphics/Color.h:
+        (WebCore::Color::createUnchecked):
+
+2012-11-29  Otto Derek Cheung  <otcheung@rim.com>
+
+        [BlackBerry] Cookies in private mode should not have access to public cookies
+        https://bugs.webkit.org/show_bug.cgi?id=103649
+
+        Reviewed by Rob Buis.
+
+        PR 253983
+
+        When CookieManager switches back from public to private mode,
+        we will clear the cookie tree so the browser won't have access
+        to the public cookies.
+
+        Tested using browser.swlab.rim.net cookie tests and the steps in
+        the PR.
+
+        * platform/blackberry/CookieManager.cpp:
+        (WebCore::CookieManager::setPrivateMode):
+
+2012-11-29  Brent Fulgham  <bfulgham@gmail.com>
+
+        Be consistent in handling of frameAtIndex (and related) returns.
+        https://bugs.webkit.org/show_bug.cgi?id=103207
+
+        Reviewed by David Hyatt.
+
+        Under various conditions, frameAtIndex (and therefore,
+        nativeImageForCurrentFrame) returns null. A series of bugs over
+        the years has ensured null returns are handled in some cases,
+        but there are a handful of remaining cases where this is still a
+        problem. 
+
+        No new tests, as these low-level functions are covered by
+        numerous existing test cases.
+
+2012-11-29  David Hyatt  <hyatt@apple.com>
+
+        [New Multicolumn] Add minimum column height tracking and forced break tracking to column sets.
+        https://bugs.webkit.org/show_bug.cgi?id=103657
+
+        Reviewed by Simon Fraser.
+
+        * rendering/RenderMultiColumnSet.cpp:
+        (WebCore::RenderMultiColumnSet::RenderMultiColumnSet):
+        * rendering/RenderMultiColumnSet.h:
+        (WebCore::RenderMultiColumnSet::updateMinimumColumnHeight):
+        (WebCore::RenderMultiColumnSet::minimumColumnHeight):
+        (RenderMultiColumnSet):
+        (WebCore::RenderMultiColumnSet::forcedBreaksCount):
+        (WebCore::RenderMultiColumnSet::forcedBreakOffset):
+        (WebCore::RenderMultiColumnSet::maximumDistanceBetweenForcedBreaks):
+        (WebCore::RenderMultiColumnSet::clearForcedBreaks):
+        (WebCore::RenderMultiColumnSet::addForcedBreak):
+
+2012-11-29  Pavel Feldman  <pfeldman@chromium.org>
+
+        Web Inspector: introduce fast case for within-chunk edit
+        https://bugs.webkit.org/show_bug.cgi?id=103545
+
+        Reviewed by Vsevolod Vlasov.
+
+        Special-casing edits within the chunk for faster operation.
+
+        * inspector/front-end/DOMExtension.js:
+        (removeSubsequentNodes):
+        * inspector/front-end/DefaultTextEditor.js:
+        (WebInspector.TextEditorMainPanel.prototype._updateChunksForRanges):
+
+2012-11-29  Pavel Feldman  <pfeldman@chromium.org>
+
+        Web Inspector: Console: hovering node wrappers in object tree should highlight them on the page
+        https://bugs.webkit.org/show_bug.cgi?id=101150
+
+        Reviewed by Vsevolod Vlasov.
+
+        - Introduced a way to highlight nodes by object id in addition to node id.
+        - Decorated nodes in the object tree outline and added on-hover highlighting.
+
+        * inspector/Inspector.json:
+        * inspector/InspectorDOMAgent.cpp:
+        (WebCore::InspectorDOMAgent::highlightNode):
+        * inspector/InspectorDOMAgent.h:
+        (InspectorDOMAgent):
+        * inspector/front-end/ConsoleMessage.js:
+        (WebInspector.ConsoleMessageImpl.prototype._appendPropertyPreview):
+        * inspector/front-end/DOMAgent.js:
+        (WebInspector.DOMAgent.prototype.highlightDOMNode):
+        * inspector/front-end/DOMPresentationUtils.js:
+        (WebInspector.DOMPresentationUtils.createSpansForNodeTitle):
+        * inspector/front-end/ObjectPropertiesSection.js:
+        (WebInspector.ObjectPropertyTreeElement.prototype.update):
+        (WebInspector.ObjectPropertyTreeElement.prototype._mouseMove):
+        (WebInspector.ObjectPropertyTreeElement.prototype._mouseOut):
+        * inspector/front-end/RemoteObject.js:
+        (WebInspector.RemoteObject.prototype.highlightAsDOMNode):
+        (WebInspector.RemoteObject.prototype.hideDOMNodeHighlight):
+        * inspector/front-end/TestController.js:
+        * inspector/front-end/externs.js:
+        * inspector/front-end/inspector.css:
+        (.console-formatted-node:hover):
+        * inspector/front-end/utilities.js:
+
+2012-11-29  Dan Bernstein  <mitz@apple.com>
+
+        <rdar://problem/12771885> Support ruby-position: {before, after}
+        https://bugs.webkit.org/show_bug.cgi?id=103569
+
+        Reviewed by Anders Carlsson.
+
+        Specified in <http://www.w3.org/TR/2011/WD-css3-ruby-20110630/#rubypos>, the ruby-position
+        property takes four values: before, after, inter-character, and inline. This change adds
+        support for the values before and after.
+
+        Test: fast/ruby/position-after.html
+
+        * css/CSSComputedStyleDeclaration.cpp:
+        (WebCore::CSSComputedStyleDeclaration::getPropertyCSSValue): Handle ruby-position.
+        * css/CSSParser.cpp:
+        (WebCore::isValidKeywordPropertyAndValue): Accept before and after as valid values for
+        ruby-position.
+        (WebCore::isKeywordPropertyID): Added ruby-position to the list of properties with keyword
+        values.
+        (WebCore::CSSParser::parseValue): Added ruby-position to the switch statement.
+        * css/CSSPrimitiveValueMappings.h:
+        (WebCore::CSSPrimitiveValue::CSSPrimitiveValue): Added mapping from RubyPosition.
+        (WebCore::CSSPrimitiveValue::operator RubyPosition): Added mapping from CSSPrimitiveValue.
+        * css/CSSProperty.cpp:
+        (WebCore::CSSProperty::isInheritedProperty): Added ruby-position as an inherited property.
+        * css/CSSPropertyNames.in: Added -webkit-ruby-position.
+        * css/CSSValueKeywords.in: Added after and before.
+        * css/StyleBuilder.cpp:
+        (WebCore::StyleBuilder::StyleBuilder): Added a handler for ruby-position.
+        * css/StyleResolver.cpp:
+        (WebCore::StyleResolver::applyProperty): Added ruby-position.
+        * rendering/InlineFlowBox.cpp:
+        (WebCore::InlineFlowBox::placeBoxesInBlockDirection): Changed to choose which of
+        hasAnnotationsBefore and hasAnnotationsAfter to set based on ruby position.
+        (WebCore::InlineFlowBox::computeOverAnnotationAdjustment): Changed to adjust only for
+        ruby positioned before the base.
+        (WebCore::InlineFlowBox::computeUnderAnnotationAdjustment): Added adjustment for ruby
+        positioned after the base.
+        * rendering/RenderRubyRun.cpp:
+        (WebCore::RenderRubyRun::layout): Account for ruby-position when positioning the ruby text
+        relative to the base.
+        * rendering/style/RenderStyle.cpp:
+        (WebCore::RenderStyle::diff): Made a ruby-position difference a layout difference.
+        * rendering/style/RenderStyle.h: Added rubyPosition(), setRubyPosition(), and 
+        initialRubyPosition().
+        * rendering/style/RenderStyleConstants.h: Added the RubyPosition enum.
+        * rendering/style/StyleRareInheritedData.cpp:
+        (WebCore::StyleRareInheritedData::StyleRareInheritedData): Added initialized for
+        m_rubyPosition. Added copying the value of this member to the copy constructor.
+        (WebCore::StyleRareInheritedData::operator==): Added comparison of m_rubyPosition.
+        * rendering/style/StyleRareInheritedData.h:
+        (StyleRareInheritedData): Added m_rubyPosition member variable.
+
+2012-11-29  Tiancheng Jiang  <tijiang@rim.com>
+
+        [BlackBerry] Update BB10 form theme.
+        https://bugs.webkit.org/show_bug.cgi?id=100760
+
+        Reviewed by Rob Buis.
+
+        Internally Reviewed by Eli Fidler.
+        Set text color after buttons are pressed.
+
+        * css/themeBlackBerry.css:
+        (input[type="button"]:active, input[type="submit"]:active, input[type="reset"]:active, input[type="file"]:active::-webkit-file-upload-button, button:active):
+        (select:active):
+        * platform/blackberry/RenderThemeBlackBerry.cpp:
+        (WebCore):
+        (WebCore::RenderThemeBlackBerry::paintButton):
+        (WebCore::RenderThemeBlackBerry::paintMenuList):
+
+2012-11-29  Zeno Albisser  <zeno@webkit.org>
+
+        GraphicsSurfaceGLX: remove redundant parameter from resolveGLMethods.
+        https://bugs.webkit.org/show_bug.cgi?id=103636
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        * platform/graphics/surfaces/qt/GraphicsSurfaceGLX.cpp:
+        (WebCore::resolveGLMethods):
+        (WebCore::GraphicsSurface::platformCreate):
+        (WebCore::GraphicsSurface::platformImport):
+
+2012-11-29  Mike West  <mkwst@chromium.org>
+
+        Typo in 'autofocus' sandboxing error message.
+        https://bugs.webkit.org/show_bug.cgi?id=103616
+
+        Reviewed by Jochen Eisinger.
+
+        The sandbox attribute name is 'allow-scripts', not 'allow-script'. :(
+
+        * html/HTMLFormControlElement.cpp:
+        (WebCore::shouldAutofocus):
+
+2012-11-29  Hajime Morrita  <morrita@google.com>
+
+        HTMLMediaElement's .textTracks property does not reflect <track> element
+        https://bugs.webkit.org/show_bug.cgi?id=103420
+
+        Reviewed by Eric Carlson.
+
+        There were some assumptions that <track> elements are valid only
+        if the parent <media> is in document. This change relaxes this
+        assumption so that <track> is valid when it has <media> as a
+        parent regardless whether the <media> is in the document or not.
+
+        HTMLMediaElement::didAddTrack and didRemoveTrack are now called
+        when the <track> is inserted to or removed from the parent <media>
+        element.
+
+        Test: media/track/track-node-add-remove.html
+
+        * html/HTMLMediaElement.cpp:
+        (WebCore::HTMLMediaElement::didRemoveTrack):
+        Renamed from willRemoveTrack() to reflect the timing. This was once called from
+        Node::willRemove(), which was removed a while ago.
+        * html/HTMLMediaElement.h:
+        (HTMLMediaElement):
+        * html/HTMLTrackElement.cpp:
+        (WebCore::HTMLTrackElement::insertedInto):
+        The old code notified parent <media> only if the subtree became a part of the document.
+        Now it notifies the <media> when this <track> becomes a child of that <media>.
+
+        (WebCore::HTMLTrackElement::removedFrom):
+        The old code notifies the parent <media> every time as long as the parent is available.
+        Now it notifies the <media> only if this <track> is removed from the parent <media>.
+        This matches how corresponding notification is done in insertedInto().
+
+        * html/track/LoadableTextTrack.cpp:
+        (WebCore::LoadableTextTrack::trackElementIndex):
+
+2012-11-29  Florin Malita  <fmalita@chromium.org>
+
+        [Skia] Add missing OpaqueRegionSkia notifier calls
+        https://bugs.webkit.org/show_bug.cgi?id=102824
+
+        Reviewed by Stephen White.
+
+        http://trac.webkit.org/changeset/135390 exposed some canvas draw clients which are not
+        updating the opaque region tracker. This patch adds the required notifier calls.
+
+        No new tests: platform unit tests added.
+
+        * platform/graphics/skia/OpaqueRegionSkia.h:
+        (OpaqueRegionSkia):
+        * platform/graphics/skia/PlatformContextSkia.h:
+        (WebCore::PlatformContextSkia::writePixels):
+        (WebCore::PlatformContextSkia::drawBitmap):
+        (WebCore::PlatformContextSkia::drawBitmapRect):
+        (WebCore::PlatformContextSkia::drawIRect):
+        (WebCore::PlatformContextSkia::drawPosText):
+        (WebCore::PlatformContextSkia::drawPosTextH):
+        (WebCore::PlatformContextSkia::drawTextOnPath):
+
+2012-11-29  Andy Shaw  <andy.shaw@digia.com>
+
+        [Qt] Implement support for Cocoa based NPAPI plugins on Mac
+        https://bugs.webkit.org/show_bug.cgi?id=72358
+
+        Reviewed by Simon Hausmann.
+
+        With later versions of Flash they are only Cocoa based which meant that it was not possible to use Flash in a QtWebKit browser.
+        This makes it possible to also use 64bit based plugins too.  
+
+        * plugins/PluginPackage.cpp:
+        (WebCore::PluginPackage::initializeBrowserFuncs):
+        (WebCore):
+        * plugins/PluginQuirkSet.h:
+        * plugins/PluginView.cpp:
+        (WebCore::PluginView::handleEvent):
+        (WebCore::PluginView::PluginView):
+        (WebCore):
+        (WebCore::PluginView::userAgent):
+        * plugins/PluginView.h:
+        (WebCore):
+        (PluginView):
+        * plugins/mac/PluginPackageMac.cpp:
+        (WebCore::PluginPackage::determineQuirks):
+        (WebCore::PluginPackage::fetchInfo):
+        * plugins/mac/PluginViewMac.mm:
+        (WebCore):
+        (WebCore::initializeNPCocoaEvent):
+        (WebCore::getModifiers):
+        (WebCore::PluginView::platformStart):
+        * plugins/npapi.cpp:
+        (NPN_PopUpContextMenu):
+        * plugins/npapi.h:
+
 2012-11-29  Sheriff Bot  <webkit.review.bot@gmail.com>
 
         Unreviewed, rolling out r136111.

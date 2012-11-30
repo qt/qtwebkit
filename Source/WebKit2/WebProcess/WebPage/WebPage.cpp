@@ -114,6 +114,7 @@
 #include <WebCore/ResourceRequest.h>
 #include <WebCore/ResourceResponse.h>
 #include <WebCore/RunLoop.h>
+#include <WebCore/RuntimeEnabledFeatures.h>
 #include <WebCore/SchemeRegistry.h>
 #include <WebCore/ScriptValue.h>
 #include <WebCore/SerializedScriptValue.h>
@@ -535,7 +536,8 @@ PassRefPtr<Plugin> WebPage::createPlugin(WebFrame* frame, HTMLPlugInElement* plu
     }
 
 #if ENABLE(PLUGIN_PROCESS)
-    return PluginProxy::create(pluginPath);
+    PluginProcess::Type processType = (pluginElement->displayState() == HTMLPlugInElement::WaitingForSnapshot ? PluginProcess::TypeSnapshotProcess : PluginProcess::TypeRegularProcess);
+    return PluginProxy::create(pluginPath, processType);
 #else
     NetscapePlugin::setSetExceptionFunction(NPRuntimeObjectMap::setGlobalException);
     return NetscapePlugin::create(NetscapePluginModule::getOrCreate(pluginPath));
@@ -1025,8 +1027,21 @@ void WebPage::sendViewportAttributesChanged()
     ViewportAttributes attr = computeViewportAttributes(m_page->viewportArguments(), minimumLayoutFallbackWidth, deviceWidth, deviceHeight, m_page->deviceScaleFactor(), m_viewportSize);
     attr.initialScale = m_page->viewportArguments().zoom; // Resets auto (-1) if no value was set by user.
 
+    // Keep the current position, update size only.
+    // For the new loads position is already reset to (0,0).
+    FrameView* view = m_page->mainFrame()->view();
+    IntPoint contentFixedOrigin = view->fixedVisibleContentRect().location();
+
+    // Put the width and height to the viewport width and height. In css units however.
+    // FIXME: This should be in scaled units but this currently affects viewport attributes calculation.
+    IntSize contentFixedSize = m_viewportSize;
+    contentFixedSize.scale(1 / m_page->deviceScaleFactor());
+
+    setFixedVisibleContentRect(IntRect(contentFixedOrigin, contentFixedSize));
+
     // This also takes care of the relayout.
-    setFixedLayoutSize(IntSize(static_cast<int>(attr.layoutSize.width()), static_cast<int>(attr.layoutSize.height())));
+    setFixedLayoutSize(roundedIntSize(attr.layoutSize));
+
     send(Messages::WebPageProxy::DidChangeViewportProperties(attr));
 }
 
@@ -1506,20 +1521,18 @@ void WebPage::mouseEvent(const WebMouseEvent& mouseEvent)
         return;
     }
 #endif
-    
     bool handled = false;
-    
     if (m_pageOverlay) {
         // Let the page overlay handle the event.
         handled = m_pageOverlay->mouseEvent(mouseEvent);
     }
 
-    if (!handled) {
+    if (!handled && canHandleUserEvents()) {
         CurrentEvent currentEvent(mouseEvent);
 
         // We need to do a full, normal hit test during this mouse event if the page is active or if a mouse
-        // button is currently pressed. It is possible that neither of those things will be true since on 
-        // Lion when legacy scrollbars are enabled, WebKit receives mouse events all the time. If it is one 
+        // button is currently pressed. It is possible that neither of those things will be true since on
+        // Lion when legacy scrollbars are enabled, WebKit receives mouse events all the time. If it is one
         // of those cases where the page is not active and the mouse is not pressed, then we can fire a more
         // efficient scrollbars-only version of the event.
         bool onlyUpdateScrollbars = !(m_page->focusController()->isActive() || (mouseEvent.button() != WebMouseEvent::NoButton));
@@ -1558,9 +1571,13 @@ static bool handleWheelEvent(const WebWheelEvent& wheelEvent, Page* page)
 
 void WebPage::wheelEvent(const WebWheelEvent& wheelEvent)
 {
-    CurrentEvent currentEvent(wheelEvent);
+    bool handled = false;
 
-    bool handled = handleWheelEvent(wheelEvent, m_page.get());
+    if (canHandleUserEvents()) {
+        CurrentEvent currentEvent(wheelEvent);
+
+        handled = handleWheelEvent(wheelEvent, m_page.get());
+    }
     send(Messages::WebPageProxy::DidReceiveEvent(static_cast<uint32_t>(wheelEvent.type()), handled));
 }
 
@@ -1583,13 +1600,16 @@ static bool handleKeyEvent(const WebKeyboardEvent& keyboardEvent, Page* page)
 
 void WebPage::keyEvent(const WebKeyboardEvent& keyboardEvent)
 {
-    CurrentEvent currentEvent(keyboardEvent);
+    bool handled = false;
 
-    bool handled = handleKeyEvent(keyboardEvent, m_page.get());
-    // FIXME: Platform default behaviors should be performed during normal DOM event dispatch (in most cases, in default keydown event handler).
-    if (!handled)
-        handled = performDefaultBehaviorForKeyEvent(keyboardEvent);
+    if (canHandleUserEvents()) {
+        CurrentEvent currentEvent(keyboardEvent);
 
+        handled = handleKeyEvent(keyboardEvent, m_page.get());
+        // FIXME: Platform default behaviors should be performed during normal DOM event dispatch (in most cases, in default keydown event handler).
+        if (!handled)
+            handled = performDefaultBehaviorForKeyEvent(keyboardEvent);
+    }
     send(Messages::WebPageProxy::DidReceiveEvent(static_cast<uint32_t>(keyboardEvent.type()), handled));
 }
 
@@ -1615,9 +1635,13 @@ static bool handleGestureEvent(const WebGestureEvent& gestureEvent, Page* page)
 
 void WebPage::gestureEvent(const WebGestureEvent& gestureEvent)
 {
-    CurrentEvent currentEvent(gestureEvent);
+    bool handled = false;
 
-    bool handled = handleGestureEvent(gestureEvent, m_page.get());
+    if (canHandleUserEvents()) {
+        CurrentEvent currentEvent(gestureEvent);
+
+        handled = handleGestureEvent(gestureEvent, m_page.get());
+    }
     send(Messages::WebPageProxy::DidReceiveEvent(static_cast<uint32_t>(gestureEvent.type()), handled));
 }
 #endif
@@ -1733,10 +1757,13 @@ static bool handleTouchEvent(const WebTouchEvent& touchEvent, Page* page)
 
 void WebPage::touchEvent(const WebTouchEvent& touchEvent)
 {
-    CurrentEvent currentEvent(touchEvent);
+    bool handled = false;
 
-    bool handled = handleTouchEvent(touchEvent, m_page.get());
+    if (canHandleUserEvents()) {
+        CurrentEvent currentEvent(touchEvent);
 
+        handled = handleTouchEvent(touchEvent, m_page.get());
+    }
     send(Messages::WebPageProxy::DidReceiveEvent(static_cast<uint32_t>(touchEvent.type()), handled));
 }
 
@@ -1881,6 +1908,15 @@ void WebPage::setCanStartMediaTimerFired()
 {
     if (m_page)
         m_page->setCanStartMedia(true);
+}
+
+inline bool WebPage::canHandleUserEvents() const
+{
+#if USE(TILED_BACKING_STORE)
+    // Should apply only if the area was frozen by didStartPageTransition().
+    return !m_drawingArea->layerTreeStateIsFrozen();
+#endif
+    return true;
 }
 
 void WebPage::setIsInWindow(bool isInWindow)
@@ -2236,7 +2272,7 @@ void WebPage::updatePreferences(const WebPreferencesStore& store)
     settings->setShowDebugBorders(store.getBoolValueForKey(WebPreferencesKey::compositingBordersVisibleKey()));
     settings->setShowRepaintCounter(store.getBoolValueForKey(WebPreferencesKey::compositingRepaintCountersVisibleKey()));
     settings->setCSSCustomFilterEnabled(store.getBoolValueForKey(WebPreferencesKey::cssCustomFilterEnabledKey()));
-    settings->setCSSRegionsEnabled(store.getBoolValueForKey(WebPreferencesKey::cssRegionsEnabledKey()));
+    RuntimeEnabledFeatures::setCSSRegionsEnabled(store.getBoolValueForKey(WebPreferencesKey::cssRegionsEnabledKey()));
     settings->setCSSGridLayoutEnabled(store.getBoolValueForKey(WebPreferencesKey::cssGridLayoutEnabledKey()));
     settings->setRegionBasedColumnsEnabled(store.getBoolValueForKey(WebPreferencesKey::regionBasedColumnsEnabledKey()));
     settings->setWebGLEnabled(store.getBoolValueForKey(WebPreferencesKey::webGLEnabledKey()));

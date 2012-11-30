@@ -1,9 +1,9 @@
 This is a snapshot of WebKit. It is based on the upstream trunk subversion
-revision 136119
+revision 136242
 
 You can browse the base of this snapshot at
 
-    http://trac.webkit.org/browser/trunk?rev=136119
+    http://trac.webkit.org/browser/trunk?rev=136242
 
 Additional patches may have been applied on top and files not required by the
 Qt port may have been removed.

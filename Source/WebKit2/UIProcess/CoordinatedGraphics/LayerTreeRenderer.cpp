@@ -216,8 +216,8 @@ void LayerTreeRenderer::adjustPositionForFixedLayers()
     FloatPoint renderedScrollPosition = boundedScrollPosition(m_renderedContentsScrollPosition, m_visibleContentsRect, m_contentsSize);
     FloatSize delta = scrollPosition - renderedScrollPosition;
 
-    LayerMap::iterator end = m_fixedLayers.end();
-    for (LayerMap::iterator it = m_fixedLayers.begin(); it != end; ++it)
+    LayerRawPtrMap::iterator end = m_fixedLayers.end();
+    for (LayerRawPtrMap::iterator it = m_fixedLayers.begin(); it != end; ++it)
         toTextureMapperLayer(it->value)->setScrollPositionDeltaIfNeeded(delta);
 }
 
@@ -266,17 +266,16 @@ void LayerTreeRenderer::destroyCanvas(WebLayerID id)
 
 void LayerTreeRenderer::setLayerChildren(WebLayerID id, const Vector<WebLayerID>& childIDs)
 {
-    ensureLayer(id);
-    LayerMap::iterator it = m_layers.find(id);
-    GraphicsLayer* layer = it->value;
+    GraphicsLayer* layer = ensureLayer(id);
     Vector<GraphicsLayer*> children;
 
     for (size_t i = 0; i < childIDs.size(); ++i) {
         WebLayerID childID = childIDs[i];
         GraphicsLayer* child = layerByID(childID);
         if (!child) {
-            child = createLayer(childID).leakPtr();
-            m_layers.add(childID, child);
+            OwnPtr<GraphicsLayer*> newChild = createLayer(childID);
+            child = newChild.get();
+            m_layers.add(childID, newChild.release());
         }
         children.append(child);
     }
@@ -286,11 +285,8 @@ void LayerTreeRenderer::setLayerChildren(WebLayerID id, const Vector<WebLayerID>
 #if ENABLE(CSS_FILTERS)
 void LayerTreeRenderer::setLayerFilters(WebLayerID id, const FilterOperations& filters)
 {
-    ensureLayer(id);
-    LayerMap::iterator it = m_layers.find(id);
-    ASSERT(it != m_layers.end());
+    GraphicsLayer* layer = ensureLayer(id);
 
-    GraphicsLayer* layer = it->value;
 #if ENABLE(CSS_SHADERS)
     injectCachedCustomFilterPrograms(filters);
 #endif
@@ -332,11 +328,7 @@ void LayerTreeRenderer::removeCustomFilterProgram(int id)
 
 void LayerTreeRenderer::setLayerState(WebLayerID id, const WebLayerInfo& layerInfo)
 {
-    ensureLayer(id);
-    LayerMap::iterator it = m_layers.find(id);
-    ASSERT(it != m_layers.end());
-
-    GraphicsLayer* layer = it->value;
+    GraphicsLayer* layer = ensureLayer(id);
 
     layer->setReplicatedByLayer(layerByID(layerInfo.replica));
     layer->setMaskLayer(layerByID(layerInfo.mask));
@@ -371,26 +363,29 @@ void LayerTreeRenderer::setLayerState(WebLayerID id, const WebLayerInfo& layerIn
 
 void LayerTreeRenderer::deleteLayer(WebLayerID layerID)
 {
-    GraphicsLayer* layer = layerByID(layerID);
+    OwnPtr<GraphicsLayer> layer = m_layers.take(layerID);
     if (!layer)
         return;
 
     layer->removeFromParent();
-    m_layers.remove(layerID);
     m_fixedLayers.remove(layerID);
 #if USE(GRAPHICS_SURFACE)
     m_surfaceBackingStores.remove(layerID);
 #endif
-    delete layer;
 }
 
 
-void LayerTreeRenderer::ensureLayer(WebLayerID id)
+WebCore::GraphicsLayer* LayerTreeRenderer::ensureLayer(WebLayerID id)
 {
-    // We have to leak the new layer's pointer and manage it ourselves,
-    // because OwnPtr is not copyable.
-    if (m_layers.find(id) == m_layers.end())
-        m_layers.add(id, createLayer(id).leakPtr());
+    LayerMap::iterator it = m_layers.find(id);
+    if (it != m_layers.end())
+        return it->value.get();
+
+    OwnPtr<WebCore::GraphicsLayer> newLayer = createLayer(id);
+    WebCore::GraphicsLayer* layer = newLayer.get();
+    m_layers.add(id, newLayer.release());
+
+    return layer;
 }
 
 void LayerTreeRenderer::setRootLayerID(WebLayerID layerID)

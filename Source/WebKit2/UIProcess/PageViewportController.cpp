@@ -111,7 +111,7 @@ void PageViewportController::didChangeContentsSize(const IntSize& newSize)
 {
     m_contentsSize = newSize;
 
-    bool minimumScaleUpdated = updateMinimumScaleToFit();
+    bool minimumScaleUpdated = updateMinimumScaleToFit(false);
 
     if (m_initiallyFitToViewport) {
         // Restrict scale factors to m_minimumScaleToFit.
@@ -209,7 +209,7 @@ void PageViewportController::didChangeContentsVisibility(const FloatPoint& viewp
 
 void PageViewportController::syncVisibleContents(const FloatPoint& trajectoryVector)
 {
-    DrawingAreaProxy* const drawingArea = m_webPageProxy->drawingArea();
+    DrawingAreaProxy* drawingArea = m_webPageProxy->drawingArea();
     if (!drawingArea || m_viewportSize.isEmpty() || m_contentsSize.isEmpty())
         return;
 
@@ -232,10 +232,8 @@ void PageViewportController::didChangeViewportAttributes(const WebCore::Viewport
     if (!m_initiallyFitToViewport)
         WebCore::restrictScaleFactorToInitialScaleIfNotUserScalable(m_rawAttributes);
 
-    if (updateMinimumScaleToFit())
+    if (updateMinimumScaleToFit(true))
         m_client->didChangeViewportAttributes();
-
-    syncVisibleContents();
 }
 
 WebCore::FloatSize PageViewportController::viewportSizeInContentsCoordinates() const
@@ -277,10 +275,12 @@ void PageViewportController::applyPositionAfterRenderingContents(const FloatPoin
     syncVisibleContents();
 }
 
-bool PageViewportController::updateMinimumScaleToFit()
+bool PageViewportController::updateMinimumScaleToFit(bool userInitiatedUpdate)
 {
     if (m_viewportSize.isEmpty() || m_contentsSize.isEmpty())
         return false;
+
+    bool currentlyScaledToFit = fuzzyCompare(m_effectiveScale, toViewportScale(m_minimumScaleToFit), 0.001);
 
     float minimumScale = WebCore::computeMinimumScaleFactorForContentContained(m_rawAttributes, WebCore::roundedIntSize(m_viewportSize), WebCore::roundedIntSize(m_contentsSize), devicePixelRatio());
 
@@ -290,8 +290,16 @@ bool PageViewportController::updateMinimumScaleToFit()
     if (!fuzzyCompare(minimumScale, m_minimumScaleToFit, 0.001)) {
         m_minimumScaleToFit = minimumScale;
 
-        if (!m_hadUserInteraction && !hasSuspendedContent())
-            applyScaleAfterRenderingContents(toViewportScale(minimumScale));
+        if (!hasSuspendedContent()) {
+            if (!m_hadUserInteraction || (userInitiatedUpdate && currentlyScaledToFit))
+                applyScaleAfterRenderingContents(toViewportScale(m_minimumScaleToFit));
+            else {
+                // Ensure the effective scale stays within bounds.
+                float boundedScale = innerBoundedViewportScale(m_effectiveScale);
+                if (!fuzzyCompare(boundedScale, m_effectiveScale, 0.001))
+                    applyScaleAfterRenderingContents(boundedScale);
+            }
+        }
 
         return true;
     }

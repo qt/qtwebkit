@@ -409,6 +409,7 @@ public:
 
 #if USE(APPKIT)
     WKView* wkView() const;
+    void intrinsicContentSizeDidChange(const WebCore::IntSize& intrinsicContentSize);
 #endif
 #endif
 #if PLATFORM(WIN)
@@ -757,6 +758,9 @@ public:
 
     const WebLoaderClient& loaderClient() { return m_loaderClient; }
 
+    double minimumLayoutWidth() const { return m_minimumLayoutWidth; }
+    void setMinimumLayoutWidth(double);
+
 private:
     WebPageProxy(PageClient*, PassRefPtr<WebProcessProxy>, WebPageGroup*, uint64_t pageID);
 
@@ -895,6 +899,9 @@ private:
 #endif
 
     void editorStateChanged(const EditorState&);
+#if PLATFORM(QT)
+    void willSetInputMethodState();
+#endif
 
     // Back/Forward list management
     void backForwardAddItem(uint64_t itemID);
@@ -1239,6 +1246,7 @@ private:
     bool m_shouldSendEventsSynchronously;
 
     bool m_suppressVisibilityUpdates;
+    float m_minimumLayoutWidth;
 
     float m_mediaVolume;
     bool m_mayStartMediaWhenInWindow;
