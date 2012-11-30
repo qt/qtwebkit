@@ -170,13 +170,6 @@ SOURCES += \
     jit/JITStubs.cpp \
     jit/JumpReplacementWatchpoint.cpp \
     jit/ThunkGenerators.cpp \
-    llint/LLIntCLoop.cpp \
-    llint/LLIntData.cpp \
-    llint/LLIntEntrypoints.cpp \
-    llint/LLIntExceptions.cpp \
-    llint/LLIntSlowPaths.cpp \
-    llint/LLIntThunks.cpp \
-    llint/LowLevelInterpreter.cpp \
     parser/Lexer.cpp \
     parser/Nodes.cpp \
     parser/ParserArena.cpp \
@@ -284,6 +277,17 @@ SOURCES += \
     tools/CodeProfile.cpp \
     tools/CodeProfiling.cpp \
     yarr/YarrJIT.cpp \
+
+!macx {
+    SOURCES += \
+        llint/LLIntCLoop.cpp \
+        llint/LLIntData.cpp \
+        llint/LLIntEntrypoints.cpp \
+        llint/LLIntExceptions.cpp \
+        llint/LLIntSlowPaths.cpp \
+        llint/LLIntThunks.cpp \
+        llint/LowLevelInterpreter.cpp
+}
 
 linux-*:if(isEqual(QT_ARCH, "i386")|isEqual(QT_ARCH, "x86_64")) {
     SOURCES += \

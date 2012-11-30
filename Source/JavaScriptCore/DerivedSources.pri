@@ -95,20 +95,22 @@ klgen.input = KEYWORDLUT_FILES
 klgen.commands = python $$klgen.script ${QMAKE_FILE_NAME} > ${QMAKE_FILE_OUT}
 GENERATORS += klgen
 
-EXTRACTOR_BINARY = LLIntOffsetsExtractor$$BIN_EXTENSION
-DIRS = $$OUT_PWD $$OUT_PWD/debug $$OUT_PWD/release
-for(dir, DIRS) {
-    file = $$dir/$$EXTRACTOR_BINARY
-    exists($$file): LLINT_FILES += $$file
-}
+!macx{
+    EXTRACTOR_BINARY = LLIntOffsetsExtractor$$BIN_EXTENSION
+    DIRS = $$OUT_PWD $$OUT_PWD/debug $$OUT_PWD/release
+    for(dir, DIRS) {
+        file = $$dir/$$EXTRACTOR_BINARY
+        exists($$file): LLINT_FILES += $$file
+    }
 
-#GENERATOR: LLInt
-llint.output = ${QMAKE_FILE_IN_PATH}$${QMAKE_DIR_SEP}LLIntAssembly.h
-llint.script = $$PWD/offlineasm/asm.rb
-llint.input = LLINT_FILES
-llint.depends = $$LLINT_DEPENDENCY
-llint.commands = ruby $$llint.script $$LLINT_ASSEMBLER ${QMAKE_FILE_IN} ${QMAKE_FILE_OUT}
-GENERATORS += llint
+    #GENERATOR: LLInt
+    llint.output = ${QMAKE_FILE_IN_PATH}$${QMAKE_DIR_SEP}LLIntAssembly.h
+    llint.script = $$PWD/offlineasm/asm.rb
+    llint.input = LLINT_FILES
+    llint.depends = $$LLINT_DEPENDENCY
+    llint.commands = ruby $$llint.script $$LLINT_ASSEMBLER ${QMAKE_FILE_IN} ${QMAKE_FILE_OUT}
+    GENERATORS += llint
+}
 
 linux-*:if(isEqual(QT_ARCH, "i386")|isEqual(QT_ARCH, "x86_64")) {
     # GENERATOR: disassembler
