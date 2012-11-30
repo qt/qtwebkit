@@ -11,3 +11,14 @@ exampledirs = WebKit/qt/docs
 imagedirs = WebKit/qt/docs
 
 depends += qtcore qtwidgets qtgui qtscript qtdoc qtprintsupport qtxml
+
+qhp.projects = qtwebkit
+
+qhp.qtwebkit.file = qtwebkit.qhp
+qhp.qtwebkit.namespace = org.qt-project.qtwebkit.500
+qhp.qtwebkit.indexTitle = Qt WebKit Documentation
+qhp.qtwebkit.virtualFolder  = qtwebkit
+qhp.qtwebkit.subprojects = classes
+qhp.qtwebkit.subprojects.classes.title = Qt WebKit C++ Classes
+qhp.qtwebkit.subprojects.classes.selectors = class fake:headerfile
+qhp.qtwebkit.subprojects.classes.sortPages = true
