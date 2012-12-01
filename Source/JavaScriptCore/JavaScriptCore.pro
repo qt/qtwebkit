@@ -7,18 +7,16 @@
 TEMPLATE = subdirs
 CONFIG += ordered
 
-!macx {
-    LLIntOffsetsExtractor.file = LLIntOffsetsExtractor.pro
-    LLIntOffsetsExtractor.makefile = Makefile.LLIntOffsetsExtractor
-    SUBDIRS += LLIntOffsetsExtractor
-}
+LLIntOffsetsExtractor.file = LLIntOffsetsExtractor.pro
+LLIntOffsetsExtractor.makefile = Makefile.LLIntOffsetsExtractor
+SUBDIRS += LLIntOffsetsExtractor
 
 derived_sources.file = DerivedSources.pri
 target.file = Target.pri
 
 SUBDIRS += derived_sources target
 
-!macx:addStrictSubdirOrderBetween(LLIntOffsetsExtractor, derived_sources)
+addStrictSubdirOrderBetween(LLIntOffsetsExtractor, derived_sources)
 addStrictSubdirOrderBetween(derived_sources, target)
 
 jsc.file = jsc.pro
