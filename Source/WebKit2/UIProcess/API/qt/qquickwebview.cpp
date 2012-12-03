@@ -1413,7 +1413,7 @@ QQuickWebPage* QQuickWebViewExperimental::page()
 }
 
 /*!
-    \page index.html
+    \page qtwebkit-index.html
     \title QtWebKit: QML WebView version 3.0
 
     The WebView API allows QML applications to render regions of dynamic

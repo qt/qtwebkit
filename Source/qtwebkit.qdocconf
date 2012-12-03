@@ -5,6 +5,26 @@ project     = qtwebkit
 description = "Qt WebKit API Documentation"
 version     = 5.0.0
 
+# Defines the name of the project. You cannot use operators (+, =, -) in
+# the name. Properties for this project are set using a qhp.<projectname>.property
+# format.
+qhp.projects = qtwebkit
+qhp.qtwebkit.file = qtwebkit.qhp
+qhp.qtwebkit.namespace = org.qt-project.qtwebkit.500
+qhp.qtwebkit.indexTitle = Qt WebKit Reference Documentation
+qhp.qtwebkit.virtualFolder  = qtwebkit
+
+# For listing child nodes in Qt Creator or Assistant.
+qhp.qtwebkit.subprojects = classes qmltypes
+qhp.qtwebkit.subprojects.classes.title = C++ Classes
+qhp.qtwebkit.subprojects.classes.indexTitle = Qt WebKit C++ Classes
+qhp.qtwebkit.subprojects.classes.selectors = class fake:headerfile
+qhp.qtwebkit.subprojects.classes.sortPages = true
+qhp.qtwebkit.subprojects.qmltypes.title = QML Types
+qhp.qtwebkit.subprojects.qmltypes.indexTitle = Qt WebKit QML Types
+qhp.qtwebkit.subprojects.qmltypes.selectors = class fake:headerfile
+qhp.qtwebkit.subprojects.qmltypes.sortPages = true
+
 headerdirs = WebKit/qt/Api WebKit/qt/WidgetApi WebKit2/UIProcess/API/qt
 sourcedirs = WebKit/qt/Api WebKit/qt/WidgetApi WebKit/qt/docs Source/JavaScriptCore/qt/api WebKit2/UIProcess/API/qt
 exampledirs = WebKit/qt/docs
