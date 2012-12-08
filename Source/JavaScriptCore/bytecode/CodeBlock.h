@@ -521,7 +521,7 @@ namespace JSC {
             return result;
         }
 #else
-        JITCode::JITType getJITType() { return JITCode::BaselineJIT; }
+        JITCode::JITType getJITType() const { return JITCode::BaselineJIT; }
 #endif
 
         ScriptExecutable* ownerExecutable() const { return m_ownerExecutable.get(); }
