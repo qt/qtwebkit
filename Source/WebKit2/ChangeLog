@@ -1,3 +1,14 @@
+2012-12-10  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Fix build without QtQuick 2
+
+        Unreviewed trivial build fix.
+
+        This function is defined in QtWebContext, which is only used when QtQuick2 is available.
+
+        * UIProcess/qt/WebContextQt.cpp:
+        (WebKit::WebContext::platformInvalidateContext):
+
 2012-12-03  Andras Becsi  <andras.becsi@digia.com>
 
         [Qt][WK2] Do not override previously set flags of QQuickWebView when enabling drag&drop
