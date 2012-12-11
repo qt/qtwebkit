@@ -28,9 +28,6 @@
 #include <QApplication>
 #include <QLineEdit>
 #include <QPainter>
-#ifdef Q_OS_MAC
-#include <QProxyStyle>
-#endif
 #include <QPushButton>
 #include <QStyleFactory>
 #include <QStyleOption>
@@ -481,21 +478,6 @@ QObject* QStyleFacadeImp::widgetForPainter(QPainter* painter)
     return 0;
 }
 
-#ifdef Q_OS_MAC
-class QMacNonTransientScrollBarsProxyStyle : public QProxyStyle
-{
-public:
-    QMacNonTransientScrollBarsProxyStyle(QStyle *bs) : QProxyStyle(bs) { }
-
-    int styleHint(StyleHint sh, const QStyleOption *opt, const QWidget *w, QStyleHintReturn *hret) const
-    {
-        if (sh == SH_ScrollBar_Transient)
-            return 0;
-        return baseStyle()->styleHint(sh, opt, w, hret);
-    }
-};
-#endif // Q_OS_MAC
-
 QStyle* QStyleFacadeImp::style() const
 {
     if (m_style)
@@ -508,10 +490,6 @@ QStyle* QStyleFacadeImp::style() const
 
     if (!m_style)
         m_style = QApplication::style();
-
-#ifdef Q_OS_MAC
-    m_style = new QMacNonTransientScrollBarsProxyStyle(m_style);
-#endif
 
     return m_style;
 }
