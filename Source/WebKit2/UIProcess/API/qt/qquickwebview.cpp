@@ -826,16 +826,15 @@ void QQuickWebViewLegacyPrivate::updateViewportSize()
     if (viewportSize.isEmpty())
         return;
 
-    float devicePixelRatio = webPageProxy->deviceScaleFactor();
     pageView->setContentsSize(viewportSize);
-    // Make sure that our scale matches the one passed to setVisibleContentsRect.
-    pageView->setContentsScale(devicePixelRatio);
 
     // The fixed layout is handled by the FrameView and the drawing area doesn't behave differently
     // whether its fixed or not. We still need to tell the drawing area which part of it
     // has to be rendered on tiles, and in desktop mode it's all of it.
-    webPageProxy->drawingArea()->setSize((viewportSize / devicePixelRatio).toSize(), IntSize());
-    webPageProxy->drawingArea()->setVisibleContentsRect(FloatRect(FloatPoint(), FloatSize(viewportSize / devicePixelRatio)), devicePixelRatio, FloatPoint());
+    webPageProxy->drawingArea()->setSize(viewportSize.toSize(), IntSize());
+    // The backing store scale factor should already be set to the device pixel ratio
+    // of the underlying window, thus we set the effective scale to 1 here.
+    webPageProxy->drawingArea()->setVisibleContentsRect(FloatRect(FloatPoint(), FloatSize(viewportSize)), 1, FloatPoint());
 }
 
 qreal QQuickWebViewLegacyPrivate::zoomFactor() const
@@ -1189,59 +1188,6 @@ void QQuickWebViewExperimental::setUserAgent(const QString& userAgent)
 
     d->webPageProxy->setUserAgent(userAgent);
     emit userAgentChanged();
-}
-
-/*!
-    \internal
-
-    \qmlproperty real WebViewExperimental::devicePixelRatio
-    \brief The ratio between the CSS units and device pixels when the content is unscaled.
-
-    When designing touch-friendly contents, knowing the approximated target size on a device
-    is important for contents providers in order to get the intented layout and element
-    sizes.
-
-    As most first generation touch devices had a PPI of approximately 160, this became a
-    de-facto value, when used in conjunction with the viewport meta tag.
-
-    Devices with a higher PPI learning towards 240 or 320, applies a pre-scaling on all
-    content, of either 1.5 or 2.0, not affecting the CSS scale or pinch zooming.
-
-    This value can be set using this property and it is exposed to CSS media queries using
-    the -webkit-device-pixel-ratio query.
-
-    For instance, if you want to load an image without having it upscaled on a web view
-    using a device pixel ratio of 2.0 it can be done by loading an image of say 100x100
-    pixels but showing it at half the size.
-
-    FIXME: Move documentation example out in separate files
-
-    @media (-webkit-min-device-pixel-ratio: 1.5) {
-        .icon {
-            width: 50px;
-            height: 50px;
-            url: "/images/icon@2x.png"; // This is actually a 100x100 image
-        }
-    }
-
-    If the above is used on a device with device pixel ratio of 1.5, it will be scaled
-    down but still provide a better looking image.
-*/
-
-qreal QQuickWebViewExperimental::devicePixelRatio() const
-{
-    Q_D(const QQuickWebView);
-    return d->webPageProxy->deviceScaleFactor();
-}
-
-void QQuickWebViewExperimental::setDevicePixelRatio(qreal devicePixelRatio)
-{
-    Q_D(QQuickWebView);
-    if (0 >= devicePixelRatio || devicePixelRatio == this->devicePixelRatio())
-        return;
-
-    d->webPageProxy->setIntrinsicDeviceScaleFactor(devicePixelRatio);
-    emit devicePixelRatioChanged();
 }
 
 /*!
