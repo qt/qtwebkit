@@ -4,7 +4,7 @@ TARGET = tst_qmltests_WebView
 OBJECTS_DIR = obj_WebView/$$activeBuildConfig()
 
 QT += webkit-private
-CONFIG += warn_on testcase
+CONFIG += testcase
 
 QT += qmltest
 
