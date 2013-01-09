@@ -234,6 +234,8 @@ void PageViewportController::didChangeViewportAttributes(const WebCore::Viewport
 
     if (updateMinimumScaleToFit(true))
         m_client->didChangeViewportAttributes();
+
+    syncVisibleContents();
 }
 
 WebCore::FloatSize PageViewportController::viewportSizeInContentsCoordinates() const
