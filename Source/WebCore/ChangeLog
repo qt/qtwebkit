@@ -1,3 +1,34 @@
+2013-01-10  Alexis Menard  <alexis@webkit.org>
+
+        ASSERT_NOT_REACHED in StylePropertySet::fontValue when accessing font style property through JS after setting style font size.
+        https://bugs.webkit.org/show_bug.cgi?id=88866
+
+        Reviewed by Alexander Pavlov.
+
+        StylePropertySet::fontValue always assumed that it was called using
+        style.font after a subsequent call which set the shorthand font. The
+        ASSERT_NOT_REACHED assumed that all longhands of the font shorthand not
+        set by the shorthand itself were set to initial. While it's true when
+        we set the font shorthand (i.e all longhands are set to implicit initial)
+        it is not true when you set the longhands individually. For example setting
+        font-size will not set other font properties to initial. It is the behavior of all
+        other shorthands in WebKit. When reconstructing the shorthand other
+        properties tests whether the value of each longhands is initial or not
+        (if not then we omit the value, as we should always construct the
+        shortest shorthand possible) or if the value is set or not (if set then
+        we include it in the shorthand if not then we omit it). The comment
+        removed was also talking about invalid font property potentially built
+        by fontValue(). So far appendFontLonghandValueIfExplicit will always
+        construct a valid value as it takes care of adding ' ' or '/' when
+        needed, so the return value is parsable and correct.
+
+        Test: fast/css/font-shorthand-from-longhands.html
+
+        * css/StylePropertySet.cpp:
+        (WebCore::StylePropertySet::appendFontLonghandValueIfExplicit):
+        (WebCore::StylePropertySet::fontValue):
+        * css/StylePropertySet.h:
+
 2012-12-19  Simon Hausmann  <simon.hausmann@digia.com>, Jedrzej Nowacki <jedrzej.nowacki@digia.com>
 
         [Qt] JS bridge does not transmit QVariants anymore in Qt5
