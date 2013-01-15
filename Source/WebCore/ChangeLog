@@ -1,3 +1,22 @@
+2013-01-15  Allan Sandfeld Jensen  <allan.jensen@digia.com>
+
+        [Qt][CSS Shaders] Make custom filter render in Wk1 mode
+        https://bugs.webkit.org/show_bug.cgi?id=101532
+
+        Reviewed by Noam Rosenthal.
+
+        Handle ValidatedCustomFilterOperations which are used by WebKit1. To keep the cache of compiled programs working, 
+        the cache has been updated to use CustomFilterProgramInfo as a hash key. CustomFilterProgramInfo is an existing
+        class specifically designed for this purpose.
+
+        * platform/graphics/texmap/TextureMapperGL.cpp:
+        (WebCore::getPassesRequiredForFilter):
+        (WebCore::TextureMapperGL::removeCachedCustomFilterProgram):
+        (WebCore::TextureMapperGL::drawUsingCustomFilter):
+        (WebCore::BitmapTextureGL::applyFilters):
+        * platform/graphics/texmap/TextureMapperGL.h:
+        (TextureMapperGL):
+
 2013-01-07  Justin Novosad  <junov@google.com>
 
         Fixing memory read after free in CanvasRenderingContext2D::accessFont
