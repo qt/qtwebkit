@@ -47,9 +47,9 @@ PageViewportController::PageViewportController(WebKit::WebPageProxy* proxy, Page
     , m_initiallyFitToViewport(true)
     , m_hasSuspendedContent(false)
     , m_hadUserInteraction(false)
-    , m_effectiveScale(1)
+    , m_pageScaleFactor(1)
     , m_viewportPosIsLocked(false)
-    , m_effectiveScaleIsLocked(false)
+    , m_pageScaleFactorIsLocked(false)
 {
     // Initializing Viewport Raw Attributes to avoid random negative or infinity scale factors
     // if there is a race condition between the first layout and setting the viewport attributes for the first time.
@@ -68,15 +68,15 @@ PageViewportController::PageViewportController(WebKit::WebPageProxy* proxy, Page
 
 float PageViewportController::innerBoundedViewportScale(float viewportScale) const
 {
-    return clampTo(viewportScale, toViewportScale(m_minimumScaleToFit), toViewportScale(m_rawAttributes.maximumScale));
+    return clampTo(viewportScale, m_minimumScaleToFit, m_rawAttributes.maximumScale);
 }
 
 float PageViewportController::outerBoundedViewportScale(float viewportScale) const
 {
     if (m_allowsUserScaling) {
         // Bounded by [0.1, 10.0] like the viewport meta code in WebCore.
-        float hardMin = toViewportScale(std::max<float>(0.1, 0.5 * m_minimumScaleToFit));
-        float hardMax = toViewportScale(std::min<float>(10, 2 * m_rawAttributes.maximumScale));
+        float hardMin = std::max<float>(0.1, 0.5 * m_minimumScaleToFit);
+        float hardMax = std::min<float>(10, 2 * m_rawAttributes.maximumScale);
         return clampTo(viewportScale, hardMin, hardMax);
     }
     return innerBoundedViewportScale(viewportScale);
@@ -145,12 +145,12 @@ void PageViewportController::didRenderFrame(const IntSize& contentsSize, const I
     // All position and scale changes resulting from a web process event should
     // go through here to be applied on the viewport to avoid showing incomplete
     // tiles to the user during a few milliseconds.
-    if (m_effectiveScaleIsLocked) {
-        m_client->setContentsScale(m_effectiveScale, false);
-        m_effectiveScaleIsLocked = false;
+    if (m_pageScaleFactorIsLocked) {
+        m_client->setContentsScale(m_pageScaleFactor, false);
+        m_pageScaleFactorIsLocked = false;
     }
     if (m_viewportPosIsLocked) {
-        FloatPoint clampedPos = clampViewportToContents(m_viewportPos, m_effectiveScale);
+        FloatPoint clampedPos = clampViewportToContents(m_viewportPos, m_pageScaleFactor);
         // There might be rendered frames not covering our requested position yet, wait for it.
         if (FloatRect(clampedPos, viewportSizeInContentsCoordinates()).intersects(coveredRect)) {
             m_client->setViewportPosition(clampedPos);
@@ -164,7 +164,7 @@ void PageViewportController::pageTransitionViewportReady()
     if (!m_rawAttributes.layoutSize.isEmpty()) {
         m_hadUserInteraction = false;
         float initialScale = m_initiallyFitToViewport ? m_minimumScaleToFit : m_rawAttributes.initialScale;
-        applyScaleAfterRenderingContents(innerBoundedViewportScale(toViewportScale(initialScale)));
+        applyScaleAfterRenderingContents(innerBoundedViewportScale(initialScale));
     }
 
     // At this point we should already have received the first viewport arguments and the requested scroll
@@ -180,7 +180,7 @@ void PageViewportController::pageDidRequestScroll(const IntPoint& cssPosition)
     if (m_hasSuspendedContent)
         return;
 
-    FloatRect endVisibleContentRect(clampViewportToContents(cssPosition, m_effectiveScale), viewportSizeInContentsCoordinates());
+    FloatRect endVisibleContentRect(clampViewportToContents(cssPosition, m_pageScaleFactor), viewportSizeInContentsCoordinates());
     if (m_lastFrameCoveredRect.intersects(endVisibleContentRect))
         m_client->setViewportPosition(endVisibleContentRect.location());
     else
@@ -204,8 +204,8 @@ void PageViewportController::didChangeContentsVisibility(const FloatPoint& viewp
 {
     if (!m_viewportPosIsLocked)
         m_viewportPos = viewportPos;
-    if (!m_effectiveScaleIsLocked)
-        m_effectiveScale = viewportScale;
+    if (!m_pageScaleFactorIsLocked)
+        m_pageScaleFactor = viewportScale;
 
     syncVisibleContents(trajectoryVector);
 }
@@ -216,9 +216,9 @@ void PageViewportController::syncVisibleContents(const FloatPoint& trajectoryVec
     if (!drawingArea || m_viewportSize.isEmpty() || m_contentsSize.isEmpty())
         return;
 
-    FloatRect visibleContentsRect(clampViewportToContents(m_viewportPos, m_effectiveScale), viewportSizeInContentsCoordinates());
+    FloatRect visibleContentsRect(clampViewportToContents(m_viewportPos, m_pageScaleFactor), viewportSizeInContentsCoordinates());
     visibleContentsRect.intersect(FloatRect(FloatPoint::zero(), m_contentsSize));
-    drawingArea->setVisibleContentsRect(visibleContentsRect, m_effectiveScale, trajectoryVector);
+    drawingArea->setVisibleContentsRect(visibleContentsRect, m_pageScaleFactor, trajectoryVector);
 
     m_client->didChangeVisibleContents();
 }
@@ -243,7 +243,7 @@ void PageViewportController::didChangeViewportAttributes(const WebCore::Viewport
 
 WebCore::FloatSize PageViewportController::viewportSizeInContentsCoordinates() const
 {
-    return WebCore::FloatSize(m_viewportSize.width() / m_effectiveScale, m_viewportSize.height() / m_effectiveScale);
+    return WebCore::FloatSize(m_viewportSize.width() / m_pageScaleFactor, m_viewportSize.height() / m_pageScaleFactor);
 }
 
 void PageViewportController::suspendContent()
@@ -268,8 +268,8 @@ void PageViewportController::resumeContent()
 
 void PageViewportController::applyScaleAfterRenderingContents(float scale)
 {
-    m_effectiveScale = scale;
-    m_effectiveScaleIsLocked = true;
+    m_pageScaleFactor = scale;
+    m_pageScaleFactorIsLocked = true;
     syncVisibleContents();
 }
 
@@ -285,9 +285,9 @@ bool PageViewportController::updateMinimumScaleToFit(bool userInitiatedUpdate)
     if (m_viewportSize.isEmpty() || m_contentsSize.isEmpty())
         return false;
 
-    bool currentlyScaledToFit = fuzzyCompare(m_effectiveScale, toViewportScale(m_minimumScaleToFit), 0.001);
+    bool currentlyScaledToFit = fuzzyCompare(m_pageScaleFactor, m_minimumScaleToFit, 0.001);
 
-    float minimumScale = WebCore::computeMinimumScaleFactorForContentContained(m_rawAttributes, WebCore::roundedIntSize(m_viewportSize), WebCore::roundedIntSize(m_contentsSize), devicePixelRatio());
+    float minimumScale = WebCore::computeMinimumScaleFactorForContentContained(m_rawAttributes, WebCore::roundedIntSize(m_viewportSize), WebCore::roundedIntSize(m_contentsSize), 1);
 
     if (minimumScale <= 0)
         return false;
@@ -297,11 +297,11 @@ bool PageViewportController::updateMinimumScaleToFit(bool userInitiatedUpdate)
 
         if (!hasSuspendedContent()) {
             if (!m_hadUserInteraction || (userInitiatedUpdate && currentlyScaledToFit))
-                applyScaleAfterRenderingContents(toViewportScale(m_minimumScaleToFit));
+                applyScaleAfterRenderingContents(m_minimumScaleToFit);
             else {
                 // Ensure the effective scale stays within bounds.
-                float boundedScale = innerBoundedViewportScale(m_effectiveScale);
-                if (!fuzzyCompare(boundedScale, m_effectiveScale, 0.001))
+                float boundedScale = innerBoundedViewportScale(m_pageScaleFactor);
+                if (!fuzzyCompare(boundedScale, m_pageScaleFactor, 0.001))
                     applyScaleAfterRenderingContents(boundedScale);
             }
         }
