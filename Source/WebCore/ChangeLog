@@ -1,5 +1,46 @@
 2013-01-16  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
 
+        [Qt] Use the shared HistoryItem serialization for QWebHistory
+        https://bugs.webkit.org/show_bug.cgi?id=106671
+
+        Reviewed by Allan Sandfeld Jensen.
+
+        This allows a few things missing from the previous serialization code
+        to function while using commonly maintained code:
+        - The itemSequenceNumber and documentSequenceNumber that were needed
+          to properly restore same-document navigations
+        - The form data
+        - The navigation hierarchy mapping the frame tree
+
+        * history/HistoryItem.h:
+        (HistoryItem):
+        * history/qt/HistoryItemQt.cpp:
+        (QDataStreamCoder):
+        (WebCore):
+        (WebCore::QDataStreamCoder::QDataStreamCoder):
+        (WebCore::QDataStreamCoder::encodeBytes):
+        (WebCore::QDataStreamCoder::encodeBool):
+        (WebCore::QDataStreamCoder::encodeUInt32):
+        (WebCore::QDataStreamCoder::encodeUInt64):
+        (WebCore::QDataStreamCoder::encodeInt32):
+        (WebCore::QDataStreamCoder::encodeInt64):
+        (WebCore::QDataStreamCoder::encodeFloat):
+        (WebCore::QDataStreamCoder::encodeDouble):
+        (WebCore::QDataStreamCoder::encodeString):
+        (WebCore::QDataStreamCoder::decodeBytes):
+        (WebCore::QDataStreamCoder::decodeBool):
+        (WebCore::QDataStreamCoder::decodeUInt32):
+        (WebCore::QDataStreamCoder::decodeUInt64):
+        (WebCore::QDataStreamCoder::decodeInt32):
+        (WebCore::QDataStreamCoder::decodeInt64):
+        (WebCore::QDataStreamCoder::decodeFloat):
+        (WebCore::QDataStreamCoder::decodeDouble):
+        (WebCore::QDataStreamCoder::decodeString):
+        (WebCore::HistoryItem::restoreState):
+        (WebCore::WebCore::HistoryItem::saveState):
+
+2013-01-16  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
         [Qt] Crash in WebCore::CachedFrame::destroy
         https://bugs.webkit.org/show_bug.cgi?id=104525
 
