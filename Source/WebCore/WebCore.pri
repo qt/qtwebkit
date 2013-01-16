@@ -107,17 +107,15 @@ INCLUDEPATH += $$WEBCORE_GENERATED_SOURCES_DIR
 enable?(XSLT) {
     use?(LIBXML2) {
         mac {
-            INCLUDEPATH += /usr/include/libxml2
+            INCLUDEPATH += /usr/include/libxslt /usr/include/libxml2
             LIBS += -lxml2 -lxslt
         } else {
-            PKGCONFIG += libxslt
+            PKGCONFIG += libxslt libxml-2.0
         }
     } else {
         QT *= xmlpatterns
     }
-}
-
-use?(LIBXML2) {
+} else:!mac:use?(LIBXML2) {
     PKGCONFIG += libxml-2.0
 }
 
@@ -231,12 +229,22 @@ use?(GRAPHICS_SURFACE) {
     }
 }
 
-!system-sqlite:exists( $${SQLITE3SRCDIR}/sqlite3.c ) {
-    INCLUDEPATH += $${SQLITE3SRCDIR}
-    DEFINES += SQLITE_CORE SQLITE_OMIT_LOAD_EXTENSION SQLITE_OMIT_COMPLETE
+have?(sqlite3) {
+    mac {
+        LIBS += -lsqlite3
+    } else {
+        PKGCONFIG += sqlite3
+    }
 } else {
-    INCLUDEPATH += $${SQLITE3SRCDIR}
-    LIBS += -lsqlite3
+    SQLITE3SRCDIR = $$(SQLITE3SRCDIR)
+    isEmpty(SQLITE3SRCDIR): SQLITE3SRCDIR = ../../../qtbase/src/3rdparty/sqlite/
+    exists($${SQLITE3SRCDIR}/sqlite3.c) {
+        INCLUDEPATH += $${SQLITE3SRCDIR}
+        DEFINES += SQLITE_CORE SQLITE_OMIT_LOAD_EXTENSION SQLITE_OMIT_COMPLETE
+    } else {
+        INCLUDEPATH += $${SQLITE3SRCDIR}
+        LIBS += -lsqlite3
+    }
 }
 
 use?(libjpeg): LIBS += -ljpeg

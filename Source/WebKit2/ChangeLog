@@ -1,3 +1,130 @@
+2012-12-19  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        [EFL][Qt][WK2] Going back to 47-amazing-css3-animation-demos shows nothing or wrong position
+        https://bugs.webkit.org/show_bug.cgi?id=104414
+
+        Reviewed by Simon Hausmann.
+
+        When contents size changes, make sure to apply any pending position
+        change if possible.
+
+        * UIProcess/PageViewportController.cpp:
+        (WebKit::PageViewportController::didChangeContentsSize):
+
+2012-12-13  Andras Becsi  <andras.becsi@digia.com>
+
+        [Qt][WK2] Fix painting on Mac with retina display
+        https://bugs.webkit.org/show_bug.cgi?id=104574
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Since HiDPI support has been added and enabled in Qt we ended up
+        painting incorrectly scaled content on high-resolution screens.
+        Because the intrinsic device pixel ratio is always taken into
+        account by Qt when painting to high-resolution screens we should
+        automatically obtain the scale ratio from the window in which the
+        item is rendered instead of setting it in QML.
+
+        Qt does not make it possible to override the device pixel ratio
+        of the native window, therefore our experimental QML API for setting
+        a custom value is of no use any more and should be removed.
+
+        This patch fixes the scaling issue on Mac retina display by querying
+        the underlying window for the device scale factor and applying it to
+        the backing store and the scene-graph rendering of the content node.
+        Additionally removes the experimental API and related API tests.
+
+        * UIProcess/API/qt/qquickwebpage.cpp:
+        (QQuickWebPage::updatePaintNode):
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewPrivate::QQuickWebViewPrivate):
+        (QQuickWebViewLegacyPrivate::updateViewportSize):
+        (QQuickWebViewFlickablePrivate::onComponentComplete):
+        * UIProcess/API/qt/qquickwebview_p.h:
+        * UIProcess/API/qt/tests/qquickwebview/tst_qquickwebview.cpp:
+        (tst_QQuickWebView::newWebView):
+        * UIProcess/CoordinatedGraphics/CoordinatedLayerTreeHostProxy.cpp:
+        (WebKit::CoordinatedLayerTreeHostProxy::setVisibleContentsRect):
+        (WebKit::CoordinatedLayerTreeHostProxy::deviceScaleFactor):
+        * UIProcess/CoordinatedGraphics/CoordinatedLayerTreeHostProxy.h:
+        (CoordinatedLayerTreeHostProxy):
+        * UIProcess/qt/QtWebPageSGNode.cpp:
+        (WebKit::ContentsSGNode::ContentsSGNode):
+        (WebKit::ContentsSGNode::render):
+        (WebKit::ContentsSGNode::clipRect):
+        (ContentsSGNode):
+        (WebKit::QtWebPageSGNode::QtWebPageSGNode):
+        (WebKit::QtWebPageSGNode::devicePixelRatio):
+        (WebKit):
+        (WebKit::QtWebPageSGNode::setRenderer):
+        * UIProcess/qt/QtWebPageSGNode.h:
+        (QtWebPageSGNode):
+
+2012-12-10  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Fix QtWebProcess discovery on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=104552
+
+        Reviewed by Jocelyn Turcotte.
+
+        Make sure to look for QtWebProcess.exe on Windows instead of QtWebProcess.
+
+        * Shared/qt/ProcessExecutablePathQt.cpp:
+        (WebKit::executablePath):
+
+2012-12-10  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Use QLibraryInfo::LibraryExecutablesPath unconditionally
+        https://bugs.webkit.org/show_bug.cgi?id=104541
+
+        Reviewed by Jocelyn Turcotte.
+
+        We now depend on a Qt 5 version that is guaranteed to have this API, so we
+        can remove the configure checks for it.
+
+        * PluginProcess.pro:
+        * Shared/qt/ProcessExecutablePathQt.cpp:
+        (WebKit::executablePath):
+        * WebProcess.pro:
+
+2012-12-10  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Fix build without QtQuick 2
+
+        Unreviewed trivial build fix.
+
+        This function is defined in QtWebContext, which is only used when QtQuick2 is available.
+
+        * UIProcess/qt/WebContextQt.cpp:
+        (WebKit::WebContext::platformInvalidateContext):
+
+2012-12-03  Andras Becsi  <andras.becsi@digia.com>
+
+        [Qt][WK2] Do not override previously set flags of QQuickWebView when enabling drag&drop
+        https://bugs.webkit.org/show_bug.cgi?id=103901
+
+        Reviewed by Jocelyn Turcotte.
+
+        Setting the specific flag instead of resetting all the flags
+        when enabling QQuickItem::ItemAcceptsDrops.
+        This fixes clipping of the contents of QQuickWebView.
+
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewPrivate::initialize):
+
+2012-12-03  Simon Hausmann  <simon.hausmann@digia.com>
+
+        Unreviewed, rolling out r136119.
+        http://trac.webkit.org/changeset/136119
+        https://bugs.webkit.org/show_bug.cgi?id=100964
+
+        We decided to restore previous default behaviour
+
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewFlickablePrivate::handleMouseEvent):
+        * UIProcess/API/qt/qquickwebview_p_p.h:
+        (QQuickWebViewFlickablePrivate):
+
 2012-11-30  Pierre Rossi  <pierre.rossi@gmail.com>
 
         [Qt] Unreviewed speculative Mac build fix after r136232

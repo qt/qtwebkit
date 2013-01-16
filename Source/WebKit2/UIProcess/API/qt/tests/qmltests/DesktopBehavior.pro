@@ -1,10 +1,10 @@
 include(../tests.pri)
 SOURCES += tst_qmltests.cpp
 TARGET = tst_qmltests_DesktopBehavior
-OBJECTS_DIR = obj_DesktopBehavior/$$activeBuildConfig()
+OBJECTS_DIR = .obj_DesktopBehavior
 
 QT += webkit-private
-CONFIG += warn_on testcase
+CONFIG += testcase
 
 QT += qmltest
 

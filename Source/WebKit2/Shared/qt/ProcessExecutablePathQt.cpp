@@ -36,20 +36,18 @@ namespace WebKit {
 
 static String executablePath(QString baseName)
 {
+#if OS(WINDOWS)
+    baseName.append(QStringLiteral(".exe"));
+#endif
     QString expectedPath = QCoreApplication::applicationDirPath() + QDir::separator() + baseName;
     if (QFile::exists(expectedPath))
-        return String(expectedPath);
+        return expectedPath;
 
-    QLibraryInfo::LibraryLocation location = QLibraryInfo::BinariesPath;
-#if USE(LIBEXECDIR)
-    location = QLibraryInfo::LibraryExecutablesPath;
-#endif
-
-    expectedPath = QLibraryInfo::location(location) + QDir::separator() + baseName;
+    expectedPath = QLibraryInfo::location(QLibraryInfo::LibraryExecutablesPath) + QDir::separator() + baseName;
     if (QFile::exists(expectedPath))
-        return String(expectedPath);
+        return expectedPath;
 
-    return String(QString(baseName));
+    return baseName;
 }
 
 String executablePathOfWebProcess()

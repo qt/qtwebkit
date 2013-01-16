@@ -56,6 +56,11 @@ void LayerTreeCoordinatorProxy::updateViewport()
     m_drawingAreaProxy->updateViewport();
 }
 
+float LayerTreeCoordinatorProxy::deviceScaleFactor() const
+{
+    return m_drawingAreaProxy->page()->deviceScaleFactor();
+}
+
 void LayerTreeCoordinatorProxy::dispatchUpdate(const Function<void()>& function)
 {
     m_renderer->appendUpdate(function);
@@ -178,19 +183,20 @@ void LayerTreeCoordinatorProxy::setAnimationsLocked(bool locked)
     dispatchUpdate(bind(&LayerTreeRenderer::setAnimationsLocked, m_renderer.get(), locked));
 }
 
-void LayerTreeCoordinatorProxy::setVisibleContentsRect(const FloatRect& rect, float scale, const FloatPoint& trajectoryVector)
+void LayerTreeCoordinatorProxy::setVisibleContentsRect(const FloatRect& rect, float pageScaleFactor, const FloatPoint& trajectoryVector)
 {
     // Inform the renderer to adjust viewport-fixed layers.
     dispatchUpdate(bind(&LayerTreeRenderer::setVisibleContentsRect, m_renderer.get(), rect));
 
     // Round the rect instead of enclosing it to make sure that its size stays the same while panning. This can have nasty effects on layout.
     IntRect roundedRect = roundedIntRect(rect);
-    if (roundedRect == m_lastSentVisibleRect && scale == m_lastSentScale && trajectoryVector == m_lastSentTrajectoryVector)
+    const float effectiveScale = deviceScaleFactor() * pageScaleFactor;
+    if (roundedRect == m_lastSentVisibleRect && effectiveScale == m_lastSentScale && trajectoryVector == m_lastSentTrajectoryVector)
         return;
 
-    m_drawingAreaProxy->page()->process()->send(Messages::LayerTreeCoordinator::SetVisibleContentsRect(roundedRect, scale, trajectoryVector), m_drawingAreaProxy->page()->pageID());
+    m_drawingAreaProxy->page()->process()->send(Messages::LayerTreeCoordinator::SetVisibleContentsRect(roundedRect, effectiveScale, trajectoryVector), m_drawingAreaProxy->page()->pageID());
     m_lastSentVisibleRect = roundedRect;
-    m_lastSentScale = scale;
+    m_lastSentScale = effectiveScale;
     m_lastSentTrajectoryVector = trajectoryVector;
 }
 

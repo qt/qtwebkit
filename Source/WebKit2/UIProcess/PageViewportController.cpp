@@ -122,6 +122,9 @@ void PageViewportController::didChangeContentsSize(const IntSize& newSize)
 
     if (minimumScaleUpdated)
         m_client->didChangeViewportAttributes();
+
+    // We might have pending position change which is now possible.
+    syncVisibleContents();
 }
 
 void PageViewportController::didRenderFrame(const IntSize& contentsSize, const IntRect& coveredRect)
@@ -234,6 +237,8 @@ void PageViewportController::didChangeViewportAttributes(const WebCore::Viewport
 
     if (updateMinimumScaleToFit(true))
         m_client->didChangeViewportAttributes();
+
+    syncVisibleContents();
 }
 
 WebCore::FloatSize PageViewportController::viewportSizeInContentsCoordinates() const

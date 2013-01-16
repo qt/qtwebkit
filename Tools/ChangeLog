@@ -1,3 +1,115 @@
+2012-12-06  Andras Becsi  <andras.becsi@digia.com>
+
+        [Qt][Mac] Fix libxslt and libxml2 config tests
+        https://bugs.webkit.org/show_bug.cgi?id=104164
+
+        Reviewed by Simon Hausmann.
+
+        We should not use pkg-config on Mac instead use direct include
+        paths and add needed libraries to the linker options to detect
+        libxslt and libxml2 provided by the system.
+        Previously we would always fall back to qtxmlpatterns.
+
+        * qmake/config.tests/libxml2/libxml2.pro:
+        * qmake/config.tests/libxslt/libxslt.pro:
+
+2013-01-08  Heikki Paajanen  <heikki.paajanen@palm.com>
+
+        [Qt] Fix libxml2 config test
+        https://bugs.webkit.org/show_bug.cgi?id=106317
+
+        Reviewed by Simon Hausmann.
+
+        Don't assume standard include/libxml2, libxml-2.0.pc should know
+        where it's headers are.
+
+        * qmake/config.tests/libxml2/libxml2.cpp: Fix include
+
+2013-01-03  Jonathan Liu  <net147@gmail.com>
+
+        [Qt] Fix library linking order
+        https://bugs.webkit.org/show_bug.cgi?id=105818
+
+        Some Qt libraries are linked before the private static libraries
+        that depend on them which results in QtWebKit failing to link.
+
+        Copy Qt module dependencies from QT to QT_PRIVATE when creating
+        module to ensure the Qt libraries are linked after the private
+        static libraries that depend on them.
+
+        Reviewed by Tor Arne Vestbø.
+
+        * qmake/mkspecs/features/default_post.prf:
+
+2012-12-17  Jonathan Liu  <net147@gmail.com>
+
+        Fix linking of libraries with -Wl,-whole-archive
+        https://bugs.webkit.org/show_bug.cgi?id=104436
+
+        Reviewed by Simon Hausmann.
+
+        If there is more than one library in LIBS linked with
+        -Wl,-whole-archive -l... -Wl,-no-whole-archive, qmake tries to
+        merge the duplicate flags in LIBS which causes linking to fail.
+
+        Add no_smart_library_merge to CONFIG to prevent the duplicate
+        flags from being removed when using -Wl,-whole-archive.
+
+        * qmake/mkspecs/features/functions.prf:
+
+2012-12-13  Andras Becsi  <andras.becsi@digia.com>
+
+        [Qt][WK2] Fix painting on Mac with retina display
+        https://bugs.webkit.org/show_bug.cgi?id=104574
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Remove setting the devicePixelRatio experimental property
+        since the value is now automatically picked up from Qt.
+
+        * MiniBrowser/qt/qml/BrowserWindow.qml:
+
+2012-12-12  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Fix build on Mac
+
+        Reviewed by Csaba Osztrogonác.
+
+        On Mac OS X we have sqlite as a system library available.
+
+        * qmake/mkspecs/features/features.prf:
+
+2012-12-12  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Fix linkage against SQLite
+        https://bugs.webkit.org/show_bug.cgi?id=104781
+
+        Reviewed by Csaba Osztrogonác.
+
+        Detect SQLite either through pkg-config, from the SQLITE3SRCDIR
+        environment variable or from qtbase via a qt5.git build. Bail out early
+        with an error message if neither option applies.
+
+        This removes the usage of $$QT.core.sources and the dependency on Qt's
+        system-sqlite configure setting. We should always favour a system
+        library over a copy in Qt.
+
+        * qmake/mkspecs/features/features.prf:
+
+2012-12-10  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Use QLibraryInfo::LibraryExecutablesPath unconditionally
+        https://bugs.webkit.org/show_bug.cgi?id=104541
+
+        Reviewed by Jocelyn Turcotte.
+
+        We now depend on a Qt 5 version that is guaranteed to have this API, so we
+        can remove the configure checks for it.
+
+        * qmake/config.tests/libexecdir/libexecdir.cpp: Removed.
+        * qmake/config.tests/libexecdir/libexecdir.pro: Removed.
+        * qmake/mkspecs/features/features.prf:
+
 2012-11-29  Tommy Widenflycht  <tommyw@google.com>
 
         Speech Recognition API: Update SpeechRecognitionEvent to match the specification
