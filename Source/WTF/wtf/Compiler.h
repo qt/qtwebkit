@@ -312,7 +312,7 @@
 
 /* UNUSED_PARAM */
 
-#if COMPILER(INTEL) && !(defined(WIN32) || defined(_WIN32)) || COMPILER(RVCT)
+#if COMPILER(RVCT)
 template<typename T>
 inline void unusedParam(T& x) { (void)x; }
 #define UNUSED_PARAM(variable) unusedParam(variable)
