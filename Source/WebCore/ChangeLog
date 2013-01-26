@@ -1,4 +1,217 @@
-2012-12-06  Andras Becsi  <andras.becsi@digia.com>
+2013-01-04  John Mellor  <johnme@chromium.org>
+
+        Early out from FontCache::releaseFontData if cached font data not found.
+        https://bugs.webkit.org/show_bug.cgi?id=106104
+
+        Reviewed by Abhishek Arya.
+
+        No tests, as no change in behavior.
+
+        * platform/graphics/FontCache.cpp:
+        (WebCore::FontCache::releaseFontData):
+            Early out in release builds if cached font data not found.
+
+2013-01-02  Abhishek Arya  <inferno@chromium.org>
+
+        Crash in WebCore::Element::cloneElementWithoutChildren.
+        https://bugs.webkit.org/show_bug.cgi?id=105949
+
+        Reviewed by Ryosuke Niwa.
+
+        RefPtr |ancestors| vector since its elements can be destroyed from mutation events
+        fired in CompositeEditCommand::appendNode.
+
+        No new tests. The testcase relies on recursive DOM mutations and does not minimize.
+
+        * editing/InsertParagraphSeparatorCommand.cpp:
+        (WebCore::InsertParagraphSeparatorCommand::getAncestorsInsideBlock):
+        (WebCore::InsertParagraphSeparatorCommand::cloneHierarchyUnderNewBlock):
+        (WebCore::InsertParagraphSeparatorCommand::doApply):
+        * editing/InsertParagraphSeparatorCommand.h:
+        (InsertParagraphSeparatorCommand):
+
+2013-01-04  Abhishek Arya  <inferno@chromium.org>
+
+        Heap-use-after-free in WebCore::XMLDocumentParser::doEnd
+        https://bugs.webkit.org/show_bug.cgi?id=100152
+
+        Reviewed by Adam Barth.
+
+        XMLDocumentParser can be blown away inside document()->styleResolverChanged()
+        call. Protect it with a local RefPtr in Document::explitClose.
+
+        No new tests. The site specific dependencies are hard to minimize.
+
+        * dom/Document.cpp:
+        (WebCore::Document::explicitClose): RefPtr m_parser into a local, since
+        it can be detached and nulled out in DocumentWriter::end().
+        * xml/parser/XMLDocumentParser.cpp:
+        (WebCore::XMLDocumentParser::end): Bail out when we are detached.
+        * xml/parser/XMLDocumentParserLibxml2.cpp:
+        (WebCore::XMLDocumentParser::doEnd): Bail out when we are detached.
+        * xml/parser/XMLDocumentParserQt.cpp:
+        (WebCore::XMLDocumentParser::doEnd): Bail out when we are detached.
+
+2013-01-06  Abhishek Arya  <inferno@chromium.org>
+
+        Heap-use-after-free in DocumentLoader::stopLoading
+        https://bugs.webkit.org/show_bug.cgi?id=103656
+
+        Reviewed by Eric Seidel.
+
+        Test: fast/dom/ready-state-change-crash.html
+
+        * html/parser/HTMLDocumentParser.cpp:
+        (WebCore::HTMLDocumentParser::prepareToStopParsing): Bail out
+        if the parser is detached due to mutation event.
+        * loader/DocumentLoader.cpp:
+        (WebCore::DocumentLoader::stopLoading): Move the protectors for
+        frame and document loader to the start of the function. Call to
+        m_frame->loader()->stopLoading() can change document ready state
+        and fire mutation event which might blow the document loader from
+        underneath.
+
+2013-01-15  Allan Sandfeld Jensen  <allan.jensen@digia.com>
+
+        [Qt][CSS Shaders] Make custom filter render in Wk1 mode
+        https://bugs.webkit.org/show_bug.cgi?id=101532
+
+        Reviewed by Noam Rosenthal.
+
+        Handle ValidatedCustomFilterOperations which are used by WebKit1. To keep the cache of compiled programs working, 
+        the cache has been updated to use CustomFilterProgramInfo as a hash key. CustomFilterProgramInfo is an existing
+        class specifically designed for this purpose.
+
+        * platform/graphics/texmap/TextureMapperGL.cpp:
+        (WebCore::getPassesRequiredForFilter):
+        (WebCore::TextureMapperGL::removeCachedCustomFilterProgram):
+        (WebCore::TextureMapperGL::drawUsingCustomFilter):
+        (WebCore::BitmapTextureGL::applyFilters):
+        * platform/graphics/texmap/TextureMapperGL.h:
+        (TextureMapperGL):
+
+2013-01-07  Justin Novosad  <junov@google.com>
+
+        Fixing memory read after free in CanvasRenderingContext2D::accessFont
+        https://bugs.webkit.org/show_bug.cgi?id=106244
+
+        Reviewed by Abhishek Arya.
+
+        Using a temporary String object to hold ref count on string that is
+        passed by reference in CanvasRenderingContext2D::accessFont.
+
+        Test: fast/canvas/canvas-measureText.html
+
+        * html/canvas/CanvasRenderingContext2D.cpp:
+        (WebCore::CanvasRenderingContext2D::accessFont):
+
+2013-01-17  Poul Sysolyatin  <psytonx@gmail.com>
+
+        32-bit build for Qt5 on Mac OS fails.
+        https://bugs.webkit.org/show_bug.cgi?id=107094
+
+        We need to define NS_BUILD_32_LIKE_64 for 32-bit build for Mac OS.
+        Fixed 32-bit build detection for support Qt5.
+
+        Reviewed by Benjamin Poulain.
+
+        * Target.pri:
+
+2013-01-16  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] Use the shared HistoryItem serialization for QWebHistory
+        https://bugs.webkit.org/show_bug.cgi?id=106671
+
+        Reviewed by Allan Sandfeld Jensen.
+
+        This allows a few things missing from the previous serialization code
+        to function while using commonly maintained code:
+        - The itemSequenceNumber and documentSequenceNumber that were needed
+          to properly restore same-document navigations
+        - The form data
+        - The navigation hierarchy mapping the frame tree
+
+        * history/HistoryItem.h:
+        (HistoryItem):
+        * history/qt/HistoryItemQt.cpp:
+        (QDataStreamCoder):
+        (WebCore):
+        (WebCore::QDataStreamCoder::QDataStreamCoder):
+        (WebCore::QDataStreamCoder::encodeBytes):
+        (WebCore::QDataStreamCoder::encodeBool):
+        (WebCore::QDataStreamCoder::encodeUInt32):
+        (WebCore::QDataStreamCoder::encodeUInt64):
+        (WebCore::QDataStreamCoder::encodeInt32):
+        (WebCore::QDataStreamCoder::encodeInt64):
+        (WebCore::QDataStreamCoder::encodeFloat):
+        (WebCore::QDataStreamCoder::encodeDouble):
+        (WebCore::QDataStreamCoder::encodeString):
+        (WebCore::QDataStreamCoder::decodeBytes):
+        (WebCore::QDataStreamCoder::decodeBool):
+        (WebCore::QDataStreamCoder::decodeUInt32):
+        (WebCore::QDataStreamCoder::decodeUInt64):
+        (WebCore::QDataStreamCoder::decodeInt32):
+        (WebCore::QDataStreamCoder::decodeInt64):
+        (WebCore::QDataStreamCoder::decodeFloat):
+        (WebCore::QDataStreamCoder::decodeDouble):
+        (WebCore::QDataStreamCoder::decodeString):
+        (WebCore::HistoryItem::restoreState):
+        (WebCore::WebCore::HistoryItem::saveState):
+
+2013-01-16  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] Crash in WebCore::CachedFrame::destroy
+        https://bugs.webkit.org/show_bug.cgi?id=104525
+
+        Reviewed by Adam Barth.
+
+        Add an assert to increase the chances of catching this crash
+        early on in the future.
+
+        * dom/Document.cpp:
+        (WebCore::Document::takeDOMWindowFrom):
+
+2012-12-12  Allan Sandfeld Jensen  <allan.jensen@digia.com>
+
+        [Qt] Animation fails on large layers
+        https://bugs.webkit.org/show_bug.cgi?id=104538
+
+        Reviewed by Noam Rosenthal.
+
+        The backing tiles had no upper limit defined for the non-GL backend, which could cause them
+        to allocate pixmaps widier or higher than what the underlying graphics systems can handle.
+
+        On top of that GraphicsLayerTextureMapper::prepareBackingStore() would allocate an intermediate
+        pixmap the size of the dirty rect, which would at least on the first paint be the size of the
+        entire layer, again causing allocation of pixmaps with dimensions outside of platform bounds.
+
+        This patch introduces a limit to the size of image buffer tiles, and adds an alternative path
+        for painting where the GraphicsLayer paints directly to the tile instead of over an intermediate
+        pixmap. This alternative path can also be useful later to minimize the amount of pixel copying
+        happening in full repaints.
+
+        * platform/graphics/texmap/GraphicsLayerTextureMapper.cpp:
+        (WebCore::GraphicsLayerTextureMapper::prepareBackingStore):
+        * platform/graphics/texmap/GraphicsLayerTextureMapper.h:
+        (GraphicsLayerTextureMapper):
+        * platform/graphics/texmap/TextureMapper.cpp:
+        (WebCore::BitmapTexture::updateContents):
+        * platform/graphics/texmap/TextureMapper.h:
+        (BitmapTexture):
+        (TextureMapper):
+        * platform/graphics/texmap/TextureMapperBackingStore.cpp:
+        (WebCore::TextureMapperTile::updateContents):
+        (WebCore::TextureMapperTiledBackingStore::updateContents):
+        * platform/graphics/texmap/TextureMapperBackingStore.h:
+        (TextureMapperTile):
+        (TextureMapperTiledBackingStore):
+        * platform/graphics/texmap/TextureMapperImageBuffer.cpp:
+        (WebCore::BitmapTextureImageBuffer::updateContents):
+        (WebCore::TextureMapperImageBuffer::maxTextureSize):
+        * platform/graphics/texmap/TextureMapperImageBuffer.h:
+        (BitmapTextureImageBuffer):
+
+ 2012-12-06  Andras Becsi  <andras.becsi@digia.com>
 
         [Qt][Mac] Fix libxslt and libxml2 config tests
         https://bugs.webkit.org/show_bug.cgi?id=104164

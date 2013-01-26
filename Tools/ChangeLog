@@ -1,3 +1,44 @@
+2013-01-14  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] The Qt's configuration isn't honoured regarding the use of the system libpng and libjpeg
+        https://bugs.webkit.org/show_bug.cgi?id=104909
+
+        Reviewed by Simon Hausmann.
+
+        To be able to build redistribuable binary packages, Qt's configure switches
+        -qt-libpng and -qt-libjpeg are used to avoid having the binaries trying to
+        dynamically link to optional system libraries.
+        QtWebKit is doing its own configure checks for those libraries, thus adding a
+        runtime dependency that might not be fulfilled if the packager's machine had
+        those libraries while the user's machine won't.
+
+        Since in most cases where WebKit will want to use those system libraries, Qt will
+        also be using them, remove these configure tests from WebKit.
+
+        * qmake/config.tests/libjpeg/libjpeg.cpp: Removed.
+        * qmake/config.tests/libjpeg/libjpeg.pro: Removed.
+        * qmake/config.tests/libpng/libpng.cpp: Removed.
+        * qmake/config.tests/libpng/libpng.pro: Removed.
+        * qmake/mkspecs/features/features.prf:
+
+2013-01-13  Jonathan Liu  <net147@gmail.com>
+
+        Fix CONFIG missing link_pkgconfig on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=106647
+
+        Some libraries (e.g. libxslt, libxml2 and sqlite3) fail to link
+        properly on Windows because they are added to PKGCONFIG but
+        CONFIG does not contain link_pkgconfig.
+
+        This is because link_pkgconfig is added in unix/default_pre.prf
+        which is only used for UNIX platforms. To fix this, move it to
+        the general default_pre.prf.
+
+        Reviewed by Simon Hausmann.
+
+        * qmake/mkspecs/features/default_pre.prf:
+        * qmake/mkspecs/features/unix/default_pre.prf:
+
 2012-12-06  Andras Becsi  <andras.becsi@digia.com>
 
         [Qt][Mac] Fix libxslt and libxml2 config tests

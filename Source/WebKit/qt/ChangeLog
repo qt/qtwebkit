@@ -1,3 +1,113 @@
+2013-01-21  Allan Sandfeld Jensen  <allan.jensen@digia.com>
+
+        [Qt] Crash in gmail on enabling desktop notifications
+        https://bugs.webkit.org/show_bug.cgi?id=106699
+
+        Patch by David Rosca.
+        Reviewed by Jocelyn Turcotte.
+
+        Protect against callback that may be null. This also matches WebKit2 behaviour.
+
+        * WebCoreSupport/NotificationPresenterClientQt.cpp:
+        (WebCore::NotificationPresenterClientQt::allowNotificationForFrame):
+
+2013-01-21  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] Update the documentation about the storage of inspector settings
+        https://bugs.webkit.org/show_bug.cgi?id=106777
+
+        Reviewed by Allan Sandfeld Jensen.
+
+        Since r76770, QSettings isn't queried anymore to persist inspector
+        settings like whether or not the debugger is enabled by default.
+        It still seems to be used for the default attach height.
+
+        Update the documentation accordingly.
+
+        * WidgetApi/qwebinspector.cpp:
+
+2013-01-16  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] Use the shared HistoryItem serialization for QWebHistory
+        https://bugs.webkit.org/show_bug.cgi?id=106671
+
+        Reviewed by Allan Sandfeld Jensen.
+
+        Bump the serialization version and change the code to abort the
+        restore of a previous stream version rather than trying to keep the
+        support of restoring previous versions. This is mainly to simplify
+        things given that HistoryItem itself aborts in that case.
+ 
+        * Api/qwebhistory.cpp:
+        (operator<<):
+        (operator>>):
+        * tests/qwebhistory/tst_qwebhistory.cpp:
+        (tst_QWebHistory::serialize_2): Modify the test to cover same-document navigations.
+        (tst_QWebHistory::restoreIncompatibleVersion1): Add a previous version
+        hard-coded stream to verify that the deserialization doesn't hang or
+        crash.
+
+2013-01-16  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] Crash in WebCore::CachedFrame::destroy
+        https://bugs.webkit.org/show_bug.cgi?id=104525
+
+        Reviewed by Adam Barth.
+
+        Remove the call to HistoryController::setCurrentItem which is ultimately
+        causing the initial empty document of a page to be added to the page cache.
+
+        This re-introduce the bug that was fixed by this line, which will be
+        properly fixed in a follow-up patch.
+
+        * Api/qwebhistory.cpp:
+        (operator>>):
+        * tests/qwebhistory/tst_qwebhistory.cpp:
+        (tst_QWebHistory::saveAndRestore_crash_4): Cover the crash.
+
+2013-01-07  Michael Brüning  <michael.bruning@digia.com>
+
+        [Qt] Apply correct patch for the scrolling issue from bug 105014
+        https://bugs.webkit.org/show_bug.cgi?id=106219
+
+        Correct the if condition when overwriting the layout direction option
+        with the values from the facade options to only overwrite if the facade
+        direction is not equal to LayoutDirectionAuto.
+
+        Reviewed by Allan Sandfeld Jensen.
+
+        * WidgetSupport/QStyleFacadeImp.cpp:
+        (WebKit::initGenericStyleOption):
+
+2013-01-07  Michael Brüning  <michael.bruning@digia.com>
+
+        [Qt] Horizontal scrollbars events are offseted making them difficult to use
+        https://bugs.webkit.org/show_bug.cgi?id=105014
+
+        Reviewed by Allan Sandfeld Jensen.
+
+        Patch co-authored by Simon Hausmann.
+
+        Only copy the layout direction from the facade options if the
+        current option is Qt::LayoutDirectionAuto in order to prevent
+        misinterpretations as different layout direction when hit testing.
+
+        Tests added to tst_qwebview and tst_qgraphicswebview to verify
+        that the view actually is scrolled in the right direction.
+
+        * WidgetSupport/QStyleFacadeImp.cpp:
+        (WebKit::initGenericStyleOption):
+        * tests/qgraphicswebview/resources/scrolltest_page.html: Added.
+        * tests/qgraphicswebview/tst_qgraphicswebview.cpp:
+        (tst_QGraphicsWebView):
+        (tst_QGraphicsWebView::horizontalScrollbarTest):
+        * tests/qgraphicswebview/tst_qgraphicswebview.qrc:
+        * tests/qwebview/resources/scrolltest_page.html: Added.
+        * tests/qwebview/tst_qwebview.cpp:
+        (tst_QWebView):
+        (tst_QWebView::horizontalScrollbarTest):
+        * tests/qwebview/tst_qwebview.qrc:
+
 2012-12-06  Pierre Rossi  <pierre.rossi@gmail.com>
 
         [Qt] QWebView uses the mobile style and doesn't follow Qt's style

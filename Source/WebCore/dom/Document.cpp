@@ -2352,8 +2352,8 @@ void Document::close()
 
 void Document::explicitClose()
 {
-    if (m_parser)
-        m_parser->finish();
+    if (RefPtr<DocumentParser> parser = m_parser)
+        parser->finish();
 
     if (!m_frame) {
         // Because we have no frame, we don't know if all loading has completed,
@@ -3612,6 +3612,8 @@ void Document::takeDOMWindowFrom(Document* document)
     ASSERT(m_frame);
     ASSERT(!m_domWindow);
     ASSERT(document->domWindow());
+    // A valid DOMWindow is needed by CachedFrame for its documents.
+    ASSERT(!document->inPageCache());
 
     m_domWindow = document->m_domWindow.release();
     m_domWindow->didSecureTransitionTo(this);
