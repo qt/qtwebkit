@@ -835,6 +835,8 @@ static bool shouldRespectPriorityInCSSAttributeSetters()
 
     [self _registerDraggedTypes];
 
+    [self _setVisibilityState:([self _isViewVisible] ? WebPageVisibilityStateVisible : WebPageVisibilityStateHidden) isInitialState:YES];
+
     WebPreferences *prefs = [self preferences];
     [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_preferencesChangedNotification:)
                                                  name:WebPreferencesChangedInternalNotification object:prefs];
@@ -2641,9 +2643,29 @@ static inline IMP getMethod(id o, SEL s)
     SecurityPolicy::removeOriginAccessWhitelistEntry(*SecurityOrigin::createFromString(sourceOrigin), destinationProtocol, destinationHost, allowDestinationSubdomains);
 }
 
-+(void)_resetOriginAccessWhitelists
++ (void)_resetOriginAccessWhitelists
 {
     SecurityPolicy::resetOriginAccessWhitelists();
+}
+
+- (BOOL)_isViewVisible
+{
+    if (![self window])
+        return false;
+
+    if (![[self window] isVisible])
+        return false;
+
+    if ([self isHiddenOrHasHiddenAncestor])
+        return false;
+
+    return true;
+}
+
+- (void)_updateVisibilityState
+{
+    if (_private && _private->page)
+        [self _setVisibilityState:([self _isViewVisible] ? WebPageVisibilityStateVisible : WebPageVisibilityStateHidden) isInitialState:NO];
 }
 
 - (void)_updateActiveState
@@ -3561,6 +3583,14 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
             name:windowDidChangeBackingPropertiesNotification object:window];
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_windowDidChangeScreen:)
             name:NSWindowDidChangeScreenNotification object:window];
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_windowVisibilityChanged:) 
+            name:NSWindowDidMiniaturizeNotification object:window];
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_windowVisibilityChanged:)
+            name:NSWindowDidDeminiaturizeNotification object:window];
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_windowVisibilityChanged:) 
+            name:@"NSWindowDidOrderOffScreenNotification" object:window];
+        [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(_windowVisibilityChanged:) 
+            name:@"_NSWindowDidBecomeVisible" object:window];
     }
 }
 
@@ -3576,6 +3606,14 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
             name:windowDidChangeBackingPropertiesNotification object:window];
         [[NSNotificationCenter defaultCenter] removeObserver:self
             name:NSWindowDidChangeScreenNotification object:window];
+        [[NSNotificationCenter defaultCenter] removeObserver:self
+            name:NSWindowDidMiniaturizeNotification object:window];
+        [[NSNotificationCenter defaultCenter] removeObserver:self
+            name:NSWindowDidDeminiaturizeNotification object:window];
+        [[NSNotificationCenter defaultCenter] removeObserver:self
+            name:@"NSWindowDidOrderOffScreenNotification" object:window];
+        [[NSNotificationCenter defaultCenter] removeObserver:self
+            name:@"_NSWindowDidBecomeVisible" object:window];
     }
 }
 
@@ -3626,6 +3664,7 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
     _private->page->setDeviceScaleFactor([self _deviceScaleFactor]);
 
     [self _updateActiveState];
+    [self _updateVisibilityState];
 }
 
 - (void)doWindowDidChangeScreen
@@ -3664,6 +3703,11 @@ static NSString * const backingPropertyOldScaleFactorKey = @"NSBackingPropertyOl
         _private->page->suspendScriptedAnimations();
         _private->page->focusController()->setContainingWindowIsVisible(false);
     }
+}
+
+- (void)_windowVisibilityChanged:(NSNotification *)notification
+{
+    [self _updateVisibilityState];
 }
 
 - (void)_windowWillClose:(NSNotification *)notification

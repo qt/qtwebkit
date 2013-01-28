@@ -492,7 +492,7 @@ void TestInvocation::didReceiveMessageFromInjectedBundle(WKStringRef messageName
 
         TestController::shared().setVisibilityState(visibilityState, isInitialState);
         return;
-    }    
+    }
 
     if (WKStringIsEqualToUTF8CString(messageName, "ProcessWorkQueue")) {
         if (TestController::shared().workQueueManager().processWorkQueue()) {
