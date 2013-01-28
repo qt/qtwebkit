@@ -508,6 +508,8 @@ public:
 
     void listenForLayoutMilestones(WebCore::LayoutMilestones);
 
+    void setVisibilityState(WebCore::PageVisibilityState, bool isInitialState);
+
     bool hasHorizontalScrollbar() const { return m_mainFrameHasHorizontalScrollbar; }
     bool hasVerticalScrollbar() const { return m_mainFrameHasVerticalScrollbar; }
 

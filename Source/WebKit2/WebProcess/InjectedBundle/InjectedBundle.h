@@ -173,8 +173,6 @@ public:
 
     static bool isProcessingUserGesture();
 
-    void setPageVisibilityState(WebPage*, int state, bool isInitialState);
-
     static size_t workerThreadCount();
 
     void setTabKeyCyclesThroughElements(WebPage*, bool enabled);
