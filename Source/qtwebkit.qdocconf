@@ -2,14 +2,14 @@ include($QT_INSTALL_DOCS/global/qt-module-defaults.qdocconf)
 
 project     = QtWebKit
 description = "Qt WebKit API Documentation"
-version     = 5.0.0
+version     = 5.0.1
 
 # Defines the name of the project. You cannot use operators (+, =, -) in
 # the name. Properties for this project are set using a qhp.<projectname>.property
 # format.
 qhp.projects = QtWebKit
 qhp.QtWebKit.file = qtwebkit.qhp
-qhp.QtWebKit.namespace = org.qt-project.qtwebkit.500
+qhp.QtWebKit.namespace = org.qt-project.qtwebkit.501
 qhp.QtWebKit.indexTitle = Qt WebKit
 qhp.QtWebKit.virtualFolder  = qtwebkit
 
