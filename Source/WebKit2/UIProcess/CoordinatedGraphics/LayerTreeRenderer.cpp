@@ -661,7 +661,9 @@ void LayerTreeRenderer::purgeGLResources()
     m_surfaceBackingStores.clear();
 #endif
 
-    m_rootLayer->removeAllChildren();
+    if (m_rootLayer) {
+        m_rootLayer->removeAllChildren();
+    }
     m_rootLayer.clear();
     m_rootLayerID = InvalidWebLayerID;
     m_layers.clear();
