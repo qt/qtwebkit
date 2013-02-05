@@ -1,3 +1,17 @@
+2013-01-31  Allan Sandfeld Jensen  <allan.jensen@digia.com>
+
+        [Qt] Box shadows on a transparency layer is very slow
+        https://bugs.webkit.org/show_bug.cgi?id=107547
+
+        Reviewed by Noam Rosenthal.
+
+        Include the window boundaries in the clip returned by GraphicsContext,
+        since QPainter may remember clips larger than the destination, but
+        ShadowBlur uses the clipBounds to determine the size of the shadow layer.
+
+        * platform/graphics/qt/GraphicsContextQt.cpp:
+        (WebCore::GraphicsContext::clipBounds):
+
 2013-01-04  John Mellor  <johnme@chromium.org>
 
         Early out from FontCache::releaseFontData if cached font data not found.
