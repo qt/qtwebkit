@@ -185,6 +185,22 @@
         * dom/Document.cpp:
         (WebCore::Document::takeDOMWindowFrom):
 
+2013-01-14  Julien Chaffraix  <jchaffraix@webkit.org>
+
+        REGRESSION (r132591): Underpainting @ uofmchildrenshospital.org
+        https://bugs.webkit.org/show_bug.cgi?id=105861
+
+        Reviewed by David Hyatt.
+
+        Test: fast/repaint/overhanging-float-detach-repaint.html
+
+        The issue comes from overhanging float not contributing to their containing block's
+        overflow. This meant that repaint() would ignore them leading to an under-repaint.
+        The fix is simple: force all the overhanging floats to repaint themselves.
+
+        * rendering/RenderObject.cpp:
+        (WebCore::RenderObject::destroyAndCleanupAnonymousWrappers):
+
 2012-12-12  Allan Sandfeld Jensen  <allan.jensen@digia.com>
 
         [Qt] Animation fails on large layers
@@ -225,7 +241,7 @@
         * platform/graphics/texmap/TextureMapperImageBuffer.h:
         (BitmapTextureImageBuffer):
 
- 2012-12-06  Andras Becsi  <andras.becsi@digia.com>
+2012-12-06  Andras Becsi  <andras.becsi@digia.com>
 
         [Qt][Mac] Fix libxslt and libxml2 config tests
         https://bugs.webkit.org/show_bug.cgi?id=104164
