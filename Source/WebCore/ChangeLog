@@ -12,6 +12,29 @@
         * platform/graphics/qt/GraphicsContextQt.cpp:
         (WebCore::GraphicsContext::clipBounds):
 
+2013-01-29  Allan Sandfeld Jensen  <allan.jensen@digia.com>
+
+        REGRESSION: ChildrenAffectedBy flags lost between siblings which have child elements sharing style
+        https://bugs.webkit.org/show_bug.cgi?id=105672
+
+        Reviewed by Andreas Kling.
+
+        Change in how childrenAffectedBy bits were stored made it easier to trigger an issue where childrenAffectedBy bits
+        were not set due to sharing of styles between cousin elements.
+
+        This patch fixes the issue by not sharing styles from children with parents who prevent sharing.
+
+        Tests: fast/selectors/cousin-stylesharing-adjacent-selector.html
+               fast/selectors/cousin-stylesharing-last-child-selector.html
+
+        * css/StyleResolver.cpp:
+        (WebCore::parentElementPreventsSharing):
+        (WebCore::StyleResolver::locateCousinList):
+        * dom/Element.cpp:
+        (WebCore::Element::hasFlagsSetDuringStylingOfChildren):
+        * dom/Element.h:
+        (Element):
+
 2013-01-04  John Mellor  <johnme@chromium.org>
 
         Early out from FontCache::releaseFontData if cached font data not found.
