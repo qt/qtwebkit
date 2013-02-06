@@ -201,6 +201,20 @@
         * rendering/RenderObject.cpp:
         (WebCore::RenderObject::destroyAndCleanupAnonymousWrappers):
 
+2013-01-10  Xianzhu Wang  <wangxianzhu@chromium.org>
+
+        Regression(r129944): Heap-use-after-free in WebCore::computeNonFastScrollableRegion
+        https://bugs.webkit.org/show_bug.cgi?id=99515
+
+        Reviewed by Simon Fraser.
+
+        The object used-after-freed is a destructed FrameView that is still in the m_scrollableAreas set of the parent FrameView. Actually it has been removed from m_scrollableAreas when setParent(0), but then is added back in updateScrollableAreaSet() because its frameViewParent() is still not 0 (though parent() is already 0).
+
+        No new tests. The heap-use-after-free doesn't always cause crash so it can't be stably tested with a test case. Memory analysis tools like asan discovered the heap-use-after-free and verified that the patch can fix the issue.
+
+        * page/FrameView.cpp:
+        (WebCore::FrameView::parentFrameView): Checks if the FrameView has been removed from the parent.
+
 2012-12-12  Allan Sandfeld Jensen  <allan.jensen@digia.com>
 
         [Qt] Animation fails on large layers
