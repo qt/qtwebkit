@@ -1005,6 +1005,13 @@ inline void StyleResolver::initForStyleResolve(Element* e, RenderStyle* parentSt
 static const unsigned cStyleSearchThreshold = 10;
 static const unsigned cStyleSearchLevelThreshold = 10;
 
+static inline bool parentElementPreventsSharing(const Element* parentElement)
+{
+    if (!parentElement)
+        return false;
+    return parentElement->hasFlagsSetDuringStylingOfChildren();
+}
+
 Node* StyleResolver::locateCousinList(Element* parent, unsigned& visitedNodeCount) const
 {
     if (visitedNodeCount >= cStyleSearchThreshold * cStyleSearchLevelThreshold)
@@ -1034,7 +1041,8 @@ Node* StyleResolver::locateCousinList(Element* parent, unsigned& visitedNodeCoun
     while (thisCousin) {
         while (currentNode) {
             ++subcount;
-            if (currentNode->renderStyle() == parentStyle && currentNode->lastChild()) {
+            if (currentNode->renderStyle() == parentStyle && currentNode->lastChild()
+                && currentNode->isElementNode() && !parentElementPreventsSharing(toElement(currentNode))) {
                 // Adjust for unused reserved tries.
                 visitedNodeCount -= cStyleSearchThreshold - subcount;
                 return currentNode->lastChild();
@@ -1245,16 +1253,6 @@ inline StyledElement* StyleResolver::findSiblingForStyleSharing(Node* node, unsi
             return 0;
     }
     return static_cast<StyledElement*>(node);
-}
-
-static inline bool parentElementPreventsSharing(const Element* parentElement)
-{
-    if (!parentElement)
-        return false;
-    return parentElement->childrenAffectedByPositionalRules()
-        || parentElement->childrenAffectedByFirstChildRules()
-        || parentElement->childrenAffectedByLastChildRules()
-        || parentElement->childrenAffectedByDirectAdjacentRules();
 }
 
 RenderStyle* StyleResolver::locateSharedStyle()

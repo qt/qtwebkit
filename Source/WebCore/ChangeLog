@@ -1,3 +1,40 @@
+2013-01-31  Allan Sandfeld Jensen  <allan.jensen@digia.com>
+
+        [Qt] Box shadows on a transparency layer is very slow
+        https://bugs.webkit.org/show_bug.cgi?id=107547
+
+        Reviewed by Noam Rosenthal.
+
+        Include the window boundaries in the clip returned by GraphicsContext,
+        since QPainter may remember clips larger than the destination, but
+        ShadowBlur uses the clipBounds to determine the size of the shadow layer.
+
+        * platform/graphics/qt/GraphicsContextQt.cpp:
+        (WebCore::GraphicsContext::clipBounds):
+
+2013-01-29  Allan Sandfeld Jensen  <allan.jensen@digia.com>
+
+        REGRESSION: ChildrenAffectedBy flags lost between siblings which have child elements sharing style
+        https://bugs.webkit.org/show_bug.cgi?id=105672
+
+        Reviewed by Andreas Kling.
+
+        Change in how childrenAffectedBy bits were stored made it easier to trigger an issue where childrenAffectedBy bits
+        were not set due to sharing of styles between cousin elements.
+
+        This patch fixes the issue by not sharing styles from children with parents who prevent sharing.
+
+        Tests: fast/selectors/cousin-stylesharing-adjacent-selector.html
+               fast/selectors/cousin-stylesharing-last-child-selector.html
+
+        * css/StyleResolver.cpp:
+        (WebCore::parentElementPreventsSharing):
+        (WebCore::StyleResolver::locateCousinList):
+        * dom/Element.cpp:
+        (WebCore::Element::hasFlagsSetDuringStylingOfChildren):
+        * dom/Element.h:
+        (Element):
+
 2013-01-04  John Mellor  <johnme@chromium.org>
 
         Early out from FontCache::releaseFontData if cached font data not found.
@@ -171,6 +208,53 @@
         * dom/Document.cpp:
         (WebCore::Document::takeDOMWindowFrom):
 
+2013-01-14  Julien Chaffraix  <jchaffraix@webkit.org>
+
+        REGRESSION (r132591): Underpainting @ uofmchildrenshospital.org
+        https://bugs.webkit.org/show_bug.cgi?id=105861
+
+        Reviewed by David Hyatt.
+
+        Test: fast/repaint/overhanging-float-detach-repaint.html
+
+        The issue comes from overhanging float not contributing to their containing block's
+        overflow. This meant that repaint() would ignore them leading to an under-repaint.
+        The fix is simple: force all the overhanging floats to repaint themselves.
+
+        * rendering/RenderObject.cpp:
+        (WebCore::RenderObject::destroyAndCleanupAnonymousWrappers):
+
+2013-01-10  Xianzhu Wang  <wangxianzhu@chromium.org>
+
+        Regression(r129944): Heap-use-after-free in WebCore::computeNonFastScrollableRegion
+        https://bugs.webkit.org/show_bug.cgi?id=99515
+
+        Reviewed by Simon Fraser.
+
+        The object used-after-freed is a destructed FrameView that is still in the m_scrollableAreas set of the parent FrameView. Actually it has been removed from m_scrollableAreas when setParent(0), but then is added back in updateScrollableAreaSet() because its frameViewParent() is still not 0 (though parent() is already 0).
+
+        No new tests. The heap-use-after-free doesn't always cause crash so it can't be stably tested with a test case. Memory analysis tools like asan discovered the heap-use-after-free and verified that the patch can fix the issue.
+
+        * page/FrameView.cpp:
+        (WebCore::FrameView::parentFrameView): Checks if the FrameView has been removed from the parent.
+
+2013-01-09  Ryosuke Niwa  <rniwa@webkit.org>
+
+        [JSC] REGRESSION(r135093): A form control with name=length overrides length property on form.elements
+        https://bugs.webkit.org/show_bug.cgi?id=105775
+
+        Reviewed by Sam Weinig.
+
+        Fixed the bug by respecting properties on ancestor classes.
+
+        Test: fast/dom/collection-length-should-not-be-overridden.html
+
+        * bindings/js/JSDOMBinding.h:
+        (WebCore::getStaticValueSlotEntryWithoutCaching): Added.
+        * bindings/scripts/CodeGeneratorJS.pm:
+        (GenerateGetOwnPropertySlotBody): Use getStaticValueSlotEntryWithoutCaching to climb up the class
+        hierarchy.
+
 2012-12-12  Allan Sandfeld Jensen  <allan.jensen@digia.com>
 
         [Qt] Animation fails on large layers
@@ -211,7 +295,7 @@
         * platform/graphics/texmap/TextureMapperImageBuffer.h:
         (BitmapTextureImageBuffer):
 
- 2012-12-06  Andras Becsi  <andras.becsi@digia.com>
+2012-12-06  Andras Becsi  <andras.becsi@digia.com>
 
         [Qt][Mac] Fix libxslt and libxml2 config tests
         https://bugs.webkit.org/show_bug.cgi?id=104164
@@ -441,6 +525,32 @@
             since BGR is not supported by QImage.
         (WebCore::MediaPlayerPrivateQTKit::paint):
 
+2012-12-06  Stephen Chenney  <schenney@chromium.org>
+
+        SVG <use> element inside an svg-as-image fails
+        https://bugs.webkit.org/show_bug.cgi?id=104007
+
+        Reviewed by Eric Seidel.
+
+        Upon redraw, SVGImage calls layout on the document it is drawing into
+        the image if the image, provided it believes the redraw does not need
+        to be delayed. Unfortunately, when an SVG <use> element is modified
+        (by animation, say) and regenerates its shadow tree, the destructors
+        invoke redraw, causing the SVGImage to call layout on something that
+        is in the process of being deleted. That's bad.
+
+        This change causes SVGImage to always delay the redraw. It is the most robust
+        way to protect against this problem, as there may be any number of
+        ways to cause this issue (a node being deleted in an svg-as-image
+        target) and this protects against them all.
+
+        The test case crashes in Asan Chromium.
+
+        Test: svg/as-image/animated-use-as-image-crash.html
+
+        * svg/graphics/SVGImageCache.cpp:
+        (WebCore::SVGImageCache::imageContentChanged): Always redraw on the timer.
+
 2012-12-03  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
 
         Document::initSecurityContext() fails to call securityOrigin().grantLoadLocalResources()
@@ -458,6 +568,26 @@
         (WebCore::Document::initSecurityContext):
         * loader/FrameLoader.cpp:
         (WebCore::FrameLoader::didBeginDocument):
+
+2012-11-30  Florin Malita  <fmalita@chromium.org>
+
+        SVG pattern data deleted while in use
+        https://bugs.webkit.org/show_bug.cgi?id=103415
+
+        Reviewed by Dirk Schulze.
+
+        Various calls in RenderSVGResourcePattern::applyResource() can trigger invalidations,
+        which may end up deleting our current pattern data (via removeAllClientsFromCache).
+        To avoid this, we should add the pattern data to the cache only after it is fully built.
+        For clarity, the patch also refactors the pattern setup code into a separate method.
+
+        Test: svg/custom/large-image-pattern-crash.html
+
+        * rendering/svg/RenderSVGResourcePattern.cpp:
+        (WebCore::RenderSVGResourcePattern::buildPattern):
+        (WebCore::RenderSVGResourcePattern::applyResource):
+        * rendering/svg/RenderSVGResourcePattern.h:
+        (RenderSVGResourcePattern):
 
 2012-11-29  Tommy Widenflycht  <tommyw@google.com>
 

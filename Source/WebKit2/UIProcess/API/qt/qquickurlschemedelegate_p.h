@@ -23,6 +23,7 @@
 
 #include "qwebkitglobal.h"
 #include <QObject>
+#include <QtCore/QUrl>
 #include <QtQuick/qquickitem.h>
 
 class QQuickNetworkRequest;
@@ -52,6 +53,16 @@ private:
 };
 
 QML_DECLARE_TYPE(QQuickUrlSchemeDelegate)
+
+class QQuickQrcSchemeDelegate : public QQuickUrlSchemeDelegate {
+    Q_OBJECT
+public:
+    QQuickQrcSchemeDelegate(const QUrl& url);
+    void readResourceAndSend();
+
+private:
+    QString m_fileName;
+};
 
 #endif // qquickurlschemedelegate_p_h
 
