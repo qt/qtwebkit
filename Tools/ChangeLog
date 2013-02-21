@@ -1,3 +1,85 @@
+2013-02-19  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Skip the build with a warning if certain tools cannot be found in the PATH
+        https://bugs.webkit.org/show_bug.cgi?id=110215
+
+        Reviewed by Tor Arne Vestbø.
+
+        Check that gperf, python, ruby, perl, bison and flex are in the PATH before
+        continuing the build. Otherwise skip with an error message explaining which
+        programs are missing from the build.
+
+        * qmake/mkspecs/features/configure.prf:
+        * qmake/mkspecs/features/functions.prf:
+
+2013-02-18  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Disable the build if certain configure checks fail
+        https://bugs.webkit.org/show_bug.cgi?id=110094
+
+        Reviewed by Tor Arne Vestbø.
+
+        Allow for the build to be skipped (clear out SUBDIRS) if certain
+        configure conditions aren't met.
+
+        * qmake/mkspecs/features/configure.prf:
+
+2013-01-14  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] The Qt's configuration isn't honoured regarding the use of the system libpng and libjpeg
+        https://bugs.webkit.org/show_bug.cgi?id=104909
+
+        Reviewed by Simon Hausmann.
+
+        To be able to build redistribuable binary packages, Qt's configure switches
+        -qt-libpng and -qt-libjpeg are used to avoid having the binaries trying to
+        dynamically link to optional system libraries.
+        QtWebKit is doing its own configure checks for those libraries, thus adding a
+        runtime dependency that might not be fulfilled if the packager's machine had
+        those libraries while the user's machine won't.
+
+        Since in most cases where WebKit will want to use those system libraries, Qt will
+        also be using them, remove these configure tests from WebKit.
+
+        * qmake/config.tests/libjpeg/libjpeg.cpp: Removed.
+        * qmake/config.tests/libjpeg/libjpeg.pro: Removed.
+        * qmake/config.tests/libpng/libpng.cpp: Removed.
+        * qmake/config.tests/libpng/libpng.pro: Removed.
+        * qmake/mkspecs/features/features.prf:
+
+2013-01-13  Jonathan Liu  <net147@gmail.com>
+
+        Fix CONFIG missing link_pkgconfig on Windows
+        https://bugs.webkit.org/show_bug.cgi?id=106647
+
+        Some libraries (e.g. libxslt, libxml2 and sqlite3) fail to link
+        properly on Windows because they are added to PKGCONFIG but
+        CONFIG does not contain link_pkgconfig.
+
+        This is because link_pkgconfig is added in unix/default_pre.prf
+        which is only used for UNIX platforms. To fix this, move it to
+        the general default_pre.prf.
+
+        Reviewed by Simon Hausmann.
+
+        * qmake/mkspecs/features/default_pre.prf:
+        * qmake/mkspecs/features/unix/default_pre.prf:
+
+2012-12-06  Andras Becsi  <andras.becsi@digia.com>
+
+        [Qt][Mac] Fix libxslt and libxml2 config tests
+        https://bugs.webkit.org/show_bug.cgi?id=104164
+
+        Reviewed by Simon Hausmann.
+
+        We should not use pkg-config on Mac instead use direct include
+        paths and add needed libraries to the linker options to detect
+        libxslt and libxml2 provided by the system.
+        Previously we would always fall back to qtxmlpatterns.
+
+        * qmake/config.tests/libxml2/libxml2.pro:
+        * qmake/config.tests/libxslt/libxslt.pro:
+
 2013-01-08  Heikki Paajanen  <heikki.paajanen@palm.com>
 
         [Qt] Fix libxml2 config test

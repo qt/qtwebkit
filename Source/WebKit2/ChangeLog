@@ -1,3 +1,133 @@
+2013-01-24  Michael Brüning  <michael.bruning@digia.com>
+
+        [Qt][WK2] Pages / resources cannot be loaded from qrc files.
+        https://bugs.webkit.org/show_bug.cgi?id=107031
+
+        Reviewed by Jocelyn Turcotte.
+
+        Enables WebKit2 Qt applications to load files from the bundled
+        qrc files. This is achieved by adding a url scheme handler for
+        the "qrc" scheme using the application scheme handler and ignoring
+        all handlers for the qrc application scheme that the application might
+        set.
+
+        * UIProcess/API/qt/qquickurlschemedelegate.cpp:
+        (QQuickQrcSchemeDelegate::QQuickQrcSchemeDelegate):
+        (QQuickQrcSchemeDelegate::readResourceAndSend):
+        * UIProcess/API/qt/qquickurlschemedelegate_p.h:
+        (QQuickQrcSchemeDelegate):
+        * UIProcess/API/qt/qquickwebview.cpp:
+        (QQuickWebViewPrivate::initialize):
+        (QQuickWebViewExperimental::schemeDelegates_Append):
+        (QQuickWebViewExperimental::invokeApplicationSchemeHandler):
+        * UIProcess/API/qt/tests/qmltests/WebView/tst_applicationScheme.qml:
+        * UIProcess/API/qt/tests/qmltests/common/qrctest.html: Added.
+        * UIProcess/API/qt/tests/qmltests/resources.qrc:
+
+        (WebKit::NetworkResourceLoader::connectionToWebProcessDidClose):
+        * NetworkProcess/NetworkResourceLoader.h:
+
+2013-01-17  Poul Sysolyatin  <psytonx@gmail.com>
+
+        32-bit build for Qt5 on Mac OS fails.
+        https://bugs.webkit.org/show_bug.cgi?id=107094
+
+        We need to define NS_BUILD_32_LIKE_64 for 32-bit build for Mac OS.
+        Fixed 32-bit build detection for support Qt5.
+
+        Reviewed by Benjamin Poulain.
+
+        * Target.pri:
+
+2013-01-09  Andras Becsi  <andras.becsi@digia.com>
+
+        [Qt][EFL][WK2] Remove redundant device pixel ratio adjustment from PageViewportController
+        https://bugs.webkit.org/show_bug.cgi?id=106355
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Since r137597 Qt uses the device pixel ratio of the underlying
+        platform window as the device pixel ratio in WebCore.
+        The tiles are rendered with the effective scale (scale adjusted with
+        the device scale factor) and the projection matrix is also adjusted
+        with the device pixel ratio when painting.
+        As a result we can follow the same approach as QtQuick and all the
+        coordinates in PageViewportController need to be in device independent
+        pixels (UI pixels) thus we do no longer need to adjust with the device
+        pixel ratio when calculating the viewport attributes.
+        This simplifies the logic significantly and increases robustness,
+        but does not allow to set a custom device pixel ratio different from
+        the factor of the underlying platform (eg. for testing purposes).
+        This patch is conceptually a follow-up of r137597 and fixes layout
+        and canvas size on retina display.
+
+        * UIProcess/PageViewportController.cpp:
+        (WebKit::PageViewportController::PageViewportController):
+        (WebKit::PageViewportController::innerBoundedViewportScale):
+        (WebKit::PageViewportController::outerBoundedViewportScale):
+        (WebKit::PageViewportController::pixelAlignedFloatPoint):
+        (WebKit::PageViewportController::boundContentsPosition):
+        (WebKit::PageViewportController::didRenderFrame):
+        (WebKit::PageViewportController::pageTransitionViewportReady):
+        (WebKit::PageViewportController::didChangeContentsVisibility):
+        (WebKit::PageViewportController::syncVisibleContents):
+        (WebKit::PageViewportController::visibleContentsSize):
+        (WebKit::PageViewportController::applyScaleAfterRenderingContents):
+        (WebKit::PageViewportController::updateMinimumScaleToFit):
+        * UIProcess/PageViewportController.h:
+        (WebKit::PageViewportController::currentContentsScale):
+        (PageViewportController):
+        * UIProcess/efl/PageViewportControllerClientEfl.cpp:
+        (WebKit::PageViewportControllerClientEfl::updateViewportSize):
+        Adjust the viewport size with the device pixel ratio to keep previous
+        behaviour.
+        * UIProcess/qt/PageViewportControllerClientQt.cpp:
+        (WebKit::PageViewportControllerClientQt::focusEditableArea):
+        (WebKit::PageViewportControllerClientQt::zoomToAreaGestureEnded):
+        * UIProcess/qt/QtWebPageSGNode.cpp:
+        (WebKit::ContentsSGNode::clipRect):
+        * WebProcess/WebPage/WebPage.cpp:
+        (WebKit::WebPage::sendViewportAttributesChanged):
+
+2013-01-03  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] Fix a crash when the QQuickWebPage is destroyed between the scene graph sync and render.
+        https://bugs.webkit.org/show_bug.cgi?id=106018
+
+        Reviewed by Simon Hausmann.
+
+        The main and rendering threads are only guaranteed to be synchronised in
+        the updatePaintNode call. In every other cases, QQuickItems cannot be
+        safely accessed from the rendering thread.
+
+        Do as the first patch version in
+        https://bugs.webkit.org/show_bug.cgi?id=104574 was doing and copy the
+        ratio value directly to fix the issue.
+
+        Also add a note about the threading issue in QQuickWebPage::updatePaintNode.
+
+        * UIProcess/API/qt/qquickwebpage.cpp:
+        (QQuickWebPage::updatePaintNode):
+        * UIProcess/qt/QtWebPageSGNode.cpp:
+        (WebKit::QtWebPageSGNode::QtWebPageSGNode):
+        * UIProcess/qt/QtWebPageSGNode.h:
+        (QtWebPageSGNode):
+        (WebKit::QtWebPageSGNode::devicePixelRatio):
+        (WebKit::QtWebPageSGNode::setDevicePixelRatio):
+
+2012-12-19  Kenneth Rohde Christiansen  <kenneth@webkit.org>
+
+        [EFL][Qt][WK2] Going back to 47-amazing-css3-animation-demos shows nothing or wrong position
+        https://bugs.webkit.org/show_bug.cgi?id=104414
+
+        Reviewed by Simon Hausmann.
+
+        When contents size changes, make sure to apply any pending position
+        change if possible.
+
+        * UIProcess/PageViewportController.cpp:
+        (WebKit::PageViewportController::didChangeContentsSize):
+
 2012-12-13  Andras Becsi  <andras.becsi@digia.com>
 
         [Qt][WK2] Fix painting on Mac with retina display

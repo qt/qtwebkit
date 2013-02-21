@@ -1,3 +1,110 @@
+2013-01-30  Allan Sandfeld Jensen  <allan.jensen@digia.com>
+
+        [Qt][WK1] Remember denied permission for notifications 
+        https://bugs.webkit.org/show_bug.cgi?id=107694
+
+        Reviewed by Jocelyn Turcotte.
+
+        Store denied permissions. According to the specification, we should
+        ask the user again if he has already granted or denied permission.
+
+        * WebCoreSupport/NotificationPresenterClientQt.cpp:
+        (WebCore::NotificationPresenterClientQt::requestPermission):
+        (WebCore::NotificationPresenterClientQt::setNotificationsAllowedForFrame):
+        * WebCoreSupport/NotificationPresenterClientQt.h:
+        (NotificationPresenterClientQt):
+        * WebCoreSupport/QWebPageAdapter.cpp:
+        (QWebPageAdapter::setNotificationsAllowedForFrame):
+        * WebCoreSupport/QWebPageAdapter.h:
+        * WidgetApi/qwebpage.cpp:
+        (QWebPage::setFeaturePermission):
+
+2013-01-21  Allan Sandfeld Jensen  <allan.jensen@digia.com>
+
+        [Qt][WK1] Permission request callbacks for non-legacy notifications
+        https://bugs.webkit.org/show_bug.cgi?id=107438
+
+        Reviewed by Jocelyn Turcotte.
+
+        Tracks the new callbacks the same way legacy callbacks are tracked.
+
+        No test affected yet as we are still lacking support for testing
+        feature permission callbacks.
+
+        * WebCoreSupport/NotificationPresenterClientQt.cpp:
+        (WebCore::NotificationPresenterClientQt::requestPermission):
+        (WebCore::NotificationPresenterClientQt::allowNotificationForFrame):
+       * WebCoreSupport/NotificationPresenterClientQt.h:
+        (NotificationPresenterClientQt):
+        (CallbacksInfo):
+
+2013-01-21  Allan Sandfeld Jensen  <allan.jensen@digia.com>
+
+        [Qt] Crash in gmail on enabling desktop notifications
+        https://bugs.webkit.org/show_bug.cgi?id=106699
+
+        Patch by David Rosca.
+        Reviewed by Jocelyn Turcotte.
+
+        Protect against callback that may be null. This also matches WebKit2 behaviour.
+
+        * WebCoreSupport/NotificationPresenterClientQt.cpp:
+        (WebCore::NotificationPresenterClientQt::allowNotificationForFrame):
+
+2013-01-21  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] Update the documentation about the storage of inspector settings
+        https://bugs.webkit.org/show_bug.cgi?id=106777
+
+        Reviewed by Allan Sandfeld Jensen.
+
+        Since r76770, QSettings isn't queried anymore to persist inspector
+        settings like whether or not the debugger is enabled by default.
+        It still seems to be used for the default attach height.
+
+        Update the documentation accordingly.
+
+        * WidgetApi/qwebinspector.cpp:
+
+2013-01-16  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] Use the shared HistoryItem serialization for QWebHistory
+        https://bugs.webkit.org/show_bug.cgi?id=106671
+
+        Reviewed by Allan Sandfeld Jensen.
+
+        Bump the serialization version and change the code to abort the
+        restore of a previous stream version rather than trying to keep the
+        support of restoring previous versions. This is mainly to simplify
+        things given that HistoryItem itself aborts in that case.
+ 
+        * Api/qwebhistory.cpp:
+        (operator<<):
+        (operator>>):
+        * tests/qwebhistory/tst_qwebhistory.cpp:
+        (tst_QWebHistory::serialize_2): Modify the test to cover same-document navigations.
+        (tst_QWebHistory::restoreIncompatibleVersion1): Add a previous version
+        hard-coded stream to verify that the deserialization doesn't hang or
+        crash.
+
+2013-01-16  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
+
+        [Qt] Crash in WebCore::CachedFrame::destroy
+        https://bugs.webkit.org/show_bug.cgi?id=104525
+
+        Reviewed by Adam Barth.
+
+        Remove the call to HistoryController::setCurrentItem which is ultimately
+        causing the initial empty document of a page to be added to the page cache.
+
+        This re-introduce the bug that was fixed by this line, which will be
+        properly fixed in a follow-up patch.
+
+        * Api/qwebhistory.cpp:
+        (operator>>):
+        * tests/qwebhistory/tst_qwebhistory.cpp:
+        (tst_QWebHistory::saveAndRestore_crash_4): Cover the crash.
+
 2013-01-07  Michael Brüning  <michael.bruning@digia.com>
 
         [Qt] Apply correct patch for the scrolling issue from bug 105014

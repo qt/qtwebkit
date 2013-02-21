@@ -1952,6 +1952,20 @@ void Element::setChildIndex(unsigned index)
     rareData->setChildIndex(index);
 }
 
+bool Element::hasFlagsSetDuringStylingOfChildren() const
+{
+    if (!hasRareData())
+        return false;
+    return rareDataChildrenAffectedByHover()
+        || rareDataChildrenAffectedByActive()
+        || rareDataChildrenAffectedByDrag()
+        || rareDataChildrenAffectedByFirstChildRules()
+        || rareDataChildrenAffectedByLastChildRules()
+        || rareDataChildrenAffectedByDirectAdjacentRules()
+        || rareDataChildrenAffectedByForwardPositionalRules()
+        || rareDataChildrenAffectedByBackwardPositionalRules();
+}
+
 bool Element::rareDataStyleAffectedByEmpty() const
 {
     ASSERT(hasRareData());

@@ -110,7 +110,7 @@ ALWAYS_INLINE void JSObject::copyButterfly(CopyVisitor& visitor, Butterfly* butt
         indexingPayloadSizeInBytes = 0;
     }
     size_t capacityInBytes = Butterfly::totalSize(preCapacity, propertyCapacity, hasIndexingHeader, indexingPayloadSizeInBytes);
-    if (visitor.checkIfShouldCopy(butterfly->base(preCapacity, propertyCapacity), capacityInBytes)) {
+    if (visitor.checkIfShouldCopy(butterfly->base(preCapacity, propertyCapacity))) {
         Butterfly* newButterfly = Butterfly::createUninitializedDuringCollection(visitor, preCapacity, propertyCapacity, hasIndexingHeader, indexingPayloadSizeInBytes);
         
         // Copy the properties.
@@ -610,7 +610,7 @@ Butterfly* JSObject::createInitialIndexedStorage(JSGlobalData& globalData, unsig
     ASSERT(!structure()->needsSlowPutIndexing());
     ASSERT(!indexingShouldBeSparse());
     unsigned vectorLength = std::max(length, BASE_VECTOR_LEN);
-    Butterfly* newButterfly = m_butterfly->growArrayRight(
+    Butterfly* newButterfly = Butterfly::createOrGrowArrayRight(m_butterfly, 
         globalData, structure(), structure()->outOfLineCapacity(), false, 0,
         elementSize * vectorLength);
     newButterfly->setPublicLength(length);
@@ -656,7 +656,7 @@ ArrayStorage* JSObject::createArrayStorage(JSGlobalData& globalData, unsigned le
 {
     IndexingType oldType = structure()->indexingType();
     ASSERT_UNUSED(oldType, !hasIndexedProperties(oldType));
-    Butterfly* newButterfly = m_butterfly->growArrayRight(
+    Butterfly* newButterfly = Butterfly::createOrGrowArrayRight(m_butterfly, 
         globalData, structure(), structure()->outOfLineCapacity(), false, 0,
         ArrayStorage::sizeFor(vectorLength));
     if (!newButterfly)
