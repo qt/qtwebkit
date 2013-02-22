@@ -24,6 +24,31 @@
         * platform/graphics/qt/GraphicsContextQt.cpp:
         (WebCore::GraphicsContext::clipBounds):
 
+2013-01-29  Justin Novosad  <junov@google.com>
+
+        REGRESSION (r135628-135632): Double box shadow failure to render
+        https://bugs.webkit.org/show_bug.cgi?id=107833
+
+        Reviewed by Simon Fraser.
+
+        Regression caused by http://trac.webkit.org/changeset/135629
+        The regression was due to faulty occlusion logic that was assuming
+        that drawing the background color of a render box background layer
+        could be skipped when the same layer also has an opaque image attached.
+        In the case where the background color is drawn for the purpose of
+        rendering a box shadow, the shadow is typically not
+        completely occluded by the background image because of the shadow
+        blur and/or offset.  This patch fixes the problem by not culling a
+        background draw if it is used to draw a box shadow.
+
+        Test: fast/backgrounds/gradient-background-shadow.html
+
+        * rendering/RenderBoxModelObject.cpp:
+        (WebCore::RenderBoxModelObject::paintFillLayerExtended):
+        Changing occlusion culling test to never cull background color
+        draw if it is used to draw a box shadow. This is because box shadows
+        can draw outside the border fill region.
+
 2013-01-29  Allan Sandfeld Jensen  <allan.jensen@digia.com>
 
         REGRESSION: ChildrenAffectedBy flags lost between siblings which have child elements sharing style
