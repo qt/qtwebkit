@@ -244,6 +244,7 @@ JIT::Label JIT::privateCompileCTINativeCall(JSGlobalData* globalData, bool isCon
     peek(regT1);
     emitPutToCallFrameHeader(regT1, JSStack::ReturnPC);
 
+#if !OS(WINDOWS)
     // Calling convention:      f(edi, esi, edx, ecx, ...);
     // Host function signature: f(ExecState*);
     move(callFrameRegister, X86Registers::edi);
@@ -256,6 +257,21 @@ JIT::Label JIT::privateCompileCTINativeCall(JSGlobalData* globalData, bool isCon
     call(Address(X86Registers::r9, executableOffsetToFunction));
 
     addPtr(TrustedImm32(16 - sizeof(int64_t)), stackPointerRegister);
+#else
+    // Calling convention:      f(ecx, edx, r8, r9, ...);
+    // Host function signature: f(ExecState*);
+    move(callFrameRegister, X86Registers::ecx);
+
+    // Leave space for the callee parameter home addresses and align the stack.
+    subPtr(TrustedImm32(4 * sizeof(int64_t) + 16 - sizeof(int64_t)), stackPointerRegister);
+
+    emitGetFromCallFrameHeaderPtr(JSStack::Callee, X86Registers::edx);
+    loadPtr(Address(X86Registers::edx, OBJECT_OFFSETOF(JSFunction, m_executable)), X86Registers::r9);
+    move(regT0, callFrameRegister); // Eagerly restore caller frame register to avoid loading from stack.
+    call(Address(X86Registers::r9, executableOffsetToFunction));
+
+    addPtr(TrustedImm32(4 * sizeof(int64_t) + 16 - sizeof(int64_t)), stackPointerRegister);
+#endif
 
 #elif CPU(ARM)
     // Load caller frame's scope chain into this callframe so that whatever we call can
