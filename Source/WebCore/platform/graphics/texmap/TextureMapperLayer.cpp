@@ -264,25 +264,7 @@ void TextureMapperLayer::paintSelfAndChildrenWithReplica(const TextureMapperPain
     paintSelfAndChildren(options);
 }
 
-void TextureMapperLayer::setAnimatedTransform(const TransformationMatrix& matrix)
-{
-    m_shouldUpdateCurrentTransformFromGraphicsLayer = false;
-    setTransform(matrix);
-}
-
-void TextureMapperLayer::setAnimatedOpacity(float opacity)
-{
-    m_shouldUpdateCurrentOpacityFromGraphicsLayer = false;
-    setOpacity(opacity);
-}
-
 #if ENABLE(CSS_FILTERS)
-void TextureMapperLayer::setAnimatedFilters(const FilterOperations& filters)
-{
-    m_shouldUpdateCurrentFiltersFromGraphicsLayer = false;
-    setFilters(filters);
-}
-
 static bool shouldKeepContentTexture(const FilterOperations& filters)
 {
     for (size_t i = 0; i < filters.size(); ++i) {
@@ -430,17 +412,6 @@ void TextureMapperLayer::flushCompositingStateSelf(GraphicsLayerTextureMapper* g
 
     if (changeMask & AnimationChange)
         m_animations = graphicsLayer->m_animations;
-    
-    if (changeMask & TransformChange)
-        m_shouldUpdateCurrentTransformFromGraphicsLayer = true;
-
-    if (changeMask & OpacityChange)
-        m_shouldUpdateCurrentOpacityFromGraphicsLayer = true;
-
-#if ENABLE(CSS_FILTERS)
-    if (changeMask & FilterChange)
-        m_shouldUpdateCurrentFiltersFromGraphicsLayer = true;
-#endif
 
     m_state.maskLayer = toTextureMapperLayer(graphicsLayer->maskLayer());
     m_state.replicaLayer = toTextureMapperLayer(graphicsLayer->replicaLayer());
@@ -495,12 +466,12 @@ void TextureMapperLayer::applyAnimationsRecursively()
 void TextureMapperLayer::syncAnimations()
 {
     m_animations.apply(this);
-    if (!m_animations.hasActiveAnimationsOfType(AnimatedPropertyWebkitTransform) && m_shouldUpdateCurrentTransformFromGraphicsLayer)
+    if (!m_animations.hasActiveAnimationsOfType(AnimatedPropertyWebkitTransform))
         setTransform(m_state.transform);
-    if (!m_animations.hasActiveAnimationsOfType(AnimatedPropertyOpacity) && m_shouldUpdateCurrentOpacityFromGraphicsLayer)
+    if (!m_animations.hasActiveAnimationsOfType(AnimatedPropertyOpacity))
         setOpacity(m_state.opacity);
 #if ENABLE(CSS_FILTERS)
-    if (!m_animations.hasActiveAnimationsOfType(AnimatedPropertyWebkitFilter) && m_shouldUpdateCurrentFiltersFromGraphicsLayer)
+    if (!m_animations.hasActiveAnimationsOfType(AnimatedPropertyWebkitFilter))
         setFilters(m_state.filters);
 #endif
 }
