@@ -122,6 +122,7 @@ private:
     FloatRect m_needsDisplayRect;
     GraphicsLayerAnimations m_animations;
     Timer<GraphicsLayerTextureMapper> m_animationStartedTimer;
+    double m_animationStartTime;
 };
 
 inline static GraphicsLayerTextureMapper* toGraphicsLayerTextureMapper(GraphicsLayer* layer)
