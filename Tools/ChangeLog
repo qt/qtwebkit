@@ -1,3 +1,29 @@
+2013-02-19  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Skip the build with a warning if certain tools cannot be found in the PATH
+        https://bugs.webkit.org/show_bug.cgi?id=110215
+
+        Reviewed by Tor Arne Vestbø.
+
+        Check that gperf, python, ruby, perl, bison and flex are in the PATH before
+        continuing the build. Otherwise skip with an error message explaining which
+        programs are missing from the build.
+
+        * qmake/mkspecs/features/configure.prf:
+        * qmake/mkspecs/features/functions.prf:
+
+2013-02-18  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Disable the build if certain configure checks fail
+        https://bugs.webkit.org/show_bug.cgi?id=110094
+
+        Reviewed by Tor Arne Vestbø.
+
+        Allow for the build to be skipped (clear out SUBDIRS) if certain
+        configure conditions aren't met.
+
+        * qmake/mkspecs/features/configure.prf:
+
 2013-01-14  Jocelyn Turcotte  <jocelyn.turcotte@digia.com>
 
         [Qt] The Qt's configuration isn't honoured regarding the use of the system libpng and libjpeg
