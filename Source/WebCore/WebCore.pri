@@ -245,7 +245,7 @@ use?(3D_GRAPHICS) {
             }
         }
     } else {
-        contains(QT_CONFIG, opengles2): LIBS += -lEGL
+        contains(QT_CONFIG, opengles2): CONFIG += egl
     }
 }
 

@@ -1,3 +1,18 @@
+2013-03-12  Floris Bos  <bos@je-eigen-domein.nl>
+
+        [Qt] WebKit fails to compile if EGL headers are not in default INCLUDEPATH
+        https://bugs.webkit.org/show_bug.cgi?id=111859
+
+        Reviewed by Jocelyn Turcotte.
+
+        The 3D graphics code wants to include EGL header files.
+        But on some platforms such as the Raspberry Pi those are not in /usr/include
+        but in another folder.
+        Fix adds "egl" to CONFIG when OpenGL ES2 is used, so the right include
+        paths are added.
+
+        * WebCore.pri:
+
 2013-01-29  Michael Brüning  <michael.bruning@digia.com>
 
         [Qt][WK1] Reflect recursion limit and loop checks also for list conversions.
