@@ -60,6 +60,7 @@ GraphicsLayerTextureMapper::GraphicsLayerTextureMapper(GraphicsLayerClient* clie
     , m_debugBorderWidth(0)
     , m_contentsLayer(0)
     , m_animationStartedTimer(this, &GraphicsLayerTextureMapper::animationStartedTimerFired)
+    , m_animationStartTime(0)
 {
 }
 
@@ -542,7 +543,13 @@ bool GraphicsLayerTextureMapper::addAnimation(const KeyframeValueList& valueList
     if (valueList.property() == AnimatedPropertyWebkitTransform)
         listsMatch = validateTransformOperations(valueList, hasBigRotation) >= 0;
 
-    m_animations.add(GraphicsLayerAnimation(keyframesName, valueList, boxSize, anim, WTF::currentTime() - timeOffset, listsMatch));
+    const double currentTime = WTF::currentTime();
+    m_animations.add(GraphicsLayerAnimation(keyframesName, valueList, boxSize, anim, currentTime - timeOffset, listsMatch));
+    // m_animationStartTime is the time of the first real frame of animation, now or delayed by a negative offset.
+    if (timeOffset > 0)
+        m_animationStartTime = currentTime;
+    else
+        m_animationStartTime = currentTime - timeOffset;
     notifyChange(TextureMapperLayer::AnimationChange);
     m_animationStartedTimer.startOneShot(0);
     return true;
@@ -567,7 +574,7 @@ void GraphicsLayerTextureMapper::removeAnimation(const String& animationName)
 
 void GraphicsLayerTextureMapper::animationStartedTimerFired(Timer<GraphicsLayerTextureMapper>*)
 {
-    client()->notifyAnimationStarted(this, /* DOM time */ WTF::currentTime());
+    client()->notifyAnimationStarted(this, m_animationStartTime);
 }
 
 void GraphicsLayerTextureMapper::setDebugBorder(const Color& color, float width)

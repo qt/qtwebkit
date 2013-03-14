@@ -1,3 +1,19 @@
+2013-02-21  Levi Weintraub  <leviw@chromium.org>
+
+        ASSERTION FAILED: !object || object->isBox(), UNKNOWN in WebCore::RenderListItem::positionListMarker
+        https://bugs.webkit.org/show_bug.cgi?id=108699
+
+        Reviewed by Abhishek Arya.
+
+        RenderListItems performs special management of its children to maintain list markers. Splitting a flow
+        through a list item results in assumptions made inside RenderListItem failing, so for now, avoid splitting
+        flows when inside one.
+
+        Test: fast/multicol/span/list-multi-column-crash.html
+
+        * rendering/RenderBlock.cpp:
+        (WebCore::RenderBlock::containingColumnsBlock):
+
 2013-02-19  Andras Becsi  <andras.becsi@digia.com>
 
         [Qt] Fix compilation if Qt was configured with -no-rtti
@@ -24,6 +40,31 @@
         * platform/graphics/qt/GraphicsContextQt.cpp:
         (WebCore::GraphicsContext::clipBounds):
 
+2013-01-29  Justin Novosad  <junov@google.com>
+
+        REGRESSION (r135628-135632): Double box shadow failure to render
+        https://bugs.webkit.org/show_bug.cgi?id=107833
+
+        Reviewed by Simon Fraser.
+
+        Regression caused by http://trac.webkit.org/changeset/135629
+        The regression was due to faulty occlusion logic that was assuming
+        that drawing the background color of a render box background layer
+        could be skipped when the same layer also has an opaque image attached.
+        In the case where the background color is drawn for the purpose of
+        rendering a box shadow, the shadow is typically not
+        completely occluded by the background image because of the shadow
+        blur and/or offset.  This patch fixes the problem by not culling a
+        background draw if it is used to draw a box shadow.
+
+        Test: fast/backgrounds/gradient-background-shadow.html
+
+        * rendering/RenderBoxModelObject.cpp:
+        (WebCore::RenderBoxModelObject::paintFillLayerExtended):
+        Changing occlusion culling test to never cull background color
+        draw if it is used to draw a box shadow. This is because box shadows
+        can draw outside the border fill region.
+
 2013-01-29  Allan Sandfeld Jensen  <allan.jensen@digia.com>
 
         REGRESSION: ChildrenAffectedBy flags lost between siblings which have child elements sharing style
@@ -46,51 +87,6 @@
         (WebCore::Element::hasFlagsSetDuringStylingOfChildren):
         * dom/Element.h:
         (Element):
-
-2013-01-25  Alexander Paschenko  <alexander.pashenko@lge.com>
-
-        [TexMap] Flickering after transitions on Apple HTML5 demo
-        https://bugs.webkit.org/show_bug.cgi?id=102501
-
-        Reviewed by Noam Rosenthal.
-
-        The problem is caused by inconsistent state of TextureMapperLayer's transformation matrix
-        and opacity data during and after the end of animation.
-        This patch solves the problem by introducing three additional private flags
-        to TextureMapperLayer:
-        m_shouldUpdateCurrentTransformFromGraphicsLayer,
-        m_shouldUpdateCurrentOpacityFromGraphicsLayer, and
-        m_shouldUpdateCurrentFiltersFromGraphicsLayer.
-        The latter has been introduced in order to avoid similar future problems
-        with m_currentFilters.
-        On these flags' basis, TextureMapperLayer is able to decide whether to update
-        its inner state or not.
-        These flags themselves are set based on GraphicsLayerTextureMapper's changeMask
-        which indicates what details of the state have been changed since the last sync.
-
-        No new tests - this doesn't expose any testable surface.
-        Eyes-only check has been made to ensure that the problem is gone now.
-
-        * platform/graphics/texmap/TextureMapperLayer.cpp:
-        (WebCore::TextureMapperLayer::setAnimatedTransform):
-        sets m_shouldUpdateCurrentTransformFromGraphicsLayer to false and
-        updates m_currentTransform based on the updated state from GraphicsLayerAnimation.
-        (WebCore):
-        (WebCore::TextureMapperLayer::setAnimatedOpacity):
-        sets m_shouldUpdateCurrentOpacityFromGraphicsLayer to false and
-        updates m_currentOpacity based on the updated state from GraphicsLayerAnimation.
-        (WebCore::TextureMapperLayer::setAnimatedFilters):
-        sets m_shouldUpdateCurrentFiltersFromGraphicsLayer to false and
-        updates m_currentFilters based on the updated state from GraphicsLayerAnimation.
-        (WebCore::TextureMapperLayer::flushCompositingStateForThisLayerOnly):
-        sets m_shouldUpdateCurrent* flags based on GLTM's changeMask. Also illegal modification
-        of m_currentTransform that caused flickering has been removed from this method.
-        (WebCore::TextureMapperLayer::syncAnimations): updates m_currentTransform and/or
-        m_currentOpacity and/or m_currentFilters if corresponding flags allow to do so.
-        * platform/graphics/texmap/TextureMapperLayer.h:
-        (WebCore::TextureMapperLayer::TextureMapperLayer): aforementioned flags
-        get initialized in ctor.
-        (TextureMapperLayer): aforementioned flags are declared in the class.
 
 2013-01-04  John Mellor  <johnme@chromium.org>
 
