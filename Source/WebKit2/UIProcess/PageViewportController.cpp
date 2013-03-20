@@ -45,7 +45,6 @@ PageViewportController::PageViewportController(WebKit::WebPageProxy* proxy, Page
     , m_allowsUserScaling(false)
     , m_minimumScaleToFit(1)
     , m_initiallyFitToViewport(true)
-    , m_hasSuspendedContent(false)
     , m_hadUserInteraction(false)
     , m_pageScaleFactor(1)
     , m_viewportPosIsLocked(false)
@@ -177,7 +176,7 @@ void PageViewportController::pageTransitionViewportReady()
 void PageViewportController::pageDidRequestScroll(const IntPoint& cssPosition)
 {
     // Ignore the request if suspended. Can only happen due to delay in event delivery.
-    if (m_hasSuspendedContent)
+    if (m_webPageProxy->areActiveDOMObjectsAndAnimationsSuspended())
         return;
 
     FloatRect endVisibleContentRect(clampViewportToContents(cssPosition, m_pageScaleFactor), viewportSizeInContentsCoordinates());
@@ -246,26 +245,6 @@ WebCore::FloatSize PageViewportController::viewportSizeInContentsCoordinates() c
     return WebCore::FloatSize(m_viewportSize.width() / m_pageScaleFactor, m_viewportSize.height() / m_pageScaleFactor);
 }
 
-void PageViewportController::suspendContent()
-{
-    if (m_hasSuspendedContent)
-        return;
-
-    m_hasSuspendedContent = true;
-    m_webPageProxy->suspendActiveDOMObjectsAndAnimations();
-}
-
-void PageViewportController::resumeContent()
-{
-    m_client->didResumeContent();
-
-    if (!m_hasSuspendedContent)
-        return;
-
-    m_hasSuspendedContent = false;
-    m_webPageProxy->resumeActiveDOMObjectsAndAnimations();
-}
-
 void PageViewportController::applyScaleAfterRenderingContents(float scale)
 {
     m_pageScaleFactor = scale;
@@ -295,7 +274,7 @@ bool PageViewportController::updateMinimumScaleToFit(bool userInitiatedUpdate)
     if (!fuzzyCompare(minimumScale, m_minimumScaleToFit, 0.001)) {
         m_minimumScaleToFit = minimumScale;
 
-        if (!hasSuspendedContent()) {
+        if (!m_webPageProxy->areActiveDOMObjectsAndAnimationsSuspended()) {
             if (!m_hadUserInteraction || (userInitiatedUpdate && currentlyScaledToFit))
                 applyScaleAfterRenderingContents(m_minimumScaleToFit);
             else {
