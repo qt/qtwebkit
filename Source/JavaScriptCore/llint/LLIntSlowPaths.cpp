@@ -635,8 +635,7 @@ LLINT_SLOW_PATH_DECL(slow_path_add)
     JSValue v2 = LLINT_OP_C(3).jsValue();
     
 #if LLINT_SLOW_PATH_TRACING
-    dataLogF("Trying to add %s", v1.description());
-    dataLogF(" to %s.\n", v2.description());
+    dataLog("Trying to add ", v1, " to ", v2, ".\n");
 #endif
     
     if (v1.isString() && !v2.isObject())
@@ -1367,7 +1366,7 @@ static SlowPathReturnType handleHostCall(ExecState* execCallee, Instruction* pc,
         }
         
 #if LLINT_SLOW_PATH_TRACING
-        dataLogF("Call callee is not a function: %s\n", callee.description());
+        dataLog("Call callee is not a function: ", callee, "\n");
 #endif
 
         ASSERT(callType == CallTypeNone);
@@ -1390,7 +1389,7 @@ static SlowPathReturnType handleHostCall(ExecState* execCallee, Instruction* pc,
     }
     
 #if LLINT_SLOW_PATH_TRACING
-    dataLogF("Constructor callee is not a function: %s\n", callee.description());
+    dataLog("Constructor callee is not a function: ", callee, "\n");
 #endif
 
     ASSERT(constructType == ConstructTypeNone);
