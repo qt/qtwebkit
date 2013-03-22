@@ -671,7 +671,7 @@ void GraphicsContext::fillRoundedRect(const RoundedRect& rect, const Color& colo
     fillRoundedRect(rect.rect(), rect.radii().topLeft(), rect.radii().topRight(), rect.radii().bottomLeft(), rect.radii().bottomRight(), color, colorSpace);
 }
 
-#if !USE(CG)
+#if !USE(CG) && !PLATFORM(QT)
 void GraphicsContext::fillRectWithRoundedHole(const IntRect& rect, const RoundedRect& roundedHoleRect, const Color& color, ColorSpace colorSpace)
 {
     if (paintingDisabled())

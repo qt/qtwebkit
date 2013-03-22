@@ -90,7 +90,7 @@ private:
 #if USE(QT_MULTIMEDIA)
     QWebFullScreenVideoHandler* m_FullScreenVideoHandler;
 #endif
-#if USE(GSTREAMER)
+#if USE(GSTREAMER) && !defined(GST_API_VERSION_1)
     GStreamerFullScreenVideoHandler* m_FullScreenVideoHandlerGStreamer;
 #endif
 #if USE(QTKIT)
