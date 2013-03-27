@@ -1050,6 +1050,11 @@ void DumpRenderTreeSupportQt::getTrackedRepaintRects(QWebFrameAdapter* adapter, 
         result.append(rects[i]);
 }
 
+void DumpRenderTreeSupportQt::disableDefaultTypesettingFeatures()
+{
+    WebCore::Font::setDefaultTypesettingFeatures(0);
+}
+
 void DumpRenderTreeSupportQt::setShouldUseFontSmoothing(bool enabled)
 {
     WebCore::Font::setShouldUseSmoothing(enabled);

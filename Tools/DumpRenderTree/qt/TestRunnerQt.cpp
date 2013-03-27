@@ -94,6 +94,7 @@ void TestRunner::reset()
     DumpRenderTreeSupportQt::dumpVisitedLinksCallbacks(false);
     DumpRenderTreeSupportQt::resetGeolocationMock(m_drt->pageAdapter());
     DumpRenderTreeSupportQt::setShouldUseFontSmoothing(false);
+    DumpRenderTreeSupportQt::disableDefaultTypesettingFeatures();
     setIconDatabaseEnabled(false);
     clearAllDatabases();
     // The default state for DRT is to block third-party cookies, mimicing the Mac port
