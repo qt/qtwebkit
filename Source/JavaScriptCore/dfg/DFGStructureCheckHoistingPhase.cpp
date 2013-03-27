@@ -201,7 +201,7 @@ public:
                 if (!value || !value.isCell()) {
 #if DFG_ENABLE(DEBUG_PROPAGATION_VERBOSE)
                     dataLogF("Zeroing the structure to hoist for %s because the OSR entry value is not a cell: %s.\n",
-                            m_graph.nameOfVariableAccessData(variable), value.description());
+                            m_graph.nameOfVariableAccessData(variable), value);
 #endif
                     iter->value.m_structure = 0;
                     continue;

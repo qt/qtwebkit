@@ -285,9 +285,11 @@ private:
             SpeculatedType left = m_graph[node.child1()].prediction();
             SpeculatedType right = m_graph[node.child2()].prediction();
             
+            AddSpeculationMode mode = DontSpeculateInteger;
+            
             if (left && right) {
                 if (isNumberSpeculationExpectingDefined(left) && isNumberSpeculationExpectingDefined(right)) {
-                    if (m_graph.addShouldSpeculateInteger(node))
+                    if ((mode = m_graph.addSpeculationMode(node)) != DontSpeculateInteger)
                         changed |= mergePrediction(SpecInt32);
                     else
                         changed |= mergePrediction(speculatedDoubleTypeForPredictions(left, right));
@@ -303,6 +305,9 @@ private:
             if (m_graph[node.child1()].hasNumberResult() || m_graph[node.child2()].hasNumberResult())
                 flags &= ~NodeUsedAsOther;
             
+            if (mode != SpeculateInteger)
+                flags |= NodeUsedAsNumber;
+            
             changed |= m_graph[node.child1()].mergeFlags(flags);
             changed |= m_graph[node.child2()].mergeFlags(flags);
             break;
@@ -312,8 +317,10 @@ private:
             SpeculatedType left = m_graph[node.child1()].prediction();
             SpeculatedType right = m_graph[node.child2()].prediction();
             
+            AddSpeculationMode mode = DontSpeculateInteger;
+            
             if (left && right) {
-                if (m_graph.addShouldSpeculateInteger(node))
+                if ((mode = m_graph.addSpeculationMode(node)) != DontSpeculateInteger)
                     changed |= mergePrediction(SpecInt32);
                 else
                     changed |= mergePrediction(speculatedDoubleTypeForPredictions(left, right));
@@ -322,6 +329,9 @@ private:
             if (isNotNegZero(node.child1().index()) || isNotNegZero(node.child2().index()))
                 flags &= ~NodeNeedsNegZero;
             flags &= ~NodeUsedAsOther;
+            
+            if (mode != SpeculateInteger)
+                flags |= NodeUsedAsNumber;
             
             changed |= m_graph[node.child1()].mergeFlags(flags);
             changed |= m_graph[node.child2()].mergeFlags(flags);
@@ -332,8 +342,10 @@ private:
             SpeculatedType left = m_graph[node.child1()].prediction();
             SpeculatedType right = m_graph[node.child2()].prediction();
             
+            AddSpeculationMode mode = DontSpeculateInteger;
+            
             if (left && right) {
-                if (m_graph.addShouldSpeculateInteger(node))
+                if ((mode = m_graph.addSpeculationMode(node)) != DontSpeculateInteger)
                     changed |= mergePrediction(SpecInt32);
                 else
                     changed |= mergePrediction(speculatedDoubleTypeForPredictions(left, right));
@@ -342,6 +354,9 @@ private:
             if (isNotZero(node.child1().index()) || isNotZero(node.child2().index()))
                 flags &= ~NodeNeedsNegZero;
             flags &= ~NodeUsedAsOther;
+            
+            if (mode != SpeculateInteger)
+                flags |= NodeUsedAsNumber;
             
             changed |= m_graph[node.child1()].mergeFlags(flags);
             changed |= m_graph[node.child2()].mergeFlags(flags);
@@ -721,6 +736,10 @@ private:
             break;
 
         case PutScopedVar:
+            changed |= m_graph[node.child1()].mergeFlags(NodeUsedAsValue);
+            changed |= m_graph[node.child3()].mergeFlags(NodeUsedAsValue);
+            break;
+            
         case Return:
         case Throw:
             changed |= m_graph[node.child1()].mergeFlags(NodeUsedAsValue);
