@@ -1,3 +1,18 @@
+2013-04-03  Zeno Albisser  <zeno@webkit.org>
+
+        [Qt] Fail gracefully if an OpenGL context could not be created.
+        https://bugs.webkit.org/show_bug.cgi?id=113784
+
+        In case we fail to create or adopt a valid platform OpenGL context
+        we do not want to provide a GraphicsContext3D instance.
+        Otherwise we would crash as soon as the instance is being used.
+
+        Reviewed by Jocelyn Turcotte.
+
+        * platform/graphics/qt/GraphicsContext3DQt.cpp:
+        (WebCore::GraphicsContext3DPrivate::GraphicsContext3DPrivate):
+        (WebCore::GraphicsContext3D::GraphicsContext3D):
+
 2013-04-03  Tor Arne Vestbø  <tor.arne.vestbo@digia.com>
 
         [Qt] Update QMAKE_MAC_SDK check for Qt 5.1
