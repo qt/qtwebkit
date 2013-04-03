@@ -39,6 +39,7 @@
 #include "EditorClientQt.h"
 #include "Element.h"
 #include "FocusController.h"
+#include "Font.h"
 #include "Frame.h"
 #include "FrameLoadRequest.h"
 #include "FrameLoaderClientQt.h"
@@ -1047,6 +1048,16 @@ void DumpRenderTreeSupportQt::getTrackedRepaintRects(QWebFrameAdapter* adapter, 
     result.resize(rects.size());
     for (size_t i = 0; i < rects.size(); ++i)
         result.append(rects[i]);
+}
+
+void DumpRenderTreeSupportQt::disableDefaultTypesettingFeatures()
+{
+    WebCore::Font::setDefaultTypesettingFeatures(0);
+}
+
+void DumpRenderTreeSupportQt::setShouldUseFontSmoothing(bool enabled)
+{
+    WebCore::Font::setShouldUseSmoothing(enabled);
 }
 
 QString DumpRenderTreeSupportQt::frameRenderTreeDump(QWebFrameAdapter* adapter)
