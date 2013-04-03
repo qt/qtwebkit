@@ -166,7 +166,6 @@ RenderLayer::RenderLayer(RenderLayerModelObject* renderer)
 #if !ASSERT_DISABLED
     , m_layerListMutationAllowed(true)
 #endif
-    , m_canSkipRepaintRectsUpdateOnScroll(renderer->isTableCell())
 #if ENABLE(CSS_FILTERS)
     , m_hasFilterInfo(false)
 #endif
@@ -546,7 +545,7 @@ void RenderLayer::updateLayerPositionsAfterScroll(RenderGeometryMap* geometryMap
         flags |= HasSeenAncestorWithOverflowClip;
 
     if (flags & HasSeenViewportConstrainedAncestor
-        || (flags & IsOverflowScroll && flags & HasSeenAncestorWithOverflowClip && !m_canSkipRepaintRectsUpdateOnScroll)) {
+        || (flags & IsOverflowScroll && flags & HasSeenAncestorWithOverflowClip)) {
         // FIXME: We could track the repaint container as we walk down the tree.
         computeRepaintRects(renderer()->containerForRepaint(), geometryMap);
     } else {
