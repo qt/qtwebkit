@@ -122,6 +122,9 @@
 
 /* Specific compiler features */
 #if COMPILER(GCC) && !COMPILER(CLANG)
+#if GCC_VERSION_AT_LEAST(4, 8, 0)
+#pragma GCC diagnostic ignored "-Wunused-local-typedefs"
+#endif
 #if GCC_VERSION_AT_LEAST(4, 7, 0) && defined(__cplusplus) && __cplusplus >= 201103L
 #define WTF_COMPILER_SUPPORTS_CXX_RVALUE_REFERENCES 1
 #define WTF_COMPILER_SUPPORTS_CXX_DELETED_FUNCTIONS 1
