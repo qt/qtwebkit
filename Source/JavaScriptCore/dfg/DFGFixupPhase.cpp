@@ -317,8 +317,8 @@ private:
                 && node.canSpeculateInteger()) {
                 if (isX86())
                     break;
-                fixDoubleEdge(0);
-                fixDoubleEdge(1);
+                injectInt32ToDoubleNode(0);
+                injectInt32ToDoubleNode(1);
                 
                 Node& oldDivision = m_graph[m_compileIndex];
                 
@@ -544,6 +544,14 @@ private:
             edge.setUseKind(DoubleUse);
             return;
         }
+        
+        injectInt32ToDoubleNode(childIndex);
+    }
+
+    void injectInt32ToDoubleNode(unsigned childIndex)
+    {
+        Node& source = m_graph[m_compileIndex];
+        Edge& edge = m_graph.child(source, childIndex);
         
         NodeIndex resultIndex = (NodeIndex)m_graph.size();
         
