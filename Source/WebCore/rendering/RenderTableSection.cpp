@@ -1081,7 +1081,9 @@ CellSpan RenderTableSection::spannedColumns(const LayoutRect& flippedRect) const
     return CellSpan(startColumn, endColumn);
 }
 
-
+#if defined(_MSC_VER) && _MSC_VER == 1700
+#pragma optimize("", off)
+#endif
 void RenderTableSection::paintObject(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
     PaintPhase paintPhase = paintInfo.phase;
@@ -1182,6 +1184,9 @@ void RenderTableSection::paintObject(PaintInfo& paintInfo, const LayoutPoint& pa
         }
     }
 }
+#if defined(_MSC_VER) && _MSC_VER == 1700
+#pragma optimize("", on)
+#endif
 
 void RenderTableSection::imageChanged(WrappedImagePtr, const IntRect*)
 {
