@@ -427,6 +427,7 @@ void LayerTreeRenderer::prepareContentBackingStore(GraphicsLayer* graphicsLayer)
     }
 
     createBackingStoreIfNeeded(graphicsLayer);
+    resetBackingStoreSizeToLayerSize(graphicsLayer);
 }
 
 void LayerTreeRenderer::createBackingStoreIfNeeded(GraphicsLayer* graphicsLayer)
@@ -448,7 +449,6 @@ void LayerTreeRenderer::createBackingStoreIfNeeded(GraphicsLayer* graphicsLayer)
         return; // The layer already has a backing store (and no pending removal).
 
     RefPtr<CoordinatedBackingStore> backingStore(CoordinatedBackingStore::create());
-    backingStore->setSize(graphicsLayer->size());
     ASSERT(!m_pendingSyncBackingStores.contains(layer));
     m_pendingSyncBackingStores.add(layer, backingStore);
 }
@@ -481,6 +481,7 @@ void LayerTreeRenderer::resetBackingStoreSizeToLayerSize(GraphicsLayer* graphics
     CoordinatedBackingStore* backingStore = getBackingStore(graphicsLayer);
     ASSERT(backingStore);
     backingStore->setSize(graphicsLayer->size());
+    m_backingStoresWithPendingBuffers.add(backingStore);
 }
 
 void LayerTreeRenderer::createTile(WebLayerID layerID, int tileID, float scale)
@@ -490,7 +491,6 @@ void LayerTreeRenderer::createTile(WebLayerID layerID, int tileID, float scale)
     CoordinatedBackingStore* backingStore = getBackingStore(layer);
     ASSERT(backingStore);
     backingStore->createTile(tileID, scale);
-    resetBackingStoreSizeToLayerSize(layer);
 }
 
 void LayerTreeRenderer::removeTile(WebLayerID layerID, int tileID)
@@ -502,7 +502,6 @@ void LayerTreeRenderer::removeTile(WebLayerID layerID, int tileID)
         return;
 
     backingStore->removeTile(tileID);
-    resetBackingStoreSizeToLayerSize(layer);
     m_backingStoresWithPendingBuffers.add(backingStore);
 }
 
@@ -513,7 +512,6 @@ void LayerTreeRenderer::updateTile(WebLayerID layerID, int tileID, const TileUpd
     RefPtr<CoordinatedBackingStore> backingStore = getBackingStore(layer);
     ASSERT(backingStore);
     backingStore->updateTile(tileID, update.sourceRect, update.tileRect, update.surface, update.offset);
-    resetBackingStoreSizeToLayerSize(layer);
     m_backingStoresWithPendingBuffers.add(backingStore);
 }
 

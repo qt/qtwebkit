@@ -77,6 +77,8 @@ private:
     HashSet<int> m_tilesToRemove;
     WebCore::FloatSize m_size;
     float m_scale;
+    // FIXME: m_pendingSize should be removed after the following bug is fixed: https://bugs.webkit.org/show_bug.cgi?id=108294
+    WebCore::FloatSize m_pendingSize;
 };
 
 } // namespace WebKit
