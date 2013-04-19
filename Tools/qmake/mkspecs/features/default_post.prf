@@ -12,7 +12,6 @@ CONFIG += config_step
 
 # Enable dynamic instead of static libraries for development
 !production_build:!buildbot:!win*: CONFIG += force_static_libs_as_shared
-!debug_and_release:*-g++*: CONFIG += gnu_thin_archives
 
 root_project_file: finalizeConfigure()
 
