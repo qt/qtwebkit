@@ -275,6 +275,7 @@ namespace WebCore {
             CanvasTrigger = 1 << 3,
             AnimationTrigger = 1 << 4,
             FilterTrigger = 1 << 5,
+            AnimatedOpacityTrigger = 1 << 6,
             AllTriggers = 0xFFFFFFFF
         };
         typedef unsigned CompositingTriggerFlags;
