@@ -1,3 +1,26 @@
+2013-01-08  Zan Dobersek  <zandobersek@gmail.com>
+
+        [GTK] Build failures when building with python 3.3
+        https://bugs.webkit.org/show_bug.cgi?id=106194
+
+        Reviewed by Dirk Pranke.
+
+        Python 3.3 introduced changes to dictionaries which can result in changed
+        iteration order. More about these changes:
+        http://docs.python.org/3.3/whatsnew/3.3.html#pep-412-key-sharing-dictionary
+        http://www.python.org/dev/peps/pep-0412/#cons
+
+        This causes the Source/WebCore/inspector/generate-inspector-protocol-version
+        script to fail the self-testing when using Python 3.3. These changes work
+        around this problem by not checking for expected errors in order but rather
+        for their presence in the error output sequence. The number of actual errors
+        is also checked to be equal to the number of expected errors.
+
+        No new tests - no new functionality.
+
+        * inspector/generate-inspector-protocol-version:
+        (self_test):
+
 2013-03-12  Floris Bos  <bos@je-eigen-domein.nl>
 
         [Qt] WebKit fails to compile if EGL headers are not in default INCLUDEPATH
