@@ -268,13 +268,11 @@ QNetworkReplyWrapper::QNetworkReplyWrapper(QNetworkReplyHandlerCallQueue* queue,
 {
     Q_ASSERT(m_reply);
 
-    // Allow the QNetworkReply to outlive its parent QNetworkAccessManager in case the later gets destroyed before our ResourceHandle is done with it.
-    m_reply->setParent(0);
-
     // setFinished() must be the first that we connect, so isFinished() is updated when running other slots.
     connect(m_reply, SIGNAL(finished()), this, SLOT(setFinished()));
     connect(m_reply, SIGNAL(finished()), this, SLOT(receiveMetaData()));
     connect(m_reply, SIGNAL(readyRead()), this, SLOT(receiveMetaData()));
+    connect(m_reply, SIGNAL(destroyed()), this, SLOT(replyDestroyed()));
 }
 
 QNetworkReplyWrapper::~QNetworkReplyWrapper()
@@ -289,7 +287,7 @@ QNetworkReply* QNetworkReplyWrapper::release()
     if (!m_reply)
         return 0;
 
-    resetConnections();
+    m_reply->disconnect(this);
     QNetworkReply* reply = m_reply;
     m_reply = 0;
     m_sniffer = nullptr;
@@ -303,10 +301,10 @@ void QNetworkReplyWrapper::synchronousLoad()
     receiveMetaData();
 }
 
-void QNetworkReplyWrapper::resetConnections()
+void QNetworkReplyWrapper::stopForwarding()
 {
     if (m_reply) {
-        // Disconnect all connections except the one to setFinished() slot.
+        // Disconnect all connections that might affect the ResourceHandleClient.
         m_reply->disconnect(this, SLOT(receiveMetaData()));
         m_reply->disconnect(this, SLOT(didReceiveFinished()));
         m_reply->disconnect(this, SLOT(didReceiveReadyRead()));
@@ -317,8 +315,7 @@ void QNetworkReplyWrapper::resetConnections()
 void QNetworkReplyWrapper::receiveMetaData()
 {
     // This slot is only used to receive the first signal from the QNetworkReply object.
-    resetConnections();
-
+    stopForwarding();
 
     WTF::String contentType = m_reply->header(QNetworkRequest::ContentTypeHeader).toString();
     m_encoding = extractCharsetFromMediaType(contentType);
@@ -371,6 +368,12 @@ void QNetworkReplyWrapper::setFinished()
     m_reply->setProperty("_q_isFinished", true);
 }
 
+void QNetworkReplyWrapper::replyDestroyed()
+{
+    m_reply = 0;
+    m_sniffer = nullptr;
+}
+
 void QNetworkReplyWrapper::emitMetaDataChanged()
 {
     QueueLocker lock(m_queue);
@@ -401,7 +404,7 @@ void QNetworkReplyWrapper::didReceiveReadyRead()
 void QNetworkReplyWrapper::didReceiveFinished()
 {
     // Disconnecting will make sure that nothing will happen after emitting the finished signal.
-    resetConnections();
+    stopForwarding();
     m_queue->push(&QNetworkReplyHandler::finish);
 }
 
