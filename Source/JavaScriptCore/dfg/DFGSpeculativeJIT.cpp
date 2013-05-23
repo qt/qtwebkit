@@ -2250,8 +2250,7 @@ void SpeculativeJIT::compileInt32ToDouble(Node& node)
     // than a int->double conversion. On 32_64, unfortunately, we currently don't have
     // any such mechanism - though we could have it, if we just provisioned some memory
     // in CodeBlock for the double form of integer constants.
-    if (at(node.child1()).hasConstant()) {
-        ASSERT(isInt32Constant(node.child1().index()));
+    if (isInt32Constant(node.child1().index())) {
         FPRTemporary result(this);
         GPRTemporary temp(this);
         m_jit.move(MacroAssembler::Imm64(reinterpretDoubleToInt64(valueOfNumberConstant(node.child1().index()))), temp.gpr());
@@ -3097,11 +3096,11 @@ void SpeculativeJIT::compileIntegerArithDivForX86(Node& node)
         speculationCheck(Overflow, JSValueRegs(), NoNode, m_jit.branch32(JITCompiler::Equal, op1GPR, TrustedImm32(-2147483647-1)));
     } else {
         JITCompiler::Jump zero = m_jit.branchTest32(JITCompiler::Zero, op2GPR);
-        JITCompiler::Jump notNeg2ToThe31 = m_jit.branch32(JITCompiler::Equal, op1GPR, TrustedImm32(-2147483647-1));
+        JITCompiler::Jump isNeg2ToThe31 = m_jit.branch32(JITCompiler::Equal, op1GPR, TrustedImm32(-2147483647-1));
         zero.link(&m_jit);
         m_jit.move(TrustedImm32(0), eax.gpr());
+        isNeg2ToThe31.link(&m_jit);
         done = m_jit.jump();
-        notNeg2ToThe31.link(&m_jit);
     }
     
     safeDenominator.link(&m_jit);

@@ -77,6 +77,7 @@
 #include "qwebhistory_p.h"
 #include "qwebhistoryinterface.h"
 #include "qwebpluginfactory.h"
+#include "qwebsettings.h"
 
 #include <QCoreApplication>
 #include <QDebug>
@@ -1560,6 +1561,9 @@ PassRefPtr<Widget> FrameLoaderClientQt::createJavaAppletWidget(const IntSize& pl
 
 String FrameLoaderClientQt::overrideMediaType() const
 {
+    if (m_webFrame && m_webFrame->pageAdapter && m_webFrame->pageAdapter->settings)
+        return m_webFrame->pageAdapter->settings->cssMediaType();
+
     return String();
 }
 

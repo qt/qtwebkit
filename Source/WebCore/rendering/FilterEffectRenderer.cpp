@@ -88,6 +88,9 @@ inline bool isFilterSizeValid(FloatRect rect)
 #if ENABLE(CSS_SHADERS) && USE(3D_GRAPHICS)
 static PassRefPtr<FECustomFilter> createCustomFilterEffect(Filter* filter, Document* document, ValidatedCustomFilterOperation* operation)
 {
+    if (!document)
+        return 0;
+
     CustomFilterGlobalContext* globalContext = document->renderView()->customFilterGlobalContext();
     globalContext->prepareContextIfNeeded(document->view()->hostWindow());
     if (!globalContext->context())

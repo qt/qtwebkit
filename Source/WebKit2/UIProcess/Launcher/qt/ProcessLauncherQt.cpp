@@ -109,7 +109,7 @@ void QtWebProcess::setupChildProcess()
 
 void ProcessLauncher::launchProcess()
 {
-    QString commandLine = QLatin1String("%1 %2 %3");
+    QString commandLine = QLatin1String("%1 \"%2\" %3");
     if (m_launchOptions.processType == WebProcess) {
         QByteArray webProcessPrefix = qgetenv("QT_WEBKIT2_WP_CMD_PREFIX");
         commandLine = commandLine.arg(QLatin1String(webProcessPrefix.constData())).arg(QString(executablePathOfWebProcess()));

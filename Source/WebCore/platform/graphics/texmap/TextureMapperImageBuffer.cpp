@@ -171,12 +171,13 @@ PassRefPtr<BitmapTexture> BitmapTextureImageBuffer::applyFilters(TextureMapper*,
     renderer->setSourceImageRect(FloatRect(FloatPoint::zero(), contentTexture.size()));
 
     // The document parameter is only needed for CSS shaders.
-    renderer->build(0 /*document */, filters);
-    renderer->allocateBackingStoreIfNeeded();
-    GraphicsContext* context = renderer->inputContext();
-    context->drawImageBuffer(static_cast<const BitmapTextureImageBuffer&>(contentTexture).m_image.get(), ColorSpaceDeviceRGB, IntPoint::zero());
-    renderer->apply();
-    m_image->context()->drawImageBuffer(renderer->output(), ColorSpaceDeviceRGB, renderer->outputRect());
+    if (renderer->build(0 /*document */, filters)) {
+        renderer->allocateBackingStoreIfNeeded();
+        GraphicsContext* context = renderer->inputContext();
+        context->drawImageBuffer(static_cast<const BitmapTextureImageBuffer&>(contentTexture).m_image.get(), ColorSpaceDeviceRGB, IntPoint::zero());
+        renderer->apply();
+        m_image->context()->drawImageBuffer(renderer->output(), ColorSpaceDeviceRGB, renderer->outputRect());
+    }
     return this;
 }
 #endif

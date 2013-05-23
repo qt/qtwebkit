@@ -2124,7 +2124,7 @@ void QQuickWebView::setAllowAnyHTTPSCertificateForLocalHost(bool allow)
 
     \row
     \li InternalErrorDomain
-    \li Content fails to be interpreted by QtWebKit.
+    \li Content fails to be interpreted by Qt WebKit.
 
     \row
     \li NetworkErrorDomain

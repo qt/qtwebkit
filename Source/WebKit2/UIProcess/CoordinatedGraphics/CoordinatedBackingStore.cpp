@@ -106,7 +106,7 @@ PassRefPtr<BitmapTexture> CoordinatedBackingStore::texture() const
 
 void CoordinatedBackingStore::setSize(const WebCore::FloatSize& size)
 {
-    m_size = size;
+    m_pendingSize = size;
 }
 
 static bool shouldShowTileDebugVisuals()
@@ -177,6 +177,11 @@ void CoordinatedBackingStore::paintToTextureMapper(TextureMapper* textureMapper,
 void CoordinatedBackingStore::commitTileOperations(TextureMapper* textureMapper)
 {
     HashSet<int>::iterator tilesToRemoveEnd = m_tilesToRemove.end();
+    if (!m_pendingSize.isZero()) {
+        m_size = m_pendingSize;
+        m_pendingSize = FloatSize();
+    }
+
     for (HashSet<int>::iterator it = m_tilesToRemove.begin(); it != tilesToRemoveEnd; ++it)
         m_tiles.remove(*it);
     m_tilesToRemove.clear();

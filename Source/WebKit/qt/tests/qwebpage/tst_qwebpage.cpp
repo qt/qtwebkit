@@ -186,6 +186,9 @@ private Q_SLOTS:
     void renderOnRepaintRequestedShouldNotRecurse();
     void loadSignalsOrder_data();
     void loadSignalsOrder();
+    void openWindowDefaultSize();
+    void cssMediaTypeGlobalSetting();
+    void cssMediaTypePageSetting();
 
 #ifdef Q_OS_MAC
     void macCopyUnicodeToClipboard();
@@ -410,10 +413,13 @@ void tst_QWebPage::consoleOutput()
     QCOMPARE(page.lineNumbers.at(0), 1);
 }
 
-class TestPage : public QWebPage
-{
+class TestPage : public QWebPage {
+    Q_OBJECT
 public:
-    TestPage(QObject* parent = 0) : QWebPage(parent) {}
+    TestPage(QObject* parent = 0) : QWebPage(parent)
+    {
+        connect(this, SIGNAL(geometryChangeRequested(QRect)), this, SLOT(slotGeometryChangeRequested(QRect)));
+    }
 
     struct Navigation {
         QPointer<QWebFrame> frame;
@@ -422,7 +428,8 @@ public:
     };
 
     QList<Navigation> navigations;
-    QList<QWebPage*> createdWindows;
+    QList<TestPage*> createdWindows;
+    QRect requestedGeometry;
 
     virtual bool acceptNavigationRequest(QWebFrame* frame, const QNetworkRequest &request, NavigationType type) {
         Navigation n;
@@ -434,9 +441,14 @@ public:
     }
 
     virtual QWebPage* createWindow(WebWindowType) {
-        QWebPage* page = new TestPage(this);
+        TestPage* page = new TestPage(this);
         createdWindows.append(page);
         return page;
+    }
+
+private Q_SLOTS:
+    void slotGeometryChangeRequested(const QRect& geom) {
+        requestedGeometry = geom;
     }
 };
 
@@ -3251,6 +3263,84 @@ void tst_QWebPage::undoActionHaveCustomText()
     QString alignActionText = m_page->action(QWebPage::Undo)->text();
 
     QVERIFY(typingActionText != alignActionText);
+}
+
+void tst_QWebPage::openWindowDefaultSize()
+{
+    TestPage page;
+    page.settings()->setAttribute(QWebSettings::JavascriptCanOpenWindows, true);
+    // Open a default window.
+    page.mainFrame()->evaluateJavaScript("window.open()");
+    // Open a too small window.
+    page.mainFrame()->evaluateJavaScript("window.open('', '', 'width=10,height=10')");
+
+    QTest::qWait(500);
+    // The number of popups created should be two.
+    QVERIFY(page.createdWindows.size() == 2);
+
+    QRect requestedGeometry = page.createdWindows[0]->requestedGeometry;
+    // Check default size has been requested.
+    QVERIFY(requestedGeometry.width() == 0);
+    QVERIFY(requestedGeometry.height() == 0);
+
+    requestedGeometry = page.createdWindows[1]->requestedGeometry;
+    // Check minimum size has been requested.
+    QVERIFY(requestedGeometry.width() == 100);
+    QVERIFY(requestedGeometry.height() == 100);
+}
+
+void tst_QWebPage::cssMediaTypeGlobalSetting()
+{
+    QString testHtml("<style>@media tv {body{background-color:red;}}@media handheld {body{background-color:green;}}@media screen {body{background-color:blue;}}</style>");
+    QSignalSpy loadSpy(m_view, SIGNAL(loadFinished(bool)));
+
+    QWebSettings::globalSettings()->setCSSMediaType("tv");
+    // Clear page specific setting to read from global setting
+    m_view->page()->settings()->setCSSMediaType(QString());
+    m_view->setHtml(testHtml);
+    QTRY_COMPARE(loadSpy.count(), 1);
+    QVERIFY(m_view->page()->mainFrame()->evaluateJavaScript("window.matchMedia('tv').matches == true").toBool()); 
+    QVERIFY(QWebSettings::globalSettings()->cssMediaType() == "tv");
+
+    QWebSettings::globalSettings()->setCSSMediaType("handheld");
+    // Clear page specific setting to read from global setting
+    m_view->page()->settings()->setCSSMediaType(QString());
+    m_view->setHtml(testHtml);
+    QTRY_COMPARE(loadSpy.count(), 2);
+    QVERIFY(m_view->page()->mainFrame()->evaluateJavaScript("window.matchMedia('handheld').matches == true").toBool());
+    QVERIFY(QWebSettings::globalSettings()->cssMediaType() == "handheld");
+
+    QWebSettings::globalSettings()->setCSSMediaType("screen");
+    // Clear page specific setting to read from global setting
+    m_view->page()->settings()->setCSSMediaType(QString());
+    m_view->setHtml(testHtml);
+    QTRY_COMPARE(loadSpy.count(), 3);
+    QVERIFY(m_view->page()->mainFrame()->evaluateJavaScript("window.matchMedia('screen').matches == true").toBool()); 
+    QVERIFY(QWebSettings::globalSettings()->cssMediaType() == "screen"); 
+}
+
+void tst_QWebPage::cssMediaTypePageSetting()
+{
+    QString testHtml("<style>@media tv {body{background-color:red;}}@media handheld {body{background-color:green;}}@media screen {body{background-color:blue;}}</style>");
+    QSignalSpy loadSpy(m_view, SIGNAL(loadFinished(bool)));
+
+    m_view->page()->settings()->setCSSMediaType("tv");
+    m_view->setHtml(testHtml);
+    QTRY_COMPARE(loadSpy.count(), 1);
+    QVERIFY(m_view->page()->mainFrame()->evaluateJavaScript("window.matchMedia('tv').matches == true").toBool()); 
+    QVERIFY(m_view->page()->settings()->cssMediaType() == "tv"); 
+
+    m_view->page()->settings()->setCSSMediaType("handheld");
+    m_view->setHtml(testHtml);
+    QTRY_COMPARE(loadSpy.count(), 2);
+    QVERIFY(m_view->page()->mainFrame()->evaluateJavaScript("window.matchMedia('handheld').matches == true").toBool());
+    QVERIFY(m_view->page()->settings()->cssMediaType() == "handheld");
+
+    m_view->page()->settings()->setCSSMediaType("screen");
+    m_view->setHtml(testHtml);
+    QTRY_COMPARE(loadSpy.count(), 3);
+    QVERIFY(m_view->page()->mainFrame()->evaluateJavaScript("window.matchMedia('screen').matches == true").toBool()); 
+    QVERIFY(m_view->page()->settings()->cssMediaType() == "screen"); 
 }
 
 QTEST_MAIN(tst_QWebPage)

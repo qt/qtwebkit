@@ -1,3 +1,102 @@
+2013-01-08  Zan Dobersek  <zandobersek@gmail.com>
+
+        [GTK] Build failures when building with python 3.3
+        https://bugs.webkit.org/show_bug.cgi?id=106194
+
+        Reviewed by Dirk Pranke.
+
+        Python 3.3 introduced changes to dictionaries which can result in changed
+        iteration order. More about these changes:
+        http://docs.python.org/3.3/whatsnew/3.3.html#pep-412-key-sharing-dictionary
+        http://www.python.org/dev/peps/pep-0412/#cons
+
+        This causes the Source/WebCore/inspector/generate-inspector-protocol-version
+        script to fail the self-testing when using Python 3.3. These changes work
+        around this problem by not checking for expected errors in order but rather
+        for their presence in the error output sequence. The number of actual errors
+        is also checked to be equal to the number of expected errors.
+
+        No new tests - no new functionality.
+
+        * inspector/generate-inspector-protocol-version:
+        (self_test):
+
+2013-03-12  Floris Bos  <bos@je-eigen-domein.nl>
+
+        [Qt] WebKit fails to compile if EGL headers are not in default INCLUDEPATH
+        https://bugs.webkit.org/show_bug.cgi?id=111859
+
+        Reviewed by Jocelyn Turcotte.
+
+        The 3D graphics code wants to include EGL header files.
+        But on some platforms such as the Raspberry Pi those are not in /usr/include
+        but in another folder.
+        Fix adds "egl" to CONFIG when OpenGL ES2 is used, so the right include
+        paths are added.
+
+        * WebCore.pri:
+
+2013-01-29  Michael Brüning  <michael.bruning@digia.com>
+
+        [Qt][WK1] Reflect recursion limit and loop checks also for list conversions.
+        https://bugs.webkit.org/show_bug.cgi?id=107950
+
+        Reviewed by Allan Sandfeld Jensen.
+
+        No new tests, bugfix, no behavioral change.
+
+        Make conversions from Javascript values to QLists take the maximum
+        recursion depth into consideration and check for objects that were
+        already visited. Otherwise, the conversion may recurse until the
+        stack is full and then cause a segmentation fault.
+
+        * bridge/qt/qt_runtime.cpp:
+        (JSC::Bindings::convertToList):
+        (JSC::Bindings::convertValueToQVariant):
+
+2013-04-03  Zeno Albisser  <zeno@webkit.org>
+
+        [Qt] Fail gracefully if an OpenGL context could not be created.
+        https://bugs.webkit.org/show_bug.cgi?id=113784
+
+        In case we fail to create or adopt a valid platform OpenGL context
+        we do not want to provide a GraphicsContext3D instance.
+        Otherwise we would crash as soon as the instance is being used.
+
+        Reviewed by Jocelyn Turcotte.
+
+        * platform/graphics/qt/GraphicsContext3DQt.cpp:
+        (WebCore::GraphicsContext3DPrivate::GraphicsContext3DPrivate):
+        (WebCore::GraphicsContext3D::GraphicsContext3D):
+
+2013-04-03  Tor Arne Vestbø  <tor.arne.vestbo@digia.com>
+
+        [Qt] Update QMAKE_MAC_SDK check for Qt 5.1
+
+        Relies on QMAKE_MAC_SDK_VERSION set in features.prf
+
+        Reviewed by Simon Hausmann.
+
+        * WebCore.pri:
+
+2012-12-10  Michael Brüning  <michael.bruning@digia.com>
+
+        [Qt] Builds for Mac are tied to the OS system instead of the SDK version.
+        https://bugs.webkit.org/show_bug.cgi?id=104529
+
+        Reviewed by Simon Hausmann.
+
+        Using work by Eike Ziller <eike.ziller@digia.com>.
+
+        The build system now first tries to assign the correct system libraries
+        for the SDK being used for Mac builds. If this does not yield any
+        result, it falls back to using the Mac OS version to determine the
+        correct library.
+
+        No new tests (not applicable).
+
+        * WebCore.pri:
+
 2013-02-21  Levi Weintraub  <leviw@chromium.org>
 
         ASSERTION FAILED: !object || object->isBox(), UNKNOWN in WebCore::RenderListItem::positionListMarker
