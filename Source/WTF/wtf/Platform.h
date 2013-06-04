@@ -921,7 +921,7 @@
     && ENABLE(JIT) \
     && (OS(DARWIN) || OS(LINUX)) \
     && (PLATFORM(MAC) || PLATFORM(IOS) || PLATFORM(GTK) || PLATFORM(QT)) \
-    && (CPU(X86) || CPU(X86_64) || CPU(ARM_THUMB2))
+    && (CPU(X86) || CPU(X86_64) || CPU(ARM_THUMB2) || CPU(MIPS))
 #define ENABLE_LLINT 1
 #endif
 
@@ -936,6 +936,10 @@
 #endif
 /* Enable the DFG JIT on ARM. */
 #if CPU(ARM_TRADITIONAL)
+#define ENABLE_DFG_JIT 1
+#endif
+/* Enable the DFG JIT on MIPS. */
+#if CPU(MIPS)
 #define ENABLE_DFG_JIT 1
 #endif
 #endif

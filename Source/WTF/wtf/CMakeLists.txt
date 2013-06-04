@@ -157,6 +157,7 @@ SET(WTF_SOURCES
     ArrayBuffer.cpp
     ArrayBufferView.cpp
     Assertions.cpp
+    Atomics.cpp
     BitVector.cpp
     CryptographicallyRandomNumber.cpp
     CurrentTime.cpp

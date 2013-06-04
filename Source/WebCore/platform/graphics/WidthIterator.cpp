@@ -162,7 +162,8 @@ inline unsigned WidthIterator::advanceInternal(TextIterator& textIterator, Glyph
     CharactersTreatedAsSpace charactersTreatedAsSpace;
     while (textIterator.consume(character, clusterLength)) {
         unsigned advanceLength = clusterLength;
-        const GlyphData& glyphData = glyphDataForCharacter(character, rtl, textIterator.currentCharacter(), advanceLength);
+        int currentCharacterIndex = textIterator.currentCharacter();
+        const GlyphData& glyphData = glyphDataForCharacter(character, rtl, currentCharacterIndex, advanceLength);
         Glyph glyph = glyphData.glyph;
         const SimpleFontData* fontData = glyphData.fontData;
 
@@ -223,9 +224,10 @@ inline unsigned WidthIterator::advanceInternal(TextIterator& textIterator, Glyph
                         float expansionAtThisOpportunity = !m_run.applyWordRounding() ? m_expansionPerOpportunity : roundf(previousExpansion) - roundf(m_expansion);
                         m_runWidthSoFar += expansionAtThisOpportunity;
                         if (glyphBuffer) {
-                            if (glyphBuffer->isEmpty())
+                            if (glyphBuffer->isEmpty()) {
                                 glyphBuffer->add(fontData->spaceGlyph(), fontData, expansionAtThisOpportunity);
-                            else
+                                m_characterIndex.append(currentCharacterIndex);
+                            } else
                                 glyphBuffer->expandLastAdvance(expansionAtThisOpportunity);
                         }
                         previousExpansion = m_expansion;
@@ -291,8 +293,10 @@ inline unsigned WidthIterator::advanceInternal(TextIterator& textIterator, Glyph
                 widthSinceLastRounding += width;
         }
 
-        if (glyphBuffer)
+        if (glyphBuffer) {
             glyphBuffer->add(glyph, fontData, (rtl ? oldWidth + lastRoundingWidth : width));
+            m_characterIndex.append(currentCharacterIndex);
+        }
 
         lastRoundingWidth = width - oldWidth;
 
@@ -330,17 +334,6 @@ unsigned WidthIterator::advance(int offset, GlyphBuffer* glyphBuffer)
 
     SurrogatePairAwareTextIterator textIterator(m_run.data16(m_currentCharacter), m_currentCharacter, offset, length);
     return advanceInternal(textIterator, glyphBuffer);
-}
-
-bool WidthIterator::advanceOneCharacter(float& width, GlyphBuffer& glyphBuffer)
-{
-    int oldSize = glyphBuffer.size();
-    advance(m_currentCharacter + 1, &glyphBuffer);
-    float w = 0;
-    for (int i = oldSize; i < glyphBuffer.size(); ++i)
-        w += glyphBuffer.advanceAt(i);
-    width = w;
-    return glyphBuffer.size() > oldSize;
 }
 
 }
