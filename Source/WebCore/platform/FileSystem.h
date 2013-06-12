@@ -53,7 +53,7 @@
 #include <wx/file.h>
 #endif
 
-#if USE(CF) || (PLATFORM(QT) && defined(Q_WS_MAC))
+#if USE(CF) || (PLATFORM(QT) && defined(Q_OS_MACX))
 typedef struct __CFBundle* CFBundleRef;
 typedef const struct __CFData* CFDataRef;
 #endif
@@ -85,7 +85,7 @@ typedef GModule* PlatformModule;
 #elif PLATFORM(EFL)
 typedef Eina_Module* PlatformModule;
 #elif PLATFORM(QT)
-#if defined(Q_WS_MAC)
+#if defined(Q_OS_MACX)
 typedef CFBundleRef PlatformModule;
 #elif !defined(QT_NO_LIBRARY)
 typedef QLibrary* PlatformModule;
