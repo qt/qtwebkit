@@ -30,3 +30,7 @@ exampledirs = WebKit/qt/docs
 imagedirs = WebKit/qt/docs
 
 depends += qtcore qtwidgets qtgui qtscript qtdoc qtprintsupport qtxml qtwebkitexamples
+
+navigation.landingpage = "Qt WebKit"
+navigation.cppclassespage = "Qt WebKit Widgets"
+navigation.qmltypespage = "Qt WebKit QML Types"
