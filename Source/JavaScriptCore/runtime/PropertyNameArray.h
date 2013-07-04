@@ -55,12 +55,16 @@ namespace JSC {
         PropertyNameArray(JSGlobalData* globalData)
             : m_data(PropertyNameArrayData::create())
             , m_globalData(globalData)
+            , m_numCacheableSlots(0)
+            , m_baseObject(0)
         {
         }
 
         PropertyNameArray(ExecState* exec)
             : m_data(PropertyNameArrayData::create())
             , m_globalData(&exec->globalData())
+            , m_numCacheableSlots(0)
+            , m_baseObject(0)
         {
         }
 
@@ -83,12 +87,28 @@ namespace JSC {
         const_iterator begin() const { return m_data->propertyNameVector().begin(); }
         const_iterator end() const { return m_data->propertyNameVector().end(); }
 
+        size_t numCacheableSlots() const { return m_numCacheableSlots; }
+        void setNumCacheableSlotsForObject(JSObject* object, size_t numCacheableSlots)
+        {
+            if (object != m_baseObject)
+                return;
+            m_numCacheableSlots = numCacheableSlots;
+        }
+        void setBaseObject(JSObject* object)
+        {
+            if (m_baseObject)
+                return;
+            m_baseObject = object;
+        }
+
     private:
         typedef HashSet<StringImpl*, PtrHash<StringImpl*> > IdentifierSet;
 
         RefPtr<PropertyNameArrayData> m_data;
         IdentifierSet m_set;
         JSGlobalData* m_globalData;
+        size_t m_numCacheableSlots;
+        JSObject* m_baseObject;
     };
 
 } // namespace JSC
