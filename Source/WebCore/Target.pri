@@ -4097,7 +4097,7 @@ use?(GRAPHICS_SURFACE) {
     win32 {
         SOURCES += platform/graphics/surfaces/win/GraphicsSurfaceWin.cpp
     }
-    have?(XCOMPOSITE) {
+    use?(glx) {
         SOURCES += platform/graphics/surfaces/qt/GraphicsSurfaceGLX.cpp
     }
 }
