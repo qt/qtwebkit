@@ -129,6 +129,14 @@ public:
         ScrollByDocument
     };
 
+    // Must match with values of QWebPage::VisibilityState enum.
+    enum VisibilityState {
+        VisibilityStateVisible,
+        VisibilityStateHidden,
+        VisibilityStatePrerender,
+        VisibilityStateUnloaded
+    };
+
     QWebPageAdapter();
     virtual ~QWebPageAdapter();
 
@@ -242,6 +250,9 @@ public:
     };
     virtual void createAndSetCurrentContextMenu(const QList<MenuItemDescription>&, QBitArray*) = 0;
     virtual bool handleScrollbarContextMenuEvent(QContextMenuEvent*, bool, ScrollDirection*, ScrollGranularity*) = 0;
+
+    void setVisibilityState(VisibilityState);
+    VisibilityState visibilityState() const;
 
     static QWebPageAdapter* kit(WebCore::Page*);
     WebCore::ViewportArguments viewportArguments() const;
