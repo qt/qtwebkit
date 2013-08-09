@@ -299,6 +299,9 @@ HTMLMediaElement::HTMLMediaElement(const QualifiedName& tagName, Document* docum
 HTMLMediaElement::~HTMLMediaElement()
 {
     LOG(Media, "HTMLMediaElement::~HTMLMediaElement");
+
+    m_asyncEventQueue->close();
+
     if (m_isWaitingUntilMediaCanStart)
         document()->removeMediaCanStartListener(this);
     setShouldDelayLoadEvent(false);
@@ -617,7 +620,9 @@ void HTMLMediaElement::scheduleEvent(const AtomicString& eventName)
     LOG(Media, "HTMLMediaElement::scheduleEvent - scheduling '%s'", eventName.string().ascii().data());
 #endif
     RefPtr<Event> event = Event::create(eventName, false, true);
-    event->setTarget(this);
+    
+    // Don't set the event target, the event queue will set it in GenericEventQueue::timerFired and setting it here
+    // will trigger an ASSERT if this element has been marked for deletion.
 
     m_asyncEventQueue->enqueueEvent(event.release());
 }
@@ -3807,6 +3812,8 @@ void HTMLMediaElement::stop()
     
     stopPeriodicTimers();
     cancelPendingEventsAndCallbacks();
+
+    m_asyncEventQueue->close();
 }
 
 void HTMLMediaElement::suspend(ReasonForSuspension why)
