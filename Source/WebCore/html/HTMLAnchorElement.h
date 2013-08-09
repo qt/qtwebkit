@@ -174,6 +174,7 @@ inline HTMLAnchorElement* toHTMLAnchorElement(Node* node)
 
 bool isEnterKeyKeydownEvent(Event*);
 bool isLinkClick(Event*);
+bool shouldProhibitLinks(Element*);
 
 } // namespace WebCore
 
