@@ -42,12 +42,13 @@
 #include <wtf/text/WTFString.h>
 
 #include <QCoreApplication>
-#include <QDebug>
 #include <QImage>
 #include <QImageReader>
 #include <QPainter>
 #include <QPixmap>
+#include <QPixmapCache>
 #include <QTransform>
+#include <private/qhexstring_p.h>
 
 #include <math.h>
 
@@ -230,6 +231,49 @@ void BitmapImage::invalidatePlatformData()
 {
 }
 
+QPixmap* prescaleImageIfRequired(QPainter* painter, QPixmap* image, QPixmap* buffer, const QRectF& destRect, QRectF* srcRect)
+{
+    // The quality of down scaling at 0.5x and below in QPainter is not very good
+    // due to using bilinear sampling, so for high quality scaling we need to
+    // perform scaling ourselves.
+    ASSERT(image);
+    ASSERT(painter);
+    if (!(painter->renderHints() & QPainter::SmoothPixmapTransform))
+        return image;
+
+    QTransform transform = painter->combinedTransform();
+
+    // Prescaling transforms that does more than scale or translate is not supported.
+    if (transform.type() > QTransform::TxScale)
+        return image;
+
+    QRectF transformedDst = transform.mapRect(destRect);
+    // Only prescale if downscaling to 0.5x or less
+    if (transformedDst.width() * 2 > srcRect->width() && transformedDst.height() * 2 > srcRect->height())
+        return image;
+
+    // This may not work right with subpixel positions, but that can not currently happen.
+    QRect pixelSrc = srcRect->toRect();
+    QSize scaledSize = transformedDst.size().toSize();
+
+    QString key = QStringLiteral("qtwebkit_prescaled_")
+        % HexString<qint64>(image->cacheKey())
+        % HexString<int>(pixelSrc.x()) % HexString<int>(pixelSrc.y())
+        % HexString<int>(pixelSrc.width()) % HexString<int>(pixelSrc.height())
+        % HexString<int>(scaledSize.width()) % HexString<int>(scaledSize.height());
+
+    if (!QPixmapCache::find(key, buffer)) {
+        if (pixelSrc != image->rect())
+            *buffer = image->copy(pixelSrc).scaled(scaledSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        else
+            *buffer = image->scaled(scaledSize, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+        QPixmapCache::insert(key, *buffer);
+    }
+
+    *srcRect = QRectF(QPointF(), buffer->size());
+    return buffer;
+}
+
 // Drawing Routines
 void BitmapImage::draw(GraphicsContext* ctxt, const FloatRect& dst,
                        const FloatRect& src, ColorSpace styleColorSpace, CompositeOperator op)
@@ -254,6 +298,9 @@ void BitmapImage::draw(GraphicsContext* ctxt, const FloatRect& dst,
 #if ENABLE(IMAGE_DECODER_DOWN_SAMPLING)
     normalizedSrc = adjustSourceRectForDownSampling(normalizedSrc, image->size());
 #endif
+
+    QPixmap prescaledBuffer;
+    image = prescaleImageIfRequired(ctxt->platformContext(), image, &prescaledBuffer, normalizedDst, &normalizedSrc);
 
     CompositeOperator previousOperator = ctxt->compositeOperation();
     ctxt->setCompositeOperation(!image->hasAlpha() && op == CompositeSourceOver ? CompositeCopy : op);
