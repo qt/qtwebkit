@@ -374,6 +374,11 @@ Q_SIGNALS:
     void preferredMinimumContentsWidthChanged();
     void remoteInspectorUrlChanged();
 
+    void processDidCrash();
+    void didRelaunchProcess();
+    void processDidBecomeUnresponsive();
+    void processDidBecomeResponsive();
+
 private:
     QQuickWebViewExperimental(QQuickWebView* webView, QQuickWebViewPrivate* webViewPrivate);
     QQuickWebView* q_ptr;

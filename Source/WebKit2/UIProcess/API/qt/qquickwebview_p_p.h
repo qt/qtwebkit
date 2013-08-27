@@ -133,6 +133,8 @@ public:
     virtual void pageDidRequestScroll(const QPoint& pos) { }
     void processDidCrash();
     void didRelaunchProcess();
+    void processDidBecomeUnresponsive();
+    void processDidBecomeResponsive();
     PassOwnPtr<WebKit::DrawingAreaProxy> createDrawingAreaProxy();
     void handleDownloadRequest(WebKit::DownloadProxy*);
 

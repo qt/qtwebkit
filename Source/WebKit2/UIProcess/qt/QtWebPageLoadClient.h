@@ -48,6 +48,8 @@ private:
     void didReceiveTitle();
     void didChangeProgress(int);
     void didChangeBackForwardList();
+    void processDidBecomeUnresponsive();
+    void processDidBecomeResponsive();
 
     void dispatchLoadSucceeded();
     void dispatchLoadStopped();
@@ -67,6 +69,8 @@ private:
     static void didChangeProgress(WKPageRef, const void* clientInfo);
     static void didFinishProgress(WKPageRef, const void* clientInfo);
     static void didChangeBackForwardList(WKPageRef, WKBackForwardListItemRef, WKArrayRef, const void *clientInfo);
+    static void processDidBecomeUnresponsive(WKPageRef, const void* clientInfo);
+    static void processDidBecomeResponsive(WKPageRef, const void* clientInfo);
 
     QQuickWebView* m_webView;
 };

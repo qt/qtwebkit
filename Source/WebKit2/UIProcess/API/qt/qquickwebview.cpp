@@ -484,16 +484,40 @@ void QQuickWebViewPrivate::processDidCrash()
         loadProgressDidChange(100);
         emit q->loadingChanged(&loadRequest);
     }
+
+    emit q->experimental()->processDidCrash();
 }
 
 void QQuickWebViewPrivate::didRelaunchProcess()
 {
+    Q_Q(QQuickWebView);
+
     qWarning("WARNING: The web process has been successfully restarted.");
 
     webPageProxy->drawingArea()->setSize(viewSize(), IntSize());
 
     updateViewportSize();
     updateUserScripts();
+
+    emit q->experimental()->didRelaunchProcess();
+}
+
+void QQuickWebViewPrivate::processDidBecomeUnresponsive()
+{
+    Q_Q(QQuickWebView);
+
+    qWarning("WARNING: The web process has become unresponsive.");
+
+    emit q->experimental()->processDidBecomeUnresponsive();
+}
+
+void QQuickWebViewPrivate::processDidBecomeResponsive()
+{
+    Q_Q(QQuickWebView);
+
+    qWarning("WARNING: The web process has become responsive.");
+
+    emit q->experimental()->processDidBecomeResponsive();
 }
 
 PassOwnPtr<DrawingAreaProxy> QQuickWebViewPrivate::createDrawingAreaProxy()

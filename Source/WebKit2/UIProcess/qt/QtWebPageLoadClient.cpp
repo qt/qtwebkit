@@ -47,6 +47,8 @@ QtWebPageLoadClient::QtWebPageLoadClient(WKPageRef pageRef, QQuickWebView* webVi
     loadClient.didChangeProgress = didChangeProgress;
     loadClient.didFinishProgress = didFinishProgress;
     loadClient.didChangeBackForwardList = didChangeBackForwardList;
+    loadClient.processDidBecomeUnresponsive = processDidBecomeUnresponsive;
+    loadClient.processDidBecomeResponsive = processDidBecomeResponsive;
     WKPageSetPageLoaderClient(pageRef, &loadClient);
 }
 
@@ -86,6 +88,16 @@ void QtWebPageLoadClient::didChangeProgress(int loadProgress)
 void QtWebPageLoadClient::didChangeBackForwardList()
 {
     m_webView->d_func()->backForwardListDidChange();
+}
+
+void QtWebPageLoadClient::processDidBecomeUnresponsive()
+{
+    m_webView->d_func()->processDidBecomeUnresponsive();
+}
+
+void QtWebPageLoadClient::processDidBecomeResponsive()
+{
+    m_webView->d_func()->processDidBecomeResponsive();
 }
 
 void QtWebPageLoadClient::dispatchLoadSucceeded()
@@ -211,6 +223,16 @@ void QtWebPageLoadClient::didFinishProgress(WKPageRef, const void* clientInfo)
 void QtWebPageLoadClient::didChangeBackForwardList(WKPageRef, WKBackForwardListItemRef, WKArrayRef, const void *clientInfo)
 {
     toQtWebPageLoadClient(clientInfo)->didChangeBackForwardList();
+}
+
+void QtWebPageLoadClient::processDidBecomeUnresponsive(WKPageRef, const void* clientInfo)
+{
+    toQtWebPageLoadClient(clientInfo)->processDidBecomeUnresponsive();
+}
+
+void QtWebPageLoadClient::processDidBecomeResponsive(WKPageRef, const void* clientInfo)
+{
+    toQtWebPageLoadClient(clientInfo)->processDidBecomeResponsive();
 }
 
 } // namespace Webkit
