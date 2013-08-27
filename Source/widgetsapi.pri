@@ -48,9 +48,7 @@ WEBKIT += javascriptcore wtf webcore
 
 MODULE = webkitwidgets
 
-# We want the QtWebKit API forwarding includes to live in the root build dir.
-MODULE_BASE_DIR = $$_PRO_FILE_PWD_
-MODULE_BASE_OUTDIR = $$ROOT_BUILD_DIR
+MODULE_SYNCQT_DIR = $$_PRO_FILE_PWD_
 
 # This is the canonical list of dependencies for the public API of
 # the QtWebKitWidgets library, and will end up in the library's prl file.
