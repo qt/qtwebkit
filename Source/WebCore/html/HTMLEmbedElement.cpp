@@ -28,6 +28,7 @@
 #include "CSSPropertyNames.h"
 #include "DocumentLoader.h"
 #include "Frame.h"
+#include "FrameView.h"
 #include "HTMLDocument.h"
 #include "HTMLImageLoader.h"
 #include "HTMLNames.h"
@@ -70,7 +71,9 @@ static inline RenderWidget* findWidgetRenderer(const Node* n)
 
 RenderWidget* HTMLEmbedElement::renderWidgetForJSBindings() const
 {
-    document()->updateLayoutIgnorePendingStylesheets();
+    FrameView* view = document()->view();
+    if (!view || (!view->isInLayout() && !view->isPainting()))
+        document()->updateLayoutIgnorePendingStylesheets();
     return findWidgetRenderer(this);
 }
 
