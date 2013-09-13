@@ -53,7 +53,7 @@ LocalStorageDatabaseTracker::~LocalStorageDatabaseTracker()
 void LocalStorageDatabaseTracker::setLocalStorageDirectory(const String& localStorageDirectory)
 {
     // FIXME: We should come up with a better idiom for safely copying strings across threads.
-    RefPtr<StringImpl> copiedLocalStorageDirectory = localStorageDirectory.impl() ? localStorageDirectory.impl()->isolatedCopy() : nullptr;
+    RefPtr<StringImpl> copiedLocalStorageDirectory = localStorageDirectory.impl() ? localStorageDirectory.impl()->isolatedCopy() : PassRefPtr<StringImpl>();
 
     m_queue->dispatch(bind(&LocalStorageDatabaseTracker::setLocalStorageDirectoryInternal, this, copiedLocalStorageDirectory.release()));
 }

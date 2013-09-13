@@ -123,7 +123,7 @@ PluginProcessProxy* PluginProcessManager::getOrCreatePluginProcess(uint64_t plug
         }
     }
 
-    return nullptr;
+    return 0;
 }
 
 } // namespace WebKit
