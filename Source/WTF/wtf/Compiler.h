@@ -61,6 +61,12 @@
 #define WTF_COMPILER_SUPPORTS_HAS_TRIVIAL_DESTRUCTOR __has_feature(has_trivial_destructor)
 #define WTF_COMPILER_SUPPORTS_CXX_STRONG_ENUMS __has_feature(cxx_strong_enums)
 #define WTF_COMPILER_SUPPORTS_CXX_REFERENCE_QUALIFIED_FUNCTIONS __has_feature(cxx_reference_qualified_functions)
+
+#if defined(__APPLE__) && COMPILER_SUPPORTS(CXX_RVALUE_REFERENCES) && defined(_GLIBCXX_VERSION) && (_GLIBCXX_VERSION <= 20070719)
+/* WTF expects the standard library to have std::move when the compiler supports rvalue references, but some old versions of stdc++11 shipped by Apple does not. */
+#define WTF_COMPILER_SUPPORTS_CXX_RVALUE_REFERENCES 0
+#endif
+
 #endif
 
 #ifndef CLANG_PRAGMA

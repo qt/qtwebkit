@@ -88,6 +88,12 @@ CONFIG += include_webinspector
 # used by bots and developers, will disable it, to enable warnings etc.
 CONFIG += production_build
 
+# Make sure the static libraries are compiled with the same C++11 setting
+# as the module will be linked with. This is particular important on mac
+# since otherwise the libraries can be compiled against libstdc++, but
+# linked against libc++.
+contains(QT_CONFIG, c++11): CONFIG += c++11
+
 # Limit the creation of thin archives to Linux, since only GNU's ar supports it.
 !debug_and_release:linux-g++*: CONFIG += gnu_thin_archives
 

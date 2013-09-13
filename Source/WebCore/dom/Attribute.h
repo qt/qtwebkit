@@ -61,8 +61,8 @@ public:
     // elements may have placed the Attribute in a hash by name.
     void parserSetName(const QualifiedName& name) { m_name = name; }
 
-#if COMPILER(MSVC)
-    // NOTE: This constructor is not actually implemented, it's just defined so MSVC
+#if COMPILER(MSVC) || COMPILER(CLANG)
+    // NOTE: This constructor is not actually implemented, it's just defined so MSVC (or clang)
     // will let us use a zero-length array of Attributes.
     Attribute();
 #endif

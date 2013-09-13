@@ -2807,7 +2807,7 @@ END
     void* expectedVTablePointer = reinterpret_cast<void*>(${vtableRefWin});
 #else
     void* expectedVTablePointer = ${vtableRefGnu};
-#if COMPILER(CLANG)
+#if COMPILER(CLANG) && COMPILER_SUPPORTS(CXX_STATIC_ASSERT)
     // If this fails $implType does not have a vtable, so you need to add the
     // ImplementationLacksVTable attribute to the interface definition
     COMPILE_ASSERT(__is_polymorphic($implType), ${implType}_is_not_polymorphic);
@@ -2821,7 +2821,7 @@ END
 #endif
 END
         push(@implContent, <<END) if $interface->extendedAttributes->{"ImplementationLacksVTable"};
-#if COMPILER(CLANG)
+#if COMPILER(CLANG) && COMPILER_SUPPORTS(CXX_STATIC_ASSERT)
     // If you hit this failure the interface definition has the ImplementationLacksVTable
     // attribute. You should remove that attribute. If the class has subclasses
     // that may be passed through this toJS() function you should use the SkipVTableValidation
